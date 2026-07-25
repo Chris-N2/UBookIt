@@ -1,0 +1,32 @@
+schema: spec-driven
+
+# Project context shown to AI when creating artifacts.
+context: |
+  uBookIt: open-source booking system package for Umbraco 17+ (LTS).
+  Tech stack: .NET 10 / Umbraco.Cms 17.5.x (pinned — never let anything
+  resolve to Umbraco 18), EF Core persistence, Lit + @umbraco-cms/backoffice
+  (uui-*) + TypeScript + Vite backoffice client, xunit tests.
+  Solution: UBookIt.Core (domain, keep Umbraco types out where practical),
+  UBookIt.Persistence (EF Core, additive-only migrations),
+  UBookIt.Backoffice (Management API + client), UBookIt.Web (Delivery API +
+  default ViewComponents/Razor rendering), UBookIt.TestSite (dev site, not
+  shipped), UBookIt.Tests.
+  Hard invariants (from CLAUDE.md — violations are automatic rejects):
+  zero DevExpress anywhere in this repo; no widget-level abstractions
+  (front-end contract is API endpoints + strongly-typed view models, never
+  IScheduler/ICalendarControl-style wrappers); backoffice is native Umbraco
+  (no third-party widget frameworks); default rendering is dependency-free,
+  semantic HTML, WCAG 2.2 AA.
+  Conventions: nullable enabled everywhere, warnings are errors in CI,
+  central package management in root Directory.Packages.props, Management
+  API endpoints require backoffice authorization policies, delivery
+  endpoints validate all input, booking form submissions use anti-forgery
+  protection. Azure DevOps (not GitHub) for hosting/CI.
+
+# Per-artifact rules
+rules:
+  proposal:
+    - Always include a "Non-goals" section
+    - Any breaking change to public API surface or destructive schema change must be called out explicitly
+  specs:
+    - New third-party dependencies must be named explicitly with their license

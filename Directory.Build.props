@@ -1,0 +1,8 @@
+<Project>
+  <PropertyGroup>
+    <Nullable>enable</Nullable>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <!-- Warnings are errors in CI (CLAUDE.md convention); locally they stay warnings -->
+    <TreatWarningsAsErrors Condition="'$(CI)' == 'true' or '$(TF_BUILD)' == 'true'">true</TreatWarningsAsErrors>
+  </PropertyGroup>
+</Project>

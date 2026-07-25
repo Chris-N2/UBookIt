@@ -1,0 +1,14 @@
+{
+  "id": "UBookIt.Backoffice",
+  "name": "UBookIt.Backoffice",
+  "version": "0.0.0",
+  "allowTelemetry": true,
+  "extensions": [
+    {
+      "name": "UBook It Backoffice Bundle",
+      "alias": "UBookIt.Backoffice.Bundle",
+      "type": "bundle",
+      "js": "/App_Plugins/UBookItBackoffice/u-book-it-backoffice.js"
+    }
+  ]
+}

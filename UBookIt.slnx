@@ -1,0 +1,12 @@
+<Solution>
+  <Folder Name="/src/">
+    <Project Path="src/UBookIt.Backoffice/UBookIt.Backoffice.csproj" />
+    <Project Path="src/UBookIt.Core/UBookIt.Core.csproj" />
+    <Project Path="src/UBookIt.Persistence/UBookIt.Persistence.csproj" />
+    <Project Path="src/UBookIt.TestSite/UBookIt.TestSite.csproj" />
+    <Project Path="src/UBookIt.Web/UBookIt.Web.csproj" />
+  </Folder>
+  <Folder Name="/tests/">
+    <Project Path="tests/UBookIt.Tests/UBookIt.Tests.csproj" />
+  </Folder>
+</Solution>
