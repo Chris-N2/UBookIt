@@ -51,6 +51,7 @@ Tables: `uBookItResource` (identity, type key, display name, description, constr
 `PlaceAsync` runs one transaction: for each claimed resource id (sorted ascending — deadlock-proof for future multi-claim bookings), acquire `sp_getapplock @Resource='ubookit:resource:<guid>', @LockMode='Exclusive', @LockOwner='Transaction'`; then run the overlap check (half-open interval, blocking statuses); insert booking + claims; commit. Lock release is implicit at transaction end. Conflict → the structured `conflict` failure from the contract.
 
 - **Why**: an app lock serializes exactly the contended unit (one resource) without touching isolation levels or relying on range-lock subtleties; it is easy to reason about and easy to prove.
+- **Lock timeout semantics** *(added during QA remediation)*: failure to acquire the lock within 15 s surfaces as an exception (SQL error 51000), not a structured domain failure — a saturated lock is an infrastructure fault (something is holding a resource's calendar far beyond any placement's duration), not an expected booking outcome, so the structured-results convention (core design D5) deliberately does not apply.
 - **Alternatives considered**: SERIALIZABLE isolation with range predicates — rejected: correct but deadlock-prone under contention and harder to review; unique constraint on quantized slots — rejected in core-domain D2 (interval model).
 
 ### D6: Booking rehydration is a distinct, validating factory (Core, additive)

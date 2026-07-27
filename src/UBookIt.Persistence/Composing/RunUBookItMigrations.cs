@@ -13,7 +13,7 @@ namespace UBookIt.Persistence.Composing;
 /// configured. Idempotent: pending migrations are checked first. Records into
 /// the package-private history table (see <see cref="UBookItDbContext"/>).
 /// </summary>
-public sealed class RunUBookItMigrations(
+internal sealed class RunUBookItMigrations(
     UBookItDbContext dbContext,
     IRuntimeState runtimeState,
     IConfiguration configuration,
@@ -26,12 +26,7 @@ public sealed class RunUBookItMigrations(
             return;
         }
 
-        if (configuration[UBookItPersistenceComposer.TimeZoneSettingKey] is null)
-        {
-            logger.LogWarning(
-                "No '{SettingKey}' configuration value found; uBookIt is defaulting the site booking time zone to UTC.",
-                UBookItPersistenceComposer.TimeZoneSettingKey);
-        }
+        WarnIfTimeZoneNotConfigured(configuration, logger);
 
         try
         {
@@ -51,6 +46,16 @@ public sealed class RunUBookItMigrations(
         {
             logger.LogError(ex, "uBookIt database migration failed.");
             throw;
+        }
+    }
+
+    internal static void WarnIfTimeZoneNotConfigured(IConfiguration configuration, ILogger logger)
+    {
+        if (!UBookItPersistenceComposer.IsTimeZoneConfigured(configuration))
+        {
+            logger.LogWarning(
+                "No '{SettingKey}' configuration value found; uBookIt is defaulting the site booking time zone to UTC.",
+                UBookItPersistenceComposer.TimeZoneSettingKey);
         }
     }
 }

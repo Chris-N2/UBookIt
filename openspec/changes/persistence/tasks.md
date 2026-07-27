@@ -44,7 +44,20 @@
 - [x] 7.1 Boot `UBookIt.TestSite` against SQL Server: uBookIt tables + history table created; `IBookingService` resolvable (verified via startup log or minimal probe); commit the pending `UserSecretsId` csproj change with this change
 - [x] 7.2 Document the SQL Server 2019+ requirement (README stub in `UBookIt.Persistence`)
 
-## 8. Wrap-up
+## 8. QA remediation (first review: REJECT — 2 MAJOR, 4 MINOR, 3 NIT)
+
+- [x] 8.R1 MAJOR: 23 xUnit1051 warnings in integration tests — all async calls now pass `TestContext.Current.CancellationToken`; contexts disposed via `await using` (also clears the disposal NIT)
+- [x] 8.R2 MAJOR: covering tests for "Missing time zone setting defaults safely" — `ResolveSettings`/`WarnIfTimeZoneNotConfigured` extracted as internal statics and unit-tested (absent → UTC, blank → UTC, configured → used, warning logged/not logged); blank-string NIT fixed via `IsNullOrWhiteSpace`
+- [x] 8.R3 MINOR: claims-by-resource index now `INCLUDE (BookingId)` per design D4 — additive migration `ClaimResourceIndexIncludesBookingId`
+- [x] 8.R4 MINOR: lock-timeout semantics documented in design D5 (infrastructure exception, deliberately not a structured failure)
+- [x] 8.R5 NIT: `RunUBookItMigrations` made internal
+
+Deferred obligation (QA-accepted; binds change ③'s proposal):
+
+- **Change ③ (management API) proposal MUST include**: enforcement of at-most-one-exception-per-resource-per-date at the write surface (the DB index is non-unique because an override is multiple rows per date; the read side tolerates duplicates by grouping, but ③'s write paths must prevent them)
+- QA-accepted residual risk, for ③ to respect: `Booking.Rehydrate` + `IBookingStore.PlaceAsync` technically permit persisting a never-validated booking (documentation-enforced per the bookings delta spec); ③/④ must keep raw store access out of reach of HTTP callers
+
+## 9. Wrap-up
 
 - [x] 8.1 Public-surface audit: Persistence exposes composer + DbContext as infrastructure; stores may stay internal if DI-only; Core additions limited to `Booking.Rehydrate`
 - [x] 8.2 Full build green (only the documented pre-existing NU1903 baseline); all unit + integration tests pass locally; no dependencies beyond those named in the proposal

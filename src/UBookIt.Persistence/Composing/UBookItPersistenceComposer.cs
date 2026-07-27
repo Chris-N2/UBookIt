@@ -48,13 +48,7 @@ public sealed class UBookItPersistenceComposer : IComposer
 
         builder.Services.AddSingleton(TimeProvider.System);
         builder.Services.AddSingleton(serviceProvider =>
-        {
-            var configuration = serviceProvider.GetRequiredService<IConfiguration>();
-            return new SiteBookingSettings
-            {
-                TimeZoneId = configuration[TimeZoneSettingKey] ?? DefaultTimeZoneId,
-            };
-        });
+            ResolveSettings(serviceProvider.GetRequiredService<IConfiguration>()));
 
         builder.Services.AddScoped<IResourceStore, SqlResourceStore>();
         builder.Services.AddScoped<IBookingStore, SqlBookingStore>();
@@ -63,4 +57,18 @@ public sealed class UBookItPersistenceComposer : IComposer
 
         builder.AddNotificationAsyncHandler<UmbracoApplicationStartedNotification, RunUBookItMigrations>();
     }
+
+    /// <summary>
+    /// Missing or blank <c>UBookIt:TimeZoneId</c> defaults safely to UTC
+    /// (persistence spec, "Missing time zone setting defaults safely").
+    /// </summary>
+    internal static SiteBookingSettings ResolveSettings(IConfiguration configuration) => new()
+    {
+        TimeZoneId = IsTimeZoneConfigured(configuration)
+            ? configuration[TimeZoneSettingKey]!
+            : DefaultTimeZoneId,
+    };
+
+    internal static bool IsTimeZoneConfigured(IConfiguration configuration)
+        => !string.IsNullOrWhiteSpace(configuration[TimeZoneSettingKey]);
 }

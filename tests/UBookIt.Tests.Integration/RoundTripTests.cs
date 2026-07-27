@@ -9,6 +9,8 @@ namespace UBookIt.Tests.Integration;
 [Collection(SqlServerCollection.Name)]
 public class RoundTripTests(SqlServerFixture fixture)
 {
+    private static CancellationToken Ct => TestContext.Current.CancellationToken;
+
     [Fact]
     public async Task Resource_availability_configuration_round_trips()
     {
@@ -44,10 +46,11 @@ public class RoundTripTests(SqlServerFixture fixture)
         await using (var context = fixture.CreateContext())
         {
             context.Resources.Add(row);
-            await context.SaveChangesAsync();
+            await context.SaveChangesAsync(Ct);
         }
 
-        var resource = await new SqlResourceStore(fixture.CreateContext()).GetAsync(id);
+        await using var readContext = fixture.CreateContext();
+        var resource = await new SqlResourceStore(readContext).GetAsync(id, Ct);
 
         Assert.NotNull(resource);
         Assert.Equal("room", resource.Type);
@@ -77,15 +80,18 @@ public class RoundTripTests(SqlServerFixture fixture)
     {
         fixture.EnsureAvailable();
 
-        var resourceId = await Seed.EveryDayRoomAsync(fixture);
+        var resourceId = await Seed.EveryDayRoomAsync(fixture, Ct);
         var start = new DateTimeOffset(2026, 9, 15, 9, 0, 0, TimeSpan.Zero);
         var booking = Seed.ConfirmedBooking(resourceId, start, TimeSpan.FromHours(1));
 
-        var store = new SqlBookingStore(fixture.CreateContext());
-        var placed = await store.PlaceAsync(booking);
-        Assert.True(placed.Succeeded);
+        await using (var placeContext = fixture.CreateContext())
+        {
+            var placed = await new SqlBookingStore(placeContext).PlaceAsync(booking, Ct);
+            Assert.True(placed.Succeeded);
+        }
 
-        var reloaded = await new SqlBookingStore(fixture.CreateContext()).GetBookingAsync(booking.Id);
+        await using var readContext = fixture.CreateContext();
+        var reloaded = await new SqlBookingStore(readContext).GetBookingAsync(booking.Id, Ct);
 
         Assert.NotNull(reloaded);
         Assert.Equal(booking.Id, reloaded.Id);
@@ -106,7 +112,8 @@ public class RoundTripTests(SqlServerFixture fixture)
     {
         fixture.EnsureAvailable();
 
-        Assert.Null(await new SqlResourceStore(fixture.CreateContext()).GetAsync(Guid.NewGuid()));
-        Assert.Null(await new SqlBookingStore(fixture.CreateContext()).GetBookingAsync(Guid.NewGuid()));
+        await using var context = fixture.CreateContext();
+        Assert.Null(await new SqlResourceStore(context).GetAsync(Guid.NewGuid(), Ct));
+        Assert.Null(await new SqlBookingStore(context).GetBookingAsync(Guid.NewGuid(), Ct));
     }
 }

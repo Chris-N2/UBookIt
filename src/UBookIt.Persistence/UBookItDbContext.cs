@@ -76,7 +76,7 @@ public sealed class UBookItDbContext(DbContextOptions<UBookItDbContext> options)
             claim.ToTable("uBookItResourceClaim");
             claim.HasKey(c => c.Id);
             claim.HasIndex(c => new { c.BookingId, c.ResourceId }).IsUnique();
-            claim.HasIndex(c => c.ResourceId);
+            claim.HasIndex(c => c.ResourceId).IncludeProperties(c => c.BookingId);
             claim.HasOne<ResourceRow>().WithMany().HasForeignKey(c => c.ResourceId).OnDelete(DeleteBehavior.Restrict);
         });
     }

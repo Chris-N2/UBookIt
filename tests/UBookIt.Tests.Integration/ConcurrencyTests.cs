@@ -15,16 +15,18 @@ public class ConcurrencyTests(SqlServerFixture fixture)
     public async Task Racing_conflicting_placements_yield_exactly_one_success_and_one_row()
     {
         fixture.EnsureAvailable();
+        var cancellationToken = TestContext.Current.CancellationToken;
 
-        var resourceId = await Seed.EveryDayRoomAsync(fixture);
+        var resourceId = await Seed.EveryDayRoomAsync(fixture, cancellationToken);
         var start = new DateTimeOffset(2026, 9, 16, 10, 0, 0, TimeSpan.Zero);
 
         var attempts = await Task.WhenAll(Enumerable.Range(0, 12).Select(_ => Task.Run(async () =>
         {
             // Each racer gets its own DbContext (its own connection + transaction).
-            var store = new SqlBookingStore(fixture.CreateContext());
-            return await store.PlaceAsync(Seed.ConfirmedBooking(resourceId, start, TimeSpan.FromHours(1)));
-        })));
+            await using var racerContext = fixture.CreateContext();
+            var store = new SqlBookingStore(racerContext);
+            return await store.PlaceAsync(Seed.ConfirmedBooking(resourceId, start, TimeSpan.FromHours(1)), cancellationToken);
+        }, cancellationToken)));
 
         Assert.Equal(1, attempts.Count(r => r.Succeeded));
         Assert.All(

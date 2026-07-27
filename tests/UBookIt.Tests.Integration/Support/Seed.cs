@@ -6,7 +6,7 @@ namespace UBookIt.Tests.Integration.Support;
 internal static class Seed
 {
     /// <summary>A room open every day 08:00–18:00 (UTC site zone), default-ish constraints.</summary>
-    public static async Task<Guid> EveryDayRoomAsync(SqlServerFixture fixture)
+    public static async Task<Guid> EveryDayRoomAsync(SqlServerFixture fixture, CancellationToken cancellationToken = default)
     {
         var id = Guid.NewGuid();
         var row = new ResourceRow
@@ -31,7 +31,7 @@ internal static class Seed
 
         await using var context = fixture.CreateContext();
         context.Resources.Add(row);
-        await context.SaveChangesAsync();
+        await context.SaveChangesAsync(cancellationToken);
         return id;
     }
 
