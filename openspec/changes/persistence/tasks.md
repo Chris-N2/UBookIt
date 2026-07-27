@@ -59,5 +59,5 @@ Deferred obligation (QA-accepted; binds change ③'s proposal):
 
 ## 9. Wrap-up
 
-- [x] 8.1 Public-surface audit: Persistence exposes composer + DbContext as infrastructure; stores may stay internal if DI-only; Core additions limited to `Booking.Rehydrate`
-- [x] 8.2 Full build green (only the documented pre-existing NU1903 baseline); all unit + integration tests pass locally; no dependencies beyond those named in the proposal
+- [x] 9.1 Public-surface audit: Persistence exposes composer + DbContext as infrastructure; stores may stay internal if DI-only; Core additions limited to `Booking.Rehydrate`
+- [x] 9.2 Full build green (only the documented pre-existing NU1903 baseline); all unit + integration tests pass locally; no dependencies beyond those named in the proposal

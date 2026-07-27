@@ -21,6 +21,7 @@ public sealed class SqlServerFixture : IAsyncLifetime
     private const string DefaultServer = @"Server=(localdb)\MSSQLLocalDB;Integrated Security=true;TrustServerCertificate=true";
 
     private readonly string _databaseName = $"uBookItTest_{Guid.NewGuid():N}";
+    private readonly List<UBookItDbContext> _serviceContexts = [];
     private string? _masterConnectionString;
     private bool _databaseCreated;
 
@@ -67,6 +68,11 @@ public sealed class SqlServerFixture : IAsyncLifetime
 
     public async ValueTask DisposeAsync()
     {
+        foreach (var context in _serviceContexts)
+        {
+            await context.DisposeAsync();
+        }
+
         if (!_databaseCreated)
         {
             return;
@@ -91,17 +97,27 @@ public sealed class SqlServerFixture : IAsyncLifetime
 
     public UBookItDbContext CreateContext() => new(Options);
 
-    /// <summary>Core services wired to real SQL stores, fixed clock, UTC site zone.</summary>
+    /// <summary>
+    /// Core services wired to real SQL stores, fixed clock, UTC site zone.
+    /// The two backing contexts are tracked and disposed with the fixture.
+    /// </summary>
     public (BookingService Bookings, AvailabilityService Availability) CreateServices(DateTimeOffset nowUtc)
     {
         var settings = new SiteBookingSettings { TimeZoneId = "UTC" };
         var time = new FixedTimeProvider(nowUtc);
-        var resourceStore = new SqlResourceStore(CreateContext());
-        var bookingStore = new SqlBookingStore(CreateContext());
+        var resourceStore = new SqlResourceStore(TrackContext());
+        var bookingStore = new SqlBookingStore(TrackContext());
 
         return (
             new BookingService(resourceStore, bookingStore, time, settings),
             new AvailabilityService(resourceStore, bookingStore, time, settings));
+    }
+
+    private UBookItDbContext TrackContext()
+    {
+        var context = CreateContext();
+        _serviceContexts.Add(context);
+        return context;
     }
 }
 
