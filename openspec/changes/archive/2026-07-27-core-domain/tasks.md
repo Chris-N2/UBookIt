@@ -55,5 +55,7 @@
 - [x] 8.3 MINOR: touching open-hours windows coalesce into continuous bookable time (`OpenIntervals` merges adjacent/overlapping UTC intervals; availability spec clarified with a new scenario; 4 covering tests incl. gapped-windows negative case)
 - [x] 8.4 NIT: bookings spec clarified — start alignment is relative to the containing coalesced window; `outside-open-hours` suppresses separate start-alignment evaluation
 - [x] 8.5 NIT: boundary tests — start exactly at now+leadTime allowed; start on horizon day 90 allowed, day 91 rejected
-- [ ] 8.6 Deferred to change ②'s spec: public `Booking` rehydration surface (per design D9, downstream changes add surface via their own specs)
-- [ ] 8.7 Deferred: cap on availability query date-range span — obligation recorded for change ④'s delivery endpoints (no uncontrolled caller exists until then)
+Deferred obligations (QA-accepted; not tasks of this change — they bind future proposals):
+
+- **Change ② (persistence) proposal MUST include**: public `Booking` rehydration surface (per design D9, downstream changes add surface via their own specs)
+- **Change ④ (delivery API) proposal MUST include**: a cap on availability query date-range span (no uncontrolled caller exists until then; ④'s QA should treat an uncapped delivery endpoint as a hard finding)
