@@ -17,10 +17,18 @@
   </ItemGroup>
 
   <ItemGroup>
-    <!-- Testing -->
+    <!-- Persistence (EF Core major aligned with Umbraco 17.5.x / .NET 10) -->
+    <PackageVersion Include="Umbraco.Cms.Persistence.EFCore" Version="17.5.3" />
+    <PackageVersion Include="Microsoft.EntityFrameworkCore.SqlServer" Version="10.0.10" />
+    <PackageVersion Include="Microsoft.EntityFrameworkCore.Design" Version="10.0.10" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <!-- Testing (integration tests use xunit v3 for runtime Assert.Skip) -->
     <PackageVersion Include="coverlet.collector" Version="6.0.4" />
     <PackageVersion Include="Microsoft.NET.Test.Sdk" Version="17.14.1" />
     <PackageVersion Include="xunit" Version="2.9.3" />
+    <PackageVersion Include="xunit.v3" Version="3.2.2" />
     <PackageVersion Include="xunit.runner.visualstudio" Version="3.1.4" />
   </ItemGroup>
 </Project>

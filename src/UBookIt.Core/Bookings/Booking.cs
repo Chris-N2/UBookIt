@@ -79,6 +79,40 @@ public sealed class Booking
         return new Booking(id, interval, booker, claimList, status, createdUtc.ToUniversalTime());
     }
 
+    /// <summary>
+    /// Materializes a booking from stored state. Persistence-boundary API:
+    /// enforces structural invariants (at least one claim, no duplicate
+    /// resources) but accepts any status without transition rules — the
+    /// stored status is historical fact, not a transition. Placement via
+    /// <see cref="IBookingService"/> remains the only pathway that creates
+    /// new bookings.
+    /// </summary>
+    public static DomainResult<Booking> Rehydrate(
+        Guid id,
+        BookingInterval interval,
+        Booker booker,
+        IEnumerable<ResourceClaim> claims,
+        BookingStatus status,
+        DateTimeOffset createdUtc)
+    {
+        var claimList = claims.ToList();
+
+        if (claimList.Count == 0)
+        {
+            return DomainResult<Booking>.Failure(
+                FailureCodes.ClaimsInvalid, "A booking requires at least one resource claim.");
+        }
+
+        if (claimList.Select(c => c.ResourceId).Distinct().Count() != claimList.Count)
+        {
+            return DomainResult<Booking>.Failure(
+                FailureCodes.ClaimsInvalid, "A booking cannot claim the same resource twice.");
+        }
+
+        return DomainResult<Booking>.Success(
+            new Booking(id, interval, booker, claimList, status, createdUtc.ToUniversalTime()));
+    }
+
     public DomainResult Confirm() => Transition(BookingStatus.Confirmed, BookingStatus.Requested);
 
     public DomainResult Decline() => Transition(BookingStatus.Declined, BookingStatus.Requested);

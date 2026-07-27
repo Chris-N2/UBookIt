@@ -21,7 +21,7 @@
 
 ### D1: Umbraco's EF Core integration, site connection string
 
-The DbContext registers via `Umbraco.Cms.Persistence.EFCore`'s `AddUmbracoEFCoreContext<UBookItDbContext>(...)`, which supplies the site's `umbracoDbDSN` connection string and provider.
+The DbContext registers via `Umbraco.Cms.Persistence.EFCore`'s `AddUmbracoDbContext<UBookItDbContext>(...)` (with `shareUmbracoConnection: true`), which supplies the site's `umbracoDbDSN` connection string and provider. *(Corrected during apply: the extension is named `AddUmbracoDbContext`, not `AddUmbracoEFCoreContext` as first drafted.)*
 
 - **Why**: one database, one connection string, zero extra configuration for installers; it is the documented pattern for Umbraco packages using EF Core.
 - **Alternative considered**: package-specific connection string key — rejected: real sites would nearly always point it at the same database anyway, and a second string is one more thing to misconfigure.
@@ -34,7 +34,7 @@ Migrations record into `__uBookItEFMigrationsHistory` (via `MigrationsHistoryTab
 
 ### D3: Migrations run from an Umbraco startup notification handler
 
-A handler on Umbraco's application-starting notification calls `Database.Migrate()` when the runtime level indicates a configured database. Additive-only enforcement is procedural (spec + QA review gate), not tooling.
+A handler on `UmbracoApplicationStartedNotification` (the documented pattern; corrected from "application-starting" during apply) calls `Database.Migrate()` when the runtime level indicates a configured database (`Run` or `Upgrade`). Additive-only enforcement is procedural (spec + QA review gate), not tooling.
 
 - **Why**: package consumers install a NuGet package and boot; requiring `dotnet ef database update` would be install friction Umbraco users do not expect. Umbraco's own migrations work the same way.
 - **Alternative considered**: `IHostedService` — rejected: runs before Umbraco decides the database is ready/installed; the notification pattern sequences correctly with Umbraco's install pipeline.

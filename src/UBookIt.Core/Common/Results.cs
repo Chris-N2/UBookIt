@@ -30,6 +30,7 @@ public static class FailureCodes
     public const string TimeZoneInvalid = "time-zone-invalid";
 
     // Definitional validation
+    public const string ClaimsInvalid = "claims-invalid";
     public const string DisplayNameRequired = "display-name-required";
     public const string TypeKeyInvalid = "type-key-invalid";
     public const string WindowInvalid = "window-invalid";
