@@ -40,7 +40,7 @@ Each resource SHALL carry booking constraints: slot granularity, minimum duratio
 - **THEN** its constraints report granularity 15 minutes, minimum duration 30 minutes, maximum duration 8 hours, lead time zero, and horizon 90 days
 
 ### Requirement: Free-time computation
-The system SHALL compute free time for a resource over a queried date range as: open hours (with exceptions applied), minus intervals covered by blocking booking claims (see `bookings` for which statuses block). The result SHALL be an ordered list of disjoint `[start, end)` intervals. Claims in non-blocking statuses (`Cancelled`, `Declined`) SHALL NOT reduce free time.
+The system SHALL compute free time for a resource over a queried date range as: open hours (with exceptions applied), minus intervals covered by blocking booking claims (see `bookings` for which statuses block). The result SHALL be an ordered list of disjoint `[start, end)` intervals. Claims in non-blocking statuses (`Cancelled`, `Declined`) SHALL NOT reduce free time. Touching or overlapping open windows SHALL coalesce: back-to-back windows (e.g. 08:00–12:00 and 12:00–14:00) form continuous bookable time, and an interval spanning their join is inside open hours.
 
 #### Scenario: Booking splits a free window
 - **WHEN** a resource is open 08:00–18:00 on a date and has one confirmed claim 10:00–11:00
@@ -49,6 +49,10 @@ The system SHALL compute free time for a resource over a queried date range as: 
 #### Scenario: Cancelled booking does not reduce free time
 - **WHEN** the only claim on an open day belongs to a cancelled booking
 - **THEN** free time for that date equals the full open hours
+
+#### Scenario: Touching windows form continuous bookable time
+- **WHEN** a resource is open 08:00–12:00 and 12:00–14:00 on a date with no bookings
+- **THEN** free time for that date is the single interval 08:00–14:00
 
 ### Requirement: Slot projection
 The system SHALL project bookable start times for a requested duration: candidate starts advance in granularity steps from each free-interval start, and a candidate is offered iff the whole `[start, start + duration)` interval fits inside a single free interval and satisfies lead time and horizon. Slots SHALL never be persisted; projection is a pure computation.

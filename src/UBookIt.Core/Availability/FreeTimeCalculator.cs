@@ -9,7 +9,12 @@ namespace UBookIt.Core.Availability;
 /// </summary>
 internal static class FreeTimeCalculator
 {
-    /// <summary>The resource's open windows for the date range, as UTC intervals.</summary>
+    /// <summary>
+    /// The resource's open windows for the date range, as UTC intervals.
+    /// Touching or overlapping windows coalesce: back-to-back windows form
+    /// continuous bookable time, so an interval spanning their join is inside
+    /// open hours.
+    /// </summary>
     internal static List<UtcInterval> OpenIntervals(
         AvailabilityConfiguration config, TimeZoneInfo zone, DateOnly fromDate, DateOnly toDate)
     {
@@ -30,7 +35,24 @@ internal static class FreeTimeCalculator
         }
 
         open.Sort(static (a, b) => a.StartUtc.CompareTo(b.StartUtc));
-        return open;
+
+        var merged = new List<UtcInterval>(open.Count);
+        foreach (var interval in open)
+        {
+            if (merged.Count > 0 && interval.StartUtc <= merged[^1].EndUtc)
+            {
+                if (interval.EndUtc > merged[^1].EndUtc)
+                {
+                    merged[^1] = new UtcInterval(merged[^1].StartUtc, interval.EndUtc);
+                }
+            }
+            else
+            {
+                merged.Add(interval);
+            }
+        }
+
+        return merged;
     }
 
     /// <summary>Open intervals minus the given blocking claim intervals.</summary>

@@ -47,3 +47,13 @@
 
 - [x] 7.1 Public-surface audit: everything `internal` unless a spec or downstream change needs it public; `InternalsVisibleTo("UBookIt.Tests")`
 - [x] 7.2 `dotnet build` and `dotnet test` green with zero warnings; verify no new package references were introduced — note: the full-solution build carries the 28 pre-existing NU1903 transitive-advisory warnings from Umbraco.Cms 17.5.3 (documented at scaffold time, to be addressed in the CI change); `UBookIt.Core` itself builds with zero warnings and zero package references
+
+## 8. QA remediation (first review: REJECT — 1 MAJOR, 3 MINOR, 4 NIT)
+
+- [x] 8.1 MAJOR: tests covering the untested blocking-rule halves — `Requested` blocks (free time + `conflict`), `Declined` does not block (BlockingStatusTests, 4 tests)
+- [x] 8.2 MINOR: duration rules accumulate one code per failed rule instead of short-circuiting (`ValidateDuration` returns all applicable of `granularity`/`duration-too-short`/`duration-too-long`; 2 covering tests)
+- [x] 8.3 MINOR: touching open-hours windows coalesce into continuous bookable time (`OpenIntervals` merges adjacent/overlapping UTC intervals; availability spec clarified with a new scenario; 4 covering tests incl. gapped-windows negative case)
+- [x] 8.4 NIT: bookings spec clarified — start alignment is relative to the containing coalesced window; `outside-open-hours` suppresses separate start-alignment evaluation
+- [x] 8.5 NIT: boundary tests — start exactly at now+leadTime allowed; start on horizon day 90 allowed, day 91 rejected
+- [ ] 8.6 Deferred to change ②'s spec: public `Booking` rehydration surface (per design D9, downstream changes add surface via their own specs)
+- [ ] 8.7 Deferred: cap on availability query date-range span — obligation recorded for change ④'s delivery endpoints (no uncontrolled caller exists until then)

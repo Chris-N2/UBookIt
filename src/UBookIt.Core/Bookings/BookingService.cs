@@ -65,11 +65,7 @@ public sealed class BookingService(
         var failures = new List<DomainFailure>();
 
         // Rules 2–4: granularity (duration part), duration bounds
-        var durationFailure = AvailabilityService.ValidateDuration(request.Duration, constraints);
-        if (durationFailure is not null)
-        {
-            failures.Add(durationFailure);
-        }
+        failures.AddRange(AvailabilityService.ValidateDuration(request.Duration, constraints));
 
         // Rule 5: lead-time
         if (interval.StartUtc < nowUtc + constraints.LeadTime)

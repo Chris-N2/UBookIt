@@ -43,40 +43,52 @@ public sealed class AvailabilityService(
 
         var (constraints, zone, free) = context.Value;
 
-        var durationFailure = ValidateDuration(duration, constraints);
-        if (durationFailure is not null)
+        var durationFailures = ValidateDuration(duration, constraints);
+        if (durationFailures.Count > 0)
         {
-            return DomainResult<IReadOnlyList<Slot>>.Failure(durationFailure);
+            return DomainResult<IReadOnlyList<Slot>>.Failure(durationFailures);
         }
 
         var slots = SlotProjector.Project(free, constraints, duration, timeProvider.GetUtcNow(), zone);
         return DomainResult<IReadOnlyList<Slot>>.Success(slots);
     }
 
-    internal static DomainFailure? ValidateDuration(TimeSpan duration, BookingConstraints constraints)
+    // One code per failed rule (bookings spec, "Placement validation pipeline"):
+    // an unaligned out-of-bounds duration reports both codes, not just the first.
+    internal static List<DomainFailure> ValidateDuration(TimeSpan duration, BookingConstraints constraints)
     {
-        if (duration <= TimeSpan.Zero || duration.Ticks % constraints.Granularity.Ticks != 0)
+        var failures = new List<DomainFailure>();
+
+        if (duration <= TimeSpan.Zero)
         {
-            return new DomainFailure(
+            failures.Add(new DomainFailure(
                 FailureCodes.Granularity,
-                $"The duration must be a positive multiple of {constraints.Granularity.TotalMinutes:0} minutes.");
+                $"The duration must be a positive multiple of {constraints.Granularity.TotalMinutes:0} minutes."));
+            return failures;
+        }
+
+        if (duration.Ticks % constraints.Granularity.Ticks != 0)
+        {
+            failures.Add(new DomainFailure(
+                FailureCodes.Granularity,
+                $"The duration must be a positive multiple of {constraints.Granularity.TotalMinutes:0} minutes."));
         }
 
         if (duration < constraints.MinDuration)
         {
-            return new DomainFailure(
+            failures.Add(new DomainFailure(
                 FailureCodes.DurationTooShort,
-                $"The duration must be at least {constraints.MinDuration.TotalMinutes:0} minutes.");
+                $"The duration must be at least {constraints.MinDuration.TotalMinutes:0} minutes."));
         }
 
         if (duration > constraints.MaxDuration)
         {
-            return new DomainFailure(
+            failures.Add(new DomainFailure(
                 FailureCodes.DurationTooLong,
-                $"The duration must be at most {constraints.MaxDuration.TotalMinutes:0} minutes.");
+                $"The duration must be at most {constraints.MaxDuration.TotalMinutes:0} minutes."));
         }
 
-        return null;
+        return failures;
     }
 
     internal static DomainResult<TimeZoneInfo> ResolveZone(SiteBookingSettings settings)
