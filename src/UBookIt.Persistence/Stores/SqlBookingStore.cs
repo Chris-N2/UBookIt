@@ -105,18 +105,7 @@ internal sealed class SqlBookingStore(UBookItDbContext db) : IBookingStore
     /// Released automatically at commit/rollback.
     /// </summary>
     private Task AcquireResourceLockAsync(Guid resourceId, CancellationToken cancellationToken)
-    {
-        var lockResource = $"ubookit:resource:{resourceId:N}";
-        return db.Database.ExecuteSqlAsync($"""
-            DECLARE @result int;
-            EXEC @result = sp_getapplock
-                @Resource = {lockResource},
-                @LockMode = 'Exclusive',
-                @LockOwner = 'Transaction',
-                @LockTimeout = 15000;
-            IF @result < 0 THROW 51000, 'uBookIt: failed to acquire the resource placement lock.', 1;
-            """, cancellationToken);
-    }
+        => AppLock.AcquireAsync(db, AppLock.ForResourcePlacement(resourceId), cancellationToken);
 
     private static BookingRow ToRow(Booking booking) => new()
     {

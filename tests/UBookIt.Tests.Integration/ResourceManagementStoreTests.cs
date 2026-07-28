@@ -117,60 +117,112 @@ public class ResourceManagementStoreTests(SqlServerFixture fixture)
         Assert.Empty(reloaded.Availability.Exceptions);
     }
 
+    /// <summary>
+    /// The hard case from the first management-api QA review: a resource with
+    /// EMPTY child sets. At READ COMMITTED, deleting zero rows takes no range
+    /// locks, so without explicit writer serialization two concurrent updates
+    /// both insert and commit a merged union. Ten iterations, each on a fresh
+    /// empty-configuration resource, so the race has no accidental
+    /// serialization point.
+    /// </summary>
     [Fact]
-    public async Task Racing_updates_leave_one_complete_set_and_no_duplicate_dates()
+    public async Task Racing_updates_on_empty_configuration_never_merge()
     {
         fixture.EnsureAvailable();
 
-        var original = BuildResource("Race Room", [(DayOfWeek.Monday, "08:00", "18:00")]);
-        await using (var context = fixture.CreateContext())
+        for (var iteration = 0; iteration < 10; iteration++)
         {
-            Assert.True((await new SqlResourceManagementStore(context).CreateAsync(original, Ct)).Succeeded);
+            // No open hours, no exceptions: the empty-child-set race.
+            var original = Resource.Create("room", $"Race Room {iteration}",
+                availability: AvailabilityConfiguration.Create(WeeklyOpenHours.Empty).Value).Value;
+            await using (var context = fixture.CreateContext())
+            {
+                Assert.True((await new SqlResourceManagementStore(context).CreateAsync(original, Ct)).Succeeded);
+            }
+
+            Resource Variant(string time, DateOnly exceptionDate) => Resource.Create(
+                "room", $"Race Room {iteration}",
+                availability: AvailabilityConfiguration.Create(
+                    WeeklyOpenHours.Create([(DayOfWeek.Wednesday, DayWindow.Create(TimeOnly.Parse(time), new TimeOnly(18, 0)).Value)]).Value,
+                    [DateException.Closure(exceptionDate)]).Value,
+                id: original.Id).Value;
+
+            var variantA = Variant("08:00", new DateOnly(2026, 11, 2));
+            var variantB = Variant("09:00", new DateOnly(2026, 11, 3));
+
+            var results = await Task.WhenAll(
+                Task.Run(async () =>
+                {
+                    await using var context = fixture.CreateContext();
+                    return await new SqlResourceManagementStore(context).UpdateAsync(variantA, Ct);
+                }, Ct),
+                Task.Run(async () =>
+                {
+                    await using var context = fixture.CreateContext();
+                    return await new SqlResourceManagementStore(context).UpdateAsync(variantB, Ct);
+                }, Ct));
+
+            Assert.All(results, r => Assert.True(r.Succeeded));
+
+            await using var readContext = fixture.CreateContext();
+            var reloaded = await new SqlResourceStore(readContext).GetAsync(original.Id, Ct);
+            Assert.NotNull(reloaded);
+
+            // Exactly one writer's complete set — a union would produce two
+            // windows and/or two exceptions.
+            var window = Assert.Single(reloaded.Availability.OpenHours.WindowsFor(DayOfWeek.Wednesday));
+            var exception = Assert.Single(reloaded.Availability.Exceptions);
+            var isA = window.Start == new TimeOnly(8, 0) && exception.Date == new DateOnly(2026, 11, 2);
+            var isB = window.Start == new TimeOnly(9, 0) && exception.Date == new DateOnly(2026, 11, 3);
+            Assert.True(isA || isB, $"Iteration {iteration}: final state must be one writer's complete set, never a merge.");
+
+            var duplicateDates = await readContext.Exceptions
+                .Where(e => e.ResourceId == original.Id)
+                .GroupBy(e => e.Date)
+                .Where(g => g.Count() > 1)
+                .CountAsync(Ct);
+            Assert.Equal(0, duplicateDates);
         }
+    }
 
-        Resource Variant(string time, DateOnly exceptionDate) => Resource.Create(
-            "room", "Race Room",
-            availability: AvailabilityConfiguration.Create(
-                WeeklyOpenHours.Create([(DayOfWeek.Wednesday, DayWindow.Create(TimeOnly.Parse(time), new TimeOnly(18, 0)).Value)]).Value,
-                [DateException.Closure(exceptionDate)]).Value,
-            id: original.Id).Value;
+    /// <summary>
+    /// The FK backstop: a claim placed after the pre-check but before the
+    /// delete statements (via the store's test seam) must surface as the
+    /// structured resource-in-use failure, not an unhandled exception, and
+    /// must leave the resource intact.
+    /// </summary>
+    [Fact]
+    public async Task Delete_racing_claim_hits_the_fk_backstop_and_maps_to_resource_in_use()
+    {
+        fixture.EnsureAvailable();
 
-        var variantA = Variant("08:00", new DateOnly(2026, 11, 2));
-        var variantB = Variant("09:00", new DateOnly(2026, 11, 3));
+        var resourceId = await Seed.EveryDayRoomAsync(fixture, Ct);
 
-        var results = await Task.WhenAll(
-            Task.Run(async () =>
+        await using var deleteContext = fixture.CreateContext();
+        var store = new SqlResourceManagementStore(deleteContext)
+        {
+            TestHookAfterDeletePreCheck = async hookCancellation =>
             {
-                await using var context = fixture.CreateContext();
-                return await new SqlResourceManagementStore(context).UpdateAsync(variantA, Ct);
-            }, Ct),
-            Task.Run(async () =>
-            {
-                await using var context = fixture.CreateContext();
-                return await new SqlResourceManagementStore(context).UpdateAsync(variantB, Ct);
-            }, Ct));
+                // Place the claim on a separate connection while the delete
+                // transaction is mid-flight — placement takes no config lock,
+                // so this is exactly the production race.
+                await using var placementContext = fixture.CreateContext();
+                var placed = await new SqlBookingStore(placementContext).PlaceAsync(
+                    Seed.ConfirmedBooking(
+                        resourceId, new DateTimeOffset(2026, 9, 22, 9, 0, 0, TimeSpan.Zero), TimeSpan.FromHours(1)),
+                    hookCancellation);
+                Assert.True(placed.Succeeded);
+            },
+        };
 
-        Assert.All(results, r => Assert.True(r.Succeeded));
+        var result = await store.DeleteAsync(resourceId, Ct);
 
-        await using var readContext = fixture.CreateContext();
-        var reloaded = await new SqlResourceStore(readContext).GetAsync(original.Id, Ct);
+        Assert.False(result.Succeeded);
+        Assert.Equal(FailureCodes.ResourceInUse, Assert.Single(result.Failures).Code);
 
-        Assert.NotNull(reloaded);
-
-        // Final state is exactly one writer's complete set.
-        var window = Assert.Single(reloaded.Availability.OpenHours.WindowsFor(DayOfWeek.Wednesday));
-        var exception = Assert.Single(reloaded.Availability.Exceptions);
-        var isA = window.Start == new TimeOnly(8, 0) && exception.Date == new DateOnly(2026, 11, 2);
-        var isB = window.Start == new TimeOnly(9, 0) && exception.Date == new DateOnly(2026, 11, 3);
-        Assert.True(isA || isB, "Final state must be one writer's complete set, never a merge.");
-
-        // And no duplicate exception rows at the SQL level.
-        var duplicateDates = await readContext.Exceptions
-            .Where(e => e.ResourceId == original.Id)
-            .GroupBy(e => e.Date)
-            .Where(g => g.Count() > 1)
-            .CountAsync(Ct);
-        Assert.Equal(0, duplicateDates);
+        await using var verifyContext = fixture.CreateContext();
+        Assert.True(await verifyContext.Resources.AnyAsync(r => r.Id == resourceId, Ct));
+        Assert.True(await verifyContext.OpenHours.AnyAsync(w => w.ResourceId == resourceId, Ct));
     }
 
     [Fact]

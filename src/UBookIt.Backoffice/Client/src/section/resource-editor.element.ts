@@ -33,6 +33,13 @@ const toInputTime = (value: string) => value.slice(0, 5);
  * Constraints groups. Saves the full resource; failures surface as an
  * announced error summary plus group-associated messages, and never lose
  * form state.
+ *
+ * Accessibility notes: uui form controls receive their programmatic name via
+ * the `label` property (a visible uui-label with `for` cannot pierce the
+ * component's shadow root); native inputs are labelled with `label[for]` in
+ * the same shadow root; group errors are announced via the focused
+ * role="alert" summary and associated to the native-input fieldsets via
+ * aria-describedby.
  */
 @customElement("ubookit-resource-editor")
 export class UBookItResourceEditorElement extends UmbLitElement {
@@ -72,6 +79,10 @@ export class UBookItResourceEditorElement extends UmbLitElement {
     horizonDays: 90,
   };
 
+  #term(key: string) {
+    return this.localize.term(`ubookitResources_${key}`);
+  }
+
   override connectedCallback() {
     super.connectedCallback();
     void this.#load();
@@ -88,12 +99,12 @@ export class UBookItResourceEditorElement extends UmbLitElement {
       const response = await UBookItBackofficeService.getResource({ path: { id: this.resourceId } });
       data = response.data;
       if (response.error || !data) {
-        this._errors = toApiErrors(response.error, "The resource could not be loaded.");
+        this._errors = toApiErrors(response.error, this.#term("resourceLoadFailed"));
         this._loading = false;
         return;
       }
     } catch (thrown) {
-      this._errors = toApiErrors(thrown, "The resource could not be loaded.");
+      this._errors = toApiErrors(thrown, this.#term("resourceLoadFailed"));
       this._loading = false;
       return;
     }
@@ -138,6 +149,17 @@ export class UBookItResourceEditorElement extends UmbLitElement {
     this._saving = true;
     this._errors = [];
 
+    // Client-side guard for a state only the UI can create: an exception row
+    // whose date was never picked. The server would reject it with a raw
+    // binding error; catch it here with a stable message instead.
+    if (this._exceptions.some((exception) => exception.date === "")) {
+      this._errors = [{ code: "duplicate-exception-date", message: this.#term("exceptionNeedsDate") }];
+      this._saving = false;
+      await this.updateComplete;
+      this.shadowRoot?.querySelector<HTMLElement>("#error-summary")?.focus();
+      return;
+    }
+
     const body = this.#buildRequest();
     try {
       const result = this.resourceId
@@ -145,11 +167,11 @@ export class UBookItResourceEditorElement extends UmbLitElement {
         : await UBookItBackofficeService.createResource({ body });
 
       if (result.error) {
-        this._errors = toApiErrors(result.error, "The resource could not be saved.");
+        this._errors = toApiErrors(result.error, this.#term("resourceSaveFailed"));
         return;
       }
     } catch (thrown) {
-      this._errors = toApiErrors(thrown, "The resource could not be saved.");
+      this._errors = toApiErrors(thrown, this.#term("resourceSaveFailed"));
       return;
     } finally {
       this._saving = false;
@@ -176,17 +198,17 @@ export class UBookItResourceEditorElement extends UmbLitElement {
 
   override render() {
     if (this._loading) {
-      return html`<uui-loader-bar aria-label="Loading resource"></uui-loader-bar>`;
+      return html`<uui-loader-bar aria-label=${this.#term("loadingResource")}></uui-loader-bar>`;
     }
 
     return html`
       <uui-button
         look="secondary"
-        label=${this.localize.term("ubookitResources_back")}
+        label=${this.#term("back")}
         @click=${() => this.dispatchEvent(new CustomEvent("ubookit-close"))}
       ></uui-button>
 
-      <h2>${this.resourceId ? this._displayName || "Edit resource" : "New resource"}</h2>
+      <h2>${this.resourceId ? this._displayName || this.#term("edit") : this.#term("newResource")}</h2>
 
       ${this.#renderErrorSummary()}
 
@@ -198,12 +220,12 @@ export class UBookItResourceEditorElement extends UmbLitElement {
           <uui-button
             type="submit"
             look="primary"
-            label=${this.localize.term("ubookitResources_save")}
+            label=${this.#term("save")}
             state=${this._saving ? "waiting" : nothing}
           ></uui-button>
           <uui-button
             look="secondary"
-            label=${this.localize.term("ubookitResources_cancel")}
+            label=${this.#term("cancel")}
             @click=${() => this.dispatchEvent(new CustomEvent("ubookit-close"))}
           ></uui-button>
         </div>
@@ -216,7 +238,7 @@ export class UBookItResourceEditorElement extends UmbLitElement {
 
     return html`
       <div id="error-summary" role="alert" tabindex="-1" class="error-summary">
-        <strong>${this.localize.term("ubookitResources_errorSummary")}</strong>
+        <strong>${this.#term("errorSummary")}</strong>
         <ul>
           ${this._errors.map((e) => html`<li>${e.message ?? e.code}</li>`)}
         </ul>
@@ -224,37 +246,40 @@ export class UBookItResourceEditorElement extends UmbLitElement {
     `;
   }
 
-  #renderGroupErrors(...codes: string[]) {
+  #renderGroupErrors(groupId: string, ...codes: string[]) {
     const errors = this.#errorsFor(...codes);
     return errors.length === 0
       ? nothing
-      : html`<p class="group-error">${errors.map((e) => e.message).join(" ")}</p>`;
+      : html`<p class="group-error" id=${groupId}>${errors.map((e) => e.message).join(" ")}</p>`;
   }
 
   #renderDetails() {
     return html`
-      <uui-box headline=${this.localize.term("ubookitResources_details")}>
-        ${this.#renderGroupErrors("display-name-required", "type-key-invalid")}
+      <uui-box headline=${this.#term("details")}>
+        ${this.#renderGroupErrors("err-details", "display-name-required", "type-key-invalid")}
         <div class="field">
-          <uui-label for="resource-name" required>Name</uui-label>
+          <uui-label for="resource-name" required>${this.#term("name")}</uui-label>
           <uui-input
             id="resource-name"
+            label=${this.#term("name")}
             .value=${this._displayName}
             @input=${(e: InputEvent) => (this._displayName = (e.target as HTMLInputElement).value)}
           ></uui-input>
         </div>
         <div class="field">
-          <uui-label for="resource-type">Type key</uui-label>
+          <uui-label for="resource-type">${this.#term("typeKey")}</uui-label>
           <uui-input
             id="resource-type"
+            label=${this.#term("typeKey")}
             .value=${this._type}
             @input=${(e: InputEvent) => (this._type = (e.target as HTMLInputElement).value)}
           ></uui-input>
         </div>
         <div class="field">
-          <uui-label for="resource-description">Description</uui-label>
+          <uui-label for="resource-description">${this.#term("description")}</uui-label>
           <uui-textarea
             id="resource-description"
+            label=${this.#term("description")}
             .value=${this._description}
             @input=${(e: InputEvent) => (this._description = (e.target as HTMLTextAreaElement).value)}
           ></uui-textarea>
@@ -271,14 +296,14 @@ export class UBookItResourceEditorElement extends UmbLitElement {
   ) {
     return html`
       <div class="window-row">
-        <label for="${idPrefix}-start">From</label>
+        <label for="${idPrefix}-start">${this.#term("from")}</label>
         <input
           id="${idPrefix}-start"
           type="time"
           .value=${window.start}
           @input=${(e: InputEvent) => onChange({ start: (e.target as HTMLInputElement).value })}
         />
-        <label for="${idPrefix}-end">To</label>
+        <label for="${idPrefix}-end">${this.#term("to")}</label>
         <input
           id="${idPrefix}-end"
           type="time"
@@ -288,7 +313,7 @@ export class UBookItResourceEditorElement extends UmbLitElement {
         <uui-button
           look="secondary"
           compact
-          label=${this.localize.term("ubookitResources_removeWindow")}
+          label=${this.#term("removeWindow")}
           @click=${onRemove}
         ></uui-button>
       </div>
@@ -296,13 +321,15 @@ export class UBookItResourceEditorElement extends UmbLitElement {
   }
 
   #renderOpeningHours() {
+    const hasErrors = this.#errorsFor("window-invalid", "windows-overlap").length > 0;
+
     return html`
-      <uui-box headline=${this.localize.term("ubookitResources_openingHours")}>
-        ${this.#renderGroupErrors("window-invalid", "windows-overlap")}
+      <uui-box headline=${this.#term("openingHours")}>
+        ${this.#renderGroupErrors("err-hours", "window-invalid", "windows-overlap")}
         ${DAY_ORDER.map((day) => {
           const windows = this._hours.get(day) ?? [];
           return html`
-            <fieldset class="day">
+            <fieldset class="day" aria-describedby=${hasErrors ? "err-hours" : nothing}>
               <legend>${day}</legend>
               ${windows.map((window, index) =>
                 this.#renderWindowRow(
@@ -315,7 +342,7 @@ export class UBookItResourceEditorElement extends UmbLitElement {
               <uui-button
                 look="secondary"
                 compact
-                label="${this.localize.term("ubookitResources_addWindow")} (${day})"
+                label="${this.#term("addWindow")} (${day})"
                 @click=${() => this.#mutateHours(day, (list) => list.push({ start: "09:00", end: "17:00" }))}
               ></uui-button>
             </fieldset>
@@ -332,15 +359,20 @@ export class UBookItResourceEditorElement extends UmbLitElement {
   }
 
   #renderExceptions() {
+    // Window-shape failures can originate from exception overrides as well as
+    // weekly hours, so both groups claim the window codes.
+    const hasErrors =
+      this.#errorsFor("duplicate-exception-date", "window-invalid", "windows-overlap").length > 0;
+
     return html`
-      <uui-box headline=${this.localize.term("ubookitResources_exceptions")}>
-        ${this.#renderGroupErrors("duplicate-exception-date")}
+      <uui-box headline=${this.#term("exceptions")}>
+        ${this.#renderGroupErrors("err-exceptions", "duplicate-exception-date", "window-invalid", "windows-overlap")}
         ${this._exceptions.map(
           (exception, index) => html`
-            <fieldset class="exception">
-              <legend>Exception ${index + 1}</legend>
+            <fieldset class="exception" aria-describedby=${hasErrors ? "err-exceptions" : nothing}>
+              <legend>${this.#term("exception")} ${index + 1}</legend>
               <div class="window-row">
-                <label for="ex-${index}-date">Date</label>
+                <label for="ex-${index}-date">${this.#term("date")}</label>
                 <input
                   id="ex-${index}-date"
                   type="date"
@@ -349,7 +381,7 @@ export class UBookItResourceEditorElement extends UmbLitElement {
                     this.#mutateExceptions((list) => (list[index].date = (e.target as HTMLInputElement).value))}
                 />
                 <uui-toggle
-                  label=${this.localize.term("ubookitResources_closedAllDay")}
+                  label=${this.#term("closedAllDay")}
                   ?checked=${exception.closed}
                   @change=${(e: Event) =>
                     this.#mutateExceptions((list) => (list[index].closed = (e.target as HTMLInputElement).checked))}
@@ -357,7 +389,7 @@ export class UBookItResourceEditorElement extends UmbLitElement {
                 <uui-button
                   look="secondary"
                   compact
-                  label="${this.localize.term("ubookitResources_removeException")} ${index + 1}"
+                  label="${this.#term("removeException")} ${index + 1}"
                   @click=${() => this.#mutateExceptions((list) => list.splice(index, 1))}
                 ></uui-button>
               </div>
@@ -378,7 +410,7 @@ export class UBookItResourceEditorElement extends UmbLitElement {
                     <uui-button
                       look="secondary"
                       compact
-                      label="${this.localize.term("ubookitResources_addWindow")} (exception ${index + 1})"
+                      label="${this.#term("addWindow")} (${this.#term("exception")} ${index + 1})"
                       @click=${() =>
                         this.#mutateExceptions((list) => list[index].windows.push({ start: "09:00", end: "17:00" }))}
                     ></uui-button>
@@ -388,7 +420,7 @@ export class UBookItResourceEditorElement extends UmbLitElement {
         )}
         <uui-button
           look="secondary"
-          label=${this.localize.term("ubookitResources_addException")}
+          label=${this.#term("addException")}
           @click=${() =>
             this.#mutateExceptions((list) => list.push({ date: "", closed: true, windows: [] }))}
         ></uui-button>
@@ -404,6 +436,7 @@ export class UBookItResourceEditorElement extends UmbLitElement {
           id=${id}
           type="number"
           min="0"
+          label=${label}
           .value=${String(this._constraints[key])}
           @input=${(e: InputEvent) =>
             (this._constraints = {
@@ -417,13 +450,13 @@ export class UBookItResourceEditorElement extends UmbLitElement {
 
   #renderConstraints() {
     return html`
-      <uui-box headline=${this.localize.term("ubookitResources_constraints")}>
-        ${this.#renderGroupErrors("constraints-incoherent")}
-        ${this.#renderConstraintField("c-granularity", "Slot granularity (minutes)", "granularityMinutes")}
-        ${this.#renderConstraintField("c-min", "Minimum duration (minutes)", "minDurationMinutes")}
-        ${this.#renderConstraintField("c-max", "Maximum duration (minutes)", "maxDurationMinutes")}
-        ${this.#renderConstraintField("c-lead", "Minimum notice (minutes)", "leadTimeMinutes")}
-        ${this.#renderConstraintField("c-horizon", "Booking horizon (days)", "horizonDays")}
+      <uui-box headline=${this.#term("constraints")}>
+        ${this.#renderGroupErrors("err-constraints", "constraints-incoherent", "granularity")}
+        ${this.#renderConstraintField("c-granularity", this.#term("granularity"), "granularityMinutes")}
+        ${this.#renderConstraintField("c-min", this.#term("minDuration"), "minDurationMinutes")}
+        ${this.#renderConstraintField("c-max", this.#term("maxDuration"), "maxDurationMinutes")}
+        ${this.#renderConstraintField("c-lead", this.#term("leadTime"), "leadTimeMinutes")}
+        ${this.#renderConstraintField("c-horizon", this.#term("horizon"), "horizonDays")}
       </uui-box>
     `;
   }
@@ -465,6 +498,8 @@ export class UBookItResourceEditorElement extends UmbLitElement {
     }
   `;
 }
+
+export default UBookItResourceEditorElement;
 
 declare global {
   interface HTMLElementTagNameMap {

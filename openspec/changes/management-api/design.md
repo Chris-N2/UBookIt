@@ -26,12 +26,13 @@ Core gains `IResourceManagementStore`: `CreateAsync(Resource)`, `UpdateAsync(Res
 - **Why**: adding members to a shipped interface breaks implementors; segregation also keeps ④'s delivery-facing reads from ever seeing write members. The port accepts only `Resource` aggregates — which can *only* be constructed through the validating Core factories — so "the store persists only validated state" holds by construction, the same property that made `Booking.Rehydrate` safe.
 - **Alternative considered**: a `ResourceManagementService` wrapping the port — rejected: it would only forward calls; controllers map models → factories → port, and the factories are the validation layer. Add a service later if orchestration appears.
 
-### D2: Availability writes are full-replace within one transaction
+### D2: Availability writes are full-replace within one transaction, serialized by a per-resource app lock
 
-`UpdateAsync` replaces the resource's open-hours and exception child rows wholesale from the validated aggregate inside a single transaction (delete children, reinsert).
+`UpdateAsync` replaces the resource's open-hours and exception child rows wholesale from the validated aggregate inside a single transaction (delete children, reinsert), **after acquiring an exclusive per-resource configuration app lock** (`sp_getapplock`, transaction-owned, lock name distinct from the placement lock so config writes and bookings never contend). `DeleteAsync` takes the same lock so a racing update cannot reinsert child rows mid-delete.
 
-- **Why**: the aggregate is already duplicate-free (`AvailabilityConfiguration.Create` rejects duplicate exception dates), so transactional full-replace *is* the write-path uniqueness enforcement the QA obligation demands: no interleaving of two updates can produce duplicate rows, because each transaction rewrites the complete set. Diff-based child updates would reintroduce the possibility the obligation exists to prevent.
-- Proven by an integration test racing two conflicting updates: final state is one writer's complete set, never a merge, never duplicates.
+- **Why full-replace**: the aggregate is already duplicate-free (`AvailabilityConfiguration.Create` rejects duplicate exception dates), and wholesale replacement means every committed write is one writer's complete set. Diff-based child updates would reintroduce the possibility the obligation exists to prevent.
+- **Why the lock is required** *(corrected after the first QA review — the original claim that full-replace alone sufficed was proven false)*: at READ COMMITTED, deleting zero child rows takes no range locks, so two concurrent updates against a resource with an empty child set would each delete nothing, both insert, and commit a merged union — duplicate dates included. The app lock serializes configuration writers per resource, making last-writer-wins real.
+- Proven by an integration test racing two conflicting updates against an **empty-configuration** resource across repeated iterations — the exact case that defeats lock-free full-replace.
 
 ### D3: Concurrent edits are last-writer-wins (documented, not tokened)
 
@@ -65,6 +66,10 @@ A `uBookIt` section (manifest + localization) hosting a root element that routes
 ### D8: Typed client via the existing hey-api generation
 
 The template's `generate-client` script (swagger → TypeScript) is the source of the API client; the checked-in generated client is refreshed whenever the API changes (site must be running for regeneration — documented in the client README). No hand-written fetch code.
+
+### D9: Authorization policy is `SectionAccessContent` for v1 *(recorded after the first QA review)*
+
+The management endpoints keep the template's `SectionAccessContent` policy rather than a custom uBookIt-section policy. QA correctly observed the mismatch: a user granted only the uBookIt section gets a UI whose calls 403, and a Content-only user can call the API without seeing the section. Decision: accepted for v1 — in practice the people managing bookable resources are content editors, and a custom section-access policy (registering a `SectionRequirement` for the uBookIt alias) is a small additive change best made when user-group granularity becomes a real requirement (likely alongside reservations management). Recorded here so it is a choice, not an accident.
 
 ## Risks / Trade-offs
 

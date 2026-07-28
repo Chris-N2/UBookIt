@@ -90,18 +90,20 @@ internal static class ResourceModelMapper
             }
         }
 
+        // Run configuration assembly even when the weekly pattern failed
+        // (using an empty pattern as a stand-in) so exception-level failures
+        // like duplicate-exception-date still surface in the same response —
+        // one save reports every failed rule.
         AvailabilityConfiguration? availability = null;
-        if (weekly.Succeeded)
+        var availabilityResult = AvailabilityConfiguration.Create(
+            weekly.Succeeded ? weekly.Value : WeeklyOpenHours.Empty, exceptions, constraints);
+        if (availabilityResult.Succeeded)
         {
-            var availabilityResult = AvailabilityConfiguration.Create(weekly.Value, exceptions, constraints);
-            if (availabilityResult.Succeeded)
-            {
-                availability = availabilityResult.Value;
-            }
-            else
-            {
-                failures.AddRange(availabilityResult.Failures);
-            }
+            availability = weekly.Succeeded ? availabilityResult.Value : null;
+        }
+        else
+        {
+            failures.AddRange(availabilityResult.Failures);
         }
 
         // Run resource creation even when availability failed so name/type

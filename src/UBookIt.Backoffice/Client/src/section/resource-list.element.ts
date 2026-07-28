@@ -28,6 +28,10 @@ export class UBookItResourceListElement extends UmbLitElement {
   @state()
   private _error?: string;
 
+  #term(key: string) {
+    return this.localize.term(`ubookitResources_${key}`);
+  }
+
   override connectedCallback() {
     super.connectedCallback();
     void this.#load();
@@ -43,13 +47,13 @@ export class UBookItResourceListElement extends UmbLitElement {
       });
 
       if (error || !data) {
-        this._error = "The resource list could not be loaded.";
+        this._error = this.#term("listLoadFailed");
       } else {
         this._items = data.items;
         this._total = data.total;
       }
     } catch {
-      this._error = "The resource list could not be loaded.";
+      this._error = this.#term("listLoadFailed");
     }
 
     this._loading = false;
@@ -110,7 +114,7 @@ export class UBookItResourceListElement extends UmbLitElement {
 
       ${this._error ? html`<div role="alert" class="error">${this._error}</div>` : nothing}
       ${this._loading
-        ? html`<uui-loader-bar aria-label="Loading resources"></uui-loader-bar>`
+        ? html`<uui-loader-bar aria-label=${this.#term("loadingList")}></uui-loader-bar>`
         : this.#renderTable(pageEnd)}
     `;
   }
@@ -121,12 +125,12 @@ export class UBookItResourceListElement extends UmbLitElement {
     }
 
     return html`
-      <uui-table aria-label="Bookable resources">
+      <uui-table aria-label=${this.#term("tableLabel")}>
         <uui-table-head>
-          <uui-table-head-cell>${this.localize.term("ubookitResources_name")}</uui-table-head-cell>
-          <uui-table-head-cell>${this.localize.term("ubookitResources_type")}</uui-table-head-cell>
-          <uui-table-head-cell>${this.localize.term("ubookitResources_availability")}</uui-table-head-cell>
-          <uui-table-head-cell><span class="visually-hidden">Actions</span></uui-table-head-cell>
+          <uui-table-head-cell>${this.#term("name")}</uui-table-head-cell>
+          <uui-table-head-cell>${this.#term("type")}</uui-table-head-cell>
+          <uui-table-head-cell>${this.#term("availability")}</uui-table-head-cell>
+          <uui-table-head-cell><span class="visually-hidden">${this.#term("actions")}</span></uui-table-head-cell>
         </uui-table-head>
         ${this._items.map(
           (resource) => html`
@@ -152,20 +156,22 @@ export class UBookItResourceListElement extends UmbLitElement {
         )}
       </uui-table>
 
-      <nav class="paging" aria-label="Resource list pages">
+      <nav class="paging" aria-label=${this.#term("pagingLabel")}>
         <uui-button
           look="secondary"
-          label="Previous page"
+          label=${this.#term("previousPage")}
           ?disabled=${this._skip === 0}
           @click=${() => {
             this._skip = Math.max(0, this._skip - PAGE_SIZE);
             void this.#load();
           }}
         ></uui-button>
-        <span aria-live="polite">Showing ${this._skip + 1}–${pageEnd} of ${this._total}</span>
+        <span aria-live="polite">
+          ${this.localize.term("ubookitResources_showing", this._skip + 1, pageEnd, this._total)}
+        </span>
         <uui-button
           look="secondary"
-          label="Next page"
+          label=${this.#term("nextPage")}
           ?disabled=${pageEnd >= this._total}
           @click=${() => {
             this._skip += PAGE_SIZE;

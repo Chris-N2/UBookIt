@@ -115,6 +115,29 @@ public class ResourceModelMapperTests
     }
 
     [Fact]
+    public void Overlapping_windows_and_duplicate_exception_dates_report_together()
+    {
+        var model = ValidModel();
+        model.OpeningHours =
+        [
+            new OpeningHoursModel { Day = DayOfWeek.Monday, Start = new TimeOnly(8, 0), End = new TimeOnly(12, 0) },
+            new OpeningHoursModel { Day = DayOfWeek.Monday, Start = new TimeOnly(11, 0), End = new TimeOnly(14, 0) },
+        ];
+        model.Exceptions =
+        [
+            new AvailabilityExceptionModel { Date = new DateOnly(2026, 12, 24) },
+            new AvailabilityExceptionModel { Date = new DateOnly(2026, 12, 24) },
+        ];
+
+        var result = ResourceModelMapper.ToDomain(model);
+
+        Assert.False(result.Succeeded);
+        var codes = result.Failures.Select(f => f.Code).ToArray();
+        Assert.Contains(FailureCodes.WindowsOverlap, codes);
+        Assert.Contains(FailureCodes.DuplicateExceptionDate, codes);
+    }
+
+    [Fact]
     public void Invalid_window_and_invalid_constraints_accumulate()
     {
         var model = ValidModel();
