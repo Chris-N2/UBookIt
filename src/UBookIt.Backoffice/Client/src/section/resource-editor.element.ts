@@ -28,6 +28,9 @@ const DAY_ORDER: DayOfWeek[] = [
 /** Trim "HH:mm:ss" (API) to "HH:mm" (time input). */
 const toInputTime = (value: string) => value.slice(0, 5);
 
+/** Client-only code for the pre-submit empty-date guard; rendered in the Exceptions group. */
+const EXCEPTION_DATE_REQUIRED = "exception-date-required";
+
 /**
  * Workspace editor for one resource: Details, Opening hours, Exceptions, and
  * Constraints groups. Saves the full resource; failures surface as an
@@ -86,9 +89,6 @@ export class UBookItResourceEditorElement extends UmbLitElement {
   #dayLabel(day: DayOfWeek) {
     return this.#term(`day${day}`);
   }
-
-  /** Client-only code for the pre-submit empty-date guard; rendered in the Exceptions group. */
-  static readonly #exceptionDateRequired = "exception-date-required";
 
   override connectedCallback() {
     super.connectedCallback();
@@ -160,9 +160,7 @@ export class UBookItResourceEditorElement extends UmbLitElement {
     // whose date was never picked. The server would reject it with a raw
     // binding error; catch it here with a stable message instead.
     if (this._exceptions.some((exception) => exception.date === "")) {
-      this._errors = [
-        { code: UBookItResourceEditorElement.#exceptionDateRequired, message: this.#term("exceptionNeedsDate") },
-      ];
+      this._errors = [{ code: EXCEPTION_DATE_REQUIRED, message: this.#term("exceptionNeedsDate") }];
       this._saving = false;
       await this.updateComplete;
       this.shadowRoot?.querySelector<HTMLElement>("#error-summary")?.focus();
@@ -372,7 +370,7 @@ export class UBookItResourceEditorElement extends UmbLitElement {
     // weekly hours, so both groups claim the window codes.
     const exceptionCodes = [
       "duplicate-exception-date",
-      UBookItResourceEditorElement.#exceptionDateRequired,
+      EXCEPTION_DATE_REQUIRED,
       "window-invalid",
       "windows-overlap",
     ];
