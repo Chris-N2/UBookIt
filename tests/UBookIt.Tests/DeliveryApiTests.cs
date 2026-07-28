@@ -1,12 +1,14 @@
 using System.Reflection;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.AspNetCore.Mvc.ModelBinding;
 using UBookIt.Core.Availability;
 using UBookIt.Core.Bookings;
 using UBookIt.Core.Common;
 using UBookIt.Core.Resources;
 using UBookIt.Tests.Support;
 using UBookIt.Web.Controllers;
+using UBookIt.Web.Mapping;
 using UBookIt.Web.Models;
 
 namespace UBookIt.Tests;
@@ -246,5 +248,37 @@ public class DeliveryApiTests
 
         Assert.DoesNotContain(names, n => n.Equals("Claims", StringComparison.OrdinalIgnoreCase));
         Assert.False(typeof(Booking).IsAssignableFrom(typeof(PlacementResponseModel)));
+    }
+
+    [Fact]
+    public void Resource_read_model_omits_management_configuration()
+    {
+        var names = typeof(ResourceReadModel).GetProperties()
+            .Concat(typeof(ConstraintsModel).GetProperties())
+            .Select(p => p.Name)
+            .ToArray();
+
+        Assert.DoesNotContain(names, n =>
+            n.Contains("open", StringComparison.OrdinalIgnoreCase)
+            || n.Contains("hour", StringComparison.OrdinalIgnoreCase)
+            || n.Contains("exception", StringComparison.OrdinalIgnoreCase)
+            || n.Contains("window", StringComparison.OrdinalIgnoreCase));
+    }
+
+    // Transport/model-binding failures share the domain envelope (design D7).
+    // The factory itself only fires in the real MVC pipeline (verified live);
+    // its projection is unit-tested here.
+    [Fact]
+    public void Model_binding_failures_project_to_the_uniform_envelope()
+    {
+        var modelState = new ModelStateDictionary();
+        modelState.AddModelError("durationMinutes", "The value 'x' is not valid.");
+
+        var (status, errors) = Problem(ApiResults.ToValidationProblemResult(modelState));
+
+        Assert.Equal(400, status);
+        var error = Assert.Single(errors);
+        Assert.Equal(UBookIt.Web.Constants.InvalidRequestCode, error.Code);
+        Assert.Equal("durationMinutes", error.Field);
     }
 }

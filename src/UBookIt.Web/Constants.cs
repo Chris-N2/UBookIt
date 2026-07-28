@@ -12,4 +12,11 @@ public static class Constants
 
     /// <summary>Public, versioned route base. No backoffice authorization applies.</summary>
     public const string RouteBase = "umbraco/ubookit/api/v{version:apiVersion}";
+
+    /// <summary>
+    /// Stable code for a request rejected at the transport/model-binding layer
+    /// (malformed body, unparseable or missing parameter) — as opposed to a
+    /// domain rule. Keeps the <c>errors[]</c> envelope uniform (design D7).
+    /// </summary>
+    public const string InvalidRequestCode = "invalid-request";
 }

@@ -1,6 +1,7 @@
 using Asp.Versioning;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.AspNetCore.Mvc.ModelBinding;
 using UBookIt.Core;
 using UBookIt.Core.Availability;
 using UBookIt.Web.Mapping;
@@ -45,7 +46,7 @@ public sealed class AvailabilityController(
     [ProducesResponseType<ProblemDetails>(StatusCodes.Status400BadRequest)]
     [ProducesResponseType<ProblemDetails>(StatusCodes.Status404NotFound)]
     public async Task<IActionResult> GetSlots(
-        Guid resourceId, DateOnly from, DateOnly to, int durationMinutes,
+        Guid resourceId, DateOnly from, DateOnly to, [BindRequired] int durationMinutes,
         CancellationToken cancellationToken = default)
     {
         var result = await availability.GetSlotsAsync(

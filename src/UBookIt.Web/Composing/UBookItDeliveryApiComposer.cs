@@ -1,6 +1,10 @@
+using Microsoft.AspNetCore.Mvc;
+using Microsoft.AspNetCore.Mvc.Controllers;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.OpenApi;
 using Swashbuckle.AspNetCore.SwaggerGen;
+using UBookIt.Web.Controllers;
+using UBookIt.Web.Mapping;
 using Umbraco.Cms.Core.Composing;
 using Umbraco.Cms.Core.DependencyInjection;
 
@@ -29,6 +33,23 @@ public sealed class UBookItDeliveryApiComposer : IComposer
 
             // Deliberately no security operation filter — the delivery API is
             // anonymous, so its operations carry no auth requirement.
+        });
+
+        // Transport/model-binding failures (malformed body, unparseable or
+        // missing parameter) must use the same errors[] envelope as domain
+        // failures (design D7). ApiBehaviorOptions is global, so this is scoped
+        // to delivery controllers and delegates everything else to the built-in
+        // factory, leaving the backoffice API's responses untouched.
+        // PostConfigure runs after all Configure actions, so this wrapper wins
+        // regardless of composer ordering and captures the final built-in.
+        builder.Services.PostConfigure<ApiBehaviorOptions>(options =>
+        {
+            var builtIn = options.InvalidModelStateResponseFactory;
+            options.InvalidModelStateResponseFactory = context =>
+                context.ActionDescriptor is ControllerActionDescriptor descriptor
+                && typeof(UBookItDeliveryApiControllerBase).IsAssignableFrom(descriptor.ControllerTypeInfo)
+                    ? ApiResults.ToValidationProblemResult(context.ModelState)
+                    : builtIn(context);
         });
     }
 }

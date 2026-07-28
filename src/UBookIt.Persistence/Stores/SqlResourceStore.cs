@@ -5,8 +5,9 @@ using UBookIt.Core.Stores;
 namespace UBookIt.Persistence.Stores;
 
 /// <summary>
-/// SQL Server implementation of <see cref="IResourceStore"/>. Read-only in
-/// this change; write surface arrives with the management API change.
+/// SQL Server implementation of the read port <see cref="IResourceStore"/>
+/// (resource loads and public paged discovery). Resource writes live on the
+/// separate management store.
 /// </summary>
 internal sealed class SqlResourceStore(UBookItDbContext db) : IResourceStore
 {

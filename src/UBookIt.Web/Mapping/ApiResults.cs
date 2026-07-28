@@ -1,5 +1,6 @@
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.AspNetCore.Mvc.ModelBinding;
 using UBookIt.Core.Common;
 using UBookIt.Web.Models;
 
@@ -42,4 +43,36 @@ internal static class ApiResults
     /// <summary>Convenience for a single-failure problem result.</summary>
     internal static IActionResult ToProblemResult(this DomainFailure failure)
         => new[] { failure }.ToProblemResult();
+
+    /// <summary>
+    /// Projects model-binding/transport failures into the same RFC 7807
+    /// envelope as domain failures (design D7): 400 with every entry as
+    /// {code, message, field} under "errors", using the stable transport code
+    /// <see cref="Constants.InvalidRequestCode"/> and the model-state key as the
+    /// field. Wired via the delivery composer's <c>InvalidModelStateResponseFactory</c>.
+    /// </summary>
+    internal static IActionResult ToValidationProblemResult(ModelStateDictionary modelState)
+    {
+        var errors = modelState
+            .Where(entry => entry.Value is { Errors.Count: > 0 })
+            .SelectMany(entry => entry.Value!.Errors.Select(error => new ApiErrorModel
+            {
+                Code = Constants.InvalidRequestCode,
+                Message = string.IsNullOrEmpty(error.ErrorMessage)
+                    ? "The request could not be read."
+                    : error.ErrorMessage,
+                Field = string.IsNullOrEmpty(entry.Key) ? null : entry.Key,
+            }))
+            .ToArray();
+
+        if (errors.Length == 0)
+        {
+            errors = [new ApiErrorModel { Code = Constants.InvalidRequestCode, Message = "The request is invalid." }];
+        }
+
+        var problem = new ProblemDetails { Title = "Validation failed", Status = StatusCodes.Status400BadRequest };
+        problem.Extensions["errors"] = errors;
+
+        return new ObjectResult(problem) { StatusCode = StatusCodes.Status400BadRequest };
+    }
 }
