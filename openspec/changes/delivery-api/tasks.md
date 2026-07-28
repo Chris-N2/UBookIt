@@ -41,6 +41,6 @@
 ## 7. Verification & housekeeping
 
 - [x] 7.1 Build with `--no-incremental`; confirm the only warnings are the accepted NU1903 Umbraco-transitive advisories (fix any compiler/analyzer/TS warning). *(clean build; only NU1903 transitives, incl. a new Microsoft.OpenApi one via Umbraco.Cms.Api.Common — same accepted class)*
-- [ ] 7.2 Confirm the delivery OpenAPI document generates as a separate document from the backoffice one and lists the delivery operations.
+- [x] 7.2 Confirm the delivery OpenAPI document generates as a separate document from the backoffice one and lists the delivery operations. *(live: "uBookIt Delivery API" doc lists all 5 ops; backoffice doc contains none of the delivery paths)*
 - [x] 7.3 Run the full test suite (LocalDB by default) green. *(134 unit + 19 integration, all pass)*
-- [ ] 7.4 Verify the live endpoints against the running TestSite (anonymous availability read + a placement) via the Umbraco MCP / direct HTTP; Chris handles any login step.
+- [x] 7.4 Verify the live endpoints against the running TestSite (anonymous availability read + a placement) via the Umbraco MCP / direct HTTP; Chris handles any login step. *(live: anonymous list/get, free-time, slots, over-wide→400 date-range-too-large, unknown→404, placement→Confirmed+bookingId, same slot→409 conflict, missing email→400 email-invalid/field. Left one test booking 6f0cf33f on 2026-08-03 in the dev DB.)*
