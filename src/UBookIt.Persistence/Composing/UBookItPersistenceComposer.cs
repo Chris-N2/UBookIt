@@ -22,6 +22,8 @@ public sealed class UBookItPersistenceComposer : IComposer
     public const string SettingsSection = "UBookIt";
     public const string TimeZoneSettingKey = "UBookIt:TimeZoneId";
     public const string DefaultTimeZoneId = "UTC";
+    public const string MaxQueryRangeDaysSettingKey = "UBookIt:MaxQueryRangeDays";
+    public const int DefaultMaxQueryRangeDays = 31;
 
     public void Compose(IUmbracoBuilder builder)
     {
@@ -68,8 +70,19 @@ public sealed class UBookItPersistenceComposer : IComposer
         TimeZoneId = IsTimeZoneConfigured(configuration)
             ? configuration[TimeZoneSettingKey]!
             : DefaultTimeZoneId,
+        MaxQueryRangeDays = ResolveMaxQueryRangeDays(configuration),
     };
 
     internal static bool IsTimeZoneConfigured(IConfiguration configuration)
         => !string.IsNullOrWhiteSpace(configuration[TimeZoneSettingKey]);
+
+    /// <summary>
+    /// A missing, malformed, or non-positive <c>UBookIt:MaxQueryRangeDays</c>
+    /// falls back to the default guardrail rather than throwing (mirrors the
+    /// safe time-zone default). The setting is an admin-controlled cap.
+    /// </summary>
+    internal static int ResolveMaxQueryRangeDays(IConfiguration configuration)
+        => int.TryParse(configuration[MaxQueryRangeDaysSettingKey], out var days) && days > 0
+            ? days
+            : DefaultMaxQueryRangeDays;
 }

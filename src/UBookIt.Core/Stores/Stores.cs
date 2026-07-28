@@ -11,6 +11,14 @@ public sealed record ClaimInfo(Guid ResourceId, Guid BookingId, BookingInterval 
 public interface IResourceStore
 {
     Task<Resource?> GetAsync(Guid resourceId, CancellationToken cancellationToken = default);
+
+    /// <summary>
+    /// A page of resources plus the unpaged total, for public read/discovery.
+    /// A read-only projection over the same aggregates as the management store,
+    /// kept on the read port so anonymous callers never depend on the
+    /// management (write) surface.
+    /// </summary>
+    Task<ResourcePage> ListAsync(int skip, int take, CancellationToken cancellationToken = default);
 }
 
 /// <summary>One page of resources plus the unpaged total.</summary>

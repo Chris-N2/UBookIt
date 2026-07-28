@@ -25,6 +25,21 @@ public sealed class InMemoryResourceStore : IResourceStore
 
     public Task<Resource?> GetAsync(Guid resourceId, CancellationToken cancellationToken = default)
         => Task.FromResult(_resources.GetValueOrDefault(resourceId));
+
+    public Task<ResourcePage> ListAsync(int skip, int take, CancellationToken cancellationToken = default)
+    {
+        skip = Math.Max(0, skip);
+        take = Math.Clamp(take, 0, 500);
+
+        var total = _resources.Count;
+        IReadOnlyList<Resource> items = _resources.Values
+            .OrderBy(r => r.DisplayName).ThenBy(r => r.Id)
+            .Skip(skip)
+            .Take(take)
+            .ToList();
+
+        return Task.FromResult(new ResourcePage(items, total));
+    }
 }
 
 /// <summary>

@@ -112,6 +112,17 @@ public sealed class AvailabilityService(
             return Fail(FailureCodes.DateRangeInvalid, "The from date must not be after the to date.");
         }
 
+        // Bounded query range (availability spec): reject an over-wide span
+        // before any work — zone resolution, resource load, and the day-by-day
+        // open-hours computation all follow — so an unbounded range costs nothing.
+        var spanDays = toDate.DayNumber - fromDate.DayNumber + 1;
+        if (spanDays > settings.MaxQueryRangeDays)
+        {
+            return Fail(
+                FailureCodes.DateRangeTooLarge,
+                $"The queried date range spans {spanDays} days, which exceeds the maximum of {settings.MaxQueryRangeDays}.");
+        }
+
         var zoneResult = ResolveZone(settings);
         if (!zoneResult.Succeeded)
         {

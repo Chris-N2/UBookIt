@@ -28,6 +28,7 @@ public static class FailureCodes
     public const string ResourceInUse = "resource-in-use";
     public const string BookingNotFound = "booking-not-found";
     public const string DateRangeInvalid = "date-range-invalid";
+    public const string DateRangeTooLarge = "date-range-too-large";
     public const string TimeZoneInvalid = "time-zone-invalid";
 
     // Definitional validation

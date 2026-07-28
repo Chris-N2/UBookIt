@@ -56,6 +56,32 @@ public class SiteSettingsTests
         Assert.Empty(logger.Entries);
     }
 
+    private static IConfiguration MaxRangeConfig(string? value)
+    {
+        var values = new Dictionary<string, string?>();
+        if (value is not null)
+        {
+            values[UBookItPersistenceComposer.MaxQueryRangeDaysSettingKey] = value;
+        }
+
+        return new ConfigurationBuilder().AddInMemoryCollection(values).Build();
+    }
+
+    [Theory]
+    [InlineData(null)]     // missing
+    [InlineData("")]       // blank
+    [InlineData("lots")]   // malformed
+    [InlineData("0")]      // non-positive
+    [InlineData("-5")]     // negative
+    public void Max_query_range_falls_back_to_default(string? configured)
+        => Assert.Equal(
+            UBookItPersistenceComposer.DefaultMaxQueryRangeDays,
+            UBookItPersistenceComposer.ResolveSettings(MaxRangeConfig(configured)).MaxQueryRangeDays);
+
+    [Fact]
+    public void Configured_max_query_range_is_used()
+        => Assert.Equal(7, UBookItPersistenceComposer.ResolveSettings(MaxRangeConfig("7")).MaxQueryRangeDays);
+
     private sealed class CapturingLogger : ILogger
     {
         public List<(LogLevel Level, string Message)> Entries { get; } = [];
