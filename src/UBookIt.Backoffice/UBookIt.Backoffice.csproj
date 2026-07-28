@@ -35,6 +35,10 @@
   </ItemGroup>
 
   <ItemGroup>
+    <InternalsVisibleTo Include="UBookIt.Tests" />
+  </ItemGroup>
+
+  <ItemGroup>
     <ProjectReference Include="..\UBookIt.Core\UBookIt.Core.csproj" />
     <ProjectReference Include="..\UBookIt.Persistence\UBookIt.Persistence.csproj" />
   </ItemGroup>

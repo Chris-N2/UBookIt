@@ -4,263 +4,215 @@ export type ClientOptions = {
     baseUrl: 'https://localhost:44348' | (string & {});
 };
 
-export type DocumentGranularPermissionModel = {
-    key: string;
-    readonly context: string;
-    permission: string;
+export type AvailabilityExceptionModel = {
+    date: string;
+    windows: Array<TimeWindowModel>;
 };
 
-export type DocumentPropertyValueGranularPermissionModel = {
-    key: string;
-    readonly context: string;
-    permission: string;
+export type ConstraintsModel = {
+    granularityMinutes: number;
+    minDurationMinutes: number;
+    maxDurationMinutes: number;
+    leadTimeMinutes: number;
+    horizonDays: number;
 };
 
-export type ReadOnlyUserGroupModel = {
-    id: number;
-    key: string;
-    name: string;
-    readonly description?: string | null;
-    icon?: string | null;
-    startContentId?: number | null;
-    startMediaId?: number | null;
-    alias: string;
-    hasAccessToAllLanguages: boolean;
-    allowedLanguages: Array<number>;
-    permissions: Array<string>;
-    granularPermissions: Array<DocumentGranularPermissionModel | DocumentPropertyValueGranularPermissionModel | UnknownTypeGranularPermissionModel>;
-    allowedSections: Array<string>;
+export type DayOfWeek = 'Sunday' | 'Monday' | 'Tuesday' | 'Wednesday' | 'Thursday' | 'Friday' | 'Saturday';
+
+export type OpeningHoursModel = {
+    day: DayOfWeek;
+    start: string;
+    end: string;
 };
 
-export type UnknownTypeGranularPermissionModel = {
-    context: string;
-    permission: string;
+export type PagedResourcesModel = {
+    total: number;
+    items: Array<ResourceResponseModel>;
 };
 
-export type UserGroupModel = {
-    id: number;
-    key: string;
-    createDate: string;
-    updateDate: string;
-    deleteDate?: string | null;
-    readonly hasIdentity: boolean;
-    startMediaId?: number | null;
-    startContentId?: number | null;
-    icon?: string | null;
-    alias: string;
-    name?: string | null;
+export type ProblemDetails = {
+    type?: string | null;
+    title?: string | null;
+    status?: number | null;
+    detail?: string | null;
+    instance?: string | null;
+    [key: string]: unknown | string | null | string | null | number | null | string | null | string | null | undefined;
+};
+
+export type ResourceRequestModel = {
+    type: string;
+    displayName: string;
     description?: string | null;
-    hasAccessToAllLanguages: boolean;
-    permissions: Array<string>;
-    granularPermissions: Array<DocumentGranularPermissionModel | DocumentPropertyValueGranularPermissionModel | UnknownTypeGranularPermissionModel>;
-    readonly allowedSections: Array<string>;
-    readonly userCount: number;
-    readonly allowedLanguages: Array<number>;
+    openingHours: Array<OpeningHoursModel>;
+    exceptions: Array<AvailabilityExceptionModel>;
+    constraints?: ConstraintsModel | null;
 };
 
-export type UserKindModel = 'Default' | 'Api';
-
-export type UserModel = {
-    id: number;
-    key: string;
-    createDate: string;
-    updateDate: string;
-    deleteDate?: string | null;
-    readonly hasIdentity: boolean;
-    emailConfirmedDate?: string | null;
-    invitedDate?: string | null;
-    username: string;
-    email: string;
-    rawPasswordValue?: string | null;
-    passwordConfiguration?: string | null;
-    isApproved: boolean;
-    isLockedOut: boolean;
-    lastLoginDate?: string | null;
-    lastPasswordChangeDate?: string | null;
-    lastLockoutDate?: string | null;
-    failedPasswordAttempts: number;
-    comments?: string | null;
-    userState: UserStateModel;
-    name?: string | null;
-    readonly allowedSections: Array<string>;
-    profileData: UserModel | UserProfileModel;
-    securityStamp?: string | null;
-    avatar?: string | null;
-    sessionTimeout: number;
-    startContentIds?: Array<number> | null;
-    startMediaIds?: Array<number> | null;
-    language?: string | null;
-    kind: UserKindModel;
-    readonly groups: Array<ReadOnlyUserGroupModel | UserGroupModel>;
-};
-
-export type UserProfileModel = {
-    id: number;
-    name?: string | null;
-};
-
-export type UserStateModel = 'Active' | 'Disabled' | 'LockedOut' | 'Invited' | 'Inactive' | 'All';
-
-export type DocumentGranularPermissionModelWritable = {
-    key: string;
-    permission: string;
-};
-
-export type DocumentPropertyValueGranularPermissionModelWritable = {
-    key: string;
-    permission: string;
-};
-
-export type ReadOnlyUserGroupModelWritable = {
-    id: number;
-    key: string;
-    name: string;
-    icon?: string | null;
-    startContentId?: number | null;
-    startMediaId?: number | null;
-    alias: string;
-    hasAccessToAllLanguages: boolean;
-    allowedLanguages: Array<number>;
-    permissions: Array<string>;
-    granularPermissions: Array<DocumentGranularPermissionModelWritable | DocumentPropertyValueGranularPermissionModelWritable | UnknownTypeGranularPermissionModel>;
-    allowedSections: Array<string>;
-};
-
-export type UserGroupModelWritable = {
-    id: number;
-    key: string;
-    createDate: string;
-    updateDate: string;
-    deleteDate?: string | null;
-    startMediaId?: number | null;
-    startContentId?: number | null;
-    icon?: string | null;
-    alias: string;
-    name?: string | null;
+export type ResourceResponseModel = {
+    id: string;
+    type: string;
+    displayName: string;
     description?: string | null;
-    hasAccessToAllLanguages: boolean;
-    permissions: Array<string>;
-    granularPermissions: Array<DocumentGranularPermissionModelWritable | DocumentPropertyValueGranularPermissionModelWritable | UnknownTypeGranularPermissionModel>;
+    openingHours: Array<OpeningHoursModel>;
+    exceptions: Array<AvailabilityExceptionModel>;
+    constraints: ConstraintsModel;
 };
 
-export type UserModelWritable = {
-    id: number;
-    key: string;
-    createDate: string;
-    updateDate: string;
-    deleteDate?: string | null;
-    emailConfirmedDate?: string | null;
-    invitedDate?: string | null;
-    username: string;
-    email: string;
-    rawPasswordValue?: string | null;
-    passwordConfiguration?: string | null;
-    isApproved: boolean;
-    isLockedOut: boolean;
-    lastLoginDate?: string | null;
-    lastPasswordChangeDate?: string | null;
-    lastLockoutDate?: string | null;
-    failedPasswordAttempts: number;
-    comments?: string | null;
-    userState: UserStateModel;
-    name?: string | null;
-    securityStamp?: string | null;
-    avatar?: string | null;
-    sessionTimeout: number;
-    startContentIds?: Array<number> | null;
-    startMediaIds?: Array<number> | null;
-    language?: string | null;
-    kind: UserKindModel;
+export type TimeWindowModel = {
+    start: string;
+    end: string;
 };
 
-export type PingData = {
+export type ListResourcesData = {
     body?: never;
     path?: never;
-    query?: never;
-    url: '/umbraco/ubookitbackoffice/api/v1/ping';
+    query?: {
+        skip?: number;
+        take?: number;
+    };
+    url: '/umbraco/ubookitbackoffice/api/v1/resources';
 };
 
-export type PingErrors = {
+export type ListResourcesErrors = {
     /**
      * The resource is protected and requires an authentication token
      */
     401: unknown;
 };
 
-export type PingResponses = {
+export type ListResourcesResponses = {
     /**
      * OK
      */
-    200: string;
+    200: PagedResourcesModel;
 };
 
-export type PingResponse = PingResponses[keyof PingResponses];
+export type ListResourcesResponse = ListResourcesResponses[keyof ListResourcesResponses];
 
-export type WhatsMyNameData = {
-    body?: never;
+export type CreateResourceData = {
+    body?: ResourceRequestModel;
     path?: never;
     query?: never;
-    url: '/umbraco/ubookitbackoffice/api/v1/whatsMyName';
+    url: '/umbraco/ubookitbackoffice/api/v1/resources';
 };
 
-export type WhatsMyNameErrors = {
+export type CreateResourceErrors = {
+    /**
+     * Bad Request
+     */
+    400: ProblemDetails;
     /**
      * The resource is protected and requires an authentication token
      */
     401: unknown;
 };
 
-export type WhatsMyNameResponses = {
+export type CreateResourceError = CreateResourceErrors[keyof CreateResourceErrors];
+
+export type CreateResourceResponses = {
     /**
      * OK
      */
-    200: string;
+    200: ResourceResponseModel;
 };
 
-export type WhatsMyNameResponse = WhatsMyNameResponses[keyof WhatsMyNameResponses];
+export type CreateResourceResponse = CreateResourceResponses[keyof CreateResourceResponses];
 
-export type WhatsTheTimeMrWolfData = {
+export type DeleteResourceData = {
     body?: never;
-    path?: never;
+    path: {
+        id: string;
+    };
     query?: never;
-    url: '/umbraco/ubookitbackoffice/api/v1/whatsTheTimeMrWolf';
+    url: '/umbraco/ubookitbackoffice/api/v1/resources/{id}';
 };
 
-export type WhatsTheTimeMrWolfErrors = {
+export type DeleteResourceErrors = {
     /**
      * The resource is protected and requires an authentication token
      */
     401: unknown;
+    /**
+     * Not Found
+     */
+    404: ProblemDetails;
+    /**
+     * Conflict
+     */
+    409: ProblemDetails;
 };
 
-export type WhatsTheTimeMrWolfResponses = {
+export type DeleteResourceError = DeleteResourceErrors[keyof DeleteResourceErrors];
+
+export type DeleteResourceResponses = {
     /**
      * OK
      */
-    200: string;
+    200: unknown;
 };
 
-export type WhatsTheTimeMrWolfResponse = WhatsTheTimeMrWolfResponses[keyof WhatsTheTimeMrWolfResponses];
-
-export type WhoAmIData = {
+export type GetResourceData = {
     body?: never;
-    path?: never;
+    path: {
+        id: string;
+    };
     query?: never;
-    url: '/umbraco/ubookitbackoffice/api/v1/whoAmI';
+    url: '/umbraco/ubookitbackoffice/api/v1/resources/{id}';
 };
 
-export type WhoAmIErrors = {
+export type GetResourceErrors = {
     /**
      * The resource is protected and requires an authentication token
      */
     401: unknown;
+    /**
+     * Not Found
+     */
+    404: ProblemDetails;
 };
 
-export type WhoAmIResponses = {
+export type GetResourceError = GetResourceErrors[keyof GetResourceErrors];
+
+export type GetResourceResponses = {
     /**
      * OK
      */
-    200: UserModel;
+    200: ResourceResponseModel;
 };
 
-export type WhoAmIResponse = WhoAmIResponses[keyof WhoAmIResponses];
+export type GetResourceResponse = GetResourceResponses[keyof GetResourceResponses];
+
+export type UpdateResourceData = {
+    body?: ResourceRequestModel;
+    path: {
+        id: string;
+    };
+    query?: never;
+    url: '/umbraco/ubookitbackoffice/api/v1/resources/{id}';
+};
+
+export type UpdateResourceErrors = {
+    /**
+     * Bad Request
+     */
+    400: ProblemDetails;
+    /**
+     * The resource is protected and requires an authentication token
+     */
+    401: unknown;
+    /**
+     * Not Found
+     */
+    404: ProblemDetails;
+};
+
+export type UpdateResourceError = UpdateResourceErrors[keyof UpdateResourceErrors];
+
+export type UpdateResourceResponses = {
+    /**
+     * OK
+     */
+    200: ResourceResponseModel;
+};
+
+export type UpdateResourceResponse = UpdateResourceResponses[keyof UpdateResourceResponses];

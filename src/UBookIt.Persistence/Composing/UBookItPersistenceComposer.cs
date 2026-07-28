@@ -51,6 +51,7 @@ public sealed class UBookItPersistenceComposer : IComposer
             ResolveSettings(serviceProvider.GetRequiredService<IConfiguration>()));
 
         builder.Services.AddScoped<IResourceStore, SqlResourceStore>();
+        builder.Services.AddScoped<IResourceManagementStore, SqlResourceManagementStore>();
         builder.Services.AddScoped<IBookingStore, SqlBookingStore>();
         builder.Services.AddScoped<IAvailabilityQueryService, AvailabilityService>();
         builder.Services.AddScoped<IBookingService, BookingService>();

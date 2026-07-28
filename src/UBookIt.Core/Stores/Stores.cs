@@ -13,6 +13,33 @@ public interface IResourceStore
     Task<Resource?> GetAsync(Guid resourceId, CancellationToken cancellationToken = default);
 }
 
+/// <summary>One page of resources plus the unpaged total.</summary>
+public sealed record ResourcePage(IReadOnlyList<Resource> Items, int Total);
+
+/// <summary>
+/// Management writes for resources. Implemented by UBookIt.Persistence.
+/// Accepts only <see cref="Resource"/> aggregates — which are constructible
+/// solely via the validating Core factories — so the store persists only
+/// validated state. Availability updates replace the resource's configuration
+/// wholesale within one transaction (write-path exception-date uniqueness).
+/// </summary>
+public interface IResourceManagementStore
+{
+    Task<DomainResult<Resource>> CreateAsync(Resource resource, CancellationToken cancellationToken = default);
+
+    /// <summary>Full update; fails with <see cref="FailureCodes.ResourceNotFound"/> for unknown ids.</summary>
+    Task<DomainResult<Resource>> UpdateAsync(Resource resource, CancellationToken cancellationToken = default);
+
+    /// <summary>
+    /// Fails with <see cref="FailureCodes.ResourceInUse"/> when the resource
+    /// has any booking claims (including a claim placed concurrently with the
+    /// delete), and <see cref="FailureCodes.ResourceNotFound"/> for unknown ids.
+    /// </summary>
+    Task<DomainResult> DeleteAsync(Guid resourceId, CancellationToken cancellationToken = default);
+
+    Task<ResourcePage> ListAsync(int skip, int take, CancellationToken cancellationToken = default);
+}
+
 /// <summary>
 /// Booking storage. Implemented by UBookIt.Persistence.
 /// </summary>

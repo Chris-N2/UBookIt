@@ -2,7 +2,7 @@
 
 import type { Client, Options as Options2, TDataShape } from './client';
 import { client } from './client.gen';
-import type { PingData, PingErrors, PingResponses, WhatsMyNameData, WhatsMyNameErrors, WhatsMyNameResponses, WhatsTheTimeMrWolfData, WhatsTheTimeMrWolfErrors, WhatsTheTimeMrWolfResponses, WhoAmIData, WhoAmIErrors, WhoAmIResponses } from './types.gen';
+import type { CreateResourceData, CreateResourceErrors, CreateResourceResponses, DeleteResourceData, DeleteResourceErrors, DeleteResourceResponses, GetResourceData, GetResourceErrors, GetResourceResponses, ListResourcesData, ListResourcesErrors, ListResourcesResponses, UpdateResourceData, UpdateResourceErrors, UpdateResourceResponses } from './types.gen';
 
 export type Options<TData extends TDataShape = TDataShape, ThrowOnError extends boolean = boolean> = Options2<TData, ThrowOnError> & {
     /**
@@ -19,55 +19,76 @@ export type Options<TData extends TDataShape = TDataShape, ThrowOnError extends 
 };
 
 export class UBookItBackofficeService {
-    public static ping<ThrowOnError extends boolean = false>(options?: Options<PingData, ThrowOnError>) {
-        return (options?.client ?? client).get<PingResponses, PingErrors, ThrowOnError>({
+    public static listResources<ThrowOnError extends boolean = false>(options?: Options<ListResourcesData, ThrowOnError>) {
+        return (options?.client ?? client).get<ListResourcesResponses, ListResourcesErrors, ThrowOnError>({
             security: [
                 {
                     scheme: 'bearer',
                     type: 'http'
                 }
             ],
-            url: '/umbraco/ubookitbackoffice/api/v1/ping',
+            url: '/umbraco/ubookitbackoffice/api/v1/resources',
             ...options
         });
     }
     
-    public static whatsMyName<ThrowOnError extends boolean = false>(options?: Options<WhatsMyNameData, ThrowOnError>) {
-        return (options?.client ?? client).get<WhatsMyNameResponses, WhatsMyNameErrors, ThrowOnError>({
+    public static createResource<ThrowOnError extends boolean = false>(options?: Options<CreateResourceData, ThrowOnError>) {
+        return (options?.client ?? client).post<CreateResourceResponses, CreateResourceErrors, ThrowOnError>({
             security: [
                 {
                     scheme: 'bearer',
                     type: 'http'
                 }
             ],
-            url: '/umbraco/ubookitbackoffice/api/v1/whatsMyName',
+            url: '/umbraco/ubookitbackoffice/api/v1/resources',
+            ...options,
+            headers: {
+                'Content-Type': 'application/json',
+                ...options?.headers
+            }
+        });
+    }
+    
+    public static deleteResource<ThrowOnError extends boolean = false>(options: Options<DeleteResourceData, ThrowOnError>) {
+        return (options.client ?? client).delete<DeleteResourceResponses, DeleteResourceErrors, ThrowOnError>({
+            security: [
+                {
+                    scheme: 'bearer',
+                    type: 'http'
+                }
+            ],
+            url: '/umbraco/ubookitbackoffice/api/v1/resources/{id}',
             ...options
         });
     }
     
-    public static whatsTheTimeMrWolf<ThrowOnError extends boolean = false>(options?: Options<WhatsTheTimeMrWolfData, ThrowOnError>) {
-        return (options?.client ?? client).get<WhatsTheTimeMrWolfResponses, WhatsTheTimeMrWolfErrors, ThrowOnError>({
+    public static getResource<ThrowOnError extends boolean = false>(options: Options<GetResourceData, ThrowOnError>) {
+        return (options.client ?? client).get<GetResourceResponses, GetResourceErrors, ThrowOnError>({
             security: [
                 {
                     scheme: 'bearer',
                     type: 'http'
                 }
             ],
-            url: '/umbraco/ubookitbackoffice/api/v1/whatsTheTimeMrWolf',
+            url: '/umbraco/ubookitbackoffice/api/v1/resources/{id}',
             ...options
         });
     }
     
-    public static whoAmI<ThrowOnError extends boolean = false>(options?: Options<WhoAmIData, ThrowOnError>) {
-        return (options?.client ?? client).get<WhoAmIResponses, WhoAmIErrors, ThrowOnError>({
+    public static updateResource<ThrowOnError extends boolean = false>(options: Options<UpdateResourceData, ThrowOnError>) {
+        return (options.client ?? client).put<UpdateResourceResponses, UpdateResourceErrors, ThrowOnError>({
             security: [
                 {
                     scheme: 'bearer',
                     type: 'http'
                 }
             ],
-            url: '/umbraco/ubookitbackoffice/api/v1/whoAmI',
-            ...options
+            url: '/umbraco/ubookitbackoffice/api/v1/resources/{id}',
+            ...options,
+            headers: {
+                'Content-Type': 'application/json',
+                ...options.headers
+            }
         });
     }
 }

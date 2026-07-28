@@ -25,6 +25,7 @@ public static class FailureCodes
 
     // Lookups and queries
     public const string ResourceNotFound = "resource-not-found";
+    public const string ResourceInUse = "resource-in-use";
     public const string BookingNotFound = "booking-not-found";
     public const string DateRangeInvalid = "date-range-invalid";
     public const string TimeZoneInvalid = "time-zone-invalid";

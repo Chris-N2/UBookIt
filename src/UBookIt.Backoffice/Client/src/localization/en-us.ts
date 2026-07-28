@@ -1,0 +1,28 @@
+export default {
+  ubookitSection: {
+    label: "uBookIt",
+  },
+  ubookitResources: {
+    label: "Resources",
+    create: "Create resource",
+    edit: "Edit",
+    delete: "Delete",
+    empty: "No resources yet. Create the first one to start taking bookings.",
+    name: "Name",
+    type: "Type",
+    availability: "Availability",
+    details: "Details",
+    openingHours: "Opening hours",
+    exceptions: "Exceptions",
+    constraints: "Constraints",
+    save: "Save",
+    cancel: "Cancel",
+    back: "Back to resources",
+    addWindow: "Add window",
+    removeWindow: "Remove window",
+    addException: "Add exception",
+    removeException: "Remove exception",
+    closedAllDay: "Closed all day",
+    errorSummary: "The resource could not be saved:",
+  },
+};
