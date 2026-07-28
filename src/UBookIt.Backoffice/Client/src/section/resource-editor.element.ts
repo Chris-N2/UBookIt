@@ -83,6 +83,13 @@ export class UBookItResourceEditorElement extends UmbLitElement {
     return this.localize.term(`ubookitResources_${key}`);
   }
 
+  #dayLabel(day: DayOfWeek) {
+    return this.#term(`day${day}`);
+  }
+
+  /** Client-only code for the pre-submit empty-date guard; rendered in the Exceptions group. */
+  static readonly #exceptionDateRequired = "exception-date-required";
+
   override connectedCallback() {
     super.connectedCallback();
     void this.#load();
@@ -153,7 +160,9 @@ export class UBookItResourceEditorElement extends UmbLitElement {
     // whose date was never picked. The server would reject it with a raw
     // binding error; catch it here with a stable message instead.
     if (this._exceptions.some((exception) => exception.date === "")) {
-      this._errors = [{ code: "duplicate-exception-date", message: this.#term("exceptionNeedsDate") }];
+      this._errors = [
+        { code: UBookItResourceEditorElement.#exceptionDateRequired, message: this.#term("exceptionNeedsDate") },
+      ];
       this._saving = false;
       await this.updateComplete;
       this.shadowRoot?.querySelector<HTMLElement>("#error-summary")?.focus();
@@ -330,7 +339,7 @@ export class UBookItResourceEditorElement extends UmbLitElement {
           const windows = this._hours.get(day) ?? [];
           return html`
             <fieldset class="day" aria-describedby=${hasErrors ? "err-hours" : nothing}>
-              <legend>${day}</legend>
+              <legend>${this.#dayLabel(day)}</legend>
               ${windows.map((window, index) =>
                 this.#renderWindowRow(
                   `oh-${day}-${index}`,
@@ -342,7 +351,7 @@ export class UBookItResourceEditorElement extends UmbLitElement {
               <uui-button
                 look="secondary"
                 compact
-                label="${this.#term("addWindow")} (${day})"
+                label="${this.#term("addWindow")} (${this.#dayLabel(day)})"
                 @click=${() => this.#mutateHours(day, (list) => list.push({ start: "09:00", end: "17:00" }))}
               ></uui-button>
             </fieldset>
@@ -361,12 +370,17 @@ export class UBookItResourceEditorElement extends UmbLitElement {
   #renderExceptions() {
     // Window-shape failures can originate from exception overrides as well as
     // weekly hours, so both groups claim the window codes.
-    const hasErrors =
-      this.#errorsFor("duplicate-exception-date", "window-invalid", "windows-overlap").length > 0;
+    const exceptionCodes = [
+      "duplicate-exception-date",
+      UBookItResourceEditorElement.#exceptionDateRequired,
+      "window-invalid",
+      "windows-overlap",
+    ];
+    const hasErrors = this.#errorsFor(...exceptionCodes).length > 0;
 
     return html`
       <uui-box headline=${this.#term("exceptions")}>
-        ${this.#renderGroupErrors("err-exceptions", "duplicate-exception-date", "window-invalid", "windows-overlap")}
+        ${this.#renderGroupErrors("err-exceptions", ...exceptionCodes)}
         ${this._exceptions.map(
           (exception, index) => html`
             <fieldset class="exception" aria-describedby=${hasErrors ? "err-exceptions" : nothing}>
