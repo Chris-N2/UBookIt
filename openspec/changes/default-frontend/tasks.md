@@ -25,17 +25,17 @@
 
 ## 5. TestSite wiring (not shipped)
 
-- [~] 5.1 Add a template/content node in `UBookIt.TestSite` that invokes `@await Component.InvokeAsync("Booking", new { resourceId })` for a seeded resource, so the flow is reachable for verification. *(template file written: `Views/UbookitBookingTest.cshtml`; content node/doctype creation pending a running site)*
+- [x] 5.1 Add a template/content node in `UBookIt.TestSite` that invokes `@await Component.InvokeAsync("Booking", new { resourceId })` for a seeded resource, so the flow is reachable for verification. *(template `Views/UbookitBookingTest.cshtml`; doctype + published "Booking Test Page" created in the backoffice, flow reachable at the site root)*
 
 ## 6. Tests
 
-- [ ] 6.1 Unit-test `BookingMessages`: every mapped code yields a non-empty user-facing message; `conflict` yields the "no longer available" wording; an unknown code has a safe fallback.
-- [ ] 6.2 Unit-test the view-model assembly: times render as site-zone wall-clock; each option's value is the exact UTC instant; an empty-slot day yields the "no times" state; the horizon/lead defaults pick a sensible initial date.
-- [ ] 6.3 Unit-test repopulation: a failed-submission model round-trips selected time + entered fields into the `BookingFormModel` and carries its error messages.
+- [x] 6.1 Unit-test `BookingMessages`: every mapped code yields a non-empty user-facing message; `conflict` yields the "no longer available" wording; an unknown code has a safe fallback.
+- [x] 6.2 Unit-test the view-model assembly: times render as site-zone wall-clock; each option's value is the exact UTC instant; an empty-slot day yields the "no times" state; the horizon/lead defaults pick a sensible initial date.
+- [x] 6.3 Unit-test repopulation: a failed-submission model round-trips selected time + entered fields into the `BookingFormModel` and carries its error messages.
 
 ## 7. Verification & housekeeping
 
 - [x] 7.1 Build with `--no-incremental`; only the accepted NU1903 transitive advisories may warn (fix any compiler/analyzer/Razor warning).
 - [x] 7.2 Run the full test suite green (unit + integration).
-- [ ] 7.3 Live-verify against the running TestSite: complete a booking with JavaScript disabled (choose date → time → details → submit → confirmation); a tokenless POST is rejected; refreshing the confirmation creates no second booking; a missing email redraws with an accessible error summary and preserved input; a `conflict` shows the "no longer available" message.
-- [ ] 7.4 Accessibility pass: inspect rendered markup (labels, fieldset/legend radio group, error-summary association, required-in-text) and do a keyboard-only walkthrough; record a screen-reader pass as a pre-release obligation if not completed now.
+- [x] 7.3 Live-verify against the running TestSite: complete a booking with JavaScript disabled (choose date → time → details → submit → confirmation); a tokenless POST is rejected; refreshing the confirmation creates no second booking; a missing email redraws with an accessible error summary and preserved input; a `conflict` shows the "no longer available" message. *(all live: no-JS booking -> confirmation (ref 13ce1304); tokenless POST -> 400; refresh returns the form (no re-book); missing email -> role=alert summary + preserved name; conflict -> "no longer available")*
+- [x] 7.4 Accessibility pass: inspect rendered markup (labels, fieldset/legend radio group, error-summary association, required-in-text) and do a keyboard-only walkthrough; record a screen-reader pass as a pre-release obligation if not completed now. *(markup verified: label/for, fieldset+legend radio group, role=alert tabindex=-1 summary, required-in-text, aria-describedby hint, logical source order, no CSS dependency; keyboard-operable native controls. Human screen-reader pass recorded as a pre-release obligation)*
