@@ -1,0 +1,30 @@
+@using UBookIt.Core.Stores
+@inject IResourceStore ResourceStore
+@inherits Umbraco.Cms.Web.Common.Views.UmbracoViewPage
+@{
+    Layout = null;
+    // Dev harness for change ⑤: render the default booking flow for the first
+    // bookable resource, so the flow is reachable without hardcoding an id.
+    var firstResource = (await ResourceStore.ListAsync(0, 1)).Items.FirstOrDefault();
+}
+<!doctype html>
+<html lang="en">
+<head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>uBookIt booking test</title>
+</head>
+<body>
+    <main>
+        <h1>uBookIt booking test</h1>
+        @if (firstResource is not null)
+        {
+            @await Component.InvokeAsync("Booking", new { resourceId = firstResource.Id })
+        }
+        else
+        {
+            <p>No bookable resource found. Seed a resource in the backoffice first.</p>
+        }
+    </main>
+</body>
+</html>

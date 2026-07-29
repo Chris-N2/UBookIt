@@ -1,0 +1,90 @@
+@using UBookIt.Web.Rendering
+@using Umbraco.Extensions
+@model BookingFormModel
+
+<section class="ubookit-booking" aria-label="Book @Model.ResourceName">
+    <h2>Book @Model.ResourceName</h2>
+
+    @if (Model.HasErrors)
+    {
+        <div role="alert" tabindex="-1" class="ubookit-errors">
+            <h3>There is a problem</h3>
+            <ul>
+                @foreach (var error in Model.Errors)
+                {
+                    <li>@error</li>
+                }
+            </ul>
+        </div>
+    }
+
+    @* Step 1 — choose a date (GET reload; no JavaScript required). *@
+    <form method="get" class="ubookit-date-form">
+        <div>
+            <label for="ubookit-date">Choose a date</label>
+            <input type="date"
+                   id="ubookit-date"
+                   name="@BookingKeys.DateQuery"
+                   value="@Model.SelectedDate.ToString("yyyy-MM-dd")"
+                   min="@Model.MinDate.ToString("yyyy-MM-dd")"
+                   max="@Model.MaxDate.ToString("yyyy-MM-dd")" />
+        </div>
+        <button type="submit">Show times</button>
+    </form>
+
+    @* Step 2 — choose a time and enter details (POST, anti-forgery via BeginUmbracoForm). *@
+    @using (Html.BeginUmbracoForm<BookingSurfaceController>(nameof(BookingSurfaceController.Submit)))
+    {
+        <input type="hidden" name="ResourceId" value="@Model.ResourceId" />
+        <input type="hidden" name="Date" value="@Model.SelectedDate.ToString("yyyy-MM-dd")" />
+
+        @if (Model.HasTimes)
+        {
+            <fieldset class="ubookit-times">
+                <legend>Available start times on @Model.SelectedDate.ToString("dddd d MMMM yyyy") (@Model.DurationMinutes minutes)</legend>
+                @foreach (var (option, index) in Model.Times.Select((option, index) => (option, index)))
+                {
+                    var id = $"ubookit-time-{index}";
+                    <div class="ubookit-time">
+                        <input type="radio"
+                               id="@id"
+                               name="SelectedTime"
+                               value="@option.InstantIso"
+                               @(option.InstantIso == Model.SelectedTimeIso ? "checked" : null)
+                               required />
+                        <label for="@id">@option.Label</label>
+                    </div>
+                }
+            </fieldset>
+
+            <fieldset class="ubookit-details">
+                <legend>Your details</legend>
+
+                <div>
+                    <label for="ubookit-name">Name (required)</label>
+                    <input type="text" id="ubookit-name" name="Name" value="@Model.Name"
+                           autocomplete="name" required />
+                </div>
+
+                <div>
+                    <label for="ubookit-email">Email (required)</label>
+                    <input type="email" id="ubookit-email" name="Email" value="@Model.Email"
+                           autocomplete="email" aria-describedby="ubookit-email-hint" required />
+                    <span id="ubookit-email-hint">We'll send your booking confirmation here.</span>
+                </div>
+
+                <div>
+                    <label for="ubookit-phone">Phone (optional)</label>
+                    <input type="tel" id="ubookit-phone" name="Phone" value="@Model.Phone"
+                           autocomplete="tel" />
+                </div>
+
+                <button type="submit">Book</button>
+            </fieldset>
+        }
+        else
+        {
+            <p class="ubookit-no-times">No times are available on @Model.SelectedDate.ToString("dddd d MMMM yyyy"). Please choose another date.</p>
+        }
+    }
+</section>

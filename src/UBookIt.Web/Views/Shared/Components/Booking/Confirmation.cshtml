@@ -1,0 +1,28 @@
+@using UBookIt.Web.Rendering
+@model BookingConfirmationModel
+
+<section class="ubookit-confirmation" aria-label="Booking confirmed">
+    <h2>Booking confirmed</h2>
+
+    <p>Thank you, @Model.BookerName. Your booking is confirmed.</p>
+
+    <dl>
+        <dt>Reference</dt>
+        <dd>@Model.BookingId</dd>
+
+        <dt>What</dt>
+        <dd>@Model.ResourceName</dd>
+
+        <dt>When</dt>
+        <dd>@Model.LocalStart&nbsp;&ndash;&nbsp;@Model.LocalEnd</dd>
+
+        <dt>Email</dt>
+        <dd>@Model.BookerEmail</dd>
+
+        @if (!string.IsNullOrWhiteSpace(Model.BookerPhone))
+        {
+            <dt>Phone</dt>
+            <dd>@Model.BookerPhone</dd>
+        }
+    </dl>
+</section>
