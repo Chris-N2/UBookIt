@@ -1,3 +1,4 @@
+using UBookIt.Core.Bookings;
 using UBookIt.Core.Common;
 
 namespace UBookIt.Web.Rendering;
@@ -32,6 +33,38 @@ public static class BookingMessages
     public static string ForCode(string code)
         => Map.TryGetValue(code, out var message) ? message : Fallback;
 
-    public static IReadOnlyList<string> ForFailures(IEnumerable<DomainFailure> failures)
-        => failures.Select(f => ForCode(f.Code)).Distinct(StringComparer.Ordinal).ToList();
+    /// <summary>
+    /// Maps failures to user-facing errors, each associated with the control it
+    /// belongs to so the view can link the summary and set per-field aria
+    /// (WCAG 2.2 AA). Deduped by message.
+    /// </summary>
+    public static IReadOnlyList<BookingError> ForFailures(IEnumerable<DomainFailure> failures)
+        => failures
+            .Select(f => new BookingError(ForCode(f.Code), FieldIdFor(f)))
+            .DistinctBy(e => e.Message, StringComparer.Ordinal)
+            .ToList();
+
+    /// <summary>
+    /// Resolves the offending control id: the domain field where present,
+    /// otherwise the time selection for placement-pipeline codes (which all
+    /// concern the chosen slot). Null = a general error with no single control.
+    /// </summary>
+    private static string? FieldIdFor(DomainFailure failure)
+        => failure.Field switch
+        {
+            nameof(Booker.Name) => BookingFieldIds.Name,
+            nameof(Booker.Email) => BookingFieldIds.Email,
+            _ => failure.Code switch
+            {
+                FailureCodes.Conflict
+                    or FailureCodes.OutsideOpenHours
+                    or FailureCodes.LeadTime
+                    or FailureCodes.Horizon
+                    or FailureCodes.Granularity
+                    or FailureCodes.IntervalInvalid
+                    or FailureCodes.DurationTooShort
+                    or FailureCodes.DurationTooLong => BookingFieldIds.Times,
+                _ => null,
+            },
+        };
 }

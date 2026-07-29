@@ -32,15 +32,32 @@ public sealed class BookingFormModel
 
     public string? Phone { get; init; }
 
-    public IReadOnlyList<string> Errors { get; init; } = [];
+    public IReadOnlyList<BookingError> Errors { get; init; } = [];
 
     public bool HasErrors => Errors.Count > 0;
 
     public bool HasTimes => Times.Count > 0;
+
+    /// <summary>The error message associated with a field id, if any (for aria wiring).</summary>
+    public string? ErrorFor(string fieldId) => Errors.FirstOrDefault(e => e.FieldId == fieldId)?.Message;
 }
 
 /// <summary>One selectable start time: the exact UTC instant plus its site-zone label.</summary>
 public sealed record BookingTimeOption(string InstantIso, string Label);
+
+/// <summary>
+/// A user-facing error message plus the id of the control it belongs to (null
+/// for a general error). Drives the error-summary links and per-field aria.
+/// </summary>
+public sealed record BookingError(string Message, string? FieldId);
+
+/// <summary>Form-control ids, shared by the view and the failure→field mapping so they stay in sync.</summary>
+public static class BookingFieldIds
+{
+    public const string Name = "ubookit-name";
+    public const string Email = "ubookit-email";
+    public const string Times = "ubookit-times";
+}
 
 /// <summary>
 /// A failed submission carried back to the re-rendered form via TempData
@@ -58,7 +75,7 @@ public sealed class FailedSubmission
 
     public string? Phone { get; init; }
 
-    public List<string> Errors { get; init; } = [];
+    public List<BookingError> Errors { get; init; } = [];
 }
 
 /// <summary>View model for the confirmation page shown after a successful placement.</summary>

@@ -1,5 +1,6 @@
 using System.Globalization;
 using System.Text.Json;
+using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
 using UBookIt.Core;
 using UBookIt.Core.Bookings;
@@ -86,7 +87,7 @@ public sealed class BookingSurfaceController : SurfaceController
             if (placed.Succeeded)
             {
                 Stash(BookingKeys.Confirmation, BuildConfirmation(placed.Value, resource.DisplayName, zone));
-                return RedirectToCurrentUmbracoPage();
+                return SeeOther(RedirectToCurrentUmbracoPage());
             }
 
             failures.AddRange(placed.Failures);
@@ -107,7 +108,28 @@ public sealed class BookingSurfaceController : SurfaceController
             Errors = [.. BookingMessages.ForFailures(failures)],
         });
 
-        return RedirectToCurrentUmbracoPage();
+        return SeeOther(RedirectToCurrentUmbracoPage());
+    }
+
+    /// <summary>
+    /// Post-Redirect-Get with a literal 303 See Other (the spec's required
+    /// code). The Umbraco redirect result resolves the current page URL and sets
+    /// the Location header and a 302; the response has not started, so we flip
+    /// the status to 303 (browsers GET the target either way — this makes the
+    /// code match the semantics).
+    /// </summary>
+    private static IActionResult SeeOther(IActionResult redirect) => new SeeOtherResult(redirect);
+
+    private sealed class SeeOtherResult(IActionResult inner) : IActionResult
+    {
+        public async Task ExecuteResultAsync(ActionContext context)
+        {
+            await inner.ExecuteResultAsync(context);
+            if (context.HttpContext.Response.StatusCode == StatusCodes.Status302Found)
+            {
+                context.HttpContext.Response.StatusCode = StatusCodes.Status303SeeOther;
+            }
+        }
     }
 
     private static BookingConfirmationModel BuildConfirmation(Booking booking, string resourceName, TimeZoneInfo zone)

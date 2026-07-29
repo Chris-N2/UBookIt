@@ -48,13 +48,28 @@ public class DefaultFrontendTests
     [Fact]
     public void Duplicate_failure_codes_dedupe_to_one_message()
     {
-        var messages = BookingMessages.ForFailures(
+        var errors = BookingMessages.ForFailures(
         [
             new DomainFailure(FailureCodes.Conflict, "x"),
             new DomainFailure(FailureCodes.Conflict, "y"),
         ]);
 
-        Assert.Equal(BookingMessages.ForCode(FailureCodes.Conflict), Assert.Single(messages));
+        Assert.Equal(BookingMessages.ForCode(FailureCodes.Conflict), Assert.Single(errors).Message);
+    }
+
+    [Fact]
+    public void Failures_carry_the_offending_field_id()
+    {
+        var errors = BookingMessages.ForFailures(
+        [
+            new DomainFailure(FailureCodes.EmailInvalid, "x", "Email"),
+            new DomainFailure(FailureCodes.NameRequired, "y", "Name"),
+            new DomainFailure(FailureCodes.Conflict, "z"),            // no field → the time selection
+        ]);
+
+        Assert.Equal(BookingFieldIds.Email, errors.Single(e => e.Message == BookingMessages.ForCode(FailureCodes.EmailInvalid)).FieldId);
+        Assert.Equal(BookingFieldIds.Name, errors.Single(e => e.Message == BookingMessages.ForCode(FailureCodes.NameRequired)).FieldId);
+        Assert.Equal(BookingFieldIds.Times, errors.Single(e => e.Message == BookingMessages.ForCode(FailureCodes.Conflict)).FieldId);
     }
 
     // --- 6.2 view-model assembly ---
@@ -116,7 +131,7 @@ public class DefaultFrontendTests
             Name = "Ada",
             Email = "not-an-email",
             Phone = "01234",
-            Errors = ["Please enter a valid email address."],
+            Errors = [new BookingError("Please enter a valid email address.", BookingFieldIds.Email)],
         };
 
         var model = BookingFormBuilder.Build(room, Date, today, [], TestData.London, failed);
@@ -126,6 +141,6 @@ public class DefaultFrontendTests
         Assert.Equal("01234", model.Phone);
         Assert.Equal(failed.SelectedTimeIso, model.SelectedTimeIso);
         Assert.True(model.HasErrors);
-        Assert.Equal("Please enter a valid email address.", Assert.Single(model.Errors));
+        Assert.Equal("Please enter a valid email address.", model.ErrorFor(BookingFieldIds.Email));
     }
 }
