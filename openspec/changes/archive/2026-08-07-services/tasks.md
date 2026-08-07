@@ -28,4 +28,4 @@
 
 - [x] 5.1 Build with `--no-incremental`; only the accepted NU1903 transitive advisories may warn (fix any compiler/analyzer warning).
 - [x] 5.2 Run the full test suite green (unit + integration).
-- [ ] 5.3 Live-verify the CRUD endpoints against the running TestSite via the Umbraco MCP / direct authenticated HTTP (create a service, list, get, update, delete); Chris handles any login. Confirm defining services does not disturb existing resource/booking behaviour.
+- [x] 5.3 Live-verify the CRUD endpoints against the running TestSite via the Umbraco MCP / direct authenticated HTTP (create a service, list, get, update, delete); Chris handles any login. Confirm defining services does not disturb existing resource/booking behaviour.
