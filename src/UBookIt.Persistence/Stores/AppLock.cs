@@ -13,6 +13,8 @@ internal static class AppLock
 
     internal static string ForResourceConfig(Guid resourceId) => $"ubookit:resource-config:{resourceId:N}";
 
+    internal static string ForServiceConfig(Guid serviceId) => $"ubookit:service-config:{serviceId:N}";
+
     /// <summary>Must be called inside an open transaction; released at commit/rollback.</summary>
     internal static Task AcquireAsync(UBookItDbContext db, string lockResource, CancellationToken cancellationToken)
         => db.Database.ExecuteSqlAsync($"""

@@ -22,6 +22,10 @@ public sealed class UBookItDbContext(DbContextOptions<UBookItDbContext> options)
 
     internal DbSet<ClaimRow> Claims => Set<ClaimRow>();
 
+    internal DbSet<ServiceRow> Services => Set<ServiceRow>();
+
+    internal DbSet<ServiceRoleRow> ServiceRoles => Set<ServiceRoleRow>();
+
     /// <summary>
     /// Single place that configures the SQL Server provider (uBookIt requires
     /// SQL Server 2019+) with the package-private migrations history table.
@@ -78,6 +82,23 @@ public sealed class UBookItDbContext(DbContextOptions<UBookItDbContext> options)
             claim.HasIndex(c => new { c.BookingId, c.ResourceId }).IsUnique();
             claim.HasIndex(c => c.ResourceId).IncludeProperties(c => c.BookingId);
             claim.HasOne<ResourceRow>().WithMany().HasForeignKey(c => c.ResourceId).OnDelete(DeleteBehavior.Restrict);
+        });
+
+        modelBuilder.Entity<ServiceRow>(service =>
+        {
+            service.ToTable("uBookItService");
+            service.HasKey(s => s.Id);
+            service.Property(s => s.Id).ValueGeneratedNever();
+            service.Property(s => s.Name).HasMaxLength(512);
+            service.HasMany(s => s.Roles).WithOne().HasForeignKey(r => r.ServiceId).OnDelete(DeleteBehavior.Cascade);
+        });
+
+        modelBuilder.Entity<ServiceRoleRow>(role =>
+        {
+            role.ToTable("uBookItServiceRole");
+            role.HasKey(r => r.Id);
+            role.Property(r => r.ResourceType).HasMaxLength(64);
+            role.HasIndex(r => r.ServiceId);
         });
     }
 }

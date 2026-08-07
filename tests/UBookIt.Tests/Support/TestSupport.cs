@@ -3,6 +3,7 @@ using UBookIt.Core.Availability;
 using UBookIt.Core.Bookings;
 using UBookIt.Core.Common;
 using UBookIt.Core.Resources;
+using UBookIt.Core.Services;
 using UBookIt.Core.Stores;
 
 namespace UBookIt.Tests.Support;
@@ -40,6 +41,59 @@ public sealed class InMemoryResourceStore : IResourceStore
 
         return Task.FromResult(new ResourcePage(items, total));
     }
+}
+
+/// <summary>In-memory service store implementing both the read and management ports.</summary>
+public sealed class InMemoryServiceStore : IServiceStore, IServiceManagementStore
+{
+    private readonly Dictionary<Guid, Service> _services = [];
+
+    public InMemoryServiceStore Add(Service service)
+    {
+        _services[service.Id] = service;
+        return this;
+    }
+
+    public Task<Service?> GetAsync(Guid serviceId, CancellationToken cancellationToken = default)
+        => Task.FromResult(_services.GetValueOrDefault(serviceId));
+
+    public Task<ServicePage> ListAsync(int skip, int take, CancellationToken cancellationToken = default)
+    {
+        skip = Math.Max(0, skip);
+        take = Math.Clamp(take, 0, 500);
+
+        var total = _services.Count;
+        IReadOnlyList<Service> items = _services.Values
+            .OrderBy(s => s.Name).ThenBy(s => s.Id)
+            .Skip(skip)
+            .Take(take)
+            .ToList();
+
+        return Task.FromResult(new ServicePage(items, total));
+    }
+
+    public Task<DomainResult<Service>> CreateAsync(Service service, CancellationToken cancellationToken = default)
+    {
+        _services[service.Id] = service;
+        return Task.FromResult(DomainResult<Service>.Success(service));
+    }
+
+    public Task<DomainResult<Service>> UpdateAsync(Service service, CancellationToken cancellationToken = default)
+    {
+        if (!_services.ContainsKey(service.Id))
+        {
+            return Task.FromResult(DomainResult<Service>.Failure(
+                FailureCodes.ServiceNotFound, $"No service exists with id {service.Id}."));
+        }
+
+        _services[service.Id] = service;
+        return Task.FromResult(DomainResult<Service>.Success(service));
+    }
+
+    public Task<DomainResult> DeleteAsync(Guid serviceId, CancellationToken cancellationToken = default)
+        => Task.FromResult(_services.Remove(serviceId)
+            ? DomainResult.Success()
+            : DomainResult.Failure(FailureCodes.ServiceNotFound, $"No service exists with id {serviceId}."));
 }
 
 /// <summary>

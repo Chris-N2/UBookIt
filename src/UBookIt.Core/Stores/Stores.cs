@@ -1,6 +1,7 @@
 using UBookIt.Core.Bookings;
 using UBookIt.Core.Common;
 using UBookIt.Core.Resources;
+using UBookIt.Core.Services;
 
 namespace UBookIt.Core.Stores;
 
@@ -46,6 +47,36 @@ public interface IResourceManagementStore
     Task<DomainResult> DeleteAsync(Guid resourceId, CancellationToken cancellationToken = default);
 
     Task<ResourcePage> ListAsync(int skip, int take, CancellationToken cancellationToken = default);
+}
+
+/// <summary>One page of services plus the unpaged total.</summary>
+public sealed record ServicePage(IReadOnlyList<Service> Items, int Total);
+
+/// <summary>Read access to services. Implemented by UBookIt.Persistence.</summary>
+public interface IServiceStore
+{
+    Task<Service?> GetAsync(Guid serviceId, CancellationToken cancellationToken = default);
+
+    Task<ServicePage> ListAsync(int skip, int take, CancellationToken cancellationToken = default);
+}
+
+/// <summary>
+/// Management writes for services. Implemented by UBookIt.Persistence. Accepts
+/// only validated <see cref="Service"/> aggregates (constructible solely via the
+/// Core factory), so the store persists only validated state. Updates replace
+/// the service's roles wholesale within one transaction.
+/// </summary>
+public interface IServiceManagementStore
+{
+    Task<DomainResult<Service>> CreateAsync(Service service, CancellationToken cancellationToken = default);
+
+    /// <summary>Full update; fails with <see cref="FailureCodes.ServiceNotFound"/> for unknown ids.</summary>
+    Task<DomainResult<Service>> UpdateAsync(Service service, CancellationToken cancellationToken = default);
+
+    /// <summary>Fails with <see cref="FailureCodes.ServiceNotFound"/> for unknown ids.</summary>
+    Task<DomainResult> DeleteAsync(Guid serviceId, CancellationToken cancellationToken = default);
+
+    Task<ServicePage> ListAsync(int skip, int take, CancellationToken cancellationToken = default);
 }
 
 /// <summary>

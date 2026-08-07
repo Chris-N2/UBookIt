@@ -41,6 +41,12 @@ public static class FailureCodes
     public const string ConstraintsIncoherent = "constraints-incoherent";
     public const string NameRequired = "name-required";
     public const string EmailInvalid = "email-invalid";
+
+    // Services
+    public const string ServiceNameRequired = "service-name-required";
+    public const string ServiceRoleInvalid = "service-role-invalid";
+    public const string ServiceDurationInvalid = "service-duration-invalid";
+    public const string ServiceNotFound = "service-not-found";
 }
 
 /// <summary>

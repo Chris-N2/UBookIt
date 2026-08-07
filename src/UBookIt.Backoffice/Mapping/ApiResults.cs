@@ -17,7 +17,8 @@ internal static class ApiResults
     {
         var status = failures switch
         {
-            _ when failures.Any(f => f.Code == FailureCodes.ResourceNotFound) => StatusCodes.Status404NotFound,
+            _ when failures.Any(f => f.Code is FailureCodes.ResourceNotFound or FailureCodes.ServiceNotFound)
+                => StatusCodes.Status404NotFound,
             _ when failures.Any(f => f.Code == FailureCodes.ResourceInUse) => StatusCodes.Status409Conflict,
             _ => StatusCodes.Status400BadRequest,
         };

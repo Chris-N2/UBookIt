@@ -92,3 +92,27 @@ internal sealed class ClaimRow
 
     public Guid ResourceId { get; set; }
 }
+
+/// <summary>Table: uBookItService. Duration stored as integer minutes (NULL = no fixed duration).</summary>
+internal sealed class ServiceRow
+{
+    public Guid Id { get; set; }
+
+    public required string Name { get; set; }
+
+    public int? DurationMinutes { get; set; }
+
+    public List<ServiceRoleRow> Roles { get; set; } = [];
+}
+
+/// <summary>Table: uBookItServiceRole. One row per required role (v1: exactly one per service).</summary>
+internal sealed class ServiceRoleRow
+{
+    public long Id { get; set; }
+
+    public Guid ServiceId { get; set; }
+
+    public required string ResourceType { get; set; }
+
+    public int Count { get; set; }
+}
