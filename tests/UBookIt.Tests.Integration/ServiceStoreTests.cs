@@ -112,6 +112,54 @@ public class ServiceStoreTests(SqlServerFixture fixture)
         Assert.Equal(0, await verify.ServiceRoles.CountAsync(r => r.ServiceId == service.Id, Ct));
     }
 
+    /// <summary>
+    /// The single-role merge race (the ③ lesson, applied to service roles): at
+    /// READ COMMITTED, two concurrent updates each delete the one role row
+    /// (taking no range lock over a 0/1-row set) and both insert, committing a
+    /// merged two-role set that violates the single-role invariant. The
+    /// per-service app lock must serialize them. Ten iterations on a fresh
+    /// service each, so there is no accidental serialization point.
+    /// </summary>
+    [Fact]
+    public async Task Racing_updates_never_merge_roles()
+    {
+        fixture.EnsureAvailable();
+
+        for (var iteration = 0; iteration < 10; iteration++)
+        {
+            var original = NewService($"Race {iteration}", 30, "person");
+            await using (var context = fixture.CreateContext())
+            {
+                Assert.True((await new SqlServiceManagementStore(context).CreateAsync(original, Ct)).Succeeded);
+            }
+
+            Service Variant(string type) =>
+                Service.Create($"Race {iteration}", TimeSpan.FromMinutes(30), [new ServiceRole(type, 1)], original.Id).Value;
+
+            var results = await Task.WhenAll(
+                Task.Run(async () =>
+                {
+                    await using var context = fixture.CreateContext();
+                    return await new SqlServiceManagementStore(context).UpdateAsync(Variant("room"), Ct);
+                }, Ct),
+                Task.Run(async () =>
+                {
+                    await using var context = fixture.CreateContext();
+                    return await new SqlServiceManagementStore(context).UpdateAsync(Variant("person"), Ct);
+                }, Ct));
+
+            Assert.All(results, r => Assert.True(r.Succeeded));
+
+            await using var read = fixture.CreateContext();
+            var reloaded = await new SqlServiceStore(read).GetAsync(original.Id, Ct);
+            Assert.NotNull(reloaded);
+
+            // Exactly one writer's role — a merge would leave two.
+            var role = Assert.Single(reloaded!.Roles);
+            Assert.Contains(role.ResourceType, new[] { "room", "person" });
+        }
+    }
+
     [Fact]
     public async Task Delete_unknown_id_fails()
     {

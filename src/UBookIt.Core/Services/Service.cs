@@ -54,10 +54,21 @@ public sealed partial class Service
                 FailureCodes.ServiceNameRequired, "A service name is required.", nameof(Name)));
         }
 
-        if (duration is { } d && d <= TimeSpan.Zero)
+        if (duration is { } d)
         {
-            failures.Add(new DomainFailure(
-                FailureCodes.ServiceDurationInvalid, "A service duration must be positive when supplied.", nameof(Duration)));
+            if (d <= TimeSpan.Zero)
+            {
+                failures.Add(new DomainFailure(
+                    FailureCodes.ServiceDurationInvalid, "A service duration must be positive when supplied.", nameof(Duration)));
+            }
+            else if (d.Ticks % TimeSpan.FromMinutes(1).Ticks != 0)
+            {
+                // Duration is persisted and exposed as whole minutes; reject
+                // sub-minute values at the domain boundary so stored state
+                // always round-trips.
+                failures.Add(new DomainFailure(
+                    FailureCodes.ServiceDurationInvalid, "A service duration must be a whole number of minutes.", nameof(Duration)));
+            }
         }
 
         var roleList = roles?.ToList() ?? [];

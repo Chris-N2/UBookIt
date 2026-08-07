@@ -106,6 +106,15 @@ public class ServicesControllerTests
     }
 
     [Fact]
+    public void Controller_inherits_the_authorized_backoffice_base()
+    {
+        Assert.True(typeof(UBookItBackofficeApiControllerBase).IsAssignableFrom(typeof(ServicesController)));
+        Assert.NotNull(
+            typeof(UBookItBackofficeApiControllerBase)
+                .GetCustomAttribute<Microsoft.AspNetCore.Authorization.AuthorizeAttribute>(inherit: true));
+    }
+
+    [Fact]
     public void Controller_depends_only_on_service_ports_not_booking_storage()
     {
         var paramTypes = typeof(ServicesController)

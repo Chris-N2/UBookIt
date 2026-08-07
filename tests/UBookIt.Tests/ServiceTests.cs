@@ -57,6 +57,17 @@ public class ServiceTests
     }
 
     [Fact]
+    public void Sub_minute_duration_is_rejected()
+    {
+        // Duration persists/round-trips as whole minutes; 90 seconds must not
+        // be silently truncated to 1 minute.
+        var result = Service.Create("X", TimeSpan.FromSeconds(90), [Role()]);
+
+        Assert.False(result.Succeeded);
+        Assert.Contains(result.Failures, f => f.Code == FailureCodes.ServiceDurationInvalid);
+    }
+
+    [Fact]
     public void Zero_roles_is_rejected()
     {
         var result = Service.Create("X", null, []);
