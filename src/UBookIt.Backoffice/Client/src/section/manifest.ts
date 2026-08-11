@@ -28,6 +28,24 @@ export const manifests: Array<UmbExtensionManifest> = [
     ],
   },
   {
+    type: "sectionView",
+    alias: "UBookIt.SectionView.Services",
+    name: "uBookIt Services Section View",
+    js: () => import("./services-view.element.js"),
+    weight: 90,
+    meta: {
+      label: "#ubookitServices_label",
+      pathname: "services",
+      icon: "icon-list",
+    },
+    conditions: [
+      {
+        alias: "Umb.Condition.SectionAlias",
+        match: "UBookIt.Section",
+      },
+    ],
+  },
+  {
     type: "localization",
     alias: "UBookIt.Localization.EnUS",
     name: "uBookIt English (United States)",

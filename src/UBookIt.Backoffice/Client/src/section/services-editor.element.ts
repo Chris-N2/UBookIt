@@ -1,0 +1,353 @@
+import { css, html, customElement, property, state, nothing } from "@umbraco-cms/backoffice/external/lit";
+import { UmbLitElement } from "@umbraco-cms/backoffice/lit-element";
+import { UBookItBackofficeService } from "../api/index.js";
+import type { ResourceTypeUsageModel, ServiceRequestModel } from "../api/index.js";
+import { toApiErrors, type ApiError } from "./api-errors.js";
+
+/** The two duration modes. Inherit sends null; fixed sends the minutes value. */
+type DurationMode = "inherit" | "fixed";
+
+/**
+ * Workspace editor for one service: Details, Service Requirements, and
+ * Duration. Saves the full service; failures surface as an announced error
+ * summary plus group-associated messages, and never lose form state.
+ *
+ * Shape notes:
+ * - Requirements render as a list of exactly one role with no add/remove
+ *   control, so multi-role support is an addition rather than a rewrite
+ *   (design D5). `count` is not surfaced and is always sent as 1.
+ * - Duration is an explicit choice, never an empty box meaning "inherit"
+ *   (design D4).
+ *
+ * Accessibility notes follow the resource editor: uui form controls receive
+ * their programmatic name via the `label` property (a visible uui-label with
+ * `for` cannot pierce the component's shadow root); native inputs are labelled
+ * with `label[for]` in the same shadow root; the error summary is focused on
+ * failed save and group errors are associated via aria-describedby.
+ */
+@customElement("ubookit-service-editor")
+export class UBookItServiceEditorElement extends UmbLitElement {
+  @property({ type: String })
+  serviceId?: string;
+
+  @state()
+  private _loading = true;
+
+  @state()
+  private _saving = false;
+
+  @state()
+  private _errors: ApiError[] = [];
+
+  @state()
+  private _name = "";
+
+  @state()
+  private _resourceType = "";
+
+  @state()
+  private _durationMode: DurationMode = "inherit";
+
+  @state()
+  private _durationMinutes = 60;
+
+  @state()
+  private _knownTypes: ResourceTypeUsageModel[] = [];
+
+  #term(key: string) {
+    return this.localize.term(`ubookitServices_${key}`);
+  }
+
+  override connectedCallback() {
+    super.connectedCallback();
+    void this.#load();
+  }
+
+  async #load() {
+    // The picker is a convenience: if the type list cannot be fetched the
+    // editor still works as a free-text field, so its failure is not surfaced
+    // as a save-blocking error.
+    void this.#loadTypes();
+
+    if (!this.serviceId) {
+      this._loading = false;
+      return;
+    }
+
+    let data;
+    try {
+      const response = await UBookItBackofficeService.getService({ path: { id: this.serviceId } });
+      data = response.data;
+      if (response.error || !data) {
+        this._errors = toApiErrors(response.error, this.#term("serviceLoadFailed"));
+        this._loading = false;
+        return;
+      }
+    } catch (thrown) {
+      this._errors = toApiErrors(thrown, this.#term("serviceLoadFailed"));
+      this._loading = false;
+      return;
+    }
+
+    this._name = data.name;
+    this._resourceType = data.roles[0]?.resourceType ?? "";
+
+    if (data.durationMinutes === null || data.durationMinutes === undefined) {
+      this._durationMode = "inherit";
+    } else {
+      this._durationMode = "fixed";
+      this._durationMinutes = data.durationMinutes;
+    }
+
+    this._loading = false;
+  }
+
+  async #loadTypes() {
+    try {
+      const { data } = await UBookItBackofficeService.listResourceTypes();
+      this._knownTypes = data ?? [];
+    } catch {
+      this._knownTypes = [];
+    }
+  }
+
+  #buildRequest(): ServiceRequestModel {
+    return {
+      name: this._name,
+      durationMinutes: this._durationMode === "fixed" ? this._durationMinutes : null,
+      // Exactly one role, count fixed at 1 in v1 (design D5).
+      roles: [{ resourceType: this._resourceType, count: 1 }],
+    };
+  }
+
+  async #save(event: Event) {
+    event.preventDefault();
+    this._saving = true;
+    this._errors = [];
+
+    const body = this.#buildRequest();
+    try {
+      const result = this.serviceId
+        ? await UBookItBackofficeService.updateService({ path: { id: this.serviceId }, body })
+        : await UBookItBackofficeService.createService({ body });
+
+      if (result.error) {
+        this._errors = toApiErrors(result.error, this.#term("serviceSaveFailed"));
+        return;
+      }
+    } catch (thrown) {
+      this._errors = toApiErrors(thrown, this.#term("serviceSaveFailed"));
+      return;
+    } finally {
+      this._saving = false;
+      if (this._errors.length > 0) {
+        await this.updateComplete;
+        this.shadowRoot?.querySelector<HTMLElement>("#error-summary")?.focus();
+      }
+    }
+
+    this.dispatchEvent(new CustomEvent("ubookit-saved"));
+  }
+
+  #errorsFor(...codes: string[]): ApiError[] {
+    return this._errors.filter((e) => e.code !== undefined && codes.includes(e.code));
+  }
+
+  /** True once a type has been entered that no existing resource uses. */
+  get #typeIsUnknown(): boolean {
+    const entered = this._resourceType.trim();
+    return entered.length > 0 && !this._knownTypes.some((t) => t.type === entered);
+  }
+
+  override render() {
+    if (this._loading) {
+      return html`<uui-loader-bar aria-label=${this.#term("loadingService")}></uui-loader-bar>`;
+    }
+
+    return html`
+      <uui-button
+        look="secondary"
+        label=${this.#term("back")}
+        @click=${() => this.dispatchEvent(new CustomEvent("ubookit-close"))}
+      ></uui-button>
+
+      <h2>${this.serviceId ? this._name || this.#term("edit") : this.#term("newService")}</h2>
+
+      ${this.#renderErrorSummary()}
+
+      <form @submit=${this.#save} novalidate>
+        ${this.#renderDetails()} ${this.#renderRequirements()} ${this.#renderDuration()}
+
+        <div class="actions">
+          <uui-button
+            type="submit"
+            look="primary"
+            label=${this.#term("save")}
+            state=${this._saving ? "waiting" : nothing}
+          ></uui-button>
+          <uui-button
+            look="secondary"
+            label=${this.#term("cancel")}
+            @click=${() => this.dispatchEvent(new CustomEvent("ubookit-close"))}
+          ></uui-button>
+        </div>
+      </form>
+    `;
+  }
+
+  #renderErrorSummary() {
+    if (this._errors.length === 0) return nothing;
+
+    return html`
+      <div id="error-summary" role="alert" tabindex="-1" class="error-summary">
+        <strong>${this.#term("errorSummary")}</strong>
+        <ul>
+          ${this._errors.map((e) => html`<li>${e.message ?? e.code}</li>`)}
+        </ul>
+      </div>
+    `;
+  }
+
+  #renderGroupErrors(groupId: string, ...codes: string[]) {
+    const errors = this.#errorsFor(...codes);
+    return errors.length === 0
+      ? nothing
+      : html`<p class="group-error" id=${groupId}>${errors.map((e) => e.message).join(" ")}</p>`;
+  }
+
+  #renderDetails() {
+    return html`
+      <uui-box headline=${this.#term("details")}>
+        ${this.#renderGroupErrors("err-details", "service-name-required")}
+        <div class="field">
+          <uui-label for="service-name" required>${this.#term("name")}</uui-label>
+          <uui-input
+            id="service-name"
+            label=${this.#term("name")}
+            .value=${this._name}
+            @input=${(e: InputEvent) => (this._name = (e.target as HTMLInputElement).value)}
+          ></uui-input>
+        </div>
+      </uui-box>
+    `;
+  }
+
+  #renderRequirements() {
+    const hasGroupError = this.#errorsFor("service-role-invalid", "type-key-invalid").length > 0;
+
+    // A native input with a datalist, not uui-combobox: the uui control's
+    // value must match one of its options, which would block naming a type
+    // before any resource has it — a legitimate setup order (design D2).
+    return html`
+      <uui-box headline=${this.#term("requirements")}>
+        ${this.#renderGroupErrors("err-requirements", "service-role-invalid", "type-key-invalid")}
+        <fieldset aria-describedby=${hasGroupError ? "err-requirements" : nothing}>
+          <legend class="visually-hidden">${this.#term("requirements")}</legend>
+          <div class="field">
+            <label for="service-resource-type">${this.#term("resourceType")}</label>
+            <input
+              id="service-resource-type"
+              list="ubookit-resource-types"
+              .value=${this._resourceType}
+              aria-describedby="resource-type-hint${this.#typeIsUnknown ? " resource-type-unknown" : ""}"
+              @input=${(e: InputEvent) => (this._resourceType = (e.target as HTMLInputElement).value)}
+            />
+            <datalist id="ubookit-resource-types">
+              ${this._knownTypes.map((t) => html`<option value=${t.type}></option>`)}
+            </datalist>
+            <p id="resource-type-hint" class="hint">${this.#term("resourceTypeHint")}</p>
+            ${this.#typeIsUnknown
+              ? html`<p id="resource-type-unknown" class="hint" role="status">
+                  ${this.#term("resourceTypeUnknown")}
+                </p>`
+              : nothing}
+          </div>
+        </fieldset>
+      </uui-box>
+    `;
+  }
+
+  #renderDuration() {
+    return html`
+      <uui-box headline=${this.#term("duration")}>
+        ${this.#renderGroupErrors("err-duration", "service-duration-invalid")}
+        <uui-radio-group
+          .value=${this._durationMode}
+          @change=${(e: Event) =>
+            (this._durationMode = (e.target as HTMLInputElement).value as DurationMode)}
+        >
+          <uui-radio value="inherit" label=${this.#term("durationInherit")}></uui-radio>
+          <uui-radio value="fixed" label=${this.#term("durationFixed")}></uui-radio>
+        </uui-radio-group>
+
+        <p class="hint">${this.#term("durationInheritHint")}</p>
+
+        <div class="field">
+          <label for="service-duration">${this.#term("durationMinutes")}</label>
+          <input
+            id="service-duration"
+            type="number"
+            min="1"
+            .value=${String(this._durationMinutes)}
+            ?disabled=${this._durationMode !== "fixed"}
+            @input=${(e: InputEvent) =>
+              (this._durationMinutes = Number((e.target as HTMLInputElement).value))}
+          />
+        </div>
+      </uui-box>
+    `;
+  }
+
+  static override styles = css`
+    uui-box {
+      margin-top: var(--uui-size-space-4);
+    }
+    .field {
+      display: flex;
+      flex-direction: column;
+      gap: var(--uui-size-space-1);
+      margin-bottom: var(--uui-size-space-4);
+      max-width: 400px;
+    }
+    fieldset {
+      border: 1px solid var(--uui-color-border, #d8d7d9);
+      border-radius: var(--uui-border-radius, 3px);
+      margin-bottom: var(--uui-size-space-3);
+      padding: var(--uui-size-space-4);
+    }
+    .hint {
+      color: var(--uui-color-text-alt, #515054);
+      font-size: var(--uui-type-small-size, 0.8rem);
+      margin: 0;
+    }
+    .error-summary {
+      border: 2px solid var(--uui-color-danger, #d42054);
+      padding: var(--uui-size-space-4);
+      margin: var(--uui-size-space-4) 0;
+    }
+    .group-error {
+      color: var(--uui-color-danger, #d42054);
+    }
+    .actions {
+      display: flex;
+      gap: var(--uui-size-space-3);
+      margin-top: var(--uui-size-space-5);
+    }
+    .visually-hidden {
+      position: absolute;
+      width: 1px;
+      height: 1px;
+      overflow: hidden;
+      clip: rect(0 0 0 0);
+      white-space: nowrap;
+    }
+  `;
+}
+
+export default UBookItServiceEditorElement;
+
+declare global {
+  interface HTMLElementTagNameMap {
+    "ubookit-service-editor": UBookItServiceEditorElement;
+  }
+}

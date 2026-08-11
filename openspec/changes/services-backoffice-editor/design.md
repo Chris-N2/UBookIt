@@ -52,6 +52,8 @@ So: choose from the types in use, **or** type a new key. An unmatched key produc
 
 - **Alternative rejected**: strict dropdown plus a separate "add new type" flow. More UI for a case the combobox handles in one control, and it implies a type registry that deliberately does not exist.
 
+**Control choice, settled during implementation:** a native `<input list>` bound to a `<datalist>`, not `uui-combobox`. Checked against the installed package: `uui-combobox`'s value must correspond to one of its `uui-combobox-list` options — text typed into its search field never becomes the value — so it structurally cannot express "a type no resource has yet", which is the entire escape hatch this decision exists to preserve. The native pairing gives suggestion-plus-free-text with built-in keyboard and assistive-technology behaviour, and the resource editor already labels native `date`/`time`/`number` inputs the same way (`label[for]` within the shadow root), so this is consistent rather than novel. `uui` remains preferred wherever a `uui` control actually fits.
+
 ### D3: Services as a second `sectionView`, mirroring the existing routing wart
 
 Verified against the installed `@umbraco-cms/backoffice@17.5.3`: the Packages section's Packages/Installed/Created tabs are `sectionView` extensions (`Umb.SectionView.Packages.*`) with the same `meta.pathname`/`icon` shape our manifest already uses. (`dashboard` remains a distinct extension type in v14+ — the welcome panels in Content — and is not what we want here.) Adding a second entry to `section/manifest.ts` is ~15 lines and the tab strip appears for free.

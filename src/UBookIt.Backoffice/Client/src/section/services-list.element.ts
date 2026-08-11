@@ -1,21 +1,25 @@
 import { css, html, customElement, state, nothing } from "@umbraco-cms/backoffice/external/lit";
 import { UmbLitElement } from "@umbraco-cms/backoffice/lit-element";
 import { UBookItBackofficeService } from "../api/index.js";
-import type { ResourceResponseModel } from "../api/index.js";
+import type { ServiceResponseModel } from "../api/index.js";
 import { toApiErrors } from "./api-errors.js";
 import { confirmDestructive } from "./confirm.js";
 
 const PAGE_SIZE = 20;
 
 /**
- * Collection view: a semantic table of resources with paging and create /
+ * Collection view: a semantic table of services with paging and create /
  * edit / delete affordances. Editing happens in the workspace editor, never
  * inline.
+ *
+ * Failure messages come from the server rather than a client-side map of
+ * known codes, so a code added later (a `service-in-use` delete guard, say)
+ * surfaces meaningfully without a change here (design D7).
  */
-@customElement("ubookit-resource-list")
-export class UBookItResourceListElement extends UmbLitElement {
+@customElement("ubookit-service-list")
+export class UBookItServiceListElement extends UmbLitElement {
   @state()
-  private _items: ResourceResponseModel[] = [];
+  private _items: ServiceResponseModel[] = [];
 
   @state()
   private _total = 0;
@@ -30,7 +34,7 @@ export class UBookItResourceListElement extends UmbLitElement {
   private _error?: string;
 
   #term(key: string) {
-    return this.localize.term(`ubookitResources_${key}`);
+    return this.localize.term(`ubookitServices_${key}`);
   }
 
   override connectedCallback() {
@@ -43,7 +47,7 @@ export class UBookItResourceListElement extends UmbLitElement {
     this._error = undefined;
 
     try {
-      const { data, error } = await UBookItBackofficeService.listResources({
+      const { data, error } = await UBookItBackofficeService.listServices({
         query: { skip: this._skip, take: PAGE_SIZE },
       });
 
@@ -60,10 +64,10 @@ export class UBookItResourceListElement extends UmbLitElement {
     this._loading = false;
   }
 
-  async #delete(resource: ResourceResponseModel) {
+  async #delete(service: ServiceResponseModel) {
     const confirmed = await confirmDestructive(this, {
       headline: this.#term("confirmDeleteHeadline"),
-      content: this.localize.term("ubookitResources_confirmDeleteContent", resource.displayName),
+      content: this.localize.term("ubookitServices_confirmDeleteContent", service.name),
       confirmLabel: this.#term("confirmDelete"),
     });
 
@@ -73,7 +77,7 @@ export class UBookItResourceListElement extends UmbLitElement {
 
     let failure: unknown;
     try {
-      const { error } = await UBookItBackofficeService.deleteResource({ path: { id: resource.id } });
+      const { error } = await UBookItBackofficeService.deleteService({ path: { id: service.id } });
       if (error) {
         failure = error;
       }
@@ -82,9 +86,10 @@ export class UBookItResourceListElement extends UmbLitElement {
     }
 
     if (failure !== undefined) {
-      this._error = toApiErrors(failure, "").some((e) => e.code === "resource-in-use")
-        ? `"${resource.displayName}" has bookings and cannot be deleted.`
-        : `"${resource.displayName}" could not be deleted.`;
+      const fallback = this.localize.term("ubookitServices_serviceDeleteFailed", service.name);
+      // Prefer whatever the server said; the fallback covers a response that
+      // carries no usable message at all.
+      this._error = toApiErrors(failure, fallback).map((e) => e.message ?? e.code).join(" ") || fallback;
       return;
     }
 
@@ -94,12 +99,19 @@ export class UBookItResourceListElement extends UmbLitElement {
     await this.#load();
   }
 
-  #summarize(resource: ResourceResponseModel): string {
-    const windows = resource.openingHours.length;
-    const exceptions = resource.exceptions.length;
-    const windowsPart = windows === 0 ? "no opening hours" : `${windows} window${windows === 1 ? "" : "s"}/week`;
-    const exceptionsPart = exceptions === 0 ? "" : `, ${exceptions} exception${exceptions === 1 ? "" : "s"}`;
-    return `${windowsPart}${exceptionsPart}`;
+  /** "Requires 1 × masseur" — the single v1 role, ready to list more later. */
+  #summarizeRequirements(service: ServiceResponseModel): string {
+    if (service.roles.length === 0) {
+      return "—";
+    }
+
+    return service.roles.map((role) => `${role.count} × ${role.resourceType}`).join(", ");
+  }
+
+  #summarizeDuration(service: ServiceResponseModel): string {
+    return service.durationMinutes === null || service.durationMinutes === undefined
+      ? this.#term("durationInheritSummary")
+      : this.localize.term("ubookitServices_durationFixedSummary", service.durationMinutes);
   }
 
   #edit(id: string) {
@@ -111,10 +123,10 @@ export class UBookItResourceListElement extends UmbLitElement {
 
     return html`
       <div class="header">
-        <h2>${this.localize.term("ubookitResources_label")}</h2>
+        <h2>${this.localize.term("ubookitServices_label")}</h2>
         <uui-button
           look="primary"
-          label=${this.localize.term("ubookitResources_create")}
+          label=${this.localize.term("ubookitServices_create")}
           @click=${() => this.dispatchEvent(new CustomEvent("ubookit-create"))}
         ></uui-button>
       </div>
@@ -128,34 +140,34 @@ export class UBookItResourceListElement extends UmbLitElement {
 
   #renderTable(pageEnd: number) {
     if (this._total === 0) {
-      return html`<p>${this.localize.term("ubookitResources_empty")}</p>`;
+      return html`<p>${this.localize.term("ubookitServices_empty")}</p>`;
     }
 
     return html`
       <uui-table aria-label=${this.#term("tableLabel")}>
         <uui-table-head>
           <uui-table-head-cell>${this.#term("name")}</uui-table-head-cell>
-          <uui-table-head-cell>${this.#term("type")}</uui-table-head-cell>
-          <uui-table-head-cell>${this.#term("availability")}</uui-table-head-cell>
+          <uui-table-head-cell>${this.#term("requirementsSummary")}</uui-table-head-cell>
+          <uui-table-head-cell>${this.#term("duration")}</uui-table-head-cell>
           <uui-table-head-cell><span class="visually-hidden">${this.#term("actions")}</span></uui-table-head-cell>
         </uui-table-head>
         ${this._items.map(
-          (resource) => html`
+          (service) => html`
             <uui-table-row>
-              <uui-table-cell>${resource.displayName}</uui-table-cell>
-              <uui-table-cell>${resource.type}</uui-table-cell>
-              <uui-table-cell>${this.#summarize(resource)}</uui-table-cell>
+              <uui-table-cell>${service.name}</uui-table-cell>
+              <uui-table-cell>${this.#summarizeRequirements(service)}</uui-table-cell>
+              <uui-table-cell>${this.#summarizeDuration(service)}</uui-table-cell>
               <uui-table-cell>
                 <uui-button
                   look="secondary"
-                  label="${this.localize.term("ubookitResources_edit")} ${resource.displayName}"
-                  @click=${() => this.#edit(resource.id)}
+                  label="${this.localize.term("ubookitServices_edit")} ${service.name}"
+                  @click=${() => this.#edit(service.id)}
                 ></uui-button>
                 <uui-button
                   look="secondary"
                   color="danger"
-                  label="${this.localize.term("ubookitResources_delete")} ${resource.displayName}"
-                  @click=${() => this.#delete(resource)}
+                  label="${this.localize.term("ubookitServices_delete")} ${service.name}"
+                  @click=${() => this.#delete(service)}
                 ></uui-button>
               </uui-table-cell>
             </uui-table-row>
@@ -174,7 +186,7 @@ export class UBookItResourceListElement extends UmbLitElement {
           }}
         ></uui-button>
         <span aria-live="polite">
-          ${this.localize.term("ubookitResources_showing", this._skip + 1, pageEnd, this._total)}
+          ${this.localize.term("ubookitServices_showing", this._skip + 1, pageEnd, this._total)}
         </span>
         <uui-button
           look="secondary"
@@ -219,6 +231,6 @@ export class UBookItResourceListElement extends UmbLitElement {
 
 declare global {
   interface HTMLElementTagNameMap {
-    "ubookit-resource-list": UBookItResourceListElement;
+    "ubookit-service-list": UBookItServiceListElement;
   }
 }
