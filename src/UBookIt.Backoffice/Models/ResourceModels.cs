@@ -90,6 +90,18 @@ public class PagedResourcesModel
     public List<ResourceResponseModel> Items { get; set; } = [];
 }
 
+/// <summary>
+/// A resource type key currently in use and how many resources have it.
+/// Backs the backoffice type picker; the count lets the UI hint that a chosen
+/// type matches no resources without a second request.
+/// </summary>
+public class ResourceTypeUsageModel
+{
+    public string Type { get; set; } = string.Empty;
+
+    public int Count { get; set; }
+}
+
 /// <summary>One failed validation rule, using the domain's stable codes.</summary>
 public class ApiErrorModel
 {

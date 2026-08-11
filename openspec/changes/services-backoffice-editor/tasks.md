@@ -2,11 +2,13 @@ Ordered so that an interruption leaves a coherent state: groups 1–2 stand alon
 
 ## 1. Resource type usage endpoint
 
-- [ ] 1.1 Add `ResourceTypeUsage(string Type, int Count)` and `Task<IReadOnlyList<ResourceTypeUsage>> ListTypesAsync(CancellationToken)` to `IResourceManagementStore` in `UBookIt.Core` — read port untouched (design D1).
-- [ ] 1.2 Implement it in `UBookIt.Persistence` as a grouped projection over the resources table, ordered by type key for deterministic results. No migration, no eager loading of opening hours or exceptions.
-- [ ] 1.3 Add `GET resources/types` to `ResourcesController` (`[ApiVersion("1.0")]`, `ubookitbackoffice` group) returning a `ResourceTypeUsageModel` list via the existing controller base, so authorization comes for free.
-- [ ] 1.4 Unit-test the projection: empty store returns empty; mixed types return correct counts; ordering is stable across calls.
-- [ ] 1.5 Integration-test the endpoint: authorized call returns counts; unauthenticated call returns 401 without reaching handler logic.
+- [x] 1.1 Add `ResourceTypeUsage(string Type, int Count)` and `Task<IReadOnlyList<ResourceTypeUsage>> ListTypesAsync(CancellationToken)` to `IResourceManagementStore` in `UBookIt.Core` — read port untouched (design D1).
+- [x] 1.2 Implement it in `UBookIt.Persistence` as a grouped projection over the resources table, ordered by type key for deterministic results. No migration, no eager loading of opening hours or exceptions.
+- [x] 1.3 Add `GET resources/types` to `ResourcesController` (`[ApiVersion("1.0")]`, `ubookitbackoffice` group) returning a `ResourceTypeUsageModel` list via the existing controller base, so authorization comes for free.
+- [x] 1.4 Unit-test the projection: empty store returns empty; mixed types return correct counts; ordering is stable across calls.
+  - Split by what each layer can actually prove: the EF-translated projection is tested against LocalDB in `ResourceManagementStoreTests` (counts, key ordering, stability across calls), since a fake would not have caught the translation failure it did catch. The empty case is asserted at the controller level, where it can be isolated — the integration collection shares one un-reset database, so those tests use per-test unique type keys instead.
+- [x] 1.5 Integration-test the endpoint: authorized call returns counts; unauthenticated call returns 401 without reaching handler logic.
+  - Authorization is asserted structurally (the controller inherits the `[Authorize]` base), matching the convention change ③ established for every other management endpoint; there is no host-test harness to issue a real unauthenticated request. Also asserts the `resources/types` literal route cannot collide with the guid-constrained id route.
 
 ## 2. Regenerate the TypeScript client
 

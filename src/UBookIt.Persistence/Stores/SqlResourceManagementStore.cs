@@ -161,4 +161,26 @@ internal sealed class SqlResourceManagementStore(UBookItDbContext db) : IResourc
 
         return new ResourcePage(rows.Select(ResourceRowMapper.ToDomain).ToList(), total);
     }
+
+    public async Task<IReadOnlyList<ResourceTypeUsage>> ListTypesAsync(CancellationToken cancellationToken = default)
+    {
+        // A grouped projection over the resources table only — no child-row
+        // includes, and it scales with the number of distinct types rather than
+        // the number of resources. Ordered by type key so the backoffice picker
+        // does not reshuffle between loads.
+        //
+        // The GROUP BY projects to an anonymous type, not straight to
+        // ResourceTypeUsage: EF cannot translate a positional record's
+        // constructor inside a grouping projection. The record is constructed
+        // after materialization, so the aggregation still runs server-side.
+        var grouped = await db.Resources
+            .AsNoTracking()
+            .GroupBy(r => r.Type)
+            .Select(g => new { Type = g.Key, Count = g.Count() })
+            .OrderBy(t => t.Type)
+            .ToListAsync(cancellationToken)
+            .ConfigureAwait(false);
+
+        return grouped.Select(g => new ResourceTypeUsage(g.Type, g.Count)).ToList();
+    }
 }

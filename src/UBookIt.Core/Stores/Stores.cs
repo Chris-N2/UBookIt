@@ -25,6 +25,9 @@ public interface IResourceStore
 /// <summary>One page of resources plus the unpaged total.</summary>
 public sealed record ResourcePage(IReadOnlyList<Resource> Items, int Total);
 
+/// <summary>A resource type key currently in use, with how many resources have it.</summary>
+public sealed record ResourceTypeUsage(string Type, int Count);
+
 /// <summary>
 /// Management writes for resources. Implemented by UBookIt.Persistence.
 /// Accepts only <see cref="Resource"/> aggregates — which are constructible
@@ -47,6 +50,14 @@ public interface IResourceManagementStore
     Task<DomainResult> DeleteAsync(Guid resourceId, CancellationToken cancellationToken = default);
 
     Task<ResourcePage> ListAsync(int skip, int take, CancellationToken cancellationToken = default);
+
+    /// <summary>
+    /// The distinct resource type keys currently in use with a count per type,
+    /// ordered by type key. Backs the backoffice type picker so a service role's
+    /// resource type is chosen rather than retyped. Kept on the management port
+    /// (not the read port) because the only consumer is a backoffice endpoint.
+    /// </summary>
+    Task<IReadOnlyList<ResourceTypeUsage>> ListTypesAsync(CancellationToken cancellationToken = default);
 }
 
 /// <summary>One page of services plus the unpaged total.</summary>

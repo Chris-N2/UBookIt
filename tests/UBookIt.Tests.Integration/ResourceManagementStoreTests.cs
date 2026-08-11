@@ -272,6 +272,76 @@ public class ResourceManagementStoreTests(SqlServerFixture fixture)
         Assert.True(await verifyContext.OpenHours.AnyAsync(w => w.ResourceId == resourceId, Ct));
     }
 
+    /// <summary>
+    /// The collection shares one database and tests do not reset it, so these
+    /// assert on type keys unique to this test rather than on the whole result
+    /// set. The "no resources at all" case is covered where it can be isolated:
+    /// <c>ResourceTypesEndpointTests</c>.
+    /// </summary>
+    [Fact]
+    public async Task Types_in_use_are_reported_with_a_count_each()
+    {
+        fixture.EnsureAvailable();
+
+        var suffix = Guid.NewGuid().ToString("n")[..8];
+        var roomType = $"zz-room-{suffix}";
+        var masseurType = $"zz-masseur-{suffix}";
+
+        await using (var context = fixture.CreateContext())
+        {
+            var store = new SqlResourceManagementStore(context);
+            foreach (var (type, name) in new[]
+                     {
+                         (roomType, "Room A"), (roomType, "Room B"), (roomType, "Room C"),
+                         (masseurType, "Mary"),
+                     })
+            {
+                var created = await store.CreateAsync(Resource.Create(type, name).Value, Ct);
+                Assert.True(created.Succeeded);
+            }
+        }
+
+        await using var verifyContext = fixture.CreateContext();
+        var types = await new SqlResourceManagementStore(verifyContext).ListTypesAsync(Ct);
+
+        Assert.Equal(3, types.Single(t => t.Type == roomType).Count);
+        Assert.Equal(1, types.Single(t => t.Type == masseurType).Count);
+        Assert.DoesNotContain(types, t => t.Type == $"zz-absent-{suffix}");
+    }
+
+    [Fact]
+    public async Task Types_are_ordered_by_key_so_the_picker_does_not_reshuffle()
+    {
+        fixture.EnsureAvailable();
+
+        var suffix = Guid.NewGuid().ToString("n")[..8];
+
+        await using (var context = fixture.CreateContext())
+        {
+            var store = new SqlResourceManagementStore(context);
+
+            // Inserted in reverse key order: an unordered projection would
+            // surface them insertion-first and fail the assertion below.
+            foreach (var letter in new[] { "c", "b", "a" })
+            {
+                var created = await store.CreateAsync(
+                    Resource.Create($"zz-{letter}-{suffix}", $"Resource {letter}").Value, Ct);
+                Assert.True(created.Succeeded);
+            }
+        }
+
+        await using var verifyContext = fixture.CreateContext();
+        var store2 = new SqlResourceManagementStore(verifyContext);
+
+        var first = await store2.ListTypesAsync(Ct);
+        var second = await store2.ListTypesAsync(Ct);
+
+        Assert.Equal(first.Select(t => t.Type), second.Select(t => t.Type));
+        Assert.Equal(
+            first.Select(t => t.Type).Order(StringComparer.Ordinal),
+            first.Select(t => t.Type));
+    }
+
     [Fact]
     public async Task Unknown_ids_fail_with_not_found()
     {

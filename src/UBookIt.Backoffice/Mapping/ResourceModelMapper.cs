@@ -2,6 +2,7 @@ using UBookIt.Backoffice.Models;
 using UBookIt.Core.Availability;
 using UBookIt.Core.Common;
 using UBookIt.Core.Resources;
+using UBookIt.Core.Stores;
 
 namespace UBookIt.Backoffice.Mapping;
 
@@ -156,4 +157,7 @@ internal static class ResourceModelMapper
             },
         };
     }
+
+    internal static ResourceTypeUsageModel ToModel(ResourceTypeUsage usage) =>
+        new() { Type = usage.Type, Count = usage.Count };
 }

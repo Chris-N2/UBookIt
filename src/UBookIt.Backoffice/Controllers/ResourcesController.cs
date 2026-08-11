@@ -32,6 +32,21 @@ public class ResourcesController(
         });
     }
 
+    /// <summary>
+    /// The distinct resource type keys in use, with a count per type. Read-only
+    /// projection over existing storage — no schema dependency of its own.
+    /// The literal segment cannot collide with the id route below, which is
+    /// constrained to a guid.
+    /// </summary>
+    [HttpGet("resources/types")]
+    [ProducesResponseType<IEnumerable<ResourceTypeUsageModel>>(StatusCodes.Status200OK)]
+    public async Task<IActionResult> ListResourceTypes(CancellationToken cancellationToken = default)
+    {
+        var types = await managementStore.ListTypesAsync(cancellationToken);
+
+        return Ok(types.Select(ResourceModelMapper.ToModel).ToList());
+    }
+
     [HttpGet("resources/{id:guid}")]
     [ProducesResponseType<ResourceResponseModel>(StatusCodes.Status200OK)]
     [ProducesResponseType<ProblemDetails>(StatusCodes.Status404NotFound)]
