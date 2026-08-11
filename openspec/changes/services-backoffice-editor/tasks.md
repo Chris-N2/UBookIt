@@ -12,9 +12,11 @@ Ordered so that an interruption leaves a coherent state: groups 1–2 stand alon
 
 ## 2. Regenerate the TypeScript client
 
-- [ ] 2.1 Start the TestSite, run `npm run generate-client` in `src/UBookIt.Backoffice/Client`, and confirm `sdk.gen.ts` now exposes the service operations plus the new types operation.
-- [ ] 2.2 Review the generated diff for unrelated drift from endpoint changes since the last run; investigate anything unexpected rather than accepting it silently (design D8).
-- [ ] 2.3 Confirm `npm run build` succeeds with no TypeScript errors or warnings.
+- [x] 2.1 Start the TestSite, run `npm run generate-client` in `src/UBookIt.Backoffice/Client`, and confirm `sdk.gen.ts` now exposes the service operations plus the new types operation.
+  - All 11 operations present: the 5 existing resource ones, `listServices`/`getService`/`createService`/`updateService`/`deleteService`, and `listResourceTypes`. TestSite stopped afterwards and port 44348 confirmed clear.
+- [x] 2.2 Review the generated diff for unrelated drift from endpoint changes since the last run; investigate anything unexpected rather than accepting it silently (design D8).
+  - No drift. Two files changed (`sdk.gen.ts`, `types.gen.ts`), 288 insertions and exactly one deletion — the import line, rewritten to include the new symbols. No existing resource operation or type was altered. `ServiceRequestModel.durationMinutes` generated as `number | null`, which is what the duration radio pair (design D4) needs.
+- [x] 2.3 Confirm `npm run build` succeeds with no TypeScript errors or warnings.
 
 ## 3. Services collection view
 

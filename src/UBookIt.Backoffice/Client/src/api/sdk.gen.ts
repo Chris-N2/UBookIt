@@ -2,7 +2,7 @@
 
 import type { Client, Options as Options2, TDataShape } from './client';
 import { client } from './client.gen';
-import type { CreateResourceData, CreateResourceErrors, CreateResourceResponses, DeleteResourceData, DeleteResourceErrors, DeleteResourceResponses, GetResourceData, GetResourceErrors, GetResourceResponses, ListResourcesData, ListResourcesErrors, ListResourcesResponses, UpdateResourceData, UpdateResourceErrors, UpdateResourceResponses } from './types.gen';
+import type { CreateResourceData, CreateResourceErrors, CreateResourceResponses, CreateServiceData, CreateServiceErrors, CreateServiceResponses, DeleteResourceData, DeleteResourceErrors, DeleteResourceResponses, DeleteServiceData, DeleteServiceErrors, DeleteServiceResponses, GetResourceData, GetResourceErrors, GetResourceResponses, GetServiceData, GetServiceErrors, GetServiceResponses, ListResourcesData, ListResourcesErrors, ListResourcesResponses, ListResourceTypesData, ListResourceTypesErrors, ListResourceTypesResponses, ListServicesData, ListServicesErrors, ListServicesResponses, UpdateResourceData, UpdateResourceErrors, UpdateResourceResponses, UpdateServiceData, UpdateServiceErrors, UpdateServiceResponses } from './types.gen';
 
 export type Options<TData extends TDataShape = TDataShape, ThrowOnError extends boolean = boolean> = Options2<TData, ThrowOnError> & {
     /**
@@ -84,6 +84,92 @@ export class UBookItBackofficeService {
                 }
             ],
             url: '/umbraco/ubookitbackoffice/api/v1/resources/{id}',
+            ...options,
+            headers: {
+                'Content-Type': 'application/json',
+                ...options.headers
+            }
+        });
+    }
+    
+    public static listResourceTypes<ThrowOnError extends boolean = false>(options?: Options<ListResourceTypesData, ThrowOnError>) {
+        return (options?.client ?? client).get<ListResourceTypesResponses, ListResourceTypesErrors, ThrowOnError>({
+            security: [
+                {
+                    scheme: 'bearer',
+                    type: 'http'
+                }
+            ],
+            url: '/umbraco/ubookitbackoffice/api/v1/resources/types',
+            ...options
+        });
+    }
+    
+    public static listServices<ThrowOnError extends boolean = false>(options?: Options<ListServicesData, ThrowOnError>) {
+        return (options?.client ?? client).get<ListServicesResponses, ListServicesErrors, ThrowOnError>({
+            security: [
+                {
+                    scheme: 'bearer',
+                    type: 'http'
+                }
+            ],
+            url: '/umbraco/ubookitbackoffice/api/v1/services',
+            ...options
+        });
+    }
+    
+    public static createService<ThrowOnError extends boolean = false>(options?: Options<CreateServiceData, ThrowOnError>) {
+        return (options?.client ?? client).post<CreateServiceResponses, CreateServiceErrors, ThrowOnError>({
+            security: [
+                {
+                    scheme: 'bearer',
+                    type: 'http'
+                }
+            ],
+            url: '/umbraco/ubookitbackoffice/api/v1/services',
+            ...options,
+            headers: {
+                'Content-Type': 'application/json',
+                ...options?.headers
+            }
+        });
+    }
+    
+    public static deleteService<ThrowOnError extends boolean = false>(options: Options<DeleteServiceData, ThrowOnError>) {
+        return (options.client ?? client).delete<DeleteServiceResponses, DeleteServiceErrors, ThrowOnError>({
+            security: [
+                {
+                    scheme: 'bearer',
+                    type: 'http'
+                }
+            ],
+            url: '/umbraco/ubookitbackoffice/api/v1/services/{id}',
+            ...options
+        });
+    }
+    
+    public static getService<ThrowOnError extends boolean = false>(options: Options<GetServiceData, ThrowOnError>) {
+        return (options.client ?? client).get<GetServiceResponses, GetServiceErrors, ThrowOnError>({
+            security: [
+                {
+                    scheme: 'bearer',
+                    type: 'http'
+                }
+            ],
+            url: '/umbraco/ubookitbackoffice/api/v1/services/{id}',
+            ...options
+        });
+    }
+    
+    public static updateService<ThrowOnError extends boolean = false>(options: Options<UpdateServiceData, ThrowOnError>) {
+        return (options.client ?? client).put<UpdateServiceResponses, UpdateServiceErrors, ThrowOnError>({
+            security: [
+                {
+                    scheme: 'bearer',
+                    type: 'http'
+                }
+            ],
+            url: '/umbraco/ubookitbackoffice/api/v1/services/{id}',
             ...options,
             headers: {
                 'Content-Type': 'application/json',

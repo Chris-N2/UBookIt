@@ -30,6 +30,11 @@ export type PagedResourcesModel = {
     items: Array<ResourceResponseModel>;
 };
 
+export type PagedServicesModel = {
+    total: number;
+    items: Array<ServiceResponseModel>;
+};
+
 export type ProblemDetails = {
     type?: string | null;
     title?: string | null;
@@ -56,6 +61,29 @@ export type ResourceResponseModel = {
     openingHours: Array<OpeningHoursModel>;
     exceptions: Array<AvailabilityExceptionModel>;
     constraints: ConstraintsModel;
+};
+
+export type ResourceTypeUsageModel = {
+    type: string;
+    count: number;
+};
+
+export type ServiceRequestModel = {
+    name: string;
+    durationMinutes?: number | null;
+    roles: Array<ServiceRoleModel>;
+};
+
+export type ServiceResponseModel = {
+    id: string;
+    name: string;
+    durationMinutes?: number | null;
+    roles: Array<ServiceRoleModel>;
+};
+
+export type ServiceRoleModel = {
+    resourceType: string;
+    count: number;
 };
 
 export type TimeWindowModel = {
@@ -216,3 +244,176 @@ export type UpdateResourceResponses = {
 };
 
 export type UpdateResourceResponse = UpdateResourceResponses[keyof UpdateResourceResponses];
+
+export type ListResourceTypesData = {
+    body?: never;
+    path?: never;
+    query?: never;
+    url: '/umbraco/ubookitbackoffice/api/v1/resources/types';
+};
+
+export type ListResourceTypesErrors = {
+    /**
+     * The resource is protected and requires an authentication token
+     */
+    401: unknown;
+};
+
+export type ListResourceTypesResponses = {
+    /**
+     * OK
+     */
+    200: Array<ResourceTypeUsageModel>;
+};
+
+export type ListResourceTypesResponse = ListResourceTypesResponses[keyof ListResourceTypesResponses];
+
+export type ListServicesData = {
+    body?: never;
+    path?: never;
+    query?: {
+        skip?: number;
+        take?: number;
+    };
+    url: '/umbraco/ubookitbackoffice/api/v1/services';
+};
+
+export type ListServicesErrors = {
+    /**
+     * The resource is protected and requires an authentication token
+     */
+    401: unknown;
+};
+
+export type ListServicesResponses = {
+    /**
+     * OK
+     */
+    200: PagedServicesModel;
+};
+
+export type ListServicesResponse = ListServicesResponses[keyof ListServicesResponses];
+
+export type CreateServiceData = {
+    body?: ServiceRequestModel;
+    path?: never;
+    query?: never;
+    url: '/umbraco/ubookitbackoffice/api/v1/services';
+};
+
+export type CreateServiceErrors = {
+    /**
+     * Bad Request
+     */
+    400: ProblemDetails;
+    /**
+     * The resource is protected and requires an authentication token
+     */
+    401: unknown;
+};
+
+export type CreateServiceError = CreateServiceErrors[keyof CreateServiceErrors];
+
+export type CreateServiceResponses = {
+    /**
+     * OK
+     */
+    200: ServiceResponseModel;
+};
+
+export type CreateServiceResponse = CreateServiceResponses[keyof CreateServiceResponses];
+
+export type DeleteServiceData = {
+    body?: never;
+    path: {
+        id: string;
+    };
+    query?: never;
+    url: '/umbraco/ubookitbackoffice/api/v1/services/{id}';
+};
+
+export type DeleteServiceErrors = {
+    /**
+     * The resource is protected and requires an authentication token
+     */
+    401: unknown;
+    /**
+     * Not Found
+     */
+    404: ProblemDetails;
+};
+
+export type DeleteServiceError = DeleteServiceErrors[keyof DeleteServiceErrors];
+
+export type DeleteServiceResponses = {
+    /**
+     * OK
+     */
+    200: unknown;
+};
+
+export type GetServiceData = {
+    body?: never;
+    path: {
+        id: string;
+    };
+    query?: never;
+    url: '/umbraco/ubookitbackoffice/api/v1/services/{id}';
+};
+
+export type GetServiceErrors = {
+    /**
+     * The resource is protected and requires an authentication token
+     */
+    401: unknown;
+    /**
+     * Not Found
+     */
+    404: ProblemDetails;
+};
+
+export type GetServiceError = GetServiceErrors[keyof GetServiceErrors];
+
+export type GetServiceResponses = {
+    /**
+     * OK
+     */
+    200: ServiceResponseModel;
+};
+
+export type GetServiceResponse = GetServiceResponses[keyof GetServiceResponses];
+
+export type UpdateServiceData = {
+    body?: ServiceRequestModel;
+    path: {
+        id: string;
+    };
+    query?: never;
+    url: '/umbraco/ubookitbackoffice/api/v1/services/{id}';
+};
+
+export type UpdateServiceErrors = {
+    /**
+     * Bad Request
+     */
+    400: ProblemDetails;
+    /**
+     * The resource is protected and requires an authentication token
+     */
+    401: unknown;
+    /**
+     * Not Found
+     */
+    404: ProblemDetails;
+};
+
+export type UpdateServiceError = UpdateServiceErrors[keyof UpdateServiceErrors];
+
+export type UpdateServiceResponses = {
+    /**
+     * OK
+     */
+    200: ServiceResponseModel;
+};
+
+export type UpdateServiceResponse = UpdateServiceResponses[keyof UpdateServiceResponses];
