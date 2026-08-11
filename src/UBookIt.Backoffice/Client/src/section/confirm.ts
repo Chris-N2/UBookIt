@@ -19,12 +19,17 @@ export type ConfirmOutcome = "confirmed" | "cancelled" | "failed";
  *
  * Cancelling or dismissing REJECTS the underlying promise rather than resolving
  * false, so catching is mandatory — an unguarded `await` raises an unhandled
- * rejection every time a user backs out. But the rejection reason distinguishes
- * the two cases: dismissal rejects with `{type:'close'}` or nothing, whereas a
- * genuine fault (`umbOpenModal` throws `Error('Modal manager not found.')` when
- * the context is missing) rejects with an Error. Collapsing both into "the user
- * cancelled" would turn that fault into a silent no-op: the user presses
- * Delete, confirms nothing, and no request, message, or log ever appears.
+ * rejection every time a user backs out. Collapsing every rejection into "the
+ * user cancelled" would turn a genuine fault into a silent no-op: the user
+ * presses Delete, confirms nothing, and no request, message, or log appears.
+ *
+ * The discriminator therefore matches the CANCEL shapes and treats everything
+ * else as a failure, rather than the reverse. Cancellation is the closed set:
+ * the confirm modal's Cancel rejects with no argument, and backdrop/escape
+ * rejects with `{type:'close'}`. Failures are open-ended and are NOT all
+ * Errors — a missing modal-manager context rejects with a plain *string* from
+ * UmbContextConsumer, so testing `instanceof Error` would let the most likely
+ * fault through as a cancellation.
  */
 export const confirmDestructive = async (
   host: UmbControllerHost,
@@ -41,11 +46,16 @@ export const confirmDestructive = async (
     });
     return "confirmed";
   } catch (reason) {
-    if (reason instanceof Error) {
-      console.error("[uBookIt] Confirmation dialog could not be shown", reason);
-      return "failed";
+    if (isCancellation(reason)) {
+      return "cancelled";
     }
 
-    return "cancelled";
+    console.error("[uBookIt] Confirmation dialog could not be shown", reason);
+    return "failed";
   }
 };
+
+/** The two shapes the backoffice uses to signal a user-initiated dismissal. */
+const isCancellation = (reason: unknown): boolean =>
+  reason === undefined ||
+  (typeof reason === "object" && reason !== null && (reason as { type?: unknown }).type === "close");

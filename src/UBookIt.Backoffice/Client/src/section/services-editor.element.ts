@@ -7,6 +7,9 @@ import { toApiErrors, type ApiError } from "./api-errors.js";
 /** The two duration modes. Inherit sends null; fixed sends the minutes value. */
 type DurationMode = "inherit" | "fixed";
 
+/** Client-only code for the empty fixed-duration guard; rendered in the Duration group. */
+const DURATION_REQUIRED = "duration-required";
+
 /**
  * Workspace editor for one service: Details, Service Requirements, and
  * Duration. Saves the full service; failures surface as an announced error
@@ -48,8 +51,14 @@ export class UBookItServiceEditorElement extends UmbLitElement {
   @state()
   private _durationMode: DurationMode = "inherit";
 
+  /**
+   * Null means the field is empty, not zero. Modelling empty explicitly is what
+   * keeps the displayed value and the submitted value in step: coercing empty
+   * to 0 submits a duration the server rejects, and silently retaining the
+   * previous number submits one the user believes they cleared.
+   */
   @state()
-  private _durationMinutes = 60;
+  private _durationMinutes: number | null = 60;
 
   @state()
   private _knownTypes: ResourceTypeUsageModel[] = [];
@@ -141,6 +150,19 @@ export class UBookItServiceEditorElement extends UmbLitElement {
     event.preventDefault();
     this._saving = true;
     this._errors = [];
+
+    // Client-side guard for a state only the UI can express: "fixed duration"
+    // chosen with the field emptied. There is no server code for it — sending
+    // null would silently mean "inherit", quietly contradicting the choice on
+    // screen — so it is caught here, mirroring the resource editor's
+    // empty-exception-date guard.
+    if (this._durationMode === "fixed" && this._durationMinutes === null) {
+      this._errors = [{ code: DURATION_REQUIRED, message: this.#term("durationRequired") }];
+      this._saving = false;
+      await this.updateComplete;
+      this.shadowRoot?.querySelector<HTMLElement>("#error-summary")?.focus();
+      return;
+    }
 
     const body = this.#buildRequest();
     try {
@@ -306,16 +328,21 @@ export class UBookItServiceEditorElement extends UmbLitElement {
   }
 
   #renderDuration() {
-    const described = this.#errorsFor("service-duration-invalid").length > 0;
+    const described = this.#errorsFor("service-duration-invalid", DURATION_REQUIRED).length > 0;
 
     return html`
       <uui-box headline=${this.#term("duration")}>
-        ${this.#renderGroupErrors("err-duration", "service-duration-invalid")}
+        ${this.#renderGroupErrors("err-duration", "service-duration-invalid", DURATION_REQUIRED)}
         <fieldset aria-describedby=${described ? "err-duration" : nothing}>
           <legend class="visually-hidden">${this.#term("duration")}</legend>
+          <!--
+            Named "Duration mode" rather than "Duration": the fieldset legend
+            already contributes "Duration", and repeating it here makes the
+            group announce its name twice. A label attribute is not used —
+            uui-radio-group has no LabelMixin, so it would be inert.
+          -->
           <uui-radio-group
-            label=${this.#term("duration")}
-            aria-label=${this.#term("duration")}
+            aria-label=${this.#term("durationMode")}
             .value=${this._durationMode}
             @change=${(e: Event) =>
               (this._durationMode = (e.target as HTMLInputElement).value as DurationMode)}
@@ -332,7 +359,7 @@ export class UBookItServiceEditorElement extends UmbLitElement {
               id="service-duration"
               type="number"
               min="1"
-              .value=${String(this._durationMinutes)}
+              .value=${this._durationMinutes === null ? "" : String(this._durationMinutes)}
               ?disabled=${this._durationMode !== "fixed"}
               @input=${(e: InputEvent) => this.#onDurationInput(e)}
             />
@@ -343,19 +370,15 @@ export class UBookItServiceEditorElement extends UmbLitElement {
   }
 
   /**
-   * Keeps an emptied field empty. `Number("")` is 0, so binding it straight
-   * back repaints "0" under the cursor and makes the field impossible to clear
-   * and retype; it would also submit 0 as a fixed duration, which the server
-   * then rejects. Treating empty as "no value yet" leaves the last real value
-   * in state and lets the server's own duration rule handle a genuine 0.
+   * `Number("")` is 0, so binding the coerced value straight back would repaint
+   * "0" under the cursor and make the field impossible to clear and retype.
+   * Empty is recorded as null instead, and the pre-submit guard turns it into
+   * an actionable message — the state the field shows is always the state that
+   * would be submitted.
    */
   #onDurationInput(event: InputEvent) {
     const raw = (event.target as HTMLInputElement).value;
-    if (raw === "") {
-      return;
-    }
-
-    this._durationMinutes = Number(raw);
+    this._durationMinutes = raw === "" ? null : Number(raw);
   }
 
   static override styles = css`

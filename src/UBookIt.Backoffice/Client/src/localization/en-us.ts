@@ -77,7 +77,9 @@ export default {
     durationInheritHint:
       "The booking length comes from whichever resource is booked, using its minimum duration.",
     durationFixed: "Fixed duration",
+    durationMode: "Duration mode",
     durationMinutes: "Minutes",
+    durationRequired: "Enter a fixed duration in minutes, or choose to use each resource's minimum.",
     durationInheritSummary: "Resource minimum",
     durationFixedSummary: "%0% minutes",
     resourceType: "Resource type",

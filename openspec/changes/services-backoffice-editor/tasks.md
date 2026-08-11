@@ -59,7 +59,8 @@ Ordered so that an interruption leaves a coherent state: groups 1–2 stand alon
 - [x] 6.4 Confirm the resources view is unchanged in behaviour apart from the delete confirmation, and that a site with no services shows an empty state rather than an error.
   - Verified live 2026-08-11. The services view showed the empty-state copy, not an error, before any service existed. The resources list, editor, paging, and load behaviour are unchanged apart from the confirmation modal; all three resources survived the session intact.
 - [ ] 6.5 Run `qa-review` in a fresh context or subagent.
-  - First pass 2026-08-11: **REJECT**, four must-fixes, nothing structural. Hard-fail gates all passed (DevExpress scan, no widget abstraction, authorized endpoints, no migration). Remediation in §8; awaiting re-review by the same reviewer.
+  - First pass 2026-08-11: **REJECT**, four must-fixes, nothing structural. Hard-fail gates all passed (DevExpress scan, no widget abstraction, authorized endpoints, no migration). Remediation in §8.
+  - Second pass 2026-08-11: **APPROVE WITH NITS**, no must-fixes; 13/13 requirements traceable to code or test. Both remaining MINORs were faults in §8's own remediation and are fixed in §9. Not re-verified live afterwards — §8/§9 changed rendered markup, verified by reading the templates and the lit/uui sources they depend on (including lit's `nothing` removing rather than emptying an attribute) but not by loading the backoffice. The fieldset/legend nesting and the live-region announcement are the two things worth a glance next time the site is up.
 
 ## 7. Problem-details `type` member (discovered during 6.3, not planned)
 
@@ -79,6 +80,17 @@ Live verification of a failed save surfaced *"A fatal server error occurred"* in
 - [x] 8.4 Make a non-cancel modal rejection visible. `confirmDestructive` returns `"confirmed" | "cancelled" | "failed"` rather than a boolean: a rejection carrying an `Error` (for example `umbOpenModal`'s `Error('Modal manager not found.')`) is logged and surfaced to the user, while a dismissal — which rejects with `{type:'close'}` or nothing — stays silent. Both lists handle the three outcomes.
 - [x] 8.5 Also taken from the same review, all non-blocking: the unknown-type live region is now always present and only its text changes (a `role="status"` inserted together with its content is often not announced); `uui-radio-group` gained an accessible name; an emptied Minutes field no longer collapses to `0` mid-edit; the services list no longer renders the "no services yet" empty state when the load actually failed; and `—` / `1 × masseur` moved into localization.
 - [x] 8.6 Rebuild and retest: `dotnet build --no-incremental` 0 errors / 38 NU1903, `npm run build` clean, 210 tests passing.
+
+## 9. QA remediation (second review pass — APPROVE WITH NITS, no must-fixes)
+
+Both remaining MINORs were defects in §8's remediation itself, so they were fixed rather than deferred.
+
+- [x] 9.1 **Invert the confirm discriminator.** §8.4 tested `reason instanceof Error`, which targets a branch that is effectively unreachable, while the realistic fault — a missing modal-manager context — rejects with a plain **string** from `UmbContextConsumer`, and so was still being classified as a cancellation. `confirm.ts` now matches the *cancel* shapes instead (`undefined`, or an object whose `type` is `close`) and treats everything else as a failure, because cancellation is the closed set and failures are open-ended. QA separately confirmed no cancel path rejects with an Error, so the inverse risk — a normal cancel producing a spurious error — does not exist.
+- [x] 9.2 **Model an empty duration explicitly.** §8.5's fix ignored an emptied Minutes field, which left the input reading empty while state still held the previous number — so saving submitted a value the user believed they had cleared, a display/payload divergence worse than the `0` it replaced. `_durationMinutes` is now `number | null`, the input renders `""` for null, and a pre-submit guard raises the client-only `duration-required` code (announced and focused like any other failure) when "fixed" is chosen with the field empty. What the field shows is now always what would be submitted.
+- [x] 9.3 Dropped the inert `label` attribute from `uui-radio-group` (no `LabelMixin` on that element) and renamed its `aria-label` to "Duration mode", so the group no longer announces "Duration" twice alongside the fieldset legend.
+- [x] 9.4 Rebuild and retest: `npm run build` clean, `dotnet build --no-incremental` 0 errors / 38 NU1903, 210 tests passing.
+
+Remaining NITs accepted as-is: the `''` in the whitespace-only `type-key-invalid` message (server-side copy, cosmetic), and `aria-describedby` sitting on the `fieldset` rather than the inputs — kept for consistency with the pattern change ③ established, and already covered by the recorded pre-release human screen-reader obligation.
 
 Left as recorded decisions rather than changes, with reasoning:
 - `type` as a bare token (`ValidationFailed`) rather than a URI reference. RFC 7807 prescribes a URI, but Umbraco's own problem bodies use bare tokens and the interceptor only tests for the member's presence. Consistency with the host wins; noted so it reads as a choice.
