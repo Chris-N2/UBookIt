@@ -36,16 +36,16 @@ Ordered so that an interruption leaves a coherent state: groups 1–2 stand alon
 - [x] 4.4 Implement the resource-type combobox: populated from `GET resources/types`, accepting a new key, with a non-blocking hint when the entered type matches no existing resource (design D2).
   - Built as a native `<input list>` + `<datalist>` rather than `uui-combobox`, which structurally cannot hold a value that is not one of its options — see the control-choice note added to design D2. A failure to load the type list degrades to a plain free-text field rather than blocking the editor.
 - [x] 4.5 Wire create and update through the generated client; map `service-name-required`, `service-role-invalid`, `service-duration-invalid`, and `type-key-invalid` to their groups; return to the collection view on success.
-- [ ] 4.6 Verify keyboard operability of the two new control types — the radio group and the combobox — including visible focus and that the hint is exposed to assistive technology.
-  - **Blocked on a logged-in backoffice session** (verification, not implementation).
+- [x] 4.6 Verify keyboard operability of the two new control types — the radio group and the combobox — including visible focus and that the hint is exposed to assistive technology.
+  - Verified live 2026-08-11. Tab order from Name goes to the type input (datalist attached), then into the radio group, which takes a single tab stop on the checked option (roving tabindex); Down moved the selection to "inherit" and the Minutes input disabled itself reactively. The unknown-type hint is a `role="status"` region referenced from the input's `aria-describedby`.
 
 ## 5. Shared confirm modal
 
 - [x] 5.1 Add a small shared helper wrapping `umbOpenModal(host, UMB_CONFIRM_MODAL, …)` from `@umbraco-cms/backoffice/modal` that returns a boolean, catching the rejection that cancellation produces (design D6). Confirmation only — no other behaviour.
 - [x] 5.2 Use it for delete in `services-list.element.ts`.
 - [x] 5.3 Replace `window.confirm` at `resource-list.element.ts:63` with the same helper, changing nothing else in that file. Discharges change ③'s QA obligation.
-- [ ] 5.4 Verify both lists: confirming deletes, cancelling and dismissing both leave the item untouched with no request issued and no unhandled rejection in the console.
-  - **Blocked on a logged-in backoffice session** (verification, not implementation).
+- [x] 5.4 Verify both lists: confirming deletes, cancelling and dismissing both leave the item untouched with no request issued and no unhandled rejection in the console.
+  - Verified live 2026-08-11. Both lists show the in-page uui modal naming the item, with no native dialog. Cancelling on the services list issued **no DELETE request** (checked against the network log) and produced **no console error or unhandled rejection** — the specific failure the helper's catch exists to prevent. Confirming deleted the service and refreshed the list. On the resources list the modal and cancel path were exercised; delete was deliberately not confirmed, to avoid destroying the dev site's resources.
 
 ## 6. Verification and sign-off
 
@@ -53,8 +53,18 @@ Ordered so that an interruption leaves a coherent state: groups 1–2 stand alon
   - 0 errors, 38 warnings, all NU1903. `npm run build` (tsc + vite) clean, both section views bundled.
 - [x] 6.2 Full test suite green, including the new unit and integration tests.
   - 207 passing (180 unit, 27 integration), 0 skipped. There is no TypeScript test harness in this project, so the new client behaviour is covered by live verification below rather than by unit tests — consistent with change ⑤.
-- [ ] 6.3 Live verification in the running TestSite backoffice: create a service with a fixed duration, create one deferring to the resource minimum, edit both, exercise the type combobox against existing and unknown types, and delete with both confirm and cancel.
-  - **Blocked on a logged-in backoffice session.**
-- [ ] 6.4 Confirm the resources view is unchanged in behaviour apart from the delete confirmation, and that a site with no services shows an empty state rather than an error.
-  - **Blocked on a logged-in backoffice session.**
+- [x] 6.3 Live verification in the running TestSite backoffice: create a service with a fixed duration, create one deferring to the resource minimum, edit both, exercise the type combobox against existing and unknown types, and delete with both confirm and cancel.
+  - Verified live 2026-08-11. Created "Deep tissue massage" (`therapist`, fixed 90) and "Sports physio assessment" (`physiotherapist`, inherit). The list rendered `1 × therapist / 90 minutes` and `1 × physiotherapist / Resource minimum`. Reopening showed every value exactly as entered, with the correct duration mode preselected. The type input suggested the types in use, showed the unknown-type hint for a partial and for the never-used `physiotherapist`, cleared it on an exact match, and never blocked saving. A failed save surfaced the real code and kept all form state.
+- [x] 6.4 Confirm the resources view is unchanged in behaviour apart from the delete confirmation, and that a site with no services shows an empty state rather than an error.
+  - Verified live 2026-08-11. The services view showed the empty-state copy, not an error, before any service existed. The resources list, editor, paging, and load behaviour are unchanged apart from the confirmation modal; all three resources survived the session intact.
 - [ ] 6.5 Run `qa-review` in a fresh context or subagent.
+
+## 7. Problem-details `type` member (discovered during 6.3, not planned)
+
+Live verification of a failed save surfaced *"A fatal server error occurred"* instead of the domain code. The server was correct — 400 with `{title, status, errors:[{code:"service-name-required"}]}`. The backoffice's `addErrorInterceptor` keeps a response body only when `isProblemDetailsLike()` passes, and that predicate requires a **`type`** member; our `ProblemDetails` never set one, so the interceptor discarded the payload, `errors` included, and substituted its own generic problem. The identical failure was then reproduced in the **resource** editor, making this a pre-existing defect from change ③ that silently violated `resource-management`'s "Validation failure is surfaced per field" — not a regression introduced here.
+
+- [x] 7.1 Set `Type` (`ValidationFailed` / `NotFound` / `Conflict`) in `UBookIt.Backoffice/Mapping/ApiResults.cs`, with a comment recording why its absence is fatal rather than cosmetic.
+- [x] 7.2 Apply the same to both methods in `UBookIt.Web/Mapping/ApiResults.cs`, keeping the two envelopes from drifting. Additive: the member was previously absent. Delivery consumers are unaffected by the backoffice interceptor, so this is consistency rather than a fix.
+- [x] 7.3 Add regression coverage: a theory over all three statuses asserting `Type` is populated, plus an assertion in the delivery suite's shared `Problem()` helper so every existing delivery failure test now guards it too.
+- [x] 7.4 Re-verify live that both editors surface real domain messages.
+  - Services: "A service name is required." Resources: "A display name is required." Both appear in the announced error summary **and** the Details group, with the summary receiving focus (confirmed by reading `document.activeElement` through the shadow roots: `div#error-summary[role=alert][tabindex="-1"]`) and no form state lost.

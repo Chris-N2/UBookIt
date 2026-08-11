@@ -30,6 +30,15 @@ internal static class ApiResults
 
         var problem = new ProblemDetails
         {
+            // Kept deliberately in step with the backoffice mapper's `Type`
+            // (see its note): the two projections are independent but must not
+            // drift in envelope shape. Additive — previously absent.
+            Type = status switch
+            {
+                StatusCodes.Status404NotFound => "NotFound",
+                StatusCodes.Status409Conflict => "Conflict",
+                _ => "ValidationFailed",
+            },
             Title = status == StatusCodes.Status400BadRequest ? "Validation failed" : failures[0].Message,
             Status = status,
         };
@@ -70,7 +79,12 @@ internal static class ApiResults
             errors = [new ApiErrorModel { Code = Constants.InvalidRequestCode, Message = "The request is invalid." }];
         }
 
-        var problem = new ProblemDetails { Title = "Validation failed", Status = StatusCodes.Status400BadRequest };
+        var problem = new ProblemDetails
+        {
+            Type = "ValidationFailed",
+            Title = "Validation failed",
+            Status = StatusCodes.Status400BadRequest,
+        };
         problem.Extensions["errors"] = errors;
 
         return new ObjectResult(problem) { StatusCode = StatusCodes.Status400BadRequest };

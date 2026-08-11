@@ -15,6 +15,17 @@ The Management API SHALL expose a versioned endpoint in the `ubookitbackoffice` 
 - **WHEN** the endpoint is called without backoffice authentication
 - **THEN** the request receives 401 and does not reach handler logic
 
+### Requirement: Problem-details responses carry a type member
+Every problem-details response from the Management API SHALL populate the RFC 7807 `type` member alongside `title`, `status`, and the `errors` extension. The backoffice's default error interceptor validates an error body before use and discards any body without a `type`, replacing it with a generic server-error problem that carries no `errors` — so omitting the member makes every field-level failure unreadable to the editor while the server response itself remains correct. The member SHALL distinguish validation, not-found, and conflict outcomes.
+
+#### Scenario: A validation failure reaches the editor with its code intact
+- **WHEN** a management endpoint rejects a request with a domain validation failure
+- **THEN** the response carries a `type` member and the editor displays the domain failure's own message, not a generic server error
+
+#### Scenario: Every failure status is typed
+- **WHEN** a management endpoint returns a validation, not-found, or conflict problem
+- **THEN** each response carries a non-empty `type` member distinguishing which of the three occurred
+
 ## MODIFIED Requirements
 
 ### Requirement: Backoffice section with collection view

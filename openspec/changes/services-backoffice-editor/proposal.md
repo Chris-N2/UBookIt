@@ -24,7 +24,10 @@ None. This change adds UI and one read endpoint over capabilities that already e
 ### Modified Capabilities
 
 - `services`: gains backoffice UI requirements — a collection view, a workspace editor, the duration affordance, the requirement (role) affordance, and the accessibility baseline. No change to the service domain model, its persistence, or the existing CRUD endpoint contracts.
-- `resource-management`: gains the `GET resources/types` endpoint requirement, and its collection-view requirement is amended so delete confirmation uses an accessible in-page modal rather than a native browser dialog.
+- `resource-management`: gains the `GET resources/types` endpoint requirement, and its collection-view requirement is amended so delete confirmation uses an accessible in-page modal rather than a native browser dialog. Also gains a requirement that problem-details responses carry a `type` member — see below.
+- `delivery-api`: its problem-details envelope gains the same `type` member, additively, so the two HTTP projections do not drift.
+
+**Added during implementation.** Live verification exposed a pre-existing defect from change ③: the backoffice discards any error body lacking a `type` member and substitutes a generic "fatal server error", so *no* management validation failure ever reached an editor with its code intact — silently violating `resource-management`'s existing "Validation failure is surfaced per field" requirement. Setting `Type` in the shared mappers fixes both the services and resources editors. Recorded in `tasks.md` §7.
 
 ## Impact
 

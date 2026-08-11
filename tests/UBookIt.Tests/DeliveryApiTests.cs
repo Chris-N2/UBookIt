@@ -68,6 +68,11 @@ public class DeliveryApiTests
         var obj = Assert.IsType<ObjectResult>(result);
         var problem = Assert.IsType<ProblemDetails>(obj.Value);
         var errors = Assert.IsType<ApiErrorModel[]>(problem.Extensions["errors"]);
+
+        // The delivery envelope is kept in step with the backoffice one, where
+        // a missing `type` causes the client to discard the whole payload.
+        Assert.False(string.IsNullOrWhiteSpace(problem.Type));
+
         return (obj.StatusCode!.Value, errors);
     }
 

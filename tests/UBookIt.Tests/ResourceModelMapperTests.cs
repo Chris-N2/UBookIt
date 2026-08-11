@@ -223,4 +223,26 @@ public class ApiResultsTests
         Assert.Equal(409, status);
         Assert.Equal(FailureCodes.ResourceInUse, Assert.Single(errors).Code);
     }
+
+    /// <summary>
+    /// Regression guard. The backoffice's default error interceptor validates
+    /// an error body with `isProblemDetailsLike`, which requires a `type`
+    /// member; without one it discards the body — errors included — and
+    /// substitutes a generic "A fatal server error occurred" problem. Dropping
+    /// `Type` therefore silently turns every field-level validation failure
+    /// into an unactionable server error in the editor, with nothing failing
+    /// except the user's experience.
+    /// </summary>
+    [Theory]
+    [InlineData(FailureCodes.DisplayNameRequired, "ValidationFailed")]
+    [InlineData(FailureCodes.ResourceNotFound, "NotFound")]
+    [InlineData(FailureCodes.ResourceInUse, "Conflict")]
+    public void Problem_details_always_carry_a_type_member(string code, string expectedType)
+    {
+        var result = new[] { new DomainFailure(code, "message") }.ToProblemResult();
+        var problem = Assert.IsType<ProblemDetails>(Assert.IsType<ObjectResult>(result).Value);
+
+        Assert.Equal(expectedType, problem.Type);
+        Assert.False(string.IsNullOrWhiteSpace(problem.Type));
+    }
 }

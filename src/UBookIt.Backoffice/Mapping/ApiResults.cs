@@ -25,6 +25,19 @@ internal static class ApiResults
 
         var problem = new ProblemDetails
         {
+            // `Type` is not decoration. The backoffice's default error
+            // interceptor keeps our body only if `isProblemDetailsLike` passes,
+            // and that check requires a `type` member; without it the
+            // interceptor discards the payload — errors and all — and
+            // substitutes a generic "A fatal server error occurred" problem, so
+            // every validation failure reached the editor as an unactionable
+            // server error.
+            Type = status switch
+            {
+                StatusCodes.Status404NotFound => "NotFound",
+                StatusCodes.Status409Conflict => "Conflict",
+                _ => "ValidationFailed",
+            },
             Title = status == StatusCodes.Status400BadRequest ? "Validation failed" : failures[0].Message,
             Status = status,
         };
