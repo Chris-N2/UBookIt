@@ -9,6 +9,7 @@ Ordered so that an interruption leaves a coherent state: groups 1–2 stand alon
   - Split by what each layer can actually prove: the EF-translated projection is tested against LocalDB in `ResourceManagementStoreTests` (counts, key ordering, stability across calls), since a fake would not have caught the translation failure it did catch. The empty case is asserted at the controller level, where it can be isolated — the integration collection shares one un-reset database, so those tests use per-test unique type keys instead.
 - [x] 1.5 Integration-test the endpoint: authorized call returns counts; unauthenticated call returns 401 without reaching handler logic.
   - Authorization is asserted structurally (the controller inherits the `[Authorize]` base), matching the convention change ③ established for every other management endpoint; there is no host-test harness to issue a real unauthenticated request. Also asserts the `resources/types` literal route cannot collide with the guid-constrained id route.
+  - **Additionally confirmed live against the running TestSite** (2026-08-11), which the structural assertion alone cannot prove: authorized `GET resources/types` returned 200 with `[{"type":"room","count":2},{"type":"therapist","count":1}]`, matching a cross-check against the full resource list; the same request **anonymous returned 401**; and the literal route resolved rather than being captured by the guid route.
 
 ## 2. Regenerate the TypeScript client
 
