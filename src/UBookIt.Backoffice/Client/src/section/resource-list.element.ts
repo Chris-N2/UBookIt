@@ -61,13 +61,18 @@ export class UBookItResourceListElement extends UmbLitElement {
   }
 
   async #delete(resource: ResourceResponseModel) {
-    const confirmed = await confirmDestructive(this, {
+    const outcome = await confirmDestructive(this, {
       headline: this.#term("confirmDeleteHeadline"),
       content: this.localize.term("ubookitResources_confirmDeleteContent", resource.displayName),
       confirmLabel: this.#term("confirmDelete"),
     });
 
-    if (!confirmed) {
+    if (outcome === "failed") {
+      this._error = this.#term("confirmFailed");
+      return;
+    }
+
+    if (outcome === "cancelled") {
       return;
     }
 

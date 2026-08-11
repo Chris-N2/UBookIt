@@ -31,6 +31,7 @@ Ordered so that an interruption leaves a coherent state: groups 1–2 stand alon
 ## 4. Services workspace editor
 
 - [x] 4.1 Add `services-editor.element.ts` with Details, Service Requirements, and Duration groups, reusing the resource editor's error-summary pattern: `role="alert"`, focus moved to the summary on failed save, group errors associated via `aria-describedby`, and no form state lost on failure.
+  - **Correction (QA).** As first written this was only true of the Requirements group; `err-details` and `err-duration` were rendered as ids that nothing referenced, so two of the three groups had no association at all. Fixed in §8.1 — do not read the original claim as evidence.
 - [x] 4.2 Implement the duration radio pair — defer to each resource's minimum (sends `null`) or a fixed value in minutes — with the number input disabled rather than hidden in the defer state (design D4).
 - [x] 4.3 Implement Service Requirements as a one-item list with no add/remove control; `count` is not rendered and is always sent as `1` (design D5).
 - [x] 4.4 Implement the resource-type combobox: populated from `GET resources/types`, accepting a new key, with a non-blocking hint when the entered type matches no existing resource (design D2).
@@ -52,12 +53,13 @@ Ordered so that an interruption leaves a coherent state: groups 1–2 stand alon
 - [x] 6.1 Full solution build with `--no-incremental`; no new warnings beyond the documented NU1903 baseline.
   - 0 errors, 38 warnings, all NU1903. `npm run build` (tsc + vite) clean, both section views bundled.
 - [x] 6.2 Full test suite green, including the new unit and integration tests.
-  - 207 passing (180 unit, 27 integration), 0 skipped. There is no TypeScript test harness in this project, so the new client behaviour is covered by live verification below rather than by unit tests — consistent with change ⑤.
+  - 210 passing (183 unit, 27 integration), 0 skipped. There is no TypeScript test harness in this project, so the new client behaviour is covered by live verification below rather than by unit tests — consistent with change ⑤.
 - [x] 6.3 Live verification in the running TestSite backoffice: create a service with a fixed duration, create one deferring to the resource minimum, edit both, exercise the type combobox against existing and unknown types, and delete with both confirm and cancel.
   - Verified live 2026-08-11. Created "Deep tissue massage" (`therapist`, fixed 90) and "Sports physio assessment" (`physiotherapist`, inherit). The list rendered `1 × therapist / 90 minutes` and `1 × physiotherapist / Resource minimum`. Reopening showed every value exactly as entered, with the correct duration mode preselected. The type input suggested the types in use, showed the unknown-type hint for a partial and for the never-used `physiotherapist`, cleared it on an exact match, and never blocked saving. A failed save surfaced the real code and kept all form state.
 - [x] 6.4 Confirm the resources view is unchanged in behaviour apart from the delete confirmation, and that a site with no services shows an empty state rather than an error.
   - Verified live 2026-08-11. The services view showed the empty-state copy, not an error, before any service existed. The resources list, editor, paging, and load behaviour are unchanged apart from the confirmation modal; all three resources survived the session intact.
 - [ ] 6.5 Run `qa-review` in a fresh context or subagent.
+  - First pass 2026-08-11: **REJECT**, four must-fixes, nothing structural. Hard-fail gates all passed (DevExpress scan, no widget abstraction, authorized endpoints, no migration). Remediation in §8; awaiting re-review by the same reviewer.
 
 ## 7. Problem-details `type` member (discovered during 6.3, not planned)
 
@@ -68,3 +70,18 @@ Live verification of a failed save surfaced *"A fatal server error occurred"* in
 - [x] 7.3 Add regression coverage: a theory over all three statuses asserting `Type` is populated, plus an assertion in the delivery suite's shared `Problem()` helper so every existing delivery failure test now guards it too.
 - [x] 7.4 Re-verify live that both editors surface real domain messages.
   - Services: "A service name is required." Resources: "A display name is required." Both appear in the announced error summary **and** the Details group, with the summary receiving focus (confirmed by reading `document.activeElement` through the shadow roots: `div#error-summary[role=alert][tabindex="-1"]`) and no form state lost.
+
+## 8. QA remediation (first review pass)
+
+- [x] 8.1 **[MAJOR]** Associate `err-details` and `err-duration` with their controls. Details and Duration now wrap their fields in a `fieldset` with a visually-hidden `legend` and a conditional `aria-describedby`, matching the Requirements group — previously both ids were rendered with no referrer, so the association silently did not exist.
+- [x] 8.2 Trim the resource type in `#buildRequest`, so the hint and the payload evaluate the same value. `" room "` previously looked known (hint hidden) yet was rejected server-side as `type-key-invalid`.
+- [x] 8.3 Track whether the type list actually loaded (`_knownTypesLoaded`). An empty list can mean "no resources" or "the request failed"; the hint is now suppressed in the failure case instead of asserting that every type entered is unused.
+- [x] 8.4 Make a non-cancel modal rejection visible. `confirmDestructive` returns `"confirmed" | "cancelled" | "failed"` rather than a boolean: a rejection carrying an `Error` (for example `umbOpenModal`'s `Error('Modal manager not found.')`) is logged and surfaced to the user, while a dismissal — which rejects with `{type:'close'}` or nothing — stays silent. Both lists handle the three outcomes.
+- [x] 8.5 Also taken from the same review, all non-blocking: the unknown-type live region is now always present and only its text changes (a `role="status"` inserted together with its content is often not announced); `uui-radio-group` gained an accessible name; an emptied Minutes field no longer collapses to `0` mid-edit; the services list no longer renders the "no services yet" empty state when the load actually failed; and `—` / `1 × masseur` moved into localization.
+- [x] 8.6 Rebuild and retest: `dotnet build --no-incremental` 0 errors / 38 NU1903, `npm run build` clean, 210 tests passing.
+
+Left as recorded decisions rather than changes, with reasoning:
+- `type` as a bare token (`ValidationFailed`) rather than a URI reference. RFC 7807 prescribes a URI, but Umbraco's own problem bodies use bare tokens and the interceptor only tests for the member's presence. Consistency with the host wins; noted so it reads as a choice.
+- No index on `uBookItResource.Type` for the grouped projection. The result is bounded by distinct type count and the table is small by nature; adding an index is a migration this change deliberately does not have.
+- `ListTypesAsync` on the public `IResourceManagementStore` is source-breaking for any external implementor. The package is unreleased and the port is realistically Persistence-only, but the proposal's "no breaking change" wording is imprecise — flagged for the release notes rather than reworded now.
+- The management API has no `InvalidModelStateResponseFactory`, so a malformed management request body still returns ASP.NET's default envelope without `errors`. Pre-existing and outside this change; a candidate for the CI/hardening pass alongside the other envelope work.

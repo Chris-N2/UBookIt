@@ -58,6 +58,7 @@ export default {
     confirmDeleteHeadline: "Delete resource",
     confirmDeleteContent: "Delete %0%? This cannot be undone.",
     confirmDelete: "Delete",
+    confirmFailed: "The confirmation dialog could not be shown, so nothing was deleted.",
   },
   ubookitServices: {
     label: "Services",
@@ -68,6 +69,8 @@ export default {
     name: "Name",
     requirements: "Service Requirements",
     requirementsSummary: "Requires",
+    requirementEntry: "%0% × %1%",
+    requirementNone: "—",
     details: "Details",
     duration: "Duration",
     durationInherit: "Use each resource's minimum duration",
@@ -100,5 +103,6 @@ export default {
     confirmDeleteHeadline: "Delete service",
     confirmDeleteContent: "Delete %0%? This cannot be undone.",
     confirmDelete: "Delete",
+    confirmFailed: "The confirmation dialog could not be shown, so nothing was deleted.",
   },
 };

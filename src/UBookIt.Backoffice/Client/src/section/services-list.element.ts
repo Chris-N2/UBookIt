@@ -65,13 +65,18 @@ export class UBookItServiceListElement extends UmbLitElement {
   }
 
   async #delete(service: ServiceResponseModel) {
-    const confirmed = await confirmDestructive(this, {
+    const outcome = await confirmDestructive(this, {
       headline: this.#term("confirmDeleteHeadline"),
       content: this.localize.term("ubookitServices_confirmDeleteContent", service.name),
       confirmLabel: this.#term("confirmDelete"),
     });
 
-    if (!confirmed) {
+    if (outcome === "failed") {
+      this._error = this.#term("confirmFailed");
+      return;
+    }
+
+    if (outcome === "cancelled") {
       return;
     }
 
@@ -99,13 +104,17 @@ export class UBookItServiceListElement extends UmbLitElement {
     await this.#load();
   }
 
-  /** "Requires 1 × masseur" — the single v1 role, ready to list more later. */
+  /** "1 × masseur" — the single v1 role, ready to list more later. */
   #summarizeRequirements(service: ServiceResponseModel): string {
     if (service.roles.length === 0) {
-      return "—";
+      return this.#term("requirementNone");
     }
 
-    return service.roles.map((role) => `${role.count} × ${role.resourceType}`).join(", ");
+    return service.roles
+      .map((role) =>
+        this.localize.term("ubookitServices_requirementEntry", role.count, role.resourceType),
+      )
+      .join(", ");
   }
 
   #summarizeDuration(service: ServiceResponseModel): string {
@@ -139,8 +148,11 @@ export class UBookItServiceListElement extends UmbLitElement {
   }
 
   #renderTable(pageEnd: number) {
+    // Only claim the site has no services when the list actually loaded. A
+    // failed load also leaves _total at 0, and rendering the empty state then
+    // tells the user something untrue alongside the error banner.
     if (this._total === 0) {
-      return html`<p>${this.localize.term("ubookitServices_empty")}</p>`;
+      return this._error ? nothing : html`<p>${this.localize.term("ubookitServices_empty")}</p>`;
     }
 
     return html`

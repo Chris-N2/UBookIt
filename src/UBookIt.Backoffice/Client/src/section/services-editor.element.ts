@@ -54,6 +54,15 @@ export class UBookItServiceEditorElement extends UmbLitElement {
   @state()
   private _knownTypes: ResourceTypeUsageModel[] = [];
 
+  /**
+   * Whether the type list was actually retrieved. An empty `_knownTypes` alone
+   * cannot distinguish "no resources exist" from "the request failed", and
+   * asserting "no resources currently have this type" on the strength of a
+   * failed lookup makes the hint lie about every type the user enters.
+   */
+  @state()
+  private _knownTypesLoaded = false;
+
   #term(key: string) {
     return this.localize.term(`ubookitServices_${key}`);
   }
@@ -104,10 +113,16 @@ export class UBookItServiceEditorElement extends UmbLitElement {
 
   async #loadTypes() {
     try {
-      const { data } = await UBookItBackofficeService.listResourceTypes();
-      this._knownTypes = data ?? [];
+      const { data, error } = await UBookItBackofficeService.listResourceTypes();
+      if (error || !data) {
+        return;
+      }
+
+      this._knownTypes = data;
+      this._knownTypesLoaded = true;
     } catch {
-      this._knownTypes = [];
+      // Leaves _knownTypesLoaded false: the field degrades to plain free text
+      // with no suggestions and no hint, rather than a hint that cannot be true.
     }
   }
 
@@ -115,8 +130,10 @@ export class UBookItServiceEditorElement extends UmbLitElement {
     return {
       name: this._name,
       durationMinutes: this._durationMode === "fixed" ? this._durationMinutes : null,
-      // Exactly one role, count fixed at 1 in v1 (design D5).
-      roles: [{ resourceType: this._resourceType, count: 1 }],
+      // Exactly one role, count fixed at 1 in v1 (design D5). Trimmed to match
+      // what the hint evaluates: otherwise " room " looks known (hint hidden)
+      // but is rejected server-side as an invalid type key.
+      roles: [{ resourceType: this._resourceType.trim(), count: 1 }],
     };
   }
 
@@ -153,8 +170,16 @@ export class UBookItServiceEditorElement extends UmbLitElement {
     return this._errors.filter((e) => e.code !== undefined && codes.includes(e.code));
   }
 
-  /** True once a type has been entered that no existing resource uses. */
+  /**
+   * True once a type has been entered that no existing resource uses. Only
+   * meaningful when the type list was actually retrieved — see
+   * {@link _knownTypesLoaded}.
+   */
   get #typeIsUnknown(): boolean {
+    if (!this._knownTypesLoaded) {
+      return false;
+    }
+
     const entered = this._resourceType.trim();
     return entered.length > 0 && !this._knownTypes.some((t) => t.type === entered);
   }
@@ -216,18 +241,27 @@ export class UBookItServiceEditorElement extends UmbLitElement {
   }
 
   #renderDetails() {
+    // The fieldset carries the association: a group error is announced with the
+    // control it belongs to, rather than only appearing in the summary. Without
+    // it the rendered id has no referrer and the association silently does not
+    // exist (QA finding).
+    const described = this.#errorsFor("service-name-required").length > 0;
+
     return html`
       <uui-box headline=${this.#term("details")}>
         ${this.#renderGroupErrors("err-details", "service-name-required")}
-        <div class="field">
-          <uui-label for="service-name" required>${this.#term("name")}</uui-label>
-          <uui-input
-            id="service-name"
-            label=${this.#term("name")}
-            .value=${this._name}
-            @input=${(e: InputEvent) => (this._name = (e.target as HTMLInputElement).value)}
-          ></uui-input>
-        </div>
+        <fieldset aria-describedby=${described ? "err-details" : nothing}>
+          <legend class="visually-hidden">${this.#term("details")}</legend>
+          <div class="field">
+            <uui-label for="service-name" required>${this.#term("name")}</uui-label>
+            <uui-input
+              id="service-name"
+              label=${this.#term("name")}
+              .value=${this._name}
+              @input=${(e: InputEvent) => (this._name = (e.target as HTMLInputElement).value)}
+            ></uui-input>
+          </div>
+        </fieldset>
       </uui-box>
     `;
   }
@@ -249,18 +283,22 @@ export class UBookItServiceEditorElement extends UmbLitElement {
               id="service-resource-type"
               list="ubookit-resource-types"
               .value=${this._resourceType}
-              aria-describedby="resource-type-hint${this.#typeIsUnknown ? " resource-type-unknown" : ""}"
+              aria-describedby="resource-type-hint resource-type-unknown"
               @input=${(e: InputEvent) => (this._resourceType = (e.target as HTMLInputElement).value)}
             />
             <datalist id="ubookit-resource-types">
               ${this._knownTypes.map((t) => html`<option value=${t.type}></option>`)}
             </datalist>
             <p id="resource-type-hint" class="hint">${this.#term("resourceTypeHint")}</p>
-            ${this.#typeIsUnknown
-              ? html`<p id="resource-type-unknown" class="hint" role="status">
-                  ${this.#term("resourceTypeUnknown")}
-                </p>`
-              : nothing}
+            <!--
+              The live region is always present and only its text changes. A
+              role="status" element inserted at the same moment as its content
+              is frequently not announced, because the region must already be
+              observed when the change happens.
+            -->
+            <p id="resource-type-unknown" class="hint" role="status">
+              ${this.#typeIsUnknown ? this.#term("resourceTypeUnknown") : ""}
+            </p>
           </div>
         </fieldset>
       </uui-box>
@@ -268,34 +306,56 @@ export class UBookItServiceEditorElement extends UmbLitElement {
   }
 
   #renderDuration() {
+    const described = this.#errorsFor("service-duration-invalid").length > 0;
+
     return html`
       <uui-box headline=${this.#term("duration")}>
         ${this.#renderGroupErrors("err-duration", "service-duration-invalid")}
-        <uui-radio-group
-          .value=${this._durationMode}
-          @change=${(e: Event) =>
-            (this._durationMode = (e.target as HTMLInputElement).value as DurationMode)}
-        >
-          <uui-radio value="inherit" label=${this.#term("durationInherit")}></uui-radio>
-          <uui-radio value="fixed" label=${this.#term("durationFixed")}></uui-radio>
-        </uui-radio-group>
+        <fieldset aria-describedby=${described ? "err-duration" : nothing}>
+          <legend class="visually-hidden">${this.#term("duration")}</legend>
+          <uui-radio-group
+            label=${this.#term("duration")}
+            aria-label=${this.#term("duration")}
+            .value=${this._durationMode}
+            @change=${(e: Event) =>
+              (this._durationMode = (e.target as HTMLInputElement).value as DurationMode)}
+          >
+            <uui-radio value="inherit" label=${this.#term("durationInherit")}></uui-radio>
+            <uui-radio value="fixed" label=${this.#term("durationFixed")}></uui-radio>
+          </uui-radio-group>
 
-        <p class="hint">${this.#term("durationInheritHint")}</p>
+          <p class="hint">${this.#term("durationInheritHint")}</p>
 
-        <div class="field">
-          <label for="service-duration">${this.#term("durationMinutes")}</label>
-          <input
-            id="service-duration"
-            type="number"
-            min="1"
-            .value=${String(this._durationMinutes)}
-            ?disabled=${this._durationMode !== "fixed"}
-            @input=${(e: InputEvent) =>
-              (this._durationMinutes = Number((e.target as HTMLInputElement).value))}
-          />
-        </div>
+          <div class="field">
+            <label for="service-duration">${this.#term("durationMinutes")}</label>
+            <input
+              id="service-duration"
+              type="number"
+              min="1"
+              .value=${String(this._durationMinutes)}
+              ?disabled=${this._durationMode !== "fixed"}
+              @input=${(e: InputEvent) => this.#onDurationInput(e)}
+            />
+          </div>
+        </fieldset>
       </uui-box>
     `;
+  }
+
+  /**
+   * Keeps an emptied field empty. `Number("")` is 0, so binding it straight
+   * back repaints "0" under the cursor and makes the field impossible to clear
+   * and retype; it would also submit 0 as a fixed duration, which the server
+   * then rejects. Treating empty as "no value yet" leaves the last real value
+   * in state and lets the server's own duration rule handle a genuine 0.
+   */
+  #onDurationInput(event: InputEvent) {
+    const raw = (event.target as HTMLInputElement).value;
+    if (raw === "") {
+      return;
+    }
+
+    this._durationMinutes = Number(raw);
   }
 
   static override styles = css`
