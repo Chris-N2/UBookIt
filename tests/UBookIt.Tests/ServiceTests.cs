@@ -4,33 +4,56 @@ using UBookIt.Core.Services;
 namespace UBookIt.Tests;
 
 /// <summary>
-/// The `Service` aggregate factory: valid single-role services (with/without
-/// duration) and each validation rule with its stable code.
+/// The `Service` aggregate factory: valid single-role services across both
+/// duration kinds, and each validation rule with its stable code. Duration
+/// validity itself belongs to <see cref="ServiceDurationTests"/> — an invalid
+/// `ServiceDuration` cannot be constructed, so it cannot reach this factory.
 /// </summary>
 public class ServiceTests
 {
     private static ServiceRole Role(string type = "person", int count = 1) => new(type, count);
 
+    private static ServiceDuration Fixed(int minutes)
+        => ServiceDuration.Fixed(TimeSpan.FromMinutes(minutes)).Value;
+
     [Fact]
-    public void Valid_service_with_duration()
+    public void Valid_service_with_fixed_duration()
     {
-        var result = Service.Create("Massage", TimeSpan.FromMinutes(60), [Role("person")]);
+        var result = Service.Create("Massage", Fixed(60), [Role("person")]);
 
         Assert.True(result.Succeeded);
         Assert.Equal("Massage", result.Value.Name);
-        Assert.Equal(TimeSpan.FromMinutes(60), result.Value.Duration);
+        Assert.Equal(ServiceDurationKind.Fixed, result.Value.Duration.Kind);
+        Assert.Equal(TimeSpan.FromMinutes(60), result.Value.Duration.FixedLength);
         var role = Assert.Single(result.Value.Roles);
         Assert.Equal("person", role.ResourceType);
         Assert.Equal(1, role.Count);
     }
 
     [Fact]
-    public void Duration_is_optional()
+    public void Valid_service_with_bounded_variable_duration()
     {
+        var duration = ServiceDuration.Variable(TimeSpan.FromMinutes(45), TimeSpan.FromMinutes(120)).Value;
+
+        var result = Service.Create("Room hire", duration, [Role("room")]);
+
+        Assert.True(result.Succeeded);
+        Assert.Equal(ServiceDurationKind.Variable, result.Value.Duration.Kind);
+        Assert.Equal(TimeSpan.FromMinutes(45), result.Value.Duration.Min);
+        Assert.Equal(TimeSpan.FromMinutes(120), result.Value.Duration.Max);
+    }
+
+    [Fact]
+    public void Omitted_duration_is_unbounded_variable()
+    {
+        // The unconfigured default defers entirely to the resource's own range,
+        // rather than pinning every booking to the resource minimum.
         var result = Service.Create("Consultation", null, [Role("person")]);
 
         Assert.True(result.Succeeded);
-        Assert.Null(result.Value.Duration);
+        Assert.Equal(ServiceDurationKind.Variable, result.Value.Duration.Kind);
+        Assert.Null(result.Value.Duration.Min);
+        Assert.Null(result.Value.Duration.Max);
     }
 
     [Theory]
@@ -39,32 +62,10 @@ public class ServiceTests
     [InlineData("   ")]
     public void Blank_name_is_rejected(string? name)
     {
-        var result = Service.Create(name, TimeSpan.FromMinutes(30), [Role()]);
+        var result = Service.Create(name, Fixed(30), [Role()]);
 
         Assert.False(result.Succeeded);
         Assert.Contains(result.Failures, f => f.Code == FailureCodes.ServiceNameRequired);
-    }
-
-    [Theory]
-    [InlineData(0)]
-    [InlineData(-15)]
-    public void Non_positive_duration_is_rejected(int minutes)
-    {
-        var result = Service.Create("X", TimeSpan.FromMinutes(minutes), [Role()]);
-
-        Assert.False(result.Succeeded);
-        Assert.Contains(result.Failures, f => f.Code == FailureCodes.ServiceDurationInvalid);
-    }
-
-    [Fact]
-    public void Sub_minute_duration_is_rejected()
-    {
-        // Duration persists/round-trips as whole minutes; 90 seconds must not
-        // be silently truncated to 1 minute.
-        var result = Service.Create("X", TimeSpan.FromSeconds(90), [Role()]);
-
-        Assert.False(result.Succeeded);
-        Assert.Contains(result.Failures, f => f.Code == FailureCodes.ServiceDurationInvalid);
     }
 
     [Fact]

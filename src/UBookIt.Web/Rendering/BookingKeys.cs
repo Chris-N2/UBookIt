@@ -6,6 +6,9 @@ internal static class BookingKeys
     /// <summary>Query parameter carrying the chosen date (yyyy-MM-dd).</summary>
     public const string DateQuery = "ubDate";
 
+    /// <summary>Query parameter carrying the chosen booking length in whole minutes.</summary>
+    public const string DurationQuery = "ubMins";
+
     /// <summary>TempData key for a failed submission redrawn on the form (design D3).</summary>
     public const string FailedSubmission = "UBookIt.Booking.Failed";
 

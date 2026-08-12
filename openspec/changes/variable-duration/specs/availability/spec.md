@@ -8,11 +8,11 @@ For each qualifying start, the longest bookable length SHALL be the run from tha
 Bookable starts SHALL never be persisted; the projection is a pure computation. The projection SHALL be bounded by the same maximum query range as every other availability query.
 
 #### Scenario: Maximum length shortens towards the end of a free interval
-- **WHEN** free time on a date is 09:00–12:00, granularity is 60 minutes, and the resource permits 30 minutes to 8 hours
+- **WHEN** free time on a date is 09:00–12:00, granularity is 60 minutes, and the resource permits 60 minutes to 8 hours
 - **THEN** the offered starts are 09:00 with a maximum of 3 hours, 10:00 with a maximum of 2 hours, and 11:00 with a maximum of 1 hour
 
 #### Scenario: The resource maximum caps the run
-- **WHEN** free time on a date is 09:00–17:00 and the resource's maximum duration is 2 hours
+- **WHEN** free time on a date is 09:00–17:00, granularity is 60 minutes, and the resource's maximum duration is 2 hours
 - **THEN** every offered start reports a maximum bookable length of at most 2 hours
 
 #### Scenario: A start too close to the end of a free interval is not offered

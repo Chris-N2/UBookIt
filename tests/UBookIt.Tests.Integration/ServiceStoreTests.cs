@@ -15,7 +15,10 @@ public class ServiceStoreTests(SqlServerFixture fixture)
     private static CancellationToken Ct => TestContext.Current.CancellationToken;
 
     private static Service NewService(string name = "Massage", int? minutes = 60, string type = "person")
-        => Service.Create(name, minutes is { } m ? TimeSpan.FromMinutes(m) : null, [new ServiceRole(type, 1)]).Value;
+        => Service.Create(
+            name,
+            minutes is { } m ? ServiceDuration.Fixed(TimeSpan.FromMinutes(m)).Value : ServiceDuration.Unbounded,
+            [new ServiceRole(type, 1)]).Value;
 
     [Fact]
     public async Task Create_then_get_round_trips()
@@ -34,8 +37,50 @@ public class ServiceStoreTests(SqlServerFixture fixture)
 
         Assert.NotNull(fetched);
         Assert.Equal("Massage", fetched!.Name);
-        Assert.Equal(TimeSpan.FromMinutes(60), fetched.Duration);
+        Assert.Equal(ServiceDurationKind.Fixed, fetched.Duration.Kind);
+        Assert.Equal(TimeSpan.FromMinutes(60), fetched.Duration.FixedLength);
         Assert.Equal("person", Assert.Single(fetched.Roles).ResourceType);
+    }
+
+    [Fact]
+    public async Task Bounded_variable_duration_round_trips()
+    {
+        fixture.EnsureAvailable();
+        var duration = ServiceDuration.Variable(TimeSpan.FromMinutes(45), TimeSpan.FromMinutes(120)).Value;
+        var service = Service.Create("Room hire", duration, [new ServiceRole("room", 1)]).Value;
+
+        await using (var context = fixture.CreateContext())
+        {
+            Assert.True((await new SqlServiceManagementStore(context).CreateAsync(service, Ct)).Succeeded);
+        }
+
+        await using var read = fixture.CreateContext();
+        var fetched = await new SqlServiceStore(read).GetAsync(service.Id, Ct);
+
+        Assert.NotNull(fetched);
+        Assert.Equal(ServiceDurationKind.Variable, fetched!.Duration.Kind);
+        Assert.Equal(TimeSpan.FromMinutes(45), fetched.Duration.Min);
+        Assert.Equal(TimeSpan.FromMinutes(120), fetched.Duration.Max);
+    }
+
+    [Fact]
+    public async Task Unbounded_variable_duration_round_trips()
+    {
+        fixture.EnsureAvailable();
+        var service = Service.Create("Hot desk", ServiceDuration.Unbounded, [new ServiceRole("desk", 1)]).Value;
+
+        await using (var context = fixture.CreateContext())
+        {
+            Assert.True((await new SqlServiceManagementStore(context).CreateAsync(service, Ct)).Succeeded);
+        }
+
+        await using var read = fixture.CreateContext();
+        var fetched = await new SqlServiceStore(read).GetAsync(service.Id, Ct);
+
+        Assert.NotNull(fetched);
+        Assert.Equal(ServiceDurationKind.Variable, fetched!.Duration.Kind);
+        Assert.Null(fetched.Duration.Min);
+        Assert.Null(fetched.Duration.Max);
     }
 
     [Fact]
@@ -75,7 +120,11 @@ public class ServiceStoreTests(SqlServerFixture fixture)
             await new SqlServiceManagementStore(c1).CreateAsync(service, Ct);
         }
 
-        var updated = Service.Create("After", TimeSpan.FromMinutes(90), [new ServiceRole("room", 1)], service.Id).Value;
+        var updated = Service.Create(
+            "After",
+            ServiceDuration.Fixed(TimeSpan.FromMinutes(90)).Value,
+            [new ServiceRole("room", 1)],
+            service.Id).Value;
         await using (var c2 = fixture.CreateContext())
         {
             var result = await new SqlServiceManagementStore(c2).UpdateAsync(updated, Ct);
@@ -86,7 +135,7 @@ public class ServiceStoreTests(SqlServerFixture fixture)
         var fetched = await new SqlServiceStore(read).GetAsync(service.Id, Ct);
 
         Assert.Equal("After", fetched!.Name);
-        Assert.Equal(TimeSpan.FromMinutes(90), fetched.Duration);
+        Assert.Equal(TimeSpan.FromMinutes(90), fetched.Duration.FixedLength);
         Assert.Equal("room", Assert.Single(fetched.Roles).ResourceType); // old role replaced, not merged
     }
 
@@ -134,7 +183,11 @@ public class ServiceStoreTests(SqlServerFixture fixture)
             }
 
             Service Variant(string type) =>
-                Service.Create($"Race {iteration}", TimeSpan.FromMinutes(30), [new ServiceRole(type, 1)], original.Id).Value;
+                Service.Create(
+                    $"Race {iteration}",
+                    ServiceDuration.Fixed(TimeSpan.FromMinutes(30)).Value,
+                    [new ServiceRole(type, 1)],
+                    original.Id).Value;
 
             var results = await Task.WhenAll(
                 Task.Run(async () =>

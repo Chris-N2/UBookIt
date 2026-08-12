@@ -8,7 +8,8 @@ namespace UBookIt.Web.Rendering;
 /// it is unit-testable without an Umbraco host). Times are shown as site-zone
 /// wall-clock; each option's value is the exact UTC instant (round-trip "O"
 /// format) so the POST re-selects the precise slot without re-parsing display
-/// text. v1 books a fixed duration — the resource's minimum duration.
+/// text. The booking length is the visitor's choice from the lengths the
+/// resource permits, defaulting to its minimum duration.
 /// </summary>
 public static class BookingFormBuilder
 {
@@ -37,14 +38,66 @@ public static class BookingFormBuilder
         }
     }
 
-    /// <summary>The booking duration for v1: the resource's minimum duration.</summary>
-    public static TimeSpan BookingDuration(Resource resource) => resource.Availability.Constraints.MinDuration;
+    /// <summary>
+    /// The default booking length: the resource's minimum duration. A visitor
+    /// who never touches the length control books exactly what they booked
+    /// before the control existed.
+    /// </summary>
+    public static TimeSpan DefaultDuration(Resource resource) => resource.Availability.Constraints.MinDuration;
+
+    /// <summary>
+    /// Every length the resource permits, in whole minutes ascending: the
+    /// granularity multiples from its minimum to its maximum duration. Both
+    /// bounds are guaranteed multiples of the granularity by
+    /// <c>BookingConstraints</c>, so the sequence lands exactly on the maximum.
+    /// </summary>
+    public static IReadOnlyList<int> DurationOptions(Resource resource)
+    {
+        var constraints = resource.Availability.Constraints;
+        var step = (int)constraints.Granularity.TotalMinutes;
+        var max = (int)constraints.MaxDuration.TotalMinutes;
+
+        var options = new List<int>();
+        for (var minutes = (int)constraints.MinDuration.TotalMinutes; minutes <= max; minutes += step)
+        {
+            options.Add(minutes);
+        }
+
+        return options;
+    }
+
+    /// <summary>
+    /// The length to render and book: the requested one when the resource
+    /// permits it, otherwise the default. Never trusts the request — an
+    /// unpermitted length silently falls back rather than offering times that
+    /// placement would reject.
+    /// </summary>
+    public static TimeSpan ResolveDuration(Resource resource, int? requestedMinutes)
+    {
+        if (requestedMinutes is not { } minutes)
+        {
+            return DefaultDuration(resource);
+        }
+
+        return DurationOptions(resource).Contains(minutes)
+            ? TimeSpan.FromMinutes(minutes)
+            : DefaultDuration(resource);
+    }
+
+    /// <summary>
+    /// The longest length bookable anywhere among these starts, or null when
+    /// there are none. Composed here rather than in Core so no presentation
+    /// concern reaches the domain (design D9).
+    /// </summary>
+    public static int? LongestAvailableMinutes(IReadOnlyList<BookableStart> starts)
+        => starts.Count == 0 ? null : (int)starts.Max(s => s.MaxDuration).TotalMinutes;
 
     public static BookingFormModel Build(
         Resource resource,
         DateOnly selectedDate,
         DateOnly today,
-        IReadOnlyList<Slot> slots,
+        IReadOnlyList<BookableStart> starts,
+        TimeSpan duration,
         TimeZoneInfo zone,
         FailedSubmission? failed = null)
     {
@@ -57,8 +110,10 @@ public static class BookingFormBuilder
             SelectedDate = selectedDate,
             MinDate = today,
             MaxDate = today.AddDays(constraints.HorizonDays),
-            DurationMinutes = (int)constraints.MinDuration.TotalMinutes,
-            Times = ToOptions(slots, zone),
+            DurationMinutes = (int)duration.TotalMinutes,
+            DurationOptions = DurationOptions(resource),
+            LongestAvailableMinutes = LongestAvailableMinutes(starts),
+            Times = ToOptions(starts.Where(s => s.Admits(duration)).Select(s => new Slot(s.StartUtc, duration)), zone),
             SelectedTimeIso = failed?.SelectedTimeIso,
             Name = failed?.Name,
             Email = failed?.Email,

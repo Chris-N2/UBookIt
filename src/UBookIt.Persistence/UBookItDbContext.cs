@@ -90,6 +90,10 @@ public sealed class UBookItDbContext(DbContextOptions<UBookItDbContext> options)
             service.HasKey(s => s.Id);
             service.Property(s => s.Id).ValueGeneratedNever();
             service.Property(s => s.Name).HasMaxLength(512);
+
+            // Stored as its name so the column is readable in the database and
+            // does not silently shift meaning if the enum is ever reordered.
+            service.Property(s => s.DurationKind).HasConversion<string>().HasMaxLength(16);
             service.HasMany(s => s.Roles).WithOne().HasForeignKey(r => r.ServiceId).OnDelete(DeleteBehavior.Cascade);
         });
 

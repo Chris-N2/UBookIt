@@ -26,7 +26,7 @@ public class ServicesControllerTests
     private static ServiceRequestModel ValidRequest(string name = "Massage") => new()
     {
         Name = name,
-        DurationMinutes = 60,
+        Duration = new ServiceDurationModel { Kind = ServiceDurationModel.FixedKind, Minutes = 60 },
         Roles = [new ServiceRoleModel { ResourceType = "person", Count = 1 }],
     };
 
@@ -49,8 +49,118 @@ public class ServicesControllerTests
         var fetched = Ok<ServiceResponseModel>(await controller.GetService(created.Id));
 
         Assert.Equal("Massage", fetched.Name);
-        Assert.Equal(60, fetched.DurationMinutes);
+        Assert.Equal(ServiceDurationModel.FixedKind, fetched.Duration.Kind);
+        Assert.Equal(60, fetched.Duration.Minutes);
         Assert.Equal("person", Assert.Single(fetched.Roles).ResourceType);
+    }
+
+    [Fact]
+    public async Task Bounded_variable_duration_round_trips()
+    {
+        var (controller, _) = Wire();
+        var request = ValidRequest("Room hire");
+        request.Duration = new ServiceDurationModel
+        {
+            Kind = ServiceDurationModel.VariableKind, MinMinutes = 45, MaxMinutes = 120,
+        };
+
+        var created = Ok<ServiceResponseModel>(await controller.CreateService(request));
+        var fetched = Ok<ServiceResponseModel>(await controller.GetService(created.Id));
+
+        Assert.Equal(ServiceDurationModel.VariableKind, fetched.Duration.Kind);
+        Assert.Equal(45, fetched.Duration.MinMinutes);
+        Assert.Equal(120, fetched.Duration.MaxMinutes);
+        Assert.Null(fetched.Duration.Minutes);
+    }
+
+    [Fact]
+    public async Task Unbounded_variable_duration_round_trips()
+    {
+        var (controller, _) = Wire();
+        var request = ValidRequest("Hot desk");
+        request.Duration = new ServiceDurationModel { Kind = ServiceDurationModel.VariableKind };
+
+        var created = Ok<ServiceResponseModel>(await controller.CreateService(request));
+        var fetched = Ok<ServiceResponseModel>(await controller.GetService(created.Id));
+
+        Assert.Equal(ServiceDurationModel.VariableKind, fetched.Duration.Kind);
+        Assert.Null(fetched.Duration.MinMinutes);
+        Assert.Null(fetched.Duration.MaxMinutes);
+    }
+
+    [Fact]
+    public async Task Inverted_bounds_are_rejected()
+    {
+        var (controller, _) = Wire();
+        var request = ValidRequest();
+        request.Duration = new ServiceDurationModel
+        {
+            Kind = ServiceDurationModel.VariableKind, MinMinutes = 120, MaxMinutes = 45,
+        };
+
+        var (status, codes) = Problem(await controller.CreateService(request));
+
+        Assert.Equal(400, status);
+        Assert.Contains(FailureCodes.ServiceDurationInvalid, codes);
+    }
+
+    [Fact]
+    public async Task An_unknown_duration_kind_is_rejected_rather_than_defaulted()
+    {
+        // Guessing a kind would store something the caller never asked for.
+        var (controller, _) = Wire();
+        var request = ValidRequest();
+        request.Duration = new ServiceDurationModel { Kind = "whenever" };
+
+        var (status, codes) = Problem(await controller.CreateService(request));
+
+        Assert.Equal(400, status);
+        Assert.Contains(FailureCodes.ServiceDurationInvalid, codes);
+    }
+
+    [Fact]
+    public async Task An_absent_duration_is_rejected_rather_than_defaulted()
+    {
+        var (controller, _) = Wire();
+        var request = ValidRequest();
+        request.Duration = null;
+
+        var (status, codes) = Problem(await controller.CreateService(request));
+
+        Assert.Equal(400, status);
+        Assert.Contains(FailureCodes.ServiceDurationInvalid, codes);
+    }
+
+    [Fact]
+    public async Task A_fixed_duration_without_a_length_is_rejected()
+    {
+        var (controller, _) = Wire();
+        var request = ValidRequest();
+        request.Duration = new ServiceDurationModel { Kind = ServiceDurationModel.FixedKind };
+
+        var (status, codes) = Problem(await controller.CreateService(request));
+
+        Assert.Equal(400, status);
+        Assert.Contains(FailureCodes.ServiceDurationInvalid, codes);
+    }
+
+    [Fact]
+    public async Task Duration_failures_identify_the_offending_input()
+    {
+        // The editor associates the message with the specific bound control, so
+        // the field has to survive the HTTP edge.
+        var (controller, _) = Wire();
+        var request = ValidRequest();
+        request.Duration = new ServiceDurationModel
+        {
+            Kind = ServiceDurationModel.VariableKind, MinMinutes = 120, MaxMinutes = 45,
+        };
+
+        var obj = Assert.IsType<ObjectResult>(await controller.CreateService(request));
+        var problem = Assert.IsType<ProblemDetails>(obj.Value);
+        var errors = Assert.IsType<UBookIt.Backoffice.Models.ApiErrorModel[]>(problem.Extensions["errors"]);
+
+        Assert.Contains(errors, e => e.Field == ServiceDuration.MinField);
     }
 
     [Fact]

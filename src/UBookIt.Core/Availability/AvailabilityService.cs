@@ -12,6 +12,16 @@ public interface IAvailabilityQueryService
     Task<DomainResult<IReadOnlyList<Slot>>> GetSlotsAsync(
         Guid resourceId, DateOnly fromDate, DateOnly toDate, TimeSpan duration,
         CancellationToken cancellationToken = default);
+
+    /// <summary>
+    /// Every bookable start over the range with the shortest and longest length
+    /// bookable from it. Takes no duration — answering "how long can I book from
+    /// here" is its purpose — and is a strict superset of
+    /// <see cref="GetSlotsAsync"/>: the starts for any duration are those whose
+    /// range admits it.
+    /// </summary>
+    Task<DomainResult<IReadOnlyList<BookableStart>>> GetBookableStartsAsync(
+        Guid resourceId, DateOnly fromDate, DateOnly toDate, CancellationToken cancellationToken = default);
 }
 
 public sealed class AvailabilityService(
@@ -51,6 +61,24 @@ public sealed class AvailabilityService(
 
         var slots = SlotProjector.Project(free, constraints, duration, timeProvider.GetUtcNow(), zone);
         return DomainResult<IReadOnlyList<Slot>>.Success(slots);
+    }
+
+    public async Task<DomainResult<IReadOnlyList<BookableStart>>> GetBookableStartsAsync(
+        Guid resourceId, DateOnly fromDate, DateOnly toDate, CancellationToken cancellationToken = default)
+    {
+        // Shares ResolveAsync with the other queries, so range, resource and
+        // time-zone failures behave identically across the availability surface.
+        var context = await ResolveAsync(resourceId, fromDate, toDate, cancellationToken).ConfigureAwait(false);
+
+        if (!context.Succeeded)
+        {
+            return DomainResult<IReadOnlyList<BookableStart>>.Failure(context.Failures);
+        }
+
+        var (constraints, zone, free) = context.Value;
+
+        var starts = SlotProjector.ProjectBookableStarts(free, constraints, timeProvider.GetUtcNow(), zone);
+        return DomainResult<IReadOnlyList<BookableStart>>.Success(starts);
     }
 
     // One code per failed rule (bookings spec, "Placement validation pipeline"):

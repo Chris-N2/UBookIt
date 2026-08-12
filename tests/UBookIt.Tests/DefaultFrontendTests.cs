@@ -85,18 +85,21 @@ public class DefaultFrontendTests
         Assert.Equal(startUtc, DateTimeOffset.Parse(option.InstantIso, null, System.Globalization.DateTimeStyles.RoundtripKind));
     }
 
+    private static IReadOnlyList<BookableStart> Starts(params (string Time, int MaxMinutes)[] entries)
+        => entries
+            .Select(e => new BookableStart(
+                TestData.Utc(Date, e.Time), TimeSpan.FromMinutes(30), TimeSpan.FromMinutes(e.MaxMinutes)))
+            .ToList();
+
     [Fact]
-    public void Build_with_slots_reports_times_and_min_duration()
+    public void Build_with_starts_reports_times_and_the_chosen_duration()
     {
         var room = TestData.Room();
         var today = BookingFormBuilder.TodayIn(TestData.Now, TestData.London);
-        IReadOnlyList<Slot> slots =
-        [
-            new Slot(TestData.Utc(Date, "09:00"), TimeSpan.FromMinutes(30)),
-            new Slot(TestData.Utc(Date, "09:30"), TimeSpan.FromMinutes(30)),
-        ];
 
-        var model = BookingFormBuilder.Build(room, Date, today, slots, TestData.London);
+        var model = BookingFormBuilder.Build(
+            room, Date, today, Starts(("09:00", 60), ("09:30", 30)),
+            TimeSpan.FromMinutes(30), TestData.London);
 
         Assert.True(model.HasTimes);
         Assert.Equal(2, model.Times.Count);
@@ -106,15 +109,97 @@ public class DefaultFrontendTests
     }
 
     [Fact]
-    public void Build_with_no_slots_reports_the_no_times_state()
+    public void Build_with_no_starts_reports_the_no_times_state()
     {
         var room = TestData.Room();
         var today = BookingFormBuilder.TodayIn(TestData.Now, TestData.London);
 
-        var model = BookingFormBuilder.Build(room, Date, today, [], TestData.London);
+        var model = BookingFormBuilder.Build(room, Date, today, [], TimeSpan.FromMinutes(30), TestData.London);
 
         Assert.False(model.HasTimes);
         Assert.Empty(model.Times);
+        Assert.Null(model.LongestAvailableMinutes);
+        Assert.False(model.LengthIsTheProblem);
+    }
+
+    // --- Visitor-chosen length ---
+
+    [Fact]
+    public void Duration_options_are_the_granularity_multiples_the_resource_permits()
+    {
+        var room = TestData.Room(TestData.Config(
+            TestData.Weekly("09:00", "17:00", Date.DayOfWeek),
+            constraints: BookingConstraints.Create(
+                granularity: TimeSpan.FromMinutes(30),
+                minDuration: TimeSpan.FromMinutes(30),
+                maxDuration: TimeSpan.FromMinutes(120)).Value));
+
+        Assert.Equal(new[] { 30, 60, 90, 120 }, BookingFormBuilder.DurationOptions(room).ToArray());
+    }
+
+    [Fact]
+    public void An_absent_length_falls_back_to_the_resource_minimum()
+    {
+        var room = TestData.Room();
+
+        Assert.Equal(
+            room.Availability.Constraints.MinDuration,
+            BookingFormBuilder.ResolveDuration(room, null));
+    }
+
+    [Theory]
+    [InlineData(0)]
+    [InlineData(-30)]
+    [InlineData(37)]      // not a granularity multiple
+    [InlineData(100000)]  // beyond the resource maximum
+    public void An_unpermitted_length_falls_back_to_the_resource_minimum(int minutes)
+    {
+        // The select is an affordance, not a trust boundary: a hand-crafted
+        // query must not produce times that placement would reject.
+        var room = TestData.Room();
+
+        Assert.Equal(
+            room.Availability.Constraints.MinDuration,
+            BookingFormBuilder.ResolveDuration(room, minutes));
+    }
+
+    [Fact]
+    public void A_permitted_length_is_honoured()
+    {
+        var room = TestData.Room();
+
+        Assert.Equal(TimeSpan.FromMinutes(60), BookingFormBuilder.ResolveDuration(room, 60));
+    }
+
+    [Fact]
+    public void Only_starts_admitting_the_chosen_length_are_offered()
+    {
+        var room = TestData.Room();
+        var today = BookingFormBuilder.TodayIn(TestData.Now, TestData.London);
+
+        var model = BookingFormBuilder.Build(
+            room, Date, today, Starts(("09:00", 120), ("11:00", 30)),
+            TimeSpan.FromMinutes(60), TestData.London);
+
+        var only = Assert.Single(model.Times);
+        Assert.Equal(
+            TestData.Utc(Date, "09:00"),
+            DateTimeOffset.Parse(only.InstantIso, null, System.Globalization.DateTimeStyles.RoundtripKind));
+    }
+
+    [Fact]
+    public void An_unavailable_length_reports_the_longest_that_is_available()
+    {
+        var room = TestData.Room();
+        var today = BookingFormBuilder.TodayIn(TestData.Now, TestData.London);
+
+        var model = BookingFormBuilder.Build(
+            room, Date, today, Starts(("09:00", 90), ("11:00", 30)),
+            TimeSpan.FromMinutes(180), TestData.London);
+
+        Assert.False(model.HasTimes);
+        Assert.True(model.LengthIsTheProblem);
+        Assert.Equal(90, model.LongestAvailableMinutes);
     }
 
     // --- 6.3 repopulation ---
@@ -127,6 +212,7 @@ public class DefaultFrontendTests
         var failed = new FailedSubmission
         {
             Date = Date,
+            DurationMinutes = 60,
             SelectedTimeIso = TestData.Utc(Date, "09:00").ToString("O"),
             Name = "Ada",
             Email = "not-an-email",
@@ -134,8 +220,12 @@ public class DefaultFrontendTests
             Errors = [new BookingError("Please enter a valid email address.", BookingFieldIds.Email)],
         };
 
-        var model = BookingFormBuilder.Build(room, Date, today, [], TestData.London, failed);
+        var model = BookingFormBuilder.Build(
+            room, Date, today, [], BookingFormBuilder.ResolveDuration(room, failed.DurationMinutes),
+            TestData.London, failed);
 
+        // The chosen length survives a failed submission alongside the details.
+        Assert.Equal(60, model.DurationMinutes);
         Assert.Equal("Ada", model.Name);
         Assert.Equal("not-an-email", model.Email);
         Assert.Equal("01234", model.Phone);

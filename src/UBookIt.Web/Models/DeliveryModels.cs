@@ -79,6 +79,33 @@ public sealed class SlotsResponseModel
 }
 
 /// <summary>
+/// A start with the range of lengths bookable from it. Every whole multiple of
+/// the resource's granularity between the two bounds may be booked.
+/// </summary>
+public sealed class BookableStartModel
+{
+    public DateTimeOffset StartUtc { get; set; }
+
+    public int MinDurationMinutes { get; set; }
+
+    public int MaxDurationMinutes { get; set; }
+}
+
+/// <summary>
+/// Every bookable start over the queried range. Carries no requested duration:
+/// the response answers how long may be booked from each start, so a client
+/// filters it locally for whichever length it needs.
+/// </summary>
+public sealed class BookableStartsResponseModel
+{
+    public Guid ResourceId { get; set; }
+
+    public string ZoneId { get; set; } = string.Empty;
+
+    public List<BookableStartModel> Starts { get; set; } = [];
+}
+
+/// <summary>
 /// Booker contact details on the wire. There is deliberately no member-key
 /// field: v1 placement is anonymous and body-only (delivery-api spec,
 /// "Booking placement"). Used for both the placement request and the echoed

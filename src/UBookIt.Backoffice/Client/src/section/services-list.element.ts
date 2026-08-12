@@ -118,9 +118,31 @@ export class UBookItServiceListElement extends UmbLitElement {
   }
 
   #summarizeDuration(service: ServiceResponseModel): string {
-    return service.durationMinutes === null || service.durationMinutes === undefined
-      ? this.#term("durationInheritSummary")
-      : this.localize.term("ubookitServices_durationFixedSummary", service.durationMinutes);
+    const duration = service.duration;
+
+    if (duration?.kind === "fixed") {
+      return this.localize.term("ubookitServices_durationFixedSummary", duration.minutes);
+    }
+
+    // A variable duration reads differently depending on which bounds were
+    // given, so each combination gets its own phrasing rather than a summary
+    // that says "variable" and hides the limits the editor actually set.
+    const min = duration?.minMinutes ?? null;
+    const max = duration?.maxMinutes ?? null;
+
+    if (min !== null && max !== null) {
+      return this.localize.term("ubookitServices_durationVariableRangeSummary", min, max);
+    }
+
+    if (min !== null) {
+      return this.localize.term("ubookitServices_durationVariableMinSummary", min);
+    }
+
+    if (max !== null) {
+      return this.localize.term("ubookitServices_durationVariableMaxSummary", max);
+    }
+
+    return this.#term("durationVariableSummary");
   }
 
   #edit(id: string) {

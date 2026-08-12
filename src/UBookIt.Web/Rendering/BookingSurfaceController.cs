@@ -76,11 +76,13 @@ public sealed class BookingSurfaceController : SurfaceController
 
         if (failures.Count == 0)
         {
+            // The submitted length is re-resolved against the resource rather
+            // than trusted: the select is an affordance, not a trust boundary.
             var placed = await _bookingService.PlaceAsync(new BookingRequest
             {
                 ResourceId = resource.Id,
                 Start = startUtc,
-                Duration = BookingFormBuilder.BookingDuration(resource),
+                Duration = BookingFormBuilder.ResolveDuration(resource, form.DurationMinutes),
                 Booker = booker.Value,
             });
 
@@ -101,6 +103,7 @@ public sealed class BookingSurfaceController : SurfaceController
         Stash(BookingKeys.FailedSubmission, new FailedSubmission
         {
             Date = form.Date,
+            DurationMinutes = form.DurationMinutes,
             SelectedTimeIso = form.SelectedTime,
             Name = form.Name,
             Email = form.Email,
@@ -158,6 +161,9 @@ public sealed class BookingSubmission
     public Guid ResourceId { get; set; }
 
     public DateOnly Date { get; set; }
+
+    /// <summary>The chosen booking length in whole minutes; re-validated server-side.</summary>
+    public int DurationMinutes { get; set; }
 
     /// <summary>The chosen slot's exact UTC instant, round-trip ("O") formatted.</summary>
     public string? SelectedTime { get; set; }

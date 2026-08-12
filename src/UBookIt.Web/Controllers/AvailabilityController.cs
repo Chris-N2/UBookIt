@@ -62,4 +62,29 @@ public sealed class AvailabilityController(
             })
             : result.Failures.ToProblemResult();
     }
+
+    /// <summary>
+    /// Every bookable start over the range with how long may be booked from
+    /// each. Deliberately takes no duration — a client filters the response for
+    /// whichever length it needs, so one call answers every length and the
+    /// longest available is discoverable rather than guessed.
+    /// </summary>
+    [HttpGet("resources/{resourceId:guid}/bookable-starts")]
+    [ProducesResponseType<BookableStartsResponseModel>(StatusCodes.Status200OK)]
+    [ProducesResponseType<ProblemDetails>(StatusCodes.Status400BadRequest)]
+    [ProducesResponseType<ProblemDetails>(StatusCodes.Status404NotFound)]
+    public async Task<IActionResult> GetBookableStarts(
+        Guid resourceId, DateOnly from, DateOnly to, CancellationToken cancellationToken = default)
+    {
+        var result = await availability.GetBookableStartsAsync(resourceId, from, to, cancellationToken);
+
+        return result.Succeeded
+            ? Ok(new BookableStartsResponseModel
+            {
+                ResourceId = resourceId,
+                ZoneId = settings.TimeZoneId,
+                Starts = result.Value.Select(DeliveryModelMapper.ToBookableStartModel).ToList(),
+            })
+            : result.Failures.ToProblemResult();
+    }
 }

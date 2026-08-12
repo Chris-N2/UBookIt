@@ -42,15 +42,22 @@ public sealed class BookingViewComponent(
             selectedDate = today;
         }
 
-        var slotsResult = await availability.GetSlotsAsync(
-            resourceId, selectedDate, selectedDate, BookingFormBuilder.BookingDuration(resource));
-        IReadOnlyList<Slot> slots = slotsResult.Succeeded ? slotsResult.Value : [];
+        var duration = BookingFormBuilder.ResolveDuration(resource, failed?.DurationMinutes ?? ReadDurationQuery());
 
-        return View(BookingFormBuilder.Build(resource, selectedDate, today, slots, zone, failed));
+        // One query answers every length: the form filters these starts for the
+        // chosen length and reads the longest available off the same result, so
+        // an unavailable length can explain itself instead of rendering blank.
+        var startsResult = await availability.GetBookableStartsAsync(resourceId, selectedDate, selectedDate);
+        IReadOnlyList<BookableStart> starts = startsResult.Succeeded ? startsResult.Value : [];
+
+        return View(BookingFormBuilder.Build(resource, selectedDate, today, starts, duration, zone, failed));
     }
 
     private DateOnly? ReadDateQuery()
         => DateOnly.TryParse(Request.Query[BookingKeys.DateQuery], out var date) ? date : null;
+
+    private int? ReadDurationQuery()
+        => int.TryParse(Request.Query[BookingKeys.DurationQuery], out var minutes) ? minutes : null;
 
     private T? ReadTempData<T>(string key)
     {

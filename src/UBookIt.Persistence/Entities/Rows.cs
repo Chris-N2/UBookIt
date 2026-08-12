@@ -1,3 +1,5 @@
+using UBookIt.Core.Services;
+
 namespace UBookIt.Persistence.Entities;
 
 /// <summary>Table: uBookItResource. Constraint values stored as integer minutes/days.</summary>
@@ -93,14 +95,22 @@ internal sealed class ClaimRow
     public Guid ResourceId { get; set; }
 }
 
-/// <summary>Table: uBookItService. Duration stored as integer minutes (NULL = no fixed duration).</summary>
+/// <summary>
+/// Table: uBookItService. The duration kind is stored as its name; bounds are
+/// integer minutes. A fixed duration stores the same value in both bounds; a
+/// variable one may leave either NULL, meaning the resource's own bound applies.
+/// </summary>
 internal sealed class ServiceRow
 {
     public Guid Id { get; set; }
 
     public required string Name { get; set; }
 
-    public int? DurationMinutes { get; set; }
+    public ServiceDurationKind DurationKind { get; set; }
+
+    public int? MinDurationMinutes { get; set; }
+
+    public int? MaxDurationMinutes { get; set; }
 
     public List<ServiceRoleRow> Roles { get; set; } = [];
 }

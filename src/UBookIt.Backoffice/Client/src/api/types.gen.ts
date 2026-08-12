@@ -68,16 +68,23 @@ export type ResourceTypeUsageModel = {
     count: number;
 };
 
+export type ServiceDurationModel = {
+    kind: string;
+    minutes?: number | null;
+    minMinutes?: number | null;
+    maxMinutes?: number | null;
+};
+
 export type ServiceRequestModel = {
     name: string;
-    durationMinutes?: number | null;
+    duration?: ServiceDurationModel | null;
     roles: Array<ServiceRoleModel>;
 };
 
 export type ServiceResponseModel = {
     id: string;
     name: string;
-    durationMinutes?: number | null;
+    duration: ServiceDurationModel;
     roles: Array<ServiceRoleModel>;
 };
 

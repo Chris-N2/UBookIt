@@ -19,7 +19,18 @@ public sealed class BookingFormModel
     /// <summary>Latest selectable date (today + booking horizon).</summary>
     public required DateOnly MaxDate { get; init; }
 
+    /// <summary>The chosen booking length, in whole minutes.</summary>
     public required int DurationMinutes { get; init; }
+
+    /// <summary>Every length this resource permits, in whole minutes, ascending.</summary>
+    public IReadOnlyList<int> DurationOptions { get; init; } = [];
+
+    /// <summary>
+    /// The longest length bookable anywhere on the selected date, or null when
+    /// the date has no availability at all. Drives the explanatory empty state:
+    /// "no 3-hour times, the longest available is 90 minutes".
+    /// </summary>
+    public int? LongestAvailableMinutes { get; init; }
 
     public IReadOnlyList<BookingTimeOption> Times { get; init; } = [];
 
@@ -37,6 +48,12 @@ public sealed class BookingFormModel
     public bool HasErrors => Errors.Count > 0;
 
     public bool HasTimes => Times.Count > 0;
+
+    /// <summary>
+    /// True when the date has availability but none of it fits the chosen
+    /// length — the case that earns an explanation rather than a bare "no times".
+    /// </summary>
+    public bool LengthIsTheProblem => !HasTimes && LongestAvailableMinutes is not null;
 
     /// <summary>The error message associated with a field id, if any (for aria wiring).</summary>
     public string? ErrorFor(string fieldId) => Errors.FirstOrDefault(e => e.FieldId == fieldId)?.Message;
@@ -66,6 +83,8 @@ public static class BookingFieldIds
 public sealed class FailedSubmission
 {
     public DateOnly Date { get; init; }
+
+    public int DurationMinutes { get; init; }
 
     public string? SelectedTimeIso { get; init; }
 

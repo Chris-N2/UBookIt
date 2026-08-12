@@ -33,7 +33,12 @@
         </div>
     }
 
-    @* Step 1 — choose a date (GET reload; no JavaScript required). *@
+    @*
+        Step 1 — choose a date and a length (GET reload; no JavaScript required).
+        The length lives here rather than beside the times so that step 2 can only
+        offer starts which admit it: no invalid date/length/start combination is
+        submittable, and no extra round trip is needed to bound the control.
+    *@
     <form method="get" class="ubookit-date-form">
         <div>
             <label for="ubookit-date">Choose a date</label>
@@ -44,6 +49,15 @@
                    min="@Model.MinDate.ToString("yyyy-MM-dd")"
                    max="@Model.MaxDate.ToString("yyyy-MM-dd")" />
         </div>
+        <div>
+            <label for="ubookit-duration">How long do you need?</label>
+            <select id="ubookit-duration" name="@BookingKeys.DurationQuery">
+                @foreach (var minutes in Model.DurationOptions)
+                {
+                    <option value="@minutes" selected="@(minutes == Model.DurationMinutes)">@BookingDurations.Label(minutes)</option>
+                }
+            </select>
+        </div>
         <button type="submit">Show times</button>
     </form>
 
@@ -52,13 +66,14 @@
     {
         <input type="hidden" name="ResourceId" value="@Model.ResourceId" />
         <input type="hidden" name="Date" value="@Model.SelectedDate.ToString("yyyy-MM-dd")" />
+        <input type="hidden" name="DurationMinutes" value="@Model.DurationMinutes" />
 
         @if (Model.HasTimes)
         {
             <fieldset id="@BookingFieldIds.Times" tabindex="-1" class="ubookit-times"
                       aria-invalid="@(timesError is not null ? "true" : null)"
                       aria-describedby="@(timesError is not null ? "ubookit-times-error" : null)">
-                <legend>Available start times on @Model.SelectedDate.ToString("dddd d MMMM yyyy", CultureInfo.InvariantCulture) (@Model.DurationMinutes minutes)</legend>
+                <legend>Available start times on @Model.SelectedDate.ToString("dddd d MMMM yyyy", CultureInfo.InvariantCulture) for @BookingDurations.Label(Model.DurationMinutes)</legend>
                 @if (timesError is not null)
                 {
                     <p id="ubookit-times-error" class="ubookit-field-error">@timesError</p>
@@ -116,6 +131,16 @@
 
                 <button type="submit">Book</button>
             </fieldset>
+        }
+        else if (Model.LengthIsTheProblem)
+        {
+            @* The date has availability, just not this much of it — say so, rather
+               than leaving the visitor to guess a shorter length by trial. *@
+            <p class="ubookit-no-times">
+                No @BookingDurations.Label(Model.DurationMinutes) times are available on @Model.SelectedDate.ToString("dddd d MMMM yyyy", CultureInfo.InvariantCulture).
+                The longest available that day is @BookingDurations.Label(Model.LongestAvailableMinutes!.Value).
+                Please choose a shorter length or another date.
+            </p>
         }
         else
         {

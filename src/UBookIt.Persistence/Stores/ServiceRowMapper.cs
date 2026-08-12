@@ -14,7 +14,7 @@ internal static class ServiceRowMapper
     internal static Service ToDomain(ServiceRow row)
         => Service.Create(
             row.Name,
-            row.DurationMinutes is { } minutes ? TimeSpan.FromMinutes(minutes) : null,
+            ToDuration(row),
             row.Roles.Select(r => new ServiceRole(r.ResourceType, r.Count)),
             row.Id).Value;
 
@@ -24,8 +24,8 @@ internal static class ServiceRowMapper
         {
             Id = service.Id,
             Name = service.Name,
-            DurationMinutes = service.Duration is { } d ? (int)d.TotalMinutes : null,
         };
+        ApplyDuration(service.Duration, row);
         row.Roles = ToRoleRows(service);
         return row;
     }
@@ -33,7 +33,35 @@ internal static class ServiceRowMapper
     internal static void ApplyScalars(Service service, ServiceRow row)
     {
         row.Name = service.Name;
-        row.DurationMinutes = service.Duration is { } d ? (int)d.TotalMinutes : null;
+        ApplyDuration(service.Duration, row);
+    }
+
+    /// <summary>
+    /// Rebuilds the duration through the Core factories, so a row that cannot
+    /// describe a valid duration throws rather than yielding a silently-wrong
+    /// aggregate.
+    /// </summary>
+    private static ServiceDuration ToDuration(ServiceRow row)
+    {
+        var min = row.MinDurationMinutes is { } lower ? TimeSpan.FromMinutes(lower) : (TimeSpan?)null;
+        var max = row.MaxDurationMinutes is { } upper ? TimeSpan.FromMinutes(upper) : (TimeSpan?)null;
+
+        return row.DurationKind switch
+        {
+            ServiceDurationKind.Fixed => ServiceDuration.Fixed(
+                min ?? throw new InvalidOperationException(
+                    $"Service {row.Id} is stored as a fixed duration but has no length.")).Value,
+            ServiceDurationKind.Variable => ServiceDuration.Variable(min, max).Value,
+            _ => throw new InvalidOperationException(
+                $"Service {row.Id} has an unknown duration kind '{row.DurationKind}'."),
+        };
+    }
+
+    private static void ApplyDuration(ServiceDuration duration, ServiceRow row)
+    {
+        row.DurationKind = duration.Kind;
+        row.MinDurationMinutes = duration.Min is { } min ? (int)min.TotalMinutes : null;
+        row.MaxDurationMinutes = duration.Max is { } max ? (int)max.TotalMinutes : null;
     }
 
     internal static List<ServiceRoleRow> ToRoleRows(Service service)

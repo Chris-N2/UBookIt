@@ -23,7 +23,7 @@ public sealed partial class Service
 
     private readonly List<ServiceRole> _roles;
 
-    private Service(Guid id, string name, TimeSpan? duration, List<ServiceRole> roles)
+    private Service(Guid id, string name, ServiceDuration duration, List<ServiceRole> roles)
     {
         Id = id;
         Name = name;
@@ -35,14 +35,18 @@ public sealed partial class Service
 
     public string Name { get; }
 
-    /// <summary>The appointment length. When null, booking falls back to the fulfilling resource's minimum duration.</summary>
-    public TimeSpan? Duration { get; }
+    /// <summary>
+    /// How long this service takes: a fixed length, or a booker-chosen length
+    /// within optional bounds. Always narrows the fulfilling resource's own
+    /// range rather than widening it — see <see cref="ServiceDuration"/>.
+    /// </summary>
+    public ServiceDuration Duration { get; }
 
     public IReadOnlyList<ServiceRole> Roles => _roles;
 
     public static DomainResult<Service> Create(
         string? name,
-        TimeSpan? duration,
+        ServiceDuration? duration,
         IEnumerable<ServiceRole> roles,
         Guid? id = null)
     {
@@ -54,22 +58,10 @@ public sealed partial class Service
                 FailureCodes.ServiceNameRequired, "A service name is required.", nameof(Name)));
         }
 
-        if (duration is { } d)
-        {
-            if (d <= TimeSpan.Zero)
-            {
-                failures.Add(new DomainFailure(
-                    FailureCodes.ServiceDurationInvalid, "A service duration must be positive when supplied.", nameof(Duration)));
-            }
-            else if (d.Ticks % TimeSpan.FromMinutes(1).Ticks != 0)
-            {
-                // Duration is persisted and exposed as whole minutes; reject
-                // sub-minute values at the domain boundary so stored state
-                // always round-trips.
-                failures.Add(new DomainFailure(
-                    FailureCodes.ServiceDurationInvalid, "A service duration must be a whole number of minutes.", nameof(Duration)));
-            }
-        }
+        // Duration validity is the value object's own concern — it cannot be
+        // constructed invalid — so an omitted specification simply means the
+        // unconfigured default: any length the resource permits.
+        var durationSpec = duration ?? ServiceDuration.Unbounded;
 
         var roleList = roles?.ToList() ?? [];
 
@@ -99,6 +91,6 @@ public sealed partial class Service
 
         return failures.Count > 0
             ? DomainResult<Service>.Failure(failures)
-            : DomainResult<Service>.Success(new Service(id ?? Guid.NewGuid(), name!.Trim(), duration, roleList));
+            : DomainResult<Service>.Success(new Service(id ?? Guid.NewGuid(), name!.Trim(), durationSpec, roleList));
     }
 }

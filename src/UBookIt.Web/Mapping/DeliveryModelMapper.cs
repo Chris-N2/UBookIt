@@ -42,6 +42,14 @@ internal static class DeliveryModelMapper
     internal static SlotModel ToSlotModel(Slot slot)
         => new() { StartUtc = slot.StartUtc, DurationMinutes = (int)slot.Duration.TotalMinutes };
 
+    internal static BookableStartModel ToBookableStartModel(BookableStart start)
+        => new()
+        {
+            StartUtc = start.StartUtc,
+            MinDurationMinutes = (int)start.MinDuration.TotalMinutes,
+            MaxDurationMinutes = (int)start.MaxDuration.TotalMinutes,
+        };
+
     internal static PlacementResponseModel ToPlacementResponse(Booking booking)
         => new()
         {

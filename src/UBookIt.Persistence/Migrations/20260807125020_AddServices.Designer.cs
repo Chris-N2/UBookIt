@@ -222,7 +222,15 @@ namespace UBookIt.Persistence.Migrations
                     b.Property<Guid>("Id")
                         .HasColumnType("uniqueidentifier");
 
-                    b.Property<int?>("DurationMinutes")
+                    b.Property<string>("DurationKind")
+                        .IsRequired()
+                        .HasMaxLength(16)
+                        .HasColumnType("nvarchar(16)");
+
+                    b.Property<int?>("MaxDurationMinutes")
+                        .HasColumnType("int");
+
+                    b.Property<int?>("MinDurationMinutes")
                         .HasColumnType("int");
 
                     b.Property<string>("Name")

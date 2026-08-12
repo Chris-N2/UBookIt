@@ -17,7 +17,9 @@ namespace UBookIt.Persistence.Migrations
                 {
                     Id = table.Column<Guid>(type: "uniqueidentifier", nullable: false),
                     Name = table.Column<string>(type: "nvarchar(512)", maxLength: 512, nullable: false),
-                    DurationMinutes = table.Column<int>(type: "int", nullable: true)
+                    DurationKind = table.Column<string>(type: "nvarchar(16)", maxLength: 16, nullable: false),
+                    MinDurationMinutes = table.Column<int>(type: "int", nullable: true),
+                    MaxDurationMinutes = table.Column<int>(type: "int", nullable: true)
                 },
                 constraints: table =>
                 {

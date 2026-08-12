@@ -4,11 +4,22 @@ import { UBookItBackofficeService } from "../api/index.js";
 import type { ResourceTypeUsageModel, ServiceRequestModel } from "../api/index.js";
 import { toApiErrors, type ApiError } from "./api-errors.js";
 
-/** The two duration modes. Inherit sends null; fixed sends the minutes value. */
-type DurationMode = "inherit" | "fixed";
+/**
+ * The two duration kinds, matching the wire contract exactly. "variable" means
+ * the person booking chooses the length, within whichever bounds are supplied
+ * and always within what the booked resource itself allows.
+ */
+type DurationMode = "variable" | "fixed";
 
 /** Client-only code for the empty fixed-duration guard; rendered in the Duration group. */
 const DURATION_REQUIRED = "duration-required";
+
+/**
+ * The failure fields the domain uses for duration inputs, mirrored from
+ * `ServiceDuration`. Each has its own control here, so a failure carrying one
+ * is rendered against that control instead of on the group.
+ */
+const DURATION_FIELDS = ["Duration", "Duration.Min", "Duration.Max"];
 
 /**
  * Workspace editor for one service: Details, Service Requirements, and
@@ -49,16 +60,25 @@ export class UBookItServiceEditorElement extends UmbLitElement {
   private _resourceType = "";
 
   @state()
-  private _durationMode: DurationMode = "inherit";
+  private _durationMode: DurationMode = "variable";
 
   /**
    * Null means the field is empty, not zero. Modelling empty explicitly is what
    * keeps the displayed value and the submitted value in step: coercing empty
    * to 0 submits a duration the server rejects, and silently retaining the
    * previous number submits one the user believes they cleared.
+   *
+   * For the variable bounds, null carries additional meaning the server acts
+   * on: an empty bound defers to the booked resource's own limit.
    */
   @state()
   private _durationMinutes: number | null = 60;
+
+  @state()
+  private _durationMin: number | null = null;
+
+  @state()
+  private _durationMax: number | null = null;
 
   @state()
   private _knownTypes: ResourceTypeUsageModel[] = [];
@@ -110,11 +130,13 @@ export class UBookItServiceEditorElement extends UmbLitElement {
     this._name = data.name;
     this._resourceType = data.roles[0]?.resourceType ?? "";
 
-    if (data.durationMinutes === null || data.durationMinutes === undefined) {
-      this._durationMode = "inherit";
-    } else {
+    if (data.duration?.kind === "fixed") {
       this._durationMode = "fixed";
-      this._durationMinutes = data.durationMinutes;
+      this._durationMinutes = data.duration.minutes ?? null;
+    } else {
+      this._durationMode = "variable";
+      this._durationMin = data.duration?.minMinutes ?? null;
+      this._durationMax = data.duration?.maxMinutes ?? null;
     }
 
     this._loading = false;
@@ -138,7 +160,13 @@ export class UBookItServiceEditorElement extends UmbLitElement {
   #buildRequest(): ServiceRequestModel {
     return {
       name: this._name,
-      durationMinutes: this._durationMode === "fixed" ? this._durationMinutes : null,
+      // The kind is always explicit: the server rejects an absent or unknown
+      // one rather than guessing, so the stored duration is always the one
+      // chosen on screen.
+      duration:
+        this._durationMode === "fixed"
+          ? { kind: "fixed", minutes: this._durationMinutes }
+          : { kind: "variable", minMinutes: this._durationMin, maxMinutes: this._durationMax },
       // Exactly one role, count fixed at 1 in v1 (design D5). Trimmed to match
       // what the hint evaluates: otherwise " room " looks known (hint hidden)
       // but is rejected server-side as an invalid type key.
@@ -328,12 +356,19 @@ export class UBookItServiceEditorElement extends UmbLitElement {
   }
 
   #renderDuration() {
-    const described = this.#errorsFor("service-duration-invalid", DURATION_REQUIRED).length > 0;
+    // Only failures the server did NOT attribute to a specific input belong on
+    // the group: rendering an attributed one here as well would announce the
+    // same message twice, once without saying which control it means.
+    const unattributed = this.#unattributedDurationErrors();
 
     return html`
       <uui-box headline=${this.#term("duration")}>
-        ${this.#renderGroupErrors("err-duration", "service-duration-invalid", DURATION_REQUIRED)}
-        <fieldset aria-describedby=${described ? "err-duration" : nothing}>
+        ${unattributed.length === 0
+          ? nothing
+          : html`<p class="group-error" id="err-duration">
+              ${unattributed.map((e) => e.message).join(" ")}
+            </p>`}
+        <fieldset aria-describedby=${unattributed.length > 0 ? "err-duration" : nothing}>
           <legend class="visually-hidden">${this.#term("duration")}</legend>
           <!--
             Named "Duration mode" rather than "Duration": the fieldset legend
@@ -347,11 +382,11 @@ export class UBookItServiceEditorElement extends UmbLitElement {
             @change=${(e: Event) =>
               (this._durationMode = (e.target as HTMLInputElement).value as DurationMode)}
           >
-            <uui-radio value="inherit" label=${this.#term("durationInherit")}></uui-radio>
             <uui-radio value="fixed" label=${this.#term("durationFixed")}></uui-radio>
+            <uui-radio value="variable" label=${this.#term("durationVariable")}></uui-radio>
           </uui-radio-group>
 
-          <p class="hint">${this.#term("durationInheritHint")}</p>
+          <p class="hint">${this.#term("durationVariableHint")}</p>
 
           <div class="field">
             <label for="service-duration">${this.#term("durationMinutes")}</label>
@@ -361,8 +396,41 @@ export class UBookItServiceEditorElement extends UmbLitElement {
               min="1"
               .value=${this._durationMinutes === null ? "" : String(this._durationMinutes)}
               ?disabled=${this._durationMode !== "fixed"}
-              @input=${(e: InputEvent) => this.#onDurationInput(e)}
+              aria-invalid=${this.#boundInvalid("Duration") ? "true" : nothing}
+              aria-describedby=${this.#boundInvalid("Duration") ? "err-duration-length" : nothing}
+              @input=${(e: InputEvent) => (this._durationMinutes = this.#readNumber(e))}
             />
+            ${this.#renderBoundError("err-duration-length", "Duration")}
+          </div>
+
+          <div class="field">
+            <label for="service-duration-min">${this.#term("durationMin")}</label>
+            <input
+              id="service-duration-min"
+              type="number"
+              min="1"
+              .value=${this._durationMin === null ? "" : String(this._durationMin)}
+              ?disabled=${this._durationMode !== "variable"}
+              aria-invalid=${this.#boundInvalid("Duration.Min") ? "true" : nothing}
+              aria-describedby=${this.#boundInvalid("Duration.Min") ? "err-duration-min" : nothing}
+              @input=${(e: InputEvent) => (this._durationMin = this.#readNumber(e))}
+            />
+            ${this.#renderBoundError("err-duration-min", "Duration.Min")}
+          </div>
+
+          <div class="field">
+            <label for="service-duration-max">${this.#term("durationMax")}</label>
+            <input
+              id="service-duration-max"
+              type="number"
+              min="1"
+              .value=${this._durationMax === null ? "" : String(this._durationMax)}
+              ?disabled=${this._durationMode !== "variable"}
+              aria-invalid=${this.#boundInvalid("Duration.Max") ? "true" : nothing}
+              aria-describedby=${this.#boundInvalid("Duration.Max") ? "err-duration-max" : nothing}
+              @input=${(e: InputEvent) => (this._durationMax = this.#readNumber(e))}
+            />
+            ${this.#renderBoundError("err-duration-max", "Duration.Max")}
           </div>
         </fieldset>
       </uui-box>
@@ -372,13 +440,44 @@ export class UBookItServiceEditorElement extends UmbLitElement {
   /**
    * `Number("")` is 0, so binding the coerced value straight back would repaint
    * "0" under the cursor and make the field impossible to clear and retype.
-   * Empty is recorded as null instead, and the pre-submit guard turns it into
-   * an actionable message — the state the field shows is always the state that
-   * would be submitted.
+   * Empty is recorded as null instead — for the variable bounds that is also
+   * the value the server acts on, meaning "use the resource's own limit".
    */
-  #onDurationInput(event: InputEvent) {
+  #readNumber(event: InputEvent): number | null {
     const raw = (event.target as HTMLInputElement).value;
-    this._durationMinutes = raw === "" ? null : Number(raw);
+    return raw === "" ? null : Number(raw);
+  }
+
+  /** Duration failures the server attributed to a specific input. */
+  #errorsForField(field: string): ApiError[] {
+    return this._errors.filter((e) => e.code === "service-duration-invalid" && e.field === field);
+  }
+
+  /**
+   * Duration failures with no field, or a field this editor has no control for
+   * — those still need saying somewhere, so they stay on the group rather than
+   * vanishing.
+   */
+  #unattributedDurationErrors(): ApiError[] {
+    return this.#errorsFor("service-duration-invalid", DURATION_REQUIRED).filter(
+      (e) => e.field === undefined || e.field === null || !DURATION_FIELDS.includes(e.field),
+    );
+  }
+
+  #boundInvalid(field: string): boolean {
+    return this.#errorsForField(field).length > 0;
+  }
+
+  /**
+   * Renders a duration failure against the input it belongs to, so a screen
+   * reader announces which control to correct rather than only that something
+   * in the group is wrong.
+   */
+  #renderBoundError(id: string, field: string) {
+    const errors = this.#errorsForField(field);
+    return errors.length === 0
+      ? nothing
+      : html`<p class="group-error" id=${id}>${errors.map((e) => e.message).join(" ")}</p>`;
   }
 
   static override styles = css`
