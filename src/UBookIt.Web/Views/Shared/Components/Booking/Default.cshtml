@@ -136,8 +136,11 @@
         {
             @* The date has availability, just not this much of it — say so, rather
                than leaving the visitor to guess a shorter length by trial. *@
+            @* Phrased "for <length>" rather than "<length> times": the label is a
+               noun phrase ("4 hours"), so using it adjectivally reads as
+               "No 4 hours times are available". *@
             <p class="ubookit-no-times">
-                No @BookingDurations.Label(Model.DurationMinutes) times are available on @Model.SelectedDate.ToString("dddd d MMMM yyyy", CultureInfo.InvariantCulture).
+                No times are available for @BookingDurations.Label(Model.DurationMinutes) on @Model.SelectedDate.ToString("dddd d MMMM yyyy", CultureInfo.InvariantCulture).
                 The longest available that day is @BookingDurations.Label(Model.LongestAvailableMinutes!.Value).
                 Please choose a shorter length or another date.
             </p>

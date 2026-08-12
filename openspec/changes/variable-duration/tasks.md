@@ -45,7 +45,7 @@
 - [x] 6.1 Add `GET resources/{resourceId:guid}/bookable-starts` to `AvailabilityController` with `from`/`to` query parameters (design D5)
 - [x] 6.2 Add the response models — top-level resource id and zone id, plus entries carrying the start instant and minimum/maximum minutes — and map through `DeliveryModelMapper`
 - [x] 6.3 Confirm failures render as problem details with `type` set, consistent with the existing endpoints
-- [ ] 6.4 Verify the endpoint appears in the `UBookIt.Delivery` OpenAPI group and that the existing `/slots` contract is unchanged
+- [x] 6.4 Verify the endpoint appears in the `UBookIt.Delivery` OpenAPI group and that the existing `/slots` contract is unchanged
 
 ## 7. Default front-end
 
@@ -62,40 +62,49 @@
 
 - [x] 8.1 Build the full solution with `--no-incremental`; no new warnings beyond the accepted NU1903 transitive advisories
 - [x] 8.2 Run the full test suite, including the SQL Server integration tests
-- [ ] 8.3 Start the TestSite and exercise the services editor live — create a fixed service, a bounded variable service, and an unbounded one; reopen each and confirm the round-trip; confirm a bound error is announced against the right input by reading the rendered shadow DOM rather than a screenshot
-- [ ] 8.4 Exercise the booking form live with JavaScript disabled: default length books as before, a longer length filters the times, an unavailable length reports the longest available, and the booking is placed at the chosen length
-- [ ] 8.5 Call the `bookable-starts` endpoint against the running site and confirm filtering its response for a duration matches the `/slots` response for that duration
+- [x] 8.3 Start the TestSite and exercise the services editor live — create a fixed service, a bounded variable service, and an unbounded one; reopen each and confirm the round-trip; confirm a bound error is announced against the right input by reading the rendered shadow DOM rather than a screenshot
+- [x] 8.4 Exercise the booking form live with JavaScript disabled: default length books as before, a longer length filters the times, an unavailable length reports the longest available, and the booking is placed at the chosen length
+- [x] 8.5 Call the `bookable-starts` endpoint against the running site and confirm filtering its response for a duration matches the `/slots` response for that duration
 - [x] 8.6 Confirm no DevExpress reference and no new third-party dependency entered the repository
 - [x] 8.7 Stop the TestSite and confirm no orphaned process holds port 44348
 
-## Status at end of the implementation session (2026-08-12)
+## Live verification (2026-08-12, second session)
 
-42 of 46 tasks complete. Everything builds clean (`--no-incremental`, exit 0,
-only the 76 accepted NU1903 transitive advisories) and all 262 tests pass
-(233 unit + 29 integration on SQL Server).
+All 46 tasks complete. Everything below was exercised against the running
+TestSite, not reasoned about.
 
-**Four tasks remain, all live verification against a running TestSite**, deferred
-because the site was needed elsewhere:
+- **The amended migration re-applied cleanly.** `uBookItService` was rebuilt with
+  `DurationKind` / `MinDurationMinutes` / `MaxDurationMinutes`, `DurationMinutes`
+  is gone, and `20260807125020_AddServices` is back in
+  `__uBookItEFMigrationsHistory`. This was the one genuinely unproven step.
+- **6.3** upgraded from structural to live: `bookable-starts` returns
+  `application/problem+json; charset=utf-8` with `type` set on all three failure
+  modes — `date-range-invalid` (400), `resource-not-found` (404),
+  `date-range-too-large` (400).
+- **6.4**: the endpoint appears in the `ubookitdelivery` OpenAPI document;
+  `/slots` still requires `durationMinutes`, so its contract is unchanged.
+- **8.5**: over a 2-day range on a 09:00–17:00 / 30-min-granularity resource,
+  filtering the `bookable-starts` response matched `/slots` exactly at 30, 60,
+  90, 120 and 240 minutes. Maxima shorten correctly toward the end of the day
+  (16:30 → 30 minutes) and clamp at the resource maximum.
+- **8.3**: all three duration kinds created through the editor, stored correctly
+  (Fixed stores 60/60 — the degenerate range), and each reopened with its kind,
+  bounds and enable/disable state intact. Inverted bounds (120/45) were rejected
+  with the message associated with the **Shortest** input specifically:
+  `aria-invalid="true"` and an `aria-describedby` that resolves, while the other
+  two inputs have the attribute **absent rather than empty**, and no duplicate
+  group-level error. Verified by reading the shadow DOM, not a screenshot.
+- **8.4**: booking form driven end to end. The page contains **zero `<script>`
+  elements**, so the flow is inherently JS-free. Default length (no `ubMins`)
+  offers 30 minutes as before; a 2-hour choice filtered the starts to 09:00–15:00
+  and **placed a booking of exactly 120 minutes** (confirmed in
+  `uBookItBooking`); an unavailable 4-hour choice reported the longest available
+  as 3 hours, correct given the 12:00–14:00 booking splitting the day.
 
-- [ ] 6.4 Verify the endpoint appears in the `UBookIt.Delivery` OpenAPI group and that the existing `/slots` contract is unchanged
-- [ ] 8.3 Exercise the services editor live (three duration kinds, round-trip, bound error announced against the right input via the rendered shadow DOM)
-- [ ] 8.4 Exercise the booking form live with JavaScript disabled
-- [ ] 8.5 Call `bookable-starts` against the running site and confirm it agrees with `/slots`
+**One defect found and fixed during this pass.** The explanatory empty state read
+"No 4 hours times are available…" — the duration label is a noun phrase, so using
+it adjectivally is ungrammatical for every value. Reworded to "No times are
+available for 4 hours on …". Logic was correct throughout; this was copy only.
 
-Qualifications on what *was* checked, so nothing reads as more verified than it is:
+QA review has still NOT been run for this change.
 
-- **6.3 was confirmed structurally, not live.** The new endpoint returns failures
-  through the same `ApiResults.ToProblemResult()` helper as the existing delivery
-  endpoints, and that helper sets `Type` (`ApiResults.cs:36`). No HTTP response
-  from the new endpoint has been inspected — that is 8.5's job.
-- **3.4 was done against the TestSite database only.** The `uBookItService` and
-  `uBookItServiceRole` tables were dropped and the `20260807125020_AddServices`
-  row removed from `__uBookItEFMigrationsHistory`; both tables were empty first.
-  **The amended migration has not yet been observed re-applying at startup** —
-  the site was stopped before it next booted. First startup should recreate both
-  tables with the new duration columns; if it does not, that is the thing to look
-  at before anything else.
-- The backoffice client was regenerated from the running site's swagger and
-  builds clean, but **no rendered backoffice UI has been looked at**.
-
-QA review has NOT been run for this change.
