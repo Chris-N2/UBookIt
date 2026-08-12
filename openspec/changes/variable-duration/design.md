@@ -56,9 +56,9 @@ Two consequences worth stating explicitly, because both are easy to get wrong:
 
 The same intersection becomes ⑦-2's cheap candidate pre-filter: a resource excluded here is excluded from union availability and from the placement loop, so a slot is never offered by a resource that could not honour it.
 
-### D4 — `ResolveAgainst` ships now, even though its consumer is ⑦-2
+### D4 — `TryResolveAgainst` ships now, even though its consumer is ⑦-2
 
-`ServiceDuration.ResolveAgainst(BookingConstraints)` is implemented and unit-tested in this change although nothing calls it at runtime until services become bookable.
+`ServiceDuration.TryResolveAgainst(BookingConstraints)` is implemented and unit-tested in this change although nothing calls it at runtime until services become bookable.
 
 *Rationale.* The resolution *is* the meaning of the value object — a duration model that cannot say what it resolves to on a given resource is half a model, and D3's semantics would otherwise be specified with nothing to verify them against. It is a short pure function on the type itself, not a service, so it carries no wiring. Change ⑥ set this precedent deliberately: its "Service duration semantics" requirement fixed the contract with the note that it takes effect when booking-via-service ships.
 
@@ -140,13 +140,40 @@ Server-side validation is unconditional regardless; the control is an affordance
 
 Deserialization of an unknown or absent `kind` is a 400 with `service-duration-invalid`, not a silent default — nothing depends on a legacy payload shape, so there is no back-compatibility rule to honour.
 
+### D13 — Rendering may substitute a length; placement must never
+
+Added after QA rejected the first implementation, which used one
+`ResolveDuration` helper on both paths and so silently placed bookings at a
+length the visitor had not chosen.
+
+The two paths have opposite correct behaviours and must not share a helper:
+
+- **Render (GET).** An absent, stale or hand-edited `ubMins` should draw a
+  usable form, not an error page. `BookingFormBuilder.ResolveDisplayDuration`
+  falls back to the resource minimum. The name now says which path it serves.
+- **Place (POST).** The submitted length goes to `IBookingService.PlaceAsync`
+  **verbatim**. Core already validates it against the resource and returns
+  `granularity` / `duration-too-short` / `duration-too-long`, and the existing
+  PRG failure path redraws the form with the message. Substituting here would
+  confirm a booking nobody asked for — the visitor's only clue would be the end
+  time on the confirmation page.
+
+Placing the check in Core rather than re-deriving it in the controller also
+means there is no second copy of the rule to drift from the option list.
+
+*Why this was worth a decision record.* The distinction was implicit in the
+first implementation, and a test was written that asserted the substitution —
+so the suite encoded the opposite of the spec scenario and still passed. A
+shared helper with a neutral name was the whole cause; naming the paths apart
+is the fix that prevents a recurrence.
+
 ## Risks / Trade-offs
 
 - **A coarse-granularity, wide-range resource produces a long `<select>`.** Option count is `(effectiveMax − effectiveMin) / granularity + 1` — 31 for the defaults (30 min–8 h at 15 min), but 133 for a 5-minute-granularity, 12-hour resource. → Accepted for this change; a long select remains keyboard- and screen-reader-navigable, which a free-text input with bespoke validation would not straightforwardly beat. Revisit if a real configuration makes it painful.
 - **Dropping the late-bound minimum is unrecoverable without a model change.** → Deliberate (D2), recorded here and in the proposal's non-goals so ⑧ picks it up as per-resource configuration rather than reintroducing a third kind.
 - **Amending a committed migration rewrites schema history.** Anyone who has already run the current `AddServices` migration gets a database that no longer matches it. → Only the TestSite is affected and it has been cleared; the implementation task list includes recreating it. Not repeatable after publication, and D6 records the approval as instance-specific.
 - **A service can be configured whose bounds no resource can satisfy** (e.g. a 90-minute fixed length when every `room` caps at 60). Narrow-only makes this resolve to "no eligible resource" rather than a configuration error. → Out of scope here because nothing resolves services against resources yet; ⑦-2 should surface it, and it is the same class of problem as ⑦a's mistyped-type-key concern, which that change solved with a picker.
-- **`ResolveAgainst` ships unconsumed.** → Justified in D4; flagged here so review treats it as a decision rather than an oversight.
+- **`TryResolveAgainst` ships unconsumed.** → Justified in D4; flagged here so review treats it as a decision rather than an oversight.
 
 ## Migration Plan
 

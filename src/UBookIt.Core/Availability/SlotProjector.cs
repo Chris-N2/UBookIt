@@ -26,6 +26,17 @@ internal static class SlotProjector
     {
         var slots = new List<Slot>();
 
+        // The `duration <= maxRun` test below is equivalent to the older
+        // "does [start, start+duration) fit in the interval" test only for a
+        // duration that is a positive granularity multiple. Callers validate
+        // first, but enforcing it here keeps the equivalence a property of the
+        // projection rather than of every present and future caller: an
+        // unbookable length yields nothing instead of a subtly different set.
+        if (duration <= TimeSpan.Zero || duration.Ticks % constraints.Granularity.Ticks != 0)
+        {
+            return slots;
+        }
+
         foreach (var (start, maxRun) in Walk(freeIntervals, constraints, nowUtc, zone))
         {
             // Equivalent to the older "start + duration <= interval end" test:

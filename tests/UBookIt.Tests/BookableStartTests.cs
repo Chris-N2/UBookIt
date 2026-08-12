@@ -122,8 +122,26 @@ public class BookableStartTests
     {
         // The equivalence the single traversal exists to guarantee: slots for a
         // duration are exactly the bookable starts whose range admits it.
-        var room = RoomOpen("09:00", "13:00", granularity: 15, min: 30, max: 180);
-        var (_, availability, _) = TestData.Services(room);
+        //
+        // Deliberately run over FRAGMENTED free time. An unbroken window makes
+        // every start's maximum the remainder of one interval, which is the
+        // easy case; two bookings force the maxima to be bounded by three
+        // different intervals, which is where a divergence would actually show.
+        var room = RoomOpen("09:00", "17:00", granularity: 15, min: 30, max: 180);
+        var (bookings, availability, _) = TestData.Services(room);
+
+        foreach (var at in new[] { "10:30", "14:00" })
+        {
+            var placed = await bookings.PlaceAsync(new UBookIt.Core.Bookings.BookingRequest
+            {
+                ResourceId = room.Id,
+                Start = TestData.Utc(Date, at),
+                Duration = Mins(45),
+                Booker = TestData.Booker(),
+            });
+            Assert.True(placed.Succeeded);
+        }
+
         var duration = Mins(minutes);
 
         var slots = await availability.GetSlotsAsync(room.Id, Date, Date, duration);

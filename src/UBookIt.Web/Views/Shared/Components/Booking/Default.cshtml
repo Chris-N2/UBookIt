@@ -6,6 +6,14 @@
     var nameError = Model.ErrorFor(BookingFieldIds.Name);
     var emailError = Model.ErrorFor(BookingFieldIds.Email);
     var timesError = Model.ErrorFor(BookingFieldIds.Times);
+    var durationError = Model.ErrorFor(BookingFieldIds.Duration);
+
+    // The length control is described by whichever of these applies: the
+    // rejection message after a failed submission, or the explanation that the
+    // chosen length has no times on this date. Both are about that control.
+    var durationDescribedBy = durationError is not null
+        ? "ubookit-duration-error"
+        : Model.LengthIsTheProblem ? "ubookit-length-unavailable" : null;
 }
 
 <section class="ubookit-booking" aria-label="Book @Model.ResourceName">
@@ -50,13 +58,19 @@
                    max="@Model.MaxDate.ToString("yyyy-MM-dd")" />
         </div>
         <div>
-            <label for="ubookit-duration">How long do you need?</label>
-            <select id="ubookit-duration" name="@BookingKeys.DurationQuery">
+            <label for="@BookingFieldIds.Duration">How long do you need?</label>
+            <select id="@BookingFieldIds.Duration" name="@BookingKeys.DurationQuery"
+                    aria-invalid="@(durationError is not null ? "true" : null)"
+                    aria-describedby="@durationDescribedBy">
                 @foreach (var minutes in Model.DurationOptions)
                 {
                     <option value="@minutes" selected="@(minutes == Model.DurationMinutes)">@BookingDurations.Label(minutes)</option>
                 }
             </select>
+            @if (durationError is not null)
+            {
+                <span id="ubookit-duration-error" class="ubookit-field-error">@durationError</span>
+            }
         </div>
         <button type="submit">Show times</button>
     </form>
@@ -139,7 +153,7 @@
             @* Phrased "for <length>" rather than "<length> times": the label is a
                noun phrase ("4 hours"), so using it adjectivally reads as
                "No 4 hours times are available". *@
-            <p class="ubookit-no-times">
+            <p class="ubookit-no-times" id="ubookit-length-unavailable">
                 No times are available for @BookingDurations.Label(Model.DurationMinutes) on @Model.SelectedDate.ToString("dddd d MMMM yyyy", CultureInfo.InvariantCulture).
                 The longest available that day is @BookingDurations.Label(Model.LongestAvailableMinutes!.Value).
                 Please choose a shorter length or another date.

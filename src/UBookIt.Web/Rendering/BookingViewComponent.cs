@@ -42,7 +42,8 @@ public sealed class BookingViewComponent(
             selectedDate = today;
         }
 
-        var duration = BookingFormBuilder.ResolveDuration(resource, failed?.DurationMinutes ?? ReadDurationQuery());
+        var duration = BookingFormBuilder.ResolveDisplayDuration(
+            resource, failed?.DurationMinutes ?? ReadDurationQuery());
 
         // One query answers every length: the form filters these starts for the
         // chosen length and reads the longest available off the same result, so

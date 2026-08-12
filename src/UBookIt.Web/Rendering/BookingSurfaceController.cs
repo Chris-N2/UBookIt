@@ -76,13 +76,18 @@ public sealed class BookingSurfaceController : SurfaceController
 
         if (failures.Count == 0)
         {
-            // The submitted length is re-resolved against the resource rather
-            // than trusted: the select is an affordance, not a trust boundary.
+            // The submitted length goes to Core exactly as submitted. It must
+            // never be silently substituted: placing a booking of a length the
+            // visitor did not choose is worse than refusing the submission, and
+            // the default-frontend spec requires a rejection here. Core already
+            // validates it against the resource (granularity, duration bounds)
+            // and returns stable codes, so there is no second rule to keep in
+            // step with the option list.
             var placed = await _bookingService.PlaceAsync(new BookingRequest
             {
                 ResourceId = resource.Id,
                 Start = startUtc,
-                Duration = BookingFormBuilder.ResolveDuration(resource, form.DurationMinutes),
+                Duration = TimeSpan.FromMinutes(form.DurationMinutes),
                 Booker = booker.Value,
             });
 

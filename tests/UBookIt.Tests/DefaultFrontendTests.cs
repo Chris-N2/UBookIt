@@ -138,13 +138,13 @@ public class DefaultFrontendTests
     }
 
     [Fact]
-    public void An_absent_length_falls_back_to_the_resource_minimum()
+    public void An_absent_length_renders_the_resource_minimum()
     {
         var room = TestData.Room();
 
         Assert.Equal(
             room.Availability.Constraints.MinDuration,
-            BookingFormBuilder.ResolveDuration(room, null));
+            BookingFormBuilder.ResolveDisplayDuration(room, null));
     }
 
     [Theory]
@@ -152,23 +152,72 @@ public class DefaultFrontendTests
     [InlineData(-30)]
     [InlineData(37)]      // not a granularity multiple
     [InlineData(100000)]  // beyond the resource maximum
-    public void An_unpermitted_length_falls_back_to_the_resource_minimum(int minutes)
+    public void An_unpermitted_length_still_RENDERS_the_resource_minimum(int minutes)
     {
-        // The select is an affordance, not a trust boundary: a hand-crafted
-        // query must not produce times that placement would reject.
+        // Rendering only: a hand-edited query parameter should still draw a
+        // usable form. This must NOT be read as permission to substitute a
+        // length when placing — see the placement tests below, and the comment
+        // on ResolveDisplayDuration.
         var room = TestData.Room();
 
         Assert.Equal(
             room.Availability.Constraints.MinDuration,
-            BookingFormBuilder.ResolveDuration(room, minutes));
+            BookingFormBuilder.ResolveDisplayDuration(room, minutes));
     }
 
     [Fact]
-    public void A_permitted_length_is_honoured()
+    public void A_permitted_length_is_honoured_when_rendering()
     {
         var room = TestData.Room();
 
-        Assert.Equal(TimeSpan.FromMinutes(60), BookingFormBuilder.ResolveDuration(room, 60));
+        Assert.Equal(TimeSpan.FromMinutes(60), BookingFormBuilder.ResolveDisplayDuration(room, 60));
+    }
+
+    // --- Placement must reject, never substitute (spec: "An unpermitted length
+    // is rejected server-side"). The surface controller needs an Umbraco host,
+    // so these assert the Core call it now makes verbatim: the submitted length
+    // reaches placement unchanged and is refused.
+
+    [Theory]
+    [InlineData(37)]      // not a granularity multiple
+    [InlineData(100000)]  // beyond the resource maximum
+    [InlineData(15)]      // below the resource minimum
+    public async Task An_unpermitted_submitted_length_is_rejected_and_places_nothing(int minutes)
+    {
+        var room = TestData.Room();
+        var (bookings, _, store) = TestData.Services(room);
+
+        var result = await bookings.PlaceAsync(new UBookIt.Core.Bookings.BookingRequest
+        {
+            ResourceId = room.Id,
+            Start = TestData.Utc(Date, "09:00"),
+            Duration = TimeSpan.FromMinutes(minutes),
+            Booker = TestData.Booker(),
+        });
+
+        Assert.False(result.Succeeded);
+
+        // Nothing was written: no claim exists anywhere on that day.
+        var claims = await store.GetClaimsAsync(
+            room.Id, TestData.Utc(Date, "00:00"), TestData.Utc(Date, "00:00").AddDays(1));
+        Assert.Empty(claims);
+
+        // And the failure has to reach the visitor as a message, not a fallback.
+        var errors = BookingMessages.ForFailures(result.Failures);
+        Assert.NotEmpty(errors);
+        Assert.DoesNotContain(errors, e => e.Message == BookingMessages.Fallback);
+    }
+
+    [Fact]
+    public void A_duration_bound_failure_points_at_the_length_control()
+    {
+        var errors = BookingMessages.ForFailures(
+        [
+            new UBookIt.Core.Common.DomainFailure(
+                UBookIt.Core.Common.FailureCodes.DurationTooLong, "too long"),
+        ]);
+
+        Assert.Equal(BookingFieldIds.Duration, Assert.Single(errors).FieldId);
     }
 
     [Fact]
@@ -221,7 +270,7 @@ public class DefaultFrontendTests
         };
 
         var model = BookingFormBuilder.Build(
-            room, Date, today, [], BookingFormBuilder.ResolveDuration(room, failed.DurationMinutes),
+            room, Date, today, [], BookingFormBuilder.ResolveDisplayDuration(room, failed.DurationMinutes),
             TestData.London, failed);
 
         // The chosen length survives a failed submission alongside the details.

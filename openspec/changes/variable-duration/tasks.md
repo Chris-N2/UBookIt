@@ -2,10 +2,10 @@
 
 - [x] 1.1 Add `ServiceDuration` value object in `UBookIt.Core/Services` — private constructor, `Fixed(TimeSpan)` and `Variable(TimeSpan? min, TimeSpan? max)` factories returning `DomainResult<ServiceDuration>`, exposing the kind and bounds
 - [x] 1.2 Validate in the factories: non-positive length or bound, sub-minute length or bound, and minimum greater than maximum — all as `service-duration-invalid` with a field identifying the offending input (design D10)
-- [x] 1.3 Implement `ResolveAgainst(BookingConstraints)` returning the effective range or "cannot fulfil": intersect with the resource range, then floor the maximum and raise the minimum to granularity multiples; report cannot-fulfil when the intersection is empty or holds no granularity multiple (design D3, D4)
+- [x] 1.3 Implement `TryResolveAgainst(BookingConstraints)` returning the effective range or "cannot fulfil": intersect with the resource range, then floor the maximum and raise the minimum to granularity multiples; report cannot-fulfil when the intersection is empty or holds no granularity multiple (design D3, D4)
 - [x] 1.4 Change `Service.Duration` to the non-nullable `ServiceDuration` and update `Service.Create` to accept and surface it; drop the old `TimeSpan?` duration validation now living on the value object
 - [x] 1.5 Unit-test `ServiceDuration` construction and validation, covering every failure in 1.2 and both kinds
-- [x] 1.6 Unit-test `ResolveAgainst` against the spec scenarios: narrowing, resource-maximum ceiling, unbounded deferral, non-aligned bounds rounding to 45 minutes, and empty intersection
+- [x] 1.6 Unit-test `TryResolveAgainst` against the spec scenarios: narrowing, resource-maximum ceiling, unbounded deferral, non-aligned bounds rounding to 45 minutes, and empty intersection
 
 ## 2. Core availability projection
 

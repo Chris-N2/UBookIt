@@ -18,8 +18,8 @@ public static class BookingMessages
         [FailureCodes.LeadTime] = "That time is too soon to book. Please choose a later time.",
         [FailureCodes.Horizon] = "That date is too far ahead to book.",
         [FailureCodes.Granularity] = "Please choose one of the offered times.",
-        [FailureCodes.DurationTooShort] = "The booking length is too short.",
-        [FailureCodes.DurationTooLong] = "The booking length is too long.",
+        [FailureCodes.DurationTooShort] = "That booking length is too short for this resource. Please choose another length.",
+        [FailureCodes.DurationTooLong] = "That booking length is too long for this resource. Please choose another length.",
         [FailureCodes.IntervalInvalid] = "Please choose a valid time.",
         [FailureCodes.EmailInvalid] = "Please enter a valid email address.",
         [FailureCodes.NameRequired] = "Please enter your name.",
@@ -56,14 +56,21 @@ public static class BookingMessages
             nameof(Booker.Email) => BookingFieldIds.Email,
             _ => failure.Code switch
             {
+                // Duration bounds concern the length control specifically.
+                FailureCodes.DurationTooShort
+                    or FailureCodes.DurationTooLong => BookingFieldIds.Duration,
+
+                // `granularity` is deliberately left on the time list: Core
+                // raises it both for a misaligned start and for a length off
+                // the grid, and the code alone cannot tell them apart. The
+                // length select only ever offers grid multiples, so through
+                // the shipped form it always means the start.
                 FailureCodes.Conflict
                     or FailureCodes.OutsideOpenHours
                     or FailureCodes.LeadTime
                     or FailureCodes.Horizon
                     or FailureCodes.Granularity
-                    or FailureCodes.IntervalInvalid
-                    or FailureCodes.DurationTooShort
-                    or FailureCodes.DurationTooLong => BookingFieldIds.Times,
+                    or FailureCodes.IntervalInvalid => BookingFieldIds.Times,
                 _ => null,
             },
         };

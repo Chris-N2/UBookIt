@@ -74,6 +74,7 @@ public static class BookingFieldIds
     public const string Name = "ubookit-name";
     public const string Email = "ubookit-email";
     public const string Times = "ubookit-times";
+    public const string Duration = "ubookit-duration";
 }
 
 /// <summary>

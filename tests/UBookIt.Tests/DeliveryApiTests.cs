@@ -139,6 +139,111 @@ public class DeliveryApiTests
         Assert.All(model.Slots, s => Assert.Equal(60, s.DurationMinutes));
     }
 
+    // --- Bookable starts (delivery-api spec, "Bookable-start read") ---
+
+    [Fact]
+    public async Task Bookable_starts_carry_the_range_of_lengths_per_start()
+    {
+        var h = new Harness();
+
+        var model = Ok<BookableStartsResponseModel>(
+            await h.Availability.GetBookableStarts(h.Room.Id, BaseDate, BaseDate));
+
+        Assert.Equal(h.Room.Id, model.ResourceId);
+        Assert.Equal("Europe/London", model.ZoneId);
+        Assert.NotEmpty(model.Starts);
+
+        var constraints = h.Room.Availability.Constraints;
+        Assert.All(model.Starts, s =>
+        {
+            Assert.Equal((int)constraints.MinDuration.TotalMinutes, s.MinDurationMinutes);
+            Assert.InRange(s.MaxDurationMinutes, s.MinDurationMinutes, (int)constraints.MaxDuration.TotalMinutes);
+        });
+
+        // Ordered, and the maximum shortens towards the end of the free window.
+        Assert.Equal(model.Starts.OrderBy(s => s.StartUtc).Select(s => s.StartUtc), model.Starts.Select(s => s.StartUtc));
+        Assert.True(model.Starts[^1].MaxDurationMinutes < model.Starts[0].MaxDurationMinutes);
+    }
+
+    [Theory]
+    [InlineData(30)]
+    [InlineData(60)]
+    [InlineData(90)]
+    [InlineData(120)]
+    public async Task Any_length_is_answerable_from_one_bookable_starts_response(int minutes)
+    {
+        // The spec's headline claim for this endpoint: a client filters the
+        // response instead of issuing one request per length.
+        var h = new Harness();
+
+        var starts = Ok<BookableStartsResponseModel>(
+            await h.Availability.GetBookableStarts(h.Room.Id, BaseDate, BaseDate));
+        var slots = Ok<SlotsResponseModel>(
+            await h.Availability.GetSlots(h.Room.Id, BaseDate, BaseDate, minutes));
+
+        Assert.Equal(
+            slots.Slots.Select(s => s.StartUtc).ToArray(),
+            starts.Starts
+                .Where(s => s.MinDurationMinutes <= minutes && s.MaxDurationMinutes >= minutes)
+                .Select(s => s.StartUtc)
+                .ToArray());
+    }
+
+    [Fact]
+    public async Task Bookable_starts_over_wide_range_is_400_date_range_too_large()
+    {
+        var h = new Harness();
+
+        var (status, errors) = Problem(
+            await h.Availability.GetBookableStarts(h.Room.Id, BaseDate, BaseDate.AddDays(31)));
+
+        Assert.Equal(400, status);
+        Assert.Equal(FailureCodes.DateRangeTooLarge, Assert.Single(errors).Code);
+    }
+
+    [Fact]
+    public async Task Bookable_starts_inverted_range_is_400_date_range_invalid()
+    {
+        var h = new Harness();
+
+        var (status, errors) = Problem(
+            await h.Availability.GetBookableStarts(h.Room.Id, BaseDate, BaseDate.AddDays(-1)));
+
+        Assert.Equal(400, status);
+        Assert.Equal(FailureCodes.DateRangeInvalid, Assert.Single(errors).Code);
+    }
+
+    [Fact]
+    public async Task Bookable_starts_unknown_resource_is_404_resource_not_found()
+    {
+        var h = new Harness();
+
+        var (status, errors) = Problem(
+            await h.Availability.GetBookableStarts(Guid.NewGuid(), BaseDate, BaseDate));
+
+        Assert.Equal(404, status);
+        Assert.Equal(FailureCodes.ResourceNotFound, Assert.Single(errors).Code);
+    }
+
+    [Fact]
+    public async Task Bookable_starts_reflect_an_existing_booking()
+    {
+        var h = new Harness();
+
+        Ok<PlacementResponseModel>(await h.Bookings.PlaceBooking(new PlacementRequestModel
+        {
+            ResourceId = h.Room.Id,
+            Start = TestData.Utc(BaseDate, "10:00"),
+            DurationMinutes = 60,
+            Booker = new BookerModel { Name = "Test Person", Email = "test@example.com" },
+        }));
+
+        var model = Ok<BookableStartsResponseModel>(
+            await h.Availability.GetBookableStarts(h.Room.Id, BaseDate, BaseDate));
+
+        Assert.DoesNotContain(model.Starts, s => s.StartUtc == TestData.Utc(BaseDate, "10:00"));
+    }
+
     [Fact]
     public async Task Over_wide_range_is_400_date_range_too_large()
     {

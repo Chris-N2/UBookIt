@@ -57,6 +57,16 @@ public static class BookingFormBuilder
         var step = (int)constraints.Granularity.TotalMinutes;
         var max = (int)constraints.MaxDuration.TotalMinutes;
 
+        // A sub-minute granularity truncates to a zero step, which would loop
+        // forever. BookingConstraints permits it (it only requires the bounds
+        // to be exact multiples), and this is a public method, so guard rather
+        // than assume the caller's constraints came from the minute-based
+        // management API.
+        if (step <= 0)
+        {
+            return [];
+        }
+
         var options = new List<int>();
         for (var minutes = (int)constraints.MinDuration.TotalMinutes; minutes <= max; minutes += step)
         {
@@ -67,12 +77,19 @@ public static class BookingFormBuilder
     }
 
     /// <summary>
-    /// The length to render and book: the requested one when the resource
-    /// permits it, otherwise the default. Never trusts the request — an
-    /// unpermitted length silently falls back rather than offering times that
-    /// placement would reject.
+    /// The length to <em>render</em>: the requested one when the resource
+    /// permits it, otherwise the default. Defaulting is correct here — an
+    /// absent or hand-edited query parameter should draw a usable form rather
+    /// than an error page.
+    /// <para>
+    /// This is deliberately NOT used when placing a booking. Substituting a
+    /// length on the write path would confirm a booking the visitor never
+    /// chose; submissions pass their length to Core unchanged and are rejected
+    /// if it is not permitted (default-frontend spec, "Visitor-chosen booking
+    /// length").
+    /// </para>
     /// </summary>
-    public static TimeSpan ResolveDuration(Resource resource, int? requestedMinutes)
+    public static TimeSpan ResolveDisplayDuration(Resource resource, int? requestedMinutes)
     {
         if (requestedMinutes is not { } minutes)
         {
