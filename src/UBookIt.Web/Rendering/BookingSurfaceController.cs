@@ -59,6 +59,20 @@ public sealed class BookingSurfaceController : SurfaceController
 
         var failures = new List<DomainFailure>();
 
+        // A POST that omits the field binds DurationMinutes to 0, which Core
+        // can only report as interval-invalid ("please choose a valid time") —
+        // pointing the visitor at the time list when the length is what is
+        // missing. Distinguishing an absent field from a submitted length is a
+        // model-binding concern, not a domain rule, so it belongs here; the
+        // permitted-length rule itself stays solely in Core.
+        if (form.DurationMinutes <= 0)
+        {
+            failures.Add(new DomainFailure(
+                FailureCodes.DurationTooShort,
+                "A booking length is required.",
+                nameof(BookingSubmission.DurationMinutes)));
+        }
+
         // The selected time round-trips the exact UTC instant (design D6), so we
         // never re-parse a display string.
         if (!DateTimeOffset.TryParse(

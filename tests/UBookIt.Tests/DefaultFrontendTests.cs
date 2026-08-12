@@ -209,6 +209,24 @@ public class DefaultFrontendTests
     }
 
     [Fact]
+    public void A_missing_length_is_reported_against_the_length_control()
+    {
+        // A POST omitting the field binds to 0. Core can only call that
+        // interval-invalid, which would point at the time list; the controller
+        // reports it as a duration problem instead. Asserts the mapping the
+        // controller relies on, since the controller itself needs a host.
+        var errors = BookingMessages.ForFailures(
+        [
+            new UBookIt.Core.Common.DomainFailure(
+                UBookIt.Core.Common.FailureCodes.DurationTooShort,
+                "A booking length is required.",
+                "DurationMinutes"),
+        ]);
+
+        Assert.Equal(BookingFieldIds.Duration, Assert.Single(errors).FieldId);
+    }
+
+    [Fact]
     public void A_duration_bound_failure_points_at_the_length_control()
     {
         var errors = BookingMessages.ForFailures(

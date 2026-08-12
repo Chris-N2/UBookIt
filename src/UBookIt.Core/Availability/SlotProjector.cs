@@ -26,12 +26,14 @@ internal static class SlotProjector
     {
         var slots = new List<Slot>();
 
-        // The `duration <= maxRun` test below is equivalent to the older
-        // "does [start, start+duration) fit in the interval" test only for a
-        // duration that is a positive granularity multiple. Callers validate
-        // first, but enforcing it here keeps the equivalence a property of the
-        // projection rather than of every present and future caller: an
-        // unbookable length yields nothing instead of a subtly different set.
+        // The `duration <= maxRun` test below matches the older "does
+        // [start, start+duration) fit in the interval" test only for a duration
+        // that is a positive granularity multiple no greater than MaxDuration.
+        // This guard enforces the first two; the MaxDuration bound remains the
+        // caller's (AvailabilityService.GetSlotsAsync validates all three before
+        // projecting). An over-long duration is not unsafe here — maxRun is
+        // already capped at MaxDuration, so it simply yields nothing, which is
+        // the correct answer anyway.
         if (duration <= TimeSpan.Zero || duration.Ticks % constraints.Granularity.Ticks != 0)
         {
             return slots;
