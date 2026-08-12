@@ -94,6 +94,33 @@ The Management API SHALL expose versioned endpoints in the `ubookitbackoffice` s
 - **WHEN** a service is submitted with a blank name and a non-normalized role type key
 - **THEN** the response is 400 and its errors carry the stable name and role-type-key codes
 
+### Requirement: Backoffice collection view for services
+The package SHALL register a services collection view within the existing uBookIt backoffice section, alongside the resources view. It SHALL list services in a semantic `uui`-based table showing the service name, a summary of what the service requires, and a summary of its duration, with paging over the management API's paged list and affordances to create, edit, and delete. The duration summary SHALL distinguish the two kinds and SHALL state whichever bounds a variable duration carries, rather than reporting only that it is variable. Editing SHALL open a separate editor view, never inline in the table. All user-facing strings SHALL come from Umbraco's localization mechanism. No third-party widget framework SHALL be used.
+
+#### Scenario: Section lists services
+- **WHEN** a backoffice user with access opens the services view of the uBookIt section
+- **THEN** existing services are listed with name, requirement summary, and duration summary, and a create action is available
+
+#### Scenario: A fixed duration is summarised as its length
+- **WHEN** a service with a fixed 60-minute duration is listed
+- **THEN** its duration summary states 60 minutes
+
+#### Scenario: A bounded variable duration states both bounds
+- **WHEN** a service with a variable duration bounded between 45 and 120 minutes is listed
+- **THEN** its duration summary states that it is variable and reports both bounds
+
+#### Scenario: An unbounded variable duration is summarised as variable
+- **WHEN** a service with a variable duration and no bounds is listed
+- **THEN** its duration summary states that it is variable, with no bounds reported
+
+#### Scenario: Both views are reachable
+- **WHEN** a backoffice user opens the uBookIt section
+- **THEN** both a Resources view and a Services view are available, and selecting Services does not disturb the resources view's behaviour
+
+#### Scenario: Paging beyond one page
+- **WHEN** more services exist than fit one page and the user advances a page
+- **THEN** the next page of services is shown with an accurate "showing X–Y of Z" indication
+
 ### Requirement: Service duration is an explicit choice
 The editor SHALL NOT represent any duration mode as an empty input. It SHALL offer an explicit choice between a **fixed** duration in minutes and a **variable** duration, and SHALL state in the UI what the variable option means — that the visitor chooses the length, within the bounds given and within what each resource permits. The variable option SHALL offer optional minimum and maximum bound inputs, and SHALL state that leaving a bound empty defers that bound to the resource. Choosing fixed SHALL send a fixed duration carrying that value in minutes; choosing variable SHALL send a variable duration carrying whichever bounds were supplied.
 
