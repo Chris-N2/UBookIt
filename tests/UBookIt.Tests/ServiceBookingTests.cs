@@ -3,6 +3,7 @@ using UBookIt.Core.Bookings;
 using UBookIt.Core.Common;
 using UBookIt.Core.Resources;
 using UBookIt.Core.Services;
+using UBookIt.Core.Stores;
 using UBookIt.Tests.Support;
 
 namespace UBookIt.Tests;
@@ -215,14 +216,122 @@ public class ServiceBookingTests
     [Fact]
     public async Task Spec_scenario_homogeneous_pool_yields_one_run_per_start()
     {
+        // Divergent free time is the whole point: identically-configured
+        // candidates only ever produce different runs once one of them is
+        // booked. A pool with nothing booked (or one whose maximum clamps every
+        // run to the same value) cannot fail this assertion, so it would not be
+        // testing anything.
         var service = Svc();
-        var harness = Wire(service, Room(1, granularity: 30, min: 30, max: 60), Room(2, granularity: 30, min: 30, max: 60));
+        var harness = Wire(
+            service,
+            Room(1, granularity: 30, min: 30, max: 480, open: "09:00", close: "17:00"),
+            Room(2, granularity: 30, min: 30, max: 480, open: "09:00", close: "17:00"));
+
+        await harness.Bookings.PlaceAsync(new BookingRequest
+        {
+            ResourceId = Id(1),
+            Start = TestData.Utc(Date, "11:00"),
+            Duration = Mins(60),
+            Booker = TestData.Booker(),
+        });
 
         var result = await harness.Services.GetBookableStartsAsync(service.Id, Date, Date);
 
         Assert.True(result.Succeeded);
         Assert.NotEmpty(result.Value);
+
+        // At 09:00 the booked candidate offers 30..120 and the free one 30..480;
+        // the first is a strict subset of the second, so only the wider survives.
+        var nine = Assert.Single(result.Value, s => s.StartUtc == TestData.Utc(Date, "09:00"));
+        Assert.Equal(new LengthRun(Mins(30), Mins(480), Mins(30)), Assert.Single(nine.Runs));
+
         Assert.All(result.Value, start => Assert.Single(start.Runs));
+    }
+
+    [Fact]
+    public async Task A_subsumed_run_is_dropped_but_a_partially_overlapping_one_is_kept()
+    {
+        // Same grid, contained range  -> collapsed (nothing is lost).
+        // Different grid, overlapping -> both kept (each carries lengths the
+        // other lacks), which is the case D3 refuses to merge.
+        var service = Svc();
+        var harness = Wire(
+            service,
+            Room(1, granularity: 30, min: 30, max: 90, open: "09:00", close: "17:00"),
+            Room(2, granularity: 30, min: 30, max: 480, open: "09:00", close: "17:00"),
+            Room(3, granularity: 20, min: 20, max: 120, open: "09:00", close: "17:00"));
+
+        var result = await harness.Services.GetBookableStartsAsync(service.Id, Date, Date);
+
+        var nine = Assert.Single(result.Value, s => s.StartUtc == TestData.Utc(Date, "09:00"));
+
+        Assert.Equal(
+            new[]
+            {
+                new LengthRun(Mins(20), Mins(120), Mins(20)),
+                new LengthRun(Mins(30), Mins(480), Mins(30)),
+            },
+            nine.Runs.ToArray());
+    }
+
+    [Fact]
+    public async Task Collapsing_runs_never_removes_an_offered_length()
+    {
+        // The safety property behind the collapse: whatever it drops, the set of
+        // lengths on offer at each start is unchanged.
+        var service = Svc();
+        Resource[] Pool() =>
+        [
+            Room(1, granularity: 30, min: 30, max: 90, open: "09:00", close: "17:00"),
+            Room(2, granularity: 30, min: 30, max: 480, open: "09:00", close: "17:00"),
+            Room(3, granularity: 20, min: 20, max: 120, open: "09:00", close: "17:00"),
+            Room(4, granularity: 60, min: 120, max: 240, open: "09:00", close: "17:00"),
+        ];
+
+        var harness = Wire(service, Pool());
+
+        await harness.Bookings.PlaceAsync(new BookingRequest
+        {
+            ResourceId = Id(2),
+            Start = TestData.Utc(Date, "12:00"),
+            Duration = Mins(60),
+            Booker = TestData.Booker(),
+        });
+
+        var collapsed = await harness.Services.GetBookableStartsAsync(service.Id, Date, Date);
+
+        // Recompute the union the naive way — every candidate's own run at every
+        // start, uncollapsed — and compare the length sets start by start.
+        foreach (var start in collapsed.Value)
+        {
+            var expected = new SortedSet<TimeSpan>();
+
+            foreach (var candidate in (await harness.Services.ResolveCandidatesAsync(service.Id)).Value)
+            {
+                var perResource = harness.Availability.ProjectBookableStarts(
+                    candidate.Resource, await harness.Store.GetClaimsAsync(
+                        [candidate.ResourceId],
+                        TestData.Utc(Date, "00:00"),
+                        TestData.Utc(Date.AddDays(1), "00:00")),
+                    Date,
+                    Date);
+
+                foreach (var bookable in perResource.Value.Where(b => b.StartUtc == start.StartUtc))
+                {
+                    var min = bookable.MinDuration > candidate.Range.Min ? bookable.MinDuration : candidate.Range.Min;
+                    var max = bookable.MaxDuration < candidate.Range.Max ? bookable.MaxDuration : candidate.Range.Max;
+
+                    for (var length = min; length <= max; length += candidate.Granularity)
+                    {
+                        expected.Add(length);
+                    }
+                }
+            }
+
+            Assert.Equal(
+                expected.ToArray(),
+                start.Runs.SelectMany(r => r.Lengths()).Distinct().OrderBy(l => l).ToArray());
+        }
     }
 
     [Fact]
@@ -330,6 +439,86 @@ public class ServiceBookingTests
 
         Assert.NotEmpty(result.Value);
         Assert.All(result.Value, start => Assert.True(Assert.Single(start.Runs).IsSingleLength));
+    }
+
+    [Fact]
+    public async Task Spec_scenario_the_pure_projection_matches_the_id_based_query()
+    {
+        // The pure projection takes caller-supplied claims, so it *can* diverge
+        // from the id-based query if the caller's window is wrong. This pins
+        // that it does not — for a resource with bookings, not just an empty one.
+        var service = Svc();
+        var room = Room(1, granularity: 30, min: 30, max: 240, open: "09:00", close: "17:00");
+        var harness = Wire(service, room);
+
+        await harness.Bookings.PlaceAsync(new BookingRequest
+        {
+            ResourceId = room.Id,
+            Start = TestData.Utc(Date, "11:00"),
+            Duration = Mins(90),
+            Booker = TestData.Booker(),
+        });
+
+        var viaId = await harness.Availability.GetBookableStartsAsync(room.Id, Date, Date);
+
+        var claims = await harness.Store.GetClaimsAsync(
+            [room.Id], TestData.Utc(Date, "00:00"), TestData.Utc(Date.AddDays(1), "00:00"));
+        var viaProjection = harness.Availability.ProjectBookableStarts(room, claims, Date, Date);
+
+        Assert.True(viaId.Succeeded);
+        Assert.True(viaProjection.Succeeded);
+        Assert.NotEmpty(viaId.Value);
+
+        // Whole entries, not just starts: minimum and maximum must match too.
+        Assert.Equal(viaId.Value.ToArray(), viaProjection.Value.ToArray());
+    }
+
+    [Fact]
+    public void The_pure_projection_ignores_claims_belonging_to_other_resources()
+    {
+        // One batched read is passed to every candidate in turn, so a claim on
+        // a sibling must not subtract from this resource's free time.
+        var service = Svc();
+        var room = Room(1, granularity: 30, min: 30, max: 240, open: "09:00", close: "17:00");
+        var harness = Wire(service, room);
+
+        var foreign = new ClaimInfo(
+            Id(99),
+            Guid.NewGuid(),
+            BookingInterval.Create(
+                TestData.Utc(Date, "09:00"), TestData.Utc(Date, "17:00"), TestData.LondonZoneId).Value,
+            BookingStatus.Confirmed);
+
+        var withForeign = harness.Availability.ProjectBookableStarts(room, [foreign], Date, Date);
+        var withNone = harness.Availability.ProjectBookableStarts(room, [], Date, Date);
+
+        Assert.Equal(withNone.Value.ToArray(), withForeign.Value.ToArray());
+        Assert.NotEmpty(withNone.Value);
+    }
+
+    [Fact]
+    public async Task An_ineligible_preference_is_reported_even_when_the_pool_is_empty()
+    {
+        // The empty-pool guard must not mask the caller's own mistake.
+        var service = Svc(type: "nothing-of-this-type");
+        var harness = Wire(service, Room(1));
+
+        var placed = await harness.Services.PlaceAsync(Request(service, "09:00", 60, preferred: Id(1)));
+
+        Assert.False(placed.Succeeded);
+        Assert.Equal(FailureCodes.ResourceNotEligible, SingleCode(placed));
+    }
+
+    [Fact]
+    public async Task An_empty_pool_without_a_preference_is_service_unavailable()
+    {
+        var service = Svc(type: "nothing-of-this-type");
+        var harness = Wire(service, Room(1));
+
+        var placed = await harness.Services.PlaceAsync(Request(service, "09:00", 60));
+
+        Assert.False(placed.Succeeded);
+        Assert.Equal(FailureCodes.ServiceUnavailable, SingleCode(placed));
     }
 
     [Fact]
@@ -586,6 +775,52 @@ public class ServiceBookingTests
 
         Assert.False(placed.Succeeded);
         Assert.Equal(FailureCodes.Conflict, SingleCode(placed));
+    }
+
+    /// <summary>
+    /// A resource that is in the candidate pool but has vanished by the time
+    /// placement loads it — a candidate deleted mid-loop.
+    /// </summary>
+    private sealed class VanishingResourceStore(IResourceStore inner) : IResourceStore
+    {
+        public Task<Resource?> GetAsync(Guid resourceId, CancellationToken cancellationToken = default)
+            => Task.FromResult<Resource?>(null);
+
+        public Task<ResourcePage> ListAsync(int skip, int take, CancellationToken cancellationToken = default)
+            => inner.ListAsync(skip, take, cancellationToken);
+
+        public Task<IReadOnlyList<Resource>> ListByTypeAsync(string type, CancellationToken cancellationToken = default)
+            => inner.ListByTypeAsync(type, cancellationToken);
+    }
+
+    [Fact]
+    public async Task A_candidate_that_vanishes_mid_loop_is_reported_as_retryable_not_as_the_canary()
+    {
+        // resource-not-found is transient, not a property of the request, so it
+        // must not arrive dressed as the deterministic drift signal.
+        var service = Svc();
+        var room = Room(1);
+
+        var resources = new InMemoryResourceStore().Add(room);
+        var serviceStore = new InMemoryServiceStore().Add(service);
+        var bookingStore = new InMemoryBookingStore();
+        var time = new FixedTimeProvider(TestData.Now);
+        var settings = TestData.Settings;
+        var vanishing = new VanishingResourceStore(resources);
+
+        var booking = new ServiceBookingService(
+            serviceStore,
+            vanishing,
+            bookingStore,
+            new AvailabilityService(vanishing, bookingStore, time, settings),
+            new BookingService(vanishing, bookingStore, time, settings),
+            settings);
+
+        var placed = await booking.PlaceAsync(Request(service, "09:00", 60));
+
+        Assert.False(placed.Succeeded);
+        Assert.Equal(FailureCodes.Conflict, SingleCode(placed));
+        Assert.NotEqual(FailureCodes.ServiceUnavailable, SingleCode(placed));
     }
 
     [Fact]

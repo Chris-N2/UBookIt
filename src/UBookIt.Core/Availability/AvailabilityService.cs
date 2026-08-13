@@ -25,23 +25,19 @@ public interface IAvailabilityQueryService
         Guid resourceId, DateOnly fromDate, DateOnly toDate, CancellationToken cancellationToken = default);
 
     /// <summary>
-    /// As <see cref="GetBookableStartsAsync(Guid, DateOnly, DateOnly, CancellationToken)"/>,
-    /// for a caller that has already loaded the resource. Produces identical
-    /// results for the same resource, range, and stored state — it changes only
-    /// who performs the load, never what is computed (book-via-service D5).
-    /// </summary>
-    Task<DomainResult<IReadOnlyList<BookableStart>>> GetBookableStartsAsync(
-        Resource resource, DateOnly fromDate, DateOnly toDate, CancellationToken cancellationToken = default);
-
-    /// <summary>
-    /// The same projection again, wholly pure: for a caller that has already
-    /// read claims for a batch of resources and so must not issue another read.
-    /// Claims for other resources are ignored, so a single batched read can be
-    /// passed for every candidate in turn.
+    /// The same projection as
+    /// <see cref="GetBookableStartsAsync(Guid, DateOnly, DateOnly, CancellationToken)"/>,
+    /// wholly pure: for a caller that has already loaded the resource and
+    /// already read claims for a batch of resources, and so must issue no reads
+    /// of its own. Claims for other resources are ignored, so a single batched
+    /// read can be passed for every candidate in turn.
     /// <para>
-    /// This is the seam that lets a service availability query over N candidates
-    /// cost one claims round trip instead of N, while still sharing one
-    /// computation with the two async projections above so they cannot drift.
+    /// Produces identical results to the id-based query for the same resource,
+    /// range, and stored state — it changes only who performs the reads, never
+    /// what is computed. This is the seam that lets a service availability query
+    /// over N candidates cost one claims round trip instead of N, while sharing
+    /// one computation with the async projection so the two cannot drift
+    /// (book-via-service design D5).
     /// </para>
     /// </summary>
     DomainResult<IReadOnlyList<BookableStart>> ProjectBookableStarts(
@@ -93,21 +89,6 @@ public sealed class AvailabilityService(
         // Shares ResolveAsync with the other queries, so range, resource and
         // time-zone failures behave identically across the availability surface.
         var context = await ResolveAsync(resourceId, fromDate, toDate, cancellationToken).ConfigureAwait(false);
-
-        return Project(context);
-    }
-
-    public async Task<DomainResult<IReadOnlyList<BookableStart>>> GetBookableStartsAsync(
-        Resource resource, DateOnly fromDate, DateOnly toDate, CancellationToken cancellationToken = default)
-    {
-        var precondition = ValidatePreconditions(fromDate, toDate);
-        if (!precondition.Succeeded)
-        {
-            return DomainResult<IReadOnlyList<BookableStart>>.Failure(precondition.Failures);
-        }
-
-        var context = await ResolveForAsync(resource, precondition.Value, fromDate, toDate, cancellationToken)
-            .ConfigureAwait(false);
 
         return Project(context);
     }

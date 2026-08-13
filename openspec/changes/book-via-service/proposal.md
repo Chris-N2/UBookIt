@@ -51,14 +51,17 @@ length through a finished booking flow.
   `IResourceManagementStore.ListTypesAsync` is untouched and stays
   management-only — it carries type keys and counts, which is not the data
   eligibility needs.
-- **Store ports gain a batched claims read and Core an availability overload
-  taking an already-loaded resource**, so a union query over N candidates does
-  not cost `1 + 2N` round trips.
+- **Store ports gain a batched claims read and Core a pure availability
+  projection** taking an already-loaded resource with already-read claims, so a
+  union query over N candidates does not cost `1 + 2N` round trips.
 - **`service-not-found` maps to 404** in the delivery problem-details mapper;
   it currently falls through to 400.
-- No breaking change to any published contract; no schema change and no
-  migration. Direct-resource booking (change ⑤) is untouched and must not
-  regress.
+- No change to any existing endpoint, request model, response shape, or failure
+  code; no schema change and no migration. Direct-resource booking (change ⑤) is
+  untouched and must not regress. The Core store and availability *interfaces*
+  do gain members, which would break an external implementer — but nothing is
+  published, the only implementations are in this repository and its tests, and
+  each addition is declared in a delta spec.
 
 ## Capabilities
 

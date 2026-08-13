@@ -117,11 +117,27 @@ produces exactly one run.
   today's `BookableStart` shape when the site is homogeneous — the common case
   pays nothing.
 
-Identical runs are collapsed and the list is ordered deterministically so
-responses are stable and testable. Overlapping-but-distinct runs are **not**
-merged: `{30,90,30}` and `{20,120,20}` share the length 60, but merging them
-would require expanding to a length set and re-deriving runs, which is the flat
-encoding wearing a disguise.
+**Subsumed runs are eliminated** — a run whose lengths another already offers is
+dropped — and the list is ordered deterministically so responses are stable and
+testable. Same step plus a contained range is sufficient for subsumption: both
+minima are multiples of that shared step, so the grids are in phase.
+
+*Corrected during QA (2026-08-13).* The first implementation collapsed only
+*identical* runs, which is not enough. Two identically-configured candidates
+diverge the moment one of them is booked — same grid and minimum, a shorter
+remaining run — so a homogeneous pool emitted up to N runs per start, each a
+subset of the widest. That falsified this decision's own claim that the
+homogeneous case "degenerates to exactly today's `BookableStart` shape", and
+reintroduced precisely the wire bloat that ruled out the flat-length encoding.
+The covering test could not see it: it used a pool with nothing booked and a
+maximum that clamped every candidate to the same run, a configuration in which
+divergence is impossible.
+
+Overlapping-but-distinct runs are still **not** merged: `{30,90,30}` and
+`{20,120,20}` share the length 60, but merging them would require expanding to a
+length set and re-deriving runs, which is the flat encoding wearing a disguise.
+Subset elimination is categorically different — it removes only what is already
+said elsewhere, and the set of lengths on offer is provably unchanged.
 
 ### D4 — Post-filtering per-resource output is lossless, so `Availability/` is untouched
 
@@ -154,15 +170,23 @@ Naively composing `GetBookableStartsAsync(resourceId, …)` per candidate costs
 re-loads its resource (`ResolveAsync` → `resourceStore.GetAsync`) and issues its
 own claims query. Two additions collapse that to 3:
 
-- `IAvailabilityQueryService` gains an overload taking an already-loaded
-  `Resource`. The id-based method becomes a thin load-then-delegate, so the two
+- `IAvailabilityQueryService` gains **one** new member,
+  `ProjectBookableStarts(resource, claims, from, to)` — wholly pure, issuing no
+  reads at all. It shares the same traversal as the id-based query, so the two
   cannot diverge.
 - `IBookingStore` gains a claims read over several resource ids in one call.
 
 Built now on Chris's call (2026-08-13): both are cheap while the call sites are
-being written and awkward to retrofit through a shipped port. The pre-loaded
-overload is also the honest shape — the service layer *has* the aggregate and
-should not pretend otherwise.
+being written and awkward to retrofit through a shipped port.
+
+*Corrected during QA (2026-08-13).* The first implementation added a third
+member as well — an async overload taking the resource but reading claims
+itself. It had no caller and no test: the service layer needs the pure member,
+because an overload that reads its own claims would leave the batched read
+unused on the very path it exists to serve. Adding untested public surface to a
+port interface is the cost of guessing at a seam instead of following the one
+call site. The overload was removed and the spec now describes the member that
+ships.
 
 ### D6 — Two distinct all-fail codes, and the deterministic one is a canary
 
@@ -177,6 +201,17 @@ asked for. Instead:
   horizon. Retrying is pointless.
 
 Mixed outcomes favour `conflict`, because the actionable advice is "try again".
+
+The deterministic refusals are **whitelisted explicitly**
+(`interval-invalid`, `granularity`, `duration-too-short`, `duration-too-long`,
+`lead-time`, `horizon`, `outside-open-hours`) rather than inferred from "not
+`conflict`". *Corrected during QA (2026-08-13)*: the first implementation
+inferred, so a candidate deleted between resolution and its attempt —
+`resource-not-found` — was reported as `service-unavailable`, telling the caller
+not to retry when a retry would succeed, and firing the drift signal for a
+transient cause. Anything unrecognised is now treated as retryable, which fails
+safe in both directions: a real drift still surfaces, and a transient fault never
+masquerades as one.
 
 The real payoff is the second code as a **drift detector**. A client that takes
 its start and length verbatim from the service availability query cannot
@@ -233,9 +268,31 @@ specific resource has stated an expectation about *which* resource; falling
 through discards it invisibly. Rejecting is recoverable — the caller can retry
 without the preference.
 
+The check runs before the empty-pool guard: a preference naming a resource
+outside the pool is equally wrong whether the pool is empty or merely lacks that
+resource, and the caller's own mistake is the more useful thing to report.
+
 *Flagged for review:* this is a judgement call rather than a settled decision,
 and it is the one place in this change where a reasonable person could prefer
 lenient behaviour. Revisit if ⑩'s pick-who UI makes rejection feel harsh.
+
+**Tension with D11, raised by QA (2026-08-13) and knowingly accepted.** This code
+is an oracle for pool membership: an anonymous caller can probe
+`preferredResourceId` against ids from the public `GET /resources` and learn, per
+service, which resources are eligible — `resource-not-eligible` for an outsider,
+some other failure for a member. D11 declines to name resources in availability
+responses partly to avoid leaking pool composition to anonymous callers before ⑩
+decides whether pick-who is offered at all, so the two decisions pull in opposite
+directions and the original design did not say so.
+
+Accepted for now, because the pool is not a secret in v1 — resource type keys and
+ids are already public, and eligibility is *defined* as "type key matches", so
+the same inference is available from `GET /resources` and `GET /services/{id}`
+without probing. That equivalence is exactly what ⑧ breaks: once capabilities
+constrain eligibility, membership stops being derivable from public data and this
+oracle starts disclosing something new. **⑧ must revisit this**, either by
+returning a non-committal failure or by gating preference behind the per-service
+switch that slice already contemplates.
 
 ### D10 — `service-unavailable` maps to 400, not a new status
 

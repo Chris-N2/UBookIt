@@ -49,15 +49,25 @@ Because each candidate resolves independently against its own constraints, two c
 
 The lengths at a start SHALL be expressed as a list of **arithmetic runs**, each `{ Min, Max, Step }`, denoting the lengths `Min, Min + Step, …, Max` inclusive. Each contributing candidate produces exactly one run at a start: its resolved range narrowed by how much free time remains from that start, stepping by that candidate's granularity. `Min` and `Max` SHALL both be multiples of `Step`, so `Max` is always reachable.
 
-Runs SHALL NOT be merged into a single `(minimum, maximum)` pair. Candidates differ in granularity and in minimum duration, so the union of their lengths at a start is in general neither contiguous nor confined to one grid; a merged pair would advertise lengths no candidate can book. Identical runs SHALL be collapsed and the list SHALL be ordered deterministically, but runs that merely overlap SHALL remain distinct.
+Runs SHALL NOT be merged into a single `(minimum, maximum)` pair. Candidates differ in granularity and in minimum duration, so the union of their lengths at a start is in general neither contiguous nor confined to one grid; a merged pair would advertise lengths no candidate can book.
+
+A run whose lengths another run at the same start already offers SHALL be dropped, and the remaining list SHALL be ordered deterministically. This is subset elimination and loses nothing: identically-configured candidates diverge as soon as one of them is booked — same grid and minimum, a shorter remaining run — and emitting both says nothing the wider one does not. Runs that merely *overlap* SHALL remain distinct, because each then carries lengths the other lacks. The set of lengths on offer at a start SHALL be identical before and after this elimination.
 
 A start SHALL be omitted entirely when no candidate can fulfil the service from it. The response SHALL NOT identify which resource backs a start or a run: v1 resolves the resource at placement time, and naming one here would imply a guarantee placement does not make.
 
 The query SHALL apply the same bounded-range, inverted-range, and time-zone rules as the per-resource availability queries.
 
 #### Scenario: Homogeneous pool yields one run per start
-- **WHEN** every candidate shares the same granularity, minimum, and maximum, and two of them are free from a given start
-- **THEN** that start carries exactly one run, identical to what a single such resource would offer
+- **WHEN** every candidate shares the same granularity, minimum, and maximum, and two of them are bookable from a given start — including when one has a booking later in the day and so offers a shorter run than the other
+- **THEN** that start carries exactly one run, the widest on offer, identical to what a single such resource would offer
+
+#### Scenario: A subsumed run is dropped but a partially overlapping one is kept
+- **WHEN** one candidate offers 30–90 at 30-minute steps, a second offers 30–480 at 30-minute steps, and a third offers 20–120 at 20-minute steps from the same start
+- **THEN** that start carries two runs — the 30-minute one is dropped as a subset of the 480 one, and the 20-minute run survives because it carries lengths the others lack
+
+#### Scenario: Eliminating runs never removes an offered length
+- **WHEN** the lengths denoted by a start's runs are compared with the union of every candidate's own lengths at that start
+- **THEN** the two sets are equal
 
 #### Scenario: Differing granularities are not merged
 - **WHEN** at one start a 30-minute-granularity candidate offers 30–90 minutes and a 20-minute-granularity candidate offers 20–120 minutes
@@ -112,6 +122,10 @@ On success the result SHALL identify the resource actually booked.
 - **WHEN** a placement supplies a preferred resource id that is not in the service's candidate pool
 - **THEN** placement fails with code `resource-not-eligible` and no booking is placed, rather than silently booking a different resource
 
+#### Scenario: An ineligible preference is reported even when the pool is empty
+- **WHEN** a placement supplies a preferred resource id against a service whose candidate pool is empty
+- **THEN** placement fails with code `resource-not-eligible`, not `service-unavailable` — the caller's own mistake is the more useful thing to report
+
 #### Scenario: One lock at a time
 - **WHEN** a candidate loop runs over several candidates
 - **THEN** each attempt completes before the next begins, and no attempt holds a lock while another is attempted
@@ -142,7 +156,9 @@ When every candidate attempt fails, service placement SHALL report which kind of
 
 When any candidate failed on `conflict`, placement SHALL fail with `conflict`: the request described a genuinely bookable slot that was taken concurrently or is already occupied, so retrying may succeed.
 
-When no candidate failed on `conflict` — every candidate rejected the request deterministically, for example because the start is off its grid, outside its open hours, inside its lead time, or beyond its horizon — placement SHALL fail with the stable code `service-unavailable`. Retrying is pointless.
+When every candidate rejected the request *deterministically* — the refusal is a property of the request against that resource's configuration, such as a start off its grid, outside its open hours, inside its lead time, or beyond its horizon — placement SHALL fail with the stable code `service-unavailable`. Retrying is pointless.
+
+The deterministic refusals SHALL be recognised explicitly rather than inferred from "not `conflict`". A refusal that is neither a conflict nor a known deterministic rule — a candidate deleted between resolution and its attempt, for instance — is transient, and reporting it as `service-unavailable` would both tell the caller not to retry when retrying would succeed and pollute the drift signal.
 
 `service-unavailable` SHALL be treated as a drift signal: a client that placed only starts and lengths taken from the service availability query cannot legitimately provoke it, so its occurrence from a conforming client means availability and placement disagree.
 
@@ -157,6 +173,10 @@ When no candidate failed on `conflict` — every candidate rejected the request 
 #### Scenario: Deterministic rejection reports service-unavailable
 - **WHEN** a placement targets a start that is outside every candidate's open hours
 - **THEN** placement fails with code `service-unavailable`
+
+#### Scenario: A transient refusal is not the deterministic code
+- **WHEN** the only candidate is deleted between resolution and its placement attempt, so the attempt fails with `resource-not-found`
+- **THEN** placement fails with code `conflict`, not `service-unavailable`, because a retry may succeed
 
 #### Scenario: A mixed outcome favours conflict
 - **WHEN** one candidate rejects a start as off-grid and another rejects it as conflicting

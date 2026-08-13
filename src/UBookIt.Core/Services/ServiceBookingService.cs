@@ -177,13 +177,39 @@ public sealed class ServiceBookingService(
 
         IReadOnlyList<ServiceBookableStart> result = byStart
             .OrderBy(entry => entry.Key)
-            .Select(entry => new ServiceBookableStart(
-                entry.Key,
-                [.. entry.Value.OrderBy(r => r.Min).ThenBy(r => r.Step).ThenBy(r => r.Max)]))
+            .Select(entry => new ServiceBookableStart(entry.Key, Collapse(entry.Value)))
             .ToList();
 
         return DomainResult<IReadOnlyList<ServiceBookableStart>>.Success(result);
     }
+
+    /// <summary>
+    /// Drops every run whose lengths another run already offers, then orders
+    /// what remains deterministically.
+    /// <para>
+    /// Identically-configured candidates diverge as soon as one of them is
+    /// booked — the same grid and minimum, a shorter remaining run — and
+    /// emitting both would say nothing the wider one does not already say.
+    /// This is subset elimination, not the merging of overlapping runs: two
+    /// runs on different grids each carry lengths the other lacks, so they both
+    /// survive (design D3).
+    /// </para>
+    /// </summary>
+    private static List<LengthRun> Collapse(HashSet<LengthRun> runs)
+    {
+        var ordered = runs.OrderBy(r => r.Min).ThenBy(r => r.Step).ThenBy(r => r.Max).ToList();
+
+        return [.. ordered.Where(run => !ordered.Any(other => other != run && Subsumes(other, run)))];
+    }
+
+    /// <summary>
+    /// Whether every length <paramref name="inner"/> denotes is also denoted by
+    /// <paramref name="outer"/>. Same step and a contained range is sufficient:
+    /// both minima are multiples of that shared step, so the two grids are in
+    /// phase and no length can fall between <paramref name="outer"/>'s.
+    /// </summary>
+    private static bool Subsumes(LengthRun outer, LengthRun inner)
+        => outer.Step == inner.Step && outer.Min <= inner.Min && outer.Max >= inner.Max;
 
     public async Task<DomainResult<Booking>> PlaceAsync(
         ServiceBookingRequest request, CancellationToken cancellationToken = default)
@@ -196,11 +222,10 @@ public sealed class ServiceBookingService(
 
         var candidates = candidateResult.Value;
 
-        if (candidates.Count == 0)
-        {
-            return Unavailable("No resource is currently able to fulfil this service.");
-        }
-
+        // Before the empty-pool guard: a preference naming a resource outside
+        // the pool is equally wrong whether the pool is empty or merely lacks
+        // that resource, and the caller's own mistake is the more useful thing
+        // to report.
         if (request.PreferredResourceId is { } preferred && candidates.All(c => c.ResourceId != preferred))
         {
             // Rejected rather than ignored: the caller named a resource, and
@@ -209,6 +234,11 @@ public sealed class ServiceBookingService(
                 FailureCodes.ResourceNotEligible,
                 $"Resource {preferred} cannot fulfil this service.",
                 nameof(ServiceBookingRequest.PreferredResourceId));
+        }
+
+        if (candidates.Count == 0)
+        {
+            return Unavailable("No resource is currently able to fulfil this service.");
         }
 
         // Pool-wide bounds are decided from constraints alone, before any
@@ -256,7 +286,7 @@ public sealed class ServiceBookingService(
                 return placed;
             }
 
-            raced |= placed.Failures.Any(f => f.Code == FailureCodes.Conflict);
+            raced |= placed.Failures.Any(f => !IsDeterministic(f.Code));
         }
 
         // Echoing the last candidate's failures would be arbitrary — it depends
@@ -270,6 +300,27 @@ public sealed class ServiceBookingService(
 
     private static DomainResult<Booking> Unavailable(string message)
         => DomainResult<Booking>.Failure(FailureCodes.ServiceUnavailable, message);
+
+    /// <summary>
+    /// The refusals that are a property of the request against a resource's
+    /// configuration, and so cannot come good on a retry.
+    /// <para>
+    /// Whitelisted rather than inferred from "not <c>conflict</c>": treating
+    /// every unrecognised failure as deterministic would report
+    /// <c>service-unavailable</c> for a transient one — a candidate deleted
+    /// mid-loop yields <c>resource-not-found</c> — telling the caller not to
+    /// retry when retrying would work, and polluting the drift signal that code
+    /// exists to be (design D6).
+    /// </para>
+    /// </summary>
+    private static bool IsDeterministic(string code)
+        => code is FailureCodes.IntervalInvalid
+            or FailureCodes.Granularity
+            or FailureCodes.DurationTooShort
+            or FailureCodes.DurationTooLong
+            or FailureCodes.LeadTime
+            or FailureCodes.Horizon
+            or FailureCodes.OutsideOpenHours;
 
     /// <summary>
     /// Whether the requested length is one this candidate actually offers —

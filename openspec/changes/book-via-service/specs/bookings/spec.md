@@ -9,7 +9,9 @@ The read port SHALL additionally expose a listing of every resource of a given t
 
 The booking store port SHALL additionally expose a claims read spanning several resource ids in one call, with the same half-open overlap and status-neutral semantics as the single-resource read. It exists so a query over a candidate pool does not issue one round trip per candidate; it SHALL return the same claims the single-resource read would return for each of those resources.
 
-The availability query service SHALL additionally accept an already-loaded resource aggregate in place of a resource id, for callers that have just loaded it. That overload SHALL produce results identical to the id-based one for the same resource, date range, and stored state — it changes only who performs the load, never what is computed.
+The availability query service SHALL additionally expose a pure bookable-start projection taking an already-loaded resource aggregate together with already-read claims, for callers that must issue no reads of their own. It SHALL produce results identical to the id-based query for the same resource, date range, and stored state — it changes only who performs the reads, never what is computed. Claims belonging to other resources SHALL be ignored rather than rejected, so one batched read can be passed for every candidate in turn.
+
+Only one such member SHALL be added. An additional overload taking the resource but reading claims itself would leave the batched claims read without a caller on the path it exists to serve, and would ship untested public surface on a port interface.
 
 #### Scenario: Services are testable with in-memory stores
 - **WHEN** the availability and booking services are constructed with in-memory store implementations
@@ -27,6 +29,10 @@ The availability query service SHALL additionally accept an already-loaded resou
 - **WHEN** claims are read for three resource ids in one call over a range
 - **THEN** the result is exactly the union of what the single-resource read returns for each of those three ids over the same range
 
-#### Scenario: Pre-loaded overload matches the id-based query
-- **WHEN** the availability query is issued for a resource id, and again with that same resource aggregate already loaded
-- **THEN** both produce identical results
+#### Scenario: The pure projection matches the id-based query
+- **WHEN** the availability query is issued for a resource id that has bookings in range, and the pure projection is issued for that same resource with the claims read separately
+- **THEN** both produce identical results, entry for entry, including each entry's minimum and maximum
+
+#### Scenario: Claims for other resources are ignored
+- **WHEN** the pure projection is passed a claim belonging to a different resource that would, if applied, remove all of this resource's free time
+- **THEN** the result is unchanged from passing no claims at all
