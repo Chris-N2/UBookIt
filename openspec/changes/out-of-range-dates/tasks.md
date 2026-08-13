@@ -45,4 +45,4 @@
 - [x] 7.3 Re-issue all nine requests from 1.1 against the running site; every one now 400 with the documented code, none 500
 - [x] 7.4 Re-issue the controls from 1.2 and account for every difference — the three lower-bound cases changed deliberately (D6); the rest are unchanged
 - [x] 7.5 Spot-check that a normal booking and a normal availability query still behave identically, over HTTP
-- [ ] 7.6 Hand to `qa-review` in a fresh session or subagent; do not self-review
+- [x] 7.6 Handed to `qa-review` in a fresh subagent: REJECT (1 CRITICAL, 4 MAJOR) → remediate → APPROVE WITH NITS, 21/21 spec criteria; nits folded in
