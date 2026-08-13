@@ -159,7 +159,18 @@ only what was changed:
 | `WallClockMapper` DST gap-walk (`probe.AddMinutes(-1)`) | Examined, not guarded: it runs only for a wall-clock time inside a DST gap, which requires a modern-era transition, so it is unreachable at the calendar's edges |
 | `SlotProjector.Walk` `start += Granularity` | Examined, not guarded: needs an administrator-set granularity of order `int.MaxValue` minutes *and* a far-future query. Same class as the horizon case but far more contrived; recorded rather than fixed, and the natural home for it is a bound on granularity at configuration time |
 
-### D7 — Only the saturating helper is public
+### D7 — One predicate per edge, used everywhere
+
+Two predicates carry the whole rule — `IsUtcMappable` for the lower edge and
+`IsWalkableTo` for the upper — and every guard is expressed through them: both
+availability preconditions, and `TryWindowAround`, which applies them to the
+window it is about to produce rather than restating the margins arithmetically.
+That is what makes the two-days-at-each-end margin a consequence of the rule
+instead of a constant to be kept in sync, and it is why the first version got
+the lower margin wrong: it had the reasoning written out at the query path and
+open-coded at the placement path.
+
+### D8 — Only the saturating helper is public
 
 `CalendarBounds` is public so `UBookIt.Web` can reach `AddDaysSaturating` for the
 date picker's upper bound; the other members are `internal`. Public API is a

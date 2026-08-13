@@ -224,7 +224,7 @@ public sealed class AvailabilityService(
         // that lands before year one, which `DateTimeOffset` refuses to
         // represent. Rejecting both ends keeps the rule zone-independent rather
         // than working in London and throwing in Auckland.
-        if (fromDate <= DateOnly.MinValue)
+        if (!CalendarBounds.IsUtcMappable(fromDate))
         {
             return DomainResult<TimeZoneInfo>.Failure(
                 FailureCodes.DateRangeInvalid,

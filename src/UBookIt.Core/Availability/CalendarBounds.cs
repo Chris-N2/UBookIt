@@ -29,6 +29,14 @@ public static class CalendarBounds
     internal static bool IsWalkableTo(DateOnly toDate) => toDate < DateOnly.MaxValue;
 
     /// <summary>
+    /// Whether a wall-clock time on <paramref name="fromDate"/> can be mapped to
+    /// UTC in any site zone. Mapping subtracts the zone's offset, so on the first
+    /// representable date the result falls before the calendar starts for a zone
+    /// far enough east — always, for a window opening at midnight.
+    /// </summary>
+    internal static bool IsUtcMappable(DateOnly fromDate) => fromDate > DateOnly.MinValue;
+
+    /// <summary>
     /// The inclusive day range spanning one day either side of
     /// <paramref name="date"/>, as the open-hours rule requires. Returns false
     /// when either neighbour lies outside the calendar, or when the resulting
@@ -39,23 +47,27 @@ public static class CalendarBounds
         from = default;
         to = default;
 
-        // A margin of two days is needed at each end, for different reasons.
-        //
-        // Above: the day after must exist, and the walk steps once past it.
-        //
-        // Below: the day before must exist, and must itself be mappable to UTC.
-        // Mapping a wall-clock time on the first representable date from a site
-        // zone east of UTC lands before the calendar starts, so a window whose
-        // earlier day is that date throws for such a site — the same reasoning
-        // that rejects `from == MinValue` on the query path.
-        if (date.DayNumber <= DateOnly.MinValue.DayNumber + 1
-            || date.DayNumber >= DateOnly.MaxValue.DayNumber - 1)
+        // A margin of two days is needed at each end, for different reasons:
+        // above, the day after must exist and the walk steps once past it; below,
+        // the day before must exist and must itself be mappable to UTC. Expressed
+        // through the same two predicates the query path uses, so the edge
+        // reasoning lives in one place rather than being restated here.
+        if (date.DayNumber <= DateOnly.MinValue.DayNumber
+            || date.DayNumber >= DateOnly.MaxValue.DayNumber)
         {
             return false;
         }
 
-        from = date.AddDays(-1);
-        to = date.AddDays(1);
+        var candidateFrom = date.AddDays(-1);
+        var candidateTo = date.AddDays(1);
+
+        if (!IsUtcMappable(candidateFrom) || !IsWalkableTo(candidateTo))
+        {
+            return false;
+        }
+
+        from = candidateFrom;
+        to = candidateTo;
         return true;
     }
 
