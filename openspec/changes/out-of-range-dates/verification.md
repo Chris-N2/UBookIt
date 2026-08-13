@@ -76,6 +76,25 @@ interval is a property of the request, identical for every candidate, so it is
 now echoed rather than translated, exactly as a broken site time zone already
 was. Both routes now agree.
 
+### Four more cases added during QA remediation
+
+QA found that the interval guard was wrong for a start carrying a non-zero UTC
+offset: it measured headroom in UTC, while the addition moves the clock
+component. Three anonymous requests were still 500 after the first fix, and no
+test caught them because every case used a zero offset. The probe now covers the
+offset dimension, and all four are 400 `interval-invalid`:
+
+| Case | Request | After remediation |
+| --- | --- | --- |
+| P6 | `POST /bookings` start `9999-12-31T23:00:00+14:00` | 400 `interval-invalid` |
+| P7 | `POST /bookings` start `0001-01-01T00:00:00-14:00`, duration −60 | 400 `interval-invalid` |
+| P8 | `POST /services/{id}/bookings` start `9999-12-31T23:00:00+14:00` | 400 `interval-invalid` |
+| P9 | `POST /bookings` start `9999-12-31T23:00:00+01:00` | 400 `interval-invalid` |
+
+P9 matters: a one-hour offset is enough. This was not an extreme-value problem.
+
+**20 cases, 0 × 500.**
+
 ### Normal behaviour, same session
 
 Free-time returns its single interval; the resource offers 16 bookable starts;

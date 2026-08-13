@@ -231,7 +231,7 @@ public sealed class AvailabilityService(
                 $"The from date must be later than {DateOnly.MinValue:yyyy-MM-dd}.");
         }
 
-        if (toDate >= DateOnly.MaxValue)
+        if (!CalendarBounds.IsWalkableTo(toDate))
         {
             return DomainResult<TimeZoneInfo>.Failure(
                 FailureCodes.DateRangeInvalid,

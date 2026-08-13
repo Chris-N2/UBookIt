@@ -290,6 +290,121 @@ public class CalendarBoundaryTests
         Assert.DoesNotContain(result.Failures, f => f.Code == FailureCodes.IntervalInvalid);
     }
 
+    // ------------------------------------------------------------- offset dimension
+
+    // A start carries its own UTC offset, and the addition that builds the
+    // interval moves the *clock* component, not the UTC instant. Headroom
+    // measured against DateTimeOffset.MaxValue/MinValue is therefore the wrong
+    // headroom for an offset-carrying start — the clock can overflow while UTC
+    // still has room, and vice versa at the bottom.
+
+    // Only offsets that keep the *start itself* representable are listed: a
+    // western offset at the ceiling (or an eastern one at the floor) cannot be
+    // constructed at all, so it never reaches the domain.
+    [Theory]
+    [InlineData(14)]
+    [InlineData(1)]
+    public async Task A_placement_near_the_ceiling_is_rejected_whatever_its_offset(int offsetHours)
+    {
+        var room = Room();
+        var (bookings, _, _) = TestData.Services(room);
+
+        var start = new DateTimeOffset(
+            LastDay.ToDateTime(new TimeOnly(23, 0), DateTimeKind.Unspecified), TimeSpan.FromHours(offsetHours));
+
+        var result = await bookings.PlaceAsync(new BookingRequest
+        {
+            ResourceId = room.Id,
+            Start = start,
+            Duration = Mins(60),
+            Booker = TestData.Booker(),
+        });
+
+        Assert.False(result.Succeeded);
+        Assert.Equal(FailureCodes.IntervalInvalid, SingleCode(result));
+    }
+
+    [Theory]
+    [InlineData(-14)]
+    [InlineData(-1)]
+    public async Task A_placement_near_the_floor_is_rejected_whatever_its_offset(int offsetHours)
+    {
+        var room = Room();
+        var (bookings, _, _) = TestData.Services(room);
+
+        var start = new DateTimeOffset(
+            FirstDay.ToDateTime(new TimeOnly(0, 0), DateTimeKind.Unspecified), TimeSpan.FromHours(offsetHours));
+
+        var result = await bookings.PlaceAsync(new BookingRequest
+        {
+            ResourceId = room.Id,
+            Start = start,
+            Duration = Mins(-60),
+            Booker = TestData.Booker(),
+        });
+
+        Assert.False(result.Succeeded);
+        Assert.Equal(FailureCodes.IntervalInvalid, SingleCode(result));
+    }
+
+    [Fact]
+    public async Task A_service_placement_near_the_ceiling_is_rejected_whatever_its_offset()
+    {
+        var room = Room();
+        var service = Service.Create("Boundary", null, [new ServiceRole(ResourceTypes.Room, 1)]).Value;
+
+        var resources = new InMemoryResourceStore().Add(room);
+        var store = new InMemoryBookingStore();
+        var time = new FixedTimeProvider(TestData.Now);
+        var settings = TestData.Settings;
+
+        var serviceBooking = new ServiceBookingService(
+            new InMemoryServiceStore().Add(service),
+            resources,
+            store,
+            new AvailabilityService(resources, store, time, settings),
+            new BookingService(resources, store, time, settings),
+            settings);
+
+        var result = await serviceBooking.PlaceAsync(new ServiceBookingRequest
+        {
+            ServiceId = service.Id,
+            Start = new DateTimeOffset(
+                LastDay.ToDateTime(new TimeOnly(23, 0), DateTimeKind.Unspecified), TimeSpan.FromHours(14)),
+            Duration = Mins(60),
+            Booker = TestData.Booker(),
+        });
+
+        Assert.False(result.Succeeded);
+        Assert.Equal(FailureCodes.IntervalInvalid, SingleCode(result));
+    }
+
+    [Fact]
+    public async Task A_placement_just_inside_the_floor_is_evaluated_in_an_eastern_site_zone()
+    {
+        // The open-hours window reaches one day either side of the start, and
+        // mapping year one into UTC from an eastern zone falls off the calendar.
+        // The lower window margin must therefore match the upper one.
+        var auckland = new SiteBookingSettings { TimeZoneId = "Pacific/Auckland" };
+        var room = Room();
+        var resources = new InMemoryResourceStore().Add(room);
+        var store = new InMemoryBookingStore();
+        var bookings = new BookingService(
+            resources, store, new FixedTimeProvider(TestData.Now), auckland);
+
+        var result = await bookings.PlaceAsync(new BookingRequest
+        {
+            ResourceId = room.Id,
+            Start = new DateTimeOffset(
+                FirstDay.AddDays(1).ToDateTime(new TimeOnly(9, 0), DateTimeKind.Unspecified), TimeSpan.FromHours(13)),
+            Duration = Mins(60),
+            Booker = TestData.Booker(),
+        });
+
+        Assert.False(result.Succeeded);
+        Assert.Equal(FailureCodes.IntervalInvalid, SingleCode(result));
+    }
+
     // ------------------------------------------------------------------ horizon
 
     [Fact]

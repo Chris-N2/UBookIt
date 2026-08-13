@@ -12,10 +12,11 @@ namespace UBookIt.Core.Availability;
 /// individually would have left the next one to rediscover it.
 /// </para>
 /// <para>
-/// Public rather than internal because the default front-end needs the same
-/// saturating horizon arithmetic when it renders a date picker's upper bound,
-/// and it lives in another assembly. Copying three lines across that boundary
-/// would recreate the duplication this type exists to remove.
+/// The type is public but only <see cref="AddDaysSaturating"/> is: the default
+/// front-end needs that one when it renders a date picker's upper bound and
+/// lives in another assembly, and copying it across that boundary would
+/// recreate the duplication this type exists to remove. The rest is internal —
+/// public API is a compatibility promise, and nothing outside Core needs it.
 /// </para>
 /// </summary>
 public static class CalendarBounds
@@ -25,7 +26,7 @@ public static class CalendarBounds
     /// completion. Such a walk increments once more after processing its final
     /// day, so the last representable date cannot be its end.
     /// </summary>
-    public static bool IsWalkableTo(DateOnly toDate) => toDate < DateOnly.MaxValue;
+    internal static bool IsWalkableTo(DateOnly toDate) => toDate < DateOnly.MaxValue;
 
     /// <summary>
     /// The inclusive day range spanning one day either side of
@@ -33,14 +34,21 @@ public static class CalendarBounds
     /// when either neighbour lies outside the calendar, or when the resulting
     /// range could not then be walked.
     /// </summary>
-    public static bool TryWindowAround(DateOnly date, out DateOnly from, out DateOnly to)
+    internal static bool TryWindowAround(DateOnly date, out DateOnly from, out DateOnly to)
     {
         from = default;
         to = default;
 
-        // Needs a day before, a day after, and that day after must itself be
-        // walkable — the walk steps once past it.
-        if (date.DayNumber <= DateOnly.MinValue.DayNumber
+        // A margin of two days is needed at each end, for different reasons.
+        //
+        // Above: the day after must exist, and the walk steps once past it.
+        //
+        // Below: the day before must exist, and must itself be mappable to UTC.
+        // Mapping a wall-clock time on the first representable date from a site
+        // zone east of UTC lands before the calendar starts, so a window whose
+        // earlier day is that date throws for such a site — the same reasoning
+        // that rejects `from == MinValue` on the query path.
+        if (date.DayNumber <= DateOnly.MinValue.DayNumber + 1
             || date.DayNumber >= DateOnly.MaxValue.DayNumber - 1)
         {
             return false;
@@ -73,17 +81,40 @@ public static class CalendarBounds
     /// Adds a duration to an instant, reporting failure instead of throwing when
     /// the result would fall outside the representable range. Both directions
     /// matter: a far-future start overflows, a large negative duration underflows.
+    /// <para>
+    /// There are two independent limits, and comparing against
+    /// <see cref="DateTimeOffset.MaxValue"/>/<see cref="DateTimeOffset.MinValue"/>
+    /// tests neither of them correctly. Those subtractions measure headroom in
+    /// <em>UTC</em>, whereas the addition moves the <em>clock</em> component and
+    /// keeps the offset; the result must then also convert back to a
+    /// representable UTC instant. For a start carrying an eastern offset the
+    /// clock can overflow while UTC still has room — which is exactly how the
+    /// first version of this guard let a 500 through, so both limits are checked
+    /// explicitly here rather than inferred from one comparison.
+    /// </para>
     /// </summary>
-    public static bool TryAdd(DateTimeOffset start, TimeSpan duration, out DateTimeOffset end)
+    internal static bool TryAdd(DateTimeOffset start, TimeSpan duration, out DateTimeOffset end)
     {
         end = default;
 
-        if (duration > DateTimeOffset.MaxValue - start || duration < DateTimeOffset.MinValue - start)
+        var clock = start.DateTime;
+
+        if (duration > DateTime.MaxValue - clock || duration < DateTime.MinValue - clock)
         {
             return false;
         }
 
-        end = start + duration;
+        var shifted = clock + duration;
+
+        // The DateTimeOffset constructor additionally requires the UTC
+        // equivalent — clock minus offset — to be representable.
+        var utcTicks = shifted.Ticks - start.Offset.Ticks;
+        if (utcTicks < DateTime.MinValue.Ticks || utcTicks > DateTime.MaxValue.Ticks)
+        {
+            return false;
+        }
+
+        end = new DateTimeOffset(shifted, start.Offset);
         return true;
     }
 }

@@ -5,7 +5,7 @@ The availability free-time and slot queries SHALL reject a requested date range 
 
 A range SHALL additionally be rejected with `date-range-invalid` when either endpoint sits at the edge of the representable calendar — that is, when `from` is the first representable date or `to` is the last. Bounding the span is not sufficient on its own: a range at either edge can be one day wide and so passes the span check.
 
-The two edges fail for different reasons, and both SHALL be rejected. At the end, the day-by-day computation increments once past its final day and steps off the calendar. At the start, mapping a wall-clock time on the first representable date into UTC subtracts the site zone's offset; for any zone east of UTC the result falls before the first representable instant, which cannot be represented. Rejecting both keeps the rule independent of which zone the site is configured for, rather than succeeding in one zone and raising an exception in another.
+The two edges fail for different reasons, and both SHALL be rejected. At the end, the day-by-day computation increments once past its final day and steps off the calendar. At the start, mapping a wall-clock time on the first representable date into UTC subtracts the site zone's offset; when that offset exceeds the time of day being mapped — which happens for eastern zones and early opening times, and always for a window opening at midnight — the result falls before the first representable instant. Rejecting the date outright, rather than only the combinations that actually overflow, keeps the rule independent of the site's zone and of each resource's opening times, instead of succeeding for one configuration and raising an exception for another.
 
 No availability query SHALL raise an exception for any pair of dates the caller can express, in any site time zone.
 
@@ -21,8 +21,16 @@ No availability query SHALL raise an exception for any pair of dates the caller 
 - **WHEN** slots are queried for a range wider than `MaxQueryRangeDays`
 - **THEN** the query fails with the code `date-range-too-large`
 
+#### Scenario: Bound is evaluated before resource lookup
+- **WHEN** an over-wide range is queried for a resource id that does not exist
+- **THEN** the failure is `date-range-too-large` (the range is rejected before the resource is loaded)
+
+#### Scenario: An over-wide range that also touches an edge reports as over-wide
+- **WHEN** a range is both wider than `MaxQueryRangeDays` and ends at the last representable date
+- **THEN** the failure is `date-range-too-large`, the more useful of the two answers
+
 #### Scenario: A range ending at the last representable date is rejected
-- **WHEN** any availability query is requested with `to` set to the last representable date, even for a one-day span
+- **WHEN** any availability query within `MaxQueryRangeDays` is requested with `to` set to the last representable date, even for a one-day span
 - **THEN** the query fails with the code `date-range-invalid` and no exception is raised
 
 #### Scenario: A range starting at the first representable date is rejected
