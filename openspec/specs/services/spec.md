@@ -3,9 +3,7 @@
 ## Purpose
 
 Defines services as a first-class bookable concept: a domain `Service` with a display name, a duration specification that is either fixed or variable within optional bounds, and a single required resource-type role in v1; Core-factory validation with stable machine-readable failure codes; the duration semantics that govern appointment length when booking-via-service ships; and an authorized versioned Management API surface with purpose-built DTOs that keeps raw booking storage out of the HTTP layer. Defining services is purely additive — the existing direct-resource booking path is unaffected.
-
 ## Requirements
-
 ### Requirement: Service definition
 A `Service` SHALL have a `Guid` id, a non-empty display name, a duration specification, and exactly one required role in v1. The duration specification SHALL be a value object with exactly two kinds — **fixed** (a single length) and **variable** (an optional minimum and an optional maximum bound) — constructible only through validating factories, so a service can never hold a combination of duration fields that has no meaning. A `ServiceRole` SHALL name a resource **type** key (normalized lower-case kebab-case, as for resources) and a count, which SHALL be 1 in v1. The model SHALL NOT structurally prevent multiple roles or a role carrying required capabilities — those are additive later — but v1 behaviour SHALL enforce a single role of count 1 and no capability requirements. Domain purity holds: `Service`, `ServiceRole`, and the duration value object reference no Umbraco, EF, or third-party types.
 
@@ -51,7 +49,7 @@ Service bounds SHALL NOT be required to align to any resource's granularity; the
 
 When the intersection is empty, or when no granularity multiple lies within it, that resource SHALL be treated as unable to fulfil that service. This SHALL NOT be a validation failure at service-definition time, because a service spanning many resources cannot know each resource's limits.
 
-This requirement fixes the contract and the resolution is implemented and unit-tested here; it governs booking behaviour when booking-via-service ships.
+This resolution governs booking behaviour: it is what decides a service's candidate pool and the lengths each candidate offers (see `service-booking`).
 
 #### Scenario: Service bounds narrow the resource range
 - **WHEN** a service with a variable duration of 45–180 minutes is resolved against a resource permitting 30–120 minutes
@@ -72,6 +70,10 @@ This requirement fixes the contract and the resolution is implemented and unit-t
 #### Scenario: Empty intersection is not a definition-time failure
 - **WHEN** a service is defined with a fixed duration that no currently defined resource could satisfy
 - **THEN** the service is created successfully and the mismatch surfaces only when resolving against a resource
+
+#### Scenario: The resolution drives the candidate pool
+- **WHEN** a service's availability or placement is requested
+- **THEN** a resource whose effective range is empty is excluded from the candidate pool, and each remaining candidate offers exactly the granularity multiples within its own effective range
 
 ### Requirement: Service management endpoints require backoffice authorization
 Every service management endpoint SHALL require an authenticated backoffice user via the shared Umbraco backoffice authorization policy. Unauthenticated requests SHALL receive 401 and SHALL NOT reach handler logic; the endpoints SHALL NOT be reachable anonymously under any shipped configuration.
@@ -227,3 +229,4 @@ The services UI SHALL render failure messages supplied by the API rather than ma
 #### Scenario: An unrecognized failure code still informs the user
 - **WHEN** a delete or save fails with a failure code the client has no specific handling for
 - **THEN** the message supplied by the server is displayed to the user
+
