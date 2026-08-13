@@ -86,9 +86,15 @@ _None._ This corrects behaviour already governed by existing capabilities.
 - **No new failure codes.** Existing codes describe these outcomes accurately;
   inventing one would add contract surface for an input nobody sends
   deliberately.
-- **No change to the accepted input range.** This is not a tightening of what
-  callers may book — every date and duration accepted today stays accepted. Only
-  the failure *mode* at the boundary changes, from 500 to 400.
+- **No change to the accepted input range that anyone could be relying on.**
+  For the nine defects, only the failure *mode* changes, from 500 to 400. There
+  is one genuine narrowing, found during the sweep and taken deliberately: an
+  availability query whose `from` is the *first* representable date returns an
+  empty result today when the site zone is west of UTC, and will now be rejected
+  with `date-range-invalid`. It is rejected because the same query throws for any
+  site zone east of UTC — mapping a wall-clock time on that date into UTC lands
+  before year one — so the current behaviour is not "works", it is "works in
+  London". A zone-independent rule is worth more than an input nobody sends.
 - **No controller-level or middleware-level exception handling.** A global
   exception filter would convert these into 500-with-nicer-body, or mask them
   entirely; the point is that the domain should never have thrown. A catch-all

@@ -201,12 +201,41 @@ public sealed class AvailabilityService(
         // Bounded query range (availability spec): reject an over-wide span
         // before any work — zone resolution, resource load, and the day-by-day
         // open-hours computation all follow — so an unbounded range costs nothing.
+        // Checked ahead of the walkability guard below so that an over-wide range
+        // reports as over-wide, which is the more useful answer, even when it also
+        // happens to end at the calendar's limit.
         var spanDays = toDate.DayNumber - fromDate.DayNumber + 1;
         if (spanDays > settings.MaxQueryRangeDays)
         {
             return DomainResult<TimeZoneInfo>.Failure(
                 FailureCodes.DateRangeTooLarge,
                 $"The queried date range spans {spanDays} days, which exceeds the maximum of {settings.MaxQueryRangeDays}.");
+        }
+
+        // The range must also lie clear of the calendar's edges
+        // (out-of-range-dates design D1). Bounding the span is not enough: a
+        // range at either edge can be one day wide and pass the span check.
+        //
+        // At the end: the day-by-day open-hours walk increments once past its
+        // final day and steps off the calendar.
+        //
+        // At the start: mapping a wall-clock time on the first representable date
+        // to UTC subtracts the zone's offset, and for any site zone east of UTC
+        // that lands before year one, which `DateTimeOffset` refuses to
+        // represent. Rejecting both ends keeps the rule zone-independent rather
+        // than working in London and throwing in Auckland.
+        if (fromDate <= DateOnly.MinValue)
+        {
+            return DomainResult<TimeZoneInfo>.Failure(
+                FailureCodes.DateRangeInvalid,
+                $"The from date must be later than {DateOnly.MinValue:yyyy-MM-dd}.");
+        }
+
+        if (toDate >= DateOnly.MaxValue)
+        {
+            return DomainResult<TimeZoneInfo>.Failure(
+                FailureCodes.DateRangeInvalid,
+                $"The to date must be earlier than {DateOnly.MaxValue:yyyy-MM-dd}.");
         }
 
         return ResolveZone(settings);

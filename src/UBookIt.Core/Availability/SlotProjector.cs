@@ -88,7 +88,12 @@ internal static class SlotProjector
         TimeZoneInfo zone)
     {
         var earliestStart = nowUtc + constraints.LeadTime;
-        var lastLocalDate = WallClockMapper.ToLocalDate(nowUtc, zone).AddDays(constraints.HorizonDays);
+
+        // Saturating for the same reason as placement's horizon rule: a horizon
+        // reaching past the end of the calendar is not an error, and HorizonDays
+        // is only validated as positive.
+        var lastLocalDate = CalendarBounds.AddDaysSaturating(
+            WallClockMapper.ToLocalDate(nowUtc, zone), constraints.HorizonDays);
 
         foreach (var interval in freeIntervals)
         {

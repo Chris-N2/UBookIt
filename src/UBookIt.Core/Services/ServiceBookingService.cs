@@ -129,6 +129,10 @@ public sealed class ServiceBookingService(
         // (design D5). The window is the queried range in local terms, which
         // contains every open interval any candidate can have in it; claims
         // outside a given candidate's own windows simply subtract nothing.
+        //
+        // `toDate.AddDays(1)` is safe only because the shared preconditions above
+        // have already rejected a range ending at the last representable date
+        // (out-of-range-dates D1). That ordering is load-bearing, not incidental.
         var claims = await bookingStore
             .GetClaimsAsync(
                 [.. candidates.Select(c => c.ResourceId)],
@@ -286,13 +290,14 @@ public sealed class ServiceBookingService(
                 return placed;
             }
 
-            // A broken site time zone is neither a race nor a per-candidate
-            // refusal — it is site configuration, identical for every candidate,
-            // so looping on cannot help and neither all-fail code describes it.
-            // Echo it instead of translating it into one of them.
-            if (placed.Failures.FirstOrDefault(f => f.Code == FailureCodes.TimeZoneInvalid) is { } zoneFailure)
+            // Some failures are properties of the request or the site, not of
+            // the candidate: a broken site time zone, and an interval that
+            // cannot be represented at all. They are identical for every
+            // candidate, so looping on cannot help and neither all-fail code
+            // describes them. Echo them instead of translating them.
+            if (placed.Failures.FirstOrDefault(f => IsRequestLevel(f.Code)) is { } requestFailure)
             {
-                return DomainResult<Booking>.Failure(zoneFailure);
+                return DomainResult<Booking>.Failure(requestFailure);
             }
 
             raced |= placed.Failures.Any(f => !IsDeterministic(f.Code));
@@ -309,6 +314,16 @@ public sealed class ServiceBookingService(
 
     private static DomainResult<Booking> Unavailable(string message)
         => DomainResult<Booking>.Failure(FailureCodes.ServiceUnavailable, message);
+
+    /// <summary>
+    /// Failures that describe the request or the site rather than a candidate's
+    /// answer to it. Every candidate would report them identically, so reporting
+    /// "no resource could take this" instead would blame the pool for a fault
+    /// that has nothing to do with it — and would tell a caller whose date is
+    /// simply unrepresentable to look for another time slot.
+    /// </summary>
+    private static bool IsRequestLevel(string code)
+        => code is FailureCodes.TimeZoneInvalid or FailureCodes.IntervalInvalid;
 
     /// <summary>
     /// The refusals that are a property of the request against a resource's

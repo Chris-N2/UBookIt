@@ -9,6 +9,8 @@ A request SHALL likewise fail with `interval-invalid` when the interval is repre
 
 No placement request SHALL raise an exception for any start instant or duration the caller can express, whatever its magnitude or sign.
 
+When placement runs over a service's candidate pool, an `interval-invalid` failure SHALL be reported as itself rather than translated into an all-candidates-failed outcome. It describes the request, not any candidate's answer to it, so every candidate reports it identically; answering "no resource can fulfil this" would blame the pool for a fault it has nothing to do with, and would send a caller whose date is simply unrepresentable looking for a different time slot.
+
 #### Scenario: Inverted interval
 - **WHEN** placement is requested with an end instant not after its start
 - **THEN** the result is failure with code `interval-invalid`
@@ -32,6 +34,10 @@ No placement request SHALL raise an exception for any start instant or duration 
 #### Scenario: A start at a calendar boundary is rejected
 - **WHEN** placement is requested for a start on the first representable date, so the open-hours rule's surrounding day window cannot be formed
 - **THEN** the result is failure with code `interval-invalid` and no exception is raised
+
+#### Scenario: A service placement echoes the request-level failure
+- **WHEN** a service placement is requested with a start at a calendar edge, so every candidate rejects it as unrepresentable
+- **THEN** the result carries `interval-invalid`, not `service-unavailable`
 
 #### Scenario: Ordinary far-future placement is unaffected
 - **WHEN** placement is requested for a start many years ahead but far from the representable limit

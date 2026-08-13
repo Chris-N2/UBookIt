@@ -126,7 +126,9 @@ public static class BookingFormBuilder
             ResourceName = resource.DisplayName,
             SelectedDate = selectedDate,
             MinDate = today,
-            MaxDate = today.AddDays(constraints.HorizonDays),
+            // Saturating: HorizonDays is only validated as positive, so a large
+            // one would otherwise throw while rendering the form.
+            MaxDate = CalendarBounds.AddDaysSaturating(today, constraints.HorizonDays),
             DurationMinutes = (int)duration.TotalMinutes,
             DurationOptions = DurationOptions(resource),
             LongestAvailableMinutes = LongestAvailableMinutes(starts),
