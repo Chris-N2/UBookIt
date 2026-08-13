@@ -79,6 +79,10 @@ length through a finished booking flow.
   depend on `IServiceStore` alongside the two existing ports.
 - `persistence`: SQL Server implementations of the two new port methods.
   Explicitly no schema change and no new migration.
+- `services`: the duration-semantics requirement closes by saying the resolution
+  "governs booking behaviour when booking-via-service ships" — a forward-looking
+  sentence written by ⑦-1 that this change makes false. Restated to describe what
+  the resolution now actually drives. Text only; no behaviour changes.
 
 ## Non-goals
 
