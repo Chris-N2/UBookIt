@@ -174,6 +174,10 @@ The deterministic refusals SHALL be recognised explicitly rather than inferred f
 - **WHEN** a placement targets a start that is outside every candidate's open hours
 - **THEN** placement fails with code `service-unavailable`
 
+#### Scenario: A site misconfiguration is reported as itself
+- **WHEN** every candidate attempt fails because the configured site time zone is invalid
+- **THEN** placement fails with `time-zone-invalid`, not with either all-fail code — it is site configuration rather than a race or a per-candidate refusal
+
 #### Scenario: A transient refusal is not the deterministic code
 - **WHEN** the only candidate is deleted between resolution and its placement attempt, so the attempt fails with `resource-not-found`
 - **THEN** placement fails with code `conflict`, not `service-unavailable`, because a retry may succeed

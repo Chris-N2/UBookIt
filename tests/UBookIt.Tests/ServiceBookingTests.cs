@@ -1,3 +1,4 @@
+using UBookIt.Core;
 using UBookIt.Core.Availability;
 using UBookIt.Core.Bookings;
 using UBookIt.Core.Common;
@@ -821,6 +822,32 @@ public class ServiceBookingTests
         Assert.False(placed.Succeeded);
         Assert.Equal(FailureCodes.Conflict, SingleCode(placed));
         Assert.NotEqual(FailureCodes.ServiceUnavailable, SingleCode(placed));
+    }
+
+    [Fact]
+    public async Task A_broken_site_time_zone_is_reported_as_itself()
+    {
+        var service = Svc();
+        var room = Room(1);
+
+        var resources = new InMemoryResourceStore().Add(room);
+        var serviceStore = new InMemoryServiceStore().Add(service);
+        var bookingStore = new InMemoryBookingStore();
+        var time = new FixedTimeProvider(TestData.Now);
+        var broken = new SiteBookingSettings { TimeZoneId = "Not/AZone" };
+
+        var booking = new ServiceBookingService(
+            serviceStore,
+            resources,
+            bookingStore,
+            new AvailabilityService(resources, bookingStore, time, broken),
+            new BookingService(resources, bookingStore, time, broken),
+            broken);
+
+        var placed = await booking.PlaceAsync(Request(service, "09:00", 60));
+
+        Assert.False(placed.Succeeded);
+        Assert.Equal(FailureCodes.TimeZoneInvalid, SingleCode(placed));
     }
 
     [Fact]

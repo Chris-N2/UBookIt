@@ -213,6 +213,12 @@ transient cause. Anything unrecognised is now treated as retryable, which fails
 safe in both directions: a real drift still surfaces, and a transient fault never
 masquerades as one.
 
+One failure is neither: `time-zone-invalid` is site configuration, identical for
+every candidate, so it is echoed rather than translated into either all-fail
+code. Reporting a permanent misconfiguration as `conflict` would invite a retry
+that cannot succeed, and as `service-unavailable` would blame the request for a
+site fault. (Raised by QA, 2026-08-13.)
+
 The real payoff is the second code as a **drift detector**. A client that takes
 its start and length verbatim from the service availability query cannot
 legitimately provoke it: availability and placement would have to disagree about

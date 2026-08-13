@@ -286,6 +286,15 @@ public sealed class ServiceBookingService(
                 return placed;
             }
 
+            // A broken site time zone is neither a race nor a per-candidate
+            // refusal — it is site configuration, identical for every candidate,
+            // so looping on cannot help and neither all-fail code describes it.
+            // Echo it instead of translating it into one of them.
+            if (placed.Failures.FirstOrDefault(f => f.Code == FailureCodes.TimeZoneInvalid) is { } zoneFailure)
+            {
+                return DomainResult<Booking>.Failure(zoneFailure);
+            }
+
             raced |= placed.Failures.Any(f => !IsDeterministic(f.Code));
         }
 
