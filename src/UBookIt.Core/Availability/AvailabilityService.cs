@@ -1,4 +1,5 @@
 using UBookIt.Core.Common;
+using UBookIt.Core.Resources;
 using UBookIt.Core.Stores;
 
 namespace UBookIt.Core.Availability;
@@ -22,6 +23,29 @@ public interface IAvailabilityQueryService
     /// </summary>
     Task<DomainResult<IReadOnlyList<BookableStart>>> GetBookableStartsAsync(
         Guid resourceId, DateOnly fromDate, DateOnly toDate, CancellationToken cancellationToken = default);
+
+    /// <summary>
+    /// As <see cref="GetBookableStartsAsync(Guid, DateOnly, DateOnly, CancellationToken)"/>,
+    /// for a caller that has already loaded the resource. Produces identical
+    /// results for the same resource, range, and stored state — it changes only
+    /// who performs the load, never what is computed (book-via-service D5).
+    /// </summary>
+    Task<DomainResult<IReadOnlyList<BookableStart>>> GetBookableStartsAsync(
+        Resource resource, DateOnly fromDate, DateOnly toDate, CancellationToken cancellationToken = default);
+
+    /// <summary>
+    /// The same projection again, wholly pure: for a caller that has already
+    /// read claims for a batch of resources and so must not issue another read.
+    /// Claims for other resources are ignored, so a single batched read can be
+    /// passed for every candidate in turn.
+    /// <para>
+    /// This is the seam that lets a service availability query over N candidates
+    /// cost one claims round trip instead of N, while still sharing one
+    /// computation with the two async projections above so they cannot drift.
+    /// </para>
+    /// </summary>
+    DomainResult<IReadOnlyList<BookableStart>> ProjectBookableStarts(
+        Resource resource, IReadOnlyList<ClaimInfo> claims, DateOnly fromDate, DateOnly toDate);
 }
 
 public sealed class AvailabilityService(
@@ -70,15 +94,43 @@ public sealed class AvailabilityService(
         // time-zone failures behave identically across the availability surface.
         var context = await ResolveAsync(resourceId, fromDate, toDate, cancellationToken).ConfigureAwait(false);
 
-        if (!context.Succeeded)
+        return Project(context);
+    }
+
+    public async Task<DomainResult<IReadOnlyList<BookableStart>>> GetBookableStartsAsync(
+        Resource resource, DateOnly fromDate, DateOnly toDate, CancellationToken cancellationToken = default)
+    {
+        var precondition = ValidatePreconditions(fromDate, toDate);
+        if (!precondition.Succeeded)
         {
-            return DomainResult<IReadOnlyList<BookableStart>>.Failure(context.Failures);
+            return DomainResult<IReadOnlyList<BookableStart>>.Failure(precondition.Failures);
         }
 
-        var (constraints, zone, free) = context.Value;
+        var context = await ResolveForAsync(resource, precondition.Value, fromDate, toDate, cancellationToken)
+            .ConfigureAwait(false);
 
-        var starts = SlotProjector.ProjectBookableStarts(free, constraints, timeProvider.GetUtcNow(), zone);
-        return DomainResult<IReadOnlyList<BookableStart>>.Success(starts);
+        return Project(context);
+    }
+
+    public DomainResult<IReadOnlyList<BookableStart>> ProjectBookableStarts(
+        Resource resource, IReadOnlyList<ClaimInfo> claims, DateOnly fromDate, DateOnly toDate)
+    {
+        var precondition = ValidatePreconditions(fromDate, toDate);
+        if (!precondition.Succeeded)
+        {
+            return DomainResult<IReadOnlyList<BookableStart>>.Failure(precondition.Failures);
+        }
+
+        var zone = precondition.Value;
+        var open = FreeTimeCalculator.OpenIntervals(resource.Availability, zone, fromDate, toDate);
+
+        // Claims for other resources are ignored rather than rejected: the point
+        // of this overload is that one batched read serves every candidate.
+        var free = open.Count == 0
+            ? open
+            : FreeTimeCalculator.Subtract(open, claims.Where(c => c.ResourceId == resource.Id && IsBlocking(c)));
+
+        return Project(Ok(resource.Availability.Constraints, zone, free));
     }
 
     // One code per failed rule (bookings spec, "Placement validation pipeline"):
@@ -132,12 +184,37 @@ public sealed class AvailabilityService(
         }
     }
 
-    private async Task<DomainResult<(BookingConstraints Constraints, TimeZoneInfo Zone, IReadOnlyList<UtcInterval> Free)>>
-        ResolveAsync(Guid resourceId, DateOnly fromDate, DateOnly toDate, CancellationToken cancellationToken)
+    internal static bool IsBlocking(ClaimInfo claim)
+        => claim.Status is Bookings.BookingStatus.Requested or Bookings.BookingStatus.Confirmed;
+
+    private DomainResult<IReadOnlyList<BookableStart>> Project(DomainResult<Context> context)
+    {
+        if (!context.Succeeded)
+        {
+            return DomainResult<IReadOnlyList<BookableStart>>.Failure(context.Failures);
+        }
+
+        var (constraints, zone, free) = context.Value;
+
+        var starts = SlotProjector.ProjectBookableStarts(free, constraints, timeProvider.GetUtcNow(), zone);
+        return DomainResult<IReadOnlyList<BookableStart>>.Success(starts);
+    }
+
+    private DomainResult<TimeZoneInfo> ValidatePreconditions(DateOnly fromDate, DateOnly toDate)
+        => ValidateQueryPreconditions(settings, fromDate, toDate);
+
+    /// <summary>
+    /// Range and time-zone checks, which precede any resource load. Shared so
+    /// every availability-shaped query — per-resource or over a service's
+    /// candidate pool — rejects a bad range identically and before any work.
+    /// </summary>
+    internal static DomainResult<TimeZoneInfo> ValidateQueryPreconditions(
+        SiteBookingSettings settings, DateOnly fromDate, DateOnly toDate)
     {
         if (fromDate > toDate)
         {
-            return Fail(FailureCodes.DateRangeInvalid, "The from date must not be after the to date.");
+            return DomainResult<TimeZoneInfo>.Failure(
+                FailureCodes.DateRangeInvalid, "The from date must not be after the to date.");
         }
 
         // Bounded query range (availability spec): reject an over-wide span
@@ -146,25 +223,37 @@ public sealed class AvailabilityService(
         var spanDays = toDate.DayNumber - fromDate.DayNumber + 1;
         if (spanDays > settings.MaxQueryRangeDays)
         {
-            return Fail(
+            return DomainResult<TimeZoneInfo>.Failure(
                 FailureCodes.DateRangeTooLarge,
                 $"The queried date range spans {spanDays} days, which exceeds the maximum of {settings.MaxQueryRangeDays}.");
         }
 
-        var zoneResult = ResolveZone(settings);
-        if (!zoneResult.Succeeded)
-        {
-            return DomainResult<(BookingConstraints, TimeZoneInfo, IReadOnlyList<UtcInterval>)>.Failure(zoneResult.Failures);
-        }
+        return ResolveZone(settings);
+    }
 
-        var zone = zoneResult.Value;
+    private async Task<DomainResult<Context>> ResolveAsync(
+        Guid resourceId, DateOnly fromDate, DateOnly toDate, CancellationToken cancellationToken)
+    {
+        var precondition = ValidatePreconditions(fromDate, toDate);
+        if (!precondition.Succeeded)
+        {
+            return DomainResult<Context>.Failure(precondition.Failures);
+        }
 
         var resource = await resourceStore.GetAsync(resourceId, cancellationToken).ConfigureAwait(false);
         if (resource is null)
         {
-            return Fail(FailureCodes.ResourceNotFound, $"No resource exists with id {resourceId}.");
+            return DomainResult<Context>.Failure(
+                FailureCodes.ResourceNotFound, $"No resource exists with id {resourceId}.");
         }
 
+        return await ResolveForAsync(resource, precondition.Value, fromDate, toDate, cancellationToken)
+            .ConfigureAwait(false);
+    }
+
+    private async Task<DomainResult<Context>> ResolveForAsync(
+        Resource resource, TimeZoneInfo zone, DateOnly fromDate, DateOnly toDate, CancellationToken cancellationToken)
+    {
         var open = FreeTimeCalculator.OpenIntervals(resource.Availability, zone, fromDate, toDate);
 
         if (open.Count == 0)
@@ -173,19 +262,15 @@ public sealed class AvailabilityService(
         }
 
         var claims = await bookingStore
-            .GetClaimsAsync(resourceId, open[0].StartUtc, open[^1].EndUtc, cancellationToken)
+            .GetClaimsAsync(resource.Id, open[0].StartUtc, open[^1].EndUtc, cancellationToken)
             .ConfigureAwait(false);
 
-        var blocking = claims.Where(c =>
-            c.Status is Bookings.BookingStatus.Requested or Bookings.BookingStatus.Confirmed);
-
-        return Ok(resource.Availability.Constraints, zone, FreeTimeCalculator.Subtract(open, blocking));
-
-        static DomainResult<(BookingConstraints, TimeZoneInfo, IReadOnlyList<UtcInterval>)> Fail(string code, string message)
-            => DomainResult<(BookingConstraints, TimeZoneInfo, IReadOnlyList<UtcInterval>)>.Failure(code, message);
-
-        static DomainResult<(BookingConstraints, TimeZoneInfo, IReadOnlyList<UtcInterval>)> Ok(
-            BookingConstraints constraints, TimeZoneInfo zone, IReadOnlyList<UtcInterval> free)
-            => DomainResult<(BookingConstraints, TimeZoneInfo, IReadOnlyList<UtcInterval>)>.Success((constraints, zone, free));
+        return Ok(resource.Availability.Constraints, zone, FreeTimeCalculator.Subtract(open, claims.Where(IsBlocking)));
     }
+
+    private static DomainResult<Context> Ok(
+        BookingConstraints constraints, TimeZoneInfo zone, IReadOnlyList<UtcInterval> free)
+        => DomainResult<Context>.Success(new Context(constraints, zone, free));
+
+    private sealed record Context(BookingConstraints Constraints, TimeZoneInfo Zone, IReadOnlyList<UtcInterval> Free);
 }

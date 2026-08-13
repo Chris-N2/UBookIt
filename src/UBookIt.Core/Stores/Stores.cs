@@ -20,6 +20,25 @@ public interface IResourceStore
     /// management (write) surface.
     /// </summary>
     Task<ResourcePage> ListAsync(int skip, int take, CancellationToken cancellationToken = default);
+
+    /// <summary>
+    /// Every resource whose type key equals <paramref name="type"/>, with the
+    /// same child state as <see cref="GetAsync"/> so each is complete enough to
+    /// compute availability from.
+    /// <para>
+    /// Deliberately unpaged, and deliberately without paging parameters at all:
+    /// its consumer is a service's candidate pool, and a truncated pool does not
+    /// error — it reports unavailability that does not exist, or resolves to the
+    /// wrong resource. The absence of the parameters is the guarantee
+    /// (book-via-service design D2).
+    /// </para>
+    /// <para>
+    /// Distinct from <see cref="IResourceManagementStore.ListTypesAsync"/>,
+    /// which reports type keys with usage counts for a backoffice picker and
+    /// stays on the management port.
+    /// </para>
+    /// </summary>
+    Task<IReadOnlyList<Resource>> ListByTypeAsync(string type, CancellationToken cancellationToken = default);
 }
 
 /// <summary>One page of resources plus the unpaged total.</summary>
@@ -102,6 +121,21 @@ public interface IBookingStore
     /// </summary>
     Task<IReadOnlyList<ClaimInfo>> GetClaimsAsync(
         Guid resourceId, DateTimeOffset fromUtc, DateTimeOffset toUtc, CancellationToken cancellationToken = default);
+
+    /// <summary>
+    /// The same claims as <see cref="GetClaimsAsync(Guid, DateTimeOffset, DateTimeOffset, CancellationToken)"/>
+    /// but for several resources at once: every claim of any status whose
+    /// booking interval overlaps [fromUtc, toUtc) for any of
+    /// <paramref name="resourceIds"/>. The result SHALL equal the union of the
+    /// single-resource reads for those ids over the same range.
+    /// <para>
+    /// Exists so an availability query over a service's candidate pool costs one
+    /// round trip rather than one per candidate (book-via-service design D5).
+    /// </para>
+    /// </summary>
+    Task<IReadOnlyList<ClaimInfo>> GetClaimsAsync(
+        IReadOnlyCollection<Guid> resourceIds, DateTimeOffset fromUtc, DateTimeOffset toUtc,
+        CancellationToken cancellationToken = default);
 
     /// <summary>
     /// Persists a validated booking, atomically with respect to conflict

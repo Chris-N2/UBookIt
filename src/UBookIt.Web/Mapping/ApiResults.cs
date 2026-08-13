@@ -11,9 +11,16 @@ namespace UBookIt.Web.Mapping;
 /// (design D3 — a Web-local mapper, deliberately independent of the backoffice
 /// one; the shared contract is the stable <see cref="FailureCodes"/>, not the
 /// HTTP projection). Status per code: <c>conflict</c> → 409;
-/// <c>resource-not-found</c>/<c>booking-not-found</c> → 404; every other domain
-/// code → 400. Every failed rule is echoed as {code, message, field} in the
-/// "errors" extension, codes verbatim from the domain.
+/// <c>resource-not-found</c>/<c>booking-not-found</c>/<c>service-not-found</c>
+/// → 404; every other domain code → 400. Every failed rule is echoed as
+/// {code, message, field} in the "errors" extension, codes verbatim from the
+/// domain.
+/// <para>
+/// <c>service-unavailable</c> takes the default 400 deliberately: it reports
+/// that no eligible resource can fulfil the request as stated, the same category
+/// as <c>outside-open-hours</c>. A distinct status would put meaning on the
+/// status line that the stable code already carries (book-via-service D10).
+/// </para>
 /// </summary>
 internal static class ApiResults
 {
@@ -21,7 +28,9 @@ internal static class ApiResults
     {
         var status = failures switch
         {
-            _ when failures.Any(f => f.Code is FailureCodes.ResourceNotFound or FailureCodes.BookingNotFound)
+            _ when failures.Any(f => f.Code is FailureCodes.ResourceNotFound
+                or FailureCodes.BookingNotFound
+                or FailureCodes.ServiceNotFound)
                 => StatusCodes.Status404NotFound,
             _ when failures.Any(f => f.Code == FailureCodes.Conflict)
                 => StatusCodes.Status409Conflict,

@@ -2,6 +2,7 @@ using UBookIt.Core.Availability;
 using UBookIt.Core.Bookings;
 using UBookIt.Core.Common;
 using UBookIt.Core.Resources;
+using UBookIt.Core.Services;
 using UBookIt.Web.Models;
 
 namespace UBookIt.Web.Mapping;
@@ -50,6 +51,45 @@ internal static class DeliveryModelMapper
             MaxDurationMinutes = (int)start.MaxDuration.TotalMinutes,
         };
 
+    internal static ServiceReadModel ToReadModel(Service service)
+        => new()
+        {
+            Id = service.Id,
+            Name = service.Name,
+            // v1 guarantees exactly one role (services spec).
+            ResourceType = service.Roles[0].ResourceType,
+            Duration = ToDurationModel(service.Duration),
+        };
+
+    internal static ServiceDurationModel ToDurationModel(ServiceDuration duration)
+        => duration.Kind == ServiceDurationKind.Fixed
+            ? new ServiceDurationModel
+            {
+                Kind = "fixed",
+                DurationMinutes = (int)duration.FixedLength!.Value.TotalMinutes,
+            }
+            : new ServiceDurationModel
+            {
+                Kind = "variable",
+                MinDurationMinutes = Minutes(duration.Min),
+                MaxDurationMinutes = Minutes(duration.Max),
+            };
+
+    internal static ServiceBookableStartModel ToServiceBookableStartModel(ServiceBookableStart start)
+        => new()
+        {
+            StartUtc = start.StartUtc,
+            Runs = start.Runs.Select(ToRunModel).ToList(),
+        };
+
+    internal static LengthRunModel ToRunModel(LengthRun run)
+        => new()
+        {
+            MinDurationMinutes = (int)run.Min.TotalMinutes,
+            MaxDurationMinutes = (int)run.Max.TotalMinutes,
+            StepMinutes = (int)run.Step.TotalMinutes,
+        };
+
     internal static PlacementResponseModel ToPlacementResponse(Booking booking)
         => new()
         {
@@ -90,4 +130,34 @@ internal static class DeliveryModelMapper
             Booker = booker.Value,
         });
     }
+
+    /// <summary>
+    /// Builds a validated <see cref="ServiceBookingRequest"/> from the route's
+    /// service id and the request body. The submitted length is carried through
+    /// verbatim — Core validates it and never substitutes a permitted one
+    /// (book-via-service design D8).
+    /// </summary>
+    internal static DomainResult<ServiceBookingRequest> ToServiceBookingRequest(
+        Guid serviceId, ServicePlacementRequestModel model)
+    {
+        var booker = Booker.Create(
+            memberKey: null, model.Booker.Name, model.Booker.Email, model.Booker.Phone);
+
+        if (!booker.Succeeded)
+        {
+            return DomainResult<ServiceBookingRequest>.Failure(booker.Failures);
+        }
+
+        return DomainResult<ServiceBookingRequest>.Success(new ServiceBookingRequest
+        {
+            ServiceId = serviceId,
+            Start = model.Start,
+            // Model validation guarantees the value is present.
+            Duration = TimeSpan.FromMinutes(model.DurationMinutes!.Value),
+            Booker = booker.Value,
+            PreferredResourceId = model.PreferredResourceId,
+        });
+    }
+
+    private static int? Minutes(TimeSpan? value) => value is { } v ? (int)v.TotalMinutes : null;
 }

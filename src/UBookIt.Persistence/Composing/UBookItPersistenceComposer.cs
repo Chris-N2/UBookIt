@@ -3,6 +3,7 @@ using Microsoft.Extensions.DependencyInjection;
 using UBookIt.Core;
 using UBookIt.Core.Availability;
 using UBookIt.Core.Bookings;
+using UBookIt.Core.Services;
 using UBookIt.Core.Stores;
 using UBookIt.Persistence.Stores;
 using Umbraco.Cms.Core.Composing;
@@ -59,6 +60,7 @@ public sealed class UBookItPersistenceComposer : IComposer
         builder.Services.AddScoped<IBookingStore, SqlBookingStore>();
         builder.Services.AddScoped<IAvailabilityQueryService, AvailabilityService>();
         builder.Services.AddScoped<IBookingService, BookingService>();
+        builder.Services.AddScoped<IServiceBookingService, ServiceBookingService>();
 
         builder.AddNotificationAsyncHandler<UmbracoApplicationStartedNotification, RunUBookItMigrations>();
     }

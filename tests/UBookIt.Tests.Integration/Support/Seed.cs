@@ -6,17 +6,24 @@ namespace UBookIt.Tests.Integration.Support;
 internal static class Seed
 {
     /// <summary>A room open every day 08:00–18:00 (UTC site zone), default-ish constraints.</summary>
-    public static async Task<Guid> EveryDayRoomAsync(SqlServerFixture fixture, CancellationToken cancellationToken = default)
+    public static async Task<Guid> EveryDayRoomAsync(
+        SqlServerFixture fixture,
+        CancellationToken cancellationToken = default,
+        string type = "room",
+        int granularityMinutes = 15,
+        int minDurationMinutes = 30,
+        int maxDurationMinutes = 480,
+        Guid? id = null)
     {
-        var id = Guid.NewGuid();
+        id ??= Guid.NewGuid();
         var row = new ResourceRow
         {
-            Id = id,
-            Type = "room",
+            Id = id.Value,
+            Type = type,
             DisplayName = $"Room {id:N}",
-            GranularityMinutes = 15,
-            MinDurationMinutes = 30,
-            MaxDurationMinutes = 480,
+            GranularityMinutes = granularityMinutes,
+            MinDurationMinutes = minDurationMinutes,
+            MaxDurationMinutes = maxDurationMinutes,
             LeadTimeMinutes = 0,
             HorizonDays = 90,
             OpenHours = Enum.GetValues<DayOfWeek>()
@@ -32,7 +39,7 @@ internal static class Seed
         await using var context = fixture.CreateContext();
         context.Resources.Add(row);
         await context.SaveChangesAsync(cancellationToken);
-        return id;
+        return id.Value;
     }
 
     /// <summary>A confirmed single-claim booking aggregate built via the public rehydration surface.</summary>

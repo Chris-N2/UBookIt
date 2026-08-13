@@ -1,3 +1,5 @@
+using System.ComponentModel.DataAnnotations;
+
 namespace UBookIt.Web.Models;
 
 /// <summary>
@@ -103,6 +105,111 @@ public sealed class BookableStartsResponseModel
     public string ZoneId { get; set; } = string.Empty;
 
     public List<BookableStartModel> Starts { get; set; } = [];
+}
+
+/// <summary>
+/// A service's duration on the wire. The kind is stated explicitly rather than
+/// left to be inferred from which bounds are present, so a consumer never has to
+/// re-derive the rule from nullable fields.
+/// </summary>
+public sealed class ServiceDurationModel
+{
+    /// <summary>Either <c>fixed</c> or <c>variable</c>.</summary>
+    public string Kind { get; set; } = string.Empty;
+
+    /// <summary>The fixed length, when the kind is <c>fixed</c>; otherwise null.</summary>
+    public int? DurationMinutes { get; set; }
+
+    /// <summary>The lower bound when variable and bounded; null means each resource's own minimum applies.</summary>
+    public int? MinDurationMinutes { get; set; }
+
+    /// <summary>The upper bound when variable and bounded; null means each resource's own maximum applies.</summary>
+    public int? MaxDurationMinutes { get; set; }
+}
+
+public sealed class ServiceReadModel
+{
+    public Guid Id { get; set; }
+
+    public string Name { get; set; } = string.Empty;
+
+    public ServiceDurationModel Duration { get; set; } = new();
+
+    /// <summary>The resource type key this service's single role resolves against.</summary>
+    public string ResourceType { get; set; } = string.Empty;
+}
+
+public sealed class PagedServicesModel
+{
+    public int Total { get; set; }
+
+    public List<ServiceReadModel> Items { get; set; } = [];
+}
+
+/// <summary>
+/// An arithmetic run of bookable lengths: every whole multiple of
+/// <c>stepMinutes</c> from <c>minDurationMinutes</c> to <c>maxDurationMinutes</c>
+/// inclusive. One contributing resource produces one run.
+/// </summary>
+public sealed class LengthRunModel
+{
+    public int MinDurationMinutes { get; set; }
+
+    public int MaxDurationMinutes { get; set; }
+
+    public int StepMinutes { get; set; }
+}
+
+/// <summary>
+/// A start at which a service can be booked, with the lengths available there.
+/// The lengths are a list of runs rather than a single minimum/maximum pair:
+/// resources backing a service differ in granularity and minimum, so the lengths
+/// on offer are in general neither contiguous nor on one grid, and a collapsed
+/// pair would advertise lengths no resource can book. No resource is named — the
+/// resource is resolved at placement time.
+/// </summary>
+public sealed class ServiceBookableStartModel
+{
+    public DateTimeOffset StartUtc { get; set; }
+
+    public List<LengthRunModel> Runs { get; set; } = [];
+}
+
+public sealed class ServiceBookableStartsResponseModel
+{
+    public Guid ServiceId { get; set; }
+
+    public string ZoneId { get; set; } = string.Empty;
+
+    public List<ServiceBookableStartModel> Starts { get; set; } = [];
+}
+
+/// <summary>
+/// A request to book a service. The service comes from the route. There is no
+/// resource id: the resource is resolved from the service's eligible pool.
+/// <c>DurationMinutes</c> is required for every service, including a
+/// fixed-duration one — a length is never inferred or substituted.
+/// </summary>
+public sealed class ServicePlacementRequestModel
+{
+    public DateTimeOffset Start { get; set; }
+
+    /// <summary>
+    /// Required, and nullable so an omitted length is a validation failure
+    /// naming the field rather than a silent zero that gets reported as some
+    /// unrelated duration error.
+    /// </summary>
+    [Required]
+    public int? DurationMinutes { get; set; }
+
+    /// <summary>
+    /// Optionally ask for a particular eligible resource. It is attempted first
+    /// and falls through when unavailable; naming a resource that cannot fulfil
+    /// the service is rejected rather than ignored.
+    /// </summary>
+    public Guid? PreferredResourceId { get; set; }
+
+    public BookerModel Booker { get; set; } = new();
 }
 
 /// <summary>

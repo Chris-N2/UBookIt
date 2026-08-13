@@ -41,6 +41,48 @@ internal sealed class SqlBookingStore(UBookItDbContext db) : IBookingStore
             .ToList();
     }
 
+    public async Task<IReadOnlyList<ClaimInfo>> GetClaimsAsync(
+        IReadOnlyCollection<Guid> resourceIds, DateTimeOffset fromUtc, DateTimeOffset toUtc,
+        CancellationToken cancellationToken = default)
+    {
+        if (resourceIds.Count == 0)
+        {
+            return [];
+        }
+
+        // One query over the same interval index as the single-resource read,
+        // not a loop over it (book-via-service design D5). The claim's own
+        // resource id is projected because a single booking may claim several
+        // of the queried resources.
+        var ids = resourceIds.ToArray();
+
+        var rows = await (
+            from claim in db.Claims.AsNoTracking()
+            join booking in db.Bookings.AsNoTracking() on claim.BookingId equals booking.Id
+            where ids.Contains(claim.ResourceId)
+                && booking.StartUtc < toUtc
+                && fromUtc < booking.EndUtc
+            select new
+            {
+                claim.ResourceId,
+                booking.Id,
+                booking.StartUtc,
+                booking.EndUtc,
+                booking.TimeZoneId,
+                booking.Status,
+            })
+            .ToListAsync(cancellationToken)
+            .ConfigureAwait(false);
+
+        return rows
+            .Select(r => new ClaimInfo(
+                r.ResourceId,
+                r.Id,
+                BookingInterval.Create(r.StartUtc, r.EndUtc, r.TimeZoneId).Value,
+                (BookingStatus)r.Status))
+            .ToList();
+    }
+
     public async Task<DomainResult<Booking>> PlaceAsync(Booking booking, CancellationToken cancellationToken = default)
     {
         // Ascending lock order is deadlock-proof for future multi-claim bookings.

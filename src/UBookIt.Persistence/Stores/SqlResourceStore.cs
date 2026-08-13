@@ -44,4 +44,25 @@ internal sealed class SqlResourceStore(UBookItDbContext db) : IResourceStore
 
         return new ResourcePage(rows.Select(ResourceRowMapper.ToDomain).ToList(), total);
     }
+
+    public async Task<IReadOnlyList<Resource>> ListByTypeAsync(
+        string type, CancellationToken cancellationToken = default)
+    {
+        // Deliberately unpaged (book-via-service design D2): the consumer is a
+        // service's candidate pool, and truncating one produces a wrong answer
+        // silently rather than an error. Child collections are included so each
+        // aggregate is complete enough to compute availability from without a
+        // second load per candidate.
+        var rows = await db.Resources
+            .AsNoTracking()
+            .Include(r => r.OpenHours)
+            .Include(r => r.Exceptions)
+            .AsSplitQuery()
+            .Where(r => r.Type == type)
+            .OrderBy(r => r.Id)
+            .ToListAsync(cancellationToken)
+            .ConfigureAwait(false);
+
+        return rows.Select(ResourceRowMapper.ToDomain).ToList();
+    }
 }

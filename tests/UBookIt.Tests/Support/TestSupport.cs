@@ -41,6 +41,18 @@ public sealed class InMemoryResourceStore : IResourceStore
 
         return Task.FromResult(new ResourcePage(items, total));
     }
+
+    public Task<IReadOnlyList<Resource>> ListByTypeAsync(string type, CancellationToken cancellationToken = default)
+    {
+        // Unpaged by contract — a truncated candidate pool would silently change
+        // the answer rather than fail, so the double must not clamp either.
+        IReadOnlyList<Resource> items = _resources.Values
+            .Where(r => string.Equals(r.Type, type, StringComparison.Ordinal))
+            .OrderBy(r => r.Id)
+            .ToList();
+
+        return Task.FromResult(items);
+    }
 }
 
 /// <summary>In-memory service store implementing both the read and management ports.</summary>
@@ -114,6 +126,25 @@ public sealed class InMemoryBookingStore : IBookingStore
                 .Where(b => b.Interval.Overlaps(fromUtc, toUtc))
                 .SelectMany(b => b.Claims
                     .Where(c => c.ResourceId == resourceId)
+                    .Select(c => new ClaimInfo(c.ResourceId, b.Id, b.Interval, b.Status)))
+                .ToList();
+
+            return Task.FromResult(claims);
+        }
+    }
+
+    public Task<IReadOnlyList<ClaimInfo>> GetClaimsAsync(
+        IReadOnlyCollection<Guid> resourceIds, DateTimeOffset fromUtc, DateTimeOffset toUtc,
+        CancellationToken cancellationToken = default)
+    {
+        var wanted = resourceIds.ToHashSet();
+
+        lock (_gate)
+        {
+            IReadOnlyList<ClaimInfo> claims = _bookings.Values
+                .Where(b => b.Interval.Overlaps(fromUtc, toUtc))
+                .SelectMany(b => b.Claims
+                    .Where(c => wanted.Contains(c.ResourceId))
                     .Select(c => new ClaimInfo(c.ResourceId, b.Id, b.Interval, b.Status)))
                 .ToList();
 

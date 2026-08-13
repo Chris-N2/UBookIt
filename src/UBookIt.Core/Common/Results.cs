@@ -47,6 +47,28 @@ public static class FailureCodes
     public const string ServiceRoleInvalid = "service-role-invalid";
     public const string ServiceDurationInvalid = "service-duration-invalid";
     public const string ServiceNotFound = "service-not-found";
+
+    /// <summary>
+    /// Every candidate resource rejected a service placement deterministically —
+    /// the start is off their grids, outside their open hours, inside their lead
+    /// times, or beyond their horizons. Distinct from <see cref="Conflict"/>:
+    /// retrying cannot succeed, because nothing was taken.
+    /// <para>
+    /// Doubles as a drift signal (service-booking spec). A client placing only
+    /// starts and lengths taken from the service availability query cannot
+    /// legitimately provoke this, so its arrival from a conforming client means
+    /// availability and placement disagree about the same rules.
+    /// </para>
+    /// </summary>
+    public const string ServiceUnavailable = "service-unavailable";
+
+    /// <summary>
+    /// A service placement named a preferred resource that is not in the
+    /// service's candidate pool. Rejected rather than ignored: a caller who
+    /// names a resource has stated an expectation, and silently booking a
+    /// different one discards it invisibly.
+    /// </summary>
+    public const string ResourceNotEligible = "resource-not-eligible";
 }
 
 /// <summary>
