@@ -107,6 +107,18 @@ export class UBookItServiceEditorElement extends UmbLitElement {
   @state()
   private _matchCount: number | null = null;
 
+  /**
+   * Whether {@link _matchCount} was counted for a requirement with no
+   * capabilities. Snapshotted with the count rather than derived at render:
+   * removing a capability updates the live state immediately but the count only
+   * a round trip later, so a rendered-from-live-state phrasing would briefly
+   * assert "3 resources have this type" about a count that was
+   * capability-filtered — and say it into a live region, where a screen reader
+   * announces the false sentence before the correction arrives.
+   */
+  @state()
+  private _matchCountedByTypeAlone = false;
+
   /** Guards against an earlier in-flight preview overwriting a later one. */
   #matchToken = 0;
 
@@ -198,14 +210,6 @@ export class UBookItServiceEditorElement extends UmbLitElement {
   }
 
   /**
-   * Recomputes how many resources carry the requirement as currently entered.
-   *
-   * Server-side rather than filtered from a local resource list, so the count
-   * comes from the same capability test the booking path applies. A readout
-   * computed by a second, browser-side implementation of eligibility could
-   * disagree with the booker, which is worse than showing nothing.
-   */
-  /**
    * Debounced entry point for the type field. Typing a ten-character key would
    * otherwise be ten requests, most of them describing a prefix nobody asked
    * about. Capability add/remove calls {@link #refreshMatches} directly — those
@@ -221,9 +225,22 @@ export class UBookItServiceEditorElement extends UmbLitElement {
     super.disconnectedCallback();
   }
 
+  /**
+   * Recomputes how many resources carry the requirement as currently entered.
+   *
+   * Server-side rather than filtered from a local resource list, so the count
+   * comes from the same capability test the booking path applies. A readout
+   * computed by a second, browser-side implementation of eligibility could
+   * disagree with the booker, which is worse than showing nothing.
+   */
   async #refreshMatches() {
     const token = ++this.#matchToken;
     const resourceType = this._resourceType.trim();
+
+    // Captured with the request, not read at render: by the time the answer
+    // arrives the live requirement may already describe something else, and the
+    // count must be phrased for the requirement it actually counted.
+    const capabilities = [...this._requiredCapabilities];
 
     // An empty or malformed type has no meaningful count. Saying nothing beats
     // saying "0 resources match", which reads as a broken requirement rather
@@ -235,7 +252,7 @@ export class UBookItServiceEditorElement extends UmbLitElement {
 
     try {
       const { data, error } = await UBookItBackofficeService.listMatchingResources({
-        query: { resourceType, capability: [...this._requiredCapabilities] },
+        query: { resourceType, capability: capabilities },
       });
 
       // A later edit has already superseded this request; its answer describes a
@@ -245,6 +262,7 @@ export class UBookItServiceEditorElement extends UmbLitElement {
       }
 
       this._matchCount = error || !data ? null : data.total;
+      this._matchCountedByTypeAlone = capabilities.length === 0;
     } catch {
       if (token === this.#matchToken) {
         this._matchCount = null;
@@ -483,7 +501,7 @@ export class UBookItServiceEditorElement extends UmbLitElement {
     // versus plural ("1 resources have" is the sort of thing a reader stops on),
     // and whether any capability is actually required — with none, "these
     // capabilities" refers to nothing and the count is really about the type.
-    const byType = this._requiredCapabilities.length === 0;
+    const byType = this._matchCountedByTypeAlone;
 
     if (this._matchCount === 0) {
       return this.#term(byType ? "requirementMatchesTypeNone" : "requirementMatchesNone");

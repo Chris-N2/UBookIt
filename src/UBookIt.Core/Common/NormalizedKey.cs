@@ -27,8 +27,9 @@ public static partial class NormalizedKey
     public const int MaxLength = 64;
 
     /// <summary>Whether <paramref name="key"/> is a well-formed normalized key.</summary>
+    /// <remarks>
+    /// Shape only — <see cref="MaxLength"/> is checked separately by the caller,
+    /// so a malformed key and an over-long one can carry different messages.
+    /// </remarks>
     public static bool IsValid(string? key) => key is not null && Pattern().IsMatch(key);
-
-    /// <summary>Whether <paramref name="key"/> is well-formed and storable.</summary>
-    public static bool IsValidAndStorable(string? key) => IsValid(key) && key!.Length <= MaxLength;
 }
