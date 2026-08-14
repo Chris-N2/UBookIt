@@ -9,7 +9,7 @@ namespace UBookIt.Tests.Integration;
 
 /// <summary>
 /// Capability persistence against a real SQL Server: round-trips, schema-level
-/// uniqueness, cascade cleanup, and the two management projections
+/// uniqueness, cascade cleanup, and the capability usage projection
 /// (persistence spec, "Capability hydration on the read path" and "Capability
 /// projections on the management store").
 /// </summary>
@@ -330,90 +330,6 @@ public class CapabilityStoreTests(SqlServerFixture fixture)
                 mine,
                 first => { Assert.Equal(alpha, first.Key); Assert.Equal(2, first.Count); },
                 second => { Assert.Equal(beta, second.Key); Assert.Equal(1, second.Count); });
-        }
-    }
-
-    [Fact]
-    public async Task The_match_projection_returns_resources_carrying_every_required_capability()
-    {
-        fixture.EnsureAvailable();
-
-        var type = $"cap-m-{Guid.NewGuid():N}"[..20];
-        var mary = Resource.Create(type, "Mary", capabilities: ["cert-x", "massage"]).Value;
-        var frank = Resource.Create(type, "Frank", capabilities: ["massage"]).Value;
-        var joan = Resource.Create(type, "Joan").Value;
-
-        await using (var context = fixture.CreateContext())
-        {
-            var store = new SqlResourceManagementStore(context);
-            foreach (var resource in new[] { mary, frank, joan })
-            {
-                Assert.True((await store.CreateAsync(resource, Ct)).Succeeded);
-            }
-        }
-
-        await using (var context = fixture.CreateContext())
-        {
-            var store = new SqlResourceManagementStore(context);
-
-            var certX = await store.ListMatchingAsync(type, CapabilitySet.Create(["cert-x"]).Value, Ct);
-            Assert.Equal(["Mary"], certX.Select(m => m.DisplayName));
-
-            var massage = await store.ListMatchingAsync(type, CapabilitySet.Create(["massage"]).Value, Ct);
-            Assert.Equal(["Frank", "Mary"], massage.Select(m => m.DisplayName));
-
-            var unconstrained = await store.ListMatchingAsync(type, CapabilitySet.Empty, Ct);
-            Assert.Equal(3, unconstrained.Count);
-
-            var absent = await store.ListMatchingAsync(type, CapabilitySet.Create(["never-tagged"]).Value, Ct);
-            Assert.Empty(absent);
-        }
-    }
-
-    [Fact]
-    public async Task The_match_projection_agrees_with_core_candidate_resolution()
-    {
-        // The backoffice readout and the booking path must answer the capability
-        // question identically — a readout that disagrees with the booker is
-        // worse than none (design D6). The match projection is a superset: it
-        // omits the duration narrowing that resolution also applies, which is
-        // why the assertion is containment plus equality on the capability term.
-        fixture.EnsureAvailable();
-
-        var type = $"cap-a-{Guid.NewGuid():N}"[..20];
-        var mary = Resource.Create(type, "Mary", capabilities: ["cert-x", "massage"]).Value;
-        var frank = Resource.Create(type, "Frank", capabilities: ["massage"]).Value;
-        var joan = Resource.Create(type, "Joan").Value;
-
-        await using (var context = fixture.CreateContext())
-        {
-            var store = new SqlResourceManagementStore(context);
-            foreach (var resource in new[] { mary, frank, joan })
-            {
-                Assert.True((await store.CreateAsync(resource, Ct)).Succeeded);
-            }
-        }
-
-        await using (var context = fixture.CreateContext())
-        {
-            var required = CapabilitySet.Create(["massage"]).Value;
-
-            var projected = (await new SqlResourceManagementStore(context)
-                .ListMatchingAsync(type, required, Ct))
-                .Select(m => m.Id)
-                .OrderBy(id => id)
-                .ToList();
-
-            // The same question, asked through the read port the candidate loop
-            // uses and the same Core predicate it applies.
-            var resolved = (await new SqlResourceStore(context).ListByTypeAsync(type, Ct))
-                .Where(r => required.IsSatisfiedBy(r.Capabilities))
-                .Select(r => r.Id)
-                .OrderBy(id => id)
-                .ToList();
-
-            Assert.Equal(resolved, projected);
-            Assert.Equal(2, projected.Count);
         }
     }
 }

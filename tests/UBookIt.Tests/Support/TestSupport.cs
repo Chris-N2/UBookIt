@@ -104,23 +104,6 @@ public sealed class InMemoryResourceStore : IResourceStore, IResourceManagementS
 
         return Task.FromResult(usage);
     }
-
-    /// <summary>
-    /// Applies the real <see cref="CapabilitySet"/> test, so this double cannot
-    /// answer a different question from the one the store answers.
-    /// </summary>
-    public Task<IReadOnlyList<ResourceMatch>> ListMatchingAsync(
-        string type, CapabilitySet requiredCapabilities, CancellationToken cancellationToken = default)
-    {
-        IReadOnlyList<ResourceMatch> matches = _resources.Values
-            .Where(r => string.Equals(r.Type, type, StringComparison.Ordinal)
-                && requiredCapabilities.IsSatisfiedBy(r.Capabilities))
-            .OrderBy(r => r.DisplayName, StringComparer.Ordinal).ThenBy(r => r.Id)
-            .Select(r => new ResourceMatch(r.Id, r.DisplayName))
-            .ToList();
-
-        return Task.FromResult(matches);
-    }
 }
 
 /// <summary>In-memory service store implementing both the read and management ports.</summary>
@@ -298,6 +281,27 @@ public static class TestData
     /// <summary>UTC instant for a wall-clock time on a date in the London zone.</summary>
     public static DateTimeOffset Utc(DateOnly date, string time)
         => WallClockMapper.ToUtc(date, TimeOnly.Parse(time), London);
+
+    /// <summary>
+    /// A fully wired <see cref="ServiceBookingService"/> over in-memory stores.
+    /// Shared so every caller exercises the real collaborator graph — a double
+    /// standing in for resolution would let a test agree with itself about which
+    /// resources a configuration resolves to.
+    /// </summary>
+    public static ServiceBookingService ServiceBooking(
+        InMemoryServiceStore services, InMemoryResourceStore resources, DateTimeOffset? nowUtc = null)
+    {
+        var bookingStore = new InMemoryBookingStore();
+        var time = new FixedTimeProvider(nowUtc ?? Now);
+
+        return new ServiceBookingService(
+            services,
+            resources,
+            bookingStore,
+            new AvailabilityService(resources, bookingStore, time, Settings),
+            new BookingService(resources, bookingStore, time, Settings),
+            Settings);
+    }
 
     public static (BookingService Bookings, AvailabilityService Availability, InMemoryBookingStore Store)
         Services(Resource resource, DateTimeOffset? nowUtc = null)

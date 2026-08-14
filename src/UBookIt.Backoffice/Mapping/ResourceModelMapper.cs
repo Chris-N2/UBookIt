@@ -164,7 +164,4 @@ internal static class ResourceModelMapper
 
     internal static CapabilityUsageModel ToModel(CapabilityUsage usage) =>
         new() { Key = usage.Key, Count = usage.Count };
-
-    internal static ResourceMatchModel ToModel(ResourceMatch match) =>
-        new() { Id = match.Id, DisplayName = match.DisplayName };
 }

@@ -3,7 +3,10 @@ import { UmbLitElement } from "@umbraco-cms/backoffice/lit-element";
 import { UBookItBackofficeService } from "../api/index.js";
 import type {
   CapabilityUsageModel,
+  DurationExclusionModel,
   ResourceTypeUsageModel,
+  ServiceDurationModel,
+  ServicePreviewRequestModel,
   ServiceRequestModel,
 } from "../api/index.js";
 import { toApiErrors, type ApiError } from "./api-errors.js";
@@ -15,6 +18,28 @@ import "./capability-input.element.js";
  * and always within what the booked resource itself allows.
  */
 type DurationMode = "variable" | "fixed";
+
+/**
+ * A resolution chain and the configuration it was computed for, captured
+ * together.
+ *
+ * The pairing is the point. ⑧'s readout derived its phrasing from live form
+ * state while its count was a snapshot from the previous request, so removing a
+ * capability could briefly assert a sentence that was false for the number
+ * beside it — into a `role="status"` region, where a screen reader announces the
+ * false sentence and then the correction. Everything the summary says is read
+ * from here, never from the live fields.
+ */
+type ResolutionSnapshot = {
+  resourceType: string;
+  ofType: number;
+  withCapabilities: number;
+  canProvide: number;
+  exclusions: DurationExclusionModel[];
+};
+
+/** How many excluded resources are named before the rest are counted instead. */
+const MAX_NAMED_EXCLUSIONS = 3;
 
 /** Client-only code for the empty fixed-duration guard; rendered in the Duration group. */
 const DURATION_REQUIRED = "duration-required";
@@ -95,35 +120,23 @@ export class UBookItServiceEditorElement extends UmbLitElement {
   private _knownCapabilities: CapabilityUsageModel[] = [];
 
   /**
-   * How many resources carry this requirement's type and capabilities, or null
-   * when that is not currently known.
+   * The resolution chain for the configuration on screen, or null when that is
+   * not currently known.
    *
-   * Null is not zero, and the distinction is the whole point: zero is the
-   * number that says "your requirement matches nothing, go and fix it", so
-   * showing it because a request failed would send someone to correct a
-   * configuration that is fine. This readout exists precisely to be believed,
-   * so it must be silent rather than wrong.
+   * Null is not a chain of zeros, and the distinction is the whole point: zero
+   * is the number that says "your configuration resolves to nothing, go and fix
+   * it", so showing it because a request failed would send someone to correct a
+   * configuration that is fine. This summary exists precisely to be believed, so
+   * it must be silent rather than wrong (design D7).
    */
   @state()
-  private _matchCount: number | null = null;
-
-  /**
-   * Whether {@link _matchCount} was counted for a requirement with no
-   * capabilities. Snapshotted with the count rather than derived at render:
-   * removing a capability updates the live state immediately but the count only
-   * a round trip later, so a rendered-from-live-state phrasing would briefly
-   * assert "3 resources have this type" about a count that was
-   * capability-filtered — and say it into a live region, where a screen reader
-   * announces the false sentence before the correction arrives.
-   */
-  @state()
-  private _matchCountedByTypeAlone = false;
+  private _resolution: ResolutionSnapshot | null = null;
 
   /** Guards against an earlier in-flight preview overwriting a later one. */
-  #matchToken = 0;
+  #previewToken = 0;
 
-  /** Pending debounce for the type field, which changes a character at a time. */
-  #matchDebounce?: ReturnType<typeof setTimeout>;
+  /** Pending debounce for the fields that change a character at a time. */
+  #previewDebounce?: ReturnType<typeof setTimeout>;
 
   #term(key: string) {
     return this.localize.term(`ubookitServices_${key}`);
@@ -143,9 +156,10 @@ export class UBookItServiceEditorElement extends UmbLitElement {
 
     if (!this.serviceId) {
       this._loading = false;
-      // A new service starts with an empty requirement, and the readout should
-      // describe it from the outset rather than after the first keystroke.
-      void this.#refreshMatches();
+      // A new service starts with an empty configuration, and the summary should
+      // describe it from the outset rather than after the first keystroke. With
+      // no resource type yet it will say nothing, which is the correct answer.
+      void this.#refreshResolution();
       return;
     }
 
@@ -167,7 +181,6 @@ export class UBookItServiceEditorElement extends UmbLitElement {
     this._name = data.name;
     this._resourceType = data.roles[0]?.resourceType ?? "";
     this._requiredCapabilities = [...(data.roles[0]?.requiredCapabilities ?? [])];
-    void this.#refreshMatches();
 
     if (data.duration?.kind === "fixed") {
       this._durationMode = "fixed";
@@ -177,6 +190,11 @@ export class UBookItServiceEditorElement extends UmbLitElement {
       this._durationMin = data.duration?.minMinutes ?? null;
       this._durationMax = data.duration?.maxMinutes ?? null;
     }
+
+    // After the duration is applied, not before: the duration is now one of the
+    // summary's inputs, so resolving mid-load would report the chain for the
+    // default duration rather than the saved one.
+    void this.#refreshResolution();
 
     this._loading = false;
   }
@@ -210,64 +228,96 @@ export class UBookItServiceEditorElement extends UmbLitElement {
   }
 
   /**
-   * Debounced entry point for the type field. Typing a ten-character key would
-   * otherwise be ten requests, most of them describing a prefix nobody asked
-   * about. Capability add/remove calls {@link #refreshMatches} directly — those
-   * are discrete choices, not keystrokes.
+   * Debounced entry point for the free-text fields — the resource type and the
+   * duration numbers, which change a character at a time. Typing a
+   * ten-character key would otherwise be ten requests, most of them describing
+   * a prefix nobody asked about. Discrete choices (adding a capability,
+   * switching duration mode) call {@link #refreshResolution} directly.
    */
-  #scheduleMatchRefresh() {
-    clearTimeout(this.#matchDebounce);
-    this.#matchDebounce = setTimeout(() => void this.#refreshMatches(), 250);
+  #scheduleResolutionRefresh() {
+    clearTimeout(this.#previewDebounce);
+    this.#previewDebounce = setTimeout(() => void this.#refreshResolution(), 250);
   }
 
   override disconnectedCallback() {
-    clearTimeout(this.#matchDebounce);
+    clearTimeout(this.#previewDebounce);
     super.disconnectedCallback();
   }
 
   /**
-   * Recomputes how many resources carry the requirement as currently entered.
-   *
-   * Server-side rather than filtered from a local resource list, so the count
-   * comes from the same capability test the booking path applies. A readout
-   * computed by a second, browser-side implementation of eligibility could
-   * disagree with the booker, which is worse than showing nothing.
+   * The configuration as currently entered, or null when it is too incomplete
+   * to resolve — no resource type, or a fixed duration with no length. Those are
+   * unfinished, not broken, and a chain of zeros would say the opposite.
    */
-  async #refreshMatches() {
-    const token = ++this.#matchToken;
+  #buildPreviewRequest(): ServicePreviewRequestModel | null {
     const resourceType = this._resourceType.trim();
+    if (resourceType === "") {
+      return null;
+    }
+
+    if (this._durationMode === "fixed" && this._durationMinutes === null) {
+      return null;
+    }
+
+    return {
+      resourceType,
+      requiredCapabilities: [...this._requiredCapabilities],
+      duration: this.#buildDuration(),
+    };
+  }
+
+  /**
+   * Recomputes the resolution chain for the configuration as currently entered.
+   *
+   * Server-side rather than filtered from a local resource list, because the
+   * answer must come from the same resolution the booking path runs. A summary
+   * computed by a second, browser-side implementation of eligibility could
+   * disagree with the booker — and it would disagree precisely in the case it
+   * exists to detect, which is worse than showing nothing.
+   */
+  async #refreshResolution() {
+    const token = ++this.#previewToken;
 
     // Captured with the request, not read at render: by the time the answer
-    // arrives the live requirement may already describe something else, and the
-    // count must be phrased for the requirement it actually counted.
-    const capabilities = [...this._requiredCapabilities];
+    // arrives the live form may already describe something else, and the chain
+    // must be phrased for the configuration it actually resolved.
+    const body = this.#buildPreviewRequest();
 
-    // An empty or malformed type has no meaningful count. Saying nothing beats
-    // saying "0 resources match", which reads as a broken requirement rather
-    // than an unfinished one.
-    if (resourceType === "") {
-      this._matchCount = null;
+    if (body === null) {
+      this._resolution = null;
       return;
     }
 
     try {
-      const { data, error } = await UBookItBackofficeService.listMatchingResources({
-        query: { resourceType, capability: capabilities },
-      });
+      const { data, error } = await UBookItBackofficeService.previewServiceConfiguration({ body });
 
       // A later edit has already superseded this request; its answer describes a
-      // requirement that is no longer on screen.
-      if (token !== this.#matchToken) {
+      // configuration that is no longer on screen.
+      if (token !== this.#previewToken) {
         return;
       }
 
-      this._matchCount = error || !data ? null : data.total;
-      this._matchCountedByTypeAlone = capabilities.length === 0;
+      this._resolution =
+        error || !data
+          ? null
+          : {
+              resourceType: body.resourceType,
+              ofType: data.ofType.total,
+              withCapabilities: data.withCapabilities.total,
+              canProvide: data.canProvide.total,
+              exclusions: data.durationExclusions,
+            };
     } catch {
-      if (token === this.#matchToken) {
-        this._matchCount = null;
+      if (token === this.#previewToken) {
+        this._resolution = null;
       }
     }
+  }
+
+  #buildDuration(): ServiceDurationModel {
+    return this._durationMode === "fixed"
+      ? { kind: "fixed", minutes: this._durationMinutes }
+      : { kind: "variable", minMinutes: this._durationMin, maxMinutes: this._durationMax };
   }
 
   #buildRequest(): ServiceRequestModel {
@@ -275,11 +325,9 @@ export class UBookItServiceEditorElement extends UmbLitElement {
       name: this._name,
       // The kind is always explicit: the server rejects an absent or unknown
       // one rather than guessing, so the stored duration is always the one
-      // chosen on screen.
-      duration:
-        this._durationMode === "fixed"
-          ? { kind: "fixed", minutes: this._durationMinutes }
-          : { kind: "variable", minMinutes: this._durationMin, maxMinutes: this._durationMax },
+      // chosen on screen. Shared with the preview so the summary can never
+      // describe a different duration from the one a save would send.
+      duration: this.#buildDuration(),
       // Exactly one role, count fixed at 1 in v1 (design D5). Trimmed to match
       // what the hint evaluates: otherwise " room " looks known (hint hidden)
       // but is rejected server-side as an invalid type key.
@@ -356,7 +404,8 @@ export class UBookItServiceEditorElement extends UmbLitElement {
       ${this.#renderErrorSummary()}
 
       <form @submit=${this.#save} novalidate>
-        ${this.#renderDetails()} ${this.#renderRequirements()} ${this.#renderDuration()}
+        ${this.#renderResolutionSummary()} ${this.#renderDetails()} ${this.#renderRequirements()}
+        ${this.#renderDuration()}
 
         <div class="actions">
           <uui-button
@@ -438,10 +487,10 @@ export class UBookItServiceEditorElement extends UmbLitElement {
               id="service-resource-type"
               list="ubookit-resource-types"
               .value=${this._resourceType}
-              aria-describedby="resource-type-hint requirement-matches"
+              aria-describedby="resource-type-hint"
               @input=${(e: InputEvent) => {
                 this._resourceType = (e.target as HTMLInputElement).value;
-                this.#scheduleMatchRefresh();
+                this.#scheduleResolutionRefresh();
               }}
             />
             <datalist id="ubookit-resource-types">
@@ -464,57 +513,133 @@ export class UBookItServiceEditorElement extends UmbLitElement {
               .join(" ")}
             @ubookit-capabilities-changed=${(e: CustomEvent<{ capabilities: string[] }>) => {
               this._requiredCapabilities = e.detail.capabilities;
-              void this.#refreshMatches();
+              // A discrete choice, not a keystroke: no debounce.
+              void this.#refreshResolution();
             }}
           ></ubookit-capability-input>
-
-          <!--
-            The live region is always present and only its text changes. A
-            role="status" element inserted at the same moment as its content
-            is frequently not announced, because the region must already be
-            observed when the change happens.
-          -->
-          <p id="requirement-matches" class="hint" role="status">${this.#matchSummary()}</p>
         </fieldset>
       </uui-box>
     `;
   }
 
   /**
-   * What the readout says. It describes capability matching and nothing more.
+   * The resolution summary, at form level above the groups (design D6).
    *
-   * Never "N resources can provide this service": candidate resolution also
-   * excludes resources whose duration range cannot admit the service, and that
-   * is not evaluated here. A service fixed at four hours against rooms capped at
-   * two resolves to an empty pool while this readout truthfully reports three
-   * matches, so the stronger wording would be false in exactly the case the
-   * readout exists to expose. Reporting the duration exclusion is change ⑧a.
+   * It is above rather than inside Service Requirements because its inputs now
+   * span both that group and Duration: an editor who sets a four-hour duration
+   * must not have to scroll back to Requirements to discover that doing so
+   * emptied the pool.
+   *
+   * The live region is always present and only its content changes. A
+   * `role="status"` element inserted at the same moment as its text is
+   * frequently not announced, because the region has to already be observed when
+   * the change happens.
    */
-  #matchSummary(): string {
-    // Null means "not known" — an empty type, or a lookup that failed. Showing
-    // zero here would send someone to fix a requirement that may be correct.
-    if (this._matchCount === null) {
-      return "";
+  #renderResolutionSummary() {
+    const lines = this.#resolutionLines();
+
+    return html`
+      <div class="resolution" role="status" aria-label=${this.#term("resolutionSummary")}>
+        ${lines.length === 0
+          ? nothing
+          : html`<ul>
+              ${lines.map((line) => html`<li>${line}</li>`)}
+            </ul>`}
+      </div>
+    `;
+  }
+
+  /**
+   * What the summary says, derived entirely from the snapshot — never from the
+   * live form (design D7).
+   *
+   * An empty array is silence, and silence is what "not known" looks like: no
+   * resource type entered yet, a fixed duration with no length, or a request
+   * that failed. Rendering a chain of zeros instead would tell an editor their
+   * configuration resolves to nothing, which is the one thing a failed request
+   * does not know.
+   *
+   * The chain stops at the stage that emptied the pool. Continuing past it would
+   * print "None of those…" about a stage that had nothing to filter, which is
+   * how ⑧ managed to blame the capabilities for a mistyped type key.
+   */
+  #resolutionLines(): string[] {
+    const chain = this._resolution;
+    if (chain === null) {
+      return [];
     }
 
-    // Six forms, not one string with a count substituted in. Two axes: singular
-    // versus plural ("1 resources have" is the sort of thing a reader stops on),
-    // and whether any capability is actually required — with none, "these
-    // capabilities" refers to nothing and the count is really about the type.
-    const byType = this._matchCountedByTypeAlone;
-
-    if (this._matchCount === 0) {
-      return this.#term(byType ? "requirementMatchesTypeNone" : "requirementMatchesNone");
+    if (chain.ofType === 0) {
+      return [this.localize.term("ubookitServices_resolutionTypeNone", chain.resourceType)];
     }
 
-    if (this._matchCount === 1) {
-      return this.#term(byType ? "requirementMatchesTypeOne" : "requirementMatchesOne");
+    // Nothing was excluded anywhere. Three lines carrying one number say less
+    // than one line does, so the healthy case collapses.
+    if (chain.ofType === chain.canProvide) {
+      return [
+        chain.canProvide === 1
+          ? this.#term("resolutionHealthyOne")
+          : this.localize.term("ubookitServices_resolutionHealthy", chain.canProvide),
+      ];
     }
 
-    return this.localize.term(
-      byType ? "ubookitServices_requirementMatchesType" : "ubookitServices_requirementMatches",
-      this._matchCount,
+    const lines = [
+      chain.ofType === 1
+        ? this.localize.term("ubookitServices_resolutionTypeOne", chain.resourceType)
+        : this.localize.term("ubookitServices_resolutionType", chain.ofType, chain.resourceType),
+    ];
+
+    if (chain.withCapabilities === 0) {
+      lines.push(this.#term("resolutionCapabilitiesNone"));
+      return lines;
+    }
+
+    lines.push(
+      chain.withCapabilities === 1
+        ? this.#term("resolutionCapabilitiesOne")
+        : this.localize.term("ubookitServices_resolutionCapabilities", chain.withCapabilities),
     );
+
+    lines.push(
+      chain.canProvide === 0
+        ? this.#term("resolutionDurationNone")
+        : chain.canProvide === 1
+          ? this.#term("resolutionDurationOne")
+          : this.localize.term("ubookitServices_resolutionDuration", chain.canProvide),
+    );
+
+    if (chain.exclusions.length > 0) {
+      lines.push(
+        this.localize.term("ubookitServices_resolutionExcluded", this.#excludedNames(chain.exclusions)),
+      );
+    }
+
+    return lines;
+  }
+
+  /**
+   * The excluded resources with the bound that excluded each — the number the
+   * editor has to change. Capped, because a wide pool with a low ceiling would
+   * otherwise produce a list longer than the form.
+   */
+  #excludedNames(exclusions: DurationExclusionModel[]): string {
+    const named = exclusions.slice(0, MAX_NAMED_EXCLUSIONS).map((exclusion) => {
+      const key =
+        exclusion.reason === "resource-minimum"
+          ? "ubookitServices_resolutionExcludedMinimum"
+          : exclusion.reason === "granularity"
+            ? "ubookitServices_resolutionExcludedGranularity"
+            : "ubookitServices_resolutionExcludedMaximum";
+
+      return this.localize.term(key, exclusion.displayName, exclusion.boundMinutes);
+    });
+
+    const remaining = exclusions.length - named.length;
+    if (remaining > 0) {
+      named.push(this.localize.term("ubookitServices_resolutionExcludedMore", remaining));
+    }
+
+    return named.join(", ");
   }
 
   #renderDuration() {
@@ -541,8 +666,13 @@ export class UBookItServiceEditorElement extends UmbLitElement {
           <uui-radio-group
             aria-label=${this.#term("durationMode")}
             .value=${this._durationMode}
-            @change=${(e: Event) =>
-              (this._durationMode = (e.target as HTMLInputElement).value as DurationMode)}
+            @change=${(e: Event) => {
+              this._durationMode = (e.target as HTMLInputElement).value as DurationMode;
+              // A discrete choice: refresh immediately. Switching to a fixed
+              // length with no minutes entered resolves to "not known", which
+              // renders as silence rather than as a chain of zeros.
+              void this.#refreshResolution();
+            }}
           >
             <uui-radio value="fixed" label=${this.#term("durationFixed")}></uui-radio>
             <uui-radio value="variable" label=${this.#term("durationVariable")}></uui-radio>
@@ -560,7 +690,10 @@ export class UBookItServiceEditorElement extends UmbLitElement {
               ?disabled=${this._durationMode !== "fixed"}
               aria-invalid=${this.#boundInvalid("Duration") ? "true" : nothing}
               aria-describedby=${this.#boundInvalid("Duration") ? "err-duration-length" : nothing}
-              @input=${(e: InputEvent) => (this._durationMinutes = this.#readNumber(e))}
+              @input=${(e: InputEvent) => {
+                this._durationMinutes = this.#readNumber(e);
+                this.#scheduleResolutionRefresh();
+              }}
             />
             ${this.#renderBoundError("err-duration-length", "Duration")}
           </div>
@@ -575,7 +708,10 @@ export class UBookItServiceEditorElement extends UmbLitElement {
               ?disabled=${this._durationMode !== "variable"}
               aria-invalid=${this.#boundInvalid("Duration.Min") ? "true" : nothing}
               aria-describedby=${this.#boundInvalid("Duration.Min") ? "err-duration-min" : nothing}
-              @input=${(e: InputEvent) => (this._durationMin = this.#readNumber(e))}
+              @input=${(e: InputEvent) => {
+                this._durationMin = this.#readNumber(e);
+                this.#scheduleResolutionRefresh();
+              }}
             />
             ${this.#renderBoundError("err-duration-min", "Duration.Min")}
           </div>
@@ -590,7 +726,10 @@ export class UBookItServiceEditorElement extends UmbLitElement {
               ?disabled=${this._durationMode !== "variable"}
               aria-invalid=${this.#boundInvalid("Duration.Max") ? "true" : nothing}
               aria-describedby=${this.#boundInvalid("Duration.Max") ? "err-duration-max" : nothing}
-              @input=${(e: InputEvent) => (this._durationMax = this.#readNumber(e))}
+              @input=${(e: InputEvent) => {
+                this._durationMax = this.#readNumber(e);
+                this.#scheduleResolutionRefresh();
+              }}
             />
             ${this.#renderBoundError("err-duration-max", "Duration.Max")}
           </div>
@@ -663,6 +802,22 @@ export class UBookItServiceEditorElement extends UmbLitElement {
       color: var(--uui-color-text-alt, #515054);
       font-size: var(--uui-type-small-size, 0.8rem);
       margin: 0;
+    }
+    /*
+      The live region is always in the DOM so a screen reader is already
+      observing it when its content changes; when it has nothing to say it
+      simply collapses, contributing no margin or border of its own.
+    */
+    .resolution ul {
+      border-left: 3px solid var(--uui-color-border, #d8d7d9);
+      color: var(--uui-color-text-alt, #515054);
+      font-size: var(--uui-type-small-size, 0.8rem);
+      list-style: none;
+      margin: var(--uui-size-space-4) 0 0;
+      padding: 0 0 0 var(--uui-size-space-4);
+    }
+    .resolution li + li {
+      margin-top: var(--uui-size-space-1);
     }
     .error-summary {
       border: 2px solid var(--uui-color-danger, #d42054);

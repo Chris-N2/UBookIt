@@ -123,30 +123,6 @@ public class CapabilityUsageModel
     public int Count { get; set; }
 }
 
-/// <summary>
-/// A resource matching a requirement's type and capabilities.
-/// <para>
-/// Answers "which resources hold these capabilities", NOT "which resources can
-/// fulfil this service" — candidate resolution additionally excludes resources
-/// whose duration range cannot admit the service, and this preview does not
-/// evaluate that. Consumers must word their presentation accordingly (design D8).
-/// </para>
-/// </summary>
-public class ResourceMatchModel
-{
-    public Guid Id { get; set; }
-
-    public string DisplayName { get; set; } = string.Empty;
-}
-
-/// <summary>The resources matching a requirement, with their count.</summary>
-public class RoleMatchesModel
-{
-    public int Total { get; set; }
-
-    public List<ResourceMatchModel> Items { get; set; } = [];
-}
-
 /// <summary>One failed validation rule, using the domain's stable codes.</summary>
 public class ApiErrorModel
 {

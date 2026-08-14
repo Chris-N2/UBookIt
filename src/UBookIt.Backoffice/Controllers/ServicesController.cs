@@ -3,21 +3,69 @@ using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
 using UBookIt.Backoffice.Mapping;
 using UBookIt.Backoffice.Models;
+using UBookIt.Core.Services;
 using UBookIt.Core.Stores;
 
 namespace UBookIt.Backoffice.Controllers;
 
 /// <summary>
 /// Service management endpoints. Depends only on the service read/management
-/// ports — never on booking storage (HTTP-caller containment). Authorization
-/// comes from the shared base controller.
+/// ports and on Core resolution — never on booking storage (HTTP-caller
+/// containment). Authorization comes from the shared base controller.
 /// </summary>
 [ApiVersion("1.0")]
 [ApiExplorerSettings(GroupName = "UBookIt.Backoffice")]
 public class ServicesController(
     IServiceStore serviceStore,
-    IServiceManagementStore managementStore) : UBookItBackofficeApiControllerBase
+    IServiceManagementStore managementStore,
+    IServiceBookingService resolution) : UBookItBackofficeApiControllerBase
 {
+    /// <summary>
+    /// The resolution chain for a service configuration: the resources of the
+    /// role's type, those of them carrying its required capabilities, those of
+    /// them whose own constraints admit a length the duration permits, and what
+    /// the last filter excluded with the bound that excluded it.
+    /// <para>
+    /// Accepts a configuration no saved service holds and does not require it to
+    /// be a valid service — in particular, no name. Its whole purpose is to
+    /// report on one being edited (design D2).
+    /// </para>
+    /// <para>
+    /// The answer comes from Core resolution, not from a filter of its own, so
+    /// the backoffice cannot report a different pool from the one the booking
+    /// path will act on (design D1). It is a POST because a duration
+    /// specification is a structured value — a kind plus whichever bounds apply
+    /// — and flattening it into query parameters would reproduce the ambiguity
+    /// the duration value object exists to prevent (design D3).
+    /// </para>
+    /// <para>
+    /// The literal segment cannot collide with the guid-constrained id route
+    /// below, and there is no POST on <c>services/{id}</c> in any case.
+    /// </para>
+    /// </summary>
+    [HttpPost("services/preview")]
+    [ProducesResponseType<ServicePreviewResponseModel>(StatusCodes.Status200OK)]
+    [ProducesResponseType<ProblemDetails>(StatusCodes.Status400BadRequest)]
+    public async Task<IActionResult> PreviewServiceConfiguration(
+        ServicePreviewRequestModel model, CancellationToken cancellationToken = default)
+    {
+        var configuration = ServiceModelMapper.ToDomain(model);
+        if (!configuration.Succeeded)
+        {
+            return configuration.Failures.ToProblemResult();
+        }
+
+        var (role, duration) = configuration.Value;
+
+        // A well-formed type key no resource uses is a chain whose first stage is
+        // empty, not an error: naming a type before creating resources of it is a
+        // legitimate setup order, and the empty first stage is precisely the
+        // signal that distinguishes it from a capability or duration exclusion.
+        var chain = await resolution.ResolveAsync(role, duration, cancellationToken);
+
+        return Ok(ServiceModelMapper.ToModel(chain));
+    }
+
     [HttpGet("services")]
     [ProducesResponseType<PagedServicesModel>(StatusCodes.Status200OK)]
     public async Task<IActionResult> ListServices(

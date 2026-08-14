@@ -50,8 +50,9 @@ public sealed record ServiceBookableStart(DateTimeOffset StartUtc, IReadOnlyList
 /// <summary>
 /// A resource able to fulfil a service, paired with the lengths the service
 /// permits on it — that resource's own range narrowed by the service's duration
-/// specification. Membership of the pool is decided by resource type key alone
-/// in v1; capability-constrained eligibility is a later slice.
+/// specification. Membership of the pool is the final stage of
+/// <see cref="ServiceResolution"/>: type key, then required capabilities, then a
+/// duration range that admits a permitted length.
 /// </summary>
 public sealed record ServiceCandidate(Resource Resource, DurationRange Range)
 {

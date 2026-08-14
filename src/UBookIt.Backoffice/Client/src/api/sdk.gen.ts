@@ -2,7 +2,7 @@
 
 import type { Client, Options as Options2, TDataShape } from './client';
 import { client } from './client.gen';
-import type { CreateResourceData, CreateResourceErrors, CreateResourceResponses, CreateServiceData, CreateServiceErrors, CreateServiceResponses, DeleteResourceData, DeleteResourceErrors, DeleteResourceResponses, DeleteServiceData, DeleteServiceErrors, DeleteServiceResponses, GetResourceData, GetResourceErrors, GetResourceResponses, GetServiceData, GetServiceErrors, GetServiceResponses, ListCapabilitiesData, ListCapabilitiesErrors, ListCapabilitiesResponses, ListMatchingResourcesData, ListMatchingResourcesErrors, ListMatchingResourcesResponses, ListResourcesData, ListResourcesErrors, ListResourcesResponses, ListResourceTypesData, ListResourceTypesErrors, ListResourceTypesResponses, ListServicesData, ListServicesErrors, ListServicesResponses, UpdateResourceData, UpdateResourceErrors, UpdateResourceResponses, UpdateServiceData, UpdateServiceErrors, UpdateServiceResponses } from './types.gen';
+import type { CreateResourceData, CreateResourceErrors, CreateResourceResponses, CreateServiceData, CreateServiceErrors, CreateServiceResponses, DeleteResourceData, DeleteResourceErrors, DeleteResourceResponses, DeleteServiceData, DeleteServiceErrors, DeleteServiceResponses, GetResourceData, GetResourceErrors, GetResourceResponses, GetServiceData, GetServiceErrors, GetServiceResponses, ListCapabilitiesData, ListCapabilitiesErrors, ListCapabilitiesResponses, ListResourcesData, ListResourcesErrors, ListResourcesResponses, ListResourceTypesData, ListResourceTypesErrors, ListResourceTypesResponses, ListServicesData, ListServicesErrors, ListServicesResponses, PreviewServiceConfigurationData, PreviewServiceConfigurationErrors, PreviewServiceConfigurationResponses, UpdateResourceData, UpdateResourceErrors, UpdateResourceResponses, UpdateServiceData, UpdateServiceErrors, UpdateServiceResponses } from './types.gen';
 
 export type Options<TData extends TDataShape = TDataShape, ThrowOnError extends boolean = boolean> = Options2<TData, ThrowOnError> & {
     /**
@@ -105,19 +105,6 @@ export class UBookItBackofficeService {
         });
     }
     
-    public static listMatchingResources<ThrowOnError extends boolean = false>(options?: Options<ListMatchingResourcesData, ThrowOnError>) {
-        return (options?.client ?? client).get<ListMatchingResourcesResponses, ListMatchingResourcesErrors, ThrowOnError>({
-            security: [
-                {
-                    scheme: 'bearer',
-                    type: 'http'
-                }
-            ],
-            url: '/umbraco/ubookitbackoffice/api/v1/resources/matching',
-            ...options
-        });
-    }
-    
     public static listResourceTypes<ThrowOnError extends boolean = false>(options?: Options<ListResourceTypesData, ThrowOnError>) {
         return (options?.client ?? client).get<ListResourceTypesResponses, ListResourceTypesErrors, ThrowOnError>({
             security: [
@@ -200,6 +187,23 @@ export class UBookItBackofficeService {
             headers: {
                 'Content-Type': 'application/json',
                 ...options.headers
+            }
+        });
+    }
+    
+    public static previewServiceConfiguration<ThrowOnError extends boolean = false>(options?: Options<PreviewServiceConfigurationData, ThrowOnError>) {
+        return (options?.client ?? client).post<PreviewServiceConfigurationResponses, PreviewServiceConfigurationErrors, ThrowOnError>({
+            security: [
+                {
+                    scheme: 'bearer',
+                    type: 'http'
+                }
+            ],
+            url: '/umbraco/ubookitbackoffice/api/v1/services/preview',
+            ...options,
+            headers: {
+                'Content-Type': 'application/json',
+                ...options?.headers
             }
         });
     }

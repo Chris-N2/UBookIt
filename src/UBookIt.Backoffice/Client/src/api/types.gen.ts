@@ -24,6 +24,13 @@ export type ConstraintsModel = {
 
 export type DayOfWeek = 'Sunday' | 'Monday' | 'Tuesday' | 'Wednesday' | 'Thursday' | 'Friday' | 'Saturday';
 
+export type DurationExclusionModel = {
+    id: string;
+    displayName: string;
+    reason: string;
+    boundMinutes: number;
+};
+
 export type OpeningHoursModel = {
     day: DayOfWeek;
     start: string;
@@ -40,6 +47,11 @@ export type PagedServicesModel = {
     items: Array<ServiceResponseModel>;
 };
 
+export type PreviewResourceModel = {
+    id: string;
+    displayName: string;
+};
+
 export type ProblemDetails = {
     type?: string | null;
     title?: string | null;
@@ -47,11 +59,6 @@ export type ProblemDetails = {
     detail?: string | null;
     instance?: string | null;
     [key: string]: unknown | string | null | string | null | number | null | string | null | string | null | undefined;
-};
-
-export type ResourceMatchModel = {
-    id: string;
-    displayName: string;
 };
 
 export type ResourceRequestModel = {
@@ -80,16 +87,29 @@ export type ResourceTypeUsageModel = {
     count: number;
 };
 
-export type RoleMatchesModel = {
-    total: number;
-    items: Array<ResourceMatchModel>;
-};
-
 export type ServiceDurationModel = {
     kind: string;
     minutes?: number | null;
     minMinutes?: number | null;
     maxMinutes?: number | null;
+};
+
+export type ServicePreviewRequestModel = {
+    resourceType: string;
+    requiredCapabilities: Array<string>;
+    duration?: ServiceDurationModel | null;
+};
+
+export type ServicePreviewResponseModel = {
+    ofType: ServicePreviewStageModel;
+    withCapabilities: ServicePreviewStageModel;
+    canProvide: ServicePreviewStageModel;
+    durationExclusions: Array<DurationExclusionModel>;
+};
+
+export type ServicePreviewStageModel = {
+    total: number;
+    items: Array<PreviewResourceModel>;
 };
 
 export type ServiceRequestModel = {
@@ -293,38 +313,6 @@ export type ListCapabilitiesResponses = {
 
 export type ListCapabilitiesResponse = ListCapabilitiesResponses[keyof ListCapabilitiesResponses];
 
-export type ListMatchingResourcesData = {
-    body?: never;
-    path?: never;
-    query?: {
-        resourceType?: string;
-        capability?: Array<string>;
-    };
-    url: '/umbraco/ubookitbackoffice/api/v1/resources/matching';
-};
-
-export type ListMatchingResourcesErrors = {
-    /**
-     * Bad Request
-     */
-    400: ProblemDetails;
-    /**
-     * The resource is protected and requires an authentication token
-     */
-    401: unknown;
-};
-
-export type ListMatchingResourcesError = ListMatchingResourcesErrors[keyof ListMatchingResourcesErrors];
-
-export type ListMatchingResourcesResponses = {
-    /**
-     * OK
-     */
-    200: RoleMatchesModel;
-};
-
-export type ListMatchingResourcesResponse = ListMatchingResourcesResponses[keyof ListMatchingResourcesResponses];
-
 export type ListResourceTypesData = {
     body?: never;
     path?: never;
@@ -497,3 +485,32 @@ export type UpdateServiceResponses = {
 };
 
 export type UpdateServiceResponse = UpdateServiceResponses[keyof UpdateServiceResponses];
+
+export type PreviewServiceConfigurationData = {
+    body?: ServicePreviewRequestModel;
+    path?: never;
+    query?: never;
+    url: '/umbraco/ubookitbackoffice/api/v1/services/preview';
+};
+
+export type PreviewServiceConfigurationErrors = {
+    /**
+     * Bad Request
+     */
+    400: ProblemDetails;
+    /**
+     * The resource is protected and requires an authentication token
+     */
+    401: unknown;
+};
+
+export type PreviewServiceConfigurationError = PreviewServiceConfigurationErrors[keyof PreviewServiceConfigurationErrors];
+
+export type PreviewServiceConfigurationResponses = {
+    /**
+     * OK
+     */
+    200: ServicePreviewResponseModel;
+};
+
+export type PreviewServiceConfigurationResponse = PreviewServiceConfigurationResponses[keyof PreviewServiceConfigurationResponses];

@@ -2,6 +2,7 @@ using UBookIt.Core.Availability;
 using UBookIt.Core.Bookings;
 using UBookIt.Core.Common;
 using UBookIt.Core.Resources;
+using UBookIt.Core.Services;
 using UBookIt.Tests.Support;
 
 namespace UBookIt.Tests;
@@ -256,5 +257,61 @@ public class ResourceTests
 
         Assert.True(result.Succeeded);
         Assert.Equal("person", result.Value.Type);
+    }
+
+    [Fact]
+    public void Spec_scenario_an_over_long_type_key_is_a_validation_failure()
+    {
+        // Well formed — lower-case, no separators to trip the shape rule — and
+        // one character past what the column accepts. Without the bound it would
+        // pass the domain and the API and fail at INSERT as a 500, where the
+        // resources spec promises `type-key-invalid`.
+        var result = Resource.Create(new string('a', NormalizedKey.MaxLength + 1), "Meeting Room A");
+
+        Assert.False(result.Succeeded);
+        Assert.Equal(FailureCodes.TypeKeyInvalid, Assert.Single(result.Failures).Code);
+    }
+
+    [Fact]
+    public void Spec_scenario_a_type_key_at_the_length_limit_is_accepted()
+    {
+        var atLimit = new string('a', NormalizedKey.MaxLength);
+
+        var result = Resource.Create(atLimit, "Meeting Room A");
+
+        Assert.True(result.Succeeded);
+        Assert.Equal(atLimit, result.Value.Type);
+    }
+
+    [Fact]
+    public void Spec_scenario_a_service_roles_resource_type_is_bounded_the_same_way()
+    {
+        var tooLong = new string('a', NormalizedKey.MaxLength + 1);
+
+        var overLong = Service.Create("Massage", null, [new ServiceRole(tooLong, 1)]);
+        var atLimit = Service.Create(
+            "Massage", null, [new ServiceRole(new string('a', NormalizedKey.MaxLength), 1)]);
+
+        Assert.False(overLong.Succeeded);
+        Assert.Equal(FailureCodes.TypeKeyInvalid, Assert.Single(overLong.Failures).Code);
+        Assert.True(atLimit.Succeeded);
+    }
+
+    /// <summary>
+    /// The same bound through the role factory a configuration preview uses, so
+    /// the preview cannot accept a key the save path rejects.
+    /// </summary>
+    [Fact]
+    public void The_role_factory_applies_the_same_type_key_bound()
+    {
+        var overLong = ServiceRole.Create(new string('a', NormalizedKey.MaxLength + 1), []);
+        var atLimit = ServiceRole.Create(new string('a', NormalizedKey.MaxLength), []);
+        var malformed = ServiceRole.Create("Meeting Room", []);
+
+        Assert.False(overLong.Succeeded);
+        Assert.Equal(FailureCodes.TypeKeyInvalid, Assert.Single(overLong.Failures).Code);
+        Assert.True(atLimit.Succeeded);
+        Assert.False(malformed.Succeeded);
+        Assert.Equal(FailureCodes.TypeKeyInvalid, Assert.Single(malformed.Failures).Code);
     }
 }

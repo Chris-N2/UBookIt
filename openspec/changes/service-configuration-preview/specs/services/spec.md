@@ -52,3 +52,41 @@ The report's wording SHALL be derived from state captured with the response it d
 #### Scenario: The report never asserts a stale phrasing
 - **WHEN** a user changes the configuration and the previous chain has not yet been replaced
 - **THEN** the report continues to describe the configuration it was computed for, or says nothing, and never describes the new configuration using the old counts
+
+### Requirement: Resource type is chosen from types already in use
+The requirement row SHALL let the user choose a resource type from the types currently in use — sourced from the resource type usage endpoint — while still permitting a type key that no resource currently uses, since a service may legitimately be defined before its resources exist. Choosing a type with no matching resources SHALL NOT prevent saving; the fact that nothing has that type SHALL be reported through the resolution summary's first stage rather than as a separate type-specific hint, so that one report answers the question. An invalid type key SHALL still be rejected by the server's existing `type-key-invalid` validation and surfaced like any other failure.
+
+#### Scenario: Choosing an existing type
+- **WHEN** resources of types `room` and `masseur` exist and the user opens the requirement's type control
+- **THEN** both `room` and `masseur` are offered as choices
+
+#### Scenario: Naming a type that does not exist yet
+- **WHEN** a user enters the type `physiotherapist` while no resource has that type
+- **THEN** the summary reports the type stage as empty, saving still succeeds, and no blocking error is shown
+
+#### Scenario: Invalid type key is rejected by the server
+- **WHEN** a user enters a type key the domain rejects and saves
+- **THEN** the editor surfaces the server's `type-key-invalid` failure and no service is created
+
+### Requirement: Required capabilities are edited on the requirement row
+The requirement row SHALL let a user add and remove required capability keys, offering the capability keys already in use — sourced from the capability usage endpoint — while still permitting a key no resource currently carries, for the same reason a not-yet-used resource type is permitted. Removing every capability SHALL be permitted and SHALL restore type-only matching, which the summary's capability stage then reports as equal to its type stage. A malformed key SHALL be surfaced from the server's `capability-key-invalid` failure, associated with the capability control rather than the type control.
+
+#### Scenario: Adding a required capability
+- **WHEN** a user adds the capability `cert-x` to the requirement and saves
+- **THEN** the save succeeds and reopening the service shows `cert-x` as required
+
+#### Scenario: Capabilities in use are offered
+- **WHEN** resources carry the capabilities `cert-x` and `massage` and the user opens the capability control
+- **THEN** both are offered as choices
+
+#### Scenario: A capability nothing carries is still permitted
+- **WHEN** a user requires a capability no resource currently carries and saves
+- **THEN** the save succeeds and the summary reports the capability stage as empty while the type stage is populated
+
+#### Scenario: Removing all capabilities restores type-only matching
+- **WHEN** a user removes every required capability from a service and saves
+- **THEN** the service's role requires no capabilities and matches every resource of its type
+
+#### Scenario: Malformed capability key is surfaced on its own control
+- **WHEN** the server rejects a capability key with `capability-key-invalid`
+- **THEN** the editor associates the message with the capability control and no data is lost from the form

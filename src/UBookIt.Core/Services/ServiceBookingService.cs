@@ -37,7 +37,33 @@ public sealed record ServiceBookingRequest
 /// <summary>Availability and placement for a service, resolving its role to eligible resources.</summary>
 public interface IServiceBookingService
 {
-    /// <summary>The service's candidate pool: every eligible resource with the lengths the service permits on it.</summary>
+    /// <summary>
+    /// Evaluates a role and a duration against the resources that exist,
+    /// returning the whole filter chain — not only its survivors.
+    /// <para>
+    /// Takes the role and duration directly rather than a service or a service
+    /// id (design D2). A configuration being previewed may not be a valid
+    /// service — most obviously it may have no name — and requiring an aggregate
+    /// to be constructible in order to ask which resources a role resolves to
+    /// would let a validator with no stake in the question decide whether it can
+    /// be asked at all.
+    /// </para>
+    /// </summary>
+    Task<ServiceResolution> ResolveAsync(
+        ServiceRole role, ServiceDuration duration, CancellationToken cancellationToken = default);
+
+    /// <summary>
+    /// The same evaluation for a saved service: loads it and delegates. Fails
+    /// with <see cref="FailureCodes.ServiceNotFound"/> for an unknown id.
+    /// </summary>
+    Task<DomainResult<ServiceResolution>> ResolveAsync(
+        Guid serviceId, CancellationToken cancellationToken = default);
+
+    /// <summary>
+    /// The service's candidate pool: every eligible resource with the lengths the
+    /// service permits on it. A projection of <see cref="ResolveAsync(Guid, CancellationToken)"/>,
+    /// never a second filtering path (design D1).
+    /// </summary>
     Task<DomainResult<IReadOnlyList<ServiceCandidate>>> ResolveCandidatesAsync(
         Guid serviceId, CancellationToken cancellationToken = default);
 
@@ -65,49 +91,85 @@ public sealed class ServiceBookingService(
     IBookingService bookingService,
     SiteBookingSettings settings) : IServiceBookingService
 {
-    public async Task<DomainResult<IReadOnlyList<ServiceCandidate>>> ResolveCandidatesAsync(
+    /// <summary>
+    /// The single evaluation. Every other resolution entry point on this service
+    /// projects from what this returns, so a diagnostic view and the pool the
+    /// booking path acts on cannot disagree (design D1).
+    /// </summary>
+    public async Task<ServiceResolution> ResolveAsync(
+        ServiceRole role, ServiceDuration duration, CancellationToken cancellationToken = default)
+    {
+        ArgumentNullException.ThrowIfNull(role);
+        ArgumentNullException.ThrowIfNull(duration);
+
+        var ofType = await resourceStore
+            .ListByTypeAsync(role.ResourceType, cancellationToken)
+            .ConfigureAwait(false);
+
+        // Ordered once, here, so every stage and the pool projected from them
+        // share one order rather than each imposing its own.
+        var stage1 = ofType.OrderBy(r => r.Id).ToList();
+
+        // Eligibility's second term, evaluated here in Core over capabilities
+        // the read port hydrated — never as a storage-layer predicate, which
+        // would be a second implementation of the rule free to disagree with
+        // this one (design D5). Excluded silently: a resource lacking a
+        // capability is an answer about that resource, not a validation failure
+        // of the service.
+        var stage2 = stage1
+            .Where(r => role.RequiredCapabilities.IsSatisfiedBy(r.Capabilities))
+            .ToList();
+
+        var candidates = new List<ServiceCandidate>(stage2.Count);
+        var exclusions = new List<DurationExclusion>();
+
+        foreach (var resource in stage2)
+        {
+            // A resource whose constraints admit no length the service permits
+            // is excluded silently — that is an answer about the resource, not a
+            // validation failure of the service (services spec, TryResolveAgainst).
+            // It is recorded rather than merely dropped, because this is the
+            // exclusion an editor can neither see nor guess at.
+            if (duration.TryResolveAgainst(resource.Availability.Constraints, out var range))
+            {
+                candidates.Add(new ServiceCandidate(resource, range));
+            }
+            else
+            {
+                exclusions.Add(ServiceResolution.Explain(
+                    resource, duration, resource.Availability.Constraints));
+            }
+        }
+
+        return new ServiceResolution(stage1, stage2, candidates, exclusions);
+    }
+
+    public async Task<DomainResult<ServiceResolution>> ResolveAsync(
         Guid serviceId, CancellationToken cancellationToken = default)
     {
         var service = await serviceStore.GetAsync(serviceId, cancellationToken).ConfigureAwait(false);
         if (service is null)
         {
-            return DomainResult<IReadOnlyList<ServiceCandidate>>.Failure(
+            return DomainResult<ServiceResolution>.Failure(
                 FailureCodes.ServiceNotFound, $"No service exists with id {serviceId}.");
         }
 
         // v1 guarantees exactly one role of count 1 (services spec); multi-role
         // composition is a later slice.
-        var role = service.Roles[0];
-
-        var resources = await resourceStore
-            .ListByTypeAsync(role.ResourceType, cancellationToken)
+        var resolution = await ResolveAsync(service.Roles[0], service.Duration, cancellationToken)
             .ConfigureAwait(false);
 
-        var candidates = new List<ServiceCandidate>(resources.Count);
+        return DomainResult<ServiceResolution>.Success(resolution);
+    }
 
-        foreach (var resource in resources.OrderBy(r => r.Id))
-        {
-            // Eligibility's second term, evaluated here in Core over capabilities
-            // the read port hydrated — never as a storage-layer predicate, which
-            // would be a second implementation of the rule free to disagree with
-            // this one (design D5). Excluded silently, like the duration test
-            // below: a resource lacking a capability is an answer about that
-            // resource, not a validation failure of the service.
-            if (!role.RequiredCapabilities.IsSatisfiedBy(resource.Capabilities))
-            {
-                continue;
-            }
+    public async Task<DomainResult<IReadOnlyList<ServiceCandidate>>> ResolveCandidatesAsync(
+        Guid serviceId, CancellationToken cancellationToken = default)
+    {
+        var resolution = await ResolveAsync(serviceId, cancellationToken).ConfigureAwait(false);
 
-            // A resource whose constraints admit no length the service permits
-            // is excluded silently — that is an answer about the resource, not a
-            // validation failure of the service (services spec, TryResolveAgainst).
-            if (service.Duration.TryResolveAgainst(resource.Availability.Constraints, out var range))
-            {
-                candidates.Add(new ServiceCandidate(resource, range));
-            }
-        }
-
-        return DomainResult<IReadOnlyList<ServiceCandidate>>.Success(candidates);
+        return resolution.Succeeded
+            ? DomainResult<IReadOnlyList<ServiceCandidate>>.Success(resolution.Value.Candidates)
+            : DomainResult<IReadOnlyList<ServiceCandidate>>.Failure(resolution.Failures);
     }
 
     public async Task<DomainResult<IReadOnlyList<ServiceBookableStart>>> GetBookableStartsAsync(

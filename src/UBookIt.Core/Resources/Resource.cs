@@ -67,6 +67,17 @@ public sealed class Resource
                 $"Resource type key '{type}' must be lower-case kebab-case (e.g. 'room').",
                 nameof(Type)));
         }
+        else if (type!.Length > NormalizedKey.MaxLength)
+        {
+            // Length is validated here rather than left to the column: a
+            // well-formed but over-long key would otherwise pass the domain and
+            // the API and fail at INSERT as a 500, where the spec promises the
+            // stable `type-key-invalid` code.
+            failures.Add(new DomainFailure(
+                FailureCodes.TypeKeyInvalid,
+                $"A resource type key may be at most {NormalizedKey.MaxLength} characters.",
+                nameof(Type)));
+        }
 
         if (string.IsNullOrWhiteSpace(displayName))
         {

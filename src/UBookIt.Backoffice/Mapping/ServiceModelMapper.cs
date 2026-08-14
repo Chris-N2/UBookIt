@@ -1,5 +1,6 @@
 using UBookIt.Backoffice.Models;
 using UBookIt.Core.Common;
+using UBookIt.Core.Resources;
 using UBookIt.Core.Services;
 
 namespace UBookIt.Backoffice.Mapping;
@@ -54,6 +55,62 @@ internal static class ServiceModelMapper
         }
 
         return DomainResult<Service>.Failure(failures);
+    }
+
+    /// <summary>
+    /// A preview configuration to the pair resolution actually depends on: a
+    /// role and a duration. Never a <see cref="Service"/> — that would require a
+    /// name the editor may not have entered yet, letting a validator with no
+    /// stake in the question decide whether it can be asked (design D2).
+    /// <para>
+    /// Both parts validate, and both report through their existing stable codes:
+    /// a malformed key is a failure here as everywhere else, because a chain
+    /// computed from a silently narrowed configuration would describe something
+    /// other than what is on screen.
+    /// </para>
+    /// </summary>
+    internal static DomainResult<(ServiceRole Role, ServiceDuration Duration)> ToDomain(
+        ServicePreviewRequestModel model)
+    {
+        var role = ServiceRole.Create(model.ResourceType, model.RequiredCapabilities);
+        var duration = ToDomain(model.Duration);
+
+        var failures = role.Failures.Concat(duration.Failures).ToList();
+
+        return failures.Count > 0
+            ? DomainResult<(ServiceRole, ServiceDuration)>.Failure(failures)
+            : DomainResult<(ServiceRole, ServiceDuration)>.Success((role.Value, duration.Value));
+    }
+
+    internal static ServicePreviewResponseModel ToModel(ServiceResolution resolution)
+        => new()
+        {
+            OfType = ToStage(resolution.OfType),
+            WithCapabilities = ToStage(resolution.WithCapabilities),
+            CanProvide = ToStage(resolution.Candidates.Select(c => c.Resource)),
+            DurationExclusions = resolution.DurationExclusions
+                .Select(e => new DurationExclusionModel
+                {
+                    Id = e.Resource.Id,
+                    DisplayName = e.Resource.DisplayName,
+                    Reason = e.Reason switch
+                    {
+                        DurationExclusionReason.ResourceMaximum => DurationExclusionModel.ResourceMaximumReason,
+                        DurationExclusionReason.ResourceMinimum => DurationExclusionModel.ResourceMinimumReason,
+                        _ => DurationExclusionModel.GranularityReason,
+                    },
+                    BoundMinutes = (int)e.Bound.TotalMinutes,
+                })
+                .ToList(),
+        };
+
+    private static ServicePreviewStageModel ToStage(IEnumerable<Resource> resources)
+    {
+        var items = resources
+            .Select(r => new PreviewResourceModel { Id = r.Id, DisplayName = r.DisplayName })
+            .ToList();
+
+        return new ServicePreviewStageModel { Total = items.Count, Items = items };
     }
 
     internal static ServiceResponseModel ToModel(Service service)

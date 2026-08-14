@@ -103,16 +103,42 @@ export default {
     requiredCapabilitiesHint: "A resource without all of these cannot fulfil this service.",
     capabilityAdd: "Add capability",
     capabilityRemove: "Remove %0%",
-    // Deliberately about capabilities, not about bookability: resources are
-    // also excluded by duration, which this count does not check (design D8).
-    requirementMatches: "%0% resources have these capabilities.",
-    requirementMatchesOne: "1 resource has these capabilities.",
-    requirementMatchesNone: "No resources have these capabilities.",
-    // When the requirement names no capabilities, "these capabilities" refers
-    // to nothing; the count is really about the resource type.
-    requirementMatchesType: "%0% resources have this type.",
-    requirementMatchesTypeOne: "1 resource has this type.",
-    requirementMatchesTypeNone: "No resources have this type.",
+
+    // ---------------------------------------------------------- resolution summary
+    //
+    // ⑧'s capability-only wording is gone. The summary now evaluates every
+    // filter candidate resolution applies, so it MAY say what can provide the
+    // service (design D5). It must never say available, free, or bookable: the
+    // chain says nothing about opening hours, lead time, booking horizon, or
+    // existing bookings, and an editor reading "available" would take it as a
+    // promise about slots that this cannot make.
+    resolutionSummary: "Resource resolution",
+    // The healthy case, where all three stages agree. Three lines saying the
+    // same number tell an editor less than one line does.
+    resolutionHealthy: "%0% resources can provide this service.",
+    resolutionHealthyOne: "1 resource can provide this service.",
+    // Stage 1 — the resource type. Named explicitly so a mistyped key is
+    // visible as a mistyped key, which is the ⑧ defect this replaces.
+    resolutionType: "%0% resources have the type “%1%”.",
+    resolutionTypeOne: "1 resource has the type “%0%”.",
+    resolutionTypeNone: "No resources have the type “%0%”.",
+    // Stage 2 — "of those" is load-bearing: it says this count is a subset of
+    // the line above rather than an independent number.
+    resolutionCapabilities: "%0% of those have the required capabilities.",
+    resolutionCapabilitiesOne: "1 of those has the required capabilities.",
+    resolutionCapabilitiesNone: "None of those have the required capabilities.",
+    // Stage 3.
+    resolutionDuration: "%0% of those can provide this service.",
+    resolutionDurationOne: "1 of those can provide this service.",
+    resolutionDurationNone: "None of those can provide this service.",
+    // The bound is named per resource because it is the number the editor
+    // changes: "Red Room" says something is wrong, "Red Room (maximum 120
+    // minutes)" says which field to open.
+    resolutionExcluded: "Excluded by the length: %0%",
+    resolutionExcludedMaximum: "%0% (maximum %1% minutes)",
+    resolutionExcludedMinimum: "%0% (minimum %1% minutes)",
+    resolutionExcludedGranularity: "%0% (bookable in %1%-minute steps)",
+    resolutionExcludedMore: "and %0% more",
     save: "Save",
     cancel: "Cancel",
     back: "Back to services",

@@ -51,13 +51,6 @@ public sealed record ResourceTypeUsage(string Type, int Count);
 public sealed record CapabilityUsage(string Key, int Count);
 
 /// <summary>
-/// A resource matching a role's requirements, identified only. Enough for a
-/// backoffice readout; deliberately not the full aggregate, since this answers
-/// "which resources hold these capabilities" rather than "what can be booked".
-/// </summary>
-public sealed record ResourceMatch(Guid Id, string DisplayName);
-
-/// <summary>
 /// Management writes for resources. Implemented by UBookIt.Persistence.
 /// Accepts only <see cref="Resource"/> aggregates — which are constructible
 /// solely via the validating Core factories — so the store persists only
@@ -94,21 +87,17 @@ public interface IResourceManagementStore
     /// A key required by a service but carried by no resource does not appear —
     /// this reports what exists, not what is wanted.
     /// </summary>
+    /// <remarks>
+    /// This store deliberately carries no projection selecting resources BY a
+    /// required-capability set. Matching resources to a role is an eligibility
+    /// question, and eligibility has exactly one implementation — in
+    /// <c>UBookIt.Core</c>, over resources the read port hydrates. A
+    /// storage-layer projection applying the same rule would be a second
+    /// implementation free to diverge in its predicate, its ordering, or its test
+    /// doubles, and a backoffice answer that diverges from the booking path's is
+    /// worse than no answer (design D4).
+    /// </remarks>
     Task<IReadOnlyList<CapabilityUsage>> ListCapabilitiesAsync(CancellationToken cancellationToken = default);
-
-    /// <summary>
-    /// The resources of <paramref name="type"/> carrying every key in
-    /// <paramref name="requiredCapabilities"/>, for the backoffice's requirement
-    /// readout.
-    /// <para>
-    /// Answers the capability question only. It deliberately does NOT apply the
-    /// duration narrowing that candidate resolution also applies, so its result
-    /// is a superset of the bookable candidate pool and must never be presented
-    /// as "resources this service can be booked on" (design D8).
-    /// </para>
-    /// </summary>
-    Task<IReadOnlyList<ResourceMatch>> ListMatchingAsync(
-        string type, CapabilitySet requiredCapabilities, CancellationToken cancellationToken = default);
 }
 
 /// <summary>One page of services plus the unpaged total.</summary>

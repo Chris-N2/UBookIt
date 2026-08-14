@@ -20,7 +20,9 @@ public class ServicesControllerTests
     private static (ServicesController Controller, InMemoryServiceStore Store) Wire()
     {
         var store = new InMemoryServiceStore();
-        return (new ServicesController(store, store), store);
+        return (
+            new ServicesController(store, store, TestData.ServiceBooking(store, new InMemoryResourceStore())),
+            store);
     }
 
     private static ServiceRequestModel ValidRequest(string name = "Massage") => new()
@@ -293,7 +295,14 @@ public class ServicesControllerTests
             .GetParameters().Select(p => p.ParameterType)
             .ToArray();
 
-        Assert.Equal([typeof(IServiceStore), typeof(IServiceManagementStore)], paramTypes);
+        // Core resolution joins the two service ports for the configuration
+        // preview. It is not booking storage: it reads through the same read
+        // ports the booking path uses and the containment rule constrains what
+        // the controller may reach, not what resolution may be asked (design D3).
+        Assert.Equal(
+            [typeof(IServiceStore), typeof(IServiceManagementStore), typeof(IServiceBookingService)],
+            paramTypes);
         Assert.DoesNotContain(typeof(IBookingStore), paramTypes);
+        Assert.DoesNotContain(typeof(IResourceManagementStore), paramTypes);
     }
 }

@@ -207,35 +207,4 @@ internal sealed class SqlResourceManagementStore(UBookItDbContext db) : IResourc
 
         return grouped.Select(g => new CapabilityUsage(g.Key, g.Count)).ToList();
     }
-
-    public async Task<IReadOnlyList<ResourceMatch>> ListMatchingAsync(
-        string type, CapabilitySet requiredCapabilities, CancellationToken cancellationToken = default)
-    {
-        ArgumentNullException.ThrowIfNull(requiredCapabilities);
-
-        // The type term is a query; the capability term is NOT. Expressing the
-        // subset test in SQL would be a second implementation of eligibility,
-        // free to disagree with the one the booking path runs — and a backoffice
-        // readout that disagrees with the booker is worse than no readout at all
-        // (design D5, D6). So the same CapabilitySet test decides both, and only
-        // the projection differs.
-        var rows = await db.Resources
-            .AsNoTracking()
-            .Where(r => r.Type == type)
-            .OrderBy(r => r.DisplayName).ThenBy(r => r.Id)
-            .Select(r => new
-            {
-                r.Id,
-                r.DisplayName,
-                Capabilities = r.Capabilities.Select(c => c.Key).ToList(),
-            })
-            .ToListAsync(cancellationToken)
-            .ConfigureAwait(false);
-
-        return rows
-            .Where(r => requiredCapabilities.IsSatisfiedBy(
-                CapabilitySet.Create(r.Capabilities.Select(k => (string?)k)).Value))
-            .Select(r => new ResourceMatch(r.Id, r.DisplayName))
-            .ToList();
-    }
 }
