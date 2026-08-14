@@ -55,12 +55,12 @@
 
 ## 7. Verification
 
-- [ ] 7.1 Full solution build with `--no-incremental` (stop the TestSite first — a running site breaks the build with copy locks). Only the known NU1903 transitive advisories are acceptable; every compiler, analyzer and TypeScript warning must be fixed.
+- [x] 7.1 Full solution build with `--no-incremental` (stop the TestSite first — a running site breaks the build with copy locks). Only the known NU1903 transitive advisories are acceptable; every compiler, analyzer and TypeScript warning must be fixed.
 - [x] 7.2 Full unit and integration test run, all green.
 - [x] 7.3 Live verification in the running backoffice: tag a resource, require that capability on a service, watch the readout change, and confirm the readout's wording. Assert control associations by reading the shadow DOM via `javascript_tool`, not from screenshots.
 - [x] 7.4 Live verification of both delivery reads through the scratchpad API script, reading raw `.Content` rather than `Invoke-RestMethod` output.
 - [x] 7.5 End-to-end: book a service whose role requires a capability, confirm it places on an eligible resource; then require a capability nothing carries and confirm the failure is the expected code, not an exception.
-- [ ] 7.6 Stop the TestSite and check port 44348 for orphaned processes.
+- [x] 7.6 Stop the TestSite and check port 44348 for orphaned processes.
 
 ## 8. Handover
 
