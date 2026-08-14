@@ -86,8 +86,7 @@ public class CapabilityEligibilityTests
     {
         var result = await Wire(service, resources).ResolveCandidatesAsync(service.Id);
 
-        Assert.True(result.Succeeded);
-        return [.. result.Value.Select(c => c.Resource.DisplayName)];
+        return [.. result.SingleRolePool().Select(c => c.Resource.DisplayName)];
     }
 
     [Fact]
@@ -160,8 +159,7 @@ public class CapabilityEligibilityTests
 
         var result = await Wire(service, Mary, Frank, Joan).ResolveCandidatesAsync(service.Id);
 
-        Assert.True(result.Succeeded);
-        Assert.Empty(result.Value);
+        Assert.Empty(result.SingleRolePool());
     }
 
     [Fact]

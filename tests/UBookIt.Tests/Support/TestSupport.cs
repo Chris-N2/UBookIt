@@ -241,6 +241,22 @@ public sealed class InMemoryBookingStore : IBookingStore
     }
 }
 
+/// <summary>
+/// Reading a single-role service's candidate pool out of the per-role
+/// resolution result. Asserts the service really does have one role, so a test
+/// written for one role cannot quietly pass by inspecting the first of several.
+/// </summary>
+public static class ResolutionResultExtensions
+{
+    public static IReadOnlyList<ServiceCandidate> SingleRolePool(
+        this DomainResult<IReadOnlyList<RoleCandidates>> result)
+    {
+        Assert.True(result.Succeeded, "resolution failed");
+
+        return Assert.Single(result.Value).Candidates;
+    }
+}
+
 public static class TestData
 {
     public const string LondonZoneId = "Europe/London";

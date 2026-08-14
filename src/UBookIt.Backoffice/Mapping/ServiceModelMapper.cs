@@ -21,8 +21,11 @@ internal static class ServiceModelMapper
         // alongside — not instead of — whatever else the save got wrong. That is
         // what lets one response carry both `type-key-invalid` and
         // `capability-key-invalid` for a role that fumbled both.
+        // Each set's failures carry their own role's index, so a malformed key in
+        // the third role marks the third row rather than the first.
         var capabilities = model.Roles
-            .Select(r => CapabilitySet.Create(r.RequiredCapabilities, CapabilitySet.RequiredField))
+            .Select((r, index) => CapabilitySet.Create(
+                r.RequiredCapabilities, ServiceRole.FieldFor(index, CapabilitySet.RequiredField)))
             .ToList();
 
         var service = Service.Create(

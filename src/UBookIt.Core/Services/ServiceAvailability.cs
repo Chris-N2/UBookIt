@@ -5,8 +5,7 @@ namespace UBookIt.Core.Services;
 
 /// <summary>
 /// An arithmetic run of bookable lengths: <c>Min, Min + Step, …, Max</c>
-/// inclusive. Both bounds are multiples of <see cref="Step"/>, so
-/// <see cref="Max"/> is always itself reachable.
+/// inclusive.
 /// <para>
 /// One contributing resource produces exactly one run at a start. Runs are the
 /// wire and domain shape for service availability because a candidate pool does
@@ -15,15 +14,112 @@ namespace UBookIt.Core.Services;
 /// one grid. Collapsing a start's runs to a single (min, max) pair would
 /// advertise lengths no candidate can book (book-via-service design D3).
 /// </para>
+/// <para>
+/// <b>A run is anchored at its step</b>: <see cref="Min"/> is always a multiple
+/// of <see cref="Step"/>, so the run denotes exactly the multiples of
+/// <see cref="Step"/> in <c>[Min, Max]</c> and two runs are in phase at zero.
+/// Enforced here rather than left to the sites that build runs, because more
+/// than one algorithm silently depends on it: subset elimination compares two
+/// runs of equal step assuming they are in phase, and intersection across roles
+/// takes the least common multiple of two steps on the same assumption. An
+/// out-of-phase run would break both without raising anything — advertising
+/// lengths no resource can book, or discarding lengths that were bookable
+/// (multi-role-composition design D3).
+/// </para>
+/// <para>
+/// The bounds are get-only rather than <c>init</c> so that <c>with</c> cannot
+/// reach past the constructor and rebuild a run out of phase.
+/// </para>
 /// </summary>
-public readonly record struct LengthRun(TimeSpan Min, TimeSpan Max, TimeSpan Step)
+public readonly record struct LengthRun
 {
+    public LengthRun(TimeSpan min, TimeSpan max, TimeSpan step)
+    {
+        if (step <= TimeSpan.Zero)
+        {
+            throw new ArgumentOutOfRangeException(
+                nameof(step), step, "A length run's step must be positive.");
+        }
+
+        if (min < TimeSpan.Zero || max < min)
+        {
+            throw new ArgumentOutOfRangeException(
+                nameof(max), max, $"A length run's range must be non-negative and ordered (min {min}, max {max}).");
+        }
+
+        if (min.Ticks % step.Ticks != 0)
+        {
+            throw new ArgumentException(
+                $"A length run must be anchored at its step: a minimum of {min} is not a multiple of {step}.",
+                nameof(min));
+        }
+
+        // The union-availability requirement also states that Max is a multiple
+        // of Step, "so Max is always reachable". Every producer already floors
+        // it; checking it here is what stops that from being a second property
+        // three algorithms rely on and nothing enforces.
+        if (max.Ticks % step.Ticks != 0)
+        {
+            throw new ArgumentException(
+                $"A length run's maximum must be reachable: {max} is not a multiple of {step}.",
+                nameof(max));
+        }
+
+        Min = min;
+        Max = max;
+        Step = step;
+    }
+
+    /// <summary>The shortest length this run offers. Always a multiple of <see cref="Step"/>.</summary>
+    public TimeSpan Min { get; }
+
+    /// <summary>The longest length this run offers.</summary>
+    public TimeSpan Max { get; }
+
+    /// <summary>The spacing between the lengths this run offers.</summary>
+    public TimeSpan Step { get; }
+
     /// <summary>True when this run admits exactly one length.</summary>
     public bool IsSingleLength => Min == Max;
 
     /// <summary>Whether a length is one of the lengths this run denotes.</summary>
     public bool Admits(TimeSpan duration)
         => duration >= Min && duration <= Max && (duration - Min).Ticks % Step.Ticks == 0;
+
+    /// <summary>
+    /// The lengths this run and <paramref name="other"/> both offer, as a run.
+    /// <para>
+    /// Because every run is anchored at zero, the common lengths are exactly the
+    /// multiples of the least common multiple of the two steps inside the
+    /// overlap of the two ranges — arithmetic, with no congruence to solve. The
+    /// result is anchored too, so the representation is closed under
+    /// intersection (multi-role-composition design D3).
+    /// </para>
+    /// <para>
+    /// Returns false when the two offer no length in common, which is an answer
+    /// rather than a failure: a start where two roles share no bookable length
+    /// is simply not a start the service can be booked at.
+    /// </para>
+    /// </summary>
+    public bool TryIntersect(LengthRun other, out LengthRun result)
+    {
+        var step = DurationMath.Lcm(Step, other.Step);
+
+        // Inward to the shared grid from both ends: ceiling the minimum and
+        // flooring the maximum can only ever discard lengths one of the two
+        // cannot book.
+        var min = DurationMath.CeilTo(DurationMath.MaxOf(Min, other.Min), step);
+        var max = DurationMath.FloorTo(DurationMath.MinOf(Max, other.Max), step);
+
+        if (min > max)
+        {
+            result = default;
+            return false;
+        }
+
+        result = new LengthRun(min, max, step);
+        return true;
+    }
 
     /// <summary>The lengths this run denotes, ascending.</summary>
     public IEnumerable<TimeSpan> Lengths()
@@ -60,3 +156,21 @@ public sealed record ServiceCandidate(Resource Resource, DurationRange Range)
 
     public TimeSpan Granularity => Resource.Availability.Constraints.Granularity;
 }
+
+/// <summary>
+/// One role of a service with the resources able to fill it.
+/// <para>
+/// Pools are kept per role rather than flattened into one because a booking
+/// takes one resource from <em>each</em> — a flat pool could not say which role
+/// a resource was counted for, and every rule this change adds (a start every
+/// role can fulfil, a length every role can provide, one claim per role) is
+/// stated over the roles individually.
+/// </para>
+/// <para>
+/// Every role names a distinct resource type, so the pools are disjoint: no
+/// resource appears in two of them. That is what makes choosing each role a
+/// candidate independently correct rather than merely convenient
+/// (multi-role-composition design D1).
+/// </para>
+/// </summary>
+public sealed record RoleCandidates(ServiceRole Role, IReadOnlyList<ServiceCandidate> Candidates);

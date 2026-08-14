@@ -13,6 +13,9 @@ public class ServiceTests
 {
     private static ServiceRole Role(string type = "person", int count = 1) => new(type, count);
 
+    private static ServiceRole WithCapabilities(ServiceRole role, params string[] keys)
+        => role with { RequiredCapabilities = CapabilitySet.Create(keys, CapabilitySet.RequiredField).Value };
+
     private static ServiceDuration Fixed(int minutes)
         => ServiceDuration.Fixed(TimeSpan.FromMinutes(minutes)).Value;
 
@@ -78,12 +81,89 @@ public class ServiceTests
     }
 
     [Fact]
-    public void Multiple_roles_are_rejected_in_v1()
+    public void Several_roles_of_different_types_are_accepted()
     {
-        var result = Service.Create("X", null, [Role("room"), Role("person")]);
+        var result = Service.Create("Massage", null, [Role("room"), Role("therapist")]);
+
+        Assert.True(result.Succeeded);
+        Assert.Equal(["room", "therapist"], result.Value.Roles.Select(r => r.ResourceType));
+        Assert.All(result.Value.Roles, r => Assert.Equal(1, r.Count));
+    }
+
+    [Fact]
+    public void Two_roles_of_the_same_type_are_rejected()
+    {
+        // The pair the restriction exists for: same type, different capabilities,
+        // so the pools overlap without being equal.
+        var result = Service.Create(
+            "X",
+            null,
+            [WithCapabilities(Role("therapist"), "cert-x"), Role("therapist")]);
 
         Assert.False(result.Succeeded);
-        Assert.Contains(result.Failures, f => f.Code == FailureCodes.ServiceRoleInvalid);
+
+        var failure = Assert.Single(result.Failures, f => f.Code == FailureCodes.ServiceRoleDuplicateType);
+        Assert.Contains("therapist", failure.Message, StringComparison.Ordinal);
+
+        // Distinct from the malformed-key code: one is a typo, the other a
+        // composition this version does not support, and they are corrected
+        // differently.
+        Assert.DoesNotContain(result.Failures, f => f.Code == FailureCodes.TypeKeyInvalid);
+    }
+
+    [Fact]
+    public void Differing_capabilities_do_not_make_two_roles_distinct()
+    {
+        // Every dimension of a role other than its type varied at once: if the
+        // rule ever compared more than the type, this is the case that catches it.
+        var result = Service.Create(
+            "X",
+            null,
+            [
+                WithCapabilities(Role("therapist"), "cert-x", "cert-y"),
+                WithCapabilities(Role("therapist"), "cert-z"),
+            ]);
+
+        Assert.False(result.Succeeded);
+        Assert.Contains(result.Failures, f => f.Code == FailureCodes.ServiceRoleDuplicateType);
+    }
+
+    [Fact]
+    public void Two_roles_requiring_no_capabilities_of_the_same_type_are_rejected()
+    {
+        // The degenerate instance of the same rule — identical roles. Kept
+        // alongside the differing-capability case so neither can pass alone.
+        var result = Service.Create("X", null, [Role("therapist"), Role("therapist")]);
+
+        Assert.False(result.Succeeded);
+        Assert.Contains(result.Failures, f => f.Code == FailureCodes.ServiceRoleDuplicateType);
+    }
+
+    [Fact]
+    public void A_duplicate_type_is_attributed_to_the_repeated_role()
+    {
+        var result = Service.Create("X", null, [Role("room"), Role("therapist"), Role("therapist")]);
+
+        var failure = Assert.Single(result.Failures, f => f.Code == FailureCodes.ServiceRoleDuplicateType);
+
+        // The row that repeated the type, not the row that introduced it.
+        Assert.Equal("Roles[2].ResourceType", failure.Field);
+    }
+
+    [Fact]
+    public void Role_order_is_not_observable()
+    {
+        var forwards = Service.Create("X", null, [WithCapabilities(Role("room"), "projector"), Role("therapist")]);
+        var backwards = Service.Create("X", null, [Role("therapist"), WithCapabilities(Role("room"), "projector")]);
+
+        Assert.True(forwards.Succeeded);
+        Assert.True(backwards.Succeeded);
+
+        // The same set of roles either way round: nothing downstream may depend
+        // on the order they were supplied in.
+        Assert.Equal(
+            forwards.Value.Roles.OrderBy(r => r.ResourceType, StringComparer.Ordinal),
+            backwards.Value.Roles.OrderBy(r => r.ResourceType, StringComparer.Ordinal));
     }
 
     [Fact]

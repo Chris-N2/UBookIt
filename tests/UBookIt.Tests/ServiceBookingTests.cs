@@ -116,10 +116,9 @@ public class ServiceBookingTests
 
         var result = await harness.Services.ResolveCandidatesAsync(service.Id);
 
-        Assert.True(result.Succeeded);
         Assert.Equal(
             new[] { Id(1), Id(2), Id(3), Id(4) },
-            result.Value.Select(c => c.ResourceId).ToArray());
+            result.SingleRolePool().Select(c => c.ResourceId).ToArray());
     }
 
     [Fact]
@@ -131,7 +130,7 @@ public class ServiceBookingTests
         var result = await harness.Services.ResolveCandidatesAsync(service.Id);
 
         Assert.True(result.Succeeded, "exclusion is an answer about the resource, not a validation failure");
-        Assert.Equal(Id(2), Assert.Single(result.Value).ResourceId);
+        Assert.Equal(Id(2), Assert.Single(result.SingleRolePool()).ResourceId);
     }
 
     [Fact]
@@ -143,8 +142,7 @@ public class ServiceBookingTests
 
         var result = await harness.Services.ResolveCandidatesAsync(service.Id);
 
-        Assert.True(result.Succeeded);
-        Assert.Equal(Id(2), Assert.Single(result.Value).ResourceId);
+        Assert.Equal(Id(2), Assert.Single(result.SingleRolePool()).ResourceId);
     }
 
     [Fact]
@@ -158,8 +156,7 @@ public class ServiceBookingTests
 
         var result = await harness.Services.ResolveCandidatesAsync(service.Id);
 
-        Assert.True(result.Succeeded);
-        Assert.Equal(501, result.Value.Count);
+        Assert.Equal(501, result.SingleRolePool().Count);
     }
 
     [Fact]
@@ -181,7 +178,7 @@ public class ServiceBookingTests
         var service = Svc(ServiceDuration.Variable(Mins(60), Mins(180)).Value);
         var harness = Wire(service, Room(1, granularity: 30, min: 30, max: 120));
 
-        var candidate = Assert.Single((await harness.Services.ResolveCandidatesAsync(service.Id)).Value);
+        var candidate = Assert.Single((await harness.Services.ResolveCandidatesAsync(service.Id)).SingleRolePool());
 
         Assert.Equal(new DurationRange(Mins(60), Mins(120)), candidate.Range);
     }
@@ -192,7 +189,7 @@ public class ServiceBookingTests
         var service = Svc(ServiceDuration.Variable(null, Mins(240)).Value);
         var harness = Wire(service, Room(1, max: 90));
 
-        var candidate = Assert.Single((await harness.Services.ResolveCandidatesAsync(service.Id)).Value);
+        var candidate = Assert.Single((await harness.Services.ResolveCandidatesAsync(service.Id)).SingleRolePool());
 
         Assert.Equal(Mins(90), candidate.Range.Max);
     }
@@ -206,7 +203,7 @@ public class ServiceBookingTests
             Room(1, granularity: 30, min: 30, max: 60),
             Room(2, granularity: 20, min: 20, max: 40));
 
-        var candidates = (await harness.Services.ResolveCandidatesAsync(service.Id)).Value;
+        var candidates = (await harness.Services.ResolveCandidatesAsync(service.Id)).SingleRolePool();
 
         Assert.Equal(new DurationRange(Mins(30), Mins(60)), candidates[0].Range);
         Assert.Equal(new DurationRange(Mins(20), Mins(40)), candidates[1].Range);
@@ -307,7 +304,7 @@ public class ServiceBookingTests
         {
             var expected = new SortedSet<TimeSpan>();
 
-            foreach (var candidate in (await harness.Services.ResolveCandidatesAsync(service.Id)).Value)
+            foreach (var candidate in (await harness.Services.ResolveCandidatesAsync(service.Id)).SingleRolePool())
             {
                 var perResource = harness.Availability.ProjectBookableStarts(
                     candidate.Resource, await harness.Store.GetClaimsAsync(

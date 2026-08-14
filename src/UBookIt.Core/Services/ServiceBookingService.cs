@@ -53,26 +53,38 @@ public interface IServiceBookingService
         ServiceRole role, ServiceDuration duration, CancellationToken cancellationToken = default);
 
     /// <summary>
-    /// The service's candidate pool: every eligible resource with the lengths the
-    /// service permits on it. A thin wrapper that loads the service and delegates
-    /// to <see cref="ResolveAsync(ServiceRole, ServiceDuration, CancellationToken)"/>,
-    /// projecting the pool from the chain rather than filtering again (design D1).
-    /// Fails with <see cref="FailureCodes.ServiceNotFound"/> for an unknown id.
+    /// The service's candidate pools, one per role: every eligible resource with
+    /// the lengths the service permits on it. A thin wrapper that loads the
+    /// service and delegates to
+    /// <see cref="ResolveAsync(ServiceRole, ServiceDuration, CancellationToken)"/>
+    /// once per role, projecting each pool from its chain rather than filtering
+    /// again (design D1). Fails with <see cref="FailureCodes.ServiceNotFound"/>
+    /// for an unknown id.
+    /// <para>
+    /// Pools are returned per role rather than merged: a booking claims one
+    /// resource from each, so which role a resource was resolved for is part of
+    /// the answer, not an implementation detail.
+    /// </para>
     /// <para>
     /// There is deliberately no by-id overload returning the whole chain. The
     /// only caller that wants a chain is the configuration preview, which asks
-    /// about a configuration being edited and therefore has a role and a
+    /// about a configuration being edited and therefore has roles and a
     /// duration rather than an id — so such an overload would be public surface
     /// with no consumer.
     /// </para>
     /// </summary>
-    Task<DomainResult<IReadOnlyList<ServiceCandidate>>> ResolveCandidatesAsync(
+    Task<DomainResult<IReadOnlyList<RoleCandidates>>> ResolveCandidatesAsync(
         Guid serviceId, CancellationToken cancellationToken = default);
 
     /// <summary>
-    /// Every start over the range at which some candidate can fulfil the
-    /// service, with the lengths bookable there as arithmetic runs. Takes no
-    /// duration: one response answers every length.
+    /// Every start over the range at which the service can be booked, with the
+    /// lengths bookable there as arithmetic runs. Takes no duration: one
+    /// response answers every length.
+    /// <para>
+    /// Within a role that is the union over its candidates; across roles it is
+    /// the intersection, because a booking has one interval and one length and
+    /// every role has to be able to fulfil it (design D2).
+    /// </para>
     /// </summary>
     Task<DomainResult<IReadOnlyList<ServiceBookableStart>>> GetBookableStartsAsync(
         Guid serviceId, DateOnly fromDate, DateOnly toDate, CancellationToken cancellationToken = default);
@@ -146,23 +158,30 @@ public sealed class ServiceBookingService(
         return new ServiceResolution(stage1, stage2, candidates, exclusions);
     }
 
-    public async Task<DomainResult<IReadOnlyList<ServiceCandidate>>> ResolveCandidatesAsync(
+    public async Task<DomainResult<IReadOnlyList<RoleCandidates>>> ResolveCandidatesAsync(
         Guid serviceId, CancellationToken cancellationToken = default)
     {
         var service = await serviceStore.GetAsync(serviceId, cancellationToken).ConfigureAwait(false);
         if (service is null)
         {
-            return DomainResult<IReadOnlyList<ServiceCandidate>>.Failure(
+            return DomainResult<IReadOnlyList<RoleCandidates>>.Failure(
                 FailureCodes.ServiceNotFound, $"No service exists with id {serviceId}.");
         }
 
-        // v1 guarantees exactly one role of count 1 (services spec); multi-role
-        // composition is a later slice.
-        var resolution = await ResolveAsync(service.Roles[0], service.Duration, cancellationToken)
-            .ConfigureAwait(false);
+        var pools = new List<RoleCandidates>(service.Roles.Count);
 
-        // The pool is the chain's final stage, projected — never recomputed.
-        return DomainResult<IReadOnlyList<ServiceCandidate>>.Success(resolution.Candidates);
+        foreach (var role in service.Roles)
+        {
+            // One evaluation per role. The roles name distinct types, so the
+            // pools cannot overlap and resolving them independently loses
+            // nothing (design D1).
+            var resolution = await ResolveAsync(role, service.Duration, cancellationToken).ConfigureAwait(false);
+
+            // The pool is the chain's final stage, projected — never recomputed.
+            pools.Add(new RoleCandidates(role, resolution.Candidates));
+        }
+
+        return DomainResult<IReadOnlyList<RoleCandidates>>.Success(pools);
     }
 
     public async Task<DomainResult<IReadOnlyList<ServiceBookableStart>>> GetBookableStartsAsync(
@@ -183,8 +202,11 @@ public sealed class ServiceBookingService(
             return DomainResult<IReadOnlyList<ServiceBookableStart>>.Failure(candidateResult.Failures);
         }
 
-        var candidates = candidateResult.Value;
-        if (candidates.Count == 0)
+        var pools = candidateResult.Value;
+
+        // A role nothing can fill makes the whole service unbookable: the
+        // intersection with an empty set is empty, whichever role it was.
+        if (pools.Any(p => p.Candidates.Count == 0))
         {
             return DomainResult<IReadOnlyList<ServiceBookableStart>>.Success([]);
         }
@@ -201,11 +223,57 @@ public sealed class ServiceBookingService(
         // (out-of-range-dates D1). That ordering is load-bearing, not incidental.
         var claims = await bookingStore
             .GetClaimsAsync(
-                [.. candidates.Select(c => c.ResourceId)],
+                [.. pools.SelectMany(p => p.Candidates).Select(c => c.ResourceId)],
                 WallClockMapper.ToUtc(fromDate, TimeOnly.MinValue, zone),
                 WallClockMapper.ToUtc(toDate.AddDays(1), TimeOnly.MinValue, zone),
                 cancellationToken)
             .ConfigureAwait(false);
+
+        Dictionary<DateTimeOffset, HashSet<LengthRun>>? composite = null;
+
+        foreach (var pool in pools)
+        {
+            var byStart = UnionOverPool(pool.Candidates, claims, fromDate, toDate, out var failures);
+            if (byStart is null)
+            {
+                return DomainResult<IReadOnlyList<ServiceBookableStart>>.Failure(failures!);
+            }
+
+            // Folded pairwise, left to right: the first role seeds the composite
+            // and each further role narrows it.
+            composite = composite is null ? byStart : Intersect(composite, byStart);
+
+            if (composite.Count == 0)
+            {
+                break;
+            }
+        }
+
+        IReadOnlyList<ServiceBookableStart> result = (composite ?? [])
+            .OrderBy(entry => entry.Key)
+            .Select(entry => new ServiceBookableStart(entry.Key, Collapse(entry.Value)))
+            .ToList();
+
+        return DomainResult<IReadOnlyList<ServiceBookableStart>>.Success(result);
+    }
+
+    /// <summary>
+    /// One role's availability: the union over its candidates of the lengths
+    /// each offers at each start.
+    /// <para>
+    /// Returns null and sets <paramref name="failures"/> when a candidate's
+    /// projection fails, so the caller can report it rather than compose an
+    /// answer over a pool it could not read.
+    /// </para>
+    /// </summary>
+    private Dictionary<DateTimeOffset, HashSet<LengthRun>>? UnionOverPool(
+        IReadOnlyList<ServiceCandidate> candidates,
+        IReadOnlyList<ClaimInfo> claims,
+        DateOnly fromDate,
+        DateOnly toDate,
+        out IReadOnlyList<DomainFailure>? failures)
+    {
+        failures = null;
 
         // Runs are accumulated per start. A set per start collapses identical
         // runs — two candidates configured alike offer the same lengths, and
@@ -217,7 +285,8 @@ public sealed class ServiceBookingService(
             var starts = availability.ProjectBookableStarts(candidate.Resource, claims, fromDate, toDate);
             if (!starts.Succeeded)
             {
-                return DomainResult<IReadOnlyList<ServiceBookableStart>>.Failure(starts.Failures);
+                failures = starts.Failures;
+                return null;
             }
 
             foreach (var start in starts.Value)
@@ -245,12 +314,58 @@ public sealed class ServiceBookingService(
             }
         }
 
-        IReadOnlyList<ServiceBookableStart> result = byStart
-            .OrderBy(entry => entry.Key)
-            .Select(entry => new ServiceBookableStart(entry.Key, Collapse(entry.Value)))
-            .ToList();
+        return byStart;
+    }
 
-        return DomainResult<IReadOnlyList<ServiceBookableStart>>.Success(result);
+    /// <summary>
+    /// Composes two roles' availability: the starts both offer, and at each of
+    /// those the lengths both offer.
+    /// <para>
+    /// Starts are absolute instants, so intersecting them is plain set
+    /// intersection — two roles on different granularities simply share fewer
+    /// starts. Lengths need more care: each role offers a <em>set</em> of runs
+    /// at a start, and set intersection distributes over union, so the composite
+    /// is every pairwise run intersection (design D2). Intersecting only the
+    /// outermost bounds would advertise lengths no pair of resources can book.
+    /// </para>
+    /// </summary>
+    private static Dictionary<DateTimeOffset, HashSet<LengthRun>> Intersect(
+        Dictionary<DateTimeOffset, HashSet<LengthRun>> left,
+        Dictionary<DateTimeOffset, HashSet<LengthRun>> right)
+    {
+        var composed = new Dictionary<DateTimeOffset, HashSet<LengthRun>>();
+
+        foreach (var (start, leftRuns) in left)
+        {
+            if (!right.TryGetValue(start, out var rightRuns))
+            {
+                // A start only one role can fulfil is not a start the service
+                // can be booked at.
+                continue;
+            }
+
+            var shared = new HashSet<LengthRun>();
+
+            foreach (var a in leftRuns)
+            {
+                foreach (var b in rightRuns)
+                {
+                    if (a.TryIntersect(b, out var run))
+                    {
+                        shared.Add(run);
+                    }
+                }
+            }
+
+            // No length common to both roles: the start goes too, rather than
+            // being offered with nothing bookable at it.
+            if (shared.Count > 0)
+            {
+                composed[start] = shared;
+            }
+        }
+
+        return composed;
     }
 
     /// <summary>
@@ -290,13 +405,14 @@ public sealed class ServiceBookingService(
             return DomainResult<Booking>.Failure(candidateResult.Failures);
         }
 
-        var candidates = candidateResult.Value;
+        var pools = candidateResult.Value;
 
         // Before the empty-pool guard: a preference naming a resource outside
-        // the pool is equally wrong whether the pool is empty or merely lacks
+        // every pool is equally wrong whether some pool is empty or merely lacks
         // that resource, and the caller's own mistake is the more useful thing
         // to report.
-        if (request.PreferredResourceId is { } preferred && candidates.All(c => c.ResourceId != preferred))
+        if (request.PreferredResourceId is { } preferred
+            && !pools.Any(p => p.Candidates.Any(c => c.ResourceId == preferred)))
         {
             // Rejected rather than ignored: the caller named a resource, and
             // quietly booking a different one discards that invisibly (design D9).
@@ -306,7 +422,7 @@ public sealed class ServiceBookingService(
                 nameof(ServiceBookingRequest.PreferredResourceId));
         }
 
-        if (candidates.Count == 0)
+        if (pools.Any(p => p.Candidates.Count == 0))
         {
             return Unavailable("No resource is currently able to fulfil this service.");
         }
@@ -314,36 +430,43 @@ public sealed class ServiceBookingService(
         // Pool-wide bounds are decided from constraints alone, before any
         // free-time or placement work, so an obviously wrong length gets an
         // actionable code rather than falling through the loop (design D8).
-        var boundsFailure = ValidateAgainstPoolBounds(request.Duration, candidates);
+        var boundsFailure = ValidateAgainstPoolBounds(request.Duration, pools);
         if (boundsFailure is not null)
         {
             return DomainResult<Booking>.Failure(boundsFailure);
         }
 
-        var attemptable = Order(candidates, request.PreferredResourceId)
-            .Where(c => Admits(c, request.Duration))
+        // One ordered shortlist per role. A preferred resource belongs to
+        // exactly one role's pool — a resource has one type — so it orders that
+        // role's candidates and leaves the others untouched.
+        var attemptable = pools
+            .Select(pool => Order(pool.Candidates, request.PreferredResourceId)
+                .Where(c => Admits(c, request.Duration))
+                .ToList())
             .ToList();
 
-        if (attemptable.Count == 0)
+        if (attemptable.Any(shortlist => shortlist.Count == 0))
         {
-            // In bounds pool-wide, but no single candidate's own range admits it
-            // — a gap between candidates, or off every grid. Deterministic.
+            // In bounds pool-wide, but some role has no candidate whose own
+            // range admits it — a gap between candidates, or off every grid.
+            // Deterministic.
             return Unavailable(
                 $"No resource able to fulfil this service can be booked for {request.Duration.TotalMinutes:0} minutes.");
         }
 
         var raced = false;
 
-        foreach (var candidate in attemptable)
+        foreach (var combination in Combinations(attemptable))
         {
-            // The full per-resource pipeline, unchanged, one attempt at a time:
-            // at most one resource lock is held at any moment, and a failed
-            // attempt leaves no rows (bookings spec, atomic placement contract).
+            // One booking claiming one resource per role, placed through the
+            // store's all-or-nothing contract: either every claim is persisted
+            // or none is, so attempting combinations in sequence is safe
+            // (bookings spec, atomic placement contract).
             var placed = await bookingService
                 .PlaceAsync(
-                    new BookingRequest
+                    new MultiClaimBookingRequest
                     {
-                        ResourceId = candidate.ResourceId,
+                        ResourceIds = [.. combination.Select(c => c.ResourceId)],
                         Start = request.Start,
                         Duration = request.Duration,
                         Booker = request.Booker,
@@ -429,11 +552,60 @@ public sealed class ServiceBookingService(
                 .Concat(candidates.Where(c => c.ResourceId != preferred))
             : candidates;
 
-    private static DomainFailure? ValidateAgainstPoolBounds(
-        TimeSpan duration, IReadOnlyList<ServiceCandidate> candidates)
+    /// <summary>
+    /// Every combination of one candidate per role, in a deterministic order:
+    /// the last role varies fastest, so repeated identical requests attempt the
+    /// same combinations in the same sequence.
+    /// <para>
+    /// Lazy, so a successful first attempt costs one placement. The number of
+    /// combinations is the product of the shortlist sizes; it is bounded in
+    /// practice by roles being few and by every candidate having already been
+    /// filtered to those admitting the requested length.
+    /// </para>
+    /// </summary>
+    private static IEnumerable<ServiceCandidate[]> Combinations(List<List<ServiceCandidate>> shortlists)
     {
-        var shortest = candidates.Min(c => c.Range.Min);
-        var longest = candidates.Max(c => c.Range.Max);
+        var indices = new int[shortlists.Count];
+
+        while (true)
+        {
+            var combination = new ServiceCandidate[shortlists.Count];
+            for (var role = 0; role < shortlists.Count; role++)
+            {
+                combination[role] = shortlists[role][indices[role]];
+            }
+
+            yield return combination;
+
+            var position = shortlists.Count - 1;
+            while (position >= 0 && ++indices[position] == shortlists[position].Count)
+            {
+                indices[position] = 0;
+                position--;
+            }
+
+            if (position < 0)
+            {
+                yield break;
+            }
+        }
+    }
+
+    /// <summary>
+    /// Whether the requested length is one <em>some</em> candidate of
+    /// <em>every</em> role could provide, judged from constraints alone.
+    /// <para>
+    /// The floor is the highest of the roles' own floors and the ceiling the
+    /// lowest of their ceilings: a length below any one role's shortest, or
+    /// above any one role's longest, cannot be booked whatever the other roles
+    /// permit.
+    /// </para>
+    /// </summary>
+    private static DomainFailure? ValidateAgainstPoolBounds(
+        TimeSpan duration, IReadOnlyList<RoleCandidates> pools)
+    {
+        var shortest = pools.Max(p => p.Candidates.Min(c => c.Range.Min));
+        var longest = pools.Min(p => p.Candidates.Max(c => c.Range.Max));
 
         if (duration < shortest)
         {

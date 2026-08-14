@@ -1,24 +1,24 @@
 ## 1. Core — the domain rule
 
-- [ ] 1.1 Let `Service.Create` accept several roles; keep `Count == 1` per role.
-- [ ] 1.2 Reject two roles naming the same resource type with a new stable code, distinct from `type-key-invalid`, naming the duplicated type (design D1). Add the code alongside the existing ones.
-- [ ] 1.3 Unit tests: several roles of distinct types accepted; same-type roles rejected **whatever their capabilities differ by**; role order not observable; existing single-role scenarios unchanged.
-- [ ] 1.4 Mutation-check 1.3: make the duplicate check compare type **and** capabilities, and confirm the "differing capabilities do not make two roles distinct" test fails. A rule that only rejects identical roles is the plausible wrong implementation, and it would leave exactly the overlapping-pool case unguarded.
+- [x] 1.1 Let `Service.Create` accept several roles; keep `Count == 1` per role.
+- [x] 1.2 Reject two roles naming the same resource type with a new stable code, distinct from `type-key-invalid`, naming the duplicated type (design D1). Add the code alongside the existing ones.
+- [x] 1.3 Unit tests: several roles of distinct types accepted; same-type roles rejected **whatever their capabilities differ by**; role order not observable; existing single-role scenarios unchanged.
+- [x] 1.4 Mutation-check 1.3: make the duplicate check compare type **and** capabilities, and confirm the "differing capabilities do not make two roles distinct" test fails. A rule that only rejects identical roles is the plausible wrong implementation, and it would leave exactly the overlapping-pool case unguarded.
 
 ## 2. Core — the length-run invariant
 
-- [ ] 2.1 Enforce `Min ≡ 0 (mod Step)` where `LengthRun` is constructed, rather than relying on every call site (design D3). Three algorithms will depend on it once intersection lands.
-- [ ] 2.2 Unit tests: every run produced by availability projection and duration resolution is anchored; an out-of-phase construction is rejected.
-- [ ] 2.3 Mutation-check: remove the enforcement and confirm 2.2 fails. Then confirm the existing subset-elimination tests still pass without it — demonstrating that the invariant was previously unguarded, which is the reason for 2.1.
+- [x] 2.1 Enforce `Min ≡ 0 (mod Step)` where `LengthRun` is constructed, rather than relying on every call site (design D3). Three algorithms will depend on it once intersection lands.
+- [x] 2.2 Unit tests: every run produced by availability projection and duration resolution is anchored; an out-of-phase construction is rejected.
+- [x] 2.3 Mutation-check: remove the enforcement and confirm 2.2 fails. Then confirm the existing subset-elimination tests still pass without it — demonstrating that the invariant was previously unguarded, which is the reason for 2.1.
 
 ## 3. Core — composite availability
 
-- [ ] 3.1 Add run intersection: `lcm` of steps over the overlap of ranges, computed as `a / gcd(a, b) * b` so the intermediate cannot overflow where `a * b` would (design D3).
-- [ ] 3.2 Compose across roles: intersect the starts, then at each common start take every pairwise run intersection and pass the result through the existing `Collapse` (design D2).
-- [ ] 3.3 Unit tests from the spec scenarios: a start only one role can fulfil is dropped; `{30,120,30}` ∩ `{20,120,20}` = `{60,120,60}`; disjoint length ranges drop the start entirely; 30 and 45 grids intersect to 90; intersection distributes over each role's union.
-- [ ] 3.4 Property test: the composite's length set equals `{ d : every role has a candidate offering d }`, computed independently by enumerating each role's lengths. This is the definition the run arithmetic is an optimisation of, and it is the only check that would catch a wrong `lcm`.
-- [ ] 3.5 Equivalence test: a single-role service's composite availability is **identical** to its union availability. This is the regression gate for every ⑦-2 scenario.
-- [ ] 3.6 Mutation-check 3.3 and 3.4: replace `lcm` with `max` of the two steps, and separately intersect only the outer bounds ignoring steps. Both are the plausible wrong implementations; a suite that stays green under either is not testing the arithmetic.
+- [x] 3.1 Add run intersection: `lcm` of steps over the overlap of ranges, computed as `a / gcd(a, b) * b` so the intermediate cannot overflow where `a * b` would (design D3).
+- [x] 3.2 Compose across roles: intersect the starts, then at each common start take every pairwise run intersection and pass the result through the existing `Collapse` (design D2).
+- [x] 3.3 Unit tests from the spec scenarios: a start only one role can fulfil is dropped; `{30,120,30}` ∩ `{20,120,20}` = `{60,120,60}`; disjoint length ranges drop the start entirely; 30 and 45 grids intersect to 90; intersection distributes over each role's union.
+- [x] 3.4 Property test: the composite's length set equals `{ d : every role has a candidate offering d }`, computed independently by enumerating each role's lengths. This is the definition the run arithmetic is an optimisation of, and it is the only check that would catch a wrong `lcm`.
+- [x] 3.5 Equivalence test: a single-role service's composite availability is **identical** to its union availability. This is the regression gate for every ⑦-2 scenario.
+- [x] 3.6 Mutation-check 3.3 and 3.4: replace `lcm` with `max` of the two steps, and separately intersect only the outer bounds ignoring steps. Both are the plausible wrong implementations; a suite that stays green under either is not testing the arithmetic.
 
 ## 4. Core — placement
 

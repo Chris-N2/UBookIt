@@ -53,6 +53,21 @@ public static class FailureCodes
     // Services
     public const string ServiceNameRequired = "service-name-required";
     public const string ServiceRoleInvalid = "service-role-invalid";
+
+    /// <summary>
+    /// Two of a service's roles name the same resource type. Distinct from
+    /// <see cref="TypeKeyInvalid"/> because the two faults are corrected
+    /// differently: that one is a typo in a key, this one a composition this
+    /// version does not support.
+    /// <para>
+    /// A deliberate restriction of this version rather than a property of
+    /// services (multi-role-composition design D1): roles of the same type draw
+    /// from overlapping eligibility pools, where assigning each role its first
+    /// available candidate can report a service unavailable when it was
+    /// bookable. The change that implements real assignment lifts it.
+    /// </para>
+    /// </summary>
+    public const string ServiceRoleDuplicateType = "service-role-duplicate-type";
     public const string ServiceDurationInvalid = "service-duration-invalid";
     public const string ServiceNotFound = "service-not-found";
 

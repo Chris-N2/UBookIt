@@ -250,10 +250,9 @@ public class ServiceResolutionTests
         var direct = await resolution.ResolveAsync(role, duration);
         var byId = await resolution.ResolveCandidatesAsync(service.Id);
 
-        Assert.True(byId.Succeeded);
         Assert.Equal(
             direct.Candidates.Select(c => c.ResourceId),
-            byId.Value.Select(c => c.ResourceId));
+            byId.SingleRolePool().Select(c => c.ResourceId));
     }
 
     [Fact]
@@ -282,10 +281,9 @@ public class ServiceResolutionTests
             var chain = await resolution.ResolveAsync(configuredRole, duration);
             var pool = await resolution.ResolveCandidatesAsync(service.Id);
 
-            Assert.True(pool.Succeeded);
             Assert.Equal(
                 chain.Candidates.Select(c => c.ResourceId).OrderBy(id => id),
-                pool.Value.Select(c => c.ResourceId).OrderBy(id => id));
+                pool.SingleRolePool().Select(c => c.ResourceId).OrderBy(id => id));
         }
     }
 

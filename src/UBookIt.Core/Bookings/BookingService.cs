@@ -1,5 +1,6 @@
 using UBookIt.Core.Availability;
 using UBookIt.Core.Common;
+using UBookIt.Core.Resources;
 using UBookIt.Core.Stores;
 
 namespace UBookIt.Core.Bookings;
@@ -8,6 +9,27 @@ namespace UBookIt.Core.Bookings;
 public sealed record BookingRequest
 {
     public required Guid ResourceId { get; init; }
+
+    public required DateTimeOffset Start { get; init; }
+
+    public required TimeSpan Duration { get; init; }
+
+    public required Booker Booker { get; init; }
+}
+
+/// <summary>
+/// A request to place one booking claiming several resources at once — the
+/// shape a multi-role service resolves to. All claims share the booking's single
+/// interval, which is what the store's atomic contract is defined over.
+/// </summary>
+public sealed record MultiClaimBookingRequest
+{
+    /// <summary>
+    /// The resources to claim, one per role. Every one of them is validated
+    /// against its own constraints: a booking is placed only where each
+    /// resource would have accepted it on its own.
+    /// </summary>
+    public required IReadOnlyList<Guid> ResourceIds { get; init; }
 
     public required DateTimeOffset Start { get; init; }
 
@@ -25,6 +47,19 @@ public interface IBookingService
     /// </summary>
     Task<DomainResult<Booking>> PlaceAsync(BookingRequest request, CancellationToken cancellationToken = default);
 
+    /// <summary>
+    /// The same pipeline for a booking claiming several resources: every
+    /// resource is validated against its own constraints, and one booking
+    /// carrying a claim for each is placed through the store's all-or-nothing
+    /// contract.
+    /// <para>
+    /// The single-resource overload delegates here rather than duplicating the
+    /// rules, so direct placement and service placement cannot drift apart.
+    /// </para>
+    /// </summary>
+    Task<DomainResult<Booking>> PlaceAsync(
+        MultiClaimBookingRequest request, CancellationToken cancellationToken = default);
+
     Task<DomainResult<Booking>> CancelAsync(Guid bookingId, CancellationToken cancellationToken = default);
 }
 
@@ -34,8 +69,20 @@ public sealed class BookingService(
     TimeProvider timeProvider,
     SiteBookingSettings settings) : IBookingService
 {
-    public async Task<DomainResult<Booking>> PlaceAsync(
+    public Task<DomainResult<Booking>> PlaceAsync(
         BookingRequest request, CancellationToken cancellationToken = default)
+        => PlaceAsync(
+            new MultiClaimBookingRequest
+            {
+                ResourceIds = [request.ResourceId],
+                Start = request.Start,
+                Duration = request.Duration,
+                Booker = request.Booker,
+            },
+            cancellationToken);
+
+    public async Task<DomainResult<Booking>> PlaceAsync(
+        MultiClaimBookingRequest request, CancellationToken cancellationToken = default)
     {
         var zoneResult = AvailabilityService.ResolveZone(settings);
         if (!zoneResult.Succeeded)
@@ -45,11 +92,27 @@ public sealed class BookingService(
 
         var zone = zoneResult.Value;
 
-        var resource = await resourceStore.GetAsync(request.ResourceId, cancellationToken).ConfigureAwait(false);
-        if (resource is null)
+        if (request.ResourceIds.Count == 0)
         {
             return DomainResult<Booking>.Failure(
-                FailureCodes.ResourceNotFound, $"No resource exists with id {request.ResourceId}.");
+                FailureCodes.ClaimsInvalid, "A booking must claim at least one resource.");
+        }
+
+        // Loaded before the interval rules, in the order supplied, so that an
+        // unknown resource is still reported as such rather than masked by
+        // whatever else the request got wrong.
+        var resources = new List<Resource>(request.ResourceIds.Count);
+
+        foreach (var resourceId in request.ResourceIds)
+        {
+            var loaded = await resourceStore.GetAsync(resourceId, cancellationToken).ConfigureAwait(false);
+            if (loaded is null)
+            {
+                return DomainResult<Booking>.Failure(
+                    FailureCodes.ResourceNotFound, $"No resource exists with id {resourceId}.");
+            }
+
+            resources.Add(loaded);
         }
 
         // Rule 1: interval-invalid — including an interval that cannot be
@@ -86,50 +149,58 @@ public sealed class BookingService(
                 "The requested start is too close to the limits of the calendar to be evaluated.");
         }
 
-        var constraints = resource.Availability.Constraints;
         var nowUtc = timeProvider.GetUtcNow();
         var failures = new List<DomainFailure>();
 
-        // Rules 2–4: granularity (duration part), duration bounds
-        failures.AddRange(AvailabilityService.ValidateDuration(request.Duration, constraints));
-
-        // Rule 5: lead-time
-        if (interval.StartUtc < nowUtc + constraints.LeadTime)
+        // Rules 2–7 are properties of a resource, so they run once per claimed
+        // resource: a booking is placed only where every one of them would have
+        // accepted it alone. For a single-claim request this is exactly the
+        // pipeline it has always been.
+        foreach (var resource in resources)
         {
-            failures.Add(new DomainFailure(
-                FailureCodes.LeadTime,
-                $"Bookings require at least {constraints.LeadTime.TotalMinutes:0} minutes notice."));
-        }
+            var constraints = resource.Availability.Constraints;
 
-        // Rule 6: horizon. Saturating, because a horizon reaching past the end of
-        // the calendar means "no effective limit" rather than an error — and
-        // `HorizonDays` is only validated as positive, so a large one would
-        // otherwise throw for every request against that resource.
-        var lastLocalDate = CalendarBounds.AddDaysSaturating(
-            WallClockMapper.ToLocalDate(nowUtc, zone), constraints.HorizonDays);
-        if (localStartDate > lastLocalDate)
-        {
-            failures.Add(new DomainFailure(
-                FailureCodes.Horizon,
-                $"Bookings may be placed at most {constraints.HorizonDays} days ahead."));
-        }
+            // Rules 2–4: granularity (duration part), duration bounds
+            failures.AddRange(AvailabilityService.ValidateDuration(request.Duration, constraints));
 
-        // Rule 7: outside-open-hours — the interval must fit inside one open
-        // window; granularity of the start is relative to its window's start,
-        // which keeps placement consistent with slot projection.
-        var open = FreeTimeCalculator.OpenIntervals(resource.Availability, zone, windowFrom, windowTo);
-        var window = open.FirstOrDefault(w => w.StartUtc <= interval.StartUtc && interval.EndUtc <= w.EndUtc);
+            // Rule 5: lead-time
+            if (interval.StartUtc < nowUtc + constraints.LeadTime)
+            {
+                failures.Add(new DomainFailure(
+                    FailureCodes.LeadTime,
+                    $"Bookings require at least {constraints.LeadTime.TotalMinutes:0} minutes notice."));
+            }
 
-        if (window == default)
-        {
-            failures.Add(new DomainFailure(
-                FailureCodes.OutsideOpenHours, "The requested interval is outside the resource's open hours."));
-        }
-        else if ((interval.StartUtc - window.StartUtc).Ticks % constraints.Granularity.Ticks != 0)
-        {
-            failures.Add(new DomainFailure(
-                FailureCodes.Granularity,
-                $"The start time must align to {constraints.Granularity.TotalMinutes:0}-minute steps from the window's start."));
+            // Rule 6: horizon. Saturating, because a horizon reaching past the end of
+            // the calendar means "no effective limit" rather than an error — and
+            // `HorizonDays` is only validated as positive, so a large one would
+            // otherwise throw for every request against that resource.
+            var lastLocalDate = CalendarBounds.AddDaysSaturating(
+                WallClockMapper.ToLocalDate(nowUtc, zone), constraints.HorizonDays);
+            if (localStartDate > lastLocalDate)
+            {
+                failures.Add(new DomainFailure(
+                    FailureCodes.Horizon,
+                    $"Bookings may be placed at most {constraints.HorizonDays} days ahead."));
+            }
+
+            // Rule 7: outside-open-hours — the interval must fit inside one open
+            // window; granularity of the start is relative to its window's start,
+            // which keeps placement consistent with slot projection.
+            var open = FreeTimeCalculator.OpenIntervals(resource.Availability, zone, windowFrom, windowTo);
+            var window = open.FirstOrDefault(w => w.StartUtc <= interval.StartUtc && interval.EndUtc <= w.EndUtc);
+
+            if (window == default)
+            {
+                failures.Add(new DomainFailure(
+                    FailureCodes.OutsideOpenHours, "The requested interval is outside the resource's open hours."));
+            }
+            else if ((interval.StartUtc - window.StartUtc).Ticks % constraints.Granularity.Ticks != 0)
+            {
+                failures.Add(new DomainFailure(
+                    FailureCodes.Granularity,
+                    $"The start time must align to {constraints.Granularity.TotalMinutes:0}-minute steps from the window's start."));
+            }
         }
 
         if (failures.Count > 0)
@@ -137,11 +208,16 @@ public sealed class BookingService(
             return DomainResult<Booking>.Failure(OrderByPipeline(failures));
         }
 
-        // Rule 8: conflict — checked atomically by the store (bookings spec,
-        // "Atomic placement contract"). v1 auto-confirms on placement.
+        // Rule 8: conflict — checked atomically by the store across every claimed
+        // resource (bookings spec, "Atomic placement contract"). v1 auto-confirms
+        // on placement.
         var booking = Booking.Create(
-            Guid.NewGuid(), interval, request.Booker, [new ResourceClaim(resource.Id)],
-            BookingStatus.Confirmed, nowUtc);
+            Guid.NewGuid(),
+            interval,
+            request.Booker,
+            [.. resources.Select(r => new ResourceClaim(r.Id))],
+            BookingStatus.Confirmed,
+            nowUtc);
 
         return await bookingStore.PlaceAsync(booking, cancellationToken).ConfigureAwait(false);
     }

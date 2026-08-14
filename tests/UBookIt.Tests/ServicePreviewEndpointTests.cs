@@ -194,9 +194,8 @@ public class ServicePreviewEndpointTests
 
         var candidates = await resolution.ResolveCandidatesAsync(service.Id);
 
-        Assert.True(candidates.Succeeded);
         Assert.Equal(
-            candidates.Value.Select(c => c.ResourceId).OrderBy(id => id),
+            candidates.SingleRolePool().Select(c => c.ResourceId).OrderBy(id => id),
             chain.CanProvide.Items.Select(i => i.Id).OrderBy(id => id));
         Assert.NotEmpty(chain.CanProvide.Items);
     }
