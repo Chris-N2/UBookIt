@@ -14,20 +14,39 @@ internal static class ServiceModelMapper
     {
         var duration = ToDomain(model.Duration);
 
+        // Each role's capabilities validate separately, for the same reason the
+        // duration does: they are a value object the role cannot hold in an
+        // invalid state, so a malformed key must be caught here and reported
+        // alongside — not instead of — whatever else the save got wrong. That is
+        // what lets one response carry both `type-key-invalid` and
+        // `capability-key-invalid` for a role that fumbled both.
+        var capabilities = model.Roles
+            .Select(r => CapabilitySet.Create(r.RequiredCapabilities, CapabilitySet.RequiredField))
+            .ToList();
+
         var service = Service.Create(
             model.Name,
             duration.Succeeded ? duration.Value : null,
-            model.Roles.Select(r => new ServiceRole(r.ResourceType, r.Count)),
+            model.Roles.Select((r, index) => new ServiceRole(r.ResourceType, r.Count)
+            {
+                RequiredCapabilities = capabilities[index].Succeeded
+                    ? capabilities[index].Value
+                    : CapabilitySet.Empty,
+            }),
             id);
 
-        if (duration.Succeeded)
+        var valueObjectFailures = duration.Failures
+            .Concat(capabilities.Where(c => !c.Succeeded).SelectMany(c => c.Failures))
+            .ToList();
+
+        if (valueObjectFailures.Count == 0)
         {
             return service;
         }
 
-        // Report duration problems alongside any name or role problems, so one
-        // save surfaces every failed rule rather than one round trip per rule.
-        var failures = new List<DomainFailure>(duration.Failures);
+        // Report value-object problems alongside any name or role problems, so
+        // one save surfaces every failed rule rather than one round trip per rule.
+        var failures = new List<DomainFailure>(valueObjectFailures);
 
         if (!service.Succeeded)
         {
@@ -44,7 +63,12 @@ internal static class ServiceModelMapper
             Name = service.Name,
             Duration = ToModel(service.Duration),
             Roles = service.Roles
-                .Select(r => new ServiceRoleModel { ResourceType = r.ResourceType, Count = r.Count })
+                .Select(r => new ServiceRoleModel
+                {
+                    ResourceType = r.ResourceType,
+                    RequiredCapabilities = [.. r.RequiredCapabilities.Keys],
+                    Count = r.Count,
+                })
                 .ToList(),
         };
 

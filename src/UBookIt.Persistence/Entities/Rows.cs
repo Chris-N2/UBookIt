@@ -26,6 +26,20 @@ internal sealed class ResourceRow
     public List<OpenHoursRow> OpenHours { get; set; } = [];
 
     public List<ExceptionRow> Exceptions { get; set; } = [];
+
+    public List<ResourceCapabilityRow> Capabilities { get; set; } = [];
+}
+
+/// <summary>
+/// Table: uBookItResourceCapability. One row per capability a resource carries.
+/// Keyed by (resource, key) so a duplicate is impossible in storage and not only
+/// in <c>CapabilitySet</c>.
+/// </summary>
+internal sealed class ResourceCapabilityRow
+{
+    public Guid ResourceId { get; set; }
+
+    public required string Key { get; set; }
 }
 
 /// <summary>Table: uBookItResourceOpenHours. One row per weekly window.</summary>
@@ -125,4 +139,17 @@ internal sealed class ServiceRoleRow
     public required string ResourceType { get; set; }
 
     public int Count { get; set; }
+
+    public List<ServiceRoleCapabilityRow> Capabilities { get; set; } = [];
+}
+
+/// <summary>
+/// Table: uBookItServiceRoleCapability. One row per capability a service role
+/// requires. Keyed by (role, key), as for resource capabilities.
+/// </summary>
+internal sealed class ServiceRoleCapabilityRow
+{
+    public long ServiceRoleId { get; set; }
+
+    public required string Key { get; set; }
 }

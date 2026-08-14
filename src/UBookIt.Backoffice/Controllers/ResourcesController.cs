@@ -47,6 +47,70 @@ public class ResourcesController(
         return Ok(types.Select(ResourceModelMapper.ToModel).ToList());
     }
 
+    /// <summary>
+    /// The distinct capability keys resources currently carry, with a count per
+    /// key. Mirrors the type usage endpoint, including the literal-segment
+    /// routing that cannot collide with the guid-constrained id route.
+    /// </summary>
+    [HttpGet("resources/capabilities")]
+    [ProducesResponseType<IEnumerable<CapabilityUsageModel>>(StatusCodes.Status200OK)]
+    public async Task<IActionResult> ListCapabilities(CancellationToken cancellationToken = default)
+    {
+        var capabilities = await managementStore.ListCapabilitiesAsync(cancellationToken);
+
+        return Ok(capabilities.Select(ResourceModelMapper.ToModel).ToList());
+    }
+
+    /// <summary>
+    /// The resources matching a requirement's resource type and capabilities,
+    /// for the services editor's readout. Accepts a requirement no saved service
+    /// holds — its whole purpose is to report on one being edited.
+    /// <para>
+    /// Reports capability matching ONLY. It does not apply the duration
+    /// narrowing that candidate resolution also applies, so its result is a
+    /// superset of the bookable pool and a consumer must not present it as
+    /// "resources this service can be booked on" (design D8).
+    /// </para>
+    /// </summary>
+    [HttpGet("resources/matching")]
+    [ProducesResponseType<RoleMatchesModel>(StatusCodes.Status200OK)]
+    [ProducesResponseType<ProblemDetails>(StatusCodes.Status400BadRequest)]
+    public async Task<IActionResult> ListMatchingResources(
+        [FromQuery] string resourceType,
+        [FromQuery(Name = "capability")] string[]? capability = null,
+        CancellationToken cancellationToken = default)
+    {
+        // A malformed key is a validation failure here as everywhere else,
+        // rather than being quietly dropped from the requirement — a readout
+        // computed from a silently narrowed requirement would report a count
+        // for something other than what the editor typed.
+        var required = Core.Common.CapabilitySet.Create(
+            capability, Core.Common.CapabilitySet.RequiredField);
+
+        if (!required.Succeeded)
+        {
+            return required.Failures.ToProblemResult();
+        }
+
+        if (!Core.Common.NormalizedKey.IsValid(resourceType))
+        {
+            return new List<Core.Common.DomainFailure>
+            {
+                new(Core.Common.FailureCodes.TypeKeyInvalid,
+                    $"Resource type key '{resourceType}' must be lower-case kebab-case (e.g. 'room').",
+                    nameof(resourceType)),
+            }.ToProblemResult();
+        }
+
+        var matches = await managementStore.ListMatchingAsync(resourceType, required.Value, cancellationToken);
+
+        return Ok(new RoleMatchesModel
+        {
+            Total = matches.Count,
+            Items = matches.Select(ResourceModelMapper.ToModel).ToList(),
+        });
+    }
+
     [HttpGet("resources/{id:guid}")]
     [ProducesResponseType<ResourceResponseModel>(StatusCodes.Status200OK)]
     [ProducesResponseType<ProblemDetails>(StatusCodes.Status404NotFound)]

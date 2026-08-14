@@ -35,7 +35,13 @@ internal static class ResourceRowMapper
 
         var availability = AvailabilityConfiguration.Create(openHours, exceptions, constraints).Value;
 
-        return Resource.Create(row.Type, row.DisplayName, row.Description, availability, row.Id).Value;
+        return Resource.Create(
+            row.Type,
+            row.DisplayName,
+            row.Description,
+            row.Capabilities.Select(c => (string?)c.Key),
+            availability,
+            row.Id).Value;
     }
 
     internal static ResourceRow ToRow(Resource resource)
@@ -48,6 +54,7 @@ internal static class ResourceRowMapper
             Description = resource.Description,
             OpenHours = ToOpenHoursRows(resource),
             Exceptions = ToExceptionRows(resource),
+            Capabilities = ToCapabilityRows(resource),
         };
         ApplyScalars(resource, row);
         return row;
@@ -78,6 +85,11 @@ internal static class ResourceRowMapper
                     StartTime = window.Start,
                     EndTime = window.End,
                 }))
+            .ToList();
+
+    internal static List<ResourceCapabilityRow> ToCapabilityRows(Resource resource)
+        => resource.Capabilities.Keys
+            .Select(key => new ResourceCapabilityRow { ResourceId = resource.Id, Key = key })
             .ToList();
 
     internal static List<ExceptionRow> ToExceptionRows(Resource resource)

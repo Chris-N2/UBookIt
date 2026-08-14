@@ -25,6 +25,7 @@ internal static class DeliveryModelMapper
             Type = resource.Type,
             DisplayName = resource.DisplayName,
             Description = resource.Description,
+            Capabilities = [.. resource.Capabilities.Keys],
             ZoneId = zoneId,
             Constraints = new ConstraintsModel
             {
@@ -58,6 +59,7 @@ internal static class DeliveryModelMapper
             Name = service.Name,
             // v1 guarantees exactly one role (services spec).
             ResourceType = service.Roles[0].ResourceType,
+            RequiredCapabilities = [.. service.Roles[0].RequiredCapabilities.Keys],
             Duration = ToDurationModel(service.Duration),
         };
 

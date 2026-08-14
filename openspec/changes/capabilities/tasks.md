@@ -1,40 +1,40 @@
 ## 1. Core domain
 
-- [ ] 1.1 Extract the normalized-key predicate into one shared internal helper in `UBookIt.Core.Common`, replacing the `GeneratedRegex` copies in `Resource` and `Service`. Behaviour must be identical — a pure predicate, no path-dependent decisions (design D2).
-- [ ] 1.2 Add `CapabilitySet` value object: private constructor, validating factory returning `DomainResult`, `Empty`, normalized storage (deduplicated, deterministically ordered), structural equality and `GetHashCode`, and a `Satisfies` subset test. Reject malformed keys rather than normalizing them.
-- [ ] 1.3 Add `FailureCodes.CapabilityKeyInvalid` (`capability-key-invalid`).
-- [ ] 1.4 Add `Capabilities` to `Resource`, defaulting to empty, with the `capabilities` parameter placed beside `availability` in `Resource.Create` (design D11). Surface key failures with `capability-key-invalid`.
-- [ ] 1.5 Add `RequiredCapabilities` to `ServiceRole`, defaulting to empty, and validate role capability keys in `Service.Create` so that a malformed type key and a malformed capability key produce two distinct, separately-fielded failures.
-- [ ] 1.6 Unit tests for `CapabilitySet`: equality across construction orders and duplicates, record value-equality when carried as a member, subset satisfied/unsatisfied/empty-requirement, and key rejection. Include a test that fails if `Satisfies` is inverted or made an intersection test.
-- [ ] 1.7 Unit tests for `Resource.Create` and `Service.Create` capability validation, including the two-distinct-failures case.
+- [x] 1.1 Extract the normalized-key predicate into one shared internal helper in `UBookIt.Core.Common`, replacing the `GeneratedRegex` copies in `Resource` and `Service`. Behaviour must be identical — a pure predicate, no path-dependent decisions (design D2).
+- [x] 1.2 Add `CapabilitySet` value object: private constructor, validating factory returning `DomainResult`, `Empty`, normalized storage (deduplicated, deterministically ordered), structural equality and `GetHashCode`, and a `Satisfies` subset test. Reject malformed keys rather than normalizing them.
+- [x] 1.3 Add `FailureCodes.CapabilityKeyInvalid` (`capability-key-invalid`).
+- [x] 1.4 Add `Capabilities` to `Resource`, defaulting to empty, with the `capabilities` parameter placed beside `availability` in `Resource.Create` (design D11). Surface key failures with `capability-key-invalid`.
+- [x] 1.5 Add `RequiredCapabilities` to `ServiceRole`, defaulting to empty, and validate role capability keys in `Service.Create` so that a malformed type key and a malformed capability key produce two distinct, separately-fielded failures.
+- [x] 1.6 Unit tests for `CapabilitySet`: equality across construction orders and duplicates, record value-equality when carried as a member, subset satisfied/unsatisfied/empty-requirement, and key rejection. Include a test that fails if `Satisfies` is inverted or made an intersection test.
+- [x] 1.7 Unit tests for `Resource.Create` and `Service.Create` capability validation, including the two-distinct-failures case.
 
 ## 2. Eligibility
 
-- [ ] 2.1 Add the capability subset term to `ServiceBookingService.ResolveCandidatesAsync`, evaluated in Core over hydrated capabilities via `CapabilitySet.Satisfies` (design D5). No new read-port method.
-- [ ] 2.2 Build the shared test fixture set with **overlapping** capability pools (`{Mary} ⊂ {Mary, Frank}`) plus a disjoint pool and a no-capability resource, per design D9. These back both the eligibility and the preview tests.
-- [ ] 2.3 Unit tests for eligibility: capability narrows the pool, all required capabilities must be present, extra capabilities do not disqualify, capabilities do not cross type boundaries, empty requirement matches the whole type, and overlapping pools resolve independently per role.
-- [ ] 2.4 Regression tests proving the ⑤/⑥/⑦ paths are unchanged: a service whose role requires no capabilities resolves exactly as before against resources with and without capabilities, and direct-resource booking is untouched.
-- [ ] 2.5 Mutation-check every test added in 1.6, 2.3 and 2.4 against a deliberately broken `Satisfies` and a removed subset term — a test that passes with the term removed is not covering it (see the test-scenario discipline note).
+- [x] 2.1 Add the capability subset term to `ServiceBookingService.ResolveCandidatesAsync`, evaluated in Core over hydrated capabilities via `CapabilitySet.Satisfies` (design D5). No new read-port method.
+- [x] 2.2 Build the shared test fixture set with **overlapping** capability pools (`{Mary} ⊂ {Mary, Frank}`) plus a disjoint pool and a no-capability resource, per design D9. These back both the eligibility and the preview tests.
+- [x] 2.3 Unit tests for eligibility: capability narrows the pool, all required capabilities must be present, extra capabilities do not disqualify, capabilities do not cross type boundaries, empty requirement matches the whole type, and overlapping pools resolve independently per role.
+- [x] 2.4 Regression tests proving the ⑤/⑥/⑦ paths are unchanged: a service whose role requires no capabilities resolves exactly as before against resources with and without capabilities, and direct-resource booking is untouched.
+- [x] 2.5 Mutation-check every test added in 1.6, 2.3 and 2.4 against a deliberately broken `Satisfies` and a removed subset term — a test that passes with the term removed is not covering it (see the test-scenario discipline note).
 
 ## 3. Persistence
 
-- [ ] 3.1 Add `ResourceCapabilityRow` and `ServiceRoleCapabilityRow` entities with composite primary keys on (owner id, key) and cascade delete from their owners.
-- [ ] 3.2 Configure both in `UBookItDbContext` and add a **new** migration creating `uBookItResourceCapability` and `uBookItServiceRoleCapability` — do not amend ⑥'s migration (design D10).
-- [ ] 3.3 Hydrate capabilities in resource reads used by candidate resolution, and in service/role reads. Map to and from `CapabilitySet` in the row mappers.
-- [ ] 3.4 Persist capability sets on resource and service writes, replacing rather than merging on full update.
-- [ ] 3.5 Add `ListCapabilitiesAsync` to `IResourceManagementStore` — grouped projection over the capability table with counts, ordered by key. Project the `GROUP BY` to an anonymous type and construct the record after materialization (EF cannot translate a positional record constructor inside a grouping projection).
-- [ ] 3.6 Add the match projection to `IResourceManagementStore`: resources of a type carrying every required capability, returning id and display name.
-- [ ] 3.7 Integration tests on real SQL Server: capability round-trip for resources and roles, empty set round-trips as empty, owner delete removes capability rows, duplicate key rejected at the schema level, usage projection counts and ordering, match projection results.
-- [ ] 3.8 Integration test asserting the preview's match projection agrees with Core's candidate resolution on the same fixture, differing only by non-capability exclusions (design D6).
+- [x] 3.1 Add `ResourceCapabilityRow` and `ServiceRoleCapabilityRow` entities with composite primary keys on (owner id, key) and cascade delete from their owners.
+- [x] 3.2 Configure both in `UBookItDbContext` and add a **new** migration creating `uBookItResourceCapability` and `uBookItServiceRoleCapability` — do not amend ⑥'s migration (design D10).
+- [x] 3.3 Hydrate capabilities in resource reads used by candidate resolution, and in service/role reads. Map to and from `CapabilitySet` in the row mappers.
+- [x] 3.4 Persist capability sets on resource and service writes, replacing rather than merging on full update.
+- [x] 3.5 Add `ListCapabilitiesAsync` to `IResourceManagementStore` — grouped projection over the capability table with counts, ordered by key. Project the `GROUP BY` to an anonymous type and construct the record after materialization (EF cannot translate a positional record constructor inside a grouping projection).
+- [x] 3.6 Add the match projection to `IResourceManagementStore`: resources of a type carrying every required capability, returning id and display name.
+- [x] 3.7 Integration tests on real SQL Server: capability round-trip for resources and roles, empty set round-trips as empty, owner delete removes capability rows, duplicate key rejected at the schema level, usage projection counts and ordering, match projection results.
+- [x] 3.8 Integration test asserting the preview's match projection agrees with Core's candidate resolution on the same fixture, differing only by non-capability exclusions (design D6).
 
 ## 4. Management API
 
-- [ ] 4.1 Add capabilities to the resource create/update/read DTOs and mappers; treat an omitted collection as empty.
-- [ ] 4.2 Add required capabilities to the service role DTOs and mappers.
-- [ ] 4.3 Add the capability usage endpoint to `ResourcesController`, mirroring the resource type usage endpoint including its authorization policy.
-- [ ] 4.4 Add the role match preview endpoint — `GET` with a repeated `capability` query parameter (design D6) — with the same authorization policy.
-- [ ] 4.5 Confirm `capability-key-invalid` maps to a 400 problem-details response carrying a `type` member, and that its field identifies the capability control rather than the type control.
-- [ ] 4.6 Integration tests for the new endpoints including the 401-without-auth case for both.
+- [x] 4.1 Add capabilities to the resource create/update/read DTOs and mappers; treat an omitted collection as empty.
+- [x] 4.2 Add required capabilities to the service role DTOs and mappers.
+- [x] 4.3 Add the capability usage endpoint to `ResourcesController`, mirroring the resource type usage endpoint including its authorization policy.
+- [x] 4.4 Add the role match preview endpoint — `GET` with a repeated `capability` query parameter (design D6) — with the same authorization policy.
+- [x] 4.5 Confirm `capability-key-invalid` maps to a 400 problem-details response carrying a `type` member, and that its field identifies the capability control rather than the type control.
+- [x] 4.6 Integration tests for the new endpoints including the 401-without-auth case for both.
 
 ## 5. Backoffice client
 
@@ -48,10 +48,10 @@
 
 ## 6. Delivery API
 
-- [ ] 6.1 Add capabilities to the delivery resource read model and mapper, deterministically ordered, empty collection rather than null.
-- [ ] 6.2 Add required capabilities to the delivery service read model and mapper, same treatment.
-- [ ] 6.3 Integration tests: both models expose capabilities, an empty set serializes as an empty collection, and a consumer can compute the candidate pool from the two reads alone.
-- [ ] 6.4 Confirm no `UBookIt.Web` rendering change was made — no Razor, ViewComponent, or default-frontend edit is in scope.
+- [x] 6.1 Add capabilities to the delivery resource read model and mapper, deterministically ordered, empty collection rather than null.
+- [x] 6.2 Add required capabilities to the delivery service read model and mapper, same treatment.
+- [x] 6.3 Integration tests: both models expose capabilities, an empty set serializes as an empty collection, and a consumer can compute the candidate pool from the two reads alone.
+- [x] 6.4 Confirm no `UBookIt.Web` rendering change was made — no Razor, ViewComponent, or default-frontend edit is in scope.
 
 ## 7. Verification
 

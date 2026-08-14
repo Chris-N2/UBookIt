@@ -110,7 +110,7 @@ internal static class ResourceModelMapper
         // Run resource creation even when availability failed so name/type
         // failures are reported in the same response as availability failures.
         var resource = Resource.Create(
-            model.Type, model.DisplayName, model.Description,
+            model.Type, model.DisplayName, model.Description, model.Capabilities,
             availability ?? AvailabilityConfiguration.Closed, id);
 
         if (!resource.Succeeded)
@@ -133,6 +133,7 @@ internal static class ResourceModelMapper
             Type = resource.Type,
             DisplayName = resource.DisplayName,
             Description = resource.Description,
+            Capabilities = [.. resource.Capabilities.Keys],
             OpeningHours = Enum.GetValues<DayOfWeek>()
                 .SelectMany(day => resource.Availability.OpenHours.WindowsFor(day)
                     .Select(window => new OpeningHoursModel { Day = day, Start = window.Start, End = window.End }))
@@ -160,4 +161,10 @@ internal static class ResourceModelMapper
 
     internal static ResourceTypeUsageModel ToModel(ResourceTypeUsage usage) =>
         new() { Type = usage.Type, Count = usage.Count };
+
+    internal static CapabilityUsageModel ToModel(CapabilityUsage usage) =>
+        new() { Key = usage.Key, Count = usage.Count };
+
+    internal static ResourceMatchModel ToModel(ResourceMatch match) =>
+        new() { Id = match.Id, DisplayName = match.DisplayName };
 }

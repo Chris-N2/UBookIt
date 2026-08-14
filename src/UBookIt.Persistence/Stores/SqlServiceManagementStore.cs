@@ -94,6 +94,7 @@ internal sealed class SqlServiceManagementStore(UBookItDbContext db) : IServiceM
         var rows = await db.Services
             .AsNoTracking()
             .Include(s => s.Roles)
+                .ThenInclude(r => r.Capabilities)
             .AsSplitQuery()
             .OrderBy(s => s.Name).ThenBy(s => s.Id)
             .Skip(skip)

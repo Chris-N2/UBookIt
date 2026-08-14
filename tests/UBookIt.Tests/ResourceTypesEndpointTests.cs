@@ -25,6 +25,15 @@ public class ResourceTypesEndpointTests
         public Task<IReadOnlyList<ResourceTypeUsage>> ListTypesAsync(CancellationToken cancellationToken = default)
             => Task.FromResult<IReadOnlyList<ResourceTypeUsage>>(types);
 
+        public Task<IReadOnlyList<CapabilityUsage>> ListCapabilitiesAsync(CancellationToken cancellationToken = default)
+            => throw new NotSupportedException();
+
+        public Task<IReadOnlyList<ResourceMatch>> ListMatchingAsync(
+            string type,
+            UBookIt.Core.Common.CapabilitySet requiredCapabilities,
+            CancellationToken cancellationToken = default)
+            => throw new NotSupportedException();
+
         public Task<UBookIt.Core.Common.DomainResult<UBookIt.Core.Resources.Resource>> CreateAsync(
             UBookIt.Core.Resources.Resource resource, CancellationToken cancellationToken = default)
             => throw new NotSupportedException();

@@ -54,6 +54,13 @@ public class ServiceRoleModel
 {
     public string ResourceType { get; set; } = string.Empty;
 
+    /// <summary>
+    /// What a resource must be able to do to fill this role. Omitted or empty
+    /// constrains by type alone — the behaviour of every service defined before
+    /// capabilities existed.
+    /// </summary>
+    public List<string> RequiredCapabilities { get; set; } = [];
+
     public int Count { get; set; } = 1;
 }
 

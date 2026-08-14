@@ -17,6 +17,7 @@ internal sealed class SqlResourceStore(UBookItDbContext db) : IResourceStore
             .AsNoTracking()
             .Include(r => r.OpenHours)
             .Include(r => r.Exceptions)
+            .Include(r => r.Capabilities)
             .AsSplitQuery()
             .FirstOrDefaultAsync(r => r.Id == resourceId, cancellationToken)
             .ConfigureAwait(false);
@@ -35,6 +36,7 @@ internal sealed class SqlResourceStore(UBookItDbContext db) : IResourceStore
             .AsNoTracking()
             .Include(r => r.OpenHours)
             .Include(r => r.Exceptions)
+            .Include(r => r.Capabilities)
             .AsSplitQuery()
             .OrderBy(r => r.DisplayName).ThenBy(r => r.Id)
             .Skip(skip)
@@ -57,6 +59,7 @@ internal sealed class SqlResourceStore(UBookItDbContext db) : IResourceStore
             .AsNoTracking()
             .Include(r => r.OpenHours)
             .Include(r => r.Exceptions)
+            .Include(r => r.Capabilities)
             .AsSplitQuery()
             .Where(r => r.Type == type)
             .OrderBy(r => r.Id)

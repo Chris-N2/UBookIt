@@ -1,26 +1,30 @@
-using System.Text.RegularExpressions;
 using UBookIt.Core.Common;
 
 namespace UBookIt.Core.Services;
 
 /// <summary>
-/// One required role in a service's composition: a resource type key and a
-/// count. v1 enforces exactly one role of count 1 with no capability
-/// requirements; the shape is deliberately plural/extensible so multi-role and
-/// required-capabilities are additive (see the services roadmap).
+/// One required role in a service's composition: a resource type key, the
+/// capabilities a resource must carry to fill it, and a count. v1 enforces
+/// exactly one role of count 1; the shape is deliberately plural so multi-role
+/// composition is additive (see the services roadmap).
 /// </summary>
-public sealed record ServiceRole(string ResourceType, int Count);
+public sealed record ServiceRole(string ResourceType, int Count)
+{
+    /// <summary>
+    /// What a resource must be able to do to fill this role. Empty constrains by
+    /// type alone, which is exactly the behaviour of every service defined
+    /// before capabilities existed.
+    /// </summary>
+    public CapabilitySet RequiredCapabilities { get; init; } = CapabilitySet.Empty;
+}
 
 /// <summary>
 /// A bookable service: a duration-and-composition template that later resolves
 /// to a booking's resource claims. Carries no presentation concerns; content
 /// nodes presenting a service reference it by id. Pure domain — no Umbraco/EF.
 /// </summary>
-public sealed partial class Service
+public sealed class Service
 {
-    [GeneratedRegex("^[a-z0-9]+(-[a-z0-9]+)*$")]
-    private static partial Regex TypeKeyPattern();
-
     private readonly List<ServiceRole> _roles;
 
     private Service(Guid id, string name, ServiceDuration duration, List<ServiceRole> roles)
@@ -74,7 +78,7 @@ public sealed partial class Service
         {
             var role = roleList[0];
 
-            if (role.ResourceType is null || !TypeKeyPattern().IsMatch(role.ResourceType))
+            if (!NormalizedKey.IsValid(role.ResourceType))
             {
                 failures.Add(new DomainFailure(
                     FailureCodes.TypeKeyInvalid,

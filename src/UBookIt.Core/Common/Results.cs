@@ -35,6 +35,14 @@ public static class FailureCodes
     public const string ClaimsInvalid = "claims-invalid";
     public const string DisplayNameRequired = "display-name-required";
     public const string TypeKeyInvalid = "type-key-invalid";
+
+    /// <summary>
+    /// A capability key is not a normalized key. Distinct from
+    /// <see cref="TypeKeyInvalid"/> so that a service role carrying both a
+    /// malformed resource type and a malformed capability reports two failures a
+    /// consumer can associate with two different controls.
+    /// </summary>
+    public const string CapabilityKeyInvalid = "capability-key-invalid";
     public const string WindowInvalid = "window-invalid";
     public const string WindowsOverlap = "windows-overlap";
     public const string DuplicateExceptionDate = "duplicate-exception-date";

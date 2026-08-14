@@ -216,6 +216,67 @@ public class ServicesControllerTests
     }
 
     [Fact]
+    public async Task A_malformed_required_capability_is_rejected_with_its_own_code()
+    {
+        var (controller, _) = Wire();
+        var bad = new ServiceRequestModel
+        {
+            Name = "Massage",
+            Duration = new ServiceDurationModel { Kind = ServiceDurationModel.FixedKind, Minutes = 60 },
+            Roles = [new ServiceRoleModel
+            {
+                ResourceType = "therapist",
+                RequiredCapabilities = ["Cert X"],
+                Count = 1,
+            }],
+        };
+
+        var (status, codes) = Problem(await controller.CreateService(bad));
+
+        Assert.Equal(400, status);
+        Assert.Contains(FailureCodes.CapabilityKeyInvalid, codes);
+    }
+
+    [Fact]
+    public async Task Type_and_capability_failures_are_reported_separately_in_one_response()
+    {
+        // Distinct codes are what let the editor put each message against the
+        // control it belongs to. One save reports every failed rule, so a user
+        // fixing both does not need two round trips to discover the second.
+        var (controller, _) = Wire();
+        var bad = new ServiceRequestModel
+        {
+            Name = "Massage",
+            Duration = new ServiceDurationModel { Kind = ServiceDurationModel.FixedKind, Minutes = 60 },
+            Roles = [new ServiceRoleModel
+            {
+                ResourceType = "Bad Type",
+                RequiredCapabilities = ["Cert X"],
+                Count = 1,
+            }],
+        };
+
+        var (status, codes) = Problem(await controller.CreateService(bad));
+
+        Assert.Equal(400, status);
+        Assert.Contains(FailureCodes.TypeKeyInvalid, codes);
+        Assert.Contains(FailureCodes.CapabilityKeyInvalid, codes);
+    }
+
+    [Fact]
+    public async Task Required_capabilities_round_trip_through_the_api()
+    {
+        var (controller, _) = Wire();
+        var request = ValidRequest();
+        request.Roles[0].RequiredCapabilities = ["cert-x", "welsh"];
+
+        var created = Assert.IsType<OkObjectResult>(await controller.CreateService(request));
+        var model = Assert.IsType<ServiceResponseModel>(created.Value);
+
+        Assert.Equal(["cert-x", "welsh"], model.Roles[0].RequiredCapabilities);
+    }
+
+    [Fact]
     public void Controller_inherits_the_authorized_backoffice_base()
     {
         Assert.True(typeof(UBookItBackofficeApiControllerBase).IsAssignableFrom(typeof(ServicesController)));

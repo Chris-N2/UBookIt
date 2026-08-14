@@ -26,6 +26,10 @@ public sealed class UBookItDbContext(DbContextOptions<UBookItDbContext> options)
 
     internal DbSet<ServiceRoleRow> ServiceRoles => Set<ServiceRoleRow>();
 
+    internal DbSet<ResourceCapabilityRow> ResourceCapabilities => Set<ResourceCapabilityRow>();
+
+    internal DbSet<ServiceRoleCapabilityRow> ServiceRoleCapabilities => Set<ServiceRoleCapabilityRow>();
+
     /// <summary>
     /// Single place that configures the SQL Server provider (uBookIt requires
     /// SQL Server 2019+) with the package-private migrations history table.
@@ -45,6 +49,21 @@ public sealed class UBookItDbContext(DbContextOptions<UBookItDbContext> options)
             resource.Property(r => r.DisplayName).HasMaxLength(512);
             resource.HasMany(r => r.OpenHours).WithOne().HasForeignKey(w => w.ResourceId).OnDelete(DeleteBehavior.Cascade);
             resource.HasMany(r => r.Exceptions).WithOne().HasForeignKey(e => e.ResourceId).OnDelete(DeleteBehavior.Cascade);
+            resource.HasMany(r => r.Capabilities).WithOne().HasForeignKey(c => c.ResourceId).OnDelete(DeleteBehavior.Cascade);
+        });
+
+        modelBuilder.Entity<ResourceCapabilityRow>(capability =>
+        {
+            capability.ToTable("uBookItResourceCapability");
+
+            // The composite key is the uniqueness rule: a resource cannot carry
+            // the same capability twice at the schema level, not merely because
+            // CapabilitySet deduplicates on the way in.
+            capability.HasKey(c => new { c.ResourceId, c.Key });
+            capability.Property(c => c.Key).HasMaxLength(64);
+
+            // Backs the capability usage projection, which groups by key.
+            capability.HasIndex(c => c.Key);
         });
 
         modelBuilder.Entity<OpenHoursRow>(window =>
@@ -103,6 +122,14 @@ public sealed class UBookItDbContext(DbContextOptions<UBookItDbContext> options)
             role.HasKey(r => r.Id);
             role.Property(r => r.ResourceType).HasMaxLength(64);
             role.HasIndex(r => r.ServiceId);
+            role.HasMany(r => r.Capabilities).WithOne().HasForeignKey(c => c.ServiceRoleId).OnDelete(DeleteBehavior.Cascade);
+        });
+
+        modelBuilder.Entity<ServiceRoleCapabilityRow>(capability =>
+        {
+            capability.ToTable("uBookItServiceRoleCapability");
+            capability.HasKey(c => new { c.ServiceRoleId, c.Key });
+            capability.Property(c => c.Key).HasMaxLength(64);
         });
     }
 }

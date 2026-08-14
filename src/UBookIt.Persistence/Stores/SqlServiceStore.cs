@@ -16,6 +16,7 @@ internal sealed class SqlServiceStore(UBookItDbContext db) : IServiceStore
         var row = await db.Services
             .AsNoTracking()
             .Include(s => s.Roles)
+                .ThenInclude(r => r.Capabilities)
             .FirstOrDefaultAsync(s => s.Id == serviceId, cancellationToken)
             .ConfigureAwait(false);
 
@@ -32,6 +33,7 @@ internal sealed class SqlServiceStore(UBookItDbContext db) : IServiceStore
         var rows = await db.Services
             .AsNoTracking()
             .Include(s => s.Roles)
+                .ThenInclude(r => r.Capabilities)
             .AsSplitQuery()
             .OrderBy(s => s.Name).ThenBy(s => s.Id)
             .Skip(skip)

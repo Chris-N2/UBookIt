@@ -19,6 +19,20 @@ public sealed class ResourceReadModel
 
     public string? Description { get; set; }
 
+    /// <summary>
+    /// What this resource can do, deterministically ordered; empty when it
+    /// carries none.
+    /// <para>
+    /// Published deliberately. Capabilities are an input to service eligibility,
+    /// and publishing them keeps a service's candidate pool computable from
+    /// public reads — which is what keeps the <c>resource-not-eligible</c>
+    /// failure from disclosing anything a consumer could not already derive.
+    /// Capability keys are visible to anonymous callers and must not be used to
+    /// record anything not intended to be public.
+    /// </para>
+    /// </summary>
+    public List<string> Capabilities { get; set; } = [];
+
     public ConstraintsModel Constraints { get; set; } = new();
 
     /// <summary>Site-wide IANA display zone the constraints are interpreted in.</summary>
@@ -137,6 +151,14 @@ public sealed class ServiceReadModel
 
     /// <summary>The resource type key this service's single role resolves against.</summary>
     public string ResourceType { get; set; } = string.Empty;
+
+    /// <summary>
+    /// The capabilities a resource must carry to fulfil this service,
+    /// deterministically ordered; empty when the role constrains by type alone.
+    /// Together with each resource's own capabilities, this makes the candidate
+    /// pool computable without a further request.
+    /// </summary>
+    public List<string> RequiredCapabilities { get; set; } = [];
 }
 
 public sealed class PagedServicesModel

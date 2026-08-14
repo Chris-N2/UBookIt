@@ -1,3 +1,4 @@
+using UBookIt.Core.Common;
 using UBookIt.Core.Services;
 using UBookIt.Persistence.Entities;
 
@@ -15,7 +16,12 @@ internal static class ServiceRowMapper
         => Service.Create(
             row.Name,
             ToDuration(row),
-            row.Roles.Select(r => new ServiceRole(r.ResourceType, r.Count)),
+            row.Roles.Select(r => new ServiceRole(r.ResourceType, r.Count)
+            {
+                RequiredCapabilities = CapabilitySet
+                    .Create(r.Capabilities.Select(c => (string?)c.Key), CapabilitySet.RequiredField)
+                    .Value,
+            }),
             row.Id).Value;
 
     internal static ServiceRow ToRow(Service service)
@@ -71,6 +77,12 @@ internal static class ServiceRowMapper
                 ServiceId = service.Id,
                 ResourceType = role.ResourceType,
                 Count = role.Count,
+
+                // The role's own id is database-generated, so the capability
+                // rows are attached through the navigation and let EF fill the
+                // foreign key when the role is inserted.
+                Capabilities = [.. role.RequiredCapabilities.Keys
+                    .Select(key => new ServiceRoleCapabilityRow { Key = key })],
             })
             .ToList();
 }

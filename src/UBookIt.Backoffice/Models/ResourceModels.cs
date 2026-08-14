@@ -19,6 +19,13 @@ public class ResourceRequestModel
 
     public List<AvailabilityExceptionModel> Exceptions { get; set; } = [];
 
+    /// <summary>
+    /// What this resource can do. Omitted or empty means it carries none. A full
+    /// update replaces the set rather than merging into it, like every other
+    /// part of this model.
+    /// </summary>
+    public List<string> Capabilities { get; set; } = [];
+
     /// <summary>Null applies the package defaults.</summary>
     public ConstraintsModel? Constraints { get; set; }
 }
@@ -36,6 +43,8 @@ public class ResourceResponseModel
     public List<OpeningHoursModel> OpeningHours { get; set; } = [];
 
     public List<AvailabilityExceptionModel> Exceptions { get; set; } = [];
+
+    public List<string> Capabilities { get; set; } = [];
 
     public ConstraintsModel Constraints { get; set; } = new();
 }
@@ -100,6 +109,42 @@ public class ResourceTypeUsageModel
     public string Type { get; set; } = string.Empty;
 
     public int Count { get; set; }
+}
+
+/// <summary>
+/// A capability key currently carried by resources and how many carry it.
+/// Backs the backoffice capability pickers. Descriptive, not prescriptive: it
+/// reports what is in use and never constrains what may be entered.
+/// </summary>
+public class CapabilityUsageModel
+{
+    public string Key { get; set; } = string.Empty;
+
+    public int Count { get; set; }
+}
+
+/// <summary>
+/// A resource matching a requirement's type and capabilities.
+/// <para>
+/// Answers "which resources hold these capabilities", NOT "which resources can
+/// fulfil this service" — candidate resolution additionally excludes resources
+/// whose duration range cannot admit the service, and this preview does not
+/// evaluate that. Consumers must word their presentation accordingly (design D8).
+/// </para>
+/// </summary>
+public class ResourceMatchModel
+{
+    public Guid Id { get; set; }
+
+    public string DisplayName { get; set; } = string.Empty;
+}
+
+/// <summary>The resources matching a requirement, with their count.</summary>
+public class RoleMatchesModel
+{
+    public int Total { get; set; }
+
+    public List<ResourceMatchModel> Items { get; set; } = [];
 }
 
 /// <summary>One failed validation rule, using the domain's stable codes.</summary>

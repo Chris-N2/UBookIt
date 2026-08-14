@@ -1,4 +1,3 @@
-using System.Text.RegularExpressions;
 using UBookIt.Core.Availability;
 using UBookIt.Core.Common;
 
@@ -16,17 +15,21 @@ public static class ResourceTypes
 /// need no schema or breaking API change. Carries no presentation concerns:
 /// content nodes presenting a resource reference it by id.
 /// </summary>
-public sealed partial class Resource
+public sealed class Resource
 {
-    [GeneratedRegex("^[a-z0-9]+(-[a-z0-9]+)*$")]
-    private static partial Regex TypeKeyPattern();
-
-    private Resource(Guid id, string type, string displayName, string? description, AvailabilityConfiguration availability)
+    private Resource(
+        Guid id,
+        string type,
+        string displayName,
+        string? description,
+        CapabilitySet capabilities,
+        AvailabilityConfiguration availability)
     {
         Id = id;
         Type = type;
         DisplayName = displayName;
         Description = description;
+        Capabilities = capabilities;
         Availability = availability;
     }
 
@@ -38,18 +41,26 @@ public sealed partial class Resource
 
     public string? Description { get; }
 
+    /// <summary>
+    /// What this resource can do. Empty means it carries no capabilities —
+    /// never that it carries all of them — so an untagged resource is eligible
+    /// only for roles that require nothing.
+    /// </summary>
+    public CapabilitySet Capabilities { get; }
+
     public AvailabilityConfiguration Availability { get; }
 
     public static DomainResult<Resource> Create(
         string? type,
         string? displayName,
         string? description = null,
+        IEnumerable<string?>? capabilities = null,
         AvailabilityConfiguration? availability = null,
         Guid? id = null)
     {
         var failures = new List<DomainFailure>();
 
-        if (type is null || !TypeKeyPattern().IsMatch(type))
+        if (!NormalizedKey.IsValid(type))
         {
             failures.Add(new DomainFailure(
                 FailureCodes.TypeKeyInvalid,
@@ -63,6 +74,12 @@ public sealed partial class Resource
                 FailureCodes.DisplayNameRequired, "A display name is required.", nameof(DisplayName)));
         }
 
+        var capabilitySet = CapabilitySet.Create(capabilities, CapabilitySet.ResourceField);
+        if (!capabilitySet.Succeeded)
+        {
+            failures.AddRange(capabilitySet.Failures);
+        }
+
         return failures.Count > 0
             ? DomainResult<Resource>.Failure(failures)
             : DomainResult<Resource>.Success(new Resource(
@@ -70,6 +87,7 @@ public sealed partial class Resource
                 type!,
                 displayName!.Trim(),
                 string.IsNullOrWhiteSpace(description) ? null : description.Trim(),
+                capabilitySet.Value,
                 availability ?? AvailabilityConfiguration.Closed));
     }
 }

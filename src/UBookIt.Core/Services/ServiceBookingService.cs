@@ -87,6 +87,17 @@ public sealed class ServiceBookingService(
 
         foreach (var resource in resources.OrderBy(r => r.Id))
         {
+            // Eligibility's second term, evaluated here in Core over capabilities
+            // the read port hydrated — never as a storage-layer predicate, which
+            // would be a second implementation of the rule free to disagree with
+            // this one (design D5). Excluded silently, like the duration test
+            // below: a resource lacking a capability is an answer about that
+            // resource, not a validation failure of the service.
+            if (!role.RequiredCapabilities.IsSatisfiedBy(resource.Capabilities))
+            {
+                continue;
+            }
+
             // A resource whose constraints admit no length the service permits
             // is excluded silently — that is an answer about the resource, not a
             // validation failure of the service (services spec, TryResolveAgainst).
