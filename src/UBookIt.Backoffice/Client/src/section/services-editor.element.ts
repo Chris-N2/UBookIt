@@ -9,8 +9,19 @@ import type {
   ServiceRequestModel,
 } from "../api/index.js";
 import { toApiErrors, type ApiError } from "./api-errors.js";
-import { resolutionLines, type ResolutionSnapshot } from "./resolution-summary.js";
+import { resolutionGroups, type ResolutionSnapshot } from "./resolution-summary.js";
 import "./capability-input.element.js";
+
+/**
+ * One requirement row: the resource type a role needs and the capabilities a
+ * resource must carry to fill it. The role's count is not surfaced — it is 1 in
+ * this version — so adding it later is an addition to this row rather than a
+ * restructuring of it.
+ */
+type RoleRow = {
+  resourceType: string;
+  requiredCapabilities: string[];
+};
 
 /**
  * The two duration kinds, matching the wire contract exactly. "variable" means
@@ -65,8 +76,15 @@ export class UBookItServiceEditorElement extends UmbLitElement {
   @state()
   private _name = "";
 
+  /**
+   * The service's roles, one per requirement row. Always at least one: a service
+   * with no roles resolves to nothing, and the server rejects it.
+   *
+   * Replaced wholesale on every edit rather than mutated in place, because Lit
+   * only re-renders on identity change for an array-valued state.
+   */
   @state()
-  private _resourceType = "";
+  private _roles: RoleRow[] = [{ resourceType: "", requiredCapabilities: [] }];
 
   @state()
   private _durationMode: DurationMode = "variable";
@@ -93,14 +111,11 @@ export class UBookItServiceEditorElement extends UmbLitElement {
   private _knownTypes: ResourceTypeUsageModel[] = [];
 
   @state()
-  private _requiredCapabilities: string[] = [];
-
-  @state()
   private _knownCapabilities: CapabilityUsageModel[] = [];
 
   /**
-   * The resolution chain for the configuration on screen, or null when that is
-   * not currently known.
+   * The resolution chain for each role of the configuration on screen, or null
+   * when that is not currently known.
    *
    * Null is not a chain of zeros, and the distinction is the whole point: zero
    * is the number that says "your configuration resolves to nothing, go and fix
@@ -109,7 +124,7 @@ export class UBookItServiceEditorElement extends UmbLitElement {
    * it must be silent rather than wrong (design D7).
    */
   @state()
-  private _resolution: ResolutionSnapshot | null = null;
+  private _resolution: ResolutionSnapshot[] | null = null;
 
   /** Guards against an earlier in-flight preview overwriting a later one. */
   #previewToken = 0;
@@ -158,8 +173,13 @@ export class UBookItServiceEditorElement extends UmbLitElement {
     }
 
     this._name = data.name;
-    this._resourceType = data.roles[0]?.resourceType ?? "";
-    this._requiredCapabilities = [...(data.roles[0]?.requiredCapabilities ?? [])];
+    this._roles =
+      data.roles.length > 0
+        ? data.roles.map((role) => ({
+            resourceType: role.resourceType,
+            requiredCapabilities: [...(role.requiredCapabilities ?? [])],
+          }))
+        : [{ resourceType: "", requiredCapabilities: [] }];
 
     if (data.duration?.kind === "fixed") {
       this._durationMode = "fixed";
@@ -225,24 +245,29 @@ export class UBookItServiceEditorElement extends UmbLitElement {
 
   /**
    * The configuration as currently entered, or null when it is too incomplete
-   * to resolve — no resource type, or a fixed duration with no length. Those are
-   * unfinished, not broken, and a chain of zeros would say the opposite.
+   * to resolve — no role with a resource type yet, or a fixed duration with no
+   * length. Those are unfinished, not broken, and a chain of zeros would say the
+   * opposite.
+   *
+   * A row whose type is still empty is omitted rather than silencing the whole
+   * report: the other roles' chains are known and still true, and saying nothing
+   * about the unfinished row is exactly what "not known" looks like. A duration
+   * that cannot be resolved does silence everything, because it is an input to
+   * every role's chain.
    */
   #buildPreviewRequest(): ServicePreviewRequestModel | null {
-    const resourceType = this._resourceType.trim();
-    if (resourceType === "") {
-      return null;
-    }
-
     if (this._durationMode === "fixed" && this._durationMinutes === null) {
       return null;
     }
 
-    return {
-      resourceType,
-      requiredCapabilities: [...this._requiredCapabilities],
-      duration: this.#buildDuration(),
-    };
+    const roles = this._roles
+      .filter((role) => role.resourceType.trim() !== "")
+      .map((role) => ({
+        resourceType: role.resourceType.trim(),
+        requiredCapabilities: [...role.requiredCapabilities],
+      }));
+
+    return roles.length === 0 ? null : { roles, duration: this.#buildDuration() };
   }
 
   /**
@@ -276,17 +301,20 @@ export class UBookItServiceEditorElement extends UmbLitElement {
         return;
       }
 
+      // Each chain is phrased from what came back with it — the response echoes
+      // the role it describes — rather than from the form, which may already
+      // describe something else by the time the answer arrives.
       this._resolution =
         error || !data
           ? null
-          : {
-              resourceType: body.resourceType,
-              requiresCapabilities: (body.requiredCapabilities ?? []).length > 0,
-              ofType: data.ofType.total,
-              withCapabilities: data.withCapabilities.total,
-              canProvide: data.canProvide.total,
-              exclusions: data.durationExclusions,
-            };
+          : data.roles.map((chain) => ({
+              resourceType: chain.resourceType,
+              requiresCapabilities: (chain.requiredCapabilities ?? []).length > 0,
+              ofType: chain.ofType.total,
+              withCapabilities: chain.withCapabilities.total,
+              canProvide: chain.canProvide.total,
+              exclusions: chain.durationExclusions,
+            }));
     } catch {
       if (token === this.#previewToken) {
         this._resolution = null;
@@ -308,16 +336,18 @@ export class UBookItServiceEditorElement extends UmbLitElement {
       // chosen on screen. Shared with the preview so the summary can never
       // describe a different duration from the one a save would send.
       duration: this.#buildDuration(),
-      // Exactly one role, count fixed at 1 in v1 (design D5). Trimmed to match
-      // what the hint evaluates: otherwise " room " looks known (hint hidden)
-      // but is rejected server-side as an invalid type key.
-      roles: [
-        {
-          resourceType: this._resourceType.trim(),
-          requiredCapabilities: [...this._requiredCapabilities],
-          count: 1,
-        },
-      ],
+      // Every row, in the order shown, count fixed at 1 in this version.
+      // Trimmed to match what the hint evaluates: otherwise " room " looks known
+      // (hint hidden) but is rejected server-side as an invalid type key.
+      //
+      // Rows are sent exactly as entered, including two naming the same type:
+      // the duplicate rule is the server's, and enforcing it here as well would
+      // make relaxing it later a change in two places (design D1).
+      roles: this._roles.map((role) => ({
+        resourceType: role.resourceType.trim(),
+        requiredCapabilities: [...role.requiredCapabilities],
+        count: 1,
+      })),
     };
   }
 
@@ -450,56 +480,186 @@ export class UBookItServiceEditorElement extends UmbLitElement {
     `;
   }
 
-  #renderRequirements() {
-    const hasGroupError = this.#errorsFor("service-role-invalid", "type-key-invalid").length > 0;
+  /**
+   * The failure field the server attributes to one role's control, mirrored from
+   * `ServiceRole.FieldFor`. Without the index every message would land on the
+   * first row.
+   */
+  #roleField(index: number, field: string): string {
+    return `Roles[${index}].${field}`;
+  }
 
-    // A native input with a datalist, not uui-combobox: the uui control's
-    // value must match one of its options, which would block naming a type
-    // before any resource has it — a legitimate setup order (design D2).
+  #errorsForRole(index: number, ...codes: string[]): ApiError[] {
+    return this._errors.filter(
+      (e) =>
+        e.code !== undefined &&
+        codes.includes(e.code) &&
+        (e.field === this.#roleField(index, "ResourceType") ||
+          e.field === this.#roleField(index, "RequiredCapabilities") ||
+          e.field === this.#roleField(index, "Count")),
+    );
+  }
+
+  /**
+   * Role failures the server did not attribute to any row — or attributed to a
+   * row this form no longer shows. They still need saying somewhere, so they
+   * stay on the group rather than vanishing.
+   */
+  #unattributedRoleErrors(): ApiError[] {
+    const attributed = new Set(
+      this._roles.flatMap((_, index) => [
+        this.#roleField(index, "ResourceType"),
+        this.#roleField(index, "RequiredCapabilities"),
+        this.#roleField(index, "Count"),
+      ]),
+    );
+
+    return this.#errorsFor(
+      "service-role-invalid",
+      "type-key-invalid",
+      "service-role-duplicate-type",
+    ).filter((e) => e.field === undefined || e.field === null || !attributed.has(e.field));
+  }
+
+  #renderRequirements() {
+    const unattributed = this.#unattributedRoleErrors();
+
     return html`
       <uui-box headline=${this.#term("requirements")}>
-        ${this.#renderGroupErrors("err-requirements", "service-role-invalid", "type-key-invalid")}
-        <fieldset aria-describedby=${hasGroupError ? "err-requirements" : nothing}>
-          <legend class="visually-hidden">${this.#term("requirements")}</legend>
-          <div class="field">
-            <label for="service-resource-type">${this.#term("resourceType")}</label>
-            <input
-              id="service-resource-type"
-              list="ubookit-resource-types"
-              .value=${this._resourceType}
-              aria-describedby="resource-type-hint"
-              @input=${(e: InputEvent) => {
-                this._resourceType = (e.target as HTMLInputElement).value;
-                this.#scheduleResolutionRefresh();
-              }}
-            />
-            <datalist id="ubookit-resource-types">
-              ${this._knownTypes.map((t) => html`<option value=${t.type}></option>`)}
-            </datalist>
-            <p id="resource-type-hint" class="hint">${this.#term("resourceTypeHint")}</p>
-          </div>
+        ${unattributed.length === 0
+          ? nothing
+          : html`<p class="group-error" id="err-requirements">
+              ${unattributed.map((e) => e.message).join(" ")}
+            </p>`}
 
-          <ubookit-capability-input
-            controlId="role-capabilities"
-            .capabilities=${this._requiredCapabilities}
-            .known=${this._knownCapabilities}
-            label=${this.#term("requiredCapabilities")}
-            addLabel=${this.#term("capabilityAdd")}
-            hint=${this.#term("requiredCapabilitiesHint")}
-            removeLabel=${this.#term("capabilityRemove")}
-            emptyLabel=${this.#term("requiredCapabilitiesNone")}
-            error=${this.#errorsFor("capability-key-invalid")
-              .map((e) => e.message)
-              .join(" ")}
-            @ubookit-capabilities-changed=${(e: CustomEvent<{ capabilities: string[] }>) => {
-              this._requiredCapabilities = e.detail.capabilities;
-              // A discrete choice, not a keystroke: no debounce.
-              void this.#refreshResolution();
-            }}
-          ></ubookit-capability-input>
-        </fieldset>
+        ${this._roles.map((role, index) => this.#renderRequirementRow(role, index))}
+
+        <datalist id="ubookit-resource-types">
+          ${this._knownTypes.map((t) => html`<option value=${t.type}></option>`)}
+        </datalist>
+
+        <uui-button
+          id="add-requirement"
+          look="secondary"
+          label=${this.#term("requirementAdd")}
+          @click=${() => this.#addRole()}
+        ></uui-button>
       </uui-box>
     `;
+  }
+
+  /**
+   * One requirement row.
+   *
+   * A fieldset per row, so its legend names the group a screen reader announces
+   * before each control: three controls all called "Resource type" would
+   * otherwise be indistinguishable. Ids carry the row index for the same reason
+   * — a `label[for]` and an `aria-describedby` must resolve within this shadow
+   * root, and duplicated ids resolve to the first row for every row.
+   *
+   * A native input with a datalist, not uui-combobox: the uui control's value
+   * must match one of its options, which would block naming a type before any
+   * resource has it — a legitimate setup order (design D2).
+   */
+  #renderRequirementRow(role: RoleRow, index: number) {
+    const typeErrors = this.#errorsForRole(index, "type-key-invalid", "service-role-duplicate-type");
+    const errorId = `err-requirement-${index}`;
+    const hintId = `resource-type-hint-${index}`;
+
+    return html`
+      <fieldset class="requirement">
+        <legend>${this.localize.term("ubookitServices_requirementLegend", index + 1)}</legend>
+
+        <div class="field">
+          <label for="service-resource-type-${index}">${this.#term("resourceType")}</label>
+          <input
+            id="service-resource-type-${index}"
+            list="ubookit-resource-types"
+            .value=${role.resourceType}
+            aria-invalid=${typeErrors.length > 0 ? "true" : nothing}
+            aria-describedby=${typeErrors.length > 0 ? `${hintId} ${errorId}` : hintId}
+            @input=${(e: InputEvent) => {
+              this.#updateRole(index, { resourceType: (e.target as HTMLInputElement).value });
+              this.#scheduleResolutionRefresh();
+            }}
+          />
+          <p id=${hintId} class="hint">${this.#term("resourceTypeHint")}</p>
+          ${typeErrors.length === 0
+            ? nothing
+            : html`<p class="group-error" id=${errorId}>
+                ${typeErrors.map((e) => e.message).join(" ")}
+              </p>`}
+        </div>
+
+        <ubookit-capability-input
+          controlId="role-capabilities-${index}"
+          .capabilities=${role.requiredCapabilities}
+          .known=${this._knownCapabilities}
+          label=${this.#term("requiredCapabilities")}
+          addLabel=${this.#term("capabilityAdd")}
+          hint=${this.#term("requiredCapabilitiesHint")}
+          removeLabel=${this.#term("capabilityRemove")}
+          emptyLabel=${this.#term("requiredCapabilitiesNone")}
+          error=${this.#errorsForRole(index, "capability-key-invalid")
+            .map((e) => e.message)
+            .join(" ")}
+          @ubookit-capabilities-changed=${(e: CustomEvent<{ capabilities: string[] }>) => {
+            this.#updateRole(index, { requiredCapabilities: e.detail.capabilities });
+            // A discrete choice, not a keystroke: no debounce.
+            void this.#refreshResolution();
+          }}
+        ></ubookit-capability-input>
+
+        <!--
+          Offered only while more than one row exists: a service always keeps at
+          least one role, and a control that removes the last one would either
+          fail on save or need the form to invent a replacement.
+        -->
+        ${this._roles.length === 1
+          ? nothing
+          : html`<uui-button
+              class="remove-requirement"
+              data-index=${index}
+              look="secondary"
+              color="danger"
+              label=${this.localize.term("ubookitServices_requirementRemove", index + 1)}
+              @click=${() => void this.#removeRole(index)}
+            ></uui-button>`}
+      </fieldset>
+    `;
+  }
+
+  #updateRole(index: number, changes: Partial<RoleRow>) {
+    this._roles = this._roles.map((role, i) => (i === index ? { ...role, ...changes } : role));
+  }
+
+  #addRole() {
+    this._roles = [...this._roles, { resourceType: "", requiredCapabilities: [] }];
+  }
+
+  /**
+   * Removes a row and puts focus somewhere sensible: the remove control of the
+   * row that took its place, or of the last row when the removed one was last.
+   * Focus left on a detached button falls back to the document, which strands a
+   * keyboard user at the top of the page.
+   */
+  async #removeRole(index: number) {
+    if (this._roles.length === 1) {
+      return;
+    }
+
+    this._roles = this._roles.filter((_, i) => i !== index);
+    void this.#refreshResolution();
+
+    await this.updateComplete;
+
+    const target = Math.min(index, this._roles.length - 1);
+    const next =
+      this._roles.length === 1
+        ? this.shadowRoot?.querySelector<HTMLElement>("#add-requirement")
+        : this.shadowRoot?.querySelector<HTMLElement>(`.remove-requirement[data-index="${target}"]`);
+
+    next?.focus();
   }
 
   /**
@@ -516,25 +676,39 @@ export class UBookItServiceEditorElement extends UmbLitElement {
    * the change happens.
    */
   #renderResolutionSummary() {
-    const lines = this.#resolutionLines();
+    const groups = this.#resolutionGroups();
 
     return html`
       <div class="resolution" role="status" aria-label=${this.#term("resolutionSummary")}>
-        ${lines.length === 0
+        ${groups.length === 0
           ? nothing
           : html`<ul>
-              ${lines.map((line) => html`<li>${line}</li>`)}
+              ${groups.map(
+                (group) => html`
+                  <li>
+                    <!--
+                      Labelled with its type: the roles constrain different
+                      pools, so an unlabelled list of lines would leave an
+                      editor guessing which requirement each count is about.
+                    -->
+                    <strong>${group.resourceType}</strong>
+                    <ul>
+                      ${group.lines.map((line) => html`<li>${line}</li>`)}
+                    </ul>
+                  </li>
+                `,
+              )}
             </ul>`}
       </div>
     `;
   }
 
   /**
-   * Delegates to the pure {@link resolutionLines}, passing a term resolver so
+   * Delegates to the pure {@link resolutionGroups}, passing a term resolver so
    * the phrasing logic can be exercised without a DOM or a localization host.
    */
-  #resolutionLines(): string[] {
-    return resolutionLines(this._resolution, (key, ...args) =>
+  #resolutionGroups() {
+    return resolutionGroups(this._resolution, (key, ...args) =>
       this.localize.term(`ubookitServices_${key}`, ...args),
     );
   }
@@ -715,6 +889,18 @@ export class UBookItServiceEditorElement extends UmbLitElement {
     }
     .resolution li + li {
       margin-top: var(--uui-size-space-1);
+    }
+    /* A role's own lines sit under its type label rather than beside it. */
+    .resolution ul ul {
+      border-left: none;
+      margin: 0;
+      padding-left: 0;
+    }
+    .requirement {
+      position: relative;
+    }
+    .remove-requirement {
+      margin-top: var(--uui-size-space-2);
     }
     .error-summary {
       border: 2px solid var(--uui-color-danger, #d42054);

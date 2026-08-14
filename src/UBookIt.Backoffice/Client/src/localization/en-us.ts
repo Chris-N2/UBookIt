@@ -104,6 +104,16 @@ export default {
     capabilityAdd: "Add capability",
     capabilityRemove: "Remove %0%",
 
+    // ------------------------------------------------------------ requirement rows
+    //
+    // A service may require several resources at once — a room AND a therapist —
+    // one per row. Rows are numbered in their group labels so a screen reader
+    // announces which requirement a control belongs to; nothing depends on the
+    // order, so the number is a label rather than a position with meaning.
+    requirementLegend: "Requirement %0%",
+    requirementAdd: "Add requirement",
+    requirementRemove: "Remove requirement %0%",
+
     // ---------------------------------------------------------- resolution summary
     //
     // ⑧'s capability-only wording is gone. The summary now evaluates every

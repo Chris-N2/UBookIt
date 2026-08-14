@@ -95,16 +95,17 @@ export type ServiceDurationModel = {
 };
 
 export type ServicePreviewRequestModel = {
-    resourceType: string;
-    requiredCapabilities: Array<string>;
+    roles: Array<ServicePreviewRoleModel>;
     duration?: ServiceDurationModel | null;
 };
 
 export type ServicePreviewResponseModel = {
-    ofType: ServicePreviewStageModel;
-    withCapabilities: ServicePreviewStageModel;
-    canProvide: ServicePreviewStageModel;
-    durationExclusions: Array<DurationExclusionModel>;
+    roles: Array<ServiceRoleChainModel>;
+};
+
+export type ServicePreviewRoleModel = {
+    resourceType: string;
+    requiredCapabilities: Array<string>;
 };
 
 export type ServicePreviewStageModel = {
@@ -123,6 +124,15 @@ export type ServiceResponseModel = {
     name: string;
     duration: ServiceDurationModel;
     roles: Array<ServiceRoleModel>;
+};
+
+export type ServiceRoleChainModel = {
+    resourceType: string;
+    requiredCapabilities: Array<string>;
+    ofType: ServicePreviewStageModel;
+    withCapabilities: ServicePreviewStageModel;
+    canProvide: ServicePreviewStageModel;
+    durationExclusions: Array<DurationExclusionModel>;
 };
 
 export type ServiceRoleModel = {

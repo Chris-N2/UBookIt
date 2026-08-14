@@ -1,5 +1,10 @@
 import { describe, expect, it } from "vitest";
-import { resolutionLines, type ResolutionSnapshot, type TermResolver } from "./resolution-summary.js";
+import {
+  resolutionGroups,
+  resolutionLines,
+  type ResolutionSnapshot,
+  type TermResolver,
+} from "./resolution-summary.js";
 import type { DurationExclusionModel } from "../api/index.js";
 
 /**
@@ -213,6 +218,100 @@ describe("exclusion reasons", () => {
     expect(last).toContain("(C,120)");
     expect(last).not.toContain("(D,120)");
     expect(last).toContain("resolutionExcludedMore(2)");
+  });
+});
+
+describe("a chain per role", () => {
+  it("says nothing at all when the chains are not known", () => {
+    expect(resolutionGroups(null, t)).toEqual([]);
+  });
+
+  it("groups each role's lines under its own resource type", () => {
+    const groups = resolutionGroups(
+      [
+        snapshot({ resourceType: "room", requiresCapabilities: true, withCapabilities: 3, canProvide: 3 }),
+        snapshot({ resourceType: "therapist", ofType: 2, withCapabilities: 2, canProvide: 2 }),
+      ],
+      t,
+    );
+
+    expect(groups).toEqual([
+      {
+        resourceType: "room",
+        lines: ["resolutionType(10,room)", "resolutionCapabilities(3)", "resolutionDuration(3)"],
+      },
+      { resourceType: "therapist", lines: ["resolutionHealthy(2)"] },
+    ]);
+  });
+
+  it("describes a role requiring no capabilities by its type alone, beside one that does", () => {
+    // The ⑧a MAJOR, now with a second role next to it: the capability line must
+    // follow what each role required, not what the other role required or what
+    // the numbers happen to look like.
+    const groups = resolutionGroups(
+      [
+        snapshot({ resourceType: "room", requiresCapabilities: true, withCapabilities: 3, canProvide: 3 }),
+        snapshot({
+          resourceType: "therapist",
+          requiresCapabilities: false,
+          ofType: 4,
+          withCapabilities: 4,
+          canProvide: 2,
+          exclusions: [excluded("Mary")],
+        }),
+      ],
+      t,
+    );
+
+    expect(groups[1].lines.join(" ")).not.toContain("resolutionCapabilities");
+    expect(groups[1].lines).toEqual([
+      "resolutionType(4,therapist)",
+      "resolutionDuration(2)",
+      "resolutionExcluded(resolutionExcludedMaximum(Mary,120))",
+    ]);
+
+    // And the role that DID require capabilities still reports them, so the
+    // omission above is about that role's configuration rather than a blanket
+    // rule.
+    expect(groups[0].lines).toContain("resolutionCapabilities(3)");
+  });
+
+  it("attributes a type matching nothing to that role alone", () => {
+    const groups = resolutionGroups(
+      [
+        snapshot({ resourceType: "rooom", requiresCapabilities: true, ofType: 0, withCapabilities: 0, canProvide: 0 }),
+        snapshot({ resourceType: "therapist", ofType: 2, withCapabilities: 2, canProvide: 2 }),
+      ],
+      t,
+    );
+
+    expect(groups[0].lines).toEqual(["resolutionTypeNone(rooom)"]);
+    expect(groups[1].lines).toEqual(["resolutionHealthy(2)"]);
+  });
+
+  it("keeps two roles of the same type separate rather than merging them", () => {
+    // A configuration that cannot be saved but can be previewed. Each chain is
+    // reported as supplied, so an editor can see what each row resolves to while
+    // correcting the duplicate.
+    const groups = resolutionGroups(
+      [
+        snapshot({ resourceType: "room", requiresCapabilities: true, withCapabilities: 3, canProvide: 3 }),
+        snapshot({ resourceType: "room" }),
+      ],
+      t,
+    );
+
+    expect(groups.map((g) => g.resourceType)).toEqual(["room", "room"]);
+    expect(groups[0].lines).not.toEqual(groups[1].lines);
+  });
+
+  it("preserves the order the roles were supplied in", () => {
+    const groups = resolutionGroups(
+      [snapshot({ resourceType: "therapist" }), snapshot({ resourceType: "room" })],
+      t,
+    );
+
+    expect(groups.map((g) => g.resourceType)).toEqual(["therapist", "room"]);
   });
 });
 

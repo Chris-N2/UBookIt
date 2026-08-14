@@ -51,11 +51,11 @@
 
 ## 8. Backoffice client
 
-- [ ] 8.1 Regenerate the client against the running TestSite — it reads live swagger, so the site must be up with the new contract.
-- [ ] 8.2 Requirement rows become add/remove; the last row cannot be removed; count still sent as 1.
-- [ ] 8.3 Do **not** pre-filter types another role uses; render the server's duplicate-type failure against the offending row (design D1 — relaxing the rule later must be a server change alone).
-- [ ] 8.4 The summary renders a chain per role, each labelled by its type, keeping the not-known, snapshot and stale-token disciplines and the no-availability-vocabulary rule.
-- [ ] 8.5 Extend the client test suite for the per-role phrasing, including a role requiring no capabilities and a role whose type matches nothing.
+- [x] 8.1 Regenerate the client against the running TestSite — it reads live swagger, so the site must be up with the new contract.
+- [x] 8.2 Requirement rows become add/remove; the last row cannot be removed; count still sent as 1.
+- [x] 8.3 Do **not** pre-filter types another role uses; render the server's duplicate-type failure against the offending row (design D1 — relaxing the rule later must be a server change alone).
+- [x] 8.4 The summary renders a chain per role, each labelled by its type, keeping the not-known, snapshot and stale-token disciplines and the no-availability-vocabulary rule.
+- [x] 8.5 Extend the client test suite for the per-role phrasing, including a role requiring no capabilities and a role whose type matches nothing.
 - [ ] 8.6 Accessibility: each requirement row's controls are labelled and its error associated; add/remove are real buttons with sensible focus handling after removal; the summary remains a live region whose referenced ids resolve in its own shadow root.
 
 ## 9. Verification

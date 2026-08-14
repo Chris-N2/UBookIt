@@ -34,6 +34,20 @@ export type ResolutionSnapshot = {
 /** Resolves a localization key within the `ubookitServices` area. */
 export type TermResolver = (key: string, ...args: (string | number)[]) => string;
 
+/**
+ * One role's chain, ready to render: the type it describes and what the summary
+ * says about it.
+ *
+ * Grouped per role rather than flattened into one list of lines, and labelled
+ * with the type, because the roles constrain different pools. A combined count
+ * would describe no filter that resolution applies, and an unlabelled list of
+ * lines would leave an editor guessing which role each line belongs to.
+ */
+export type RoleResolutionGroup = {
+  resourceType: string;
+  lines: string[];
+};
+
 /** How many excluded resources are named before the rest are counted instead. */
 export const MAX_NAMED_EXCLUSIONS = 3;
 
@@ -83,6 +97,24 @@ function excludedNames(exclusions: DurationExclusionModel[], t: TermResolver): s
  * print "None of those…" about a stage that had nothing to filter, which is how
  * ⑧ managed to blame the capabilities for a mistyped type key.
  */
+export function resolutionGroups(
+  chains: ResolutionSnapshot[] | null,
+  t: TermResolver,
+): RoleResolutionGroup[] {
+  if (chains === null) {
+    return [];
+  }
+
+  // Each role is described from its own chain alone. Because every role of a
+  // saveable service names a distinct resource type, the pools are disjoint and
+  // each chain stays independently true: no role can consume a resource another
+  // role's chain counted.
+  return chains.map((chain) => ({
+    resourceType: chain.resourceType,
+    lines: resolutionLines(chain, t),
+  }));
+}
+
 export function resolutionLines(chain: ResolutionSnapshot | null, t: TermResolver): string[] {
   if (chain === null) {
     return [];
