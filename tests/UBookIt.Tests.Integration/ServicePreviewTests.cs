@@ -94,7 +94,7 @@ public class ServicePreviewTests(SqlServerFixture fixture)
 
         Assert.Equal(
             new[] { shortA, shortB }.OrderBy(id => id),
-            chain.DurationExclusions.Select(e => e.ResourceId).OrderBy(id => id));
+            chain.DurationExclusions.Select(e => e.Resource.Id).OrderBy(id => id));
         Assert.All(chain.DurationExclusions, e =>
         {
             Assert.Equal(DurationExclusionReason.ResourceMaximum, e.Reason);

@@ -26,6 +26,17 @@
 - [x] 3.5 Tests: the chain for a configuration, unused type key giving an empty first stage rather than an error, no-capabilities matching the whole type, malformed key rejected, and the authorization guarantee asserted the way this repo asserts it.
 - [x] 3.6 Integration test that the endpoint's final stage equals what Core resolves for a saved service with the same role and duration.
 
+  **Amended at apply time, and QA agreed the reasoning while flagging that the
+  task should have been amended rather than simply ticked.** The equivalence is
+  asserted at *endpoint* level in the unit suite
+  (`ServicePreviewEndpointTests.Spec_scenario_preview_agrees_with_candidate_resolution`),
+  which is where every other management endpoint in this repository is tested,
+  and at *Core-over-real-SQL* level in the integration suite
+  (`ServicePreviewTests`). It is not asserted at endpoint level over SQL because
+  `UBookIt.Tests.Integration` deliberately references only Core and Persistence;
+  adding a Backoffice reference would pull Umbraco into the store-level suite,
+  which is a repo-shape decision this change should not make unilaterally.
+
 ## 4. Backoffice client
 
 - [x] 4.1 Start the TestSite against the new build and regenerate the client — it reads the live swagger, so the site must be running with the new endpoint present and the old one gone.
@@ -36,6 +47,15 @@
 - [x] 4.6 Keep the snapshot discipline: phrasing derived from state captured with the response, never from live state, and a stale-request token so an earlier reply cannot overwrite a later one.
 - [x] 4.7 Wording may say what can provide the service; it must not say available, free, or bookable (design D5).
 - [x] 4.8 Accessibility: the summary is a live region that announces changes, every id it references resolves in its own shadow root, and the layout change keeps keyboard order sensible.
+
+## 4a. QA remediation
+
+- [x] 4a.1 Fix the summary reporting a capability stage when the configuration requires no capabilities (QA MAJOR). Omit the stage: it filtered nothing by construction, so its count stays derivable and no sentence refers to capabilities the editor never entered.
+- [x] 4a.2 Extract the phrasing into a pure `resolutionLines` over the snapshot, and add `vitest` plus a covering suite (design D9). Mutation-checked: reverting 4a.1 fails the suite.
+- [x] 4a.3 Cover the persistence spec's "No capability matching in storage" over `IResourceManagementStore`, and "Projections stay off the read port" over `IResourceStore` (QA MAJOR). Mutation-checked by re-adding the projection as a default interface method.
+- [x] 4a.4 Remove `"bookable"` from the granularity exclusion string — task 4.7 bans the word outright, and a rule with judgement calls in it drifts.
+- [x] 4a.5 Remove the by-id chain overload and `DurationExclusion.ResourceId`: public surface with no production consumer, the defect this project has shipped twice.
+- [x] 4a.6 Restore the dropped "describes the type when no capabilities are required" scenario into the services delta, with the rule that governs it.
 
 ## 5. Verification
 

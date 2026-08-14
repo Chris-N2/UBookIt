@@ -137,7 +137,11 @@ export default {
     resolutionExcluded: "Excluded by the length: %0%",
     resolutionExcludedMaximum: "%0% (maximum %1% minutes)",
     resolutionExcludedMinimum: "%0% (minimum %1% minutes)",
-    resolutionExcludedGranularity: "%0% (bookable in %1%-minute steps)",
+    // Avoids "bookable" even though it describes a resource's grid rather than
+    // a free slot: design D5 bans the availability vocabulary outright rather
+    // than case by case, and a rule with judgement calls in it is a rule that
+    // drifts. "in %1%-minute steps" says the same thing.
+    resolutionExcludedGranularity: "%0% (lengths in %1%-minute steps only)",
     resolutionExcludedMore: "and %0% more",
     save: "Save",
     cancel: "Cancel",

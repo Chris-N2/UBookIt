@@ -292,7 +292,7 @@ public class ServiceResolutionTests
     [Fact]
     public async Task Spec_scenario_unknown_service()
     {
-        var result = await Wire(TenRooms()).ResolveAsync(Guid.NewGuid());
+        var result = await Wire(TenRooms()).ResolveCandidatesAsync(Guid.NewGuid());
 
         Assert.False(result.Succeeded);
         Assert.Equal(FailureCodes.ServiceNotFound, Assert.Single(result.Failures).Code);

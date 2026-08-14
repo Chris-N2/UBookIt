@@ -191,6 +191,45 @@ it is where the asymmetry gets resolved.
 No existing data can be invalidated: the columns are `nvarchar(64)`, so nothing
 longer than the new bound can already be stored.
 
+### D9 — The summary's phrasing is a pure function, and the Client gains a test runner
+
+*Added during apply, after QA. Approved by Chris.*
+
+QA found a false sentence in the summary: with no capabilities required it still
+reported *"N of those have the required capabilities"*, describing the
+configuration in terms the editor never entered. ⑧ had solved this with separate
+type-phrased strings; replacing that requirement wholesale dropped the guarantee
+along with the wording. Live verification missed it because the healthy-collapse
+branch hides it whenever all three stages agree, which is the configuration a
+manual pass naturally tries.
+
+Two things follow, and the second only became cheap because of the first.
+
+**The phrasing moves out of the element** into `resolution-summary.ts` as a pure
+function over the snapshot, taking a term resolver. This is where the summary's
+truth claims actually live: every sentence it can produce must be true of the
+configuration it describes, and that is a property of the string selection
+alone — no DOM, no Lit, no localization host.
+
+**Because it is pure, covering it needs a plain test runner** rather than a
+component harness, so `vitest` is added as a dev dependency with a `test`
+script. This is a deliberate widening of the change: the alternative was to
+record live-only verification as accepted risk, which QA's finding had just
+demonstrated to be insufficient for exactly this class of defect. It also gives
+the pending CI change something to run on the Client.
+
+The suite asserts localization **keys** rather than English, so a copy edit
+cannot break it — except for one test that reads the real strings, because D5's
+ban on availability vocabulary is a ban on the words themselves.
+
+Both guards were mutation-checked: reverting the capability-line fix fails the
+covering test, and reintroducing "bookable" fails the vocabulary test.
+
+**Not** in scope: a harness for the element itself. Rendering, the live region,
+the stale-request token and the debounce remain verified live by reading the
+shadow DOM. Testing those needs a DOM and a Lit harness, which is a larger
+decision than this change should make.
+
 ## Risks / Trade-offs
 
 - **[The booking path carries diagnostic allocation cost]** → D1; bounded by

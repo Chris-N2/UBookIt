@@ -7,6 +7,8 @@ The report SHALL be presented at **form level**, not inside the Service Requirem
 
 Reporting a single surviving count SHALL NOT be sufficient. The chain SHALL make each stage's count derivable, so that an empty or narrowed pool is attributable to the filter responsible: a mistyped resource type, an over-narrow capability set, and a duration no resource can provide are three different faults corrected in three different places. In particular, a resource type matching nothing SHALL NOT be reported as a capability problem.
 
+The report SHALL NOT refer to required capabilities when the configuration names none. Such a stage filtered nothing by construction — an empty requirement matches every resource of its type — so its count remains derivable from the stage before it, and reporting it would describe the configuration in terms the editor never entered. This carries forward a guarantee the capability-only readout made through separate type-phrased wording; the chain keeps the guarantee by omitting the stage rather than by phrasing it twice.
+
 Because the report now evaluates every filter candidate resolution applies, it MAY state that resources can provide the service. It SHALL NOT state or imply that the service is *available* — the chain says nothing about opening hours, lead time, booking horizon, or existing bookings, and wording that suggests a bookable slot would over-claim exactly as the earlier capability-only wording would have.
 
 Where a stage's count is not known — because the configuration is too incomplete to resolve, or the request failed — the report SHALL say nothing for that stage rather than reporting zero. Zero is the answer that tells an editor their configuration is wrong, so reporting it because a request failed sends them to correct something that is correct.
@@ -40,6 +42,10 @@ The report's wording SHALL be derived from state captured with the response it d
 #### Scenario: The report does not claim availability
 - **WHEN** the report is displayed for any configuration
 - **THEN** its wording describes what resources can provide, and does not state that the service is available, free, or bookable at any particular time
+
+#### Scenario: The report describes the type when no capabilities are required
+- **WHEN** the configuration names a resource type, requires no capabilities, and some resources of that type cannot provide the duration
+- **THEN** the report describes how many resources have that **type** and how many of those can provide the service, and says nothing about required capabilities that were never named
 
 #### Scenario: A stage that is not known says nothing
 - **WHEN** the resource type is empty, or the chain could not be retrieved

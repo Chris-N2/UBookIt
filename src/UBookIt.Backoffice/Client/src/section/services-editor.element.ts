@@ -3,13 +3,13 @@ import { UmbLitElement } from "@umbraco-cms/backoffice/lit-element";
 import { UBookItBackofficeService } from "../api/index.js";
 import type {
   CapabilityUsageModel,
-  DurationExclusionModel,
   ResourceTypeUsageModel,
   ServiceDurationModel,
   ServicePreviewRequestModel,
   ServiceRequestModel,
 } from "../api/index.js";
 import { toApiErrors, type ApiError } from "./api-errors.js";
+import { resolutionLines, type ResolutionSnapshot } from "./resolution-summary.js";
 import "./capability-input.element.js";
 
 /**
@@ -19,27 +19,6 @@ import "./capability-input.element.js";
  */
 type DurationMode = "variable" | "fixed";
 
-/**
- * A resolution chain and the configuration it was computed for, captured
- * together.
- *
- * The pairing is the point. ⑧'s readout derived its phrasing from live form
- * state while its count was a snapshot from the previous request, so removing a
- * capability could briefly assert a sentence that was false for the number
- * beside it — into a `role="status"` region, where a screen reader announces the
- * false sentence and then the correction. Everything the summary says is read
- * from here, never from the live fields.
- */
-type ResolutionSnapshot = {
-  resourceType: string;
-  ofType: number;
-  withCapabilities: number;
-  canProvide: number;
-  exclusions: DurationExclusionModel[];
-};
-
-/** How many excluded resources are named before the rest are counted instead. */
-const MAX_NAMED_EXCLUSIONS = 3;
 
 /** Client-only code for the empty fixed-duration guard; rendered in the Duration group. */
 const DURATION_REQUIRED = "duration-required";
@@ -302,6 +281,7 @@ export class UBookItServiceEditorElement extends UmbLitElement {
           ? null
           : {
               resourceType: body.resourceType,
+              requiresCapabilities: (body.requiredCapabilities ?? []).length > 0,
               ofType: data.ofType.total,
               withCapabilities: data.withCapabilities.total,
               canProvide: data.canProvide.total,
@@ -550,96 +530,13 @@ export class UBookItServiceEditorElement extends UmbLitElement {
   }
 
   /**
-   * What the summary says, derived entirely from the snapshot — never from the
-   * live form (design D7).
-   *
-   * An empty array is silence, and silence is what "not known" looks like: no
-   * resource type entered yet, a fixed duration with no length, or a request
-   * that failed. Rendering a chain of zeros instead would tell an editor their
-   * configuration resolves to nothing, which is the one thing a failed request
-   * does not know.
-   *
-   * The chain stops at the stage that emptied the pool. Continuing past it would
-   * print "None of those…" about a stage that had nothing to filter, which is
-   * how ⑧ managed to blame the capabilities for a mistyped type key.
+   * Delegates to the pure {@link resolutionLines}, passing a term resolver so
+   * the phrasing logic can be exercised without a DOM or a localization host.
    */
   #resolutionLines(): string[] {
-    const chain = this._resolution;
-    if (chain === null) {
-      return [];
-    }
-
-    if (chain.ofType === 0) {
-      return [this.localize.term("ubookitServices_resolutionTypeNone", chain.resourceType)];
-    }
-
-    // Nothing was excluded anywhere. Three lines carrying one number say less
-    // than one line does, so the healthy case collapses.
-    if (chain.ofType === chain.canProvide) {
-      return [
-        chain.canProvide === 1
-          ? this.#term("resolutionHealthyOne")
-          : this.localize.term("ubookitServices_resolutionHealthy", chain.canProvide),
-      ];
-    }
-
-    const lines = [
-      chain.ofType === 1
-        ? this.localize.term("ubookitServices_resolutionTypeOne", chain.resourceType)
-        : this.localize.term("ubookitServices_resolutionType", chain.ofType, chain.resourceType),
-    ];
-
-    if (chain.withCapabilities === 0) {
-      lines.push(this.#term("resolutionCapabilitiesNone"));
-      return lines;
-    }
-
-    lines.push(
-      chain.withCapabilities === 1
-        ? this.#term("resolutionCapabilitiesOne")
-        : this.localize.term("ubookitServices_resolutionCapabilities", chain.withCapabilities),
+    return resolutionLines(this._resolution, (key, ...args) =>
+      this.localize.term(`ubookitServices_${key}`, ...args),
     );
-
-    lines.push(
-      chain.canProvide === 0
-        ? this.#term("resolutionDurationNone")
-        : chain.canProvide === 1
-          ? this.#term("resolutionDurationOne")
-          : this.localize.term("ubookitServices_resolutionDuration", chain.canProvide),
-    );
-
-    if (chain.exclusions.length > 0) {
-      lines.push(
-        this.localize.term("ubookitServices_resolutionExcluded", this.#excludedNames(chain.exclusions)),
-      );
-    }
-
-    return lines;
-  }
-
-  /**
-   * The excluded resources with the bound that excluded each — the number the
-   * editor has to change. Capped, because a wide pool with a low ceiling would
-   * otherwise produce a list longer than the form.
-   */
-  #excludedNames(exclusions: DurationExclusionModel[]): string {
-    const named = exclusions.slice(0, MAX_NAMED_EXCLUSIONS).map((exclusion) => {
-      const key =
-        exclusion.reason === "resource-minimum"
-          ? "ubookitServices_resolutionExcludedMinimum"
-          : exclusion.reason === "granularity"
-            ? "ubookitServices_resolutionExcludedGranularity"
-            : "ubookitServices_resolutionExcludedMaximum";
-
-      return this.localize.term(key, exclusion.displayName, exclusion.boundMinutes);
-    });
-
-    const remaining = exclusions.length - named.length;
-    if (remaining > 0) {
-      named.push(this.localize.term("ubookitServices_resolutionExcludedMore", remaining));
-    }
-
-    return named.join(", ");
   }
 
   #renderDuration() {

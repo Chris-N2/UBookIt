@@ -6,6 +6,7 @@
   "scripts": {
     "watch": "tsc && vite build --watch",
     "build": "tsc && vite build",
+    "test": "vitest run",
     "generate-client": "node scripts/generate-openapi.js https://localhost:44348/umbraco/swagger/ubookitbackoffice/swagger.json"
   },
   "devDependencies": {
@@ -15,6 +16,7 @@
     "cross-env": "^10.1.0",
     "node-fetch": "^3.3.2",
     "typescript": "^5.9.3",
-    "vite": "^7.3.1"
+    "vite": "^7.3.1",
+    "vitest": "^4.1.10"
   }
 }

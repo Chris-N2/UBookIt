@@ -123,4 +123,49 @@ public class CapabilityEndpointTests
 
         Assert.DoesNotContain("resources/matching", routes);
     }
+
+    /// <summary>
+    /// Persistence spec, "No capability matching in storage": the management
+    /// store SHALL NOT provide a projection that selects resources by a
+    /// required-capability set.
+    /// <para>
+    /// Asserted over the port rather than over one implementation, because the
+    /// rule is about the contract: eligibility has exactly one implementation,
+    /// in Core, over resources the read port hydrates. A storage-layer
+    /// projection applying the same rule would be a second implementation free
+    /// to diverge in its predicate, its ordering, or its test doubles (design
+    /// D4). Deleting the old method is not the same as preventing the next one,
+    /// which is why this is a test and not a comment.
+    /// </para>
+    /// </summary>
+    [Fact]
+    public void The_management_store_exposes_no_capability_matching_projection()
+    {
+        var offenders = typeof(IResourceManagementStore)
+            .GetMethods()
+            .Where(m => m.GetParameters().Any(p =>
+                p.ParameterType == typeof(CapabilitySet)
+                || p.ParameterType == typeof(IEnumerable<string>)
+                || p.ParameterType == typeof(IReadOnlyCollection<string>)
+                || p.ParameterType == typeof(string[])))
+            .Select(m => m.Name)
+            .ToList();
+
+        Assert.Empty(offenders);
+    }
+
+    /// <summary>
+    /// The same rule for the read port, which candidate resolution depends on:
+    /// the backoffice's needs are not the booking path's needs, and keeping the
+    /// ports separate is what stopped one reaching across the other previously
+    /// (persistence spec, "Projections stay off the read port").
+    /// </summary>
+    [Fact]
+    public void The_read_port_exposes_neither_projection()
+    {
+        var names = typeof(IResourceStore).GetMethods().Select(m => m.Name).ToList();
+
+        Assert.DoesNotContain(nameof(IResourceManagementStore.ListCapabilitiesAsync), names);
+        Assert.DoesNotContain(nameof(IResourceManagementStore.ListTypesAsync), names);
+    }
 }

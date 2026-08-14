@@ -53,16 +53,18 @@ public interface IServiceBookingService
         ServiceRole role, ServiceDuration duration, CancellationToken cancellationToken = default);
 
     /// <summary>
-    /// The same evaluation for a saved service: loads it and delegates. Fails
-    /// with <see cref="FailureCodes.ServiceNotFound"/> for an unknown id.
-    /// </summary>
-    Task<DomainResult<ServiceResolution>> ResolveAsync(
-        Guid serviceId, CancellationToken cancellationToken = default);
-
-    /// <summary>
     /// The service's candidate pool: every eligible resource with the lengths the
-    /// service permits on it. A projection of <see cref="ResolveAsync(Guid, CancellationToken)"/>,
-    /// never a second filtering path (design D1).
+    /// service permits on it. A thin wrapper that loads the service and delegates
+    /// to <see cref="ResolveAsync(ServiceRole, ServiceDuration, CancellationToken)"/>,
+    /// projecting the pool from the chain rather than filtering again (design D1).
+    /// Fails with <see cref="FailureCodes.ServiceNotFound"/> for an unknown id.
+    /// <para>
+    /// There is deliberately no by-id overload returning the whole chain. The
+    /// only caller that wants a chain is the configuration preview, which asks
+    /// about a configuration being edited and therefore has a role and a
+    /// duration rather than an id — so such an overload would be public surface
+    /// with no consumer.
+    /// </para>
     /// </summary>
     Task<DomainResult<IReadOnlyList<ServiceCandidate>>> ResolveCandidatesAsync(
         Guid serviceId, CancellationToken cancellationToken = default);
@@ -144,13 +146,13 @@ public sealed class ServiceBookingService(
         return new ServiceResolution(stage1, stage2, candidates, exclusions);
     }
 
-    public async Task<DomainResult<ServiceResolution>> ResolveAsync(
+    public async Task<DomainResult<IReadOnlyList<ServiceCandidate>>> ResolveCandidatesAsync(
         Guid serviceId, CancellationToken cancellationToken = default)
     {
         var service = await serviceStore.GetAsync(serviceId, cancellationToken).ConfigureAwait(false);
         if (service is null)
         {
-            return DomainResult<ServiceResolution>.Failure(
+            return DomainResult<IReadOnlyList<ServiceCandidate>>.Failure(
                 FailureCodes.ServiceNotFound, $"No service exists with id {serviceId}.");
         }
 
@@ -159,17 +161,8 @@ public sealed class ServiceBookingService(
         var resolution = await ResolveAsync(service.Roles[0], service.Duration, cancellationToken)
             .ConfigureAwait(false);
 
-        return DomainResult<ServiceResolution>.Success(resolution);
-    }
-
-    public async Task<DomainResult<IReadOnlyList<ServiceCandidate>>> ResolveCandidatesAsync(
-        Guid serviceId, CancellationToken cancellationToken = default)
-    {
-        var resolution = await ResolveAsync(serviceId, cancellationToken).ConfigureAwait(false);
-
-        return resolution.Succeeded
-            ? DomainResult<IReadOnlyList<ServiceCandidate>>.Success(resolution.Value.Candidates)
-            : DomainResult<IReadOnlyList<ServiceCandidate>>.Failure(resolution.Failures);
+        // The pool is the chain's final stage, projected — never recomputed.
+        return DomainResult<IReadOnlyList<ServiceCandidate>>.Success(resolution.Candidates);
     }
 
     public async Task<DomainResult<IReadOnlyList<ServiceBookableStart>>> GetBookableStartsAsync(

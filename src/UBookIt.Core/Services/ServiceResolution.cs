@@ -36,10 +36,7 @@ public enum DurationExclusionReason
 /// is excluded" only says that something is wrong.
 /// </para>
 /// </summary>
-public sealed record DurationExclusion(Resource Resource, DurationExclusionReason Reason, TimeSpan Bound)
-{
-    public Guid ResourceId => Resource.Id;
-}
+public sealed record DurationExclusion(Resource Resource, DurationExclusionReason Reason, TimeSpan Bound);
 
 /// <summary>
 /// One evaluation of a role and a duration against the resources that exist,
