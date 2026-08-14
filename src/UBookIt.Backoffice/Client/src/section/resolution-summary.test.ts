@@ -121,6 +121,26 @@ describe("capabilities that were never named", () => {
     expect(lines.join(" ")).not.toContain("resolutionCapabilities");
   });
 
+  it("emits no exclusion line when capabilities narrow the pool but the duration excludes nothing", () => {
+    // The commonest narrowed configuration — 10 → 3 → 3 — and the one the
+    // suite was missing: every other non-healthy case either returns early or
+    // supplies exclusions, so the `exclusions.length > 0` guard was never
+    // reached with an empty list. Without it, relaxing that guard to `>= 0`
+    // leaves the suite green while the summary emits a dangling
+    // "Excluded by the length: " with nothing after it.
+    const lines = resolutionLines(
+      snapshot({ requiresCapabilities: true, withCapabilities: 3, canProvide: 3, exclusions: [] }),
+      t,
+    );
+
+    expect(lines).toEqual([
+      "resolutionType(10,room)",
+      "resolutionCapabilities(3)",
+      "resolutionDuration(3)",
+    ]);
+    expect(lines.join(" ")).not.toContain("resolutionExcluded");
+  });
+
   it("reports the capability line when they ARE required, on the same counts", () => {
     // Same numbers, different configuration: the phrasing must follow what the
     // editor typed, not what the data happens to look like. This is the pair

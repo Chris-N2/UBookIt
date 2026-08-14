@@ -53,7 +53,19 @@ public class ServicePreviewTests(SqlServerFixture fixture)
 
         // A type nobody else in the suite uses, so concurrently-seeded resources
         // cannot join this pool and make the counts non-deterministic.
-        var type = $"prev-{Guid.NewGuid():N}"[..20];
+        //
+        // The prefix is deliberately hyphen-free. `ResourceManagementStoreTests`
+        // asserts the SQL store's type ordering equals StringComparer.Ordinal's
+        // over EVERY key in the shared fixture database, and the two disagree
+        // whenever a hyphen in one key aligns with a letter in another: Ordinal
+        // ranks '-' (0x2D) below any letter, while a word-sort collation such as
+        // Latin1_General_CI_AS gives punctuation a lower weight and compares the
+        // following characters instead. `prev-<hex>` against `prevc-<hex>` hit
+        // exactly that, failing intermittently on the leading hex digit and only
+        // on servers whose collation word-sorts — the column pins no collation,
+        // so this is machine-dependent. Sharing a prefix is fine; a hyphen
+        // opposite a letter is not.
+        var type = $"prevtype{Guid.NewGuid():N}"[..20];
 
         // Two rooms capped at two hours, one that can go all day. A four-hour
         // service therefore resolves to exactly one of the three, and the two
@@ -110,7 +122,7 @@ public class ServicePreviewTests(SqlServerFixture fixture)
         // defect ⑧'s QA found on the paged reads.
         fixture.EnsureAvailable();
 
-        var type = $"prevc-{Guid.NewGuid():N}"[..20];
+        var type = $"prevcaps{Guid.NewGuid():N}"[..20];
         var tagged = await Seed.EveryDayRoomAsync(fixture, Ct, type);
         var untagged = await Seed.EveryDayRoomAsync(fixture, Ct, type);
 

@@ -141,13 +141,19 @@ public class CapabilityEndpointTests
     [Fact]
     public void The_management_store_exposes_no_capability_matching_projection()
     {
+        // Any collection of strings, not an enumerated list of the shapes a
+        // matching projection has happened to use. Naming shapes explicitly made
+        // this guard catch yesterday's signature and miss `IReadOnlyList<string>`
+        // — which is this file's own house style — so the predicate asks the
+        // structural question instead: does a parameter carry a set of keys?
+        static bool CarriesCapabilityKeys(Type parameter)
+            => parameter == typeof(CapabilitySet)
+                || (parameter != typeof(string)
+                    && typeof(IEnumerable<string>).IsAssignableFrom(parameter));
+
         var offenders = typeof(IResourceManagementStore)
             .GetMethods()
-            .Where(m => m.GetParameters().Any(p =>
-                p.ParameterType == typeof(CapabilitySet)
-                || p.ParameterType == typeof(IEnumerable<string>)
-                || p.ParameterType == typeof(IReadOnlyCollection<string>)
-                || p.ParameterType == typeof(string[])))
+            .Where(m => m.GetParameters().Any(p => CarriesCapabilityKeys(p.ParameterType)))
             .Select(m => m.Name)
             .ToList();
 

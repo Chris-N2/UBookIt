@@ -57,6 +57,12 @@
 - [x] 4a.5 Remove the by-id chain overload and `DurationExclusion.ResourceId`: public surface with no production consumer, the defect this project has shipped twice.
 - [x] 4a.6 Restore the dropped "describes the type when no capabilities are required" scenario into the services delta, with the rule that governs it.
 
+### Second QA round
+
+- [x] 4a.7 Rename this change's integration type keys so they cannot make `ResourceManagementStoreTests`' ordering assertion fail (QA MAJOR, second round). `prev-<hex>` against `prevc-<hex>` put a hyphen opposite a letter, and Ordinal ranks `-` below every letter while a word-sort collation weights punctuation lower and compares the following characters — so the two disagreed whenever the leading hex digit exceeded `c`, about one run in five. Verified under `SQL_Latin1_General_CP1_CI_AS`, `Latin1_General_CI_AS` and `Latin1_General_BIN2`: the old keys diverge under both word-sort collations, the new hyphen-free ones agree under all three. Integration suite run 8 consecutive times, green.
+- [x] 4a.8 Close the surviving mutant in the client suite: no case reached the exclusion guard with an empty list, so relaxing `> 0` to `>= 0` stayed green while the summary would emit a dangling "Excluded by the length:". Covered by the commonest narrowed configuration (10 → 3 → 3).
+- [x] 4a.9 Broaden the management-store guard, which named parameter shapes explicitly and so missed `IReadOnlyList<string>` — this file's own house style. It now asks the structural question (any collection of strings), and was mutation-checked with the shape that previously evaded it.
+
 ## 5. Verification
 
 - [x] 5.1 Full solution build with `--no-incremental`, TestSite stopped first. Only the known NU1903 advisories are acceptable.
