@@ -146,6 +146,17 @@ public class CapabilityEndpointTests
         // this guard catch yesterday's signature and miss `IReadOnlyList<string>`
         // — which is this file's own house style — so the predicate asks the
         // structural question instead: does a parameter carry a set of keys?
+        //
+        // It is deliberately over-broad. A legitimate future member taking a
+        // string collection for some unrelated purpose will fail this test; the
+        // fix is to exclude that member by name, never to delete the test.
+        //
+        // It is also knowingly partial, and the gaps are semantic rather than
+        // structural: a bespoke key-set type, or a member taking a service id and
+        // reading the role's capabilities itself, would both slip past, because
+        // no predicate over parameter types can tell "takes a set of keys" from
+        // "fetches them". The persistence spec's source-level rule is what covers
+        // those; see the deferred obligation.
         static bool CarriesCapabilityKeys(Type parameter)
             => parameter == typeof(CapabilitySet)
                 || (parameter != typeof(string)
