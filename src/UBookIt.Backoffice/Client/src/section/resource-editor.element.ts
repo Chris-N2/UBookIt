@@ -1,8 +1,9 @@
 import { css, html, customElement, property, state, nothing } from "@umbraco-cms/backoffice/external/lit";
 import { UmbLitElement } from "@umbraco-cms/backoffice/lit-element";
 import { UBookItBackofficeService } from "../api/index.js";
-import type { DayOfWeek, ResourceRequestModel } from "../api/index.js";
+import type { CapabilityUsageModel, DayOfWeek, ResourceRequestModel } from "../api/index.js";
 import { toApiErrors, type ApiError } from "./api-errors.js";
+import "./capability-input.element.js";
 
 interface WindowForm {
   start: string;
@@ -68,6 +69,17 @@ export class UBookItResourceEditorElement extends UmbLitElement {
   private _description = "";
 
   @state()
+  private _capabilities: string[] = [];
+
+  /**
+   * Keys already carried by some resource, offered as suggestions. Purely a
+   * convenience — a failed lookup leaves this empty and the control degrades to
+   * free text rather than blocking the save.
+   */
+  @state()
+  private _knownCapabilities: CapabilityUsageModel[] = [];
+
+  @state()
   private _hours = new Map<DayOfWeek, WindowForm[]>();
 
   @state()
@@ -96,6 +108,10 @@ export class UBookItResourceEditorElement extends UmbLitElement {
   }
 
   async #load() {
+    // Suggestions are a convenience, so their failure is never surfaced as a
+    // save-blocking error (mirrors the services editor's type list).
+    void this.#loadKnownCapabilities();
+
     if (!this.resourceId) {
       this._loading = false;
       return;
@@ -132,7 +148,21 @@ export class UBookItResourceEditorElement extends UmbLitElement {
       windows: exception.windows.map((w) => ({ start: toInputTime(w.start), end: toInputTime(w.end) })),
     }));
     this._constraints = { ...data.constraints };
+    this._capabilities = [...data.capabilities];
     this._loading = false;
+  }
+
+  async #loadKnownCapabilities() {
+    try {
+      const { data, error } = await UBookItBackofficeService.listCapabilities();
+      if (error || !data) {
+        return;
+      }
+
+      this._knownCapabilities = data;
+    } catch {
+      // Leaves the suggestion list empty: the control still accepts free text.
+    }
   }
 
   #buildRequest(): ResourceRequestModel {
@@ -140,6 +170,9 @@ export class UBookItResourceEditorElement extends UmbLitElement {
       type: this._type,
       displayName: this._displayName,
       description: this._description || null,
+      // Sent verbatim. Trimming happens where the key is added; normalizing
+      // here would submit something other than what the chips show.
+      capabilities: [...this._capabilities],
       openingHours: DAY_ORDER.flatMap((day) =>
         (this._hours.get(day) ?? []).map((w) => ({ day, start: w.start, end: w.end })),
       ),
@@ -220,8 +253,8 @@ export class UBookItResourceEditorElement extends UmbLitElement {
       ${this.#renderErrorSummary()}
 
       <form @submit=${this.#save} novalidate>
-        ${this.#renderDetails()} ${this.#renderOpeningHours()} ${this.#renderExceptions()}
-        ${this.#renderConstraints()}
+        ${this.#renderDetails()} ${this.#renderCapabilities()} ${this.#renderOpeningHours()}
+        ${this.#renderExceptions()} ${this.#renderConstraints()}
 
         <div class="actions">
           <uui-button
@@ -258,6 +291,37 @@ export class UBookItResourceEditorElement extends UmbLitElement {
     return errors.length === 0
       ? nothing
       : html`<p class="group-error" id=${groupId}>${errors.map((e) => e.message).join(" ")}</p>`;
+  }
+
+  /**
+   * Capability failures are attributed by the server to the capability field,
+   * so they render against this control rather than on the Details group where
+   * the type key's failure lives — the two are separate codes precisely so the
+   * two messages can land on two different controls.
+   */
+  #renderCapabilities() {
+    // The message is handed to the control as text, not referenced by id: the
+    // control owns its own shadow root, and aria-describedby cannot reach into
+    // it from here.
+    const invalid = this._errors.filter((e) => e.code === "capability-key-invalid");
+
+    return html`
+      <uui-box headline=${this.#term("capabilities")}>
+        <ubookit-capability-input
+          controlId="resource-capabilities"
+          .capabilities=${this._capabilities}
+          .known=${this._knownCapabilities}
+          label=${this.#term("capabilities")}
+          addLabel=${this.#term("capabilityAdd")}
+          hint=${this.#term("capabilityHint")}
+          removeLabel=${this.#term("capabilityRemove")}
+          emptyLabel=${this.#term("capabilityNone")}
+          error=${invalid.map((e) => e.message).join(" ")}
+          @ubookit-capabilities-changed=${(e: CustomEvent<{ capabilities: string[] }>) =>
+            (this._capabilities = e.detail.capabilities)}
+        ></ubookit-capability-input>
+      </uui-box>
+    `;
   }
 
   #renderDetails() {

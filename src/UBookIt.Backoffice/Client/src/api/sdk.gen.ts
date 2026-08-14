@@ -2,7 +2,7 @@
 
 import type { Client, Options as Options2, TDataShape } from './client';
 import { client } from './client.gen';
-import type { CreateResourceData, CreateResourceErrors, CreateResourceResponses, CreateServiceData, CreateServiceErrors, CreateServiceResponses, DeleteResourceData, DeleteResourceErrors, DeleteResourceResponses, DeleteServiceData, DeleteServiceErrors, DeleteServiceResponses, GetResourceData, GetResourceErrors, GetResourceResponses, GetServiceData, GetServiceErrors, GetServiceResponses, ListResourcesData, ListResourcesErrors, ListResourcesResponses, ListResourceTypesData, ListResourceTypesErrors, ListResourceTypesResponses, ListServicesData, ListServicesErrors, ListServicesResponses, UpdateResourceData, UpdateResourceErrors, UpdateResourceResponses, UpdateServiceData, UpdateServiceErrors, UpdateServiceResponses } from './types.gen';
+import type { CreateResourceData, CreateResourceErrors, CreateResourceResponses, CreateServiceData, CreateServiceErrors, CreateServiceResponses, DeleteResourceData, DeleteResourceErrors, DeleteResourceResponses, DeleteServiceData, DeleteServiceErrors, DeleteServiceResponses, GetResourceData, GetResourceErrors, GetResourceResponses, GetServiceData, GetServiceErrors, GetServiceResponses, ListCapabilitiesData, ListCapabilitiesErrors, ListCapabilitiesResponses, ListMatchingResourcesData, ListMatchingResourcesErrors, ListMatchingResourcesResponses, ListResourcesData, ListResourcesErrors, ListResourcesResponses, ListResourceTypesData, ListResourceTypesErrors, ListResourceTypesResponses, ListServicesData, ListServicesErrors, ListServicesResponses, UpdateResourceData, UpdateResourceErrors, UpdateResourceResponses, UpdateServiceData, UpdateServiceErrors, UpdateServiceResponses } from './types.gen';
 
 export type Options<TData extends TDataShape = TDataShape, ThrowOnError extends boolean = boolean> = Options2<TData, ThrowOnError> & {
     /**
@@ -89,6 +89,32 @@ export class UBookItBackofficeService {
                 'Content-Type': 'application/json',
                 ...options.headers
             }
+        });
+    }
+    
+    public static listCapabilities<ThrowOnError extends boolean = false>(options?: Options<ListCapabilitiesData, ThrowOnError>) {
+        return (options?.client ?? client).get<ListCapabilitiesResponses, ListCapabilitiesErrors, ThrowOnError>({
+            security: [
+                {
+                    scheme: 'bearer',
+                    type: 'http'
+                }
+            ],
+            url: '/umbraco/ubookitbackoffice/api/v1/resources/capabilities',
+            ...options
+        });
+    }
+    
+    public static listMatchingResources<ThrowOnError extends boolean = false>(options?: Options<ListMatchingResourcesData, ThrowOnError>) {
+        return (options?.client ?? client).get<ListMatchingResourcesResponses, ListMatchingResourcesErrors, ThrowOnError>({
+            security: [
+                {
+                    scheme: 'bearer',
+                    type: 'http'
+                }
+            ],
+            url: '/umbraco/ubookitbackoffice/api/v1/resources/matching',
+            ...options
         });
     }
     

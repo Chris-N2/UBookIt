@@ -1,8 +1,13 @@
 import { css, html, customElement, property, state, nothing } from "@umbraco-cms/backoffice/external/lit";
 import { UmbLitElement } from "@umbraco-cms/backoffice/lit-element";
 import { UBookItBackofficeService } from "../api/index.js";
-import type { ResourceTypeUsageModel, ServiceRequestModel } from "../api/index.js";
+import type {
+  CapabilityUsageModel,
+  ResourceTypeUsageModel,
+  ServiceRequestModel,
+} from "../api/index.js";
 import { toApiErrors, type ApiError } from "./api-errors.js";
+import "./capability-input.element.js";
 
 /**
  * The two duration kinds, matching the wire contract exactly. "variable" means
@@ -83,14 +88,28 @@ export class UBookItServiceEditorElement extends UmbLitElement {
   @state()
   private _knownTypes: ResourceTypeUsageModel[] = [];
 
+
+  @state()
+  private _requiredCapabilities: string[] = [];
+
+  @state()
+  private _knownCapabilities: CapabilityUsageModel[] = [];
+
   /**
-   * Whether the type list was actually retrieved. An empty `_knownTypes` alone
-   * cannot distinguish "no resources exist" from "the request failed", and
-   * asserting "no resources currently have this type" on the strength of a
-   * failed lookup makes the hint lie about every type the user enters.
+   * How many resources carry this requirement's type and capabilities, or null
+   * when that is not currently known.
+   *
+   * Null is not zero, and the distinction is the whole point: zero is the
+   * number that says "your requirement matches nothing, go and fix it", so
+   * showing it because a request failed would send someone to correct a
+   * configuration that is fine. The same reasoning as {@link _knownTypesLoaded},
+   * with more at stake — this readout exists precisely to be believed.
    */
   @state()
-  private _knownTypesLoaded = false;
+  private _matchCount: number | null = null;
+
+  /** Guards against an earlier in-flight preview overwriting a later one. */
+  #matchToken = 0;
 
   #term(key: string) {
     return this.localize.term(`ubookitServices_${key}`);
@@ -106,9 +125,13 @@ export class UBookItServiceEditorElement extends UmbLitElement {
     // editor still works as a free-text field, so its failure is not surfaced
     // as a save-blocking error.
     void this.#loadTypes();
+    void this.#loadCapabilities();
 
     if (!this.serviceId) {
       this._loading = false;
+      // A new service starts with an empty requirement, and the readout should
+      // describe it from the outset rather than after the first keystroke.
+      void this.#refreshMatches();
       return;
     }
 
@@ -129,6 +152,8 @@ export class UBookItServiceEditorElement extends UmbLitElement {
 
     this._name = data.name;
     this._resourceType = data.roles[0]?.resourceType ?? "";
+    this._requiredCapabilities = [...(data.roles[0]?.requiredCapabilities ?? [])];
+    void this.#refreshMatches();
 
     if (data.duration?.kind === "fixed") {
       this._durationMode = "fixed";
@@ -150,10 +175,62 @@ export class UBookItServiceEditorElement extends UmbLitElement {
       }
 
       this._knownTypes = data;
-      this._knownTypesLoaded = true;
     } catch {
-      // Leaves _knownTypesLoaded false: the field degrades to plain free text
-      // with no suggestions and no hint, rather than a hint that cannot be true.
+      // The field degrades to plain free text with no suggestions. Whether a
+      // type matches anything is answered by the requirement readout, which
+      // reports "not known" rather than "none" when its own lookup fails.
+    }
+  }
+
+  async #loadCapabilities() {
+    try {
+      const { data, error } = await UBookItBackofficeService.listCapabilities();
+      if (error || !data) {
+        return;
+      }
+
+      this._knownCapabilities = data;
+    } catch {
+      // Suggestions only; the control still accepts free text.
+    }
+  }
+
+  /**
+   * Recomputes how many resources carry the requirement as currently entered.
+   *
+   * Server-side rather than filtered from a local resource list, so the count
+   * comes from the same capability test the booking path applies. A readout
+   * computed by a second, browser-side implementation of eligibility could
+   * disagree with the booker, which is worse than showing nothing.
+   */
+  async #refreshMatches() {
+    const token = ++this.#matchToken;
+    const resourceType = this._resourceType.trim();
+
+    // An empty or malformed type has no meaningful count. Saying nothing beats
+    // saying "0 resources match", which reads as a broken requirement rather
+    // than an unfinished one.
+    if (resourceType === "") {
+      this._matchCount = null;
+      return;
+    }
+
+    try {
+      const { data, error } = await UBookItBackofficeService.listMatchingResources({
+        query: { resourceType, capability: [...this._requiredCapabilities] },
+      });
+
+      // A later edit has already superseded this request; its answer describes a
+      // requirement that is no longer on screen.
+      if (token !== this.#matchToken) {
+        return;
+      }
+
+      this._matchCount = error || !data ? null : data.total;
+    } catch {
+      if (token === this.#matchToken) {
+        this._matchCount = null;
+      }
     }
   }
 
@@ -170,7 +247,13 @@ export class UBookItServiceEditorElement extends UmbLitElement {
       // Exactly one role, count fixed at 1 in v1 (design D5). Trimmed to match
       // what the hint evaluates: otherwise " room " looks known (hint hidden)
       // but is rejected server-side as an invalid type key.
-      roles: [{ resourceType: this._resourceType.trim(), count: 1 }],
+      roles: [
+        {
+          resourceType: this._resourceType.trim(),
+          requiredCapabilities: [...this._requiredCapabilities],
+          count: 1,
+        },
+      ],
     };
   }
 
@@ -218,20 +301,6 @@ export class UBookItServiceEditorElement extends UmbLitElement {
 
   #errorsFor(...codes: string[]): ApiError[] {
     return this._errors.filter((e) => e.code !== undefined && codes.includes(e.code));
-  }
-
-  /**
-   * True once a type has been entered that no existing resource uses. Only
-   * meaningful when the type list was actually retrieved — see
-   * {@link _knownTypesLoaded}.
-   */
-  get #typeIsUnknown(): boolean {
-    if (!this._knownTypesLoaded) {
-      return false;
-    }
-
-    const entered = this._resourceType.trim();
-    return entered.length > 0 && !this._knownTypes.some((t) => t.type === entered);
   }
 
   override render() {
@@ -333,26 +402,68 @@ export class UBookItServiceEditorElement extends UmbLitElement {
               id="service-resource-type"
               list="ubookit-resource-types"
               .value=${this._resourceType}
-              aria-describedby="resource-type-hint resource-type-unknown"
-              @input=${(e: InputEvent) => (this._resourceType = (e.target as HTMLInputElement).value)}
+              aria-describedby="resource-type-hint requirement-matches"
+              @input=${(e: InputEvent) => {
+                this._resourceType = (e.target as HTMLInputElement).value;
+                void this.#refreshMatches();
+              }}
             />
             <datalist id="ubookit-resource-types">
               ${this._knownTypes.map((t) => html`<option value=${t.type}></option>`)}
             </datalist>
             <p id="resource-type-hint" class="hint">${this.#term("resourceTypeHint")}</p>
-            <!--
-              The live region is always present and only its text changes. A
-              role="status" element inserted at the same moment as its content
-              is frequently not announced, because the region must already be
-              observed when the change happens.
-            -->
-            <p id="resource-type-unknown" class="hint" role="status">
-              ${this.#typeIsUnknown ? this.#term("resourceTypeUnknown") : ""}
-            </p>
           </div>
+
+          <ubookit-capability-input
+            controlId="role-capabilities"
+            .capabilities=${this._requiredCapabilities}
+            .known=${this._knownCapabilities}
+            label=${this.#term("requiredCapabilities")}
+            addLabel=${this.#term("capabilityAdd")}
+            hint=${this.#term("requiredCapabilitiesHint")}
+            removeLabel=${this.#term("capabilityRemove")}
+            emptyLabel=${this.#term("requiredCapabilitiesNone")}
+            error=${this.#errorsFor("capability-key-invalid")
+              .map((e) => e.message)
+              .join(" ")}
+            @ubookit-capabilities-changed=${(e: CustomEvent<{ capabilities: string[] }>) => {
+              this._requiredCapabilities = e.detail.capabilities;
+              void this.#refreshMatches();
+            }}
+          ></ubookit-capability-input>
+
+          <!--
+            The live region is always present and only its text changes. A
+            role="status" element inserted at the same moment as its content
+            is frequently not announced, because the region must already be
+            observed when the change happens.
+          -->
+          <p id="requirement-matches" class="hint" role="status">${this.#matchSummary()}</p>
         </fieldset>
       </uui-box>
     `;
+  }
+
+  /**
+   * What the readout says. It describes capability matching and nothing more.
+   *
+   * Never "N resources can provide this service": candidate resolution also
+   * excludes resources whose duration range cannot admit the service, and that
+   * is not evaluated here. A service fixed at four hours against rooms capped at
+   * two resolves to an empty pool while this readout truthfully reports three
+   * matches, so the stronger wording would be false in exactly the case the
+   * readout exists to expose. Reporting the duration exclusion is change ⑧a.
+   */
+  #matchSummary(): string {
+    // Null means "not known" — an empty type, or a lookup that failed. Showing
+    // zero here would send someone to fix a requirement that may be correct.
+    if (this._matchCount === null) {
+      return "";
+    }
+
+    return this._matchCount === 0
+      ? this.#term("requirementMatchesNone")
+      : this.localize.term("ubookitServices_requirementMatches", this._matchCount);
   }
 
   #renderDuration() {

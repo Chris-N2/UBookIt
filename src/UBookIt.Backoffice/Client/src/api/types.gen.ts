@@ -9,6 +9,11 @@ export type AvailabilityExceptionModel = {
     windows: Array<TimeWindowModel>;
 };
 
+export type CapabilityUsageModel = {
+    key: string;
+    count: number;
+};
+
 export type ConstraintsModel = {
     granularityMinutes: number;
     minDurationMinutes: number;
@@ -44,12 +49,18 @@ export type ProblemDetails = {
     [key: string]: unknown | string | null | string | null | number | null | string | null | string | null | undefined;
 };
 
+export type ResourceMatchModel = {
+    id: string;
+    displayName: string;
+};
+
 export type ResourceRequestModel = {
     type: string;
     displayName: string;
     description?: string | null;
     openingHours: Array<OpeningHoursModel>;
     exceptions: Array<AvailabilityExceptionModel>;
+    capabilities: Array<string>;
     constraints?: ConstraintsModel | null;
 };
 
@@ -60,12 +71,18 @@ export type ResourceResponseModel = {
     description?: string | null;
     openingHours: Array<OpeningHoursModel>;
     exceptions: Array<AvailabilityExceptionModel>;
+    capabilities: Array<string>;
     constraints: ConstraintsModel;
 };
 
 export type ResourceTypeUsageModel = {
     type: string;
     count: number;
+};
+
+export type RoleMatchesModel = {
+    total: number;
+    items: Array<ResourceMatchModel>;
 };
 
 export type ServiceDurationModel = {
@@ -90,6 +107,7 @@ export type ServiceResponseModel = {
 
 export type ServiceRoleModel = {
     resourceType: string;
+    requiredCapabilities: Array<string>;
     count: number;
 };
 
@@ -251,6 +269,61 @@ export type UpdateResourceResponses = {
 };
 
 export type UpdateResourceResponse = UpdateResourceResponses[keyof UpdateResourceResponses];
+
+export type ListCapabilitiesData = {
+    body?: never;
+    path?: never;
+    query?: never;
+    url: '/umbraco/ubookitbackoffice/api/v1/resources/capabilities';
+};
+
+export type ListCapabilitiesErrors = {
+    /**
+     * The resource is protected and requires an authentication token
+     */
+    401: unknown;
+};
+
+export type ListCapabilitiesResponses = {
+    /**
+     * OK
+     */
+    200: Array<CapabilityUsageModel>;
+};
+
+export type ListCapabilitiesResponse = ListCapabilitiesResponses[keyof ListCapabilitiesResponses];
+
+export type ListMatchingResourcesData = {
+    body?: never;
+    path?: never;
+    query?: {
+        resourceType?: string;
+        capability?: Array<string>;
+    };
+    url: '/umbraco/ubookitbackoffice/api/v1/resources/matching';
+};
+
+export type ListMatchingResourcesErrors = {
+    /**
+     * Bad Request
+     */
+    400: ProblemDetails;
+    /**
+     * The resource is protected and requires an authentication token
+     */
+    401: unknown;
+};
+
+export type ListMatchingResourcesError = ListMatchingResourcesErrors[keyof ListMatchingResourcesErrors];
+
+export type ListMatchingResourcesResponses = {
+    /**
+     * OK
+     */
+    200: RoleMatchesModel;
+};
+
+export type ListMatchingResourcesResponse = ListMatchingResourcesResponses[keyof ListMatchingResourcesResponses];
 
 export type ListResourceTypesData = {
     body?: never;
