@@ -91,3 +91,35 @@ live in `.claude/skills/`, slash commands under `/opsx:*`.
    the spec. Findings go back through apply; QA never fixes code itself.
 5. `openspec-archive-change` (`/opsx:archive`) — after QA approval,
    archive the change and sync main specs.
+
+### Rewriting a requirement destroys guarantees silently
+
+A `## MODIFIED Requirements` entry **replaces its requirement wholesale** —
+body and every scenario. Anything the old version guaranteed and the new one
+forgets to restate is deleted from the spec, with nothing in the diff that
+looks like a deletion. A grep for stale names cannot see it, because the
+sentence is inside a requirement you are legitimately replacing.
+
+So whenever a delta modifies a requirement, **diff the guarantees, not the
+prose**:
+
+1. List every scenario and every SHALL in the requirement as it stands in
+   `openspec/specs/`.
+2. For each, decide explicitly: carried forward, deliberately dropped, or
+   superseded by a stronger claim. Carried-forward guarantees need a scenario
+   in the new version — the same behaviour, reworded for the new shape, not
+   assumed to survive.
+3. A deliberate drop belongs in the proposal, stated as a removal with its
+   reason. Silence is not a decision.
+
+This is distinct from the sync-time grep for *sibling* specs the change
+falsifies (which has found something on four consecutive changes and is still
+worth doing). That grep looks outward at requirements you are not touching;
+this looks inward at the one you are replacing.
+
+Real case, ⑧a: change ⑧ guaranteed the readout describe the **type** when a
+role required no capabilities, so it could never refer to capabilities the
+editor had not named. ⑧a replaced that requirement with a three-stage chain,
+did not restate the guarantee, and shipped a summary asserting "N of those have
+the required capabilities" for a configuration requiring none. QA caught it;
+the change's own falsified-sentence grep did not, and could not.

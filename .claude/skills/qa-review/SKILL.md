@@ -33,6 +33,22 @@ verdict regardless of everything else.
 - Flag behaviour present in the code but absent from the spec
   (scope creep) and behaviour in the spec but absent from the code.
 
+**Guarantees dropped by a rewritten requirement.** For every entry under
+`## MODIFIED Requirements`, diff it against the same requirement in
+`openspec/specs/` — a MODIFIED entry replaces the requirement wholesale, so
+anything the old version guaranteed and the new one omits is deleted with
+nothing in the diff resembling a deletion. Enumerate the old scenarios and
+SHALLs, and for each confirm it is carried forward, restated more strongly, or
+dropped **with the drop stated in the proposal**. An unexplained omission is a
+finding (major) even when the new requirement is otherwise an improvement, and
+even when the change's own falsified-sentence grep reported clean — that grep
+looks at sibling requirements and structurally cannot see this.
+
+This has already shipped a defect (⑧a: a guarantee that the readout describe
+the *type* when no capabilities are required was lost in a wholesale
+replacement, producing a summary that referred to capabilities the editor never
+named).
+
 ### 2. Build and tests
 
 - `dotnet build` — must succeed with zero warnings (nullable warnings are
