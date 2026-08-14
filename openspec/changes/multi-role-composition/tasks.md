@@ -56,19 +56,19 @@
 - [x] 8.3 Do **not** pre-filter types another role uses; render the server's duplicate-type failure against the offending row (design D1 — relaxing the rule later must be a server change alone).
 - [x] 8.4 The summary renders a chain per role, each labelled by its type, keeping the not-known, snapshot and stale-token disciplines and the no-availability-vocabulary rule.
 - [x] 8.5 Extend the client test suite for the per-role phrasing, including a role requiring no capabilities and a role whose type matches nothing.
-- [ ] 8.6 Accessibility: each requirement row's controls are labelled and its error associated; add/remove are real buttons with sensible focus handling after removal; the summary remains a live region whose referenced ids resolve in its own shadow root.
+- [x] 8.6 Accessibility: each requirement row's controls are labelled and its error associated; add/remove are real buttons with sensible focus handling after removal; the summary remains a live region whose referenced ids resolve in its own shadow root.
 
 ## 9. Verification
 
-- [ ] 9.1 Full solution build with `--no-incremental`, TestSite stopped first. Only the known NU1903 advisories are acceptable.
-- [ ] 9.2 Full unit, integration and client runs green, including every ⑤/⑥/⑦/⑧ scenario unchanged — a single-role service must behave identically by construction.
-- [ ] 9.3 Live backoffice verification: build a two-role service, confirm a chain per role; give it two roles of one type and confirm the failure lands on the right row while the preview still reports both.
-- [ ] 9.4 Assert the editor's row associations and the summary's live region by reading the shadow DOM, not from screenshots.
-- [ ] 9.5 Live end-to-end: book a two-role service and confirm one booking with two claims over one interval.
-- [ ] 9.6 Stop the TestSite and check port 44348 for orphaned processes.
+- [x] 9.1 Full solution build with `--no-incremental`, TestSite stopped first. Only the known NU1903 advisories are acceptable.
+- [x] 9.2 Full unit, integration and client runs green, including every ⑤/⑥/⑦/⑧ scenario unchanged — a single-role service must behave identically by construction.
+- [x] 9.3 Live backoffice verification: build a two-role service, confirm a chain per role; give it two roles of one type and confirm the failure lands on the right row while the preview still reports both.
+- [x] 9.4 Assert the editor's row associations and the summary's live region by reading the shadow DOM, not from screenshots.
+- [x] 9.5 Live end-to-end: book a two-role service and confirm one booking with two claims over one interval.
+- [x] 9.6 Stop the TestSite and check port 44348 for orphaned processes.
 
 ## 10. Handover
 
-- [ ] 10.1 Record that ⑨-1a owns the grid-misalignment diagnostic, with the exact condition (`gcd(step₁, step₂)` divides the offset between interval starts) and the reason deferring is safe rather than merely tolerable — ⑧a's D5 means the summary is correctly silent, not falsified.
-- [ ] 10.2 Record what ⑨-2 inherits: same-type roles, matching in **both** availability and placement, and `Count > 1`. Note that the overlapping-pool fixtures already exist and their assertions flip from rejection to assignment.
+- [x] 10.1 Record that ⑨-1a owns the grid-misalignment diagnostic, with the exact condition (`gcd(step₁, step₂)` divides the offset between interval starts) and the reason deferring is safe rather than merely tolerable — ⑧a's D5 means the summary is correctly silent, not falsified.
+- [x] 10.2 Record what ⑨-2 inherits: same-type roles, matching in **both** availability and placement, and `Count > 1`. Note that the overlapping-pool fixtures already exist and their assertions flip from rejection to assignment.
 - [ ] 10.3 At spec-sync time, run the guarantee diff `CLAUDE.md` requires for every MODIFIED requirement, and the outward grep for sibling specs this change falsifies. Both have found something on every recent change.

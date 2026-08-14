@@ -26,6 +26,8 @@ For a single-role service, placement SHALL attempt candidates one at a time, eac
 
 For a service of several roles, each role's candidate SHALL be chosen independently, which is correct because distinct types make the pools disjoint: no choice made for one role can remove a candidate from another. Combinations SHALL be attempted in a deterministic order, and a failed attempt SHALL leave no persisted state, so attempting combinations in sequence is safe.
 
+At most one placement attempt SHALL be in flight at a time. **This supersedes the earlier guarantee that no more than one resource lock is held at any moment**: an attempt for a service of several roles necessarily holds a lock for each resource it claims, which is what makes the placement atomic across them. Those locks SHALL be acquired in a deterministic order, so concurrent attempts sharing a resource cannot deadlock, and they SHALL be released together when the attempt commits or fails.
+
 When a preferred resource id is supplied and is in some role's candidate pool, that resource SHALL be attempted first for **its own** role; the remaining candidates of that role follow in the same deterministic order, and other roles are unaffected. The preference identifies its role unambiguously, since a resource has exactly one type and therefore belongs to at most one role's pool. Preference is an ordering hint only: when the preferred resource cannot take the booking, the remaining candidates SHALL still be attempted. A preferred resource id in no role's pool SHALL be rejected with `resource-not-eligible`.
 
 On success the result SHALL identify every resource actually booked.

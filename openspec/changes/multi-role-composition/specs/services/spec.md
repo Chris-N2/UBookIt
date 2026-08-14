@@ -27,6 +27,18 @@ Roles SHALL be an unordered set as far as behaviour is concerned: no requirement
 - **WHEN** a service is created with a name and a single role and no duration configuration
 - **THEN** the service is valid and reports a variable duration with no minimum and no maximum, deferring entirely to the fulfilling resource's range
 
+#### Scenario: Name is required
+- **WHEN** a service is created with an empty or whitespace name
+- **THEN** creation is rejected with a validation failure identifying the name
+
+#### Scenario: Required capabilities default to empty
+- **WHEN** a service is created with a role naming only a resource type
+- **THEN** the service is valid and its role reports an empty required-capability set
+
+#### Scenario: A role carries the capabilities it requires
+- **WHEN** a service is created with a role requiring `cert-x` and `welsh`
+- **THEN** the role reports both required capabilities and no others
+
 #### Scenario: A service may require several roles of different types
 - **WHEN** a service is created with a role for type `room` and a role for type `therapist`
 - **THEN** the service is valid and reports both roles, each with count 1
@@ -85,9 +97,9 @@ The editor SHALL NOT prevent a user selecting a resource type another role alrea
 - **WHEN** a service has exactly one requirement row
 - **THEN** no remove control is offered for it
 
-#### Scenario: Count is sent as one
+#### Scenario: Count is sent as one and never shown
 - **WHEN** a user saves any service from the editor
-- **THEN** every role in the request body carries a count of 1
+- **THEN** every role in the request body carries a count of 1, and no count field was displayed for any row
 
 #### Scenario: A duplicate type is reported by the server against its row
 - **WHEN** a user selects a resource type already used by another requirement and saves

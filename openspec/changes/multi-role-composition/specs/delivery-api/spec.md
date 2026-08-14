@@ -68,6 +68,30 @@ The existing `POST /bookings` endpoint SHALL remain unchanged in route, request 
 - **WHEN** a single-role service is placed
 - **THEN** the response carries exactly one resolved resource, in the collection member
 
+#### Scenario: Requested length is required
+- **WHEN** a service placement omits the requested length
+- **THEN** the response is 400 problem details identifying the offending field, and no booking is placed
+
+#### Scenario: An unpermitted length is rejected, not substituted
+- **WHEN** a service placement for a fixed 60-minute service requests 90 minutes
+- **THEN** the response is 400 problem details carrying `duration-too-long`, and no booking exists at 60 minutes or any other length
+
+#### Scenario: Preferred resource is optional
+- **WHEN** a service placement omits the preferred resource id
+- **THEN** placement proceeds over every role's full candidate pool in its deterministic order
+
+#### Scenario: Ineligible preferred resource is rejected
+- **WHEN** a service placement names a preferred resource id outside every role's candidate pool
+- **THEN** the response is 400 problem details carrying `resource-not-eligible`, and no booking is placed
+
+#### Scenario: Unknown service is rejected
+- **WHEN** a service placement names a service id that does not exist
+- **THEN** the response is 404 problem details carrying the `service-not-found` code
+
+#### Scenario: Request model carries no member key
+- **WHEN** the service placement request model's public shape is inspected
+- **THEN** it exposes name, email, and optional phone, but no member key field
+
 #### Scenario: Direct placement is unchanged
 - **WHEN** `POST /bookings` is used to book a resource directly
 - **THEN** its request and response are exactly as before, carrying a single resource id

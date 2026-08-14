@@ -9,6 +9,8 @@ Two placements SHALL be treated as conflicting when their intervals overlap and 
 
 Locks SHALL be acquired in a deterministic order across a booking's claimed resources, so that concurrent multi-claim placements sharing resources cannot deadlock.
 
+Core defines this contract and SHALL honour it in its in-memory test double, including for several claims: a double that conflicted only on a single claimed resource would let unit tests agree with an implementation the SQL store rejects.
+
 #### Scenario: Racing conflicting placements
 - **WHEN** two placements for overlapping intervals on the same resource are executed concurrently against a conforming store
 - **THEN** exactly one succeeds and the other fails with code `conflict`
