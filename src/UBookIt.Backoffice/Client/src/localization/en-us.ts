@@ -102,6 +102,7 @@ export default {
     // Deliberately about capabilities, not about bookability: resources are
     // also excluded by duration, which this count does not check (design D8).
     requirementMatches: "%0% resources have these capabilities.",
+    requirementMatchesOne: "1 resource has these capabilities.",
     requirementMatchesNone: "No resources have these capabilities.",
     save: "Save",
     cancel: "Cancel",

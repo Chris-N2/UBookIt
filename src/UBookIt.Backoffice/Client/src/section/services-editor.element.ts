@@ -461,8 +461,15 @@ export class UBookItServiceEditorElement extends UmbLitElement {
       return "";
     }
 
-    return this._matchCount === 0
-      ? this.#term("requirementMatchesNone")
+    // Three forms, not a count interpolated into one: "1 resources have" is
+    // the sort of thing a reader stops on, and this line is the whole point of
+    // the readout.
+    if (this._matchCount === 0) {
+      return this.#term("requirementMatchesNone");
+    }
+
+    return this._matchCount === 1
+      ? this.#term("requirementMatchesOne")
       : this.localize.term("ubookitServices_requirementMatches", this._matchCount);
   }
 
