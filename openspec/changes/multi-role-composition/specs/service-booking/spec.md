@@ -1,0 +1,121 @@
+## MODIFIED Requirements
+
+### Requirement: Overlapping eligibility pools are a known boundary
+Capability-constrained eligibility SHALL be understood to produce eligibility pools that overlap without being identical — a role requiring a capability resolves to a strict subset of the pool of a role requiring none of the same type. Single-role resolution SHALL be unaffected by this, since each role resolves independently.
+
+The specification SHALL record that assigning several roles across overlapping pools by taking each role's first available candidate can produce a wrong answer rather than a slow one, and that composing such roles therefore requires real assignment rather than greedy selection. The same is true of **availability** and not only of placement: two roles drawing from one pool in which a single resource is free would each report that start available, while the pair is not bookable there.
+
+Multi-role composition is supported **only where every role names a distinct resource type**, which makes the pools disjoint and independent per-role assignment correct. `Service.Create` SHALL continue to reject two roles naming the same resource type, and any count other than 1. Relaxing that restriction requires implementing assignment in both availability and placement.
+
+#### Scenario: Same-type roles remain rejected
+- **WHEN** a service is created with two roles both naming resource type `therapist`
+- **THEN** creation is rejected, whatever their required capabilities differ by
+
+#### Scenario: Distinct-type roles are accepted
+- **WHEN** a service is created with a role for type `room` and a role for type `therapist`
+- **THEN** creation succeeds
+
+#### Scenario: Fixtures exercise overlapping pools
+- **WHEN** the capability test fixtures are inspected
+- **THEN** they contain at least one pair of roles whose eligible pools overlap without being equal, so that a later greedy assignment defect is detectable rather than invisible
+
+### Requirement: Booking a service resolves a resource by candidate loop
+`UBookIt.Core` SHALL expose service placement taking a service id, a start instant, a requested length, booker details, and an optional preferred resource id. Placement SHALL resolve **one resource per role**, and SHALL place a single booking whose claims are those resources — all sharing the booking's one interval — through the atomic placement contract. A service SHALL NOT produce more than one booking.
+
+For a single-role service, placement SHALL attempt candidates one at a time, each attempt running the atomic placement contract for that single resource, and SHALL return the first success. Candidates SHALL be attempted in a deterministic order — ascending resource id — so repeated identical requests behave identically.
+
+For a service of several roles, each role's candidate SHALL be chosen independently, which is correct because distinct types make the pools disjoint: no choice made for one role can remove a candidate from another. Combinations SHALL be attempted in a deterministic order, and a failed attempt SHALL leave no persisted state, so attempting combinations in sequence is safe.
+
+When a preferred resource id is supplied and is in some role's candidate pool, that resource SHALL be attempted first for **its own** role; the remaining candidates of that role follow in the same deterministic order, and other roles are unaffected. The preference identifies its role unambiguously, since a resource has exactly one type and therefore belongs to at most one role's pool. Preference is an ordering hint only: when the preferred resource cannot take the booking, the remaining candidates SHALL still be attempted. A preferred resource id in no role's pool SHALL be rejected with `resource-not-eligible`.
+
+On success the result SHALL identify every resource actually booked.
+
+#### Scenario: First available candidate is booked
+- **WHEN** a single-role service is booked at a start where the lowest-id candidate is busy and the next is free
+- **THEN** the booking is placed on the next candidate and the result names that resource
+
+#### Scenario: Deterministic ordering
+- **WHEN** the same service booking is requested twice against the same state
+- **THEN** the same candidate is chosen both times
+
+#### Scenario: One resource is claimed per role
+- **WHEN** a service requiring a `room` and a `therapist` is booked
+- **THEN** exactly one booking is created, carrying one claim for a `room` and one for a `therapist`, both over the booking's single interval
+
+#### Scenario: A role with no free candidate prevents the booking
+- **WHEN** every `therapist` is busy at a start but a `room` is free
+- **THEN** no booking is placed and no claim is persisted for the room
+
+#### Scenario: Preferred resource is tried first
+- **WHEN** a placement supplies a preferred resource id that is in a role's candidate pool and is free
+- **THEN** the booking is placed using that resource for its role
+
+#### Scenario: Preferred resource falls through when unavailable
+- **WHEN** a placement supplies a preferred resource id that is in a role's candidate pool but is already booked at that start, and another candidate of that role is free
+- **THEN** the booking is placed on the other candidate
+
+#### Scenario: Preferred resource outside every pool is rejected
+- **WHEN** a placement supplies a preferred resource id that is in no role's candidate pool
+- **THEN** placement fails with code `resource-not-eligible` and no booking is placed, rather than silently booking a different resource
+
+#### Scenario: An ineligible preference is reported even when a pool is empty
+- **WHEN** a placement supplies a preferred resource id against a service one of whose roles has an empty candidate pool
+- **THEN** placement fails with code `resource-not-eligible`, not `service-unavailable` — the caller's own mistake is the more useful thing to report
+
+#### Scenario: One lock at a time within an attempt
+- **WHEN** a candidate loop runs over several candidates
+- **THEN** each attempt completes before the next begins
+
+## ADDED Requirements
+
+### Requirement: Composite availability across roles
+`UBookIt.Core` SHALL compose a multi-role service's availability as the **intersection** across its roles of each role's union availability. A start SHALL be offered only where every role has a candidate able to fulfil it, and a length SHALL be offered at that start only where every role has a candidate able to provide it. A booking has one interval and one length, so both terms are common to all roles.
+
+Intersection SHALL be over the sets of lengths the roles denote, not over their bounds. Each role offers a set of arithmetic runs at a start; the composite is every pairwise intersection of a run from one role with a run from another, since set intersection distributes over the union each role already represents. Intersecting only the outermost minimum and maximum would advertise lengths no combination of resources can book.
+
+Two runs SHALL intersect to the multiples of the **least common multiple** of their steps within the overlap of their ranges. This is well defined because every run denotes exactly the multiples of its own step within its range — its minimum is always a multiple of its step — so the two grids are in phase at zero and no congruence solving is required. The result SHALL satisfy the same property, so the representation is closed under intersection.
+
+The resulting runs SHALL be subject to the same subset elimination and deterministic ordering as a single role's, and SHALL NOT identify which resources back them.
+
+A single-role service's composite availability SHALL be exactly that role's union availability, unchanged.
+
+#### Scenario: A start is offered only when every role can fulfil it
+- **WHEN** a `room` is free at 10:00 and 11:00 but the only `therapist` is free at 11:00 alone
+- **THEN** the service offers 11:00 and does not offer 10:00
+
+#### Scenario: Lengths intersect to the common multiple
+- **WHEN** at a shared start one role offers `{30, 120, 30}` and another offers `{20, 120, 20}`
+- **THEN** the composite offers `{60, 120, 60}` — the multiples of 60 in the overlap — and does not advertise 30, 40, 80 or 90 minutes
+
+#### Scenario: A length only one role can provide is not offered
+- **WHEN** at a shared start one role can provide 30 to 60 minutes and another only 90 to 120 minutes
+- **THEN** that start is not offered at all, because no length is common to both
+
+#### Scenario: Differing grids narrow rather than merge
+- **WHEN** one role's candidates offer lengths on a 30-minute grid and another's on a 45-minute grid over the same range
+- **THEN** the composite offers only multiples of 90 minutes within that range
+
+#### Scenario: Intersection distributes over each role's union
+- **WHEN** a role offers two distinct runs at a start and another role offers one
+- **THEN** the composite is the union of both pairwise intersections, and the set of lengths offered equals the set of lengths some resource of every role can provide
+
+#### Scenario: A single-role service is unaffected
+- **WHEN** composite availability is computed for a service with one role
+- **THEN** the result is identical to that role's union availability over the same range
+
+#### Scenario: Composite availability does not name resources
+- **WHEN** a composite availability response is inspected
+- **THEN** no entry carries a resource id, and nothing identifies which role or candidate produced a run
+
+### Requirement: Every bookable length run is anchored at its step
+A `LengthRun` SHALL denote exactly the multiples of its `Step` lying within `[Min, Max]`; that is, `Min` SHALL always be a multiple of `Step`. Every construction site SHALL enforce this rather than assume it.
+
+The property is load-bearing in more than one algorithm. Subset elimination relies on two runs of equal step being in phase, and intersection across roles relies on both grids being anchored at zero so that their common lengths are the multiples of the least common multiple of their steps. An out-of-phase run would silently break both — advertising lengths no resource can book, or discarding lengths that were bookable — without any error being raised.
+
+#### Scenario: Constructed runs are anchored
+- **WHEN** any bookable length run is produced by availability projection or duration resolution
+- **THEN** its minimum is a multiple of its step
+
+#### Scenario: An out-of-phase run cannot be constructed
+- **WHEN** a length run is constructed with a minimum that is not a multiple of its step
+- **THEN** the construction is rejected rather than producing a run whose lengths the elimination and intersection rules would misread
