@@ -94,7 +94,7 @@ public class ServicePreviewTests(SqlServerFixture fixture)
 
         Assert.True(pool.Succeeded);
         Assert.Equal(
-            pool.Value.Select(c => c.ResourceId).OrderBy(id => id),
+            Assert.Single(pool.Value).Candidates.Select(c => c.ResourceId).OrderBy(id => id),
             chain.Candidates.Select(c => c.ResourceId).OrderBy(id => id));
 
         // Not a vacuous agreement: the chain narrows, and it narrows at the

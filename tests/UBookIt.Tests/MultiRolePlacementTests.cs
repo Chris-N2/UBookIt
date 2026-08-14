@@ -1,0 +1,314 @@
+using UBookIt.Core.Availability;
+using UBookIt.Core.Bookings;
+using UBookIt.Core.Common;
+using UBookIt.Core.Resources;
+using UBookIt.Core.Services;
+using UBookIt.Core.Stores;
+using UBookIt.Tests.Support;
+
+namespace UBookIt.Tests;
+
+/// <summary>
+/// Placing a booking for a service of several roles: one resource per role, one
+/// booking, one interval (service-booking spec, "Booking a service resolves a
+/// resource by candidate loop").
+/// <para>
+/// The preference scenarios are carried forward from the single-role
+/// requirement rather than assumed to still hold: a preferred resource now has
+/// to constrain its own role and leave the others alone, which is a claim the
+/// single-role tests could not make.
+/// </para>
+/// </summary>
+public class MultiRolePlacementTests
+{
+    private const string Therapist = "therapist";
+
+    private static readonly DateOnly Date = TestData.BaseDate;
+
+    private static TimeSpan Mins(int minutes) => TimeSpan.FromMinutes(minutes);
+
+    private static Guid Id(int n) => new($"00000000-0000-0000-0000-{n:x12}");
+
+    private static Resource Res(int id, string type, string open = "09:00", string close = "17:00")
+        => Resource.Create(
+            type,
+            $"Resource {id}",
+            availability: TestData.Config(
+                TestData.Weekly(open, close, Date.DayOfWeek),
+                constraints: BookingConstraints.Create(
+                    granularity: Mins(30), minDuration: Mins(30), maxDuration: Mins(480)).Value),
+            id: Id(id)).Value;
+
+    private static Service Svc(params string[] types)
+        => Service.Create("Massage", null, types.Select(t => new ServiceRole(t, 1))).Value;
+
+    private sealed class Harness
+    {
+        public required ServiceBookingService Services { get; init; }
+
+        public required IBookingService Bookings { get; init; }
+
+        public required InMemoryBookingStore Store { get; init; }
+    }
+
+    private static Harness Wire(Service service, params Resource[] resources)
+    {
+        var resourceStore = new InMemoryResourceStore();
+        foreach (var resource in resources)
+        {
+            resourceStore.Add(resource);
+        }
+
+        var serviceStore = new InMemoryServiceStore().Add(service);
+        var bookingStore = new InMemoryBookingStore();
+        var time = new FixedTimeProvider(TestData.Now);
+        var settings = TestData.Settings;
+
+        var availability = new AvailabilityService(resourceStore, bookingStore, time, settings);
+        var bookings = new BookingService(resourceStore, bookingStore, time, settings);
+
+        return new Harness
+        {
+            Services = new ServiceBookingService(
+                serviceStore, resourceStore, bookingStore, availability, bookings, settings),
+            Bookings = bookings,
+            Store = bookingStore,
+        };
+    }
+
+    /// <summary>Two rooms (1, 2) and two therapists (3, 4), all alike and all free.</summary>
+    private static Harness TwoOfEach(Service service)
+        => Wire(
+            service,
+            Res(1, ResourceTypes.Room),
+            Res(2, ResourceTypes.Room),
+            Res(3, Therapist),
+            Res(4, Therapist));
+
+    private static ServiceBookingRequest Request(Service service, string start, int minutes, Guid? preferred = null)
+        => new()
+        {
+            ServiceId = service.Id,
+            Start = TestData.Utc(Date, start),
+            Duration = Mins(minutes),
+            Booker = TestData.Booker(),
+            PreferredResourceId = preferred,
+        };
+
+    private static async Task<IReadOnlyList<ClaimInfo>> AllClaims(Harness harness)
+        => await harness.Store.GetClaimsAsync(
+            [Id(1), Id(2), Id(3), Id(4)],
+            TestData.Utc(Date, "00:00"),
+            TestData.Utc(Date.AddDays(1), "00:00"));
+
+    [Fact]
+    public async Task Spec_scenario_one_resource_is_claimed_per_role()
+    {
+        var service = Svc(ResourceTypes.Room, Therapist);
+        var harness = TwoOfEach(service);
+
+        var placed = await harness.Services.PlaceAsync(Request(service, "09:00", 60));
+
+        Assert.True(placed.Succeeded);
+
+        // Exactly one booking, carrying one claim of each type, both over the
+        // booking's single interval.
+        Assert.Equal(2, placed.Value.Claims.Count);
+        Assert.Contains(placed.Value.Claims, c => c.ResourceId == Id(1));
+        Assert.Contains(placed.Value.Claims, c => c.ResourceId == Id(3));
+
+        var claims = await AllClaims(harness);
+        Assert.Equal(2, claims.Count);
+        Assert.All(claims, claim => Assert.Equal(placed.Value.Id, claim.BookingId));
+        Assert.All(claims, claim => Assert.Equal(placed.Value.Interval, claim.Interval));
+    }
+
+    [Fact]
+    public async Task Spec_scenario_a_role_with_no_free_candidate_prevents_the_booking()
+    {
+        var service = Svc(ResourceTypes.Room, Therapist);
+        var harness = TwoOfEach(service);
+
+        // Every therapist is busy at 09:00; both rooms are free.
+        foreach (var therapist in new[] { Id(3), Id(4) })
+        {
+            Assert.True((await harness.Bookings.PlaceAsync(new BookingRequest
+            {
+                ResourceId = therapist,
+                Start = TestData.Utc(Date, "09:00"),
+                Duration = Mins(60),
+                Booker = TestData.Booker(),
+            })).Succeeded);
+        }
+
+        var placed = await harness.Services.PlaceAsync(Request(service, "09:00", 60));
+
+        Assert.False(placed.Succeeded);
+        Assert.Equal(FailureCodes.Conflict, Assert.Single(placed.Failures).Code);
+
+        // No claim was left on either room: a failed attempt persists nothing,
+        // which is what makes attempting combinations in sequence safe.
+        var claims = await AllClaims(harness);
+        Assert.Equal(2, claims.Count);
+        Assert.All(claims, claim => Assert.Contains(claim.ResourceId, new[] { Id(3), Id(4) }));
+    }
+
+    [Fact]
+    public async Task A_role_whose_pool_is_empty_is_reported_as_unavailable()
+    {
+        // No therapist exists at all — a configuration answer rather than a race.
+        var service = Svc(ResourceTypes.Room, Therapist);
+        var harness = Wire(service, Res(1, ResourceTypes.Room), Res(2, ResourceTypes.Room));
+
+        var placed = await harness.Services.PlaceAsync(Request(service, "09:00", 60));
+
+        Assert.False(placed.Succeeded);
+        Assert.Equal(FailureCodes.ServiceUnavailable, Assert.Single(placed.Failures).Code);
+    }
+
+    [Fact]
+    public async Task A_service_of_several_roles_produces_exactly_one_booking()
+    {
+        var service = Svc(ResourceTypes.Room, Therapist);
+        var harness = TwoOfEach(service);
+
+        var placed = await harness.Services.PlaceAsync(Request(service, "09:00", 60));
+
+        var claims = await AllClaims(harness);
+
+        Assert.Single(claims.Select(c => c.BookingId).Distinct());
+        Assert.Equal(placed.Value.Id, claims[0].BookingId);
+    }
+
+    [Fact]
+    public async Task Spec_scenario_a_preferred_resource_orders_only_its_own_role()
+    {
+        var service = Svc(ResourceTypes.Room, Therapist);
+        var harness = TwoOfEach(service);
+
+        // Preferring the second therapist must not disturb the room role, which
+        // still takes its lowest-id candidate.
+        var placed = await harness.Services.PlaceAsync(Request(service, "09:00", 60, preferred: Id(4)));
+
+        Assert.True(placed.Succeeded);
+        Assert.Equal(
+            [Id(1), Id(4)],
+            placed.Value.Claims.Select(c => c.ResourceId).OrderBy(id => id));
+    }
+
+    [Fact]
+    public async Task Spec_scenario_preferred_resource_falls_through_when_unavailable()
+    {
+        var service = Svc(ResourceTypes.Room, Therapist);
+        var harness = TwoOfEach(service);
+
+        Assert.True((await harness.Bookings.PlaceAsync(new BookingRequest
+        {
+            ResourceId = Id(4),
+            Start = TestData.Utc(Date, "09:00"),
+            Duration = Mins(60),
+            Booker = TestData.Booker(),
+        })).Succeeded);
+
+        var placed = await harness.Services.PlaceAsync(Request(service, "09:00", 60, preferred: Id(4)));
+
+        // Preference is an ordering hint: the other therapist still gets a turn.
+        Assert.True(placed.Succeeded);
+        Assert.Equal(
+            [Id(1), Id(3)],
+            placed.Value.Claims.Select(c => c.ResourceId).OrderBy(id => id));
+    }
+
+    [Fact]
+    public async Task Spec_scenario_preferred_resource_outside_every_pool_is_rejected()
+    {
+        var service = Svc(ResourceTypes.Room, Therapist);
+        var harness = Wire(
+            service,
+            Res(1, ResourceTypes.Room),
+            Res(3, Therapist),
+            Res(9, "equipment"));
+
+        var placed = await harness.Services.PlaceAsync(Request(service, "09:00", 60, preferred: Id(9)));
+
+        Assert.False(placed.Succeeded);
+        Assert.Equal(FailureCodes.ResourceNotEligible, Assert.Single(placed.Failures).Code);
+        Assert.Empty(await AllClaims(harness));
+    }
+
+    [Fact]
+    public async Task Spec_scenario_an_ineligible_preference_is_reported_even_when_a_pool_is_empty()
+    {
+        // No therapist exists, and the preference names a resource in no pool.
+        // The caller's own mistake is the more useful thing to report.
+        var service = Svc(ResourceTypes.Room, Therapist);
+        var harness = Wire(service, Res(1, ResourceTypes.Room), Res(9, "equipment"));
+
+        var placed = await harness.Services.PlaceAsync(Request(service, "09:00", 60, preferred: Id(9)));
+
+        Assert.False(placed.Succeeded);
+        Assert.Equal(FailureCodes.ResourceNotEligible, Assert.Single(placed.Failures).Code);
+    }
+
+    [Fact]
+    public async Task Combinations_are_attempted_in_a_deterministic_order()
+    {
+        var service = Svc(ResourceTypes.Room, Therapist);
+
+        var first = await TwoOfEach(service).Services.PlaceAsync(Request(service, "09:00", 60));
+        var second = await TwoOfEach(service).Services.PlaceAsync(Request(service, "09:00", 60));
+
+        Assert.Equal(
+            first.Value.Claims.Select(c => c.ResourceId).OrderBy(id => id),
+            second.Value.Claims.Select(c => c.ResourceId).OrderBy(id => id));
+    }
+
+    [Fact]
+    public async Task A_combination_is_retried_around_a_single_busy_resource()
+    {
+        // Room 1 is busy, so the first combination fails; the loop must go on to
+        // room 2 rather than reporting the service unavailable.
+        var service = Svc(ResourceTypes.Room, Therapist);
+        var harness = TwoOfEach(service);
+
+        Assert.True((await harness.Bookings.PlaceAsync(new BookingRequest
+        {
+            ResourceId = Id(1),
+            Start = TestData.Utc(Date, "09:00"),
+            Duration = Mins(60),
+            Booker = TestData.Booker(),
+        })).Succeeded);
+
+        var placed = await harness.Services.PlaceAsync(Request(service, "09:00", 60));
+
+        Assert.True(placed.Succeeded);
+        Assert.Equal(
+            [Id(2), Id(3)],
+            placed.Value.Claims.Select(c => c.ResourceId).OrderBy(id => id));
+    }
+
+    [Fact]
+    public async Task A_length_no_candidate_of_one_role_can_provide_is_rejected()
+    {
+        // The rooms permit up to 8 hours; the therapists cap at 60 minutes. A
+        // 120-minute request is out of bounds for the service even though one
+        // role could take it.
+        var service = Svc(ResourceTypes.Room, Therapist);
+        var therapist = Resource.Create(
+            Therapist,
+            "Short shifts",
+            availability: TestData.Config(
+                TestData.Weekly("09:00", "17:00", Date.DayOfWeek),
+                constraints: BookingConstraints.Create(
+                    granularity: Mins(30), minDuration: Mins(30), maxDuration: Mins(60)).Value),
+            id: Id(3)).Value;
+
+        var harness = Wire(service, Res(1, ResourceTypes.Room), therapist);
+
+        var placed = await harness.Services.PlaceAsync(Request(service, "09:00", 120));
+
+        Assert.False(placed.Succeeded);
+        Assert.Equal(FailureCodes.DurationTooLong, Assert.Single(placed.Failures).Code);
+        Assert.Empty(await AllClaims(harness));
+    }
+}

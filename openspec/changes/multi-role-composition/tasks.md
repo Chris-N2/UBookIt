@@ -22,18 +22,18 @@
 
 ## 4. Core — placement
 
-- [ ] 4.1 Resolve one candidate per role and build a claim set; place one booking through the existing atomic contract (design D4).
-- [ ] 4.2 Attempt combinations deterministically; a preferred resource orders only its own role's candidates and is rejected with `resource-not-eligible` when in no role's pool.
-- [ ] 4.3 Unit tests: one claim per role over one interval; a role with no free candidate places nothing at all; every preference scenario carried forward from the single-role requirement.
-- [ ] 4.4 Confirm `SqlBookingStore.PlaceAsync` needs no change — it already sorts claim ids and locks each in one transaction. **Verify, do not assume**: read it against the modified atomic-placement requirement before concluding.
+- [x] 4.1 Resolve one candidate per role and build a claim set; place one booking through the existing atomic contract (design D4).
+- [x] 4.2 Attempt combinations deterministically; a preferred resource orders only its own role's candidates and is rejected with `resource-not-eligible` when in no role's pool.
+- [x] 4.3 Unit tests: one claim per role over one interval; a role with no free candidate places nothing at all; every preference scenario carried forward from the single-role requirement.
+- [x] 4.4 Confirm `SqlBookingStore.PlaceAsync` needs no change — it already sorts claim ids and locks each in one transaction. **Verify, do not assume**: read it against the modified atomic-placement requirement before concluding.
 
 ## 5. Persistence — proving atomicity rather than inheriting it
 
-- [ ] 5.1 Racing integration test: `{A,B}` against `{B,C}` over overlapping intervals, concurrently — exactly one succeeds, the other fails `conflict`. **Design it to fail against a non-atomic store**: confirm it goes red if the per-resource lock is dropped, otherwise it proves nothing (③'s QA found a CRITICAL hole in code that also looked right).
-- [ ] 5.2 Racing test: disjoint claim sets `{A,B}` and `{C,D}` both succeed — the counterpart that stops 5.1 passing by locking too much.
-- [ ] 5.3 A failed multi-claim placement leaves no booking row and no claims.
-- [ ] 5.4 Crossing claim orders do not deadlock.
-- [ ] 5.5 No schema change and no migration — assert the migration set is untouched.
+- [x] 5.1 Racing integration test: `{A,B}` against `{B,C}` over overlapping intervals, concurrently — exactly one succeeds, the other fails `conflict`. **Design it to fail against a non-atomic store**: confirm it goes red if the per-resource lock is dropped, otherwise it proves nothing (③'s QA found a CRITICAL hole in code that also looked right).
+- [x] 5.2 Racing test: disjoint claim sets `{A,B}` and `{C,D}` both succeed — the counterpart that stops 5.1 passing by locking too much.
+- [x] 5.3 A failed multi-claim placement leaves no booking row and no claims.
+- [x] 5.4 Crossing claim orders do not deadlock.
+- [x] 5.5 No schema change and no migration — assert the migration set is untouched.
 
 ## 6. Management API
 
