@@ -98,6 +98,74 @@ public class CapabilityStoreTests(SqlServerFixture fixture)
         }
     }
 
+    /// <summary>
+    /// Every read that publishes capabilities must hydrate them, not only the
+    /// two the candidate loop uses.
+    /// <para>
+    /// These exist because deleting any one `Include`/`ThenInclude` on a paged
+    /// list path left the whole suite green (QA finding). The consequence is
+    /// not cosmetic: the anonymous `GET /resources` and `GET /services` run
+    /// through these list reads, and silently publishing an empty capability
+    /// collection would make the derivable pool a strict superset of the real
+    /// one — at which point `resource-not-eligible` starts disclosing something
+    /// a caller could not compute, and ⑦-2's D9 is reopened invisibly.
+    /// </para>
+    /// </summary>
+    [Fact]
+    public async Task Resource_list_reads_hydrate_capabilities_on_both_ports()
+    {
+        fixture.EnsureAvailable();
+
+        var name = $"Listed {Guid.NewGuid():N}";
+        var resource = Person(name, "cert-x", "massage");
+
+        await using (var context = fixture.CreateContext())
+        {
+            Assert.True((await new SqlResourceManagementStore(context).CreateAsync(resource, Ct)).Succeeded);
+        }
+
+        await using (var context = fixture.CreateContext())
+        {
+            // The read port's paged list — behind the anonymous GET /resources.
+            var readPage = await new SqlResourceStore(context).ListAsync(0, 500, Ct);
+            var fromRead = readPage.Items.Single(r => r.Id == resource.Id);
+            Assert.Equal(resource.Capabilities, fromRead.Capabilities);
+
+            // The management port's paged list — behind the backoffice grid.
+            var managementPage = await new SqlResourceManagementStore(context).ListAsync(0, 500, Ct);
+            var fromManagement = managementPage.Items.Single(r => r.Id == resource.Id);
+            Assert.Equal(resource.Capabilities, fromManagement.Capabilities);
+        }
+    }
+
+    [Fact]
+    public async Task Service_list_reads_hydrate_required_capabilities_on_both_ports()
+    {
+        fixture.EnsureAvailable();
+
+        var service = Svc($"Listed {Guid.NewGuid():N}", "cert-x", "welsh");
+
+        await using (var context = fixture.CreateContext())
+        {
+            Assert.True((await new SqlServiceManagementStore(context).CreateAsync(service, Ct)).Succeeded);
+        }
+
+        await using (var context = fixture.CreateContext())
+        {
+            var expected = service.Roles[0].RequiredCapabilities;
+
+            // The read port's paged list — behind the anonymous GET /services.
+            var readPage = await new SqlServiceStore(context).ListAsync(0, 500, Ct);
+            var fromRead = readPage.Items.Single(s => s.Id == service.Id);
+            Assert.Equal(expected, fromRead.Roles[0].RequiredCapabilities);
+
+            // The management port's paged list — behind the backoffice grid.
+            var managementPage = await new SqlServiceManagementStore(context).ListAsync(0, 500, Ct);
+            var fromManagement = managementPage.Items.Single(s => s.Id == service.Id);
+            Assert.Equal(expected, fromManagement.Roles[0].RequiredCapabilities);
+        }
+    }
+
     [Fact]
     public async Task Update_replaces_the_capability_set_rather_than_merging()
     {

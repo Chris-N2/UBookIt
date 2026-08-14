@@ -67,6 +67,19 @@ public sealed class CapabilitySet : IEquatable<CapabilitySet>
                 continue;
             }
 
+            // Length is validated here rather than left to the column: a
+            // well-formed but over-long key would otherwise pass the domain and
+            // the API and fail at INSERT as a 500, where the spec promises a
+            // stable code.
+            if (key!.Length > NormalizedKey.MaxLength)
+            {
+                failures.Add(new DomainFailure(
+                    FailureCodes.CapabilityKeyInvalid,
+                    $"A capability key may be at most {NormalizedKey.MaxLength} characters.",
+                    field));
+                continue;
+            }
+
             accepted.Add(key!);
         }
 
@@ -107,9 +120,6 @@ public sealed class CapabilitySet : IEquatable<CapabilitySet>
 
         return true;
     }
-
-    /// <summary>Whether this set carries the given capability.</summary>
-    public bool Contains(string key) => Array.IndexOf(_keys, key) >= 0;
 
     public bool Equals(CapabilitySet? other)
     {

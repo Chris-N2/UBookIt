@@ -34,7 +34,7 @@
 - [x] 4.3 Add the capability usage endpoint to `ResourcesController`, mirroring the resource type usage endpoint including its authorization policy.
 - [x] 4.4 Add the role match preview endpoint — `GET` with a repeated `capability` query parameter (design D6) — with the same authorization policy.
 - [x] 4.5 Confirm `capability-key-invalid` maps to a 400 problem-details response carrying a `type` member, and that its field identifies the capability control rather than the type control.
-- [x] 4.6 Integration tests for the new endpoints including the 401-without-auth case for both.
+- [x] 4.6 Tests for the new endpoints. The authorization guarantee is asserted the way this repo already asserts it — by checking the controller inherits the `[Authorize]` backoffice base — not by issuing an unauthenticated request; there is no host test harness that could observe a real 401.
 
 ## 5. Backoffice client
 

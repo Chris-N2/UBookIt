@@ -14,7 +14,13 @@ public sealed class FixedTimeProvider(DateTimeOffset nowUtc) : TimeProvider
     public override DateTimeOffset GetUtcNow() => nowUtc;
 }
 
-public sealed class InMemoryResourceStore : IResourceStore
+/// <summary>
+/// Doubles for both resource ports, mirroring <see cref="InMemoryServiceStore"/>.
+/// The management side exists so the DTO → mapper → controller seam can be
+/// exercised without a database; store-level semantics that this double cannot
+/// honour (delete's in-use rule) throw rather than pretending.
+/// </summary>
+public sealed class InMemoryResourceStore : IResourceStore, IResourceManagementStore
 {
     private readonly Dictionary<Guid, Resource> _resources = [];
 
@@ -52,6 +58,68 @@ public sealed class InMemoryResourceStore : IResourceStore
             .ToList();
 
         return Task.FromResult(items);
+    }
+
+    public Task<DomainResult<Resource>> CreateAsync(Resource resource, CancellationToken cancellationToken = default)
+    {
+        _resources[resource.Id] = resource;
+        return Task.FromResult(DomainResult<Resource>.Success(resource));
+    }
+
+    /// <summary>Full replace, as the SQL store does — never a merge.</summary>
+    public Task<DomainResult<Resource>> UpdateAsync(Resource resource, CancellationToken cancellationToken = default)
+    {
+        if (!_resources.ContainsKey(resource.Id))
+        {
+            return Task.FromResult(DomainResult<Resource>.Failure(
+                FailureCodes.ResourceNotFound, $"No resource exists with id {resource.Id}."));
+        }
+
+        _resources[resource.Id] = resource;
+        return Task.FromResult(DomainResult<Resource>.Success(resource));
+    }
+
+    public Task<DomainResult> DeleteAsync(Guid resourceId, CancellationToken cancellationToken = default)
+        => throw new NotSupportedException("This double cannot honour the in-use delete rule.");
+
+    public Task<IReadOnlyList<ResourceTypeUsage>> ListTypesAsync(CancellationToken cancellationToken = default)
+    {
+        IReadOnlyList<ResourceTypeUsage> types = _resources.Values
+            .GroupBy(r => r.Type)
+            .Select(g => new ResourceTypeUsage(g.Key, g.Count()))
+            .OrderBy(t => t.Type, StringComparer.Ordinal)
+            .ToList();
+
+        return Task.FromResult(types);
+    }
+
+    public Task<IReadOnlyList<CapabilityUsage>> ListCapabilitiesAsync(CancellationToken cancellationToken = default)
+    {
+        IReadOnlyList<CapabilityUsage> usage = _resources.Values
+            .SelectMany(r => r.Capabilities.Keys)
+            .GroupBy(key => key, StringComparer.Ordinal)
+            .Select(g => new CapabilityUsage(g.Key, g.Count()))
+            .OrderBy(u => u.Key, StringComparer.Ordinal)
+            .ToList();
+
+        return Task.FromResult(usage);
+    }
+
+    /// <summary>
+    /// Applies the real <see cref="CapabilitySet"/> test, so this double cannot
+    /// answer a different question from the one the store answers.
+    /// </summary>
+    public Task<IReadOnlyList<ResourceMatch>> ListMatchingAsync(
+        string type, CapabilitySet requiredCapabilities, CancellationToken cancellationToken = default)
+    {
+        IReadOnlyList<ResourceMatch> matches = _resources.Values
+            .Where(r => string.Equals(r.Type, type, StringComparison.Ordinal)
+                && requiredCapabilities.IsSatisfiedBy(r.Capabilities))
+            .OrderBy(r => r.DisplayName, StringComparer.Ordinal).ThenBy(r => r.Id)
+            .Select(r => new ResourceMatch(r.Id, r.DisplayName))
+            .ToList();
+
+        return Task.FromResult(matches);
     }
 }
 

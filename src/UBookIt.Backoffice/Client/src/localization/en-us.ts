@@ -96,7 +96,11 @@ export default {
     resourceTypeHint: "Choose a type already in use, or enter a new one.",
     requiredCapabilities: "Required capabilities",
     requiredCapabilitiesNone: "Any resource of this type.",
-    requiredCapabilitiesHint: "Only resources with all of these can be booked for this service.",
+    // States a necessary condition, never a sufficient one. "Only resources
+    // with all of these CAN be booked" sat directly above the match count and
+    // the pair read as "those N can be booked" — the inference design D8 exists
+    // to prevent, since duration also excludes resources and is not checked here.
+    requiredCapabilitiesHint: "A resource without all of these cannot fulfil this service.",
     capabilityAdd: "Add capability",
     capabilityRemove: "Remove %0%",
     // Deliberately about capabilities, not about bookability: resources are
@@ -104,6 +108,11 @@ export default {
     requirementMatches: "%0% resources have these capabilities.",
     requirementMatchesOne: "1 resource has these capabilities.",
     requirementMatchesNone: "No resources have these capabilities.",
+    // When the requirement names no capabilities, "these capabilities" refers
+    // to nothing; the count is really about the resource type.
+    requirementMatchesType: "%0% resources have this type.",
+    requirementMatchesTypeOne: "1 resource has this type.",
+    requirementMatchesTypeNone: "No resources have this type.",
     save: "Save",
     cancel: "Cancel",
     back: "Back to services",

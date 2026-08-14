@@ -111,6 +111,14 @@ The readout SHALL claim only what it verifies. It SHALL describe capability matc
 - **WHEN** the requirement names a type and capability combination no resource satisfies
 - **THEN** the readout reports that no resources match, and saving is still permitted
 
+#### Scenario: The readout describes the type when no capabilities are required
+- **WHEN** the requirement names a resource type and requires no capabilities
+- **THEN** the readout describes how many resources have that **type**, rather than referring to capabilities that were never named
+
+#### Scenario: The count is not known
+- **WHEN** the resource type is empty, or the count could not be retrieved
+- **THEN** the readout says nothing, rather than reporting zero — zero is the answer that tells an editor their requirement is wrong
+
 #### Scenario: The readout does not claim bookability
 - **WHEN** the readout is displayed for any requirement
 - **THEN** its wording describes which resources hold the capabilities, and does not state that the service can be booked on them

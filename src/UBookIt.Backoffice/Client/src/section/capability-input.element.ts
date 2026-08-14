@@ -113,7 +113,16 @@ export class UBookItCapabilityInputElement extends UmbLitElement {
     const inputId = `${this.controlId}-add`;
     const listId = `${this.controlId}-known`;
     const errorId = `${this.controlId}-error`;
+    const hintId = `${this.controlId}-hint`;
     const hasError = this.error !== "";
+    const hasHint = this.hint !== "";
+
+    // The hint states the key-format rule, which is exactly what a user needs
+    // when the error says the key is malformed — so the error is added to the
+    // description rather than replacing it.
+    const describedBy = [hasError ? errorId : "", hasHint ? hintId : ""]
+      .filter((id) => id !== "")
+      .join(" ");
 
     return html`
       <div class="field">
@@ -147,7 +156,7 @@ export class UBookItCapabilityInputElement extends UmbLitElement {
             list=${listId}
             .value=${this._draft}
             aria-invalid=${hasError ? "true" : nothing}
-            aria-describedby=${hasError ? errorId : nothing}
+            aria-describedby=${describedBy !== "" ? describedBy : nothing}
             @input=${(e: InputEvent) => (this._draft = (e.target as HTMLInputElement).value)}
             @keydown=${this.#onKeydown}
           />
@@ -158,7 +167,7 @@ export class UBookItCapabilityInputElement extends UmbLitElement {
         </div>
 
         ${hasError ? html`<p class="group-error" id=${errorId}>${this.error}</p>` : nothing}
-        ${this.hint === "" ? nothing : html`<p class="hint">${this.hint}</p>`}
+        ${hasHint ? html`<p class="hint" id=${hintId}>${this.hint}</p>` : nothing}
       </div>
     `;
   }

@@ -26,6 +26,11 @@ A capability key SHALL be a normalized string key (lower-case, kebab-case, non-e
 
 The domain SHALL NOT hold a closed list of valid capability keys.
 
+A key SHALL also be bounded in length by the domain, not only by the storage
+column. A well-formed key longer than storage accepts would otherwise pass
+domain and API validation and fail at write time as an unhandled storage error —
+a 500 where this requirement promises a stable validation code.
+
 #### Scenario: Non-normalized capability key is rejected
 - **WHEN** a resource is created with the capability key `"Cert X"` (upper-case and a space)
 - **THEN** creation is rejected with the `capability-key-invalid` code
@@ -36,6 +41,14 @@ The domain SHALL NOT hold a closed list of valid capability keys.
 
 #### Scenario: Unknown capability keys are not rejected for being unknown
 - **WHEN** a resource is created with a well-formed capability key the package has never seen
+- **THEN** creation succeeds
+
+#### Scenario: An over-long capability key is a validation failure
+- **WHEN** a resource is created with a well-formed capability key longer than storage accepts
+- **THEN** creation is rejected with the `capability-key-invalid` code rather than failing later as a storage error
+
+#### Scenario: A key at the length limit is accepted
+- **WHEN** a resource is created with a well-formed capability key exactly at the maximum length
 - **THEN** creation succeeds
 
 ### Requirement: A capability set is a value object with structural equality

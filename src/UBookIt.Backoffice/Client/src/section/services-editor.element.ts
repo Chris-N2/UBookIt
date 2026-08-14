@@ -88,7 +88,6 @@ export class UBookItServiceEditorElement extends UmbLitElement {
   @state()
   private _knownTypes: ResourceTypeUsageModel[] = [];
 
-
   @state()
   private _requiredCapabilities: string[] = [];
 
@@ -102,14 +101,17 @@ export class UBookItServiceEditorElement extends UmbLitElement {
    * Null is not zero, and the distinction is the whole point: zero is the
    * number that says "your requirement matches nothing, go and fix it", so
    * showing it because a request failed would send someone to correct a
-   * configuration that is fine. The same reasoning as {@link _knownTypesLoaded},
-   * with more at stake — this readout exists precisely to be believed.
+   * configuration that is fine. This readout exists precisely to be believed,
+   * so it must be silent rather than wrong.
    */
   @state()
   private _matchCount: number | null = null;
 
   /** Guards against an earlier in-flight preview overwriting a later one. */
   #matchToken = 0;
+
+  /** Pending debounce for the type field, which changes a character at a time. */
+  #matchDebounce?: ReturnType<typeof setTimeout>;
 
   #term(key: string) {
     return this.localize.term(`ubookitServices_${key}`);
@@ -203,6 +205,22 @@ export class UBookItServiceEditorElement extends UmbLitElement {
    * computed by a second, browser-side implementation of eligibility could
    * disagree with the booker, which is worse than showing nothing.
    */
+  /**
+   * Debounced entry point for the type field. Typing a ten-character key would
+   * otherwise be ten requests, most of them describing a prefix nobody asked
+   * about. Capability add/remove calls {@link #refreshMatches} directly — those
+   * are discrete choices, not keystrokes.
+   */
+  #scheduleMatchRefresh() {
+    clearTimeout(this.#matchDebounce);
+    this.#matchDebounce = setTimeout(() => void this.#refreshMatches(), 250);
+  }
+
+  override disconnectedCallback() {
+    clearTimeout(this.#matchDebounce);
+    super.disconnectedCallback();
+  }
+
   async #refreshMatches() {
     const token = ++this.#matchToken;
     const resourceType = this._resourceType.trim();
@@ -405,7 +423,7 @@ export class UBookItServiceEditorElement extends UmbLitElement {
               aria-describedby="resource-type-hint requirement-matches"
               @input=${(e: InputEvent) => {
                 this._resourceType = (e.target as HTMLInputElement).value;
-                void this.#refreshMatches();
+                this.#scheduleMatchRefresh();
               }}
             />
             <datalist id="ubookit-resource-types">
@@ -461,16 +479,24 @@ export class UBookItServiceEditorElement extends UmbLitElement {
       return "";
     }
 
-    // Three forms, not a count interpolated into one: "1 resources have" is
-    // the sort of thing a reader stops on, and this line is the whole point of
-    // the readout.
+    // Six forms, not one string with a count substituted in. Two axes: singular
+    // versus plural ("1 resources have" is the sort of thing a reader stops on),
+    // and whether any capability is actually required — with none, "these
+    // capabilities" refers to nothing and the count is really about the type.
+    const byType = this._requiredCapabilities.length === 0;
+
     if (this._matchCount === 0) {
-      return this.#term("requirementMatchesNone");
+      return this.#term(byType ? "requirementMatchesTypeNone" : "requirementMatchesNone");
     }
 
-    return this._matchCount === 1
-      ? this.#term("requirementMatchesOne")
-      : this.localize.term("ubookitServices_requirementMatches", this._matchCount);
+    if (this._matchCount === 1) {
+      return this.#term(byType ? "requirementMatchesTypeOne" : "requirementMatchesOne");
+    }
+
+    return this.localize.term(
+      byType ? "ubookitServices_requirementMatchesType" : "ubookitServices_requirementMatches",
+      this._matchCount,
+    );
   }
 
   #renderDuration() {

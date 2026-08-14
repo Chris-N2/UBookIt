@@ -18,6 +18,17 @@ public static partial class NormalizedKey
     [GeneratedRegex("^[a-z0-9]+(-[a-z0-9]+)*$")]
     private static partial Regex Pattern();
 
+    /// <summary>
+    /// The longest key any storage column accepts. Shape validity alone is not
+    /// enough: a well-formed key longer than the column truncates or throws at
+    /// INSERT, which surfaces as a 500 rather than the stable validation code
+    /// the specs promise.
+    /// </summary>
+    public const int MaxLength = 64;
+
     /// <summary>Whether <paramref name="key"/> is a well-formed normalized key.</summary>
     public static bool IsValid(string? key) => key is not null && Pattern().IsMatch(key);
+
+    /// <summary>Whether <paramref name="key"/> is well-formed and storable.</summary>
+    public static bool IsValidAndStorable(string? key) => IsValid(key) && key!.Length <= MaxLength;
 }
