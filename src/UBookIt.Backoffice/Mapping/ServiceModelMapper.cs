@@ -61,8 +61,8 @@ internal static class ServiceModelMapper
     }
 
     /// <summary>
-    /// A preview configuration to the pair resolution actually depends on: a
-    /// role and a duration. Never a <see cref="Service"/> — that would require a
+    /// A preview configuration to what resolution actually depends on: the roles
+    /// and a duration. Never a <see cref="Service"/> — that would require a
     /// name the editor may not have entered yet, letting a validator with no
     /// stake in the question decide whether it can be asked (design D2).
     /// <para>
@@ -72,22 +72,48 @@ internal static class ServiceModelMapper
     /// other than what is on screen.
     /// </para>
     /// </summary>
-    internal static DomainResult<(ServiceRole Role, ServiceDuration Duration)> ToDomain(
+    internal static DomainResult<(IReadOnlyList<ServiceRole> Roles, ServiceDuration Duration)> ToDomain(
         ServicePreviewRequestModel model)
     {
-        var role = ServiceRole.Create(model.ResourceType, model.RequiredCapabilities);
         var duration = ToDomain(model.Duration);
 
-        var failures = role.Failures.Concat(duration.Failures).ToList();
+        // Each role validated on its own, with its own index, so a malformed key
+        // says which row it came from. Deliberately NOT through Service.Create:
+        // that would reject two roles of one type, and refusing to answer is
+        // exactly what withholds the information needed to fix that fault.
+        var roles = model.Roles
+            .Select((r, index) => ServiceRole.Create(r.ResourceType, r.RequiredCapabilities, 1, index))
+            .ToList();
+
+        var failures = roles.SelectMany(r => r.Failures).Concat(duration.Failures).ToList();
+
+        if (model.Roles.Count == 0)
+        {
+            // An empty list is a request with nothing to report on, not a
+            // configuration whose chains are all empty.
+            failures.Add(new DomainFailure(
+                FailureCodes.ServiceRoleInvalid,
+                "At least one role is required to preview a configuration.",
+                nameof(ServicePreviewRequestModel.Roles)));
+        }
 
         return failures.Count > 0
-            ? DomainResult<(ServiceRole, ServiceDuration)>.Failure(failures)
-            : DomainResult<(ServiceRole, ServiceDuration)>.Success((role.Value, duration.Value));
+            ? DomainResult<(IReadOnlyList<ServiceRole>, ServiceDuration)>.Failure(failures)
+            : DomainResult<(IReadOnlyList<ServiceRole>, ServiceDuration)>.Success(
+                ([.. roles.Select(r => r.Value)], duration.Value));
     }
 
-    internal static ServicePreviewResponseModel ToModel(ServiceResolution resolution)
+    internal static ServicePreviewResponseModel ToModel(IEnumerable<(ServiceRole Role, ServiceResolution Chain)> chains)
         => new()
         {
+            Roles = [.. chains.Select(c => ToModel(c.Role, c.Chain))],
+        };
+
+    private static ServiceRoleChainModel ToModel(ServiceRole role, ServiceResolution resolution)
+        => new()
+        {
+            ResourceType = role.ResourceType,
+            RequiredCapabilities = [.. role.RequiredCapabilities.Keys],
             OfType = ToStage(resolution.OfType),
             WithCapabilities = ToStage(resolution.WithCapabilities),
             CanProvide = ToStage(resolution.Candidates.Select(c => c.Resource)),

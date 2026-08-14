@@ -149,14 +149,34 @@ public sealed class ServiceReadModel
 
     public ServiceDurationModel Duration { get; set; } = new();
 
-    /// <summary>The resource type key this service's single role resolves against.</summary>
+    /// <summary>
+    /// Every role this service requires, in a deterministic order. A booking
+    /// claims one resource per role.
+    /// <para>
+    /// A collection even for a single-role service, so a consumer written
+    /// against this contract needs no change when a service gains a role.
+    /// </para>
+    /// </summary>
+    public List<ServiceRoleReadModel> Roles { get; set; } = [];
+}
+
+/// <summary>
+/// One role of a service: the resource type it resolves against and the
+/// capabilities a resource must carry to fill it.
+/// <para>
+/// Publishing these alongside each resource's own capabilities is what makes a
+/// service's candidate pools computable by an anonymous consumer — which is what
+/// keeps the <c>resource-not-eligible</c> failure free of any disclosure the
+/// public reads do not already make.
+/// </para>
+/// </summary>
+public sealed class ServiceRoleReadModel
+{
     public string ResourceType { get; set; } = string.Empty;
 
     /// <summary>
-    /// The capabilities a resource must carry to fulfil this service,
-    /// deterministically ordered; empty when the role constrains by type alone.
-    /// Together with each resource's own capabilities, this makes the candidate
-    /// pool computable without a further request.
+    /// Deterministically ordered; an empty collection — never null or absent —
+    /// when the role constrains by type alone.
     /// </summary>
     public List<string> RequiredCapabilities { get; set; } = [];
 }
@@ -260,6 +280,11 @@ public sealed class PlacementRequestModel
     public BookerModel Booker { get; set; } = new();
 }
 
+/// <summary>
+/// The response to a direct placement, which claims exactly one resource and
+/// reports it as it always has. Service placement has its own response model:
+/// see <see cref="ServicePlacementResponseModel"/>.
+/// </summary>
 public sealed class PlacementResponseModel
 {
     public Guid BookingId { get; set; }
@@ -271,6 +296,34 @@ public sealed class PlacementResponseModel
     public IntervalModel Interval { get; set; } = new();
 
     public BookerModel Booker { get; set; } = new();
+}
+
+/// <summary>
+/// The response to a service placement. A service claims one resource per role,
+/// so the resources it resolved to are a collection: a single-valued member
+/// could only report one of them or none.
+/// </summary>
+public sealed class ServicePlacementResponseModel
+{
+    public Guid BookingId { get; set; }
+
+    public string Status { get; set; } = string.Empty;
+
+    /// <summary>
+    /// Every resource the service resolved to, one per role, in a deterministic
+    /// order. Present and of length one for a single-role service.
+    /// </summary>
+    public List<ResolvedResourceModel> Resources { get; set; } = [];
+
+    public IntervalModel Interval { get; set; } = new();
+
+    public BookerModel Booker { get; set; } = new();
+}
+
+/// <summary>One resource a service placement resolved to.</summary>
+public sealed class ResolvedResourceModel
+{
+    public Guid ResourceId { get; set; }
 }
 
 /// <summary>One failed rule, using the domain's stable codes.</summary>

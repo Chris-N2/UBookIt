@@ -21,10 +21,11 @@ public class ServicesController(
     IServiceBookingService resolution) : UBookItBackofficeApiControllerBase
 {
     /// <summary>
-    /// The resolution chain for a service configuration: the resources of the
-    /// role's type, those of them carrying its required capabilities, those of
-    /// them whose own constraints admit a length the duration permits, and what
-    /// the last filter excluded with the bound that excluded it.
+    /// The resolution chain for each role of a service configuration: the
+    /// resources of that role's type, those of them carrying its required
+    /// capabilities, those of them whose own constraints admit a length the
+    /// duration permits, and what the last filter excluded with the bound that
+    /// excluded it. Chains come back in the order the roles were supplied.
     /// <para>
     /// Accepts a configuration no saved service holds and does not require it to
     /// be a valid service — in particular, no name. Its whole purpose is to
@@ -55,15 +56,25 @@ public class ServicesController(
             return configuration.Failures.ToProblemResult();
         }
 
-        var (role, duration) = configuration.Value;
+        var (roles, duration) = configuration.Value;
 
-        // A well-formed type key no resource uses is a chain whose first stage is
-        // empty, not an error: naming a type before creating resources of it is a
-        // legitimate setup order, and the empty first stage is precisely the
-        // signal that distinguishes it from a capability or duration exclusion.
-        var chain = await resolution.ResolveAsync(role, duration, cancellationToken);
+        var chains = new List<(ServiceRole Role, ServiceResolution Chain)>(roles.Count);
 
-        return Ok(ServiceModelMapper.ToModel(chain));
+        foreach (var role in roles)
+        {
+            // A well-formed type key no resource uses is a chain whose first stage
+            // is empty, not an error: naming a type before creating resources of it
+            // is a legitimate setup order, and the empty first stage is precisely
+            // the signal that distinguishes it from a capability or duration
+            // exclusion.
+            //
+            // Each role is reported independently and exactly as supplied,
+            // including when two of them name the same type — a configuration that
+            // cannot be saved but is one an editor is in the middle of correcting.
+            chains.Add((role, await resolution.ResolveAsync(role, duration, cancellationToken)));
+        }
+
+        return Ok(ServiceModelMapper.ToModel(chains));
     }
 
     [HttpGet("services")]

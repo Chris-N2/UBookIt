@@ -75,12 +75,12 @@ public sealed class ServicesController(
     }
 
     /// <summary>
-    /// Books the service, resolving one of its eligible resources. The submitted
-    /// length is required and is never substituted; the response reports which
+    /// Books the service, resolving one eligible resource per role. The submitted
+    /// length is required and is never substituted; the response reports every
     /// resource the booking landed on.
     /// </summary>
     [HttpPost("services/{id:guid}/bookings")]
-    [ProducesResponseType<PlacementResponseModel>(StatusCodes.Status200OK)]
+    [ProducesResponseType<ServicePlacementResponseModel>(StatusCodes.Status200OK)]
     [ProducesResponseType<ProblemDetails>(StatusCodes.Status400BadRequest)]
     [ProducesResponseType<ProblemDetails>(StatusCodes.Status404NotFound)]
     [ProducesResponseType<ProblemDetails>(StatusCodes.Status409Conflict)]
@@ -96,7 +96,7 @@ public sealed class ServicesController(
         var placed = await serviceBooking.PlaceAsync(request.Value, cancellationToken);
 
         return placed.Succeeded
-            ? Ok(DeliveryModelMapper.ToPlacementResponse(placed.Value))
+            ? Ok(DeliveryModelMapper.ToServicePlacementResponse(placed.Value))
             : placed.Failures.ToProblemResult();
     }
 

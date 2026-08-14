@@ -57,9 +57,16 @@ internal static class DeliveryModelMapper
         {
             Id = service.Id,
             Name = service.Name,
-            // v1 guarantees exactly one role (services spec).
-            ResourceType = service.Roles[0].ResourceType,
-            RequiredCapabilities = [.. service.Roles[0].RequiredCapabilities.Keys],
+            // Published in the aggregate's own order, which is the order they
+            // were configured in and is stable for a given service.
+            Roles =
+            [
+                .. service.Roles.Select(role => new ServiceRoleReadModel
+                {
+                    ResourceType = role.ResourceType,
+                    RequiredCapabilities = [.. role.RequiredCapabilities.Keys],
+                }),
+            ],
             Duration = ToDurationModel(service.Duration),
         };
 
@@ -97,15 +104,41 @@ internal static class DeliveryModelMapper
         {
             BookingId = booking.Id,
             Status = booking.Status.ToString(),
-            // v1 is single-claim (bookings spec); the claim's resource is the booked resource.
+            // Direct placement claims exactly one resource — the endpoint takes a
+            // single resource id — so the claim's resource is the booked resource.
             ResourceId = booking.Claims[0].ResourceId,
             Interval = new IntervalModel { StartUtc = booking.Interval.StartUtc, EndUtc = booking.Interval.EndUtc },
-            Booker = new BookerModel
-            {
-                Name = booking.Booker.Name,
-                Email = booking.Booker.Email,
-                Phone = booking.Booker.Phone,
-            },
+            Booker = ToBookerModel(booking),
+        };
+
+    /// <summary>
+    /// The service placement response, reporting every resource the service
+    /// resolved to. A separate model from the direct-placement response rather
+    /// than a shared one with an optional collection: direct placement's contract
+    /// is unchanged, and one model carrying both shapes would let a consumer read
+    /// the member that happens to be empty.
+    /// </summary>
+    internal static ServicePlacementResponseModel ToServicePlacementResponse(Booking booking)
+        => new()
+        {
+            BookingId = booking.Id,
+            Status = booking.Status.ToString(),
+            Resources =
+            [
+                .. booking.Claims
+                    .Select(claim => new ResolvedResourceModel { ResourceId = claim.ResourceId })
+                    .OrderBy(r => r.ResourceId),
+            ],
+            Interval = new IntervalModel { StartUtc = booking.Interval.StartUtc, EndUtc = booking.Interval.EndUtc },
+            Booker = ToBookerModel(booking),
+        };
+
+    private static BookerModel ToBookerModel(Booking booking)
+        => new()
+        {
+            Name = booking.Booker.Name,
+            Email = booking.Booker.Email,
+            Phone = booking.Booker.Phone,
         };
 
     /// <summary>

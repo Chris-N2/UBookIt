@@ -47,12 +47,49 @@ public class ServicesDeliveryTests
                     maxDuration: Mins(max)).Value),
             id: Id(id)).Value;
 
-    private static Harness Wire(ServiceDuration? duration = null, params Resource[] resources)
+    /// <summary>
+    /// A two-role service — a `room` requiring `projector` and a `therapist`
+    /// requiring nothing — with one eligible resource of each type.
+    /// </summary>
+    private static Harness WireMultiRole()
     {
-        var service = Service.Create("Consultation", duration, [new ServiceRole(ResourceTypes.Room, 1)]).Value;
+        var service = Service.Create(
+            "Massage",
+            null,
+            [
+                new ServiceRole(ResourceTypes.Room, 1)
+                {
+                    RequiredCapabilities = CapabilitySet.Create(["projector"]).Value,
+                },
+                new ServiceRole("therapist", 1),
+            ]).Value;
 
+        var room = Resource.Create(
+            ResourceTypes.Room,
+            "Red Room",
+            capabilities: ["projector"],
+            availability: TestData.Config(TestData.Weekly("09:00", "17:00", Date.DayOfWeek)),
+            id: Id(1)).Value;
+
+        var therapist = Resource.Create(
+            "therapist",
+            "Mary",
+            availability: TestData.Config(TestData.Weekly("09:00", "17:00", Date.DayOfWeek)),
+            id: Id(2)).Value;
+
+        return WireService(service, room, therapist);
+    }
+
+    private static Harness Wire(ServiceDuration? duration = null, params Resource[] resources)
+        => WireService(
+            Service.Create("Consultation", duration, [new ServiceRole(ResourceTypes.Room, 1)]).Value,
+            resources.Length > 0 ? resources : [Room(1)]);
+
+    private static Harness WireService(Service service, params Resource[] resources)
+    {
         var resourceStore = new InMemoryResourceStore();
-        foreach (var resource in resources.Length > 0 ? resources : [Room(1)])
+
+        foreach (var resource in resources)
         {
             resourceStore.Add(resource);
         }
@@ -125,7 +162,53 @@ public class ServicesDeliveryTests
 
         Assert.Equal(h.Service.Id, model.Id);
         Assert.Equal("Consultation", model.Name);
-        Assert.Equal(ResourceTypes.Room, model.ResourceType);
+        Assert.Equal(ResourceTypes.Room, Assert.Single(model.Roles).ResourceType);
+    }
+
+    [Fact]
+    public async Task Spec_scenario_a_single_role_service_still_publishes_a_collection()
+    {
+        // A consumer written against this contract must not need changing when a
+        // service gains a role, so the single-role case is a collection of one
+        // rather than an inline role.
+        var h = Wire();
+
+        var model = Ok<ServiceReadModel>(await h.Controller.GetService(h.Service.Id));
+
+        Assert.Single(model.Roles);
+        Assert.DoesNotContain(
+            typeof(ServiceReadModel).GetProperties(),
+            p => p.Name is "ResourceType" or "RequiredCapabilities");
+    }
+
+    [Fact]
+    public async Task Spec_scenario_a_multi_role_service_publishes_every_role()
+    {
+        var h = WireMultiRole();
+
+        var model = Ok<ServiceReadModel>(await h.Controller.GetService(h.Service.Id));
+
+        Assert.Equal([ResourceTypes.Room, "therapist"], model.Roles.Select(r => r.ResourceType));
+        Assert.Equal(["projector"], model.Roles[0].RequiredCapabilities);
+
+        // A role requiring none carries an empty collection, never a null or an
+        // absent member.
+        Assert.NotNull(model.Roles[1].RequiredCapabilities);
+        Assert.Empty(model.Roles[1].RequiredCapabilities);
+    }
+
+    [Fact]
+    public async Task Spec_scenario_a_consumer_can_compute_the_candidate_pools()
+    {
+        // Every role's required capabilities are published alongside each
+        // resource's own, so the pools are computable without a further request —
+        // which is what keeps `resource-not-eligible` free of disclosure.
+        var h = WireMultiRole();
+
+        var service = Ok<ServiceReadModel>(await h.Controller.GetService(h.Service.Id));
+
+        Assert.All(service.Roles, role => Assert.NotNull(role.RequiredCapabilities));
+        Assert.Equal(2, service.Roles.Count);
     }
 
     [Fact]
@@ -243,7 +326,7 @@ public class ServicesDeliveryTests
     {
         var h = Wire();
 
-        var model = Ok<PlacementResponseModel>(
+        var model = Ok<ServicePlacementResponseModel>(
             await h.Controller.PlaceServiceBooking(h.Service.Id, Placement()));
 
         Assert.Equal("Confirmed", model.Status);
@@ -264,10 +347,10 @@ public class ServicesDeliveryTests
             Booker = TestData.Booker(),
         });
 
-        var model = Ok<PlacementResponseModel>(
+        var model = Ok<ServicePlacementResponseModel>(
             await h.Controller.PlaceServiceBooking(h.Service.Id, Placement()));
 
-        Assert.Equal(Id(2), model.ResourceId);
+        Assert.Equal(Id(2), Assert.Single(model.Resources).ResourceId);
     }
 
     [Fact]
@@ -305,10 +388,41 @@ public class ServicesDeliveryTests
     {
         var h = Wire(null, Room(1), Room(2));
 
-        var model = Ok<PlacementResponseModel>(
+        var model = Ok<ServicePlacementResponseModel>(
             await h.Controller.PlaceServiceBooking(h.Service.Id, Placement(preferred: null)));
 
-        Assert.Equal(Id(1), model.ResourceId);
+        Assert.Equal(Id(1), Assert.Single(model.Resources).ResourceId);
+    }
+
+    [Fact]
+    public async Task Spec_scenario_the_resolved_resources_are_reported()
+    {
+        var h = WireMultiRole();
+
+        var model = Ok<ServicePlacementResponseModel>(
+            await h.Controller.PlaceServiceBooking(h.Service.Id, Placement()));
+
+        // Both resolved resources, not one of them and not none: a booker is told
+        // everything they got.
+        Assert.Equal([Id(1), Id(2)], model.Resources.Select(r => r.ResourceId));
+        Assert.Equal("Confirmed", model.Status);
+    }
+
+    [Fact]
+    public void Spec_scenario_direct_placement_is_unchanged()
+    {
+        // The direct endpoint's response model still carries a single resource id
+        // and no collection. Two roles' worth of contract change must not leak
+        // into ⑤'s path.
+        var properties = typeof(PlacementResponseModel).GetProperties().Select(p => p.Name).ToArray();
+
+        Assert.Equal(
+            ["BookingId", "Status", "ResourceId", "Interval", "Booker"],
+            properties);
+
+        Assert.Equal(
+            typeof(Guid),
+            typeof(PlacementResponseModel).GetProperty("ResourceId")!.PropertyType);
     }
 
     [Fact]

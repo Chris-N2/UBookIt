@@ -68,13 +68,24 @@ public class ServicePreviewEndpointTests
         string resourceType = ResourceTypes.Room,
         string[]? capabilities = null,
         ServiceDurationModel? duration = null)
+        => Configuration(duration, Role(resourceType, capabilities));
+
+    private static ServicePreviewRoleModel Role(
+        string resourceType = ResourceTypes.Room, string[]? capabilities = null)
+        => new() { ResourceType = resourceType, RequiredCapabilities = [.. capabilities ?? []] };
+
+    private static ServicePreviewRequestModel Configuration(
+        ServiceDurationModel? duration, params ServicePreviewRoleModel[] roles)
         => new()
         {
-            ResourceType = resourceType,
-            RequiredCapabilities = [.. capabilities ?? []],
+            Roles = [.. roles],
             Duration = duration
                 ?? new ServiceDurationModel { Kind = ServiceDurationModel.FixedKind, Minutes = 60 },
         };
+
+    /// <summary>The one chain of a single-role configuration.</summary>
+    private static ServiceRoleChainModel Single(ServicePreviewResponseModel response)
+        => Assert.Single(response.Roles);
 
     private static ServiceDurationModel FixedMinutes(int minutes)
         => new() { Kind = ServiceDurationModel.FixedKind, Minutes = minutes };
@@ -90,6 +101,21 @@ public class ServicePreviewEndpointTests
         return (obj.StatusCode!.Value, errors.Select(e => e.Code).ToArray());
     }
 
+    private static string?[] Fields(IActionResult result)
+    {
+        var problem = Assert.IsType<ProblemDetails>(Assert.IsType<ObjectResult>(result).Value);
+
+        return Assert.IsType<ApiErrorModel[]>(problem.Extensions["errors"]).Select(e => e.Field).ToArray();
+    }
+
+    private static Resource Therapist(int id, string name, params string[] capabilities)
+        => Resource.Create(
+            "therapist",
+            name,
+            capabilities: capabilities,
+            availability: TestData.Config(TestData.Weekly("08:00", "20:00", Date.DayOfWeek)),
+            id: Id(id)).Value;
+
     [Fact]
     public async Task Spec_scenario_the_chain_is_returned_for_a_configuration()
     {
@@ -99,8 +125,8 @@ public class ServicePreviewEndpointTests
         // two resources excluded by duration identified.
         var (controller, _) = Wire(TenRooms());
 
-        var chain = Ok(await controller.PreviewServiceConfiguration(
-            Request(capabilities: ["projector"], duration: FixedMinutes(240))));
+        var chain = Single(Ok(await controller.PreviewServiceConfiguration(
+            Request(capabilities: ["projector"], duration: FixedMinutes(240)))));
 
         Assert.Equal(10, chain.OfType.Total);
         Assert.Equal(3, chain.WithCapabilities.Total);
@@ -140,7 +166,7 @@ public class ServicePreviewEndpointTests
     {
         var (controller, _) = Wire(TenRooms());
 
-        var chain = Ok(await controller.PreviewServiceConfiguration(Request()));
+        var chain = Single(Ok(await controller.PreviewServiceConfiguration(Request())));
 
         Assert.Equal(10, chain.OfType.Total);
         Assert.Equal(10, chain.WithCapabilities.Total);
@@ -160,7 +186,7 @@ public class ServicePreviewEndpointTests
 
         Assert.IsType<OkObjectResult>(result);
 
-        var chain = Ok(result);
+        var chain = Single(Ok(result));
         Assert.Equal(0, chain.OfType.Total);
         Assert.Equal(0, chain.WithCapabilities.Total);
         Assert.Equal(0, chain.CanProvide.Total);
@@ -189,8 +215,8 @@ public class ServicePreviewEndpointTests
         var resolution = TestData.ServiceBooking(services, resourceStore);
         var controller = new ServicesController(services, services, resolution);
 
-        var chain = Ok(await controller.PreviewServiceConfiguration(
-            Request(capabilities: ["projector"], duration: FixedMinutes(240))));
+        var chain = Single(Ok(await controller.PreviewServiceConfiguration(
+            Request(capabilities: ["projector"], duration: FixedMinutes(240)))));
 
         var candidates = await resolution.ResolveCandidatesAsync(service.Id);
 
@@ -264,6 +290,100 @@ public class ServicePreviewEndpointTests
         Assert.Contains(FailureCodes.TypeKeyInvalid, codes);
         Assert.Contains(FailureCodes.CapabilityKeyInvalid, codes);
         Assert.Contains(FailureCodes.ServiceDurationInvalid, codes);
+    }
+
+    // --------------------------------------------------------------- several roles
+
+    [Fact]
+    public async Task Spec_scenario_a_chain_is_returned_for_each_role()
+    {
+        var (controller, _) = Wire([.. TenRooms(), Therapist(20, "Mary", "cert-x"), Therapist(21, "Frank")]);
+
+        var response = Ok(await controller.PreviewServiceConfiguration(Configuration(
+            FixedMinutes(60),
+            Role(ResourceTypes.Room, ["projector"]),
+            Role("therapist", ["cert-x"]))));
+
+        // Two chains, in the order the roles were supplied, each identifying the
+        // role it describes.
+        Assert.Equal(2, response.Roles.Count);
+        Assert.Equal([ResourceTypes.Room, "therapist"], response.Roles.Select(r => r.ResourceType));
+
+        Assert.Equal(10, response.Roles[0].OfType.Total);
+        Assert.Equal(3, response.Roles[0].WithCapabilities.Total);
+
+        Assert.Equal(2, response.Roles[1].OfType.Total);
+        Assert.Equal(1, response.Roles[1].WithCapabilities.Total);
+    }
+
+    [Fact]
+    public async Task Chains_come_back_in_the_order_the_roles_were_supplied()
+    {
+        var (controller, _) = Wire([.. TenRooms(), Therapist(20, "Mary", "cert-x")]);
+
+        var reversed = Ok(await controller.PreviewServiceConfiguration(Configuration(
+            FixedMinutes(60),
+            Role("therapist"),
+            Role(ResourceTypes.Room))));
+
+        Assert.Equal(["therapist", ResourceTypes.Room], reversed.Roles.Select(r => r.ResourceType));
+        Assert.Equal(1, reversed.Roles[0].OfType.Total);
+        Assert.Equal(10, reversed.Roles[1].OfType.Total);
+    }
+
+    [Fact]
+    public async Task Spec_scenario_a_configuration_that_could_not_be_saved_can_still_be_previewed()
+    {
+        // Two roles of one resource type: saving is rejected, but previewing is
+        // how an editor sees what each role resolves to while correcting it.
+        // Refusing to answer would withhold exactly the information needed.
+        var (controller, _) = Wire(TenRooms());
+
+        var response = Ok(await controller.PreviewServiceConfiguration(Configuration(
+            FixedMinutes(60),
+            Role(ResourceTypes.Room, ["projector"]),
+            Role(ResourceTypes.Room))));
+
+        Assert.Equal(2, response.Roles.Count);
+
+        // Reported independently and exactly as supplied — the second role is not
+        // collapsed into the first, nor narrowed by it.
+        Assert.Equal(3, response.Roles[0].WithCapabilities.Total);
+        Assert.Equal(10, response.Roles[1].WithCapabilities.Total);
+        Assert.Equal(["projector"], response.Roles[0].RequiredCapabilities);
+        Assert.Empty(response.Roles[1].RequiredCapabilities);
+    }
+
+    [Fact]
+    public async Task Spec_scenario_an_empty_role_list_is_rejected()
+    {
+        var (controller, _) = Wire(TenRooms());
+
+        var (status, codes) = Problem(
+            await controller.PreviewServiceConfiguration(Configuration(FixedMinutes(60))));
+
+        Assert.Equal(400, status);
+        Assert.Contains(FailureCodes.ServiceRoleInvalid, codes);
+    }
+
+    [Fact]
+    public async Task A_malformed_key_identifies_the_role_it_came_from()
+    {
+        var (controller, _) = Wire(TenRooms());
+
+        var result = await controller.PreviewServiceConfiguration(Configuration(
+            FixedMinutes(60),
+            Role(ResourceTypes.Room),
+            Role("Meeting Room", ["Projector Screen"])));
+
+        var fields = Fields(result);
+
+        // Both failures belong to the second row, and say so: with several roles
+        // on screen, "the resource type is malformed" is not enough to know which
+        // control to mark.
+        Assert.Contains("Roles[1].ResourceType", fields);
+        Assert.Contains("Roles[1].RequiredCapabilities", fields);
+        Assert.DoesNotContain(fields, f => f is not null && f.StartsWith("Roles[0]", StringComparison.Ordinal));
     }
 
     // ------------------------------------------------------------ contract shape

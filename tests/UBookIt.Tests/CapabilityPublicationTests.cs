@@ -68,7 +68,7 @@ public class CapabilityPublicationTests
     {
         var model = DeliveryModelMapper.ToReadModel(Svc("cert-x"));
 
-        Assert.Equal(["cert-x"], model.RequiredCapabilities);
+        Assert.Equal(["cert-x"], Assert.Single(model.Roles).RequiredCapabilities);
     }
 
     [Fact]
@@ -76,8 +76,8 @@ public class CapabilityPublicationTests
     {
         var model = DeliveryModelMapper.ToReadModel(Svc());
 
-        Assert.NotNull(model.RequiredCapabilities);
-        Assert.Empty(model.RequiredCapabilities);
+        Assert.NotNull(Assert.Single(model.Roles).RequiredCapabilities);
+        Assert.Empty(Assert.Single(model.Roles).RequiredCapabilities);
     }
 
     [Fact]
@@ -96,8 +96,8 @@ public class CapabilityPublicationTests
         var service = DeliveryModelMapper.ToReadModel(Svc("cert-x"));
 
         var derived = published
-            .Where(r => r.Type == service.ResourceType
-                && service.RequiredCapabilities.All(required => r.Capabilities.Contains(required)))
+            .Where(r => r.Type == Assert.Single(service.Roles).ResourceType
+                && Assert.Single(service.Roles).RequiredCapabilities.All(required => r.Capabilities.Contains(required)))
             .Select(r => r.DisplayName)
             .ToList();
 
@@ -122,8 +122,9 @@ public class CapabilityPublicationTests
 
         var derived = resources
             .Select(r => DeliveryModelMapper.ToReadModel(r, "Europe/London"))
-            .Where(r => r.Type == publishedService.ResourceType
-                && publishedService.RequiredCapabilities.All(required => r.Capabilities.Contains(required)))
+            .Where(r => r.Type == Assert.Single(publishedService.Roles).ResourceType
+                && Assert.Single(publishedService.Roles).RequiredCapabilities
+                    .All(required => r.Capabilities.Contains(required)))
             .Select(r => r.DisplayName)
             .OrderBy(name => name)
             .ToList();

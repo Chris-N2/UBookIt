@@ -37,17 +37,17 @@
 
 ## 6. Management API
 
-- [ ] 6.1 Preview request takes a list of roles; response carries a chain per role, each identifying its role, in the order supplied.
-- [ ] 6.2 Preview accepts duplicate types and reports each role independently (design D5) — an editor fixing that fault needs to see what each role resolves to.
-- [ ] 6.3 Reject an empty role list; a malformed key identifies which role it came from.
-- [ ] 6.4 Service CRUD accepts and returns several roles; the duplicate-type failure reaches the editor with its stable code.
-- [ ] 6.5 Tests: a chain per role; duplicate types previewed but not saved; per-role failure attribution; the authorization guarantee asserted the way this repo asserts it.
+- [x] 6.1 Preview request takes a list of roles; response carries a chain per role, each identifying its role, in the order supplied.
+- [x] 6.2 Preview accepts duplicate types and reports each role independently (design D5) — an editor fixing that fault needs to see what each role resolves to.
+- [x] 6.3 Reject an empty role list; a malformed key identifies which role it came from.
+- [x] 6.4 Service CRUD accepts and returns several roles; the duplicate-type failure reaches the editor with its stable code.
+- [x] 6.5 Tests: a chain per role; duplicate types previewed but not saved; per-role failure attribution; the authorization guarantee asserted the way this repo asserts it.
 
 ## 7. Delivery API
 
-- [ ] 7.1 Service read model publishes every role as a collection, deterministically ordered, including for a single-role service.
-- [ ] 7.2 Service placement response carries the resolved resources as a collection (**BREAKING**, unpublished); `POST /bookings` unchanged in route, request, response and semantics.
-- [ ] 7.3 Tests: multi-role read; single-role read still returns a collection of one; both resolved resources reported; direct placement byte-for-byte unchanged.
+- [x] 7.1 Service read model publishes every role as a collection, deterministically ordered, including for a single-role service.
+- [x] 7.2 Service placement response carries the resolved resources as a collection (**BREAKING**, unpublished); `POST /bookings` unchanged in route, request, response and semantics.
+- [x] 7.3 Tests: multi-role read; single-role read still returns a collection of one; both resolved resources reported; direct placement byte-for-byte unchanged.
 
 ## 8. Backoffice client
 

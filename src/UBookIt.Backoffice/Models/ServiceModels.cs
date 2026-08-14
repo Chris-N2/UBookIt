@@ -72,40 +72,83 @@ public class PagedServicesModel
 }
 
 /// <summary>
-/// A service configuration to report on: a role, and the duration it would be
-/// booked for. Deliberately not a <see cref="ServiceRequestModel"/> — this
+/// A service configuration to report on: its roles, and the duration they would
+/// be booked for. Deliberately not a <see cref="ServiceRequestModel"/> — this
 /// describes a service being <em>edited</em>, which need not be a valid service
 /// and in particular need not have a name (design D2). A role count is not
 /// carried either: it is fixed at 1 in v1 and plays no part in resolution.
 /// </summary>
 public class ServicePreviewRequestModel
 {
-    public string ResourceType { get; set; } = string.Empty;
-
-    /// <summary>Omitted or empty matches every resource of the type.</summary>
-    public List<string> RequiredCapabilities { get; set; } = [];
+    /// <summary>
+    /// The roles to report on, in the order they appear on screen. Duplicated
+    /// resource types are accepted here even though saving such a service is
+    /// rejected: previewing one is how an editor sees what each role resolves to
+    /// while correcting it.
+    /// </summary>
+    public List<ServicePreviewRoleModel> Roles { get; set; } = [];
 
     public ServiceDurationModel? Duration { get; set; }
 }
 
+/// <summary>One role of a configuration being previewed.</summary>
+public class ServicePreviewRoleModel
+{
+    public string ResourceType { get; set; } = string.Empty;
+
+    /// <summary>Omitted or empty matches every resource of the type.</summary>
+    public List<string> RequiredCapabilities { get; set; } = [];
+}
+
 /// <summary>
-/// The resolution chain for a configuration: three successive filters, each a
-/// subset of the one before it, plus what the last of them excluded.
+/// What a configuration resolves to: one chain per role.
+/// <para>
+/// It describes configuration only. The chains say which resources are
+/// <em>able</em> to provide the service, never that the service is available:
+/// opening hours, lead time, booking horizon, existing bookings and whether the
+/// roles' start grids ever coincide are not evaluated here (design D5).
+/// </para>
+/// </summary>
+public class ServicePreviewResponseModel
+{
+    /// <summary>
+    /// One chain per role, in the order the roles were supplied.
+    /// <para>
+    /// Never one combined chain: the roles constrain different pools — every
+    /// role names a distinct resource type in a saveable service — so a merged
+    /// count would describe no filter that resolution applies. Because the pools
+    /// are disjoint, each chain is independently true: no role can consume a
+    /// resource another role's chain counted (design D5).
+    /// </para>
+    /// </summary>
+    public List<ServiceRoleChainModel> Roles { get; set; } = [];
+}
+
+/// <summary>
+/// The resolution chain for one role: three successive filters, each a subset
+/// of the one before it, plus what the last of them excluded — and the role the
+/// chain describes.
 /// <para>
 /// Reported as a chain rather than a surviving count because a single number
 /// cannot distinguish a mistyped resource type from an over-narrow capability
 /// set from a duration no resource can provide — three faults corrected in three
 /// different places.
 /// </para>
-/// <para>
-/// It describes configuration only. <see cref="CanProvide"/> says which
-/// resources are <em>able</em> to provide the service, never that the service is
-/// available: opening hours, lead time, booking horizon and existing bookings
-/// are not evaluated here (design D5).
-/// </para>
 /// </summary>
-public class ServicePreviewResponseModel
+public class ServiceRoleChainModel
 {
+    /// <summary>
+    /// The role this chain is about, echoed so the report can be phrased from
+    /// the answer rather than from a form that may already have moved on.
+    /// </summary>
+    public string ResourceType { get; set; } = string.Empty;
+
+    /// <summary>
+    /// The capabilities this role required. Empty means the role constrains by
+    /// type alone, which a consumer must not describe as a capability filter.
+    /// </summary>
+    public List<string> RequiredCapabilities { get; set; } = [];
+
     /// <summary>Every resource whose type key is the role's.</summary>
     public ServicePreviewStageModel OfType { get; set; } = new();
 

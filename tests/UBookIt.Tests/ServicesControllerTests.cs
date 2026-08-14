@@ -279,6 +279,59 @@ public class ServicesControllerTests
     }
 
     [Fact]
+    public async Task Several_roles_round_trip_through_the_api()
+    {
+        var (controller, _) = Wire();
+
+        var request = ValidRequest();
+        request.Roles =
+        [
+            new ServiceRoleModel { ResourceType = "room", RequiredCapabilities = ["projector"], Count = 1 },
+            new ServiceRoleModel { ResourceType = "therapist", RequiredCapabilities = ["cert-x"], Count = 1 },
+        ];
+
+        var created = Ok<ServiceResponseModel>(await controller.CreateService(request));
+        var fetched = Ok<ServiceResponseModel>(await controller.GetService(created.Id));
+
+        Assert.Equal(["room", "therapist"], fetched.Roles.Select(r => r.ResourceType));
+        Assert.Equal(["projector"], fetched.Roles[0].RequiredCapabilities);
+        Assert.Equal(["cert-x"], fetched.Roles[1].RequiredCapabilities);
+        Assert.All(fetched.Roles, r => Assert.Equal(1, r.Count));
+    }
+
+    [Fact]
+    public async Task Two_roles_of_one_type_are_rejected_with_their_own_code_against_the_offending_row()
+    {
+        var (controller, store) = Wire();
+
+        var request = ValidRequest();
+        request.Roles =
+        [
+            new ServiceRoleModel { ResourceType = "therapist", RequiredCapabilities = ["cert-x"], Count = 1 },
+            new ServiceRoleModel { ResourceType = "therapist", Count = 1 },
+        ];
+
+        var result = await controller.CreateService(request);
+        var (status, codes) = Problem(result);
+
+        Assert.Equal(400, status);
+        Assert.Contains(FailureCodes.ServiceRoleDuplicateType, codes);
+
+        // Distinguishable from a malformed key, because the two are corrected
+        // differently — and attributed to the row that repeated the type.
+        Assert.DoesNotContain(FailureCodes.TypeKeyInvalid, codes);
+
+        var problem = Assert.IsType<ProblemDetails>(Assert.IsType<ObjectResult>(result).Value);
+        var errors = Assert.IsType<UBookIt.Backoffice.Models.ApiErrorModel[]>(problem.Extensions["errors"]);
+        var duplicate = Assert.Single(errors, e => e.Code == FailureCodes.ServiceRoleDuplicateType);
+
+        Assert.Equal("Roles[1].ResourceType", duplicate.Field);
+        Assert.Contains("therapist", duplicate.Message, StringComparison.Ordinal);
+
+        Assert.Equal(0, (await store.ListAsync(0, 50)).Total);
+    }
+
+    [Fact]
     public void Controller_inherits_the_authorized_backoffice_base()
     {
         Assert.True(typeof(UBookItBackofficeApiControllerBase).IsAssignableFrom(typeof(ServicesController)));
