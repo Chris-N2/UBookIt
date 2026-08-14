@@ -38,13 +38,13 @@
 
 ## 5. Backoffice client
 
-- [ ] 5.1 Start the TestSite against the new build and regenerate the client (`npm run generate-client` reads the live swagger — the site must be running).
-- [ ] 5.2 Add a Capabilities section to the resource workspace editor: add/remove keys, offering those already in use, permitting a new one.
-- [ ] 5.3 Add required-capability editing to the service requirement row, offering keys already in use, permitting a new one, and permitting removal of all of them.
-- [ ] 5.4 Associate `capability-key-invalid` failures with the capability control in both editors, with no data loss from the form.
-- [ ] 5.5 Add the matching-resource readout to the requirement row, refreshing on type or capability change, informational and non-blocking, working for a service that has never been saved.
-- [ ] 5.6 Word the readout to claim capability matching only — "N rooms have these capabilities", never "can provide this service" (design D8). Remove the now-redundant type-specific "no resources have this type" hint, which the readout subsumes.
-- [ ] 5.7 Accessibility for the new controls: labelled inputs, programmatically associated errors, keyboard operability with visible focus, `uui-*` components, and a readout that is announced when it changes rather than only visible.
+- [x] 5.1 Start the TestSite against the new build and regenerate the client (`npm run generate-client` reads the live swagger — the site must be running).
+- [x] 5.2 Add a Capabilities section to the resource workspace editor: add/remove keys, offering those already in use, permitting a new one.
+- [x] 5.3 Add required-capability editing to the service requirement row, offering keys already in use, permitting a new one, and permitting removal of all of them.
+- [x] 5.4 Associate `capability-key-invalid` failures with the capability control in both editors, with no data loss from the form.
+- [x] 5.5 Add the matching-resource readout to the requirement row, refreshing on type or capability change, informational and non-blocking, working for a service that has never been saved.
+- [x] 5.6 Word the readout to claim capability matching only — "N rooms have these capabilities", never "can provide this service" (design D8). Remove the now-redundant type-specific "no resources have this type" hint, which the readout subsumes.
+- [x] 5.7 Accessibility for the new controls: labelled inputs, programmatically associated errors, keyboard operability with visible focus, `uui-*` components, and a readout that is announced when it changes rather than only visible.
 
 ## 6. Delivery API
 
@@ -56,14 +56,14 @@
 ## 7. Verification
 
 - [ ] 7.1 Full solution build with `--no-incremental` (stop the TestSite first — a running site breaks the build with copy locks). Only the known NU1903 transitive advisories are acceptable; every compiler, analyzer and TypeScript warning must be fixed.
-- [ ] 7.2 Full unit and integration test run, all green.
+- [x] 7.2 Full unit and integration test run, all green.
 - [ ] 7.3 Live verification in the running backoffice: tag a resource, require that capability on a service, watch the readout change, and confirm the readout's wording. Assert control associations by reading the shadow DOM via `javascript_tool`, not from screenshots.
-- [ ] 7.4 Live verification of both delivery reads through the scratchpad API script, reading raw `.Content` rather than `Invoke-RestMethod` output.
-- [ ] 7.5 End-to-end: book a service whose role requires a capability, confirm it places on an eligible resource; then require a capability nothing carries and confirm the failure is the expected code, not an exception.
+- [x] 7.4 Live verification of both delivery reads through the scratchpad API script, reading raw `.Content` rather than `Invoke-RestMethod` output.
+- [x] 7.5 End-to-end: book a service whose role requires a capability, confirm it places on an eligible resource; then require a capability nothing carries and confirm the failure is the expected code, not an exception.
 - [ ] 7.6 Stop the TestSite and check port 44348 for orphaned processes.
 
 ## 8. Handover
 
-- [ ] 8.1 Record ⑧a `duration-exclusion-diagnostic` in the deferred-obligations memory **with its provenance** — it closes a ⑦-1 hazard, not leftover ⑧ scope — including the verified seam (three scalar columns on `uBookItResource`, additive parameters and response field, reuses `TryResolveAgainst`).
-- [ ] 8.2 Record that ⑦-2's design D9 obligation is discharged by publication rather than deferred again, so ⑨ does not reopen it.
+- [x] 8.1 Record ⑧a `duration-exclusion-diagnostic` in the deferred-obligations memory **with its provenance** — it closes a ⑦-1 hazard, not leftover ⑧ scope — including the verified seam (three scalar columns on `uBookItResource`, additive parameters and response field, reuses `TryResolveAgainst`).
+- [x] 8.2 Record that ⑦-2's design D9 obligation is discharged by publication rather than deferred again, so ⑨ does not reopen it.
 - [ ] 8.3 At spec-sync time, grep the sibling main specs for forward-looking sentences this change falsifies — the "eligibility by type key alone" sentence is handled in the delta, but check for others (this has found something on each of the last two changes).

@@ -62,7 +62,16 @@ addressed head-on in this change's delta.
 Both `Resource` and `ServiceRole` carry a `CapabilitySet`: a private
 constructor plus validating factories, following `ServiceDuration`'s precedent
 from ⑦-1. It normalizes (deduplicates, orders), validates every key, and owns
-the subset test as `Satisfies`.
+the subset test.
+
+*Named `IsSatisfiedBy`, not `Satisfies`* (settled at implementation). It reads
+in the direction it is called —
+`role.RequiredCapabilities.IsSatisfiedBy(resource.Capabilities)` — whereas
+`Satisfies` is symmetric enough to be called the wrong way round and still
+compile. The wrong way round is silently wrong in the dangerous direction: it
+admits under-qualified resources whenever the requirement is the larger set. A
+mutation test confirms the swapped implementation is caught, but the name should
+not invite the mistake that the test then has to catch.
 
 *Alternative considered — a bare `IReadOnlySet<string>` member.* Rejected on a
 concrete defect, not on taste: `ServiceRole` is a `record`, and a set member
@@ -199,6 +208,17 @@ separate rather than one reaching across the other.
 The preview is a `GET` with a repeated `capability` query parameter — it is a
 read with no side effects, the parameter count is small, and a repeated
 parameter generates cleanly into the TypeScript client.
+
+Two implementation consequences worth recording. First, the shared capability
+control renders its own validation message rather than being pointed at an id in
+the host editor: `aria-describedby` does not cross a shadow boundary, so a
+host-owned id would be a dangling reference — present in the markup, resolving
+to nothing, and indistinguishable from a working association in a screenshot.
+Second, the readout distinguishes *unknown* from *zero*. An empty type or a
+failed lookup renders as silence, because zero is the number that tells an
+editor their requirement is broken, and reporting it off a failed request would
+send someone to correct a configuration that is fine. Same reasoning as
+`_knownTypesLoaded` in the ⑦a editor, with more riding on it.
 
 ### D7 — The capability vocabulary is derived from use, not managed
 
