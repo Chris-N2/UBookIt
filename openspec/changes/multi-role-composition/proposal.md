@@ -113,9 +113,24 @@ wholesale requirement replacement makes a removal look like nothing at all.
   actually holds: one attempt in flight at a time, deterministic lock order,
   and all locks released together.
 
+- **"v1 behaviour SHALL enforce exactly one claim per booking"** (`bookings`,
+  "Booking shape") — lifted, and the point of the change. Its companion clause,
+  *"the model SHALL NOT structurally prevent multiple claims"*, goes with it:
+  it described a shape the model was holding open for later, and later is now.
+  What it guaranteed is asserted directly by the scenario "Claims collection is
+  plural by design", which is carried forward verbatim.
+
 Everything else in the requirements this change replaces is carried forward,
 including scenarios whose titles are reworded for the plural shape
 (`…the pool` → `…the pools`, `…outside the pool` → `…outside every pool`).
+
+Two scenarios are **narrowed** rather than dropped, each with its multi-role
+counterpart stated alongside: `bookings`' "All candidates busy reports conflict"
+gains the condition that those candidates would otherwise have accepted the
+request, and `service-booking`'s "A mixed outcome favours conflict" is scoped to
+a single-role service. The cases they no longer cover are governed by the
+combination-granularity classification rule and its own scenarios, not left
+unhandled.
 
 ## Capabilities
 

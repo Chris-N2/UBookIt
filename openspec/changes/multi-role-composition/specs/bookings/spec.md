@@ -1,5 +1,24 @@
 ## MODIFIED Requirements
 
+### Requirement: Booking shape
+A booking SHALL have a `Guid` id, exactly one continuous interval `[start, end)` held as UTC instants plus the IANA zone id it was placed against, a creation timestamp (UTC), a booker, a status, and a collection of 1..N resource claims. Each `ResourceClaim` SHALL bind exactly one resource to the booking's interval.
+
+A booking SHALL carry **one claim per role of the service it was placed for**, all over that one interval; direct placement, which names a single resource, SHALL continue to produce exactly one claim. The earlier rule that v1 behaviour enforces exactly one claim per booking is **lifted**: the model was always plural, and multi-role composition is what makes the plural case reachable.
+
+A booking SHALL NOT claim the same resource twice.
+
+#### Scenario: Valid single-claim booking
+- **WHEN** a booking is placed for one room resource for a valid interval
+- **THEN** the booking has exactly one resource claim, referencing that resource, covering the booking interval
+
+#### Scenario: Claims collection is plural by design
+- **WHEN** the domain model's public surface is inspected
+- **THEN** a booking exposes a collection of resource claims (not a single resource reference)
+
+#### Scenario: A service booking carries one claim per role
+- **WHEN** a service requiring a `room` and a `therapist` is booked
+- **THEN** the booking carries two claims, one for each, both covering the booking's single interval
+
 ### Requirement: Atomic placement contract
 The booking store port (`IBookingStore`) SHALL define placement as atomic with respect to conflict detection: between the conflict check and the persistence of a new booking's claims, no other placement for an overlapping interval on **any** of the booking's claimed resources may succeed. Under concurrent placement of conflicting requests, exactly one SHALL succeed and the others SHALL fail with code `conflict`.
 

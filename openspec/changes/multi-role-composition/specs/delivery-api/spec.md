@@ -1,5 +1,48 @@
 ## MODIFIED Requirements
 
+### Requirement: Service bookable-start read
+The delivery API SHALL expose a bookable-start query for a service over an inclusive `[from, to]` date range at `GET /services/{id}/bookable-starts`, delegating to the Core service availability query. Each entry SHALL carry the start instant as ISO-8601 UTC together with the lengths bookable at that start, expressed as a list of arithmetic runs, each `{ minDurationMinutes, maxDurationMinutes, stepMinutes }` in whole minutes. The response SHALL carry the site time-zone id once at the top level, consistent with the other availability responses.
+
+The query SHALL NOT take a requested duration. The response SHALL NOT collapse a start's runs into a single minimum/maximum pair, because a candidate pool of differing granularities and minimums does not offer a contiguous band of lengths and a collapsed pair would advertise unbookable lengths. The response SHALL NOT identify which resource backs any start or run.
+
+Within a role, a run arises from one contributing candidate. Across roles it arises from **intersecting** the runs of one candidate per role, so a run in a multi-role service's response is not attributable to any single candidate — and after subset elimination a candidate whose lengths another run already offers contributes no run at all. The response therefore SHALL NOT be read as one run per candidate.
+
+A range wider than the configured maximum SHALL yield `date-range-too-large`; a `from` after `to` SHALL yield `date-range-invalid`; an unknown service SHALL yield `service-not-found`. The endpoint SHALL be anonymous.
+
+The existing per-resource `GET /resources/{id}/bookable-starts` endpoint SHALL remain unchanged in route, shape, and semantics.
+
+#### Scenario: Service bookable-start read
+- **WHEN** bookable starts are requested for a service over a valid date range
+- **THEN** the response carries an ordered list of entries, each with an ISO-8601 UTC start instant and one or more length runs in whole minutes, plus the site zone id
+
+#### Scenario: Heterogeneous pool yields multiple runs
+- **WHEN** a start of a single-role service is backed by candidates of differing granularity, none of whose lengths another already offers
+- **THEN** that entry carries one run per contributing candidate, rather than a single widened minimum/maximum pair
+
+#### Scenario: Composite runs are not per candidate
+- **WHEN** a multi-role service's bookable starts are read
+- **THEN** each run denotes the lengths every role can provide, and no run corresponds to a single candidate's own grid
+
+#### Scenario: Response names no resource
+- **WHEN** a service bookable-start response body is inspected
+- **THEN** no resource id appears anywhere in it
+
+#### Scenario: Over-wide range is rejected
+- **WHEN** a service bookable-start query requests a range wider than the configured maximum
+- **THEN** the response is 400 problem details carrying the `date-range-too-large` code
+
+#### Scenario: Inverted range is rejected
+- **WHEN** a service bookable-start query is requested with `from` after `to`
+- **THEN** the response is 400 problem details carrying the `date-range-invalid` code
+
+#### Scenario: Unknown service is rejected
+- **WHEN** a service bookable-start query names a service id that does not exist
+- **THEN** the response is 404 problem details carrying the `service-not-found` code
+
+#### Scenario: The per-resource endpoint is untouched
+- **WHEN** `GET /resources/{id}/bookable-starts` is requested
+- **THEN** its route, response shape, and semantics are exactly as before this change
+
 ### Requirement: Service read model
 The delivery API SHALL expose a public service read model over `GET /services` (paged) and `GET /services/{id}`. The read model SHALL carry what a consumer needs to present and drive a service booking: id, name, the duration specification (its kind, and whichever bounds apply), and **every role**, each with its resource type key and its required capability keys. It SHALL NOT expose management-only or internal structure. Roles SHALL be returned in a deterministic order, and required capability keys SHALL be returned in a deterministic order; a role requiring none SHALL return an empty collection rather than a null or an omitted member. An unknown id SHALL yield a 404 problem-details response carrying `service-not-found`. The endpoints SHALL be anonymous, consistent with the delivery API's auth stance.
 

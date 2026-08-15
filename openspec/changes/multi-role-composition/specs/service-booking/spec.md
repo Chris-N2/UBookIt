@@ -1,5 +1,50 @@
 ## MODIFIED Requirements
 
+### Requirement: All candidates failing reports one of two distinct outcomes
+When every attempt fails, service placement SHALL report which kind of failure occurred rather than echoing the last attempt's failures, which would be arbitrary.
+
+The unit of an attempt is a **combination** — one candidate per role — because placement accumulates every claimed resource's rules before the conflict check. For a single-role service a combination is one candidate, and everything below reads as it always did.
+
+When any attempt failed on `conflict`, placement SHALL fail with `conflict`: the request described a genuinely bookable slot that was taken concurrently or is already occupied, so retrying may succeed. An attempt that was **not made** because the candidates were already claimed SHALL be classified as the attempt would have been — which requires every role to have a candidate whose own rules admit the request, since otherwise no combination could have reached the conflict check at all.
+
+When every attempt rejected the request *deterministically* — the refusal is a property of the request against a resource's configuration, such as a start off its grid, outside its open hours, inside its lead time, or beyond its horizon — placement SHALL fail with the stable code `service-unavailable`. Retrying is pointless. A role that has no rule-admitting candidate makes the whole request deterministic in this sense, however free the other roles are.
+
+The deterministic refusals SHALL be recognised explicitly rather than inferred from "not `conflict`". A refusal that is neither a conflict nor a known deterministic rule — a candidate deleted between resolution and its attempt, for instance — is transient, and reporting it as `service-unavailable` would both tell the caller not to retry when retrying would succeed and pollute the drift signal.
+
+`service-unavailable` SHALL be treated as a drift signal: a client that placed only starts and lengths taken from the service availability query cannot legitimately provoke it, so its occurrence from a conforming client means availability and placement disagree. Composite availability makes this more load-bearing rather than less, since a multi-role service offers strictly fewer starts than any of its roles alone.
+
+#### Scenario: Concurrent taking reports conflict
+- **WHEN** every candidate is free at query time but all are taken before placement completes
+- **THEN** placement fails with code `conflict`
+
+#### Scenario: All candidates busy reports conflict
+- **WHEN** a placement targets a start where every candidate already has a blocking claim, and each of them would otherwise have accepted the request
+- **THEN** placement fails with code `conflict`, not `service-unavailable`
+
+#### Scenario: Deterministic rejection reports service-unavailable
+- **WHEN** a placement targets a start that is outside every candidate's open hours
+- **THEN** placement fails with code `service-unavailable`
+
+#### Scenario: A role that can never be filled makes the outcome deterministic
+- **WHEN** one role's candidates are merely busy and another role has no candidate whose own rules admit the request
+- **THEN** placement fails with code `service-unavailable`, because no combination could have reached the conflict check
+
+#### Scenario: A site misconfiguration is reported as itself
+- **WHEN** every attempt fails because the configured site time zone is invalid, including when no attempt ran because every candidate was already claimed
+- **THEN** placement fails with `time-zone-invalid`, not with either all-fail code — it is site configuration rather than a race or a per-candidate refusal
+
+#### Scenario: A transient refusal is not the deterministic code
+- **WHEN** the only candidate is deleted between resolution and its placement attempt, so the attempt fails with `resource-not-found`
+- **THEN** placement fails with code `conflict`, not `service-unavailable`, because a retry may succeed
+
+#### Scenario: A mixed outcome favours conflict
+- **WHEN** one candidate of a single-role service rejects a start as off-grid and another rejects it as conflicting
+- **THEN** placement fails with code `conflict`, because retrying may still succeed
+
+#### Scenario: Availability-driven requests do not provoke the deterministic code
+- **WHEN** a placement uses a start and a length taken verbatim from the service availability query for the same service, and no concurrent booking intervenes
+- **THEN** placement succeeds, and `service-unavailable` is not returned
+
 ### Requirement: Union availability over a candidate pool
 `UBookIt.Core` SHALL expose a service availability query returning, for an inclusive `[from, to]` date range, every start at which the service can be booked, together with the lengths bookable at that start. The query SHALL NOT take a requested duration.
 

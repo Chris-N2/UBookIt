@@ -161,11 +161,13 @@ Problem-details responses from the delivery API SHALL populate the RFC 7807 `typ
 - **THEN** that response also carries a non-empty `type` member alongside its `invalid-request` error entries
 
 ### Requirement: Service read model
-The delivery API SHALL expose a public service read model over `GET /services` (paged) and `GET /services/{id}`. The read model SHALL carry what a consumer needs to present and drive a service booking: id, name, the duration specification (its kind, and whichever bounds apply), the role's resource type key, and the role's required capability keys. It SHALL NOT expose management-only or internal structure. Required capability keys SHALL be returned in a deterministic order, and a role requiring none SHALL return an empty collection rather than a null or an omitted member. An unknown id SHALL yield a 404 problem-details response carrying `service-not-found`. The endpoints SHALL be anonymous, consistent with the delivery API's auth stance.
+The delivery API SHALL expose a public service read model over `GET /services` (paged) and `GET /services/{id}`. The read model SHALL carry what a consumer needs to present and drive a service booking: id, name, the duration specification (its kind, and whichever bounds apply), and **every role**, each with its resource type key and its required capability keys. It SHALL NOT expose management-only or internal structure. Roles SHALL be returned in a deterministic order, and required capability keys SHALL be returned in a deterministic order; a role requiring none SHALL return an empty collection rather than a null or an omitted member. An unknown id SHALL yield a 404 problem-details response carrying `service-not-found`. The endpoints SHALL be anonymous, consistent with the delivery API's auth stance.
+
+Roles SHALL be published as a collection even for a single-role service, so a consumer written against this contract does not need changing when a service gains a role.
 
 The duration specification SHALL be rendered so a consumer can distinguish a fixed length from a booker-chosen range without re-deriving the rule from nullable fields: the kind SHALL be explicit, and lengths SHALL be whole minutes.
 
-Publishing the role's required capabilities alongside each resource's capabilities SHALL make a service's candidate pool computable by an anonymous consumer, which is what keeps the `resource-not-eligible` failure free of any disclosure the public reads do not already make.
+Publishing every role's required capabilities alongside each resource's capabilities SHALL make a service's candidate pools computable by an anonymous consumer, which is what keeps the `resource-not-eligible` failure free of any disclosure the public reads do not already make.
 
 #### Scenario: List returns a page and total
 - **WHEN** `GET /services` is requested with paging parameters
@@ -173,15 +175,23 @@ Publishing the role's required capabilities alongside each resource's capabiliti
 
 #### Scenario: Get by id returns the public model
 - **WHEN** `GET /services/{id}` is requested for an existing service
-- **THEN** the response carries its id, name, duration specification, role resource type key, and role required capabilities
+- **THEN** the response carries its id, name, duration specification, and every role with its resource type key and required capabilities
+
+#### Scenario: A multi-role service publishes every role
+- **WHEN** a service requiring a `room` and a `therapist` is read
+- **THEN** the response carries both roles in a deterministic order
+
+#### Scenario: A single-role service still publishes a collection
+- **WHEN** a service with one role is read
+- **THEN** its roles are carried as a collection of one, not as a single inline role
 
 #### Scenario: A role requiring no capabilities returns an empty collection
-- **WHEN** a service whose role requires no capabilities is read
-- **THEN** the response carries an empty required-capability collection, not a null or absent member
+- **WHEN** a service one of whose roles requires no capabilities is read
+- **THEN** that role carries an empty required-capability collection, not a null or absent member
 
-#### Scenario: A consumer can compute the candidate pool
+#### Scenario: A consumer can compute the candidate pools
 - **WHEN** a consumer reads a service and the resource list
-- **THEN** the resources whose type matches and whose capabilities include every required capability are identifiable without any further request
+- **THEN** for each role, the resources whose type matches and whose capabilities include every required capability are identifiable without any further request
 
 #### Scenario: Fixed and variable durations are distinguishable
 - **WHEN** a fixed-duration service and an unbounded variable-duration service are both read
@@ -200,6 +210,8 @@ The delivery API SHALL expose a bookable-start query for a service over an inclu
 
 The query SHALL NOT take a requested duration. The response SHALL NOT collapse a start's runs into a single minimum/maximum pair, because a candidate pool of differing granularities and minimums does not offer a contiguous band of lengths and a collapsed pair would advertise unbookable lengths. The response SHALL NOT identify which resource backs any start or run.
 
+Within a role, a run arises from one contributing candidate. Across roles it arises from **intersecting** the runs of one candidate per role, so a run in a multi-role service's response is not attributable to any single candidate — and after subset elimination a candidate whose lengths another run already offers contributes no run at all. The response therefore SHALL NOT be read as one run per candidate.
+
 A range wider than the configured maximum SHALL yield `date-range-too-large`; a `from` after `to` SHALL yield `date-range-invalid`; an unknown service SHALL yield `service-not-found`. The endpoint SHALL be anonymous.
 
 The existing per-resource `GET /resources/{id}/bookable-starts` endpoint SHALL remain unchanged in route, shape, and semantics.
@@ -209,8 +221,12 @@ The existing per-resource `GET /resources/{id}/bookable-starts` endpoint SHALL r
 - **THEN** the response carries an ordered list of entries, each with an ISO-8601 UTC start instant and one or more length runs in whole minutes, plus the site zone id
 
 #### Scenario: Heterogeneous pool yields multiple runs
-- **WHEN** a start is backed by candidates of differing granularity
+- **WHEN** a start of a single-role service is backed by candidates of differing granularity, none of whose lengths another already offers
 - **THEN** that entry carries one run per contributing candidate, rather than a single widened minimum/maximum pair
+
+#### Scenario: Composite runs are not per candidate
+- **WHEN** a multi-role service's bookable starts are read
+- **THEN** each run denotes the lengths every role can provide, and no run corresponds to a single candidate's own grid
 
 #### Scenario: Response names no resource
 - **WHEN** a service bookable-start response body is inspected
@@ -237,17 +253,23 @@ The delivery API SHALL place service bookings over `POST /services/{id}/bookings
 
 Service placement SHALL be a distinct endpoint with its own request model rather than optional service fields added to the direct placement request model. A single model carrying a resource id, a service id, and a preferred resource id would admit combinations with no meaning and force every consumer to re-derive which are valid.
 
-On success the response SHALL use the same placement response shape as direct placement, whose resource id SHALL carry the resource the service resolved to — the booker is told which resource they got.
+**BREAKING (unpublished):** on success the response SHALL carry the resources the service resolved to as a **collection**, one per role, rather than a single resource id. A service may claim several resources for one booking, and a single-valued member could only report one of them or none. The collection SHALL be present and of length one for a single-role service. Each entry SHALL carry at least the resource id, so a booker is told everything they got.
 
-The existing `POST /bookings` endpoint SHALL remain unchanged in route, request model, and semantics.
+A preferred resource id SHALL constrain only the role whose pool contains it, and SHALL be rejected with `resource-not-eligible` when it is in no role's pool.
+
+The existing `POST /bookings` endpoint SHALL remain unchanged in route, request model, response model, and semantics: direct placement claims exactly one resource and continues to report it as it always has.
 
 #### Scenario: Valid service placement succeeds
 - **WHEN** a valid service placement is posted for a start and length taken from the service availability response
-- **THEN** the response carries the new booking id, a `Confirmed` status, the resolved resource id, and the booked interval
+- **THEN** the response carries the new booking id, a `Confirmed` status, the resolved resources, and the booked interval
 
-#### Scenario: The resolved resource is reported
-- **WHEN** a service placement resolves to one of several candidates
-- **THEN** the response's resource id is the resource actually booked
+#### Scenario: The resolved resources are reported
+- **WHEN** a service requiring a `room` and a `therapist` is placed
+- **THEN** the response reports both resolved resources
+
+#### Scenario: A single-role placement reports a collection of one
+- **WHEN** a single-role service is placed
+- **THEN** the response carries exactly one resolved resource, in the collection member
 
 #### Scenario: Requested length is required
 - **WHEN** a service placement omits the requested length
@@ -259,10 +281,10 @@ The existing `POST /bookings` endpoint SHALL remain unchanged in route, request 
 
 #### Scenario: Preferred resource is optional
 - **WHEN** a service placement omits the preferred resource id
-- **THEN** placement proceeds over the full candidate pool in its deterministic order
+- **THEN** placement proceeds over every role's full candidate pool in its deterministic order
 
 #### Scenario: Ineligible preferred resource is rejected
-- **WHEN** a service placement names a preferred resource id outside the service's candidate pool
+- **WHEN** a service placement names a preferred resource id outside every role's candidate pool
 - **THEN** the response is 400 problem details carrying `resource-not-eligible`, and no booking is placed
 
 #### Scenario: Unknown service is rejected
@@ -273,9 +295,9 @@ The existing `POST /bookings` endpoint SHALL remain unchanged in route, request 
 - **WHEN** the service placement request model's public shape is inspected
 - **THEN** it exposes name, email, and optional phone, but no member key field
 
-#### Scenario: Direct placement is untouched
-- **WHEN** `POST /bookings` is posted with the direct placement model
-- **THEN** its route, request model, and behaviour are exactly as before this change
+#### Scenario: Direct placement is unchanged
+- **WHEN** `POST /bookings` is used to book a resource directly
+- **THEN** its request and response are exactly as before, carrying a single resource id
 
 ### Requirement: Boundary inputs fail as validation, never as an exception
 No delivery endpoint SHALL answer with an unhandled exception for any date, instant, or duration a caller can express in the request's own types. An input at or near the limit of what a date or instant can represent SHALL be rejected by the domain as a structured failure and rendered as problem details on the same terms as any other validation failure — `date-range-invalid` for a query range that cannot be walked, `interval-invalid` for a placement interval or open-hours window that cannot be represented. Both are already 400 under the failure mapping, so no new code and no new status is introduced.

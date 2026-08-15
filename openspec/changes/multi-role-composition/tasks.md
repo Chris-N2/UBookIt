@@ -71,4 +71,4 @@
 
 - [x] 10.1 Record that ⑨-1a owns the grid-misalignment diagnostic, with the exact condition (`gcd(step₁, step₂)` divides the offset between interval starts) and the reason deferring is safe rather than merely tolerable — ⑧a's D5 means the summary is correctly silent, not falsified.
 - [x] 10.2 Record what ⑨-2 inherits: same-type roles, matching in **both** availability and placement, and `Count > 1`. Note that the overlapping-pool fixtures already exist and their assertions flip from rejection to assignment.
-- [ ] 10.3 At spec-sync time, run the guarantee diff `CLAUDE.md` requires for every MODIFIED requirement, and the outward grep for sibling specs this change falsifies. Both have found something on every recent change.
+- [x] 10.3 At spec-sync time, run the guarantee diff `CLAUDE.md` requires for every MODIFIED requirement, and the outward grep for sibling specs this change falsifies. Both have found something on every recent change.
