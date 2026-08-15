@@ -306,17 +306,31 @@ public static class TestData
     /// </summary>
     public static ServiceBookingService ServiceBooking(
         InMemoryServiceStore services, InMemoryResourceStore resources, DateTimeOffset? nowUtc = null)
+        => ServiceBookingWith(services, resources, nowUtc).Services;
+
+    /// <summary>
+    /// The same graph, with the collaborators a test needs in order to put
+    /// bookings on a resource's calendar — for the properties that are about what
+    /// does <em>not</em> change when it fills up.
+    /// </summary>
+    public static (ServiceBookingService Services, BookingService Bookings, InMemoryBookingStore Store)
+        ServiceBookingWith(
+            InMemoryServiceStore services, InMemoryResourceStore resources, DateTimeOffset? nowUtc = null)
     {
         var bookingStore = new InMemoryBookingStore();
         var time = new FixedTimeProvider(nowUtc ?? Now);
+        var bookings = new BookingService(resources, bookingStore, time, Settings);
 
-        return new ServiceBookingService(
-            services,
-            resources,
-            bookingStore,
-            new AvailabilityService(resources, bookingStore, time, Settings),
-            new BookingService(resources, bookingStore, time, Settings),
-            Settings);
+        return (
+            new ServiceBookingService(
+                services,
+                resources,
+                bookingStore,
+                new AvailabilityService(resources, bookingStore, time, Settings),
+                bookings,
+                Settings),
+            bookings,
+            bookingStore);
     }
 
     public static (BookingService Bookings, AvailabilityService Availability, InMemoryBookingStore Store)

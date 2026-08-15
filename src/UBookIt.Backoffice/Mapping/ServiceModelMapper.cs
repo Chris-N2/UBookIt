@@ -1,3 +1,4 @@
+using System.Globalization;
 using UBookIt.Backoffice.Models;
 using UBookIt.Core.Common;
 using UBookIt.Core.Resources;
@@ -116,10 +117,44 @@ internal static class ServiceModelMapper
                 ([.. roles.Select(r => r.Value)], duration.Value));
     }
 
-    internal static ServicePreviewResponseModel ToModel(IEnumerable<(ServiceRole Role, ServiceResolution Chain)> chains)
+    /// <summary>
+    /// The preview response: the chains, plus the misalignment finding when Core
+    /// found one.
+    /// <para>
+    /// The finding is passed in rather than computed here, and it is computed
+    /// from the very chains being mapped — so the report cannot describe a
+    /// different pool from the one the chains describe or the booking path acts
+    /// on.
+    /// </para>
+    /// </summary>
+    internal static ServicePreviewResponseModel ToModel(
+        IEnumerable<(ServiceRole Role, ServiceResolution Chain)> chains,
+        RoleMisalignment? misalignment = null)
         => new()
         {
             Roles = [.. chains.Select(c => ToModel(c.Role, c.Chain))],
+
+            // Null when the roles can align, and null is silence rather than
+            // reassurance: the endpoint never reports that a service is
+            // bookable, so there is no positive value to carry.
+            StartMisalignment = misalignment is null ? null : ToModel(misalignment),
+        };
+
+    private static StartMisalignmentModel ToModel(RoleMisalignment misalignment)
+        => new()
+        {
+            First = ToModel(misalignment.First),
+            Second = ToModel(misalignment.Second),
+        };
+
+    private static MisalignedRoleModel ToModel(MisalignedRole role)
+        => new()
+        {
+            ResourceType = role.Role.ResourceType,
+            ResourceId = role.Resource.Id,
+            DisplayName = role.Resource.DisplayName,
+            WindowStart = role.WindowStart.ToString("HH\\:mm", CultureInfo.InvariantCulture),
+            GranularityMinutes = (int)role.Granularity.TotalMinutes,
         };
 
     private static ServiceRoleChainModel ToModel(ServiceRole role, ServiceResolution resolution)

@@ -33,6 +33,13 @@ internal static class DurationMath
     internal static TimeSpan Lcm(TimeSpan a, TimeSpan b)
         => TimeSpan.FromTicks(a.Ticks / Gcd(a.Ticks, b.Ticks) * b.Ticks);
 
+    /// <summary>
+    /// The finest grid both <paramref name="a"/> and <paramref name="b"/> are
+    /// multiples of — and, by Bézout, the spacing of the offsets at which two
+    /// grids stepped by them can coincide.
+    /// </summary>
+    internal static TimeSpan Gcd(TimeSpan a, TimeSpan b) => TimeSpan.FromTicks(Gcd(a.Ticks, b.Ticks));
+
     private static long Gcd(long a, long b)
     {
         while (b != 0)

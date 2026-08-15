@@ -27,6 +27,13 @@ public class ServicesController(
     /// duration permits, and what the last filter excluded with the bound that
     /// excluded it. Chains come back in the order the roles were supplied.
     /// <para>
+    /// Alongside them — and never inside one — the response carries a pair of
+    /// roles whose start times can never coincide, when the configuration has
+    /// such a pair. A misaligned configuration is reported, not rejected: it is
+    /// a property of two resources' opening hours rather than of the service,
+    /// and editing either resource fixes it without the service changing.
+    /// </para>
+    /// <para>
     /// Accepts a configuration no saved service holds and does not require it to
     /// be a valid service — in particular, no name. Its whole purpose is to
     /// report on one being edited (design D2).
@@ -74,7 +81,18 @@ public class ServicesController(
             chains.Add((role, await resolution.ResolveAsync(role, duration, cancellationToken)));
         }
 
-        return Ok(ServiceModelMapper.ToModel(chains));
+        // Whether the roles' start times can ever coincide, computed by Core from
+        // the pools these very chains report — projected from the resolution
+        // already performed rather than resolved a second time, so the finding
+        // and the chains cannot describe different pools (design D1/D6).
+        //
+        // It reports impossibility or nothing at all: alignment is never returned
+        // as a positive finding, because a shared grid instant is necessary for a
+        // bookable start and nowhere near sufficient.
+        var misalignment = StartAlignment.FindMisalignment(
+            [.. chains.Select(c => new RoleCandidates(c.Role, c.Chain.Candidates))]);
+
+        return Ok(ServiceModelMapper.ToModel(chains, misalignment));
     }
 
     [HttpGet("services")]

@@ -10,6 +10,7 @@ import type {
 } from "../api/index.js";
 import { toApiErrors, type ApiError } from "./api-errors.js";
 import { resolutionGroups, type ResolutionSnapshot } from "./resolution-summary.js";
+import { alignmentReport, type AlignmentSnapshot } from "./alignment-report.js";
 import "./capability-input.element.js";
 
 /**
@@ -129,6 +130,19 @@ export class UBookItServiceEditorElement extends UmbLitElement {
    */
   @state()
   private _resolution: ResolutionSnapshot[] | null = null;
+
+  /**
+   * The two roles whose start times can never coincide, when the configuration
+   * has such a pair — otherwise null.
+   *
+   * Null covers both "they can align" and "not known", and that conflation is
+   * deliberate: neither is a claim that the service can be booked, and the only
+   * thing this state is ever allowed to assert is the impossibility. Kept beside
+   * `_resolution` rather than inside it because misalignment is a property of a
+   * PAIR of roles and belongs to neither chain (design D6).
+   */
+  @state()
+  private _alignment: AlignmentSnapshot | null = null;
 
   /** Guards against an earlier in-flight preview overwriting a later one. */
   #previewToken = 0;
@@ -293,6 +307,7 @@ export class UBookItServiceEditorElement extends UmbLitElement {
 
     if (body === null) {
       this._resolution = null;
+      this._alignment = null;
       return;
     }
 
@@ -319,9 +334,37 @@ export class UBookItServiceEditorElement extends UmbLitElement {
               canProvide: chain.canProvide.total,
               exclusions: chain.durationExclusions,
             }));
+
+      // Captured from the SAME response as the chains beside it, so the report
+      // and the counts always describe one configuration. A finding read from a
+      // later response than the chains could name a resource no longer in the
+      // pool the chains counted.
+      //
+      // Absent means only that no permanent misalignment was found — never that
+      // the roles align, and never that the service can be booked — so it is
+      // stored as the same null a failed request produces.
+      const finding = error || !data ? null : data.startMisalignment;
+
+      this._alignment = finding
+        ? {
+            first: {
+              resourceType: finding.first.resourceType,
+              displayName: finding.first.displayName,
+              windowStart: finding.first.windowStart,
+              granularityMinutes: finding.first.granularityMinutes,
+            },
+            second: {
+              resourceType: finding.second.resourceType,
+              displayName: finding.second.displayName,
+              windowStart: finding.second.windowStart,
+              granularityMinutes: finding.second.granularityMinutes,
+            },
+          }
+        : null;
     } catch {
       if (token === this.#previewToken) {
         this._resolution = null;
+        this._alignment = null;
       }
     }
   }
@@ -418,7 +461,8 @@ export class UBookItServiceEditorElement extends UmbLitElement {
       ${this.#renderErrorSummary()}
 
       <form @submit=${this.#save} novalidate>
-        ${this.#renderResolutionSummary()} ${this.#renderDetails()} ${this.#renderRequirements()}
+        ${this.#renderResolutionSummary()} ${this.#renderAlignmentReport()} ${this.#renderDetails()}
+        ${this.#renderRequirements()}
         ${this.#renderDuration()}
 
         <div class="actions">
@@ -729,6 +773,43 @@ export class UBookItServiceEditorElement extends UmbLitElement {
   }
 
   /**
+   * The start-alignment report, beside the resolution summary rather than inside
+   * it (design D6).
+   *
+   * Separate because it is a different claim about different data: the chains
+   * describe which resources can provide the service and say nothing about
+   * opening hours, while this describes whether two of them can ever start at
+   * the same moment. Folding it into a chain would make the chain assert
+   * something about availability, which it is forbidden to do.
+   *
+   * A live region on the same terms as the summary — always present, only its
+   * content changing — because a `role="status"` element inserted at the same
+   * moment as its text is frequently not announced. It is `aria-label`led and
+   * references no ids, so there is no association here that can dangle; the
+   * live pass verifies that every id referenced anywhere in this editor's shadow
+   * root resolves within it.
+   *
+   * Not a validation failure and not styled as one: a misaligned service is
+   * legitimate, saving is unaffected, and the resources it needs may be adjusted
+   * or added later.
+   */
+  #renderAlignmentReport() {
+    const lines = alignmentReport(this._alignment, (key, ...args) =>
+      this.localize.term(`ubookitServices_${key}`, ...args),
+    );
+
+    return html`
+      <div class="alignment" role="status" aria-label=${this.#term("alignmentReport")}>
+        ${lines.length === 0
+          ? nothing
+          : html`<ul>
+              ${lines.map((line) => html`<li>${line}</li>`)}
+            </ul>`}
+      </div>
+    `;
+  }
+
+  /**
    * Delegates to the pure {@link resolutionGroups}, passing a term resolver so
    * the phrasing logic can be exercised without a DOM or a localization host.
    */
@@ -920,6 +1001,22 @@ export class UBookItServiceEditorElement extends UmbLitElement {
       border-left: none;
       margin: 0;
       padding-left: 0;
+    }
+    /*
+      Set apart from the resolution summary above it so the two read as separate
+      statements, and deliberately NOT in the danger colour: this is information
+      about two resources' opening hours, not a validation failure, and a service
+      it describes still saves.
+    */
+    .alignment ul {
+      background: var(--uui-color-surface-alt, #f3f3f5);
+      border-left: 3px solid var(--uui-color-warning-standalone, #d29c00);
+      list-style: none;
+      margin: var(--uui-size-space-4) 0 0;
+      padding: var(--uui-size-space-3) var(--uui-size-space-4);
+    }
+    .alignment li + li {
+      margin-top: var(--uui-size-space-1);
     }
     .requirement {
       position: relative;

@@ -319,15 +319,30 @@ describe("eligibility is not availability (design D5)", () => {
   it("never emits the availability vocabulary, in any reachable state", async () => {
     // Reads the REAL strings, because the ban is on the words themselves. If a
     // future copy edit reintroduces "bookable", this fails.
+    //
+    // Covers the alignment report as well as the chains. That report says
+    // something the chains do not — whether two roles' start times can ever
+    // coincide — but it is under the same ban: it may state that they never can,
+    // and may never state that a service is available, free or bookable. Its
+    // absence must not read as reassurance either, which is why there is no
+    // "these roles align" string for this test to have to exempt.
     const { default: terms } = await import("../localization/en-us.js");
     const services = (terms as Record<string, Record<string, string>>).ubookitServices;
 
     const forbidden = /\b(available|availability|free|bookable)\b/i;
 
-    const offenders = Object.entries(services)
-      .filter(([key]) => key.startsWith("resolution"))
+    const covered = Object.keys(services).filter(
+      (key) => key.startsWith("resolution") || key.startsWith("alignment"),
+    );
+
+    const offenders = covered
+      .map((key) => [key, services[key]] as const)
       .filter(([, value]) => typeof value === "string" && forbidden.test(value));
 
     expect(offenders).toEqual([]);
+
+    // The filter has to actually match the alignment strings: a prefix typo
+    // would leave this test green while covering nothing.
+    expect(covered).toContain("alignmentNever");
   });
 });

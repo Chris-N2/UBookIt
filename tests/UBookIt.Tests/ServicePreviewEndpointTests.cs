@@ -418,6 +418,176 @@ public class ServicePreviewEndpointTests
         Assert.DoesNotContain(fields, f => f is not null && f.StartsWith("Roles[0]", StringComparison.Ordinal));
     }
 
+    // ------------------------------------------------------ start misalignment
+
+    /// <summary>
+    /// A resource of the given type opening at <paramref name="open"/> and
+    /// stepping in <paramref name="granularityMinutes"/> — the two numbers the
+    /// alignment finding is about.
+    /// </summary>
+    private static Resource Gridded(
+        string type, int id, string name, string open, int granularityMinutes)
+        => Resource.Create(
+            type,
+            name,
+            availability: TestData.Config(
+                TestData.Weekly(open, "20:00", Date.DayOfWeek),
+                constraints: BookingConstraints.Create(
+                    granularity: TimeSpan.FromMinutes(granularityMinutes),
+                    minDuration: TimeSpan.FromMinutes(granularityMinutes),
+                    maxDuration: TimeSpan.FromMinutes(granularityMinutes * 8)).Value),
+            id: Id(id)).Value;
+
+    /// <summary>The worked example: 09:00/30 against 09:15/20, which never meet.</summary>
+    private static Resource[] MisalignedPair() =>
+    [
+        Gridded(ResourceTypes.Room, 1, "Red Room", "09:00", 30),
+        Gridded("therapist", 2, "Mary", "09:15", 20),
+    ];
+
+    /// <summary>The same pair shifted so that gcd(30, 20) = 10 divides the offset.</summary>
+    private static Resource[] AlignablePair() =>
+    [
+        Gridded(ResourceTypes.Room, 1, "Red Room", "09:00", 30),
+        Gridded("therapist", 2, "Mary", "09:30", 20),
+    ];
+
+    private static ServicePreviewRequestModel TwoRoles()
+        => Configuration(FixedMinutes(60), Role(ResourceTypes.Room), Role("therapist"));
+
+    [Fact]
+    public async Task Spec_scenario_a_misaligned_configuration_reports_the_finding()
+    {
+        var (controller, _) = Wire(MisalignedPair());
+
+        var response = Ok(await controller.PreviewServiceConfiguration(TwoRoles()));
+
+        // Both chains as before, PLUS the finding — not instead of them.
+        Assert.Equal(2, response.Roles.Count);
+        Assert.All(response.Roles, chain => Assert.Equal(1, chain.CanProvide.Total));
+
+        var finding = response.StartMisalignment;
+        Assert.NotNull(finding);
+
+        Assert.Equal(ResourceTypes.Room, finding.First.ResourceType);
+        Assert.Equal(Id(1), finding.First.ResourceId);
+        Assert.Equal("Red Room", finding.First.DisplayName);
+        Assert.Equal("09:00", finding.First.WindowStart);
+        Assert.Equal(30, finding.First.GranularityMinutes);
+
+        Assert.Equal("therapist", finding.Second.ResourceType);
+        Assert.Equal(Id(2), finding.Second.ResourceId);
+        Assert.Equal("Mary", finding.Second.DisplayName);
+        Assert.Equal("09:15", finding.Second.WindowStart);
+        Assert.Equal(20, finding.Second.GranularityMinutes);
+    }
+
+    [Fact]
+    public async Task Spec_scenario_an_alignable_configuration_carries_no_finding()
+    {
+        // Same two roles, same pools, one opening time moved. Silence — not a
+        // positive report that the roles align, which would be read as a promise
+        // that the service is bookable.
+        var (controller, _) = Wire(AlignablePair());
+
+        var response = Ok(await controller.PreviewServiceConfiguration(TwoRoles()));
+
+        Assert.Equal(2, response.Roles.Count);
+        Assert.Null(response.StartMisalignment);
+    }
+
+    [Fact]
+    public async Task Spec_scenario_a_single_role_configuration_never_reports_a_misalignment()
+    {
+        // There is no second grid to miss. The resource is the awkward one from
+        // the misaligned pair, so the answer comes from there being one role.
+        var (controller, _) = Wire(MisalignedPair());
+
+        var response = Ok(await controller.PreviewServiceConfiguration(
+            Configuration(FixedMinutes(60), Role(ResourceTypes.Room))));
+
+        Assert.Single(response.Roles);
+        Assert.Null(response.StartMisalignment);
+    }
+
+    [Fact]
+    public async Task Spec_scenario_the_finding_is_separate_from_the_chains()
+    {
+        // The chains must be byte-for-byte what they would have been without the
+        // finding — asserted by serialising the chain list for a misaligned
+        // configuration and for an alignable one whose pools resolve identically,
+        // rather than by inspecting fields the test chose.
+        var (misaligned, _) = Wire(MisalignedPair());
+        var (alignable, _) = Wire(AlignablePair());
+
+        var withFinding = Ok(await misaligned.PreviewServiceConfiguration(TwoRoles()));
+        var without = Ok(await alignable.PreviewServiceConfiguration(TwoRoles()));
+
+        Assert.NotNull(withFinding.StartMisalignment);
+        Assert.Null(without.StartMisalignment);
+
+        Assert.Equal(
+            System.Text.Json.JsonSerializer.Serialize(without.Roles),
+            System.Text.Json.JsonSerializer.Serialize(withFinding.Roles));
+
+        // And no chain says anything about opening hours or start times: the
+        // finding's numbers appear nowhere in the chains (design D6).
+        var chains = System.Text.Json.JsonSerializer.Serialize(withFinding.Roles);
+        Assert.DoesNotContain("09:00", chains, StringComparison.Ordinal);
+        Assert.DoesNotContain("09:15", chains, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public async Task Spec_scenario_a_misaligned_configuration_is_still_previewed_not_rejected()
+    {
+        // Reported, never rejected: misalignment is a property of two resources'
+        // opening hours, not of the service, and nothing about the service is
+        // wrong.
+        var (controller, services) = Wire(MisalignedPair());
+
+        var result = await controller.PreviewServiceConfiguration(TwoRoles());
+
+        Assert.IsType<OkObjectResult>(result);
+
+        // Still read-only, as for any other configuration: nothing was saved.
+        Assert.Equal(0, (await services.ListAsync(0, 50)).Total);
+    }
+
+    [Fact]
+    public async Task The_finding_agrees_with_Core_rather_than_being_recomputed()
+    {
+        // The property the endpoint exists to preserve, applied to the new
+        // member: the answer IS Core's answer, over the pools Core resolves.
+        var resourceStore = new InMemoryResourceStore();
+        foreach (var resource in MisalignedPair())
+        {
+            resourceStore.Add(resource);
+        }
+
+        var service = Service.Create(
+            "Treatment",
+            ServiceDuration.Fixed(TimeSpan.FromMinutes(60)).Value,
+            [ServiceRole.Create(ResourceTypes.Room, null).Value, ServiceRole.Create("therapist", null).Value]).Value;
+
+        var services = new InMemoryServiceStore().Add(service);
+        var resolution = TestData.ServiceBooking(services, resourceStore);
+        var controller = new ServicesController(services, services, resolution);
+
+        var response = Ok(await controller.PreviewServiceConfiguration(TwoRoles()));
+
+        var pools = await resolution.ResolveCandidatesAsync(service.Id);
+        Assert.True(pools.Succeeded);
+
+        var core = StartAlignment.FindMisalignment(pools.Value);
+        Assert.NotNull(core);
+        Assert.NotNull(response.StartMisalignment);
+
+        Assert.Equal(core.First.Resource.Id, response.StartMisalignment.First.ResourceId);
+        Assert.Equal(core.Second.Resource.Id, response.StartMisalignment.Second.ResourceId);
+        Assert.Equal(
+            (int)core.First.Granularity.TotalMinutes, response.StartMisalignment.First.GranularityMinutes);
+    }
+
     // ------------------------------------------------------------ contract shape
 
     /// <summary>

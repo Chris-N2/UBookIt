@@ -31,6 +31,14 @@ export type DurationExclusionModel = {
     boundMinutes: number;
 };
 
+export type MisalignedRoleModel = {
+    resourceType: string;
+    resourceId: string;
+    displayName: string;
+    windowStart: string;
+    granularityMinutes: number;
+};
+
 export type OpeningHoursModel = {
     day: DayOfWeek;
     start: string;
@@ -101,6 +109,7 @@ export type ServicePreviewRequestModel = {
 
 export type ServicePreviewResponseModel = {
     roles: Array<ServiceRoleChainModel>;
+    startMisalignment?: StartMisalignmentModel | null;
 };
 
 export type ServicePreviewRoleModel = {
@@ -139,6 +148,11 @@ export type ServiceRoleModel = {
     resourceType: string;
     requiredCapabilities: Array<string>;
     count: number;
+};
+
+export type StartMisalignmentModel = {
+    first: MisalignedRoleModel;
+    second: MisalignedRoleModel;
 };
 
 export type TimeWindowModel = {

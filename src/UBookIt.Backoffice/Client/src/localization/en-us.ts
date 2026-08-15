@@ -153,6 +153,24 @@ export default {
     // drifts. "in %1%-minute steps" says the same thing.
     resolutionExcludedGranularity: "%0% (lengths in %1%-minute steps only)",
     resolutionExcludedMore: "and %0% more",
+
+    // ------------------------------------------------------------ start alignment
+    //
+    // A separate statement from the resolution chains, about a different thing:
+    // the chains say which resources CAN provide the service, this says whether
+    // two of them can ever start at the same moment. It is reported only when
+    // they never can — its absence is not a claim that the service is bookable,
+    // so the same ban applies here as to the chains: never available, free, or
+    // bookable. "Start at the same time" says what is true without implying that
+    // anything is open, unbooked, or within horizon.
+    alignmentReport: "Start times",
+    alignmentNever:
+      "The “%0%” and “%1%” requirements can never start at the same time, on any day.",
+    // The two numbers an editor changes, per resource. Naming the resource is
+    // the point: the fix is on a resource, not on this service.
+    alignmentWindow: "%0% opens at %1% and starts every %2% minutes.",
+    alignmentFix:
+      "Change one resource's opening time or step size, or add a resource whose start times line up with the other requirement.",
     save: "Save",
     cancel: "Cancel",
     back: "Back to services",

@@ -101,12 +101,19 @@ public class ServicePreviewRoleModel
 }
 
 /// <summary>
-/// What a configuration resolves to: one chain per role.
+/// What a configuration resolves to: one chain per role, and — only when there
+/// is one — a pair of roles whose start times can never coincide.
 /// <para>
-/// It describes configuration only. The chains say which resources are
+/// The chains describe configuration only. They say which resources are
 /// <em>able</em> to provide the service, never that the service is available:
-/// opening hours, lead time, booking horizon, existing bookings and whether the
-/// roles' start grids ever coincide are not evaluated here (design D5).
+/// opening hours, lead time, booking horizon and existing bookings are not
+/// evaluated in them (⑧a design D5). That boundary is unchanged by the
+/// misalignment finding, which is why the finding sits beside the chains as a
+/// member of its own rather than inside one.
+/// </para>
+/// <para>
+/// Nothing here reports that a service <em>is</em> bookable. The chains stop at
+/// eligibility, and the finding only ever reports impossibility.
 /// </para>
 /// </summary>
 public class ServicePreviewResponseModel
@@ -122,6 +129,62 @@ public class ServicePreviewResponseModel
     /// </para>
     /// </summary>
     public List<ServiceRoleChainModel> Roles { get; set; } = [];
+
+    /// <summary>
+    /// Two roles whose start times can never coincide, when the configuration has
+    /// such a pair — otherwise absent.
+    /// <para>
+    /// A member of its own, never folded into a role's chain (design D6). The
+    /// chains report type, capabilities and duration and say nothing about
+    /// opening hours; a stage that mentioned opening times would be the chain
+    /// claiming something about availability. Misalignment is also a property of
+    /// a <em>pair</em> of roles and belongs to neither of them.
+    /// </para>
+    /// <para>
+    /// Present only when the roles are permanently misaligned. Alignment is never
+    /// reported positively: sharing a start grid is necessary for a bookable
+    /// start and nowhere near sufficient, so saying so would be read as a promise
+    /// the endpoint cannot make.
+    /// </para>
+    /// </summary>
+    public StartMisalignmentModel? StartMisalignment { get; set; }
+}
+
+/// <summary>
+/// A reported clash: the two roles that can never share a start, each with the
+/// resource and the two numbers responsible.
+/// </summary>
+public class StartMisalignmentModel
+{
+    public MisalignedRoleModel First { get; set; } = new();
+
+    public MisalignedRoleModel Second { get; set; } = new();
+}
+
+/// <summary>
+/// One side of a clash. Carries the window start and granularity because the fix
+/// is to edit a <b>resource</b> — its opening time or its step size — and a
+/// report naming only the service would send an editor to the wrong screen.
+/// </summary>
+public class MisalignedRoleModel
+{
+    /// <summary>The role, identified as the chains identify one: by resource type.</summary>
+    public string ResourceType { get; set; } = string.Empty;
+
+    public Guid ResourceId { get; set; }
+
+    public string DisplayName { get; set; } = string.Empty;
+
+    /// <summary>
+    /// The wall-clock start of the window whose grid cannot meet the other's, as
+    /// <c>HH:mm</c>. A local time of day rather than an instant: the claim is
+    /// about a weekly opening time, and an instant would invite a consumer to
+    /// read it as a date.
+    /// </summary>
+    public string WindowStart { get; set; } = string.Empty;
+
+    /// <summary>The resource's granularity, in whole minutes.</summary>
+    public int GranularityMinutes { get; set; }
 }
 
 /// <summary>
