@@ -81,7 +81,13 @@ For a service of several roles, each role's candidate SHALL be chosen independen
 
 The number of attempts SHALL NOT grow as the product of the roles' pool sizes. Candidates already claimed at the requested interval SHALL be excluded before any attempt is made, from a single read over every role's shortlist, so that a fully booked service costs no placement attempts rather than one per combination. That read is advisory and SHALL NOT replace the atomic placement contract: a candidate free when it was read may be taken before the attempt lands, which the loop still handles.
 
-Excluding a candidate SHALL NOT change the outcome the caller is told. An excluded candidate SHALL be classified as the attempt it replaced would have classified it, and **being claimed is not sufficient to classify it**: the placement rules that are properties of a resource are evaluated before the conflict check, so a candidate that is claimed *and* would have been refused anyway — a start off its grid, outside its open hours, inside its lead time, or beyond its horizon — contributed a deterministic refusal and never reached the conflict check. Only an excluded candidate whose own rules admit the request makes the all-fail outcome `conflict`. That classification SHALL come from the same rule evaluation placement runs, never from a second implementation of the rules.
+Excluding a candidate SHALL NOT change the outcome the caller is told. The excluded attempts SHALL be classified as the attempts they replaced would have been classified, and **being claimed is not sufficient to classify them**: the placement rules that are properties of a resource are evaluated before the conflict check, so a candidate that is claimed *and* would have been refused anyway — a start off its grid, outside its open hours, inside its lead time, or beyond its horizon — contributed a deterministic refusal and never reached the conflict check.
+
+The unit of that classification SHALL be the **combination**, not the candidate. A combination reaches the conflict check only when *every* role contributes a candidate whose own rules admit the request, since placement accumulates the rules of every resource it would claim before checking for conflicts. The all-fail outcome SHALL therefore be `conflict` only when every role has such a candidate **and** at least one of the candidates excluded for being claimed is one of them. One admitting candidate in one role SHALL NOT make the outcome `conflict` while another role has none: no combination containing it could ever have raced.
+
+A failure that is a property of the request or the site rather than of any resource — a broken site time zone, an interval that cannot be represented — SHALL be reported as itself even when every candidate was excluded and no attempt ran. Reducing the rule evaluation to a yes/no would bury it under an all-fail code that blames the pool for a fault that has nothing to do with it.
+
+That classification SHALL come from the same rule evaluation placement runs, never from a second implementation of the rules.
 
 Treating every excluded candidate as a lost race would report `conflict` for a request that can never succeed, inviting a retry that cannot help — and would silence the drift signal `service-unavailable` exists to be, in proportion to how busy the site is.
 
@@ -134,6 +140,14 @@ On success the result SHALL identify every resource actually booked.
 #### Scenario: A claimed candidate that would have been refused anyway is not a race
 - **WHEN** the only candidate is already claimed and the requested start is also off its grid, or the requested interval is outside its open hours
 - **THEN** placement fails with `service-unavailable`, not `conflict` — the request could not have succeeded whatever that resource's calendar looked like, so a retry is pointless
+
+#### Scenario: A claimed candidate is not a race when another role can never be filled
+- **WHEN** one role's only candidate is merely claimed, and another role's only candidate would refuse the request whatever its calendar looked like
+- **THEN** placement fails with `service-unavailable` — no combination could have reached the conflict check, so the claimed candidate in the first role never had a race to lose
+
+#### Scenario: A site misconfiguration survives every candidate being excluded
+- **WHEN** the site time zone is unusable and every candidate is already claimed at the requested interval, so no attempt runs
+- **THEN** placement reports the time-zone failure itself, not an all-fail code describing the pool
 
 ## ADDED Requirements
 

@@ -492,42 +492,26 @@ public sealed class ServiceBookingService(
             free = attemptable;
         }
 
-        // A candidate the pre-filter dropped is one the loop would otherwise have
-        // attempted, so it must still be classified the way that attempt would
-        // have classified it — and "it was busy" is not enough to know.
-        //
-        // The pipeline evaluates a resource's own rules BEFORE the conflict
-        // check, so a candidate that is busy *and* would have been refused
-        // anyway — a start off its grid, outside its open hours, inside its lead
-        // time, beyond its horizon — contributed a deterministic refusal, never
-        // a conflict. Treating every dropped candidate as a lost race turns
-        // `service-unavailable` into `conflict` for exactly those, telling a
-        // caller to retry a slot that can never come good and silencing the
-        // drift signal that code exists to be.
-        //
-        // Asked of the placement service rather than recomputed here: one
-        // implementation of the rules, so the classification cannot drift from
-        // what an attempt would actually have done.
-        var raced = attemptable
-            .Zip(free)
-            .SelectMany(pair => pair.First.Where(candidate => !pair.Second.Contains(candidate)))
-            .Any(candidate => bookingService
-                .CheckPlacementRules(candidate.Resource, request.Start, request.Duration)
-                .Succeeded);
+        // Candidates the pre-filter dropped were never attempted, so the all-fail
+        // outcome has to be reasoned about rather than observed. The reasoning is
+        // in RuleClassification, which asks the placement service the same
+        // questions an attempt would have answered.
+        var rules = new RuleClassification(bookingService, request, attemptable, free);
 
         if (free.Any(shortlist => shortlist.Count == 0))
         {
-            // Every candidate of some role is already claimed at that interval.
-            // Whether that is a race or a configuration answer is decided by the
-            // same classification, not by the emptiness itself.
-            return raced
-                ? DomainResult<Booking>.Failure(
-                    FailureCodes.Conflict,
-                    "Every resource able to fulfil this service is already booked at that time.")
-                : Unavailable("This service cannot be booked at that time.");
+            // Every candidate of some role is already claimed at that interval,
+            // so there is nothing left to attempt. What the caller is told is
+            // still decided by the classification, never by the emptiness.
+            return rules.AllFail(raced: false);
         }
 
         attemptable = free;
+
+        // Whether any combination that actually ran reached the conflict check
+        // and lost. The classification below adds what the excluded ones would
+        // have contributed.
+        var raced = false;
 
         foreach (var combination in Combinations(attemptable))
         {
@@ -565,13 +549,96 @@ public sealed class ServiceBookingService(
             raced |= placed.Failures.Any(f => !IsDeterministic(f.Code));
         }
 
-        // Echoing the last candidate's failures would be arbitrary — it depends
-        // on iteration order and describes a resource the caller never named.
-        // Instead: was anything actually taken, or was this never bookable?
-        return raced
-            ? DomainResult<Booking>.Failure(
-                FailureCodes.Conflict, "Every resource able to fulfil this service is already booked at that time.")
-            : Unavailable("This service cannot be booked at that time.");
+        // Echoing the last combination's failures would be arbitrary — it
+        // depends on iteration order and describes resources the caller never
+        // named. Instead: was anything actually taken, or was this never
+        // bookable? The attempts answer for the combinations that ran; the
+        // classification answers for the ones the pre-filter removed.
+        return rules.AllFail(raced);
+    }
+
+    /// <summary>
+    /// Decides what an all-fail placement tells the caller, including for the
+    /// combinations the claims pre-filter removed before they could be attempted.
+    /// <para>
+    /// The unit of an attempt is a <em>combination</em>, not a candidate, and
+    /// that is the whole difficulty. `BookingService` accumulates each claimed
+    /// resource's rules before the conflict check, so a combination reaches that
+    /// check only when <em>every</em> role contributes a candidate whose rules
+    /// admit the request. One admitting candidate in one role says nothing if
+    /// another role has none — no combination containing it could ever have
+    /// raced, and reporting `conflict` would invite a retry that cannot succeed.
+    /// </para>
+    /// <para>
+    /// Rules are evaluated by the placement service and memoised per resource,
+    /// so this cannot drift from what an attempt would have done and costs one
+    /// evaluation per candidate on the failure path only.
+    /// </para>
+    /// </summary>
+    private sealed class RuleClassification(
+        IBookingService bookingService,
+        ServiceBookingRequest request,
+        List<List<ServiceCandidate>> shortlists,
+        List<List<ServiceCandidate>> free)
+    {
+        private readonly Dictionary<Guid, DomainResult> _checked = [];
+
+        private DomainResult Check(ServiceCandidate candidate)
+        {
+            if (!_checked.TryGetValue(candidate.ResourceId, out var result))
+            {
+                result = bookingService.CheckPlacementRules(
+                    candidate.Resource, request.Start, request.Duration);
+
+                _checked[candidate.ResourceId] = result;
+            }
+
+            return result;
+        }
+
+        internal DomainResult<Booking> AllFail(bool raced)
+        {
+            // A failure that is a property of the request or the site rather
+            // than of any resource — a broken site time zone, an interval that
+            // cannot be represented — is reported as itself. The attempt loop
+            // echoes these when it runs; when every candidate was excluded it
+            // never runs, and collapsing the check to a boolean would bury them
+            // under an all-fail code that describes the pool instead.
+            foreach (var candidate in shortlists.SelectMany(shortlist => shortlist))
+            {
+                if (Check(candidate).Failures.FirstOrDefault(f => IsRequestLevel(f.Code)) is { } requestFailure)
+                {
+                    return DomainResult<Booking>.Failure(requestFailure);
+                }
+            }
+
+            return raced || ExcludedCombinationCouldHaveRaced()
+                ? DomainResult<Booking>.Failure(
+                    FailureCodes.Conflict,
+                    "Every resource able to fulfil this service is already booked at that time.")
+                : Unavailable("This service cannot be booked at that time.");
+        }
+
+        /// <summary>
+        /// Whether some combination the pre-filter removed would have reached the
+        /// conflict check: every role has a candidate whose rules admit the
+        /// request, and at least one of those was excluded for being claimed.
+        /// </summary>
+        private bool ExcludedCombinationCouldHaveRaced()
+        {
+            var everyRoleCanBeFilled = shortlists.All(
+                shortlist => shortlist.Any(candidate => Check(candidate).Succeeded));
+
+            if (!everyRoleCanBeFilled)
+            {
+                return false;
+            }
+
+            return shortlists
+                .Zip(free)
+                .SelectMany(pair => pair.First.Where(candidate => !pair.Second.Contains(candidate)))
+                .Any(candidate => Check(candidate).Succeeded);
+        }
     }
 
     private static DomainResult<Booking> Unavailable(string message)

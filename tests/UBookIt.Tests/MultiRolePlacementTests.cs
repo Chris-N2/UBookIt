@@ -1,3 +1,4 @@
+using UBookIt.Core;
 using UBookIt.Core.Availability;
 using UBookIt.Core.Bookings;
 using UBookIt.Core.Common;
@@ -469,6 +470,88 @@ public class MultiRolePlacementTests
         // Retrying cannot help: the request is refused by the resource's own
         // configuration whatever its calendar looks like.
         Assert.Equal(FailureCodes.ServiceUnavailable, Assert.Single(placed.Failures).Code);
+    }
+
+    [Fact]
+    public async Task A_busy_candidate_in_one_role_is_not_a_race_when_another_role_can_never_be_filled()
+    {
+        // The cross-role case, and the reason the classification is about
+        // COMBINATIONS rather than candidates: placement accumulates every
+        // claimed resource's rules before the conflict check, so a combination
+        // reaches that check only when every role contributes a candidate whose
+        // rules admit. Here the therapist is merely busy — its rules admit — but
+        // the room can never take a 09:30 start on its hourly grid, so no
+        // combination could ever have raced and retrying is pointless.
+        var service = Svc(ResourceTypes.Room, Therapist);
+
+        var room = Resource.Create(
+            ResourceTypes.Room,
+            "Hourly room",
+            availability: TestData.Config(
+                TestData.Weekly("09:00", "17:00", Date.DayOfWeek),
+                constraints: BookingConstraints.Create(
+                    granularity: Mins(60), minDuration: Mins(60), maxDuration: Mins(480)).Value),
+            id: Id(1)).Value;
+
+        var harness = Wire(service, room, Res(3, Therapist));
+
+        // Busy the therapist across the requested interval; the room is free but
+        // permanently off-grid for it.
+        Assert.True((await harness.Bookings.PlaceAsync(new BookingRequest
+        {
+            ResourceId = Id(3),
+            Start = TestData.Utc(Date, "09:30"),
+            Duration = Mins(60),
+            Booker = TestData.Booker(),
+        })).Succeeded);
+
+        var placed = await harness.Services.PlaceAsync(Request(service, "09:30", 60));
+
+        Assert.False(placed.Succeeded);
+        Assert.Equal(FailureCodes.ServiceUnavailable, Assert.Single(placed.Failures).Code);
+    }
+
+    [Fact]
+    public async Task A_request_level_failure_is_reported_even_when_every_candidate_was_excluded()
+    {
+        // A broken site time zone is a property of the site, not of any pool.
+        // The attempt loop echoes it — but when every candidate is excluded the
+        // loop never runs, so the classification has to carry it rather than
+        // collapsing the rule check to a yes/no and reporting an all-fail code
+        // that blames the resources.
+        var service = Svc(ResourceTypes.Room);
+        var room = Res(1, ResourceTypes.Room);
+
+        var resourceStore = new InMemoryResourceStore().Add(room);
+        var serviceStore = new InMemoryServiceStore().Add(service);
+        var bookingStore = new InMemoryBookingStore();
+        var time = new FixedTimeProvider(TestData.Now);
+
+        // Placed through a sound configuration first, so the resource really is
+        // claimed at the requested interval.
+        var sound = TestData.Settings;
+        var soundBookings = new BookingService(resourceStore, bookingStore, time, sound);
+        Assert.True((await soundBookings.PlaceAsync(new BookingRequest
+        {
+            ResourceId = Id(1),
+            Start = TestData.Utc(Date, "09:00"),
+            Duration = Mins(60),
+            Booker = TestData.Booker(),
+        })).Succeeded);
+
+        var broken = new SiteBookingSettings { TimeZoneId = "Not/AZone" };
+        var services = new ServiceBookingService(
+            serviceStore,
+            resourceStore,
+            bookingStore,
+            new AvailabilityService(resourceStore, bookingStore, time, broken),
+            new BookingService(resourceStore, bookingStore, time, broken),
+            broken);
+
+        var placed = await services.PlaceAsync(Request(service, "09:00", 60));
+
+        Assert.False(placed.Succeeded);
+        Assert.Equal(FailureCodes.TimeZoneInvalid, Assert.Single(placed.Failures).Code);
     }
 
     [Fact]
