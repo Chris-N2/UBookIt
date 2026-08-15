@@ -44,6 +44,13 @@
 - [x] 5.5 Assert the report's association and live-region behaviour by reading the shadow DOM, not from screenshots.
 - [x] 5.6 Stop the TestSite and check port 44348 for orphaned processes.
 
+## 5a. QA remediation (round 1, 2026-08-15)
+
+- [x] 5a.1 **CRITICAL — a DST transition between two windows produced a false accusation.** Design D5's "both windows shift together" holds only for windows on the same side of a transition. Fixed by reporting only when `gcd` divides an hour, which is exactly when the wall-clock offset gives the real verdict; otherwise silent, and one unsettleable pairing clears the role pair. D5 amended with the repro, the rejected alternative, and the Lord Howe residue as a recorded limit.
+- [x] 5a.2 **MAJOR — a booking predating an opening-hours change leaves a start off the current grid.** Resolved as Chris chose: the report still fires, because it describes the configuration, which is broken once that booking clears. D2 and the service-booking delta amended to state the premise the superset argument actually needs, plus a scenario pinning the behaviour.
+- [x] 5a.3 Covering tests for both, and `proposal.md`'s claim of a DST test made true rather than deleted. Mutation-checked the guard: disabling it fails 3 tests including the CRITICAL repro.
+- [x] 5a.4 Re-run: full build clean, full unit/integration/client suites green.
+
 ## 6. Handover
 
 - [x] 6.1 Record what ⑨-2 inherits: same-type roles draw from one pool, so two roles of one type share a grid trivially and this check must not fire on them; matching changes which pairings matter.

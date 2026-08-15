@@ -86,6 +86,24 @@ share a start, whatever the bookings. The converse does not hold — sharing a
 window-grid instant does not mean either resource is free then — which is
 exactly the asymmetry D1 requires.
 
+**Amended at apply (QA MAJOR, 2026-08-15).** That derivation has an unstated
+premise: it assumes each booking was placed under the configuration *now in
+force*. A booking made **before** an opening-hours edit can end off the new grid,
+and the free interval beginning at its end is then a start the window grid does
+not contain. Reproduced: a room booked 09:00–09:30 under a 09:00/30 window, whose
+opening time then moves to 09:20, leaves a free interval starting at 09:30 — which
+a therapist on a 09:15/15 grid hits exactly, so a shared start exists while that
+booking survives.
+
+The report fires anyway, and that is the decision rather than an oversight. It
+describes the **configuration**, and the configuration is permanently broken from
+the moment the stale booking clears. Falling silent instead would make the
+diagnostic consult the booking calendar, reintroducing precisely the flicker this
+decision exists to prevent — and it would go quiet exactly when an editor was
+mid-way through the repair the report asked for. What the superset argument
+guarantees, stated exactly: the window grid contains every start the resource can
+offer **under its current configuration**.
+
 Computing over free intervals would also make the diagnostic depend on the
 booking calendar, so it would appear and disappear as bookings came and went.
 A structural fault must not flicker.
@@ -139,6 +157,36 @@ other on that date.
 Rejected: it makes the answer depend on which horizon was swept, and a service
 could be declared misaligned in one query range and not another. A structural
 claim must not depend on when it was asked.
+
+**Amended at apply (QA CRITICAL, 2026-08-15).** "Two windows in one zone shift
+together" is true only for windows on the *same side* of a transition. When the
+transition falls **between** the two window starts on that date, the later window
+moves and the real offset differs from the wall-clock offset by the transition's
+size. Reproduced: a room open 00:00–18:00 on an 8-minute grid against a therapist
+open 03:00–18:00 on a 16-minute grid, on Europe/London's 2026-03-29 spring
+forward. The wall-clock offset is 180 minutes, which `gcd(8, 16) = 8` does not
+divide — yet the real offset that date is 120 minutes, which it does, and the
+service has 56 shared starts. A false accusation, which D1 forbids outright.
+
+The fix keeps this decision's zone-free, date-free shape rather than abandoning
+it. Divisibility cannot see a shift the divisor divides, so whenever
+`gcd(s₁, s₂)` divides **an hour** the wall-clock offset yields the same verdict as
+the real one and the arithmetic is exact. Every granularity in practical use — 5,
+10, 15, 20, 30, 60 minutes — satisfies this. When it does not, the check reports
+nothing for that pairing, and one unsettleable pairing clears the whole role pair
+just as an aligning one does: silence is the direction D1 permits.
+
+*Alternative considered — thread the site zone in and compare real UTC offsets
+per date.* Rejected for the reason this decision already gives: a weekly pattern
+recurs forever, so "which dates" has no natural bound, and the answer would start
+depending on which ones were examined.
+
+**Known limit, recorded rather than silently accepted.** The guard tests against
+one hour, while Lord Howe Island shifts by 30 minutes. A site in such a zone whose
+two resources have a gcd dividing an hour but not half of one — 60 or 45 minutes —
+could still be falsely accused. Testing against 30 minutes instead would close it
+at the cost of never reporting any pair whose gcd is 60 minutes, which is an
+ordinary and detectable misalignment. Deferred deliberately.
 
 ### D6 — The finding sits beside the chains, not inside them
 

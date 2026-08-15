@@ -120,6 +120,9 @@ summary is untouched in meaning; the new statement sits beside it.
 **Persistence** — unchanged. No schema change, no migration.
 
 **Tests** — the arithmetic against enumerated grids over real open hours, the
-DST case where a day's window shifts, the one-directional property (a service
-the check clears may still be unbookable for ordinary reasons), and the
-guarantee that a misaligned service still saves and still resolves.
+DST case where a transition falls between the two windows on a date (which QA
+found to be a false accusation, not merely a hypothetical — see design D5 as
+amended), the case where a booking predating an opening-hours change leaves a
+start off the current grid (design D2 as amended), the one-directional property
+(a service the check clears may still be unbookable for ordinary reasons), and
+the guarantee that a misaligned service still saves and still resolves.

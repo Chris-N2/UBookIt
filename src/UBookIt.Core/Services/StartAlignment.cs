@@ -67,12 +67,22 @@ public sealed record RoleMisalignment(MisalignedRole First, MisalignedRole Secon
 /// </para>
 /// <para>
 /// Computed over the resources' configured <b>open windows</b>, not their free
-/// intervals, and that is sound rather than approximate: placement aligns a start
-/// to its open window's start and a booking's length is a multiple of the
-/// resource's granularity, so every free-interval start — and therefore every
-/// candidate start — lies on the open-window grid (design D2). The window grid
-/// is a superset of every start the resource can ever offer, so a conclusion
-/// drawn from it holds whatever the bookings are.
+/// intervals: placement aligns a start to its open window's start and a booking's
+/// length is a multiple of the resource's granularity, so every free-interval
+/// start — and therefore every candidate start — lies on the open-window grid
+/// (design D2). Computing over free intervals instead would make a structural
+/// fault appear and disappear as bookings came and went.
+/// </para>
+/// <para>
+/// That superset argument assumes each booking was placed under the configuration
+/// now in force. A booking made <em>before</em> an opening-hours edit can end off
+/// the new grid, and the free interval starting at its end is then a start the
+/// window grid does not contain — so for as long as that booking survives, a pair
+/// reported here may still have a shared start. The report is nonetheless right
+/// about the <em>configuration</em>, which is what it describes: once the stale
+/// booking clears, no such start remains. Reporting the configuration is the
+/// deliberate choice over falling silent, which would couple the diagnostic to
+/// the booking calendar and reintroduce exactly the flicker D2 exists to prevent.
 /// </para>
 /// </summary>
 public static class StartAlignment
@@ -132,6 +142,15 @@ public static class StartAlignment
         {
             foreach (var right in second.Candidates)
             {
+                if (!WallClockOffsetSettlesIt(left.Granularity, right.Granularity))
+                {
+                    // The wall-clock offset cannot settle this pair, so nothing
+                    // about it may be reported — and one unsettled pairing is
+                    // enough to clear the whole role pair, exactly as an aligning
+                    // one is. Silence is the permitted direction (design D1).
+                    return null;
+                }
+
                 foreach (var (leftWindow, rightWindow) in SharedDateWindows(left.Resource, right.Resource))
                 {
                     if (StartGrid.CanMeet(
@@ -156,6 +175,39 @@ public static class StartAlignment
         // resolution chain already reports an empty pool.
         return witness;
     }
+
+    /// <summary>
+    /// Whether the wall-clock offset between two windows decides the question for
+    /// <em>every</em> date, rather than only for the dates carrying no
+    /// daylight-saving transition.
+    /// <para>
+    /// Design D5 argues that two windows in one zone shift together across a DST
+    /// boundary, so the offset between them is stable. That holds for windows on
+    /// the same side of the transition and fails for windows straddling it: on
+    /// that one date the later window's UTC instant moves and the real offset
+    /// differs from the wall-clock offset by the transition's size.
+    /// </para>
+    /// <para>
+    /// Divisibility is blind to a shift that the divisor divides, so whenever
+    /// <c>gcd(s₁, s₂)</c> divides an hour the wall-clock offset gives the same
+    /// verdict as the real one and the arithmetic is exact. Every granularity in
+    /// practical use — 5, 10, 15, 20, 30, 60 minutes — has a gcd that does. When
+    /// it does not, this stays silent rather than risk accusing a configuration
+    /// that works on the transition date, which is the asymmetry design D1
+    /// requires: being conservative is allowed, accusing wrongly is not.
+    /// </para>
+    /// <para>
+    /// Checked against an hour rather than against the site zone's actual
+    /// transitions, so the check needs no zone and no date sweep — the two things
+    /// D5 rejected because they make a structural claim depend on when it was
+    /// asked. The residue is a zone whose transition is not a whole hour (Lord
+    /// Howe Island shifts by 30 minutes) paired with a gcd that divides an hour
+    /// but not half of one; recorded as a known limit rather than silently
+    /// accepted.
+    /// </para>
+    /// </summary>
+    private static bool WallClockOffsetSettlesIt(TimeSpan firstStep, TimeSpan secondStep)
+        => TimeSpan.FromHours(1).Ticks % DurationMath.Gcd(firstStep, secondStep).Ticks == 0;
 
     /// <summary>
     /// Every pair of windows the two resources can hold on one and the same local

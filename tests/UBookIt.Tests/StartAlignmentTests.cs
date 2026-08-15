@@ -71,6 +71,15 @@ public class StartAlignmentTests
 
     private static (ServiceBookingService Booking, Service Service, BookingService Bookings) Wire(
         Service service, params Resource[] resources)
+        => WireAt(null, service, resources);
+
+    /// <summary>
+    /// The same wiring with "now" moved, for the cases that query a date the
+    /// default clock has already passed — lead time would otherwise empty the
+    /// projection and a test about alignment would pass for the wrong reason.
+    /// </summary>
+    private static (ServiceBookingService Booking, Service Service, BookingService Bookings) WireAt(
+        DateTimeOffset? nowUtc, Service service, params Resource[] resources)
     {
         var resourceStore = new InMemoryResourceStore();
         foreach (var resource in resources)
@@ -79,7 +88,7 @@ public class StartAlignmentTests
         }
 
         var services = new InMemoryServiceStore().Add(service);
-        var wired = TestData.ServiceBookingWith(services, resourceStore);
+        var wired = TestData.ServiceBookingWith(services, resourceStore, nowUtc);
 
         return (wired.Services, service, wired.Bookings);
     }
@@ -385,6 +394,192 @@ public class StartAlignmentTests
 
         Assert.False(placed.Succeeded);
         Assert.Contains(placed.Failures, f => f.Code == FailureCodes.ServiceUnavailable);
+    }
+
+    // ------------------------------------------------- daylight saving (design D5)
+
+    /// <summary>
+    /// A resource open on one weekday only, from <paramref name="open"/> to
+    /// <paramref name="close"/> — for the transition-date cases, which need
+    /// windows long enough to straddle 01:00 local.
+    /// </summary>
+    private static Resource OnDay(
+        string type, int id, string name, string open, string close, int granularityMinutes, DayOfWeek day)
+        => Resource.Create(
+            type,
+            name,
+            availability: TestData.Config(
+                TestData.Weekly(open, close, day),
+                constraints: Constraints(granularityMinutes)),
+            id: Id(id)).Value;
+
+    /// <summary>The Sunday Europe/London springs forward, 2026-03-29 at 01:00 local.</summary>
+    private static readonly DateOnly SpringForward = new(2026, 3, 29);
+
+    [Fact]
+    public async Task A_daylight_saving_transition_between_two_windows_is_never_reported_as_a_clash()
+    {
+        // QA CRITICAL. The wall-clock offset between these two windows is 180
+        // minutes, which gcd(8, 16) = 8 does not divide — so on wall-clock
+        // arithmetic alone this pair reads as permanently misaligned. It is not:
+        // the transition at 01:00 falls between the two window starts, so the
+        // real UTC offset on this date is 120 minutes, which 8 divides exactly,
+        // and the service really can be booked.
+        //
+        // Design D5 claimed two windows in one zone shift together. They do —
+        // unless the transition falls between them, which is precisely this case.
+        var (booking, service, _) = WireAt(
+            new DateTimeOffset(2026, 3, 1, 0, 0, 0, TimeSpan.Zero),
+            ServiceOf(ResourceTypes.Room, Therapist),
+            OnDay(ResourceTypes.Room, 1, "Red Room", "00:00", "18:00", 8, SpringForward.DayOfWeek),
+            OnDay(Therapist, 2, "Mary", "03:00", "18:00", 16, SpringForward.DayOfWeek));
+
+        // Silent — and the shared starts below are why that silence is required
+        // rather than merely tolerable.
+        Assert.Null(await Check(booking, service.Id));
+
+        var starts = await booking.GetBookableStartsAsync(service.Id, SpringForward, SpringForward);
+
+        Assert.True(starts.Succeeded);
+        Assert.NotEmpty(starts.Value);
+    }
+
+    [Fact]
+    public void The_wall_clock_offset_is_exact_whenever_the_shared_step_divides_an_hour()
+    {
+        // The guard's own justification, asserted rather than assumed: a DST shift
+        // moves the offset by a whole hour, and divisibility cannot see a shift
+        // the divisor divides. So for every granularity pair in practical use the
+        // wall-clock verdict IS the real verdict, and the guard costs nothing.
+        var hour = TimeSpan.FromHours(1);
+
+        foreach (var (first, second) in new[]
+        {
+            (5, 10), (10, 15), (15, 20), (20, 30), (30, 30), (30, 60), (60, 60), (20, 60),
+        })
+        {
+            var gcd = Gcd(TimeSpan.FromMinutes(first), TimeSpan.FromMinutes(second));
+
+            Assert.True(
+                hour.Ticks % gcd.Ticks == 0,
+                $"gcd({first}, {second}) = {gcd.TotalMinutes} minutes does not divide an hour, " +
+                "so the diagnostic would fall silent for a granularity pair in ordinary use.");
+        }
+
+        static TimeSpan Gcd(TimeSpan a, TimeSpan b)
+        {
+            long x = a.Ticks, y = b.Ticks;
+            while (y != 0)
+            {
+                (x, y) = (y, x % y);
+            }
+
+            return TimeSpan.FromTicks(x);
+        }
+    }
+
+    [Fact]
+    public async Task A_step_pair_the_wall_clock_offset_cannot_settle_is_reported_on_no_day()
+    {
+        // The other half of the guard, and the price of it: 8 against 16 has a gcd
+        // of 8, which does not divide an hour, so this pair is never reported —
+        // not even on a Tuesday in September with no transition anywhere near it,
+        // where the wall-clock arithmetic would in fact have been right.
+        //
+        // Asserted deliberately, so the cost of the guard is visible and a future
+        // change cannot narrow it without a test going red.
+        var (booking, service, _) = Wire(
+            ServiceOf(ResourceTypes.Room, Therapist),
+            Open(ResourceTypes.Room, 1, "Red Room", "09:00", 8),
+            Open(Therapist, 2, "Mary", "09:03", 16));
+
+        Assert.Null(await Check(booking, service.Id));
+    }
+
+    [Fact]
+    public async Task One_unsettleable_candidate_pairing_silences_the_whole_role_pair()
+    {
+        // The guard clears the pair rather than skipping that one pairing, on the
+        // same reasoning as an aligning pairing: the report is about a pair of
+        // ROLES, and a role is a pool. If some candidate combination cannot be
+        // ruled out, the roles cannot be said to never meet — so a pool holding
+        // one unsettleable candidate is silent even though its other candidate
+        // clashes outright.
+        // Red Room against Mary is settleable — gcd(30, 16) = 2 divides an hour —
+        // and clashes: 2 does not divide the 15-minute offset. Blue Room against
+        // Mary is not settleable, because gcd(8, 16) = 8 does not divide an hour.
+        var (booking, service, _) = Wire(
+            ServiceOf(ResourceTypes.Room, Therapist),
+            Open(ResourceTypes.Room, 1, "Red Room", "09:15", 30),
+            Open(ResourceTypes.Room, 2, "Blue Room", "09:15", 8),
+            Open(Therapist, 3, "Mary", "09:00", 16));
+
+        Assert.Null(await Check(booking, service.Id));
+
+        // And without the unsettleable room the same configuration IS reported,
+        // so the silence above comes from the guard rather than from the pool
+        // happening to align.
+        var (narrower, narrowerService, _) = Wire(
+            ServiceOf(ResourceTypes.Room, Therapist),
+            Open(ResourceTypes.Room, 1, "Red Room", "09:15", 30),
+            Open(Therapist, 3, "Mary", "09:00", 16));
+
+        Assert.NotNull(await Check(narrower, narrowerService.Id));
+    }
+
+    // --------------------------------------------- bookings placed under old hours
+
+    [Fact]
+    public async Task A_booking_predating_an_opening_hours_change_does_not_silence_the_report()
+    {
+        // QA MAJOR, resolved as a spec amendment rather than a code change.
+        //
+        // D2's superset argument assumes every booking was placed under the
+        // configuration now in force. This one was not: the room was booked
+        // 09:00–09:30 while it opened at 09:00, and the opening time then moved to
+        // 09:20. The free interval now begins at the old booking's end, 09:30,
+        // which is NOT on the new 09:20/30 window grid — and the therapist's
+        // 09:15/15 grid hits 09:30 exactly, so a shared start exists today.
+        //
+        // The report fires anyway, and that is the decision: it describes the
+        // CONFIGURATION, which is permanently broken the moment the stale booking
+        // clears. Falling silent would couple the diagnostic to the booking
+        // calendar and bring back the flicker D2 exists to prevent.
+        var resources = new InMemoryResourceStore()
+            .Add(OpenUntil(ResourceTypes.Room, 1, "Red Room", "09:00", "17:00", 30))
+            .Add(OpenUntil(Therapist, 2, "Mary", "09:15", "17:00", 15));
+
+        var services = new InMemoryServiceStore().Add(ServiceOf(ResourceTypes.Room, Therapist));
+        var wired = TestData.ServiceBookingWith(services, resources);
+        var serviceId = (await services.ListAsync(0, 1)).Items[0].Id;
+
+        // Valid under the hours in force at the time.
+        var placed = await wired.Bookings.PlaceAsync(new MultiClaimBookingRequest
+        {
+            ResourceIds = [Id(1)],
+            Start = TestData.Utc(TestData.BaseDate, "09:00"),
+            Duration = TimeSpan.FromMinutes(30),
+            Booker = TestData.Booker(),
+        });
+
+        Assert.True(placed.Succeeded, string.Join("; ", placed.Failures.Select(f => f.Code)));
+
+        // The room's opening time moves; the booking stays where it was.
+        resources.Add(OpenUntil(ResourceTypes.Room, 1, "Red Room", "09:20", "17:00", 30));
+
+        var finding = await Check(wired.Services, serviceId);
+
+        Assert.NotNull(finding);
+        Assert.Equal(new TimeOnly(9, 20), finding.First.WindowStart);
+
+        // The transient start the stale booking leaves behind, asserted rather
+        // than described — this is the fact that makes the report's scope a
+        // deliberate choice instead of an oversight.
+        var starts = await wired.Services.GetBookableStartsAsync(
+            serviceId, TestData.BaseDate, TestData.BaseDate);
+
+        Assert.True(starts.Succeeded);
+        Assert.Contains(starts.Value, s => s.StartUtc == TestData.Utc(TestData.BaseDate, "09:30"));
     }
 
     // --------------------------------------------------------- exception dates

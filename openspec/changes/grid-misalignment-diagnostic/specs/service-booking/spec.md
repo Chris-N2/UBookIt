@@ -15,16 +15,42 @@ forbidden to do.
 Two grids SHALL be judged to meet when `gcd(step₁, step₂)` divides the offset
 between their window starts, and to be permanently disjoint otherwise. The check
 SHALL compute over the resources' configured **open windows** rather than their
-free intervals: every candidate start lies on its resource's open-window grid,
-because placement aligns a start to that window and a booking's length is a
-multiple of the resource's granularity, so the window grid contains every start
-the resource can ever offer. A conclusion drawn from it therefore holds whatever
-the bookings are, and cannot appear and disappear as bookings come and go.
+free intervals: every candidate start lies on its resource's open-window grid
+**under the configuration in force**, because placement aligns a start to that
+window and a booking's length is a multiple of the resource's granularity, so the
+window grid contains every start the resource can then offer. A conclusion drawn
+from it therefore describes the configuration rather than the calendar, and
+cannot appear and disappear as bookings come and go.
+
+A booking placed **before** an opening-hours change may end off the grid now in
+force, leaving a free interval — and so a shared start — that the current window
+grid does not contain. The check SHALL still report such a pair. It describes the
+configuration, which is permanently unbookable from the moment that booking
+clears; falling silent would make the report consult the booking calendar, and
+would withdraw it exactly while an editor was performing the repair it asked for.
 
 Windows SHALL be compared on the same **local date** in the site zone, over the
-days on which both roles are open. A daylight-saving transition moves a window's
-UTC instant, so comparing across dates or over a swept UTC horizon would make the
-answer depend on when it was asked; a structural claim SHALL NOT.
+days on which both roles are open. Comparing across dates or over a swept UTC
+horizon would make the answer depend on when it was asked; a structural claim
+SHALL NOT.
+
+A daylight-saving transition falling **between** two windows on that date moves
+one of them, so the wall-clock offset is not then the real one. The check SHALL
+report a pair only when `gcd(step₁, step₂)` divides an hour, which is exactly when
+the wall-clock offset yields the same verdict as the real one — divisibility
+cannot see a shift the divisor divides. Otherwise it SHALL report nothing for that
+pairing, and one such pairing SHALL clear the whole role pair, as an aligning
+pairing does. Every granularity in ordinary use satisfies the condition; where it
+does not, silence is required, because the alternative is accusing a
+configuration that works on the transition date.
+
+#### Scenario: A daylight-saving transition is never reported as a permanent clash
+- **WHEN** two roles' resources are open across a date whose daylight-saving transition falls between their window starts, on granularities whose greatest common divisor does not divide an hour
+- **THEN** the check reports nothing, and the service does have shared starts on that date
+
+#### Scenario: A booking predating an opening-hours change does not withdraw the report
+- **WHEN** a resource's opening time is changed after a booking was placed under the previous hours, so that the booking's end leaves a free interval off the new grid
+- **THEN** the check still reports the pair, because the configuration is permanently misaligned once that booking clears
 
 Two roles SHALL be reported as misaligned only when **no** candidate of one
 shares a grid with **any** candidate of the other, on any day both are open. A
