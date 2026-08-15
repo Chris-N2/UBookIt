@@ -79,7 +79,11 @@ A failed attempt SHALL leave no persisted state, whether it claimed one resource
 
 For a service of several roles, each role's candidate SHALL be chosen independently, which is correct because distinct types make the pools disjoint: no choice made for one role can remove a candidate from another. Combinations SHALL be attempted in a deterministic order.
 
-The number of attempts SHALL NOT grow as the product of the roles' pool sizes. Candidates already claimed at the requested interval SHALL be excluded before any attempt is made, from a single read over every role's shortlist, so that a fully booked service costs no placement attempts rather than one per combination. That read is advisory and SHALL NOT replace the atomic placement contract: a candidate free when it was read may be taken before the attempt lands, which the loop still handles. Excluding a busy candidate SHALL NOT change the all-fail outcome — a candidate that was occupied is the signal that the slot was real and raced, exactly as it was when such a candidate was attempted and refused.
+The number of attempts SHALL NOT grow as the product of the roles' pool sizes. Candidates already claimed at the requested interval SHALL be excluded before any attempt is made, from a single read over every role's shortlist, so that a fully booked service costs no placement attempts rather than one per combination. That read is advisory and SHALL NOT replace the atomic placement contract: a candidate free when it was read may be taken before the attempt lands, which the loop still handles.
+
+Excluding a candidate SHALL NOT change the outcome the caller is told. An excluded candidate SHALL be classified as the attempt it replaced would have classified it, and **being claimed is not sufficient to classify it**: the placement rules that are properties of a resource are evaluated before the conflict check, so a candidate that is claimed *and* would have been refused anyway — a start off its grid, outside its open hours, inside its lead time, or beyond its horizon — contributed a deterministic refusal and never reached the conflict check. Only an excluded candidate whose own rules admit the request makes the all-fail outcome `conflict`. That classification SHALL come from the same rule evaluation placement runs, never from a second implementation of the rules.
+
+Treating every excluded candidate as a lost race would report `conflict` for a request that can never succeed, inviting a retry that cannot help — and would silence the drift signal `service-unavailable` exists to be, in proportion to how busy the site is.
 
 At most one placement attempt SHALL be in flight at a time. **This supersedes the earlier guarantee that no more than one resource lock is held at any moment**: an attempt for a service of several roles necessarily holds a lock for each resource it claims, which is what makes the placement atomic across them. Those locks SHALL be acquired in a deterministic order, so concurrent attempts sharing a resource cannot deadlock, and they SHALL be released together when the attempt commits or fails.
 
@@ -124,8 +128,12 @@ On success the result SHALL identify every resource actually booked.
 - **THEN** each attempt completes before the next begins, and no attempt holds a lock while another is attempted
 
 #### Scenario: A fully booked service costs no placement attempts
-- **WHEN** every candidate of every role is already claimed at the requested start
+- **WHEN** every candidate of every role is already claimed at the requested start, and each of them would otherwise have accepted the request
 - **THEN** placement fails with `conflict` without attempting any combination, rather than attempting one per pair of candidates
+
+#### Scenario: A claimed candidate that would have been refused anyway is not a race
+- **WHEN** the only candidate is already claimed and the requested start is also off its grid, or the requested interval is outside its open hours
+- **THEN** placement fails with `service-unavailable`, not `conflict` — the request could not have succeeded whatever that resource's calendar looked like, so a retry is pointless
 
 ## ADDED Requirements
 

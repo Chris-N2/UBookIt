@@ -648,8 +648,12 @@ export class UBookItServiceEditorElement extends UmbLitElement {
    * A failure carries a row index (`Roles[2].ResourceType`). Adding or removing
    * a row moves every later row to a different index, so a message left behind
    * would render against whatever row now occupies that position — a server
-   * message on the wrong control, which is worse than no message. The summary
-   * keeps them until the next save, which is where they are still true.
+   * message on the wrong control, which is worse than no message.
+   *
+   * They leave the error summary too, since that reads the same list. That is
+   * the right trade: the summary would otherwise keep asserting a failure about
+   * a row the user has just changed or removed, and the next save re-reports
+   * whatever is still wrong. Failures not attributed to a row are untouched.
    */
   #dropRoleErrors() {
     this._errors = this._errors.filter(

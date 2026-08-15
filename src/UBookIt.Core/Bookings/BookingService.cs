@@ -60,6 +60,27 @@ public interface IBookingService
     Task<DomainResult<Booking>> PlaceAsync(
         MultiClaimBookingRequest request, CancellationToken cancellationToken = default);
 
+    /// <summary>
+    /// Runs the placement rules that are properties of the request and one
+    /// resource — everything the pipeline evaluates <em>before</em> the conflict
+    /// check — and reports whether that resource would have refused the request
+    /// regardless of who else holds it.
+    /// <para>
+    /// Exists so a caller that skips an attempt can still classify it the way an
+    /// attempt would have. Service placement excludes candidates already claimed
+    /// at the requested interval; whether such a candidate contributes a lost
+    /// race or a deterministic refusal depends on rules the exclusion cannot
+    /// see — a start off the resource's grid, outside its open hours, inside its
+    /// lead time, or beyond its horizon. Answering that by re-implementing the
+    /// rules would give two implementations free to disagree, so it is answered
+    /// by the same code the pipeline runs.
+    /// </para>
+    /// <para>
+    /// Touches no store and places nothing.
+    /// </para>
+    /// </summary>
+    DomainResult CheckPlacementRules(Resource resource, DateTimeOffset start, TimeSpan duration);
+
     Task<DomainResult<Booking>> CancelAsync(Guid bookingId, CancellationToken cancellationToken = default);
 }
 
@@ -115,41 +136,14 @@ public sealed class BookingService(
             resources.Add(loaded);
         }
 
-        // Rule 1: interval-invalid — including an interval that cannot be
-        // represented at all. The addition is guarded rather than attempted:
-        // unguarded it throws before `BookingInterval.Create` gets the chance to
-        // reject it, which is an unhandled exception out of an anonymous
-        // endpoint rather than a structured failure (out-of-range-dates D2).
-        if (!CalendarBounds.TryAdd(request.Start, request.Duration, out var end))
+        var windowResult = ResolveWindow(zone, request.Start, request.Duration);
+        if (!windowResult.Succeeded)
         {
-            return DomainResult<Booking>.Failure(
-                FailureCodes.IntervalInvalid,
-                "The requested start and duration do not describe a representable interval.");
+            return DomainResult<Booking>.Failure(windowResult.Failures);
         }
 
-        var intervalResult = BookingInterval.Create(request.Start, end, settings.TimeZoneId);
-        if (!intervalResult.Succeeded)
-        {
-            return DomainResult<Booking>.Failure(intervalResult.Failures);
-        }
-
-        var interval = intervalResult.Value;
-        var localStartDate = WallClockMapper.ToLocalDate(interval.StartUtc, zone);
-
-        // Still rule 1: the open-hours rule below inspects the day either side of
-        // the start, and the walk steps once past the later of them. At the edges
-        // of the calendar that window cannot be formed, so the request cannot be
-        // evaluated — reported as an unrepresentable interval rather than thrown
-        // (design D3). Checked here, ahead of the accumulating rules, because
-        // `interval-invalid` is first in the documented pipeline order.
-        if (!CalendarBounds.TryWindowAround(localStartDate, out var windowFrom, out var windowTo))
-        {
-            return DomainResult<Booking>.Failure(
-                FailureCodes.IntervalInvalid,
-                "The requested start is too close to the limits of the calendar to be evaluated.");
-        }
-
-        var nowUtc = timeProvider.GetUtcNow();
+        var window = windowResult.Value;
+        var interval = window.Interval;
         var failures = new List<DomainFailure>();
 
         // Rules 2–7 are properties of a resource, so they run once per claimed
@@ -158,49 +152,7 @@ public sealed class BookingService(
         // pipeline it has always been.
         foreach (var resource in resources)
         {
-            var constraints = resource.Availability.Constraints;
-
-            // Rules 2–4: granularity (duration part), duration bounds
-            failures.AddRange(AvailabilityService.ValidateDuration(request.Duration, constraints));
-
-            // Rule 5: lead-time
-            if (interval.StartUtc < nowUtc + constraints.LeadTime)
-            {
-                failures.Add(new DomainFailure(
-                    FailureCodes.LeadTime,
-                    $"Bookings require at least {constraints.LeadTime.TotalMinutes:0} minutes notice."));
-            }
-
-            // Rule 6: horizon. Saturating, because a horizon reaching past the end of
-            // the calendar means "no effective limit" rather than an error — and
-            // `HorizonDays` is only validated as positive, so a large one would
-            // otherwise throw for every request against that resource.
-            var lastLocalDate = CalendarBounds.AddDaysSaturating(
-                WallClockMapper.ToLocalDate(nowUtc, zone), constraints.HorizonDays);
-            if (localStartDate > lastLocalDate)
-            {
-                failures.Add(new DomainFailure(
-                    FailureCodes.Horizon,
-                    $"Bookings may be placed at most {constraints.HorizonDays} days ahead."));
-            }
-
-            // Rule 7: outside-open-hours — the interval must fit inside one open
-            // window; granularity of the start is relative to its window's start,
-            // which keeps placement consistent with slot projection.
-            var open = FreeTimeCalculator.OpenIntervals(resource.Availability, zone, windowFrom, windowTo);
-            var window = open.FirstOrDefault(w => w.StartUtc <= interval.StartUtc && interval.EndUtc <= w.EndUtc);
-
-            if (window == default)
-            {
-                failures.Add(new DomainFailure(
-                    FailureCodes.OutsideOpenHours, "The requested interval is outside the resource's open hours."));
-            }
-            else if ((interval.StartUtc - window.StartUtc).Ticks % constraints.Granularity.Ticks != 0)
-            {
-                failures.Add(new DomainFailure(
-                    FailureCodes.Granularity,
-                    $"The start time must align to {constraints.Granularity.TotalMinutes:0}-minute steps from the window's start."));
-            }
+            failures.AddRange(ValidateAgainst(resource, window, request.Duration));
         }
 
         if (failures.Count > 0)
@@ -217,7 +169,7 @@ public sealed class BookingService(
             request.Booker,
             [.. resources.Select(r => new ResourceClaim(r.Id))],
             BookingStatus.Confirmed,
-            nowUtc);
+            window.NowUtc);
 
         return await bookingStore.PlaceAsync(booking, cancellationToken).ConfigureAwait(false);
     }
@@ -240,6 +192,140 @@ public sealed class BookingService(
 
         await bookingStore.UpdateAsync(booking, cancellationToken).ConfigureAwait(false);
         return DomainResult<Booking>.Success(booking);
+    }
+
+    public DomainResult CheckPlacementRules(Resource resource, DateTimeOffset start, TimeSpan duration)
+    {
+        ArgumentNullException.ThrowIfNull(resource);
+
+        var zoneResult = AvailabilityService.ResolveZone(settings);
+        if (!zoneResult.Succeeded)
+        {
+            return DomainResult.Failure(zoneResult.Failures);
+        }
+
+        var windowResult = ResolveWindow(zoneResult.Value, start, duration);
+        if (!windowResult.Succeeded)
+        {
+            return DomainResult.Failure(windowResult.Failures);
+        }
+
+        var failures = ValidateAgainst(resource, windowResult.Value, duration);
+
+        return failures.Count == 0 ? DomainResult.Success() : DomainResult.Failure(OrderByPipeline(failures));
+    }
+
+    /// <summary>
+    /// Everything rule 1 establishes: the interval the request describes, the
+    /// local date it starts on, and the day window the open-hours rule needs.
+    /// Shared so placement and rule-checking cannot disagree about what a
+    /// request even means.
+    /// </summary>
+    private sealed record PlacementWindow(
+        TimeZoneInfo Zone,
+        BookingInterval Interval,
+        DateOnly LocalStartDate,
+        DateOnly WindowFrom,
+        DateOnly WindowTo,
+        DateTimeOffset NowUtc);
+
+    private DomainResult<PlacementWindow> ResolveWindow(
+        TimeZoneInfo zone, DateTimeOffset start, TimeSpan duration)
+    {
+        // Rule 1: interval-invalid — including an interval that cannot be
+        // represented at all. The addition is guarded rather than attempted:
+        // unguarded it throws before `BookingInterval.Create` gets the chance to
+        // reject it, which is an unhandled exception out of an anonymous
+        // endpoint rather than a structured failure (out-of-range-dates D2).
+        if (!CalendarBounds.TryAdd(start, duration, out var end))
+        {
+            return DomainResult<PlacementWindow>.Failure(
+                FailureCodes.IntervalInvalid,
+                "The requested start and duration do not describe a representable interval.");
+        }
+
+        var intervalResult = BookingInterval.Create(start, end, settings.TimeZoneId);
+        if (!intervalResult.Succeeded)
+        {
+            return DomainResult<PlacementWindow>.Failure(intervalResult.Failures);
+        }
+
+        var interval = intervalResult.Value;
+        var localStartDate = WallClockMapper.ToLocalDate(interval.StartUtc, zone);
+
+        // Still rule 1: the open-hours rule inspects the day either side of the
+        // start, and the walk steps once past the later of them. At the edges of
+        // the calendar that window cannot be formed, so the request cannot be
+        // evaluated — reported as an unrepresentable interval rather than thrown
+        // (design D3). Checked here, ahead of the accumulating rules, because
+        // `interval-invalid` is first in the documented pipeline order.
+        if (!CalendarBounds.TryWindowAround(localStartDate, out var windowFrom, out var windowTo))
+        {
+            return DomainResult<PlacementWindow>.Failure(
+                FailureCodes.IntervalInvalid,
+                "The requested start is too close to the limits of the calendar to be evaluated.");
+        }
+
+        return DomainResult<PlacementWindow>.Success(new PlacementWindow(
+            zone, interval, localStartDate, windowFrom, windowTo, timeProvider.GetUtcNow()));
+    }
+
+    /// <summary>
+    /// Rules 2–7 for one resource: duration, lead time, horizon, open hours and
+    /// the window-relative grid. The single home of every rule that is a
+    /// property of a resource rather than of the calendar as a whole.
+    /// </summary>
+    private static List<DomainFailure> ValidateAgainst(
+        Resource resource, PlacementWindow window, TimeSpan duration)
+    {
+        var constraints = resource.Availability.Constraints;
+        var interval = window.Interval;
+        var failures = new List<DomainFailure>();
+
+        // Rules 2–4: granularity (duration part), duration bounds
+        failures.AddRange(AvailabilityService.ValidateDuration(duration, constraints));
+
+        // Rule 5: lead-time
+        if (interval.StartUtc < window.NowUtc + constraints.LeadTime)
+        {
+            failures.Add(new DomainFailure(
+                FailureCodes.LeadTime,
+                $"Bookings require at least {constraints.LeadTime.TotalMinutes:0} minutes notice."));
+        }
+
+        // Rule 6: horizon. Saturating, because a horizon reaching past the end of
+        // the calendar means "no effective limit" rather than an error — and
+        // `HorizonDays` is only validated as positive, so a large one would
+        // otherwise throw for every request against that resource.
+        var lastLocalDate = CalendarBounds.AddDaysSaturating(
+            WallClockMapper.ToLocalDate(window.NowUtc, window.Zone), constraints.HorizonDays);
+        if (window.LocalStartDate > lastLocalDate)
+        {
+            failures.Add(new DomainFailure(
+                FailureCodes.Horizon,
+                $"Bookings may be placed at most {constraints.HorizonDays} days ahead."));
+        }
+
+        // Rule 7: outside-open-hours — the interval must fit inside one open
+        // window; granularity of the start is relative to its window's start,
+        // which keeps placement consistent with slot projection.
+        var open = FreeTimeCalculator.OpenIntervals(
+            resource.Availability, window.Zone, window.WindowFrom, window.WindowTo);
+        var openWindow = open.FirstOrDefault(w => w.StartUtc <= interval.StartUtc && interval.EndUtc <= w.EndUtc);
+
+        if (openWindow == default)
+        {
+            failures.Add(new DomainFailure(
+                FailureCodes.OutsideOpenHours, "The requested interval is outside the resource's open hours."));
+        }
+        else if ((interval.StartUtc - openWindow.StartUtc).Ticks % constraints.Granularity.Ticks != 0)
+        {
+            failures.Add(new DomainFailure(
+                FailureCodes.Granularity,
+                $"The start time must align to {constraints.Granularity.TotalMinutes:0}-minute steps from the window's start."));
+        }
+
+        return failures;
     }
 
     private static readonly string[] PipelineOrder =

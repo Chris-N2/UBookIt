@@ -246,7 +246,15 @@ availability and placement are byte-for-byte what they were.
   with no availability.** Cheap and obviously correct, but it changes which role
   a future diagnostic would blame for an empty result. Worth settling against
   `⑨-1a`'s needs rather than in advance.
-- **How the editor should present roles that cannot be reordered.** Roles are a
-  set, not a sequence — nothing depends on their order — but a list UI implies
-  one. Whether to sort by type key, preserve entry order, or say nothing is a
-  presentation call best made against the real editor.
+- ~~**How the editor should present roles that cannot be reordered.**~~
+  **Settled at apply.** `Service.Create` sorts roles ordinally by type key, so
+  the aggregate holds one canonical order and every store agrees by
+  construction rather than by an accident of query planning — the delivery
+  contract's promise of a deterministic order needed an owner, and no read path
+  was a good one. Validation still reports against the order the caller
+  supplied, so a failure names the row the editor is showing.
+
+  **Visible consequence, accepted:** a service reopened after a role is added
+  shows its rows in type order rather than entry order. The editor renders the
+  list it is given and nothing depends on the order, so this is a reordering,
+  not a loss.

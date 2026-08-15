@@ -309,6 +309,9 @@ public class MultiRolePlacementTests
             return inner.PlaceAsync(request, cancellationToken);
         }
 
+        public DomainResult CheckPlacementRules(Resource resource, DateTimeOffset start, TimeSpan duration)
+            => inner.CheckPlacementRules(resource, start, duration);
+
         public Task<DomainResult<Booking>> CancelAsync(
             Guid bookingId, CancellationToken cancellationToken = default)
             => inner.CancelAsync(bookingId, cancellationToken);
@@ -411,6 +414,84 @@ public class MultiRolePlacementTests
         Assert.True(placed.Succeeded);
         Assert.Equal([Id(2), Id(4)], placed.Value.Claims.Select(c => c.ResourceId).OrderBy(id => id));
         Assert.Equal(1, counting.Attempts - attemptsBefore);
+    }
+
+    /// <summary>
+    /// A candidate can be busy <em>and</em> refusable on its own rules. The
+    /// pipeline evaluates those rules before the conflict check, so such a
+    /// candidate contributed a deterministic refusal, never a conflict — and
+    /// excluding it from the attempt list must not change that answer.
+    /// <para>
+    /// This is the class of case that made the claims pre-filter a regression
+    /// the first time: "was any candidate dropped" is not the same question as
+    /// "would any dropped candidate have reached the conflict check".
+    /// </para>
+    /// </summary>
+    [Theory]
+    // Off the resource's grid: 09:30 against an hourly grid opening at 09:00.
+    [InlineData("09:00", "17:00", 60, "09:30", 60)]
+    // Outside its open hours: a 120-minute booking against a one-hour window.
+    [InlineData("09:00", "10:00", 30, "09:00", 120)]
+    public async Task A_busy_candidate_that_would_have_been_refused_anyway_is_not_a_race(
+        string open, string close, int granularity, string start, int minutes)
+    {
+        var service = Svc(ResourceTypes.Room);
+
+        var room = Resource.Create(
+            ResourceTypes.Room,
+            "Only room",
+            availability: TestData.Config(
+                TestData.Weekly(open, close, Date.DayOfWeek),
+                // The minimum has to be a multiple of the granularity, so it is
+                // derived rather than fixed at 30.
+                constraints: BookingConstraints.Create(
+                    granularity: Mins(granularity),
+                    minDuration: Mins(granularity),
+                    maxDuration: Mins(480)).Value),
+            id: Id(1)).Value;
+
+        var harness = Wire(service, room);
+
+        // Occupy it at a start that IS on its grid, so the resource is genuinely
+        // claimed — the pre-filter will drop it.
+        Assert.True((await harness.Bookings.PlaceAsync(new BookingRequest
+        {
+            ResourceId = Id(1),
+            Start = TestData.Utc(Date, open),
+            Duration = Mins(60),
+            Booker = TestData.Booker(),
+        })).Succeeded);
+
+        var placed = await harness.Services.PlaceAsync(Request(service, start, minutes));
+
+        Assert.False(placed.Succeeded);
+
+        // Retrying cannot help: the request is refused by the resource's own
+        // configuration whatever its calendar looks like.
+        Assert.Equal(FailureCodes.ServiceUnavailable, Assert.Single(placed.Failures).Code);
+    }
+
+    [Fact]
+    public async Task A_busy_candidate_that_would_have_been_bookable_is_a_race()
+    {
+        // The pair that keeps the test above honest: same shape, but the request
+        // is one the resource would have accepted, so being busy is the whole
+        // reason it failed and `conflict` is the right answer.
+        var service = Svc(ResourceTypes.Room);
+        var harness = Wire(service, Res(1, ResourceTypes.Room));
+
+        Assert.True((await harness.Bookings.PlaceAsync(new BookingRequest
+        {
+            ResourceId = Id(1),
+            Start = TestData.Utc(Date, "09:00"),
+            Duration = Mins(60),
+            Booker = TestData.Booker(),
+        })).Succeeded);
+
+        var placed = await harness.Services.PlaceAsync(Request(service, "09:00", 60));
+
+        Assert.False(placed.Succeeded);
+        Assert.Equal(FailureCodes.Conflict, Assert.Single(placed.Failures).Code);
     }
 
     [Fact]

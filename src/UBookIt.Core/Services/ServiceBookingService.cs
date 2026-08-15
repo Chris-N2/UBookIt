@@ -491,22 +491,41 @@ public sealed class ServiceBookingService(
             // `interval-invalid` for it.
             free = attemptable;
         }
-        else if (free.Any(shortlist => shortlist.Count == 0))
+
+        // A candidate the pre-filter dropped is one the loop would otherwise have
+        // attempted, so it must still be classified the way that attempt would
+        // have classified it — and "it was busy" is not enough to know.
+        //
+        // The pipeline evaluates a resource's own rules BEFORE the conflict
+        // check, so a candidate that is busy *and* would have been refused
+        // anyway — a start off its grid, outside its open hours, inside its lead
+        // time, beyond its horizon — contributed a deterministic refusal, never
+        // a conflict. Treating every dropped candidate as a lost race turns
+        // `service-unavailable` into `conflict` for exactly those, telling a
+        // caller to retry a slot that can never come good and silencing the
+        // drift signal that code exists to be.
+        //
+        // Asked of the placement service rather than recomputed here: one
+        // implementation of the rules, so the classification cannot drift from
+        // what an attempt would actually have done.
+        var raced = attemptable
+            .Zip(free)
+            .SelectMany(pair => pair.First.Where(candidate => !pair.Second.Contains(candidate)))
+            .Any(candidate => bookingService
+                .CheckPlacementRules(candidate.Resource, request.Start, request.Duration)
+                .Succeeded);
+
+        if (free.Any(shortlist => shortlist.Count == 0))
         {
             // Every candidate of some role is already claimed at that interval.
-            // A race, not a configuration answer: retrying may succeed.
-            return DomainResult<Booking>.Failure(
-                FailureCodes.Conflict,
-                "Every resource able to fulfil this service is already booked at that time.");
+            // Whether that is a race or a configuration answer is decided by the
+            // same classification, not by the emptiness itself.
+            return raced
+                ? DomainResult<Booking>.Failure(
+                    FailureCodes.Conflict,
+                    "Every resource able to fulfil this service is already booked at that time.")
+                : Unavailable("This service cannot be booked at that time.");
         }
-
-        // A candidate dropped by the pre-filter is one the loop would previously
-        // have attempted and been refused with `conflict`. That refusal is the
-        // signal separating "the slot was real and raced" from "this was never
-        // bookable", so excluding those candidates must not also lose it: the
-        // all-fail outcome stays `conflict` whenever any candidate was busy,
-        // exactly as it did when they were attempted.
-        var raced = free.Zip(attemptable).Any(pair => pair.First.Count != pair.Second.Count);
 
         attemptable = free;
 
