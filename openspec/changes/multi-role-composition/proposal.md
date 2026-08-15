@@ -88,6 +88,35 @@ same-type case, which this change rejects.
 No schema change and no migration: the claims table has always been
 one-row-per-claim.
 
+## Guarantees deliberately removed
+
+Three guarantees are **dropped rather than carried**, stated here because a
+wholesale requirement replacement makes a removal look like nothing at all.
+
+- **"Multi-role composition remains rejected"** (`service-booking`) — the
+  scenario asserting that a two-role service is rejected with
+  `service-role-invalid`. It is the behaviour this change exists to replace.
+  What survives of it is narrower and is restated: two roles of the *same*
+  type are still rejected, now with their own code.
+
+- **"One requirement is editable"** (`services`) — the scenario asserting that
+  the editor shows exactly one requirement row with no add or remove control.
+  Replaced by add/remove over one or more rows. The half of it that still
+  holds — that no count field is displayed — is restated in the scenario about
+  the count always being sent as 1.
+
+- **"No more than one resource lock is held at any moment"**
+  (`service-booking`) — superseded rather than dropped, and stated as such in
+  the requirement itself. An attempt for a service of several roles
+  necessarily holds a lock per claimed resource; that is what makes the
+  placement atomic across them. What replaces it is the guarantee that
+  actually holds: one attempt in flight at a time, deterministic lock order,
+  and all locks released together.
+
+Everything else in the requirements this change replaces is carried forward,
+including scenarios whose titles are reworded for the plural shape
+(`…the pool` → `…the pools`, `…outside the pool` → `…outside every pool`).
+
 ## Capabilities
 
 ### New Capabilities
@@ -100,9 +129,12 @@ None. Every change modifies behaviour an existing spec already owns.
   resource type is a validation failure; the editor edits a list of roles rather
   than a list of one; the resolution summary reports a chain per role.
 - `service-booking`: resolution runs per role; availability composes as an
-  intersection across roles; placement claims one resource per role; the
-  overlapping-pools boundary narrows from "multi-role is out of scope" to
-  "same-type roles are out of scope".
+  intersection across roles; placement claims one resource per role and bounds
+  its attempts by excluding candidates already claimed; the union-availability
+  requirement is scoped to *within a role*, since it read "every start at which
+  at least one candidate can fulfil the service" and that is false across
+  roles; the overlapping-pools boundary narrows from "multi-role is out of
+  scope" to "same-type roles are out of scope".
 - `bookings`: the atomic placement contract gains the multi-claim case it
   already describes but has never had reachable behaviour for.
 - `delivery-api`: the service read model publishes several roles; service

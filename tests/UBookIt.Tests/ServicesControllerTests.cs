@@ -278,6 +278,27 @@ public class ServicesControllerTests
         Assert.Equal(["cert-x", "welsh"], model.Roles[0].RequiredCapabilities);
     }
 
+    [Theory]
+    [InlineData(true)]
+    [InlineData(false)]
+    public async Task A_null_role_collection_or_entry_is_a_400_not_a_500(bool nullCollection)
+    {
+        // Neither shape is a ModelState error without [Required], so both would
+        // otherwise leave the controller as an unhandled NullReferenceException
+        // — contradicting the CRUD requirement's promise of 400 problem details
+        // carrying every failed rule.
+        var (controller, store) = Wire();
+
+        var request = ValidRequest();
+        request.Roles = nullCollection ? null! : [null!];
+
+        var (status, codes) = Problem(await controller.CreateService(request));
+
+        Assert.Equal(400, status);
+        Assert.Contains(FailureCodes.ServiceRoleInvalid, codes);
+        Assert.Equal(0, (await store.ListAsync(0, 50)).Total);
+    }
+
     [Fact]
     public async Task Several_roles_round_trip_through_the_api()
     {

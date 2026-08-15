@@ -173,9 +173,28 @@ public sealed class Service
 
         failures.AddRange(DuplicateTypeFailures(roleList));
 
-        return failures.Count > 0
-            ? DomainResult<Service>.Failure(failures)
-            : DomainResult<Service>.Success(new Service(id ?? Guid.NewGuid(), name!.Trim(), durationSpec, roleList));
+        if (failures.Count > 0)
+        {
+            return DomainResult<Service>.Failure(failures);
+        }
+
+        // Roles are an unordered set as far as behaviour is concerned, so the
+        // aggregate holds them in one canonical order — ordinal by type key,
+        // which is unique across a service's roles by the rule just applied.
+        //
+        // Canonicalised here rather than at each read: a store that returned
+        // rows in insertion order and one that returned them in whatever order
+        // an include materialised would otherwise hand back services that
+        // compare unequal and publish their roles differently, and the delivery
+        // contract's promise of a deterministic order would rest on an
+        // accident of query planning rather than on anything this code owns.
+        //
+        // Validation above reports against the order the caller *supplied*, so
+        // a failure still names the row the editor is showing.
+        roleList.Sort((left, right) => string.CompareOrdinal(left.ResourceType, right.ResourceType));
+
+        return DomainResult<Service>.Success(
+            new Service(id ?? Guid.NewGuid(), name!.Trim(), durationSpec, roleList));
     }
 
     /// <summary>

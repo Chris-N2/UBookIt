@@ -123,11 +123,14 @@ internal static class DeliveryModelMapper
         {
             BookingId = booking.Id,
             Status = booking.Status.ToString(),
+            // In the booking's own claim order, which is the order the service's
+            // roles were resolved in — not re-sorted by id. Sorting by id would
+            // be deterministic too, but it would scramble the one piece of
+            // information the collection carries beyond the ids themselves:
+            // which entry filled which role.
             Resources =
             [
-                .. booking.Claims
-                    .Select(claim => new ResolvedResourceModel { ResourceId = claim.ResourceId })
-                    .OrderBy(r => r.ResourceId),
+                .. booking.Claims.Select(claim => new ResolvedResourceModel { ResourceId = claim.ResourceId }),
             ],
             Interval = new IntervalModel { StartUtc = booking.Interval.StartUtc, EndUtc = booking.Interval.EndUtc },
             Booker = ToBookerModel(booking),

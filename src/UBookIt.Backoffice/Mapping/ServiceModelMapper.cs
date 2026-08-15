@@ -13,6 +13,13 @@ internal static class ServiceModelMapper
 {
     internal static DomainResult<Service> ToDomain(ServiceRequestModel model, Guid? id = null)
     {
+        // An explicit `"roles": null` overwrites the property initializer, and a
+        // `[null]` entry survives binding, so both reach here as a null the
+        // domain never sees. Neither is a ModelState error without [Required],
+        // so left alone they leave the controller as a 500 where the CRUD
+        // requirement promises 400 problem details.
+        var roles = (model.Roles ?? []).Where(r => r is not null).ToList();
+
         var duration = ToDomain(model.Duration);
 
         // Each role's capabilities validate separately, for the same reason the
@@ -23,7 +30,7 @@ internal static class ServiceModelMapper
         // `capability-key-invalid` for a role that fumbled both.
         // Each set's failures carry their own role's index, so a malformed key in
         // the third role marks the third row rather than the first.
-        var capabilities = model.Roles
+        var capabilities = roles
             .Select((r, index) => CapabilitySet.Create(
                 r.RequiredCapabilities, ServiceRole.FieldFor(index, CapabilitySet.RequiredField)))
             .ToList();
@@ -31,7 +38,7 @@ internal static class ServiceModelMapper
         var service = Service.Create(
             model.Name,
             duration.Succeeded ? duration.Value : null,
-            model.Roles.Select((r, index) => new ServiceRole(r.ResourceType, r.Count)
+            roles.Select((r, index) => new ServiceRole(r.ResourceType, r.Count)
             {
                 RequiredCapabilities = capabilities[index].Succeeded
                     ? capabilities[index].Value
@@ -81,13 +88,19 @@ internal static class ServiceModelMapper
         // says which row it came from. Deliberately NOT through Service.Create:
         // that would reject two roles of one type, and refusing to answer is
         // exactly what withholds the information needed to fix that fault.
-        var roles = model.Roles
+        // A null collection, or a null entry inside one, binds straight past the
+        // property initializer; dereferencing it would be a 500 where this
+        // endpoint promises a validation failure. Dropped rather than defaulted,
+        // so an all-null list becomes the empty-list failure below.
+        var supplied = (model.Roles ?? []).Where(r => r is not null).ToList();
+
+        var roles = supplied
             .Select((r, index) => ServiceRole.Create(r.ResourceType, r.RequiredCapabilities, 1, index))
             .ToList();
 
         var failures = roles.SelectMany(r => r.Failures).Concat(duration.Failures).ToList();
 
-        if (model.Roles.Count == 0)
+        if (supplied.Count == 0)
         {
             // An empty list is a request with nothing to report on, not a
             // configuration whose chains are all empty.

@@ -367,6 +367,38 @@ public class ServicePreviewEndpointTests
     }
 
     [Fact]
+    public async Task A_null_role_collection_is_a_validation_failure_not_a_crash()
+    {
+        // `{"roles": null}` binds straight past the property initializer, and a
+        // null collection is not a ModelState error without [Required] — so
+        // without a guard this leaves the controller as an unhandled
+        // NullReferenceException where the endpoint promises 400 problem details.
+        var (controller, _) = Wire(TenRooms());
+
+        var request = Configuration(FixedMinutes(60));
+        request.Roles = null!;
+
+        var (status, codes) = Problem(await controller.PreviewServiceConfiguration(request));
+
+        Assert.Equal(400, status);
+        Assert.Contains(FailureCodes.ServiceRoleInvalid, codes);
+    }
+
+    [Fact]
+    public async Task A_null_role_entry_is_a_validation_failure_not_a_crash()
+    {
+        var (controller, _) = Wire(TenRooms());
+
+        var request = Configuration(FixedMinutes(60));
+        request.Roles = [null!];
+
+        var (status, codes) = Problem(await controller.PreviewServiceConfiguration(request));
+
+        Assert.Equal(400, status);
+        Assert.Contains(FailureCodes.ServiceRoleInvalid, codes);
+    }
+
+    [Fact]
     public async Task A_malformed_key_identifies_the_role_it_came_from()
     {
         var (controller, _) = Wire(TenRooms());

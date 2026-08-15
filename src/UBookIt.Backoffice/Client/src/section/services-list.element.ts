@@ -104,7 +104,7 @@ export class UBookItServiceListElement extends UmbLitElement {
     await this.#load();
   }
 
-  /** "1 × masseur" — the single v1 role, ready to list more later. */
+  /** "1 × room, 1 × masseur" — every role the service requires, in order. */
   #summarizeRequirements(service: ServiceResponseModel): string {
     if (service.roles.length === 0) {
       return this.#term("requirementNone");

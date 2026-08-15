@@ -215,6 +215,70 @@ public class CompositeAvailabilityTests
         Assert.True(nine.Admits(Mins(120)));
     }
 
+    [Fact]
+    public async Task Spec_scenario_role_order_is_not_observable_in_availability()
+    {
+        // The half of "role order is not observable" that the aggregate test
+        // cannot reach: two services with the same roles supplied in opposite
+        // orders must resolve to the same candidates and offer the same
+        // availability. The roles differ in grid and range, so a fold that
+        // depended on order would produce different runs rather than the same
+        // ones.
+        Resource[] Pool() =>
+        [
+            Res(1, ResourceTypes.Room, granularity: 30, min: 30, max: 450, open: "09:00", close: "16:30"),
+            Res(2, Therapist, granularity: 45, min: 45, max: 450, open: "09:00", close: "16:30"),
+        ];
+
+        var duration = ServiceDuration.Variable(Mins(25), Mins(400)).Value;
+        var forwards = Svc(duration, ResourceTypes.Room, Therapist);
+        var backwards = Svc(duration, Therapist, ResourceTypes.Room);
+
+        var forwardStarts = await Starts(Wire(forwards, Pool()), forwards);
+        var backwardStarts = await Starts(Wire(backwards, Pool()), backwards);
+
+        Assert.NotEmpty(forwardStarts);
+        Assert.Equal(
+            forwardStarts.Select(s => s.StartUtc),
+            backwardStarts.Select(s => s.StartUtc));
+
+        Assert.Equal(
+            forwardStarts.Select(s => s.Runs.ToArray()),
+            backwardStarts.Select(s => s.Runs.ToArray()));
+
+        // And the candidate pools themselves, role by role.
+        var forwardPools = (await Wire(forwards, Pool()).Services.ResolveCandidatesAsync(forwards.Id)).Value;
+        var backwardPools = (await Wire(backwards, Pool()).Services.ResolveCandidatesAsync(backwards.Id)).Value;
+
+        Assert.Equal(
+            forwardPools.Select(p => (p.Role.ResourceType, p.Candidates.Select(c => c.ResourceId).ToArray())),
+            backwardPools.Select(p => (p.Role.ResourceType, p.Candidates.Select(c => c.ResourceId).ToArray())));
+    }
+
+    [Fact]
+    public async Task A_run_subsumed_by_a_coarser_grid_is_dropped()
+    {
+        // Intersection across roles produces nested runs on different steps far
+        // more often than a single role's union did: two of the room role's runs
+        // paired against the therapist's 60-minute grid give {60,120,60} and
+        // {60,120,120}, and the second says nothing the first does not. An
+        // elimination rule that required equal steps would emit both.
+        var service = Svc(null, ResourceTypes.Room, Therapist);
+        var harness = Wire(
+            service,
+            Res(1, ResourceTypes.Room, granularity: 60, min: 60, max: 120, open: "09:00", close: "11:00"),
+            Res(2, ResourceTypes.Room, granularity: 120, min: 120, max: 120, open: "09:00", close: "11:00"),
+            Res(3, Therapist, granularity: 60, min: 60, max: 120, open: "09:00", close: "11:00"));
+
+        var nine = At(await Starts(harness, service), "09:00");
+
+        Assert.Equal(new LengthRun(Mins(60), Mins(120), Mins(60)), Assert.Single(nine.Runs));
+
+        // The elimination lost nothing: both lengths are still on offer.
+        Assert.True(nine.Admits(Mins(60)));
+        Assert.True(nine.Admits(Mins(120)));
+    }
+
     // --------------------------------------------------------------- the definition
 
     [Fact]

@@ -64,18 +64,22 @@ public class ServicesDeliveryTests
                 new ServiceRole("therapist", 1),
             ]).Value;
 
+        // The therapist deliberately holds the LOWER id, so resource-id order
+        // and role order disagree. With them agreeing, a response sorted by id
+        // and a response in role order are indistinguishable, and any assertion
+        // about which is which passes either way.
         var room = Resource.Create(
             ResourceTypes.Room,
             "Red Room",
             capabilities: ["projector"],
             availability: TestData.Config(TestData.Weekly("09:00", "17:00", Date.DayOfWeek)),
-            id: Id(1)).Value;
+            id: Id(2)).Value;
 
         var therapist = Resource.Create(
             "therapist",
             "Mary",
             availability: TestData.Config(TestData.Weekly("09:00", "17:00", Date.DayOfWeek)),
-            id: Id(2)).Value;
+            id: Id(1)).Value;
 
         return WireService(service, room, therapist);
     }
@@ -403,8 +407,12 @@ public class ServicesDeliveryTests
             await h.Controller.PlaceServiceBooking(h.Service.Id, Placement()));
 
         // Both resolved resources, not one of them and not none: a booker is told
-        // everything they got.
-        Assert.Equal([Id(1), Id(2)], model.Resources.Select(r => r.ResourceId));
+        // everything they got — and in role order, which the fixture's inverted
+        // ids distinguish from id order.
+        Assert.Equal([Id(2), Id(1)], model.Resources.Select(r => r.ResourceId));
+        Assert.Equal(
+            [ResourceTypes.Room, "therapist"],
+            h.Service.Roles.Select(r => r.ResourceType));
         Assert.Equal("Confirmed", model.Status);
     }
 

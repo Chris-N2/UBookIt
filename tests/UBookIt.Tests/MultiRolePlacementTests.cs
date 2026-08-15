@@ -287,6 +287,132 @@ public class MultiRolePlacementTests
             placed.Value.Claims.Select(c => c.ResourceId).OrderBy(id => id));
     }
 
+    /// <summary>
+    /// Counts placement attempts so a test can assert how many combinations the
+    /// loop tried, not merely what it returned.
+    /// </summary>
+    private sealed class CountingBookingService(IBookingService inner) : IBookingService
+    {
+        public int Attempts { get; private set; }
+
+        public Task<DomainResult<Booking>> PlaceAsync(
+            BookingRequest request, CancellationToken cancellationToken = default)
+        {
+            Attempts++;
+            return inner.PlaceAsync(request, cancellationToken);
+        }
+
+        public Task<DomainResult<Booking>> PlaceAsync(
+            MultiClaimBookingRequest request, CancellationToken cancellationToken = default)
+        {
+            Attempts++;
+            return inner.PlaceAsync(request, cancellationToken);
+        }
+
+        public Task<DomainResult<Booking>> CancelAsync(
+            Guid bookingId, CancellationToken cancellationToken = default)
+            => inner.CancelAsync(bookingId, cancellationToken);
+    }
+
+    [Fact]
+    public async Task A_fully_booked_service_does_not_attempt_every_combination()
+    {
+        // The cost this bounds is quadratic in the pool sizes: without the
+        // claims pre-filter, six rooms against six therapists all busy is 36
+        // sequential locking transactions for one anonymous request, and a
+        // realistic pool of sixty each is 3,600. The loop must not attempt a
+        // combination it already knows is occupied.
+        var service = Svc(ResourceTypes.Room, Therapist);
+
+        var resourceStore = new InMemoryResourceStore();
+        var rooms = Enumerable.Range(1, 6).Select(n => Res(n, ResourceTypes.Room)).ToList();
+        var therapists = Enumerable.Range(11, 6).Select(n => Res(n, Therapist)).ToList();
+        foreach (var resource in rooms.Concat(therapists))
+        {
+            resourceStore.Add(resource);
+        }
+
+        var serviceStore = new InMemoryServiceStore().Add(service);
+        var bookingStore = new InMemoryBookingStore();
+        var time = new FixedTimeProvider(TestData.Now);
+        var availability = new AvailabilityService(resourceStore, bookingStore, time, TestData.Settings);
+        var real = new BookingService(resourceStore, bookingStore, time, TestData.Settings);
+        var counting = new CountingBookingService(real);
+        var services = new ServiceBookingService(
+            serviceStore, resourceStore, bookingStore, availability, counting, TestData.Settings);
+
+        // Occupy every resource of both types at the requested start.
+        foreach (var resource in rooms.Concat(therapists))
+        {
+            Assert.True((await real.PlaceAsync(new BookingRequest
+            {
+                ResourceId = resource.Id,
+                Start = TestData.Utc(Date, "09:00"),
+                Duration = Mins(60),
+                Booker = TestData.Booker(),
+            })).Succeeded);
+        }
+
+        var attemptsBefore = counting.Attempts;
+
+        var placed = await services.PlaceAsync(Request(service, "09:00", 60));
+
+        Assert.False(placed.Succeeded);
+
+        // Still a race rather than a configuration answer: those resources are
+        // occupied now, and retrying later may succeed.
+        Assert.Equal(FailureCodes.Conflict, Assert.Single(placed.Failures).Code);
+
+        // Nothing was attempted at all: every combination was known occupied
+        // before any lock was taken. The old cartesian loop made 36 attempts here.
+        Assert.Equal(0, counting.Attempts - attemptsBefore);
+    }
+
+    [Fact]
+    public async Task A_partially_booked_service_attempts_only_the_free_combination()
+    {
+        // The counterpart that stops the test above passing by never attempting
+        // anything: with one free resource per role, exactly one attempt is made
+        // and it succeeds.
+        var service = Svc(ResourceTypes.Room, Therapist);
+
+        var resourceStore = new InMemoryResourceStore();
+        foreach (var resource in new[] { Res(1, ResourceTypes.Room), Res(2, ResourceTypes.Room), Res(3, Therapist), Res(4, Therapist) })
+        {
+            resourceStore.Add(resource);
+        }
+
+        var serviceStore = new InMemoryServiceStore().Add(service);
+        var bookingStore = new InMemoryBookingStore();
+        var time = new FixedTimeProvider(TestData.Now);
+        var availability = new AvailabilityService(resourceStore, bookingStore, time, TestData.Settings);
+        var real = new BookingService(resourceStore, bookingStore, time, TestData.Settings);
+        var counting = new CountingBookingService(real);
+        var services = new ServiceBookingService(
+            serviceStore, resourceStore, bookingStore, availability, counting, TestData.Settings);
+
+        // Busy the lowest-id candidate of each role, so the free combination is
+        // the *second* of each — a combination the loop only reaches by skipping.
+        foreach (var busy in new[] { Id(1), Id(3) })
+        {
+            Assert.True((await real.PlaceAsync(new BookingRequest
+            {
+                ResourceId = busy,
+                Start = TestData.Utc(Date, "09:00"),
+                Duration = Mins(60),
+                Booker = TestData.Booker(),
+            })).Succeeded);
+        }
+
+        var attemptsBefore = counting.Attempts;
+
+        var placed = await services.PlaceAsync(Request(service, "09:00", 60));
+
+        Assert.True(placed.Succeeded);
+        Assert.Equal([Id(2), Id(4)], placed.Value.Claims.Select(c => c.ResourceId).OrderBy(id => id));
+        Assert.Equal(1, counting.Attempts - attemptsBefore);
+    }
+
     [Fact]
     public async Task A_length_no_candidate_of_one_role_can_provide_is_rejected()
     {

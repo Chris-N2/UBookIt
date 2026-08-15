@@ -159,11 +159,12 @@ public class ServiceTests
         Assert.True(forwards.Succeeded);
         Assert.True(backwards.Succeeded);
 
-        // The same set of roles either way round: nothing downstream may depend
-        // on the order they were supplied in.
-        Assert.Equal(
-            forwards.Value.Roles.OrderBy(r => r.ResourceType, StringComparer.Ordinal),
-            backwards.Value.Roles.OrderBy(r => r.ResourceType, StringComparer.Ordinal));
+        // Compared as *sequences*, without sorting either side first. Sorting
+        // both before comparing would assert only that the two contain the same
+        // roles, which is true however the aggregate stores them — the claim
+        // here is stronger: the aggregate itself is order-insensitive, so
+        // nothing downstream can observe what order the caller supplied.
+        Assert.Equal(forwards.Value.Roles, backwards.Value.Roles);
     }
 
     [Fact]

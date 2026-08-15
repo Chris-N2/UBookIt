@@ -16,6 +16,9 @@ internal static class ServiceRowMapper
         => Service.Create(
             row.Name,
             ToDuration(row),
+            // Row order is not relied on: `Service.Create` orders the roles
+            // canonically, so a service rehydrated from rows materialised in
+            // any order is the same service.
             row.Roles.Select(r => new ServiceRole(r.ResourceType, r.Count)
             {
                 RequiredCapabilities = CapabilitySet

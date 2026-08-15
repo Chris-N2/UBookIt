@@ -389,12 +389,26 @@ public sealed class ServiceBookingService(
 
     /// <summary>
     /// Whether every length <paramref name="inner"/> denotes is also denoted by
-    /// <paramref name="outer"/>. Same step and a contained range is sufficient:
-    /// both minima are multiples of that shared step, so the two grids are in
-    /// phase and no length can fall between <paramref name="outer"/>'s.
+    /// <paramref name="outer"/>.
+    /// <para>
+    /// A contained range plus a step that <em>divides</em> the inner one is
+    /// sufficient, because every run is anchored at zero: the inner run's
+    /// lengths are multiples of its own step, each of which is therefore a
+    /// multiple of the outer step, and all of them lie inside the outer range.
+    /// Equal steps are the common case and fall out of the same test.
+    /// </para>
+    /// <para>
+    /// Divisibility rather than equality matters now that runs are intersected
+    /// across roles: pairing a role's two runs against another's routinely
+    /// yields nested runs on <em>different</em> steps — <c>{60,120,60}</c>
+    /// beside <c>{60,120,120}</c> — and an equality test would emit both, the
+    /// second saying nothing the first does not.
+    /// </para>
     /// </summary>
     private static bool Subsumes(LengthRun outer, LengthRun inner)
-        => outer.Step == inner.Step && outer.Min <= inner.Min && outer.Max >= inner.Max;
+        => inner.Step.Ticks % outer.Step.Ticks == 0
+            && outer.Min <= inner.Min
+            && outer.Max >= inner.Max;
 
     public async Task<DomainResult<Booking>> PlaceAsync(
         ServiceBookingRequest request, CancellationToken cancellationToken = default)
@@ -454,7 +468,47 @@ public sealed class ServiceBookingService(
                 $"No resource able to fulfil this service can be booked for {request.Duration.TotalMinutes:0} minutes.");
         }
 
-        var raced = false;
+        // Drop candidates already claimed at the requested interval, in one read
+        // over every shortlist (design D4a).
+        //
+        // Without this the loop attempts the whole cartesian product of the
+        // shortlists — two roles of sixty candidates each, all busy, is 3,600
+        // sequential locking transactions for one anonymous request, because the
+        // filter above is on the requested *length* and bounds nothing when the
+        // resources are merely occupied.
+        //
+        // The read is advisory, not a substitute for the atomic contract: a
+        // candidate free here may be taken before the placement lands, which the
+        // loop below still handles. It can only ever cause a false `conflict` —
+        // never a booking on a resource that was not free — because placement
+        // rechecks under the lock.
+        var free = await FreeShortlistsAsync(attemptable, request, cancellationToken).ConfigureAwait(false);
+
+        if (free is null)
+        {
+            // The interval is unrepresentable, so no claims window can be formed.
+            // Left to the placement pipeline, which owns that failure and reports
+            // `interval-invalid` for it.
+            free = attemptable;
+        }
+        else if (free.Any(shortlist => shortlist.Count == 0))
+        {
+            // Every candidate of some role is already claimed at that interval.
+            // A race, not a configuration answer: retrying may succeed.
+            return DomainResult<Booking>.Failure(
+                FailureCodes.Conflict,
+                "Every resource able to fulfil this service is already booked at that time.");
+        }
+
+        // A candidate dropped by the pre-filter is one the loop would previously
+        // have attempted and been refused with `conflict`. That refusal is the
+        // signal separating "the slot was real and raced" from "this was never
+        // bookable", so excluding those candidates must not also lose it: the
+        // all-fail outcome stays `conflict` whenever any candidate was busy,
+        // exactly as it did when they were attempted.
+        var raced = free.Zip(attemptable).Any(pair => pair.First.Count != pair.Second.Count);
+
+        attemptable = free;
 
         foreach (var combination in Combinations(attemptable))
         {
@@ -553,14 +607,53 @@ public sealed class ServiceBookingService(
             : candidates;
 
     /// <summary>
+    /// The shortlists with every candidate already claimed at the requested
+    /// interval removed, judged from one claims read over all of them.
+    /// <para>
+    /// Returns null when the requested interval cannot be represented at all, so
+    /// no window can be formed to read; the caller leaves that to the placement
+    /// pipeline, which owns the failure.
+    /// </para>
+    /// </summary>
+    private async Task<List<List<ServiceCandidate>>?> FreeShortlistsAsync(
+        List<List<ServiceCandidate>> shortlists,
+        ServiceBookingRequest request,
+        CancellationToken cancellationToken)
+    {
+        if (!CalendarBounds.TryAdd(request.Start, request.Duration, out var end))
+        {
+            return null;
+        }
+
+        var claims = await bookingStore
+            .GetClaimsAsync(
+                [.. shortlists.SelectMany(s => s).Select(c => c.ResourceId)],
+                request.Start,
+                end,
+                cancellationToken)
+            .ConfigureAwait(false);
+
+        // Only a blocking claim occupies a resource; a cancelled booking leaves
+        // its interval free, exactly as the availability path treats it.
+        var claimed = claims
+            .Where(AvailabilityService.IsBlocking)
+            .Select(c => c.ResourceId)
+            .ToHashSet();
+
+        return [.. shortlists.Select(shortlist =>
+            shortlist.Where(c => !claimed.Contains(c.ResourceId)).ToList())];
+    }
+
+    /// <summary>
     /// Every combination of one candidate per role, in a deterministic order:
     /// the last role varies fastest, so repeated identical requests attempt the
     /// same combinations in the same sequence.
     /// <para>
     /// Lazy, so a successful first attempt costs one placement. The number of
-    /// combinations is the product of the shortlist sizes; it is bounded in
-    /// practice by roles being few and by every candidate having already been
-    /// filtered to those admitting the requested length.
+    /// combinations is the product of the shortlist sizes, which the caller has
+    /// already reduced to the candidates that were free when it read the claims
+    /// — normally one per role. The product is what makes that pre-filter
+    /// load-bearing rather than an optimisation.
     /// </para>
     /// </summary>
     private static IEnumerable<ServiceCandidate[]> Combinations(List<List<ServiceCandidate>> shortlists)

@@ -1,5 +1,56 @@
 ## MODIFIED Requirements
 
+### Requirement: Union availability over a candidate pool
+`UBookIt.Core` SHALL expose a service availability query returning, for an inclusive `[from, to]` date range, every start at which the service can be booked, together with the lengths bookable at that start. The query SHALL NOT take a requested duration.
+
+**Within a role**, a start SHALL be offered when at least one of that role's candidates can fulfil it: availability over a role's pool is a union. Across roles it is an intersection, specified separately in "Composite availability across roles"; for a single-role service the two coincide, and this requirement describes that case unchanged.
+
+The lengths at a start SHALL be expressed as a list of **arithmetic runs**, each `{ Min, Max, Step }`, denoting the lengths `Min, Min + Step, …, Max` inclusive. Within a role, each contributing candidate produces exactly one run at a start: its resolved range narrowed by how much free time remains from that start, stepping by that candidate's granularity. `Min` and `Max` SHALL both be multiples of `Step`, so `Max` is always reachable. A run arising from composition across roles denotes the same thing and satisfies the same property, but is not attributable to a single candidate.
+
+Runs SHALL NOT be merged into a single `(minimum, maximum)` pair. Candidates differ in granularity and in minimum duration, so the union of their lengths at a start is in general neither contiguous nor confined to one grid; a merged pair would advertise lengths no candidate can book.
+
+A run whose lengths another run at the same start already offers SHALL be dropped, and the remaining list SHALL be ordered deterministically. This is subset elimination and loses nothing: identically-configured candidates diverge as soon as one of them is booked — same grid and minimum, a shorter remaining run — and emitting both says nothing the wider one does not. Runs that merely *overlap* SHALL remain distinct, because each then carries lengths the other lacks. The set of lengths on offer at a start SHALL be identical before and after this elimination.
+
+A start SHALL be omitted entirely when the service cannot be booked from it. The response SHALL NOT identify which resource backs a start or a run: the resources are resolved at placement time, and naming one here would imply a guarantee placement does not make.
+
+The query SHALL apply the same bounded-range, inverted-range, and time-zone rules as the per-resource availability queries.
+
+#### Scenario: Homogeneous pool yields one run per start
+- **WHEN** every candidate of a single-role service shares the same granularity, minimum, and maximum, and two of them are bookable from a given start — including when one has a booking later in the day and so offers a shorter run than the other
+- **THEN** that start carries exactly one run, the widest on offer, identical to what a single such resource would offer
+
+#### Scenario: A subsumed run is dropped but a partially overlapping one is kept
+- **WHEN** one candidate offers 30–90 at 30-minute steps, a second offers 30–480 at 30-minute steps, and a third offers 20–120 at 20-minute steps from the same start
+- **THEN** that start carries two runs — the 30-minute one is dropped as a subset of the 480 one, and the 20-minute run survives because it carries lengths the others lack
+
+#### Scenario: Eliminating runs never removes an offered length
+- **WHEN** the lengths denoted by a start's runs are compared with the union of every candidate's own lengths at that start
+- **THEN** the two sets are equal
+
+#### Scenario: Differing granularities are not merged
+- **WHEN** at one start a 30-minute-granularity candidate offers 30–90 minutes and a 20-minute-granularity candidate offers 20–120 minutes
+- **THEN** that start carries two runs — `{30, 90, 30}` and `{20, 120, 20}` — and no run implies that 25, 50, or 70 minutes is bookable
+
+#### Scenario: A gap between candidates is preserved
+- **WHEN** at one start a candidate offers only 30 minutes and another offers 90–120 minutes
+- **THEN** that start carries the runs `{30, 30, 30}` and `{90, 120, 30}`, and 60 minutes is not advertised as bookable
+
+#### Scenario: Free time truncates a run
+- **WHEN** a candidate permits up to 120 minutes through the service but only 60 minutes of free time remains from a start
+- **THEN** that candidate's run at that start ends at 60 minutes
+
+#### Scenario: A start no candidate can fulfil is omitted
+- **WHEN** at a given start every candidate of a role has remaining free time shorter than its resolved minimum for the service
+- **THEN** that start does not appear in the response
+
+#### Scenario: Availability does not name resources
+- **WHEN** a service availability response is inspected
+- **THEN** no entry carries a resource id, and nothing identifies which candidate produced a run
+
+#### Scenario: Per-resource semantics are reused, not reimplemented
+- **WHEN** a single-role service has exactly one candidate whose constraints the service does not narrow
+- **THEN** the starts returned are exactly those the per-resource bookable-start query returns for that resource over the same range
+
 ### Requirement: Overlapping eligibility pools are a known boundary
 Capability-constrained eligibility SHALL be understood to produce eligibility pools that overlap without being identical — a role requiring a capability resolves to a strict subset of the pool of a role requiring none of the same type. Single-role resolution SHALL be unaffected by this, since each role resolves independently.
 
@@ -24,7 +75,11 @@ Multi-role composition is supported **only where every role names a distinct res
 
 For a single-role service, placement SHALL attempt candidates one at a time, each attempt running the atomic placement contract for that single resource, and SHALL return the first success. Candidates SHALL be attempted in a deterministic order — ascending resource id — so repeated identical requests behave identically.
 
-For a service of several roles, each role's candidate SHALL be chosen independently, which is correct because distinct types make the pools disjoint: no choice made for one role can remove a candidate from another. Combinations SHALL be attempted in a deterministic order, and a failed attempt SHALL leave no persisted state, so attempting combinations in sequence is safe.
+A failed attempt SHALL leave no persisted state, whether it claimed one resource or several, so attempting candidates or combinations in sequence is safe.
+
+For a service of several roles, each role's candidate SHALL be chosen independently, which is correct because distinct types make the pools disjoint: no choice made for one role can remove a candidate from another. Combinations SHALL be attempted in a deterministic order.
+
+The number of attempts SHALL NOT grow as the product of the roles' pool sizes. Candidates already claimed at the requested interval SHALL be excluded before any attempt is made, from a single read over every role's shortlist, so that a fully booked service costs no placement attempts rather than one per combination. That read is advisory and SHALL NOT replace the atomic placement contract: a candidate free when it was read may be taken before the attempt lands, which the loop still handles. Excluding a busy candidate SHALL NOT change the all-fail outcome — a candidate that was occupied is the signal that the slot was real and raced, exactly as it was when such a candidate was attempted and refused.
 
 At most one placement attempt SHALL be in flight at a time. **This supersedes the earlier guarantee that no more than one resource lock is held at any moment**: an attempt for a service of several roles necessarily holds a lock for each resource it claims, which is what makes the placement atomic across them. Those locks SHALL be acquired in a deterministic order, so concurrent attempts sharing a resource cannot deadlock, and they SHALL be released together when the attempt commits or fails.
 
@@ -64,9 +119,13 @@ On success the result SHALL identify every resource actually booked.
 - **WHEN** a placement supplies a preferred resource id against a service one of whose roles has an empty candidate pool
 - **THEN** placement fails with code `resource-not-eligible`, not `service-unavailable` — the caller's own mistake is the more useful thing to report
 
-#### Scenario: One lock at a time within an attempt
-- **WHEN** a candidate loop runs over several candidates
-- **THEN** each attempt completes before the next begins
+#### Scenario: One attempt at a time
+- **WHEN** a candidate loop runs over several candidates or combinations
+- **THEN** each attempt completes before the next begins, and no attempt holds a lock while another is attempted
+
+#### Scenario: A fully booked service costs no placement attempts
+- **WHEN** every candidate of every role is already claimed at the requested start
+- **THEN** placement fails with `conflict` without attempting any combination, rather than attempting one per pair of candidates
 
 ## ADDED Requirements
 

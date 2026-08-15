@@ -47,9 +47,13 @@ const DURATION_FIELDS = ["Duration", "Duration.Min", "Duration.Max"];
  * summary plus group-associated messages, and never lose form state.
  *
  * Shape notes:
- * - Requirements render as a list of exactly one role with no add/remove
- *   control, so multi-role support is an addition rather than a rewrite
- *   (design D5). `count` is not surfaced and is always sent as 1.
+ * - Requirements render as one row per role, with add and remove; a service
+ *   always keeps at least one, so the last row offers no remove control.
+ *   `count` is not surfaced and is always sent as 1, so supporting a count
+ *   greater than one is an addition to a row rather than a restructuring.
+ * - Resource types are NOT filtered against the rows already using them. The
+ *   duplicate-type rule is the server's, and enforcing it here as well would
+ *   make relaxing it later a change in two places (multi-role design D1).
  * - Duration is an explicit choice, never an empty box meaning "inherit"
  *   (design D4).
  *
@@ -635,6 +639,22 @@ export class UBookItServiceEditorElement extends UmbLitElement {
 
   #addRole() {
     this._roles = [...this._roles, { resourceType: "", requiredCapabilities: [] }];
+    this.#dropRoleErrors();
+  }
+
+  /**
+   * Discards role-attributed failures whenever the rows are re-indexed.
+   *
+   * A failure carries a row index (`Roles[2].ResourceType`). Adding or removing
+   * a row moves every later row to a different index, so a message left behind
+   * would render against whatever row now occupies that position — a server
+   * message on the wrong control, which is worse than no message. The summary
+   * keeps them until the next save, which is where they are still true.
+   */
+  #dropRoleErrors() {
+    this._errors = this._errors.filter(
+      (e) => !(e.field ?? "").startsWith("Roles["),
+    );
   }
 
   /**
@@ -649,6 +669,7 @@ export class UBookItServiceEditorElement extends UmbLitElement {
     }
 
     this._roles = this._roles.filter((_, i) => i !== index);
+    this.#dropRoleErrors();
     void this.#refreshResolution();
 
     await this.updateComplete;
