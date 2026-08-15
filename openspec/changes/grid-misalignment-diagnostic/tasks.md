@@ -57,7 +57,7 @@
 - [x] 5b.2 **MINOR — the recorded residue was wrong in both directions.** It named 45 minutes, which the guard already silences, and omitted 20, which is two resources on the same ordinary grid. Corrected to {4, 12, 20, 60}, with the empirical finding that Lord Howe Island is the only zone still carrying a sub-hour delta, and the standard-offset variant noted.
 - [x] 5b.3 Recorded the *better* alternative QA identified — require the gcd to divide every `DaylightDelta` of the site zone, which is zone-aware but date-free — so D5's rejection does not stand against a weaker alternative than the best available.
 - [x] 5b.4 NIT: signposted at the delta's "permanently disjoint otherwise" SHALL that the daylight-saving condition narrows when it may be reported.
-- [ ] 5b.5 QA asked to verify the three live-DOM scenarios itself rather than accept the applying session's pass. TestSite restarted for it.
+- [x] 5b.5 QA verified the three live-DOM scenarios itself rather than accept the applying session's pass — 22/22 spec criteria, APPROVE. It read `.alignment` and `.resolution` as sibling children of the form (neither containing the other), audited all 10 id references in the shadow root (0 dangling), and watched the live region keep its role and label while its content went from four lines to zero. For the disappears-without-saving scenario it read an existing resource's real configuration first, so the aligning case was predictable rather than hoped for, and excluded both confounds: the chains stayed populated (so the request succeeded rather than failed) and the gcd divided an hour (so the DST guard was not what silenced it). Fixture restored, nothing saved.
 
 ## 6. Handover
 
