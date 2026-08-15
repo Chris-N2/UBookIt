@@ -444,38 +444,33 @@ public class StartAlignmentTests
         Assert.NotEmpty(starts.Value);
     }
 
-    [Fact]
-    public void The_wall_clock_offset_is_exact_whenever_the_shared_step_divides_an_hour()
+    [Theory]
+    [InlineData(20, 20, "09:10")]  // gcd 20 — two resources on the same ordinary grid
+    [InlineData(60, 60, "09:30")]  // gcd 60 — the coarsest ordinary pair
+    [InlineData(20, 60, "09:10")]  // gcd 20
+    [InlineData(12, 12, "09:06")]  // gcd 12
+    [InlineData(4, 8, "09:02")]    // gcd 4
+    public async Task A_granularity_pair_in_ordinary_use_is_still_reported(
+        int firstStep, int secondStep, string secondOpen)
     {
-        // The guard's own justification, asserted rather than assumed: a DST shift
-        // moves the offset by a whole hour, and divisibility cannot see a shift
-        // the divisor divides. So for every granularity pair in practical use the
-        // wall-clock verdict IS the real verdict, and the guard costs nothing.
-        var hour = TimeSpan.FromHours(1);
+        // The guard's cost boundary, asserted THROUGH the real check rather than
+        // against a restatement of its arithmetic.
+        //
+        // QA MAJOR (round 2): this test previously reimplemented gcd locally and
+        // asserted that an hour divides it — an assertion about arithmetic, which
+        // does not regress. Narrowing the guard's divisor from an hour to half of
+        // one left all 529 tests green while silencing exactly these five pairs,
+        // and the dead test's own failure message claimed to be guarding them.
+        //
+        // These are the gcds that divide an hour but not half of one — 4, 12, 20
+        // and 60 minutes — so they are precisely what the chosen divisor buys.
+        // Narrowing it makes every case here go silent, and this red.
+        var (booking, service, _) = Wire(
+            ServiceOf(ResourceTypes.Room, Therapist),
+            Open(ResourceTypes.Room, 1, "Red Room", "09:00", firstStep),
+            Open(Therapist, 2, "Mary", secondOpen, secondStep));
 
-        foreach (var (first, second) in new[]
-        {
-            (5, 10), (10, 15), (15, 20), (20, 30), (30, 30), (30, 60), (60, 60), (20, 60),
-        })
-        {
-            var gcd = Gcd(TimeSpan.FromMinutes(first), TimeSpan.FromMinutes(second));
-
-            Assert.True(
-                hour.Ticks % gcd.Ticks == 0,
-                $"gcd({first}, {second}) = {gcd.TotalMinutes} minutes does not divide an hour, " +
-                "so the diagnostic would fall silent for a granularity pair in ordinary use.");
-        }
-
-        static TimeSpan Gcd(TimeSpan a, TimeSpan b)
-        {
-            long x = a.Ticks, y = b.Ticks;
-            while (y != 0)
-            {
-                (x, y) = (y, x % y);
-            }
-
-            return TimeSpan.FromTicks(x);
-        }
+        Assert.NotNull(await Check(booking, service.Id));
     }
 
     [Fact]

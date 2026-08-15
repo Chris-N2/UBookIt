@@ -182,11 +182,34 @@ recurs forever, so "which dates" has no natural bound, and the answer would star
 depending on which ones were examined.
 
 **Known limit, recorded rather than silently accepted.** The guard tests against
-one hour, while Lord Howe Island shifts by 30 minutes. A site in such a zone whose
-two resources have a gcd dividing an hour but not half of one — 60 or 45 minutes —
-could still be falsely accused. Testing against 30 minutes instead would close it
-at the cost of never reporting any pair whose gcd is 60 minutes, which is an
-ordinary and detectable misalignment. Deferred deliberately.
+one hour, so it is exact for every whole-hour transition and only for those. A
+zone whose transition is not a whole hour leaves a residue: the gcds that divide
+an hour but not the transition. For a 30-minute transition that residue is
+**4, 12, 20 and 60 minutes** — and 20 is two resources on the same ordinary grid,
+so this is an unremarkable configuration rather than an exotic one.
+
+The exposure is nonetheless a single zone. Enumerating the tz database, the only
+zone still carrying a sub-hour daylight delta in 2026 is **Lord Howe Island**, at
+30 minutes. Against that: testing the guard at 30 minutes instead would silence
+every one of those four gcds *everywhere*, including two 20-minute resources and
+two 60-minute ones, which are ordinary and detectable misalignments. Trading a
+worldwide loss of detection for one island is the wrong way round, so the hour
+stands and the residue is recorded. (Two 20-minute grids in Lord Howe Island can
+still be falsely accused; nothing here pretends otherwise.)
+
+A sub-hour change to a zone's **standard** offset — a jurisdiction permanently
+shifting its base offset by half an hour — has the same shape and the same
+residue. More remote still, and noted only so the record is complete.
+
+*The better alternative, for whoever revisits this.* The exact fix does not need
+dates at all: require the gcd to divide every distinct `DaylightDelta` the site
+zone's adjustment rules carry. That is zone-aware but date-free, so it escapes
+the objection above, closes the residue completely, and stops the guard
+over-silencing in zones with no daylight saving at all — where it currently fires
+on granularity alone. Its cost is threading `SiteBookingSettings` into a check
+that today takes nothing but pools, which is why it is not being done now. It is
+recorded because the rejection above should not stand against a weaker
+alternative than the best one available.
 
 ### D6 — The finding sits beside the chains, not inside them
 

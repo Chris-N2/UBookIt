@@ -51,6 +51,14 @@
 - [x] 5a.3 Covering tests for both, and `proposal.md`'s claim of a DST test made true rather than deleted. Mutation-checked the guard: disabling it fails 3 tests including the CRITICAL repro.
 - [x] 5a.4 Re-run: full build clean, full unit/integration/client suites green.
 
+## 5b. QA remediation (round 2, 2026-08-15)
+
+- [x] 5b.1 **MAJOR — a test that could not fail.** `The_wall_clock_offset_is_exact_whenever_the_shared_step_divides_an_hour` reimplemented `gcd` locally and asserted an arithmetic identity, never touching the check; QA showed that narrowing the guard's divisor to 30 minutes left all 529 tests green while silencing the very pairs the dead test's failure message claimed to guard. Replaced with a theory over the five gcds that divide an hour but not half of one (4, 12, 20, 60), asserted through the real check. That mutation now fails all five.
+- [x] 5b.2 **MINOR — the recorded residue was wrong in both directions.** It named 45 minutes, which the guard already silences, and omitted 20, which is two resources on the same ordinary grid. Corrected to {4, 12, 20, 60}, with the empirical finding that Lord Howe Island is the only zone still carrying a sub-hour delta, and the standard-offset variant noted.
+- [x] 5b.3 Recorded the *better* alternative QA identified — require the gcd to divide every `DaylightDelta` of the site zone, which is zone-aware but date-free — so D5's rejection does not stand against a weaker alternative than the best available.
+- [x] 5b.4 NIT: signposted at the delta's "permanently disjoint otherwise" SHALL that the daylight-saving condition narrows when it may be reported.
+- [ ] 5b.5 QA asked to verify the three live-DOM scenarios itself rather than accept the applying session's pass. TestSite restarted for it.
+
 ## 6. Handover
 
 - [x] 6.1 Record what ⑨-2 inherits: same-type roles draw from one pool, so two roles of one type share a grid trivially and this check must not fire on them; matching changes which pairings matter.

@@ -13,7 +13,9 @@ positively would assert availability, which the configuration surfaces are
 forbidden to do.
 
 Two grids SHALL be judged to meet when `gcd(step₁, step₂)` divides the offset
-between their window starts, and to be permanently disjoint otherwise. The check
+between their window starts, and to be permanently disjoint otherwise — subject to
+the daylight-saving condition below, which narrows when that judgement may be
+*reported*. The check
 SHALL compute over the resources' configured **open windows** rather than their
 free intervals: every candidate start lies on its resource's open-window grid
 **under the configuration in force**, because placement aligns a start to that
