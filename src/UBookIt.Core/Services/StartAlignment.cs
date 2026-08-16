@@ -142,6 +142,27 @@ public static class StartAlignment
         {
             foreach (var right in second.Candidates)
             {
+                if (left.ResourceId == right.ResourceId)
+                {
+                    // A resource compared against itself. Once two roles may draw
+                    // on one pool the same resource appears in both, and it
+                    // trivially shares its own grid — so without this the report is
+                    // silenced by an assignment that can never occur, since a
+                    // booking cannot claim one resource twice (design D7).
+                    //
+                    // Skipped *before* the daylight-saving guard, not after: a
+                    // self-pairing has gcd(g, g) = g, so a granularity that does not
+                    // divide an hour would clear the whole role pair by that route
+                    // instead — the same silence through a different door.
+                    //
+                    // Deliberately narrow. Same-type role pairs are NOT skipped
+                    // wholesale: two roles of one type requiring different
+                    // capabilities can draw on disjoint sets of resources, so a
+                    // genuine permanent misalignment between them remains possible
+                    // and must still be reported.
+                    continue;
+                }
+
                 if (!WallClockOffsetSettlesIt(left.Granularity, right.Granularity))
                 {
                     // The wall-clock offset cannot settle this pair, so nothing

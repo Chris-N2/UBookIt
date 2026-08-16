@@ -43,6 +43,40 @@ public class StartAlignmentTests
                 constraints: Constraints(granularityMinutes)),
             id: Id(id)).Value;
 
+    /// <summary>
+    /// The same, carrying capabilities — so two roles of one resource type can be
+    /// given pools that overlap, or that are disjoint, on purpose.
+    /// </summary>
+    private static Resource OpenWith(
+        string type,
+        int id,
+        string name,
+        string open,
+        int granularityMinutes,
+        params string[] capabilities)
+        => Resource.Create(
+            type,
+            name,
+            capabilities: capabilities,
+            availability: TestData.Config(
+                TestData.Weekly(open, "18:00", [OpenDay]),
+                constraints: Constraints(granularityMinutes)),
+            id: Id(id)).Value;
+
+    /// <summary>
+    /// A service of two roles of one resource type, distinguished by the
+    /// capabilities each requires — the composition ⑨-2 makes valid, and the one
+    /// the self-pairing defect lives in.
+    /// </summary>
+    private static Service SameTypeService(string type, string[] firstCapabilities, string[] secondCapabilities)
+        => Service.Create(
+            "Joint session",
+            ServiceDuration.Variable(null, null).Value,
+            [
+                ServiceRole.Create(type, firstCapabilities).Value,
+                ServiceRole.Create(type, secondCapabilities).Value,
+            ]).Value;
+
     private static BookingConstraints Constraints(int granularityMinutes)
         => BookingConstraints.Create(
             granularity: TimeSpan.FromMinutes(granularityMinutes),
@@ -625,5 +659,74 @@ public class StartAlignmentTests
             Open(Therapist, 2, "Mary", "09:00", 20));
 
         Assert.NotNull(await Check(booking, service.Id));
+    }
+
+    [Fact]
+    public async Task Spec_scenario_a_resource_shared_between_two_roles_does_not_silence_the_report()
+    {
+        // Both roles name `therapist`, and Mary carries `cert-x`, so she is in both
+        // pools. The only pairing that appears to meet is Mary against herself —
+        // offset zero, which every gcd divides.
+        //
+        //   role 1 (no capabilities) → { Mary 09:00/30, Nia 09:15/20 }
+        //   role 2 ({cert-x})        → { Mary 09:00/30 }
+        //
+        // Nia against Mary is 15 minutes apart on gcd(20, 30) = 10, which cannot
+        // meet. Before design D7 the self-pairing returned early and the report was
+        // silenced through an assignment no booking could ever make.
+        var (booking, service, _) = Wire(
+            SameTypeService(Therapist, [], ["cert-x"]),
+            OpenWith(Therapist, 1, "Mary", "09:00", 30, "cert-x"),
+            OpenWith(Therapist, 2, "Nia", "09:15", 20));
+
+        var finding = await Check(booking, service.Id);
+
+        Assert.NotNull(finding);
+        Assert.Equal("Nia", finding.First.Resource.DisplayName);
+        Assert.Equal("Mary", finding.Second.Resource.DisplayName);
+    }
+
+    [Fact]
+    public async Task Spec_scenario_a_misalignment_between_two_same_type_roles_is_still_reported()
+    {
+        // The case that distinguishes the narrow fix from the wholesale one. Two
+        // `therapist` roles requiring different capabilities, no resource holding
+        // both, so the pools are genuinely disjoint and no self-pairing arises at
+        // all. Skipping same-type role pairs — rather than equal resources — would
+        // silence a real permanent misalignment here.
+        var (booking, service, _) = Wire(
+            SameTypeService(Therapist, ["cert-x"], ["welsh"]),
+            OpenWith(Therapist, 1, "Mary", "09:00", 30, "cert-x"),
+            OpenWith(Therapist, 2, "Nia", "09:15", 20, "welsh"));
+
+        var finding = await Check(booking, service.Id);
+
+        Assert.NotNull(finding);
+        Assert.Equal("Mary", finding.First.Resource.DisplayName);
+        Assert.Equal("Nia", finding.Second.Resource.DisplayName);
+
+        // Both sides name the same resource type, which is exactly what a wholesale
+        // same-type skip would have suppressed.
+        Assert.Equal(Therapist, finding.First.Role.ResourceType);
+        Assert.Equal(Therapist, finding.Second.Role.ResourceType);
+    }
+
+    [Fact]
+    public async Task Two_roles_over_a_single_resource_pool_report_nothing()
+    {
+        // Mary is the only therapist and carries `cert-x`, so both roles resolve to
+        // her alone. Every pairing is the self-pairing, which is skipped, so nothing
+        // is ever compared and the check stays silent.
+        //
+        // That silence is correct rather than a miss: this configuration is not
+        // *misaligned*, it is short of resources — one resource cannot fill two
+        // slots. Reporting "these two grids can never meet" would be a strange way
+        // to say so. The pool-sufficiency diagnostic that does say so belongs to
+        // ⑨-2a, derived from the assignment's deficient set.
+        var (booking, service, _) = Wire(
+            SameTypeService(Therapist, [], ["cert-x"]),
+            OpenWith(Therapist, 1, "Mary", "09:00", 30, "cert-x"));
+
+        Assert.Null(await Check(booking, service.Id));
     }
 }

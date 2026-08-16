@@ -38,9 +38,10 @@
 
 ## 5. Core — the alignment check
 
-- [ ] 5.1 Skip pairings of equal resource ids in `StartAlignment.Compare` (design D7). Without it, a shared resource silences the report through an assignment that can never happen.
-- [ ] 5.2 Do **not** skip same-type role pairs wholesale. Test the case that distinguishes them: two roles of one type requiring different capabilities, no resource satisfying both, no shared grid — must still be reported.
-- [ ] 5.3 Test that two roles over a single-resource pool report nothing (nothing to compare), and record that this is ⑨-2a's insufficiency case rather than a misalignment.
+- [x] 5.1 Skip pairings of equal resource ids in `StartAlignment.Compare` (design D7). Without it, a shared resource silences the report through an assignment that can never happen.
+- [x] 5.2 Do **not** skip same-type role pairs wholesale. Test the case that distinguishes them: two roles of one type requiring different capabilities, no resource satisfying both, no shared grid — must still be reported.
+- [x] 5.3 Test that two roles over a single-resource pool report nothing (nothing to compare), and record that this is ⑨-2a's insufficiency case rather than a misalignment.
+  - Mutation-checked both directions: removing the skip turns the shared-resource case red; replacing it with a wholesale same-type-role skip turns *both* new cases red, including the one that exists specifically to catch that over-correction. The skip also had to go **before** the daylight-saving guard — a self-pairing has `gcd(g, g) = g`, so a granularity not dividing an hour would have cleared the whole role pair by that route instead.
 
 ## 6. Management API and editor
 

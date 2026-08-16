@@ -167,10 +167,13 @@ public sealed record ServiceCandidate(Resource Resource, DurationRange Range)
 /// stated over the roles individually.
 /// </para>
 /// <para>
-/// Every role names a distinct resource type, so the pools are disjoint: no
-/// resource appears in two of them. That is what makes choosing each role a
-/// candidate independently correct rather than merely convenient
-/// (multi-role-composition design D1).
+/// Pools <em>overlap</em> in general: two roles may name one resource type and be
+/// told apart only by the capabilities they require, so the same resource can
+/// appear in both. That is why choosing each role a candidate independently is no
+/// longer correct — a resource taken for one role is unavailable to the other, and
+/// a greedy choice can strand a role that had no alternative. Resolving the pools
+/// is therefore separate from assigning them: these are the candidates,
+/// <see cref="SlotAssignment"/> decides who fills what (design D1).
 /// </para>
 /// </summary>
 public sealed record RoleCandidates(ServiceRole Role, IReadOnlyList<ServiceCandidate> Candidates);
