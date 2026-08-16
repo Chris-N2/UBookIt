@@ -61,3 +61,28 @@ export function roleLabels(roles: RoleDescriptor[], t: TermResolver): string[] {
 
   return roles.map((role, index) => roleLabel(role, shared[index], t));
 }
+
+/**
+ * How the resolution chains head each role — by **row**, never by capabilities.
+ *
+ * A different rule from {@link roleLabels}, and deliberately so. The chain
+ * readout is governed by a requirement that says in as many words: "The report
+ * SHALL NOT refer to required capabilities for a role that names none." A
+ * heading of "therapist (no required capabilities)" describes the configuration
+ * in terms the editor never entered, which is exactly the ⑧a defect that
+ * sentence was written to prevent — so the chains disambiguate two same-type
+ * roles by the requirement number their rows already carry instead.
+ *
+ * The ordinal is also the better answer here, not merely the permitted one: the
+ * fix for whatever a chain reports is on that row, and the row is legended
+ * "Requirement N" a few inches below. The collection view cannot use it, because
+ * it has no rows to point at — which is why the two surfaces label differently
+ * and why the rule lives in two functions rather than one with a flag.
+ */
+export function chainLabels(roles: RoleDescriptor[], t: TermResolver): string[] {
+  const shared = sharedTypes(roles);
+
+  return roles.map((role, index) =>
+    shared[index] ? t("roleLabelOrdinal", index + 1, role.resourceType) : role.resourceType,
+  );
+}

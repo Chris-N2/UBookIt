@@ -127,6 +127,72 @@
   reports no shortfall — the two surfaces distinguishing configuration from
   instant, live.
 
+### QA round 1 — REJECT, remediated
+
+Two MAJOR findings, both real, both fixed. The reviewer's own verification is
+worth reading beside this: it fuzzed 200,000 random bipartite graphs through
+`TrySaturate` and confirmed the tight-witness and exact-neighbourhood properties
+the collapse depends on, and it re-ran the mutation set independently.
+
+- **MAJOR — the chain heading contradicted an unmodified requirement.** Task 6.4
+  asked the readout to stop implying disjoint pools; I disambiguated it by
+  borrowing the collection view's D5 capability rule, and `services` spec
+  "The editor reports the resolution chain for each role" says in as many words:
+  *the report SHALL NOT refer to required capabilities for a role that names
+  none*. "psd1782a (no required capabilities)" is exactly the ⑧a defect that
+  sentence exists to prevent. **Fixed by labelling the row, not the capabilities**:
+  where two roles share a type each chain is headed "Requirement N: type",
+  matching the fieldset legend a few inches below, and bare type otherwise. The
+  requirement is untouched and needs no MODIFIED entry. `chainLabels` is a
+  separate function from `roleLabels` rather than a flag, because the two surfaces
+  answer to different rules — the collection view has no rows to point at, which
+  is why its own requirement *was* modified to permit capability text.
+  Mutation-checked three ways, including reverting to the rejected capability
+  rule: 3 red, so the suite now catches the defect it missed.
+- **MAJOR — the single-role message.** `Required == 1` produced "needs 1 distinct
+  resources ... only 0 were available" — ungrammatical, and the commonest
+  `service-unavailable` in the product, since every one-role service refused on
+  open hours, grid, lead time or horizon arrives there. **Fixed by suppressing the
+  richer message at `Required == 1`**: counting to one describes nothing a booker
+  can act on, and the requirement permits the message rather than requiring it.
+  Three tests added, including the pair that proves the suppression is a property
+  of `Required == 1` and not of the fixture.
+- **MINOR, folded into the same fix — "available" overstated it.** That count
+  comes from the rule-admitting graph, taken *before* the claims filter, so a
+  resource already booked is still in it. Now "only N can provide it then", which
+  is the vocabulary the chains already use for exactly this notion and is true
+  whether or not the resource is free.
+- **MINOR — the count bound was half tested.** `MaxCount + 1` rejected and
+  `MaxCount` accepted both added; the second pins the boundary so the first cannot
+  pass with an off-by-one.
+- **NIT — `ClaimsBrokeIt` rebuilt the admitting graph.** It now takes it, since
+  the caller computes it to establish that method's own precondition.
+- **Two NITs deliberately not actioned, and flagged for round 2.** (a) An
+  out-of-range count blanks all three reports — spec-permitted ("say nothing when
+  ... the request failed") and consistent with every other preview failure, but a
+  *new* route to that state which ⑧a's fixed count of 1 structurally prevented.
+  Recorded rather than changed. (b) `ShortfallRoleModel` carries no role index;
+  two roles equal in type *and* capabilities are indistinguishable in the payload,
+  which is only reachable for a configuration the domain rejects, and positional
+  matching is exact end to end.
+- **One thing the reviewer and I both hit: the backoffice registered no uBookIt
+  extension at all**, Resources included, and a fresh navigation did not clear it.
+  Ruled out as the known Umbraco 17 flake rather than a bundle break by importing
+  every chunk directly — all import, the manifest exports its 5 entries, and both
+  custom elements define on import. The editor pass was then done by instantiating
+  the real elements directly, which exercises everything except the section
+  routing this change does not touch. **A rebuilt bundle is not the cause**: the
+  flake reproduced across a full TestSite restart.
+
+Re-verified after remediation: clean `--no-incremental` build (38 NU1903 only),
+607 unit / 54 integration / 47 client, `validate --strict` under the pinned 1.6.0.
+Live: the single-role service reads "This service cannot be booked at that time.";
+count 2 with one admitting resource reads "needs 2 distinct resources ... only 1
+can provide it then"; count 3 with none reads "none can provide it then"; the
+chain headings read "Requirement 1: psd1782a" / "Requirement 2: psd1782a" with no
+capability text anywhere in the readout; a distinct-type service keeps "gmdroom" /
+"gmdtherapist"; the collection view is unchanged; no dangling ids; save enabled.
+
 ## 9. Handover
 
 - [x] 9.1 Record what ⑩ inherits: the delivery-API reason code ⑨-1a deferred is now more valuable, because two different structural faults (misalignment and insufficiency) both surface to a booker as an empty result, and Core can now distinguish them.

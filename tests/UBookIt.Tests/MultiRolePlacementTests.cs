@@ -824,7 +824,7 @@ public class MultiRolePlacementTests
         Assert.Equal(FailureCodes.ServiceUnavailable, failure.Code);
         Assert.Contains(Therapist, failure.Message);
         Assert.Contains("2 distinct resources", failure.Message);
-        Assert.Contains("only 1 was available", failure.Message);
+        Assert.Contains("only 1 can provide it then", failure.Message);
     }
 
     [Fact]
@@ -891,12 +891,70 @@ public class MultiRolePlacementTests
         var message = Assert.Single(placed.Failures).Message;
 
         Assert.Contains($"{configured.Required} distinct resources", message);
-        Assert.Contains($"only {configured.Eligible} was available", message);
+        Assert.Contains($"only {configured.Eligible} can provide it then", message);
 
         // Both roles are named on both surfaces, and the capability that tells them
         // apart is in the message — "therapist and therapist" would be useless.
         Assert.Equal(2, configured.Roles.Count);
         Assert.Contains("'therapist' with cert-x", message);
+    }
+
+    [Fact]
+    public async Task A_single_resource_service_keeps_the_message_it_always_had()
+    {
+        // QA's MAJOR, and the reason it mattered: this is the commonest
+        // `service-unavailable` in the product — one role, count 1, a start the
+        // resource's own configuration refuses. Before the guard it read "needs 1
+        // distinct resources for 'therapist' at that time, and only 0 were
+        // available", which is ungrammatical and tells a booker nothing.
+        //
+        // Counting to one is not a shortfall worth describing, so the richer
+        // message is not used. The spec permits it; it does not require it.
+        var service = Svc(Therapist);
+        var harness = Wire(service, LateOpening(3));
+
+        var placed = await harness.Services.PlaceAsync(Request(service, "09:00", 60));
+
+        var failure = Assert.Single(placed.Failures);
+
+        Assert.Equal(FailureCodes.ServiceUnavailable, failure.Code);
+        Assert.Equal("This service cannot be booked at that time.", failure.Message);
+
+        // Specifically: no arithmetic at all, and above all no "1 distinct
+        // resources".
+        Assert.DoesNotContain("distinct resources", failure.Message);
+    }
+
+    [Fact]
+    public async Task A_shortfall_of_two_still_names_what_was_short()
+    {
+        // The pair that makes the guard above non-vacuous: the same fixture with
+        // a count of 2 does produce the richer message, so the suppression is a
+        // property of `Required == 1` rather than of this configuration.
+        var service = Counted(Therapist, 2);
+        var harness = Wire(service, Res(3, Therapist), LateOpening(4));
+
+        var message = Assert.Single(
+            (await harness.Services.PlaceAsync(Request(service, "09:00", 60))).Failures).Message;
+
+        Assert.Contains("2 distinct resources", message);
+    }
+
+    [Fact]
+    public async Task A_shortfall_naming_no_resource_at_all_reads_as_words()
+    {
+        // Zero gets its own phrasing rather than "only 0 can provide it then",
+        // which reads like the "not known" zero the configuration surfaces are
+        // careful never to print. Two slots, and the one eligible resource
+        // refuses the request outright, so nothing admits it.
+        var service = Counted(Therapist, 2);
+        var harness = Wire(service, LateOpening(3), LateOpening(4));
+
+        var message = Assert.Single(
+            (await harness.Services.PlaceAsync(Request(service, "09:00", 60))).Failures).Message;
+
+        Assert.Contains("none can provide it then", message);
+        Assert.DoesNotContain("only 0", message);
     }
 
     [Fact]

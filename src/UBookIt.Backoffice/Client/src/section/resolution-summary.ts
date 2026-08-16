@@ -1,5 +1,5 @@
 import type { DurationExclusionModel } from "../api/index.js";
-import { roleLabels } from "./role-label.js";
+import { chainLabels } from "./role-label.js";
 
 /**
  * A resolution chain and the configuration it was computed for, captured
@@ -58,8 +58,14 @@ export type RoleResolutionGroup = {
    * Not simply the resource type. Two roles may name one type, and two groups
    * headed "therapist" read as two independent pools — which is exactly the
    * misreading the sufficiency report beside them exists to correct, and this is
-   * the surface it lands on. Where two roles share a type, each is headed by what
-   * distinguishes it, under the same rule the collection view uses (design D5/D6).
+   * the surface it lands on. Where two roles share a type, each is headed by the
+   * requirement number its row carries (design D6).
+   *
+   * NOT by required capabilities, which is how the collection view disambiguates
+   * the same pair. This requirement forbids the report referring to capabilities
+   * for a role that names none, and "therapist (no required capabilities)"
+   * describes the configuration in terms the editor never entered. The row number
+   * says the same thing about a surface that has rows.
    */
   label: string;
 
@@ -135,9 +141,10 @@ export function resolutionGroups(
   // sufficiency report beside these (design D6).
   //
   // What the labels carry is the other half of that: where two roles share a
-  // type, each heading says what distinguishes it, so two groups cannot read as
-  // one pool counted twice.
-  const labels = roleLabels(chains, t);
+  // type, each heading carries the requirement number of the row it describes,
+  // so two groups cannot read as one pool counted twice — and so the heading
+  // points at the control that changes it.
+  const labels = chainLabels(chains, t);
 
   return chains.map((chain, index) => ({
     resourceType: chain.resourceType,

@@ -245,7 +245,7 @@ describe("a chain per role", () => {
     ]);
   });
 
-  it("labels two roles of one type by what distinguishes them", () => {
+  it("labels two roles of one type by the requirement number of their row", () => {
     // Two headings reading "therapist" present two overlapping pools as two
     // independent ones — the misreading the sufficiency report beside them
     // exists to correct, and this is the surface it lands on (design D6).
@@ -258,8 +258,51 @@ describe("a chain per role", () => {
     );
 
     expect(groups.map((g) => g.label)).toEqual([
-      "roleLabelCapabilities(therapist,cert-x)",
-      "roleLabelNoCapabilities(therapist)",
+      "roleLabelOrdinal(1,therapist)",
+      "roleLabelOrdinal(2,therapist)",
+    ]);
+  });
+
+  it("never refers to capabilities in a heading, for either kind of role", () => {
+    // The guarantee at `services` spec "The editor reports the resolution chain
+    // for each role": the report SHALL NOT refer to required capabilities for a
+    // role that names none. QA caught this readout doing exactly that, with the
+    // collection view's rule borrowed onto a surface that forbids it.
+    //
+    // Asserted over BOTH roles, and over the key rather than the English: the
+    // role WITH capabilities must not gain a capability heading either, because
+    // the rule here is "label by the row", not "label by capabilities unless
+    // there are none".
+    const labels = resolutionGroups(
+      [
+        snapshot({ resourceType: "therapist", requiredCapabilities: ["cert-x"] }),
+        snapshot({ resourceType: "therapist", requiredCapabilities: [] }),
+      ],
+      t,
+    ).map((g) => g.label);
+
+    expect(labels.join(" ")).not.toContain("roleLabelCapabilities");
+    expect(labels.join(" ")).not.toContain("roleLabelNoCapabilities");
+    expect(labels.join(" ")).not.toContain("cert-x");
+  });
+
+  it("numbers by position in the configuration, not by position among the clashing roles", () => {
+    // A shared pair sitting after an unrelated role must still be numbered 2 and
+    // 3 — the numbers name rows on screen, and an editor counting from the top
+    // has to land on the same ones.
+    const groups = resolutionGroups(
+      [
+        snapshot({ resourceType: "room", requiredCapabilities: [] }),
+        snapshot({ resourceType: "therapist", requiredCapabilities: ["cert-x"] }),
+        snapshot({ resourceType: "therapist", requiredCapabilities: [] }),
+      ],
+      t,
+    );
+
+    expect(groups.map((g) => g.label)).toEqual([
+      "room",
+      "roleLabelOrdinal(2,therapist)",
+      "roleLabelOrdinal(3,therapist)",
     ]);
   });
 
@@ -389,5 +432,6 @@ describe("eligibility is not availability (design D5)", () => {
     expect(covered).toContain("alignmentNever");
     expect(covered).toContain("sufficiencyShort");
     expect(covered).toContain("roleLabelNoCapabilities");
+    expect(covered).toContain("roleLabelOrdinal");
   });
 });

@@ -795,4 +795,38 @@ public class ServicePreviewEndpointTests
         Assert.Equal([FailureCodes.ServiceRoleCountInvalid], codes);
         Assert.Equal(new string?[] { "Roles[1].Count" }, Fields(result));
     }
+
+    [Fact]
+    public async Task A_count_above_the_permitted_maximum_is_rejected_the_same_way()
+    {
+        // The scenario says "zero **or above the permitted maximum**", and the two
+        // are different branches of the bound. Testing only zero would leave the
+        // upper half resting on the assumption that one implementation covers
+        // both — which is true today and is exactly the kind of assumption that
+        // stops being true quietly.
+        var (controller, _) = Wire(Room(1, "Red Room", 480));
+
+        var result = await controller.PreviewServiceConfiguration(
+            Configuration(null, Role(), Role("therapist", count: ServiceRole.MaxCount + 1)));
+
+        var (status, codes) = Problem(result);
+
+        Assert.Equal(StatusCodes.Status400BadRequest, status);
+        Assert.Equal([FailureCodes.ServiceRoleCountInvalid], codes);
+        Assert.Equal(new string?[] { "Roles[1].Count" }, Fields(result));
+    }
+
+    [Fact]
+    public async Task The_permitted_maximum_itself_is_accepted()
+    {
+        // The boundary on the other side, so the bound is pinned rather than
+        // merely present: MaxCount must be allowed, or the rejection above could
+        // pass with an off-by-one.
+        var (controller, _) = Wire(TenRooms());
+
+        var result = await controller.PreviewServiceConfiguration(
+            Configuration(null, Role(count: ServiceRole.MaxCount)));
+
+        Assert.IsType<OkObjectResult>(result);
+    }
 }

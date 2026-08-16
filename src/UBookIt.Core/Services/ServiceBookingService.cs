@@ -987,7 +987,7 @@ public sealed class ServiceBookingService(
                 return Unavailable(Shortfall(deficiency));
             }
 
-            return ClaimsBrokeIt()
+            return ClaimsBrokeIt(admitting)
                 ? Raced()
                 : Unavailable("This service cannot be booked at that time.");
         }
@@ -1013,13 +1013,39 @@ public sealed class ServiceBookingService(
             var shortfall = PoolSufficiency.Collapse(
                 deficiency, SlotRoles(pools), [.. pools.Select(p => p.Role)]);
 
+            if (shortfall.Required == 1)
+            {
+                // A shortfall of "1 needed, 0 able" is the ordinary single-resource
+                // refusal wearing arithmetic, and it is by some margin the commonest
+                // `service-unavailable` in the product: every one-role service asked
+                // for a start outside its resource's open hours, off its grid, inside
+                // its lead time or beyond its horizon arrives here. Counting to one
+                // tells a booker nothing they could act on, so it says what it always
+                // said. The spec permits the richer message; it does not require it,
+                // and this is the case it buys nothing in.
+                return "This service cannot be booked at that time.";
+            }
+
             // "at that time" is doing real work: it is what keeps this a statement
             // about the instant rather than about the service. A message that read
             // "this service needs two therapists and only one exists" would be the
             // configuration-time claim, made on the evidence of one moment.
+            //
+            // "can provide it" rather than "was available", and the difference is
+            // not stylistic. This count comes from the *rule-admitting* graph — the
+            // candidates whose own configuration accepts this start and length —
+            // which is taken before the claims filter, so a resource already booked
+            // is still counted here. Calling that "available" would overstate it;
+            // "can provide" is the vocabulary the resolution chains already use for
+            // exactly this notion, and it stays true whether or not the resource is
+            // free.
             return $"This service needs {shortfall.Required} distinct resources for "
-                + $"{Describe(shortfall.Roles)} at that time, and only {shortfall.Eligible} "
-                + (shortfall.Eligible == 1 ? "was available." : "were available.");
+                + $"{Describe(shortfall.Roles)} at that time, and "
+                + (shortfall.Eligible == 0
+                    ? "none can provide it then."
+                    : shortfall.Eligible == 1
+                        ? "only 1 can provide it then."
+                        : $"only {shortfall.Eligible} can provide it then.");
         }
 
         /// <summary>
@@ -1052,11 +1078,15 @@ public sealed class ServiceBookingService(
         /// candidate", which a role of count 2 with one admitting candidate would
         /// pass while being unfillable.
         /// </para>
+        /// <para>
+        /// Takes the admitting graph rather than rebuilding it: the caller has
+        /// already computed it in order to ask the question that establishes this
+        /// one's precondition, and two constructions of "the same" graph is the
+        /// shape a divergence hides in.
+        /// </para>
         /// </summary>
-        private bool ClaimsBrokeIt()
+        private bool ClaimsBrokeIt(List<IReadOnlyList<Guid>> admitting)
         {
-            var admitting = Ids(shortlists);
-
             var stillFree = free
                 .Select(slot => slot.Select(c => c.ResourceId).ToHashSet())
                 .ToList();

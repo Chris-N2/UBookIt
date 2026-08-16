@@ -872,12 +872,13 @@ export class UBookItServiceEditorElement extends UmbLitElement {
                       editor guessing which requirement each count is about.
                     -->
                     <!--
-                      Labelled by what identifies the requirement, which is its
-                      type — plus what distinguishes it, where another
-                      requirement names the same type. Two headings reading
-                      "therapist" would present two overlapping pools as two
-                      independent ones, which is precisely the misreading the
-                      sufficiency report below exists to correct (design D6).
+                      Labelled by its resource type, plus the requirement number
+                      its row carries where another requirement names the same
+                      type. Two headings reading "therapist" would present two
+                      overlapping pools as two independent ones, which is
+                      precisely the misreading the sufficiency report below
+                      exists to correct (design D6) — and the number points at
+                      the row where the fix is.
                     -->
                     <strong>${group.label}</strong>
                     <ul>

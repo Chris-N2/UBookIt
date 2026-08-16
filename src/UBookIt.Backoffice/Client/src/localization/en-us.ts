@@ -195,6 +195,15 @@ export default {
     roleLabelCapabilities: "%0% (%1%)",
     roleLabelNoCapabilities: "%0% (no required capabilities)",
 
+    // The resolution chains disambiguate the SAME pair differently, by the
+    // requirement number the row already carries. Their own requirement forbids
+    // the report referring to capabilities for a role that names none — a
+    // heading of "therapist (no required capabilities)" describes the
+    // configuration in terms the editor never entered — and the number is the
+    // better answer anyway, because the fix for what a chain reports is on that
+    // row. Matches `requirementLegend` deliberately: the two name one thing.
+    roleLabelOrdinal: "Requirement %0%: %1%",
+
     // -------------------------------------------------------- pool sufficiency
     //
     // A third statement beside the chains and the start-times report, and about a
