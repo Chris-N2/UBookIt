@@ -749,6 +749,35 @@ public class ServicePreviewEndpointTests
     }
 
     [Fact]
+    public async Task Spec_scenario_a_count_does_not_change_any_chain()
+    {
+        // Count is not a filter resolution applies: a role of count 3 draws on
+        // exactly the pool a role of count 1 does. Carried on the request only
+        // because the sufficiency finding beside the chains cannot be asked
+        // without it — and the chains must be provably untouched by it.
+        var (controller, _) = Wire(TenRooms());
+
+        async Task<int[]> StagesFor(int count)
+        {
+            var response = Ok(await controller.PreviewServiceConfiguration(
+                Configuration(FixedMinutes(240), Role(capabilities: ["projector"], count: count))));
+
+            var chain = Single(response);
+            return [chain.OfType.Total, chain.WithCapabilities.Total, chain.CanProvide.Total];
+        }
+
+        var one = await StagesFor(1);
+
+        Assert.Equal(one, await StagesFor(3));
+
+        // And the count that changed nothing did change the finding, so this is
+        // not passing because the count was ignored altogether.
+        Assert.Equal([10, 3, 1], one);
+        Assert.NotNull(Ok(await controller.PreviewServiceConfiguration(
+            Configuration(FixedMinutes(240), Role(capabilities: ["projector"], count: 3)))).PoolShortfall);
+    }
+
+    [Fact]
     public async Task An_out_of_range_count_is_a_validation_failure_against_its_own_row()
     {
         // The count is now an input to part of the answer, so a preview cannot
@@ -764,6 +793,6 @@ public class ServicePreviewEndpointTests
 
         Assert.Equal(StatusCodes.Status400BadRequest, status);
         Assert.Equal([FailureCodes.ServiceRoleCountInvalid], codes);
-        Assert.Equal(["Roles[1].Count"], Fields(result));
+        Assert.Equal(new string?[] { "Roles[1].Count" }, Fields(result));
     }
 }

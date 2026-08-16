@@ -39,7 +39,7 @@
 - [x] 5.3 Wording states required against eligible and names the roles. It must not say *available*, *free*, or *bookable* — the standing ⑧a D5 constraint, now with two prior surfaces worded under it to follow.
 - [x] 5.4 Say nothing when sufficient, and say nothing when the configuration is unresolvable or the request failed — never a shortfall of zero, which is the answer that tells an editor their configuration is wrong.
 - [x] 5.5 Wording derived from state captured with the response it describes, never from the live form.
-- [ ] 5.6 Accessibility: text in the form's own structure, every referenced id resolving in the same shadow root, not conveyed by colour alone. **Verify by reading the rendered shadow DOM, not from screenshots** — and check the error state as well as the healthy one, which is the half a static reading cannot reach.
+- [x] 5.6 Accessibility: text in the form's own structure, every referenced id resolving in the same shadow root, not conveyed by colour alone. **Verify by reading the rendered shadow DOM, not from screenshots** — and check the error state as well as the healthy one, which is the half a static reading cannot reach.
 
 ## 6. Editor — the two surfaces ⑨-2 left misleading
 
@@ -51,18 +51,18 @@
 
 ## 7. Verification
 
-- [ ] 7.1 Full solution build with `--no-incremental`, **TestSite stopped first** — it locks the output DLLs and the build will fail confusingly if it is running. Only the known NU1903 advisories are acceptable.
-- [ ] 7.2 Full unit, integration and client runs green, including every ⑤/⑥/⑦/⑧/⑨ scenario unchanged.
-- [ ] 7.3 Live: a service with a count exceeding its pool shows the report and still saves; adding a qualifying resource clears it without touching the service.
-- [ ] 7.4 Live: two same-type roles sharing one resource are reported together, and the collection view distinguishes them.
-- [ ] 7.5 Live: a booking attempt at a busy instant returns `service-unavailable` with a message naming the shortfall, and the code is unchanged.
-- [ ] 7.6 Stop the TestSite and check port 44348 for orphaned processes. Note Umbraco 17 intermittently renders the backoffice shell without registering package extensions on a first load — a fresh navigation clears it; importing the bundle directly to confirm the custom elements define is what distinguishes that flake from a real fault.
+- [x] 7.1 Full solution build with `--no-incremental`, **TestSite stopped first** — it locks the output DLLs and the build will fail confusingly if it is running. Only the known NU1903 advisories are acceptable.
+- [x] 7.2 Full unit, integration and client runs green, including every ⑤/⑥/⑦/⑧/⑨ scenario unchanged.
+- [x] 7.3 Live: a service with a count exceeding its pool shows the report and still saves; adding a qualifying resource clears it without touching the service.
+- [x] 7.4 Live: two same-type roles sharing one resource are reported together, and the collection view distinguishes them.
+- [x] 7.5 Live: a booking attempt at a busy instant returns `service-unavailable` with a message naming the shortfall, and the code is unchanged.
+- [x] 7.6 Stop the TestSite and check port 44348 for orphaned processes. Note Umbraco 17 intermittently renders the backoffice shell without registering package extensions on a first load — a fresh navigation clears it; importing the bundle directly to confirm the custom elements define is what distinguishes that flake from a real fault.
 
 ## 8. Spec hygiene
 
 - [x] 8.1 Run the guarantee diff `CLAUDE.md` requires for the two MODIFIED requirements — `All candidates failing reports one of two distinct outcomes` and `Backoffice collection view for services`. Both are being replaced wholesale, both carry guarantees unrelated to this change (the whole conflict/deterministic classification; the duration summary and paging), and anything the new version forgets to restate is deleted with nothing in the diff resembling a deletion.
 - [x] 8.2 The outward grep for sibling specs this change falsifies, **before and after** the sync. **Grep the vocabulary of the mechanisms being changed, not only of the change** — ⑨-2's first pass recorded three findings and the real number was nine, precisely because it searched for its own vocabulary rather than for the mechanisms it replaced. Candidate terms here: "cannot be filled", "no candidate", "unavailable", "each role", "independently", "eligible", "sufficient".
-- [ ] 8.3 Confirm nothing in the new wording asserts availability, across all three surfaces — Core's report, the preview payload, and the editor's text. It is one constraint stated in three places and is the easiest thing here to get subtly wrong.
+- [x] 8.3 Confirm nothing in the new wording asserts availability, across all three surfaces — Core's report, the preview payload, and the editor's text. It is one constraint stated in three places and is the easiest thing here to get subtly wrong.
 
 ### Notes from the apply
 
@@ -129,5 +129,53 @@
 
 ## 9. Handover
 
-- [ ] 9.1 Record what ⑩ inherits: the delivery-API reason code ⑨-1a deferred is now more valuable, because two different structural faults (misalignment and insufficiency) both surface to a booker as an empty result, and Core can now distinguish them.
-- [ ] 9.2 Record whether the deficient set proved to be the right unit in practice, and settle the two open questions design leaves — whether the report names the qualifying resources or only counts them, and whether the collection view states capabilities for a counted role.
+- [x] 9.1 Record what ⑩ inherits: the delivery-API reason code ⑨-1a deferred is now more valuable, because two different structural faults (misalignment and insufficiency) both surface to a booker as an empty result, and Core can now distinguish them.
+- [x] 9.2 Record whether the deficient set proved to be the right unit in practice, and settle the two open questions design leaves — whether the report names the qualifying resources or only counts them, and whether the collection view states capabilities for a counted role.
+
+### What ⑩ inherits
+
+- **The delivery-API reason code ⑨-1a deferred is now worth more, and is now
+  cheap.** A booker still cannot distinguish an empty `bookable-starts` response
+  from a fully booked week — but Core can now tell the two *structural* causes
+  apart, misalignment and insufficiency, and both already return everything such a
+  code would need. The work is contract and wording, not computation. The same
+  constraint applies as to ⑨-1a's: it may say the roles can never be filled
+  together, never that a service *is* available.
+- **The placement message is the shape a delivery-side reason code would echo.**
+  `service-unavailable` now says what was short at that instant; a configuration-time
+  code would say the complementary thing, and ⑩ should keep them worded so a reader
+  can tell which question each answers (design D4's risk note).
+- **A count above the pool remains saveable**, and ⑩ must not quietly turn the
+  report into a block. ⑨-2 design D8 decided that and its own test asserts it; this
+  change's task 5.2 asserts the editor half.
+
+### Both open questions, settled against the real screen
+
+- **The report counts the qualifying resources; it does not name them.** Seeing it
+  live settles it: the resolution chains directly above already carry the resources
+  per role, and the sufficiency claim is about a *set* of roles — a merged list of
+  names could not be attributed to a row, and would duplicate the chains for a
+  small pool while being unreadable for a large one. The alignment check names
+  exactly two because a pair is its unit; this one's unit is a group of rows.
+- **The collection view does not state capabilities for a counted role.** Count and
+  capabilities are orthogonal, and a counted role is ambiguous with nothing:
+  "2 × therapist-mrm" reads unambiguously beside "1 × room". D5's rule keys off a
+  *shared type*, which is the only thing that makes two entries indistinguishable,
+  and widening it would make every service noisier to fix a case that does not
+  exist.
+- **The deficient set was the right unit.** In the editor it renders as a headline
+  plus one line per row — "psd1782a (no required capabilities): 2 required.",
+  "psd1782a (cert-x): 1 required." — which is exactly what an editor points at.
+  The two numbers being separate (required against eligible) is what distinguishes
+  the two repairs, and both were needed live: raising a count produced one shape,
+  a missing resource the other.
+
+### Fixtures left in the TestSite for the reviewer
+
+Type `psd1782a`: resources **PSD Mary** (`cert-x`) and **PSD Gwen**; services
+**PSD Counted 1782a** (count 2 — sufficient as it stands, raise it to 3 to see the
+report) and **PSD Pair 1782a** (two roles of one type, `cert-x` and none — raise
+either count to see a two-role finding). Type `psxad4`: **PSX Mary** (`cert-x`,
+opens 09:00) and **PSX Late** (opens 14:00), with service **PSX Counted ad4**
+(count 2) — placing that service at 09:00 is the deterministic shortfall whose
+message names what was short.
