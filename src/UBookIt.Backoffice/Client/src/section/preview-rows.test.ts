@@ -30,6 +30,18 @@ describe("which rows a request carries", () => {
   it("treats whitespace as blank, matching what the request trims", () => {
     expect(carriedRows([row("   "), row("room")]).map((r) => r.resourceType)).toEqual(["room"]);
   });
+
+  it("agrees with the numbering about what blank means", () => {
+    // The two exports share one predicate, so they cannot disagree today — and
+    // this asserts that rather than assuming it. QA proved the gap by making
+    // `rowNumbers` test `!== ""` while `carriedRows` kept trimming: 57 tests
+    // stayed green while a whitespace-only row would be counted by one and
+    // dropped by the other, reintroducing the round-2 defect through a different
+    // door. This module exists so that disagreement is assertable; leaving the
+    // one predicate untested on one side would have been the whole point missed.
+    expect(rowNumbers([row("   "), row("room")])).toEqual([2]);
+    expect(rowNumbers([row("room"), row("	"), row("chair")])).toEqual([1, 3]);
+  });
 });
 
 describe("which row each carried role came from", () => {

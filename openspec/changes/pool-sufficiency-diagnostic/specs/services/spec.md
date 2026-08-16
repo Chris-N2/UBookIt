@@ -17,13 +17,22 @@ configuration whose pool is too small today is corrected as often by adding a
 resource as by editing the service, and refusing the save would force the editor to
 do those in one order.
 
-The wording SHALL state what is required against what is eligible, and SHALL name the
-roles involved. It SHALL name them by the **requirement row** each belongs to, as
-the resolution chains beside it do: the editor has rows, the fix for a role is on
-its row, and two roles of one resource type requiring the same capabilities are
-distinguishable by nothing else. A row SHALL be identified by the position the
-response reports for it, never by its position within the finding — the finding is
-a subset of the configuration, so its second entry is not the second row. It SHALL NOT state or imply that the service *is* available, free, or
+The wording SHALL state what is required against what is eligible, and SHALL name
+the roles involved.
+
+It SHALL name them by the **requirement row** each belongs to: the editor has rows,
+the fix for a role is on its row, and two roles of one resource type requiring the
+same capabilities are distinguishable by nothing else. It SHALL do so for every
+role it names, unconditionally — unlike the resolution chains, which state a row
+only where two roles share a resource type. The finding is a **subset** of the
+configuration, so asking whether the roles *it names* share a type asks the wrong
+question: a service of two same-type rows may produce a finding naming one of them,
+which would then read as unambiguous while leaving the editor unable to tell which
+row is short.
+
+A row SHALL be identified by the position the response reports for it, never by its
+position within the finding — the finding being a subset, its second entry is not
+the second row. It SHALL NOT state or imply that the service *is* available, free, or
 bookable, and SHALL NOT state that a sufficient pool means the service can be booked
 — eligibility is not availability, and this check evaluates neither opening hours,
 lead time, horizon, nor the booking calendar.
