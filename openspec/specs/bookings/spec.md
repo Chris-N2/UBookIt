@@ -112,7 +112,7 @@ Two claims SHALL conflict iff they reference the same resource and their interva
 ### Requirement: Atomic placement contract
 The booking store port (`IBookingStore`) SHALL define placement as atomic with respect to conflict detection: between the conflict check and the persistence of a new booking's claims, no other placement for an overlapping interval on **any** of the booking's claimed resources may succeed. Under concurrent placement of conflicting requests, exactly one SHALL succeed and the others SHALL fail with code `conflict`.
 
-A booking carrying several claims SHALL be placed all-or-nothing: either every claim is persisted, or none is. A placement that fails for one claimed resource SHALL NOT leave claims persisted for the others, since service placement attempts combinations in sequence and depends on a failed attempt leaving no state.
+A booking carrying several claims SHALL be placed all-or-nothing: either every claim is persisted, or none is. A placement that fails for one claimed resource SHALL NOT leave claims persisted for the others, since service placement attempts assignments in sequence and depends on a failed attempt leaving no state.
 
 Two placements SHALL be treated as conflicting when their intervals overlap and their claim sets share **at least one** resource. A store that detected conflicts only for wholly identical claim sets would let two bookings each take a resource the other also claimed.
 

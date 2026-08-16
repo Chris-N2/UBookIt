@@ -168,7 +168,7 @@ The Management API SHALL expose a versioned endpoint in the `ubookitbackoffice` 
 
 It SHALL require backoffice authorization, SHALL be read-only, and SHALL accept a configuration that no saved service holds — its purpose is to report on a service being edited, before it is saved and while it may still be incomplete. It SHALL NOT require the configuration to be a valid service; in particular it SHALL NOT require a service name.
 
-The endpoint SHALL NOT reject a configuration whose roles duplicate a resource type. Saving such a service is rejected, but previewing one is how an editor sees what each role resolves to while correcting it, and refusing to answer would withhold the information needed to fix the fault. Each role's chain SHALL be reported independently, exactly as supplied.
+The endpoint SHALL NOT reject a configuration whose roles duplicate a resource type. Two roles of one type are now valid where their required capabilities differ, and where they do not the save is rejected — but previewing either is how an editor sees what each role resolves to while building or correcting it, and refusing to answer would withhold the information needed to fix the fault. Each role's chain SHALL be reported independently, exactly as supplied.
 
 The endpoint SHALL obtain its answer from Core's resolution rather than computing eligibility itself, so that the backoffice cannot report a different answer from the one the booking path will act on. It SHALL be a `POST`: a duration specification is a structured value carrying a kind and whichever bounds apply, and flattening it into query parameters would reproduce the ambiguity the duration value object exists to prevent.
 
