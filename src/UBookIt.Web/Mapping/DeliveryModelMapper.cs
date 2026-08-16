@@ -57,14 +57,17 @@ internal static class DeliveryModelMapper
         {
             Id = service.Id,
             Name = service.Name,
-            // Published in the aggregate's own order, which is the order they
-            // were configured in and is stable for a given service.
+            // Published in the aggregate's own canonical order — type, then
+            // required capabilities, then count — which is stable for a given
+            // service however its roles were supplied. Type alone stopped being
+            // enough to distinguish two roles the moment they could share one.
             Roles =
             [
                 .. service.Roles.Select(role => new ServiceRoleReadModel
                 {
                     ResourceType = role.ResourceType,
                     RequiredCapabilities = [.. role.RequiredCapabilities.Keys],
+                    Count = role.Count,
                 }),
             ],
             Duration = ToDurationModel(service.Duration),

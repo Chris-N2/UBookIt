@@ -179,6 +179,23 @@ public sealed class ServiceRoleReadModel
     /// when the role constrains by type alone.
     /// </summary>
     public List<string> RequiredCapabilities { get; set; } = [];
+
+    /// <summary>
+    /// How many <b>distinct</b> resources this role consumes at once.
+    /// <para>
+    /// Published because eligibility alone does not say what a service requires: a
+    /// consumer can compute this role's candidate pool exactly and still present
+    /// "one therapist" for a service that needs two. Count is not an input to
+    /// eligibility — a role of count 3 draws on the same pool a role of count 1
+    /// does — which is why publishing it does not widen the disclosure the
+    /// <c>resource-not-eligible</c> failure rests on.
+    /// </para>
+    /// <para>
+    /// Always present, carrying 1 for a role needing a single resource, so a
+    /// consumer never has to treat its absence as a default.
+    /// </para>
+    /// </summary>
+    public int Count { get; set; } = 1;
 }
 
 public sealed class PagedServicesModel

@@ -51,6 +51,26 @@ public class ServicesDeliveryTests
     /// A two-role service — a `room` requiring `projector` and a `therapist`
     /// requiring nothing — with one eligible resource of each type.
     /// </summary>
+    /// <summary>A service whose single role requires two distinct resources.</summary>
+    private static Harness WireCounted()
+        => WireService(Service.Create("Workshop", null, [new ServiceRole(ResourceTypes.Room, 2)]).Value);
+
+    /// <summary>
+    /// Two roles of one resource type, told apart only by their required
+    /// capabilities — the composition that makes the published order matter.
+    /// </summary>
+    private static Harness WireSameType()
+        => WireService(Service.Create(
+            "Joint session",
+            null,
+            [
+                new ServiceRole("therapist", 1)
+                {
+                    RequiredCapabilities = CapabilitySet.Create(["cert-x"]).Value,
+                },
+                new ServiceRole("therapist", 1),
+            ]).Value);
+
     private static Harness WireMultiRole()
     {
         var service = Service.Create(
@@ -199,6 +219,50 @@ public class ServicesDeliveryTests
         // absent member.
         Assert.NotNull(model.Roles[1].RequiredCapabilities);
         Assert.Empty(model.Roles[1].RequiredCapabilities);
+    }
+
+    [Fact]
+    public async Task Spec_scenario_a_roles_count_is_published()
+    {
+        var h = WireCounted();
+
+        var model = Ok<ServiceReadModel>(await h.Controller.GetService(h.Service.Id));
+
+        Assert.Equal(2, Assert.Single(model.Roles).Count);
+    }
+
+    [Fact]
+    public async Task Spec_scenario_a_count_of_one_is_stated_rather_than_omitted()
+    {
+        // A consumer must never have to read an absent count as a default. The
+        // wire value is asserted, not the property's initializer — a mapper that
+        // forgot to set it would still read 1 from the model's own default, so the
+        // assertion is paired with the count-2 case above, which that mapper fails.
+        var h = WireMultiRole();
+
+        var model = Ok<ServiceReadModel>(await h.Controller.GetService(h.Service.Id));
+
+        Assert.All(model.Roles, role => Assert.Equal(1, role.Count));
+    }
+
+    [Fact]
+    public async Task Spec_scenario_two_roles_of_one_type_are_published_separately_and_stably()
+    {
+        // Type alone no longer distinguishes two roles, so the deterministic order
+        // the contract promises has to survive them sharing one. Read twice,
+        // because a single read cannot tell a stable order from a lucky one.
+        var h = WireSameType();
+
+        var first = Ok<ServiceReadModel>(await h.Controller.GetService(h.Service.Id));
+        var second = Ok<ServiceReadModel>(await h.Controller.GetService(h.Service.Id));
+
+        Assert.Equal(["therapist", "therapist"], first.Roles.Select(r => r.ResourceType));
+
+        // Distinguishable only by what they require — which is the point.
+        Assert.Equal([[], ["cert-x"]], first.Roles.Select(r => r.RequiredCapabilities));
+        Assert.Equal(
+            first.Roles.Select(r => r.RequiredCapabilities),
+            second.Roles.Select(r => r.RequiredCapabilities));
     }
 
     [Fact]

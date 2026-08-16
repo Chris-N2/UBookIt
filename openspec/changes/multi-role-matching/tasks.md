@@ -53,9 +53,10 @@
 
 ## 7. Delivery API
 
-- [ ] 7.1 Publish `Count` on the role read model — always present, 1 where a role needs one resource, never absent-as-default.
-- [ ] 7.2 Confirm the deterministic role order survives two roles sharing a type, across repeated reads.
-- [ ] 7.3 Check the change against the standing "eligibility remains derivable from public reads" guarantee: count is not an eligibility input, but publishing it is what stops a consumer computing pools correctly and still misreading what the service needs.
+- [x] 7.1 Publish `Count` on the role read model — always present, 1 where a role needs one resource, never absent-as-default.
+- [x] 7.2 Confirm the deterministic role order survives two roles sharing a type, across repeated reads.
+- [x] 7.3 Check the change against the standing "eligibility remains derivable from public reads" guarantee: count is not an eligibility input, but publishing it is what stops a consumer computing pools correctly and still misreading what the service needs.
+  - Checked and unchanged. Count is **not** an eligibility input — a role of count 3 draws on exactly the pool a role of count 1 does — so publishing it discloses nothing the resource and service reads did not already imply, and the `resource-not-eligible` failure's disclosure argument is untouched. What it fixes is the other half: the pools were already computable, but what the service *required* of them was not.
 
 ## 8. Verification
 
