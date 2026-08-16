@@ -88,6 +88,18 @@ has to exist before either restriction can go, which is why they lift together.
   cannot distinguish one therapist from two — and could not build a correct booking
   UI against it. Additive.
 
+- **`LengthRun.TryIntersect` is removed.** A breaking change to the public surface,
+  called out here as `CLAUDE.md` requires rather than left to a commit message. It
+  computed the common lengths of two anchored runs, and existed only for the
+  pairwise fold this change replaces — once composition asks the assignment which
+  lengths are feasible and rebuilds runs from that set, nothing calls it. It is
+  removed rather than left in place because a public method with no consumer is a
+  liability this repository argues against, and because nothing is published yet, so
+  removing it now costs nothing where removing it later would break consumers.
+  Re-adding it is fifteen lines fully determined by the anchored-run invariant.
+  Every other surface change here is additive: `ServiceRole.MaxCount`,
+  `FailureCodes.ServiceRoleCountInvalid`, and `ServiceRoleReadModel.Count`.
+
 - **No persistence change, and no migration.** Verified rather than assumed: `Count`
   is already a column on `uBookItServiceRole` from ⑥ and round-trips through
   `ServiceRowMapper`; the table carries only a non-unique index on `ServiceId`, so

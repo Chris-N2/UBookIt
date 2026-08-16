@@ -24,8 +24,17 @@ remain common to all roles.
 
 Where every role names a **distinct** resource type and has count 1, the pools are
 disjoint, a saturating assignment exists exactly when each role independently has a
-candidate, and the composed result SHALL therefore be identical to the intersection
-of the roles' union availabilities — the answer given before assignment existed.
+candidate, and the composed result SHALL therefore offer exactly the starts the
+intersection of the roles' union availabilities offered, and at each start denote
+exactly the lengths it denoted — the answer given before assignment existed.
+
+Equality is over the **lengths denoted**, not over the run objects. Runs are now
+rebuilt from the feasible length set rather than accumulated as pairwise
+intersections, and a set of lengths has more than one valid expression as anchored
+runs: `{60, 120}` may arrive as one run of step 60 where the pairwise fold produced
+two single-length runs. Both denote the same lengths, and a consumer reads lengths.
+Requiring the runs themselves to match would pin the contract to an algorithm this
+requirement no longer specifies.
 
 Lengths SHALL be composed over the **sets** of lengths the roles denote, never over
 their outermost bounds, so that no length is offered which no admissible assignment
@@ -63,7 +72,7 @@ SHALL NOT, since it requires that many distinct resources at once.
 
 #### Scenario: Distinct-type services are unaffected
 - **WHEN** availability is composed for a service whose roles all name distinct resource types with count 1
-- **THEN** the result is identical to the intersection of the roles' union availabilities over the same range
+- **THEN** it offers exactly the starts the intersection of the roles' union availabilities offered over the same range, and at each start denotes exactly the same lengths
 
 #### Scenario: Lengths intersect to the common multiple
 - **WHEN** at a shared start one role offers `{30, 120, 30}` and another offers `{20, 120, 20}`, over disjoint pools

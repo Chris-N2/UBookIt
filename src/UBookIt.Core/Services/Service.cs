@@ -275,10 +275,15 @@ public sealed class Service
 
             // Capability keys are already deduplicated and ordinally sorted by
             // CapabilitySet, so joining them is a canonical spelling of the
-            // requirement rather than an ordering accident. The separator is a
-            // character NormalizedKey cannot contain, so no two distinct
-            // requirements can collide on one string.
-            var requirement = $"{role.ResourceType} {string.Join(' ', role.RequiredCapabilities.Keys)}";
+            // requirement rather than an ordering accident.
+            //
+            // The separator is NUL, written as an escape and named here because it
+            // is invisible in the source. NormalizedKey admits only lower-case
+            // kebab-case, so no key can contain it and no two distinct requirements
+            // can collide on one string — without a separator NormalizedKey
+            // excludes, {a, bc} and {ab, c} would join to the same key and a legal
+            // pair of roles would be rejected as duplicates.
+            var requirement = $"{role.ResourceType}\0{string.Join('\0', role.RequiredCapabilities.Keys)}";
 
             if (!seen.Add(requirement))
             {

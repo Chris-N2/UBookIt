@@ -154,17 +154,28 @@ public class SlotAssignmentTests
     }
 
     [Fact]
-    public void A_preference_no_saturating_assignment_can_include_is_reported_as_none()
+    public void A_preference_is_reported_as_none_only_when_nothing_saturates()
     {
-        // R2 is eligible only for slot 0, which R1 must not take — but slot 1 can
-        // only be filled by R1, and slot 2 only by R2. Including R2 in slot 0
-        // leaves slot 2 empty.
-        var assignment = SlotAssignment.TrySaturateIncluding(
-            [Pool(R1, R2), Pool(R1), Pool(R2)], R1);
+        // This case asserts less than it looks like it does, and the reason is worth
+        // stating so nobody strengthens it by mistake.
+        //
+        // Whenever a saturating assignment exists AND the preferred resource is
+        // eligible for some slot, an assignment *containing* it always exists: pin
+        // it to that slot, and the original matching restricted to the remaining
+        // slots avoids it, because a matching uses each resource at most once. So
+        // TrySaturateIncluding returns null exactly when TrySaturate does — this
+        // cannot be a test of the preference falling through.
+        //
+        // Here nothing saturates at all: slot 1 needs R1 and slot 2 needs R2, so
+        // slot 0 has nothing left, with or without a preference.
+        Assert.Null(SlotAssignment.TrySaturateIncluding([Pool(R1, R2), Pool(R1), Pool(R2)], R1));
+        Assert.Null(SlotAssignment.TrySaturate([Pool(R1, R2), Pool(R1), Pool(R2)]));
 
-        // R1 must fill slot 1 and R2 slot 2, so slot 0 has nothing left: no
-        // saturating assignment exists at all, with or without the preference.
-        Assert.Null(assignment);
+        // The genuine fall-through — a preference that cannot be honoured while
+        // some assignment still can — is not reachable here. It arises one level up,
+        // where the claims pre-filter removes the preferred resource from the pool
+        // before the assignment sees it, and is covered by
+        // MultiRolePlacementTests.Spec_scenario_preferred_resource_falls_through_when_unavailable.
     }
 
     [Fact]

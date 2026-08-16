@@ -684,12 +684,31 @@ export class UBookItServiceEditorElement extends UmbLitElement {
             aria-invalid=${countErrors.length > 0 ? "true" : nothing}
             aria-describedby=${countErrors.length > 0 ? `${countHintId} ${countErrorId}` : countHintId}
             @input=${(e: InputEvent) => {
-              const raw = (e.target as HTMLInputElement).value;
-              // Kept as typed where it is not a number at all, so clearing the
-              // field to retype it does not silently become 1 under the cursor.
-              // The server owns the bound, and reports it against this control.
-              const parsed = Number.parseInt(raw, 10);
-              this.#updateRole(index, { count: Number.isNaN(parsed) ? 1 : parsed });
+              const parsed = Number.parseInt((e.target as HTMLInputElement).value, 10);
+
+              // A field that does not currently parse — cleared, ready to be
+              // retyped — leaves the stored count alone rather than substituting
+              // 1. Writing 1 here would change `role.count`, and because `.value`
+              // is bound to it Lit would re-commit "1" into the element the user
+              // had just emptied, under their cursor: backspacing "2" to type
+              // "20" produced "120". Leaving state untouched means the binding
+              // sees no change and does not fight the user.
+              //
+              // The server owns the bound and reports it against this control, so
+              // nothing here needs to judge the number itself.
+              if (!Number.isNaN(parsed)) {
+                this.#updateRole(index, { count: parsed });
+              }
+            }}
+            @blur=${(e: FocusEvent) => {
+              // Display and state reconverge when the control is left. Without
+              // this a field abandoned while empty would keep showing nothing
+              // while the row still holds — and would save — its previous count,
+              // which is a quieter lie than the one above but still a lie.
+              const el = e.target as HTMLInputElement;
+              if (Number.isNaN(Number.parseInt(el.value, 10))) {
+                el.value = String(role.count);
+              }
             }}
           />
           <p id=${countHintId} class="hint">${this.#term("requirementCountHint")}</p>

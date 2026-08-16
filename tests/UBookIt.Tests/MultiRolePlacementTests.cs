@@ -208,7 +208,7 @@ public class MultiRolePlacementTests
     }
 
     [Fact]
-    public async Task Spec_scenario_a_preferred_resource_orders_only_its_own_role()
+    public async Task A_preferred_resource_constrains_the_booking_not_one_role()
     {
         var service = Svc(ResourceTypes.Room, Therapist);
         var harness = TwoOfEach(service);
@@ -278,7 +278,7 @@ public class MultiRolePlacementTests
     }
 
     [Fact]
-    public async Task Combinations_are_attempted_in_a_deterministic_order()
+    public async Task Assignments_are_resolved_in_a_deterministic_order()
     {
         var service = Svc(ResourceTypes.Room, Therapist);
 
@@ -291,7 +291,7 @@ public class MultiRolePlacementTests
     }
 
     [Fact]
-    public async Task A_combination_is_retried_around_a_single_busy_resource()
+    public async Task An_assignment_is_retried_around_a_single_busy_resource()
     {
         // Room 1 is busy, so the first combination fails; the loop must go on to
         // room 2 rather than reporting the service unavailable.
@@ -345,7 +345,7 @@ public class MultiRolePlacementTests
     }
 
     [Fact]
-    public async Task A_fully_booked_service_does_not_attempt_every_combination()
+    public async Task A_fully_booked_service_does_not_attempt_every_assignment()
     {
         // The cost this bounds is quadratic in the pool sizes: without the
         // claims pre-filter, six rooms against six therapists all busy is 36
@@ -399,7 +399,7 @@ public class MultiRolePlacementTests
     }
 
     [Fact]
-    public async Task A_partially_booked_service_attempts_only_the_free_combination()
+    public async Task A_partially_booked_service_attempts_only_the_free_assignment()
     {
         // The counterpart that stops the test above passing by never attempting
         // anything: with one free resource per role, exactly one attempt is made
@@ -499,7 +499,7 @@ public class MultiRolePlacementTests
     }
 
     [Fact]
-    public async Task A_busy_candidate_in_one_role_is_not_a_race_when_another_role_can_never_be_filled()
+    public async Task A_busy_candidate_is_not_a_race_when_a_slot_can_never_be_filled()
     {
         // The cross-role case, and the reason the classification is about
         // COMBINATIONS rather than candidates: placement accumulates every

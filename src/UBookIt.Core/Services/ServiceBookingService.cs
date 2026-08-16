@@ -554,7 +554,15 @@ public sealed class ServiceBookingService(
                 {
                     var combined = DurationMath.Lcm(left, right);
 
-                    if (combined <= longest && steps.Add(combined))
+                    // The positive test is not redundant. `Lcm` is unchecked, and
+                    // granularity has no upper bound in the domain (a separately
+                    // logged hazard), so two coarse steps with a small gcd can
+                    // overflow to a negative TimeSpan — which passes `<= longest`
+                    // and would then be scanned with a negative increment, a loop
+                    // that never reaches its bound. The old pairwise intersection
+                    // had no loop, so this arithmetic became a hang vector only
+                    // when the step scan started using it.
+                    if (combined > TimeSpan.Zero && combined <= longest && steps.Add(combined))
                     {
                         next.Add(combined);
                     }

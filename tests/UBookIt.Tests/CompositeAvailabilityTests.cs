@@ -231,7 +231,7 @@ public class CompositeAvailabilityTests
     }
 
     [Fact]
-    public async Task Spec_scenario_intersection_distributes_over_each_roles_union()
+    public async Task Spec_scenario_a_role_offering_several_runs_is_composed_candidate_by_candidate()
     {
         // The room role offers two distinct runs at 09:00 — two candidates on
         // different grids, neither subsuming the other — and the therapist role
