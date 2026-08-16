@@ -69,6 +69,10 @@ SHALL NOT, since it requires that many distinct resources at once.
 - **WHEN** at a shared start one role offers `{30, 120, 30}` and another offers `{20, 120, 20}`, over disjoint pools
 - **THEN** the composite offers `{60, 120, 60}` — the multiples of 60 in the overlap — and does not advertise 30, 40, 80 or 90 minutes
 
+#### Scenario: A role offering several runs is composed candidate by candidate
+- **WHEN** at a start one role's pool offers two distinct runs and another role's offers one, over disjoint pools
+- **THEN** the lengths offered are exactly those some candidate of every role can provide, and no length is offered that only the outer envelope of a role's runs contains
+
 #### Scenario: A length only one role can provide is not offered
 - **WHEN** at a shared start one role can provide 30 to 60 minutes and another only 90 to 120 minutes
 - **THEN** that start is not offered at all, because no length is common to both
