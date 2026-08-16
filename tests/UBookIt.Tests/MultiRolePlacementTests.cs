@@ -43,6 +43,32 @@ public class MultiRolePlacementTests
     private static Service Svc(params string[] types)
         => Service.Create("Massage", null, types.Select(t => new ServiceRole(t, 1))).Value;
 
+    /// <summary>A resource of the given type carrying capabilities.</summary>
+    private static Resource ResWith(int id, string type, params string[] capabilities)
+        => Resource.Create(
+            type,
+            $"Resource {id}",
+            capabilities: capabilities,
+            availability: TestData.Config(
+                TestData.Weekly("09:00", "17:00", Date.DayOfWeek),
+                constraints: BookingConstraints.Create(
+                    granularity: Mins(30), minDuration: Mins(30), maxDuration: Mins(480)).Value),
+            id: Id(id)).Value;
+
+    /// <summary>One role of one type, requiring <paramref name="count"/> resources.</summary>
+    private static Service Counted(string type, int count)
+        => Service.Create("Workshop", null, [new ServiceRole(type, count)]).Value;
+
+    /// <summary>
+    /// Two roles of one resource type, told apart by the capabilities each
+    /// requires — so their eligibility pools overlap without being equal.
+    /// </summary>
+    private static Service SameType(string type, string[] first, string[] second)
+        => Service.Create(
+            "Joint session",
+            null,
+            [ServiceRole.Create(type, first).Value, ServiceRole.Create(type, second).Value]).Value;
+
     private sealed class Harness
     {
         public required ServiceBookingService Services { get; init; }
@@ -600,5 +626,170 @@ public class MultiRolePlacementTests
         Assert.False(placed.Succeeded);
         Assert.Equal(FailureCodes.DurationTooLong, Assert.Single(placed.Failures).Code);
         Assert.Empty(await AllClaims(harness));
+    }
+
+    // --- assignment over overlapping pools (⑨-2) ---
+
+    [Fact]
+    public async Task Spec_scenario_a_count_claims_that_many_distinct_resources()
+    {
+        var service = Counted(Therapist, 2);
+        var harness = Wire(service, Res(3, Therapist), Res(4, Therapist));
+
+        var placed = await harness.Services.PlaceAsync(Request(service, "09:00", 60));
+
+        Assert.True(placed.Succeeded);
+
+        // One booking, two claims, two *different* resources.
+        Assert.Equal(2, placed.Value.Claims.Count);
+        Assert.Equal([Id(3), Id(4)], placed.Value.Claims.Select(c => c.ResourceId).Order());
+    }
+
+    [Fact]
+    public async Task Spec_scenario_a_count_exceeding_the_free_resources_prevents_the_booking()
+    {
+        // Two candidates, one of them already booked. The count cannot be met by
+        // the survivor counted twice.
+        var service = Counted(Therapist, 2);
+        var harness = Wire(service, Res(3, Therapist), Res(4, Therapist));
+
+        Assert.True((await harness.Bookings.PlaceAsync(new BookingRequest
+        {
+            ResourceId = Id(3),
+            Start = TestData.Utc(Date, "09:00"),
+            Duration = Mins(60),
+            Booker = TestData.Booker(),
+        })).Succeeded);
+
+        var placed = await harness.Services.PlaceAsync(Request(service, "09:00", 60));
+
+        Assert.False(placed.Succeeded);
+
+        // The free one is not claimed — a partial booking would be worse than none.
+        var claims = await AllClaims(harness);
+        Assert.DoesNotContain(claims, c => c.ResourceId == Id(4));
+    }
+
+    [Fact]
+    public async Task Spec_scenario_no_resource_is_claimed_twice()
+    {
+        // Both roles name `therapist`; resource 3 holds `cert-x` and so sits in both
+        // pools. Before assignment, `Combinations` generated (3, 3) — and because a
+        // preferred resource was ordered to the head of *every* pool containing it,
+        // that duplicate was the FIRST attempt, which `Booking.Create` throws on
+        // rather than refusing. The preference is supplied here for exactly that
+        // reason.
+        var service = SameType(Therapist, [], ["cert-x"]);
+        var harness = Wire(service, ResWith(3, Therapist, "cert-x"), Res(4, Therapist));
+
+        var placed = await harness.Services.PlaceAsync(Request(service, "09:00", 60, preferred: Id(3)));
+
+        Assert.True(placed.Succeeded);
+
+        var claimed = placed.Value.Claims.Select(c => c.ResourceId).ToList();
+        Assert.Equal(2, claimed.Count);
+        Assert.Equal(2, claimed.Distinct().Count());
+
+        // The preference is honoured — in whichever slot it fits, which is the
+        // capability-constrained one, since nothing else can fill it.
+        Assert.Contains(Id(3), claimed);
+        Assert.Contains(Id(4), claimed);
+    }
+
+    [Fact]
+    public async Task Spec_scenario_a_greedy_choice_that_strands_a_slot_does_not_lose_a_bookable_service()
+    {
+        // Resource 3 holds `cert-x` and is eligible for both roles; resource 4 holds
+        // nothing and can fill only the unconstrained one. A walk that gives the
+        // unconstrained role its first candidate takes 3 and strands the `cert-x`
+        // role, reporting a service unavailable that is plainly bookable.
+        var service = SameType(Therapist, [], ["cert-x"]);
+        var harness = Wire(service, ResWith(3, Therapist, "cert-x"), Res(4, Therapist));
+
+        var placed = await harness.Services.PlaceAsync(Request(service, "09:00", 60));
+
+        Assert.True(placed.Succeeded);
+
+        // The shared resource takes the slot the other cannot fill.
+        Assert.Equal([Id(3), Id(4)], placed.Value.Claims.Select(c => c.ResourceId).Order());
+    }
+
+    [Fact]
+    public async Task An_assignment_that_reuses_a_resource_is_never_attempted()
+    {
+        // The stronger half of "no resource is claimed twice": not merely that no
+        // such booking exists, but that no such attempt is made. `Booking.Create`
+        // throws `ArgumentException` on duplicate claims, so an attempt would be an
+        // unhandled exception rather than a refusal — the injectivity has to be
+        // structural, not a filter after the fact.
+        //
+        // Both roles resolve to resource 3 alone, so the only combination the
+        // cartesian walk could form is (3, 3).
+        var service = SameType(Therapist, [], ["cert-x"]);
+        var harness = Wire(service, ResWith(3, Therapist, "cert-x"));
+
+        var placed = await harness.Services.PlaceAsync(Request(service, "09:00", 60));
+
+        // A refusal, not an exception.
+        Assert.False(placed.Succeeded);
+        Assert.Equal(FailureCodes.ServiceUnavailable, placed.Failures[0].Code);
+
+        // And nothing was persisted on the way to deciding that.
+        Assert.Empty(await AllClaims(harness));
+    }
+
+    [Fact]
+    public async Task A_count_of_two_over_a_single_candidate_is_unavailable_rather_than_a_duplicate_claim()
+    {
+        // The same structural guarantee reached through a count instead of two
+        // roles: one free candidate cannot fill two slots.
+        var service = Counted(Therapist, 2);
+        var harness = Wire(service, Res(3, Therapist));
+
+        var placed = await harness.Services.PlaceAsync(Request(service, "09:00", 60));
+
+        Assert.False(placed.Succeeded);
+        Assert.Equal(FailureCodes.ServiceUnavailable, placed.Failures[0].Code);
+        Assert.Empty(await AllClaims(harness));
+    }
+
+    [Fact]
+    public async Task A_preference_is_honoured_in_whichever_slot_admits_it()
+    {
+        // Resource 4 has no capabilities, so it can fill only the unconstrained
+        // role. Preferring it must not be read as "fill role 1 with it" — the
+        // assignment places it where it fits and gives the other slot to 3
+        // (design D4).
+        var service = SameType(Therapist, [], ["cert-x"]);
+        var harness = Wire(service, ResWith(3, Therapist, "cert-x"), Res(4, Therapist));
+
+        var placed = await harness.Services.PlaceAsync(Request(service, "09:00", 60, preferred: Id(4)));
+
+        Assert.True(placed.Succeeded);
+        Assert.Contains(Id(4), placed.Value.Claims.Select(c => c.ResourceId));
+    }
+
+    [Fact]
+    public async Task Repeated_identical_requests_claim_the_same_resources()
+    {
+        // Determinism over an overlapping pool, where there is a real choice to
+        // make — the single-role ordering guarantee could not exercise this.
+        var service = SameType(Therapist, [], ["cert-x"]);
+
+        async Task<IReadOnlyList<Guid>> Once()
+        {
+            var harness = Wire(
+                service,
+                ResWith(3, Therapist, "cert-x"),
+                ResWith(4, Therapist, "cert-x"),
+                Res(5, Therapist));
+
+            var placed = await harness.Services.PlaceAsync(Request(service, "09:00", 60));
+
+            Assert.True(placed.Succeeded);
+            return [.. placed.Value.Claims.Select(c => c.ResourceId)];
+        }
+
+        Assert.Equal(await Once(), await Once());
     }
 }

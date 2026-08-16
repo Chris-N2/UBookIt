@@ -450,13 +450,17 @@ public sealed class ServiceBookingService(
             return DomainResult<Booking>.Failure(boundsFailure);
         }
 
-        // One ordered shortlist per role. A preferred resource belongs to
-        // exactly one role's pool — a resource has one type — so it orders that
-        // role's candidates and leaves the others untouched.
+        // One shortlist per role, in resource-id order.
+        //
+        // The preferred resource is deliberately NOT ordered to the head any more.
+        // It used to be, because a resource belonged to exactly one role's pool; now
+        // that it can be eligible for several, hoisting it put the same resource at
+        // the head of every one of them — making an assignment that claims it twice
+        // the *first* attempt, which `Booking.Create` throws on rather than refuses.
+        // Preference is expressed by asking the assignment to include it instead
+        // (design D4), which is a constraint on the booking rather than on a role.
         var attemptable = pools
-            .Select(pool => Order(pool.Candidates, request.PreferredResourceId)
-                .Where(c => Admits(c, request.Duration))
-                .ToList())
+            .Select(pool => pool.Candidates.Where(c => Admits(c, request.Duration)).ToList())
             .ToList();
 
         if (attemptable.Any(shortlist => shortlist.Count == 0))
@@ -471,11 +475,12 @@ public sealed class ServiceBookingService(
         // Drop candidates already claimed at the requested interval, in one read
         // over every shortlist (design D4a).
         //
-        // Without this the loop attempts the whole cartesian product of the
-        // shortlists — two roles of sixty candidates each, all busy, is 3,600
-        // sequential locking transactions for one anonymous request, because the
-        // filter above is on the requested *length* and bounds nothing when the
-        // resources are merely occupied.
+        // Without this the search would begin from a pool in which everything is
+        // busy, and every assignment it found would be attempted and lost — two
+        // roles of sixty candidates each, all busy, is a great many sequential
+        // locking transactions for one anonymous request, because the filter above
+        // is on the requested *length* and bounds nothing when the resources are
+        // merely occupied.
         //
         // The read is advisory, not a substitute for the atomic contract: a
         // candidate free here may be taken before the placement lands, which the
@@ -492,38 +497,42 @@ public sealed class ServiceBookingService(
             free = attemptable;
         }
 
+        // Roles become slots: a role of count N contributes N interchangeable
+        // slots drawn from its pool, and one resource fills at most one of them.
+        // From here on the unit of everything — the attempt, the classification,
+        // the exclusion reasoning — is a slot rather than a role.
+        var attemptableSlots = ExpandSlots(pools, attemptable);
+        var freeSlots = ExpandSlots(pools, free);
+
         // Candidates the pre-filter dropped were never attempted, so the all-fail
         // outcome has to be reasoned about rather than observed. The reasoning is
         // in RuleClassification, which asks the placement service the same
         // questions an attempt would have answered.
-        var rules = new RuleClassification(bookingService, request, attemptable, free);
+        var rules = new RuleClassification(bookingService, request, attemptableSlots, freeSlots);
 
-        if (free.Any(shortlist => shortlist.Count == 0))
-        {
-            // Every candidate of some role is already claimed at that interval,
-            // so there is nothing left to attempt. What the caller is told is
-            // still decided by the classification, never by the emptiness.
-            return rules.AllFail(raced: false);
-        }
-
-        attemptable = free;
-
-        // Whether any combination that actually ran reached the conflict check
-        // and lost. The classification below adds what the excluded ones would
-        // have contributed.
+        // Whether any assignment that actually ran reached the conflict check and
+        // lost. The classification below adds what the excluded ones would have
+        // contributed.
         var raced = false;
 
-        foreach (var combination in Combinations(attemptable))
+        // The candidates still worth assigning. Each failed attempt removes the
+        // resources it has learned something bad about, so the loop is bounded by
+        // the number of candidates rather than by the product of the pool sizes —
+        // the bound the cartesian walk could not offer (task 3.5).
+        var remaining = freeSlots.Select(slot => slot.ToList()).ToList();
+
+        while (Resolve(remaining, request.PreferredResourceId) is { } assignment)
         {
-            // One booking claiming one resource per role, placed through the
-            // store's all-or-nothing contract: either every claim is persisted
-            // or none is, so attempting combinations in sequence is safe
-            // (bookings spec, atomic placement contract).
+            // One booking claiming one resource per slot, all distinct by
+            // construction, placed through the store's all-or-nothing contract:
+            // either every claim is persisted or none is, so attempting
+            // assignments in sequence is safe (bookings spec, atomic placement
+            // contract).
             var placed = await bookingService
                 .PlaceAsync(
                     new MultiClaimBookingRequest
                     {
-                        ResourceIds = [.. combination.Select(c => c.ResourceId)],
+                        ResourceIds = [.. assignment.Select(c => c.ResourceId)],
                         Start = request.Start,
                         Duration = request.Duration,
                         Booker = request.Booker,
@@ -547,32 +556,153 @@ public sealed class ServiceBookingService(
             }
 
             raced |= placed.Failures.Any(f => !IsDeterministic(f.Code));
+
+            if (!Exclude(remaining, assignment, rules))
+            {
+                // Nothing was learned, so the next assignment would be the same one
+                // and the loop would not terminate. Bail to the classification.
+                break;
+            }
         }
 
-        // Echoing the last combination's failures would be arbitrary — it
-        // depends on iteration order and describes resources the caller never
-        // named. Instead: was anything actually taken, or was this never
-        // bookable? The attempts answer for the combinations that ran; the
-        // classification answers for the ones the pre-filter removed.
+        // Echoing the last assignment's failures would be arbitrary — it depends on
+        // iteration order and describes resources the caller never named. Instead:
+        // was anything actually taken, or was this never bookable? The attempts
+        // answer for the assignments that ran; the classification answers for the
+        // candidates the pre-filter removed.
         return rules.AllFail(raced);
     }
 
     /// <summary>
-    /// Decides what an all-fail placement tells the caller, including for the
-    /// combinations the claims pre-filter removed before they could be attempted.
+    /// A role of count <c>N</c> repeated into <c>N</c> slots, in role order then
+    /// slot index — the order the assignment is deterministic in.
     /// <para>
-    /// The unit of an attempt is a <em>combination</em>, not a candidate, and
-    /// that is the whole difficulty. `BookingService` accumulates each claimed
-    /// resource's rules before the conflict check, so a combination reaches that
-    /// check only when <em>every</em> role contributes a candidate whose rules
-    /// admit the request. One admitting candidate in one role says nothing if
-    /// another role has none — no combination containing it could ever have
-    /// raced, and reporting `conflict` would invite a retry that cannot succeed.
+    /// The candidate lists are shared between a role's slots rather than copied:
+    /// the slots of one role are interchangeable by definition, and distinctness is
+    /// the assignment's job rather than the expansion's.
+    /// </para>
+    /// </summary>
+    private static List<List<ServiceCandidate>> ExpandSlots(
+        IReadOnlyList<RoleCandidates> pools, List<List<ServiceCandidate>> byRole)
+    {
+        var slots = new List<List<ServiceCandidate>>();
+
+        for (var role = 0; role < pools.Count; role++)
+        {
+            for (var unit = 0; unit < pools[role].Role.Count; unit++)
+            {
+                slots.Add(byRole[role]);
+            }
+        }
+
+        return slots;
+    }
+
+    /// <summary>
+    /// One candidate per slot, all distinct, honouring a preferred resource where
+    /// an assignment can — or null when no assignment saturates the slots.
+    /// <para>
+    /// Preference is a constraint on the booking rather than on a role (design D4):
+    /// the assignment is asked for a saturating matching that includes the resource
+    /// in whichever slot it fits, and only when none exists does the preference fall
+    /// through, as it does today. A preference naming a resource outside every pool
+    /// was already rejected before any of this ran.
+    /// </para>
+    /// </summary>
+    private static List<ServiceCandidate>? Resolve(
+        List<List<ServiceCandidate>> slots, Guid? preferredResourceId)
+    {
+        var ids = slots
+            .Select(slot => (IReadOnlyList<Guid>)slot.Select(c => c.ResourceId).ToList())
+            .ToList();
+
+        var assignment = preferredResourceId is { } preferred
+            ? SlotAssignment.TrySaturateIncluding(ids, preferred) ?? SlotAssignment.TrySaturate(ids)
+            : SlotAssignment.TrySaturate(ids);
+
+        if (assignment is null)
+        {
+            return null;
+        }
+
+        return [.. assignment.Select((id, slot) => slots[slot].First(c => c.ResourceId == id))];
+    }
+
+    /// <summary>
+    /// Removes from every slot the resources a failed attempt has condemned, and
+    /// reports whether anything was actually removed.
+    /// <para>
+    /// A resource whose own rules refuse the request is dropped alone, because the
+    /// fault is known to be its: the rest of the assignment is innocent and must
+    /// stay available to the next one. That is what keeps a deterministic refusal
+    /// choosing the same replacement the candidate walk used to choose.
     /// </para>
     /// <para>
-    /// Rules are evaluated by the placement service and memoised per resource,
-    /// so this cannot drift from what an attempt would have done and costs one
-    /// evaluation per candidate on the failure path only.
+    /// A conflict names nobody — the store reports that the placement clashed, not
+    /// which claim clashed — so every resource of the assignment is dropped. That is
+    /// deliberately conservative: it can report <c>conflict</c> for a service a
+    /// different assignment could still have booked, in the window between the
+    /// advisory claims read and the attempt. The alternative is a second claims read
+    /// per failed attempt, and a false <c>conflict</c> in a genuine race is
+    /// precisely what the advisory read is already permitted to cause — the caller
+    /// retries and succeeds, where a wrong booking could not be undone.
+    /// </para>
+    /// </summary>
+    private static bool Exclude(
+        List<List<ServiceCandidate>> slots,
+        List<ServiceCandidate> assignment,
+        RuleClassification rules)
+    {
+        var condemned = assignment
+            .Where(candidate => !rules.Check(candidate).Succeeded)
+            .Select(candidate => candidate.ResourceId)
+            .ToHashSet();
+
+        if (condemned.Count == 0)
+        {
+            condemned = [.. assignment.Select(candidate => candidate.ResourceId)];
+        }
+
+        var removed = false;
+
+        for (var slot = 0; slot < slots.Count; slot++)
+        {
+            // Each slot holds its own list by this point — the caller copied them
+            // out of the shared expansion — so a removal here is a removal from one
+            // slot, and the loop applies it to all of them explicitly.
+            var kept = slots[slot].Where(c => !condemned.Contains(c.ResourceId)).ToList();
+
+            removed |= kept.Count != slots[slot].Count;
+            slots[slot] = kept;
+        }
+
+        return removed;
+    }
+
+    /// <summary>
+    /// Decides what an all-fail placement tells the caller, including for the
+    /// assignments the claims pre-filter removed before they could be attempted.
+    /// <para>
+    /// The unit of an attempt is a <b>saturating assignment</b>, not a candidate and
+    /// no longer a combination, and that is the whole difficulty. `BookingService`
+    /// accumulates each claimed resource's rules before the conflict check, so an
+    /// attempt reaches that check only when <em>every slot</em> is filled by a
+    /// resource whose own rules admit the request. One admitting candidate says
+    /// nothing if some slot cannot be filled at all — no assignment containing it
+    /// could ever have raced, and reporting `conflict` would invite a retry that
+    /// cannot succeed.
+    /// </para>
+    /// <para>
+    /// Restating that over slots rather than roles is what makes it survive counts.
+    /// "Every role has an admitting candidate" was the right test only while a role
+    /// consumed one resource: a role of count 2 with a single admitting candidate
+    /// passes it and still cannot be filled. The question is now asked of the
+    /// assignment itself, which answers it for same-type roles and counts alike.
+    /// </para>
+    /// <para>
+    /// Rules are evaluated by the placement service and memoised per resource, so
+    /// this cannot drift from what an attempt would have done, and each resource
+    /// costs one evaluation however many slots it is a candidate for.
     /// </para>
     /// </summary>
     private sealed class RuleClassification(
@@ -583,7 +713,16 @@ public sealed class ServiceBookingService(
     {
         private readonly Dictionary<Guid, DomainResult> _checked = [];
 
-        private DomainResult Check(ServiceCandidate candidate)
+        /// <summary>
+        /// Whether this resource's own rules admit the request, memoised.
+        /// <para>
+        /// Shared with the attempt loop's exclusion step rather than kept private:
+        /// a resource that refused deterministically must be dropped from the
+        /// search, and asking the same memoised evaluation is what stops the
+        /// exclusion and the classification disagreeing about why an attempt failed.
+        /// </para>
+        /// </summary>
+        internal DomainResult Check(ServiceCandidate candidate)
         {
             if (!_checked.TryGetValue(candidate.ResourceId, out var result))
             {
@@ -612,7 +751,7 @@ public sealed class ServiceBookingService(
                 }
             }
 
-            return raced || ExcludedCombinationCouldHaveRaced()
+            return raced || ExcludedAssignmentCouldHaveRaced()
                 ? DomainResult<Booking>.Failure(
                     FailureCodes.Conflict,
                     "Every resource able to fulfil this service is already booked at that time.")
@@ -620,25 +759,52 @@ public sealed class ServiceBookingService(
         }
 
         /// <summary>
-        /// Whether some combination the pre-filter removed would have reached the
-        /// conflict check: every role has a candidate whose rules admit the
-        /// request, and at least one of those was excluded for being claimed.
+        /// Whether an assignment the pre-filter removed would have reached the
+        /// conflict check: a saturating assignment exists among the candidates whose
+        /// rules admit the request, and none exists once the claimed ones are taken
+        /// out — so being claimed is exactly what broke it.
+        /// <para>
+        /// Both halves are load-bearing. Without the first, a claimed candidate
+        /// would be read as a lost race even where some slot could never be filled
+        /// at all, reporting `conflict` for a request that can never succeed and
+        /// inviting a retry that cannot help. Without the second, a service with a
+        /// perfectly bookable assignment left over would be blamed on the claims.
+        /// </para>
+        /// <para>
+        /// Stated over assignments rather than "every role has an admitting
+        /// candidate", which a role of count 2 with one admitting candidate would
+        /// pass while being unfillable.
+        /// </para>
         /// </summary>
-        private bool ExcludedCombinationCouldHaveRaced()
+        private bool ExcludedAssignmentCouldHaveRaced()
         {
-            var everyRoleCanBeFilled = shortlists.All(
-                shortlist => shortlist.Any(candidate => Check(candidate).Succeeded));
+            var admitting = Ids(shortlists);
 
-            if (!everyRoleCanBeFilled)
+            if (SlotAssignment.TrySaturate(admitting) is null)
             {
                 return false;
             }
 
-            return shortlists
-                .Zip(free)
-                .SelectMany(pair => pair.First.Where(candidate => !pair.Second.Contains(candidate)))
-                .Any(candidate => Check(candidate).Succeeded);
+            var stillFree = free
+                .Select(slot => slot.Select(c => c.ResourceId).ToHashSet())
+                .ToList();
+
+            var admittingAndFree = admitting
+                .Select((slot, index) => (IReadOnlyList<Guid>)slot.Where(stillFree[index].Contains).ToList())
+                .ToList();
+
+            return SlotAssignment.TrySaturate(admittingAndFree) is null;
         }
+
+        /// <summary>
+        /// The resource ids of the candidates whose own rules admit the request, one
+        /// list per slot — the graph an attempt could actually have run over.
+        /// </summary>
+        private List<IReadOnlyList<Guid>> Ids(List<List<ServiceCandidate>> slots)
+            => [.. slots.Select(slot => (IReadOnlyList<Guid>)slot
+                .Where(candidate => Check(candidate).Succeeded)
+                .Select(candidate => candidate.ResourceId)
+                .ToList())];
     }
 
     private static DomainResult<Booking> Unavailable(string message)
@@ -685,13 +851,6 @@ public sealed class ServiceBookingService(
             && duration <= candidate.Range.Max
             && duration.Ticks % candidate.Granularity.Ticks == 0;
 
-    private static IEnumerable<ServiceCandidate> Order(
-        IReadOnlyList<ServiceCandidate> candidates, Guid? preferredResourceId)
-        => preferredResourceId is { } preferred
-            ? candidates.Where(c => c.ResourceId == preferred)
-                .Concat(candidates.Where(c => c.ResourceId != preferred))
-            : candidates;
-
     /// <summary>
     /// The shortlists with every candidate already claimed at the requested
     /// interval removed, judged from one claims read over all of them.
@@ -728,46 +887,6 @@ public sealed class ServiceBookingService(
 
         return [.. shortlists.Select(shortlist =>
             shortlist.Where(c => !claimed.Contains(c.ResourceId)).ToList())];
-    }
-
-    /// <summary>
-    /// Every combination of one candidate per role, in a deterministic order:
-    /// the last role varies fastest, so repeated identical requests attempt the
-    /// same combinations in the same sequence.
-    /// <para>
-    /// Lazy, so a successful first attempt costs one placement. The number of
-    /// combinations is the product of the shortlist sizes, which the caller has
-    /// already reduced to the candidates that were free when it read the claims
-    /// — normally one per role. The product is what makes that pre-filter
-    /// load-bearing rather than an optimisation.
-    /// </para>
-    /// </summary>
-    private static IEnumerable<ServiceCandidate[]> Combinations(List<List<ServiceCandidate>> shortlists)
-    {
-        var indices = new int[shortlists.Count];
-
-        while (true)
-        {
-            var combination = new ServiceCandidate[shortlists.Count];
-            for (var role = 0; role < shortlists.Count; role++)
-            {
-                combination[role] = shortlists[role][indices[role]];
-            }
-
-            yield return combination;
-
-            var position = shortlists.Count - 1;
-            while (position >= 0 && ++indices[position] == shortlists[position].Count)
-            {
-                indices[position] = 0;
-                position--;
-            }
-
-            if (position < 0)
-            {
-                yield break;
-            }
-        }
     }
 
     /// <summary>
