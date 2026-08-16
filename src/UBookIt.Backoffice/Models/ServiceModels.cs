@@ -1,4 +1,4 @@
-namespace UBookIt.Backoffice.Models;
+﻿namespace UBookIt.Backoffice.Models;
 
 /// <summary>
 /// Management API contract models for services. Purpose-built DTOs — domain
@@ -220,6 +220,19 @@ public class PoolShortfallModel
 /// </summary>
 public class ShortfallRoleModel
 {
+    /// <summary>
+    /// Where this role sits in the request's role list, zero-based.
+    /// <para>
+    /// Carried because nothing else identifies it. Two roles of one resource type
+    /// requiring the same capabilities are equal in every field below — a
+    /// configuration the domain rejects, but one an editor is halfway through —
+    /// and a consumer rendering them would otherwise emit two identical entries
+    /// for two different rows. Position is what a consumer with rows on screen
+    /// points at; one without them can ignore it.
+    /// </para>
+    /// </summary>
+    public int RoleIndex { get; set; }
+
     /// <summary>The role, identified as the chains identify one: by resource type.</summary>
     public string ResourceType { get; set; } = string.Empty;
 

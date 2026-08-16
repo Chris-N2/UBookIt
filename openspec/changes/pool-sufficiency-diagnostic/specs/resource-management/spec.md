@@ -22,6 +22,13 @@ distinct resources they require between them, and how many resources are eligibl
 any of them, so the reader can tell a count that is too high from a pool that is too
 small without a second request.
 
+Each role the finding names SHALL carry its **position in the request's role
+list**. Nothing else identifies it: two roles of one resource type requiring the
+same capabilities are equal in every other field, and a consumer rendering them
+would otherwise emit two identical entries for two different rows. The position is
+what lets a consumer with rows on screen point at one, and a consumer without them
+may ignore it.
+
 The endpoint SHALL NOT reject a configuration whose pools are insufficient, exactly
 as it does not reject one whose roles duplicate a resource type: previewing such a
 configuration is how an editor sees what is wrong while correcting it, and refusing
@@ -42,6 +49,10 @@ too incomplete to resolve are unaffected.
 #### Scenario: Two roles competing for one resource are reported together
 - **WHEN** a configuration is previewed with two roles of one resource type that both resolve to the same single resource
 - **THEN** the sufficiency member names both roles as one finding, rather than reporting each role separately
+
+#### Scenario: Each named role carries its position in the request
+- **WHEN** a configuration is previewed whose second and third roles cannot be filled together
+- **THEN** the finding identifies them by their positions in the request, so a consumer can tell them apart even when they are identical in resource type and required capabilities
 
 #### Scenario: The chains are not altered by the finding
 - **WHEN** a configuration is previewed whose two roles each report two eligible resources but which share the same two

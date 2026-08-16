@@ -223,7 +223,7 @@ export default {
       "This service needs %0% distinct resources at once, and 1 resource is eligible for the requirements below.",
     sufficiencyNoneEligible:
       "This service needs %0% distinct resources at once, and no resource is eligible for the requirements below.",
-    sufficiencyRole: "%0%: %1% required.",
+    sufficiencyRole: "%0% — %1% required.",
     // Both repairs, because the fault is as often a missing resource as a wrong
     // count — and saving is explicitly unaffected, so an editor can define the
     // service first and add the people afterwards.

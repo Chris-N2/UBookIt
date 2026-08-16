@@ -1,4 +1,4 @@
-namespace UBookIt.Core.Services;
+﻿namespace UBookIt.Core.Services;
 
 /// <summary>
 /// A group of roles that cannot all be filled at once, and the arithmetic that
@@ -21,7 +21,7 @@ namespace UBookIt.Core.Services;
 /// </summary>
 /// <param name="Roles">
 /// The roles that cannot be filled together, in the order the configuration
-/// declares them.
+/// declares them, each with its position in that configuration.
 /// </param>
 /// <param name="Required">
 /// How many <em>distinct</em> resources those roles need between them — the sum
@@ -32,7 +32,25 @@ namespace UBookIt.Core.Services;
 /// <see cref="Required"/>: a shortfall of zero is not a finding, and is never
 /// reported as one.
 /// </param>
-public sealed record RoleShortfall(IReadOnlyList<ServiceRole> Roles, int Required, int Eligible);
+public sealed record RoleShortfall(IReadOnlyList<ShortfallRole> Roles, int Required, int Eligible);
+
+/// <summary>
+/// One role a shortfall names, with <b>where it sits</b> in the configuration it
+/// was computed for.
+/// <para>
+/// The position travels because two roles of one resource type requiring the same
+/// capabilities are equal in every other respect — a configuration the domain
+/// rejects but an editor can be halfway through — so nothing else distinguishes
+/// them. A consumer with rows on screen can point at one; a consumer without them
+/// can ignore it.
+/// </para>
+/// <para>
+/// It is the index into the pools this check was given, which is the order the
+/// caller supplied. Deliberately not a row number: Core has no rows, and turning
+/// a position into a label is the consumer's business.
+/// </para>
+/// </summary>
+public sealed record ShortfallRole(int Index, ServiceRole Role);
 
 /// <summary>
 /// Whether a service's roles can be filled <em>at once</em> by the resources that
@@ -133,7 +151,7 @@ public static class PoolSufficiency
             .ToList();
 
         return new RoleShortfall(
-            [.. indices.Select(index => roles[index])],
+            [.. indices.Select(index => new ShortfallRole(index, roles[index]))],
 
             // The sum of the whole roles' counts, not of the deficient slots: a
             // role is a row, and reporting "2 of the 3 you asked for" would name a

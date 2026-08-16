@@ -697,6 +697,43 @@ public class ServicePreviewEndpointTests
     }
 
     [Fact]
+    public async Task Spec_scenario_each_named_role_carries_its_position_in_the_request()
+    {
+        // The healthy `room` sits first, so the finding names positions 1 and 2 —
+        // its own array would say 0 and 1, and those are different rows.
+        var (controller, _) = Wire(Room(1, "Red Room", 480), Therapist(2, "Mary", "cert-x"));
+
+        var response = Ok(await controller.PreviewServiceConfiguration(
+            Configuration(
+                null,
+                Role(),
+                Role("therapist", ["cert-x"]),
+                Role("therapist"))));
+
+        Assert.NotNull(response.PoolShortfall);
+        Assert.Equal([1, 2], response.PoolShortfall.Roles.Select(r => r.RoleIndex));
+    }
+
+    [Fact]
+    public async Task Two_roles_alike_in_every_field_are_distinguishable_in_the_payload()
+    {
+        // Unsaveable, but reachable while an editor is correcting it — and the
+        // only thing that tells the two apart on the wire is the position.
+        var (controller, _) = Wire(Therapist(1, "Mary"));
+
+        var response = Ok(await controller.PreviewServiceConfiguration(
+            Configuration(null, Role("therapist"), Role("therapist"))));
+
+        Assert.NotNull(response.PoolShortfall);
+
+        var roles = response.PoolShortfall.Roles;
+
+        Assert.Equal([0, 1], roles.Select(r => r.RoleIndex));
+        Assert.Equal(roles[0].ResourceType, roles[1].ResourceType);
+        Assert.Equal(roles[0].RequiredCapabilities, roles[1].RequiredCapabilities);
+    }
+
+    [Fact]
     public async Task Spec_scenario_the_chains_are_not_altered_by_the_finding()
     {
         // Two roles whose pools are the same two therapists, each needing two.

@@ -1,4 +1,4 @@
-using System.Globalization;
+﻿using System.Globalization;
 using UBookIt.Backoffice.Models;
 using UBookIt.Core.Common;
 using UBookIt.Core.Resources;
@@ -160,11 +160,12 @@ internal static class ServiceModelMapper
     private static PoolShortfallModel ToModel(RoleShortfall shortfall)
         => new()
         {
-            Roles = [.. shortfall.Roles.Select(role => new ShortfallRoleModel
+            Roles = [.. shortfall.Roles.Select(entry => new ShortfallRoleModel
             {
-                ResourceType = role.ResourceType,
-                RequiredCapabilities = [.. role.RequiredCapabilities.Keys],
-                Count = role.Count,
+                RoleIndex = entry.Index,
+                ResourceType = entry.Role.ResourceType,
+                RequiredCapabilities = [.. entry.Role.RequiredCapabilities.Keys],
+                Count = entry.Role.Count,
             })],
             Required = shortfall.Required,
             Eligible = shortfall.Eligible,

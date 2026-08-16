@@ -159,6 +159,7 @@ export type ServiceRoleModel = {
 };
 
 export type ShortfallRoleModel = {
+    roleIndex: number;
     resourceType: string;
     requiredCapabilities: Array<string>;
     count: number;

@@ -1,8 +1,8 @@
 import type { TermResolver } from "./resolution-summary.js";
-import { roleLabels, type RoleDescriptor } from "./role-label.js";
+import { findingLabels, type PositionedRole } from "./role-label.js";
 
 /** One requirement a shortfall names, captured with the response that named it. */
-export type ShortfallRoleSnapshot = RoleDescriptor & {
+export type ShortfallRoleSnapshot = PositionedRole & {
   count: number;
 };
 
@@ -50,7 +50,12 @@ export function sufficiencyReport(finding: ShortfallSnapshot | null, t: TermReso
     return [];
   }
 
-  const labels = roleLabels(finding.roles, t);
+  // Named by row, exactly as the chains above are — and unconditionally, because
+  // this list is a SUBSET of the configuration. Deciding by whether two named
+  // roles share a type would ask the wrong question: a service with two
+  // `therapist` rows can produce a finding naming one of them, which then reads
+  // as unambiguous while leaving the editor unable to tell which row is short.
+  const labels = findingLabels(finding.roles, t);
 
   return [
     headline(finding, t),

@@ -24,6 +24,7 @@ const t: TermResolver = (key, ...args) => (args.length === 0 ? key : `${key}(${a
 function snapshot(overrides: Partial<ResolutionSnapshot> = {}): ResolutionSnapshot {
   return {
     resourceType: "room",
+    rowNumber: 1,
     requiredCapabilities: [],
     ofType: 10,
     withCapabilities: 10,
@@ -251,8 +252,8 @@ describe("a chain per role", () => {
     // exists to correct, and this is the surface it lands on (design D6).
     const groups = resolutionGroups(
       [
-        snapshot({ resourceType: "therapist", requiredCapabilities: ["cert-x"] }),
-        snapshot({ resourceType: "therapist", requiredCapabilities: [] }),
+        snapshot({ resourceType: "therapist", rowNumber: 1, requiredCapabilities: ["cert-x"] }),
+        snapshot({ resourceType: "therapist", rowNumber: 2, requiredCapabilities: [] }),
       ],
       t,
     );
@@ -275,8 +276,8 @@ describe("a chain per role", () => {
     // there are none".
     const labels = resolutionGroups(
       [
-        snapshot({ resourceType: "therapist", requiredCapabilities: ["cert-x"] }),
-        snapshot({ resourceType: "therapist", requiredCapabilities: [] }),
+        snapshot({ resourceType: "therapist", rowNumber: 1, requiredCapabilities: ["cert-x"] }),
+        snapshot({ resourceType: "therapist", rowNumber: 2, requiredCapabilities: [] }),
       ],
       t,
     ).map((g) => g.label);
@@ -286,15 +287,15 @@ describe("a chain per role", () => {
     expect(labels.join(" ")).not.toContain("cert-x");
   });
 
-  it("numbers by position in the configuration, not by position among the clashing roles", () => {
+  it("uses the row number it was given, not its position among the clashing roles", () => {
     // A shared pair sitting after an unrelated role must still be numbered 2 and
     // 3 — the numbers name rows on screen, and an editor counting from the top
     // has to land on the same ones.
     const groups = resolutionGroups(
       [
-        snapshot({ resourceType: "room", requiredCapabilities: [] }),
-        snapshot({ resourceType: "therapist", requiredCapabilities: ["cert-x"] }),
-        snapshot({ resourceType: "therapist", requiredCapabilities: [] }),
+        snapshot({ resourceType: "room", rowNumber: 1, requiredCapabilities: [] }),
+        snapshot({ resourceType: "therapist", rowNumber: 2, requiredCapabilities: ["cert-x"] }),
+        snapshot({ resourceType: "therapist", rowNumber: 3, requiredCapabilities: [] }),
       ],
       t,
     );
@@ -303,6 +304,22 @@ describe("a chain per role", () => {
       "room",
       "roleLabelOrdinal(2,therapist)",
       "roleLabelOrdinal(3,therapist)",
+    ]);
+
+    // And the number comes from the snapshot, not the array: rows 4 and 5 of a
+    // configuration whose earlier rows were omitted from the request must still
+    // say 4 and 5. This is the round-2 MAJOR reduced to what the renderer owns.
+    const later = resolutionGroups(
+      [
+        snapshot({ resourceType: "therapist", rowNumber: 4, requiredCapabilities: ["cert-x"] }),
+        snapshot({ resourceType: "therapist", rowNumber: 5, requiredCapabilities: [] }),
+      ],
+      t,
+    );
+
+    expect(later.map((g) => g.label)).toEqual([
+      "roleLabelOrdinal(4,therapist)",
+      "roleLabelOrdinal(5,therapist)",
     ]);
   });
 

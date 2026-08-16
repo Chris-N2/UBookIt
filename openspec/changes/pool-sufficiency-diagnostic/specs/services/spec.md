@@ -18,7 +18,12 @@ resource as by editing the service, and refusing the save would force the editor
 do those in one order.
 
 The wording SHALL state what is required against what is eligible, and SHALL name the
-roles involved. It SHALL NOT state or imply that the service *is* available, free, or
+roles involved. It SHALL name them by the **requirement row** each belongs to, as
+the resolution chains beside it do: the editor has rows, the fix for a role is on
+its row, and two roles of one resource type requiring the same capabilities are
+distinguishable by nothing else. A row SHALL be identified by the position the
+response reports for it, never by its position within the finding — the finding is
+a subset of the configuration, so its second entry is not the second row. It SHALL NOT state or imply that the service *is* available, free, or
 bookable, and SHALL NOT state that a sufficient pool means the service can be booked
 — eligibility is not availability, and this check evaluates neither opening hours,
 lead time, horizon, nor the booking calendar.
@@ -47,6 +52,14 @@ that is false for the configuration it is reporting on.
 #### Scenario: The report is not attached to a requirement row
 - **WHEN** two roles together cannot be filled
 - **THEN** the statement appears once at form level naming both roles, and neither requirement row is marked as being in error
+
+#### Scenario: Two roles identical in type and capabilities are still distinguishable
+- **WHEN** two requirement rows name the same resource type and require the same capabilities, and cannot be filled together
+- **THEN** the statement names each by its own requirement row rather than producing two identical entries
+
+#### Scenario: A row above that is not yet filled in does not shift the numbering
+- **WHEN** a requirement row above has no resource type entered yet, so the configuration reported on omits it
+- **THEN** every reported role is still named by the requirement row it belongs to, not by its position among the roles reported
 
 #### Scenario: An unresolvable configuration reports nothing rather than zero
 - **WHEN** the configuration is too incomplete to resolve, or the preview request fails

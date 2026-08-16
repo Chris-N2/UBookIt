@@ -14,6 +14,17 @@ export type RoleDescriptor = {
 };
 
 /**
+ * A role together with the requirement row it came from, 1-based as the fieldset
+ * legends show it.
+ *
+ * Only the editor can supply this — it is the surface that has rows — which is
+ * also why the collection view labels by capabilities instead.
+ */
+export type PositionedRole = RoleDescriptor & {
+  rowNumber: number;
+};
+
+/**
  * For each role, whether another role of the same configuration names the same
  * resource type.
  *
@@ -55,6 +66,25 @@ export function roleLabel(role: RoleDescriptor, shared: boolean, t: TermResolver
     : t("roleLabelCapabilities", role.resourceType, role.requiredCapabilities.join(", "));
 }
 
+/**
+ * Every role a *finding* names, always headed by its row.
+ *
+ * Unconditionally, where {@link chainLabels} decides by whether two roles share a
+ * type — and the difference matters because a finding is a **subset** of the
+ * configuration. Judging "do two roles share a type" over the subset asks the
+ * wrong question: a configuration with two `therapist` rows can produce a finding
+ * naming only one of them, which then looks unambiguous and is not. The editor
+ * would be told a `therapist` row is short without being told which.
+ *
+ * The brevity argument that shapes the other two rules does not apply here
+ * either. A chain heads every role of every configuration and the collection view
+ * a cell for every service; this renders only when something is wrong, and when
+ * something is wrong the row is the whole point.
+ */
+export function findingLabels(roles: PositionedRole[], t: TermResolver): string[] {
+  return roles.map((role) => t("roleLabelOrdinal", role.rowNumber, role.resourceType));
+}
+
 /** Every role of a configuration, labelled under the same rule. */
 export function roleLabels(roles: RoleDescriptor[], t: TermResolver): string[] {
   const shared = sharedTypes(roles);
@@ -79,10 +109,15 @@ export function roleLabels(roles: RoleDescriptor[], t: TermResolver): string[] {
  * it has no rows to point at — which is why the two surfaces label differently
  * and why the rule lives in two functions rather than one with a flag.
  */
-export function chainLabels(roles: RoleDescriptor[], t: TermResolver): string[] {
+export function chainLabels(roles: PositionedRole[], t: TermResolver): string[] {
   const shared = sharedTypes(roles);
 
+  // `role.rowNumber`, never the array index. The two differ whenever a row above
+  // was omitted from the request for having no resource type yet, and an index
+  // would then head a chain with the number of a different row — the fault QA
+  // found in the first attempt at this. The number is computed once, where the
+  // request is built, and carried.
   return roles.map((role, index) =>
-    shared[index] ? t("roleLabelOrdinal", index + 1, role.resourceType) : role.resourceType,
+    shared[index] ? t("roleLabelOrdinal", role.rowNumber, role.resourceType) : role.resourceType,
   );
 }

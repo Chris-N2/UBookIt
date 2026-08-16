@@ -12,6 +12,7 @@ import { toApiErrors, type ApiError } from "./api-errors.js";
 import { resolutionGroups, type ResolutionSnapshot } from "./resolution-summary.js";
 import { alignmentReport, type AlignmentSnapshot } from "./alignment-report.js";
 import { sufficiencyReport, type ShortfallSnapshot } from "./sufficiency-report.js";
+import { carriedRows, rowNumbers } from "./preview-rows.js";
 import "./capability-input.element.js";
 
 /**
@@ -298,23 +299,29 @@ export class UBookItServiceEditorElement extends UmbLitElement {
    * that cannot be resolved does silence everything, because it is an input to
    * every role's chain.
    */
-  #buildPreviewRequest(): ServicePreviewRequestModel | null {
+  #buildPreviewRequest(): { body: ServicePreviewRequestModel; rows: number[] } | null {
     if (this._durationMode === "fixed" && this._durationMinutes === null) {
       return null;
     }
 
-    const roles = this._roles
-      .filter((role) => role.resourceType.trim() !== "")
-      .map((role) => ({
-        resourceType: role.resourceType.trim(),
-        requiredCapabilities: [...role.requiredCapabilities],
-        // Sent because the sufficiency finding is an assignment question and
-        // cannot be asked without it. The chains are unaffected: a role of count
-        // 3 draws on exactly the pool a role of count 1 does.
-        count: role.count,
-      }));
+    // The row numbers travel WITH the request, computed from the same predicate
+    // that decides what it carries. Deriving them at render time from a response
+    // array's position is the defect QA found: the response is indexed over the
+    // rows that survived the filter, and everything on screen over the rows that
+    // exist, so a blank row above a same-type pair made every heading below it
+    // name the wrong requirement.
+    const rows = rowNumbers(this._roles);
 
-    return roles.length === 0 ? null : { roles, duration: this.#buildDuration() };
+    const roles = carriedRows(this._roles).map((role) => ({
+      resourceType: role.resourceType.trim(),
+      requiredCapabilities: [...role.requiredCapabilities],
+      // Sent because the sufficiency finding is an assignment question and
+      // cannot be asked without it. The chains are unaffected: a role of count
+      // 3 draws on exactly the pool a role of count 1 does.
+      count: role.count,
+    }));
+
+    return roles.length === 0 ? null : { body: { roles, duration: this.#buildDuration() }, rows };
   }
 
   /**
@@ -332,9 +339,9 @@ export class UBookItServiceEditorElement extends UmbLitElement {
     // Captured with the request, not read at render: by the time the answer
     // arrives the live form may already describe something else, and the chain
     // must be phrased for the configuration it actually resolved.
-    const body = this.#buildPreviewRequest();
+    const request = this.#buildPreviewRequest();
 
-    if (body === null) {
+    if (request === null) {
       this._resolution = null;
       this._alignment = null;
       this._shortfall = null;
@@ -342,6 +349,8 @@ export class UBookItServiceEditorElement extends UmbLitElement {
     }
 
     try {
+      const { body, rows } = request;
+
       const { data, error } = await UBookItBackofficeService.previewServiceConfiguration({ body });
 
       // A later edit has already superseded this request; its answer describes a
@@ -356,8 +365,11 @@ export class UBookItServiceEditorElement extends UmbLitElement {
       this._resolution =
         error || !data
           ? null
-          : data.roles.map((chain) => ({
+          : data.roles.map((chain, index) => ({
               resourceType: chain.resourceType,
+              // From the mapping captured with THIS request, so the heading names
+              // the row the chain describes even when a row above carried no type.
+              rowNumber: rows[index],
               requiredCapabilities: [...(chain.requiredCapabilities ?? [])],
               ofType: chain.ofType.total,
               withCapabilities: chain.withCapabilities.total,
@@ -403,6 +415,11 @@ export class UBookItServiceEditorElement extends UmbLitElement {
         ? {
             roles: shortfall.roles.map((role) => ({
               resourceType: role.resourceType,
+              // The server echoes each role's position in the list it was sent,
+              // which this maps back to the row on screen. Nothing else
+              // distinguishes two roles equal in type and capabilities, and the
+              // report used to emit two identical lines for them.
+              rowNumber: rows[role.roleIndex],
               requiredCapabilities: [...(role.requiredCapabilities ?? [])],
               count: role.count,
             })),

@@ -1,4 +1,4 @@
-using UBookIt.Core.Availability;
+﻿using UBookIt.Core.Availability;
 using UBookIt.Core.Bookings;
 using UBookIt.Core.Resources;
 using UBookIt.Core.Services;
@@ -100,7 +100,7 @@ public class PoolSufficiencyTests
         var finding = await Check(booking, service.Id);
 
         Assert.NotNull(finding);
-        Assert.Equal([Therapist], finding.Roles.Select(r => r.ResourceType));
+        Assert.Equal([Therapist], finding.Roles.Select(r => r.Role.ResourceType));
         Assert.Equal(2, finding.Required);
         Assert.Equal(1, finding.Eligible);
     }
@@ -130,8 +130,8 @@ public class PoolSufficiencyTests
         // aggregate's canonical order, which puts the capability-free role first —
         // and the one carrying a capability is distinguishable from the one that
         // does not. "therapist and therapist" would leave an editor guessing.
-        Assert.Empty(finding.Roles[0].RequiredCapabilities.Keys);
-        Assert.Equal([CertX], finding.Roles[1].RequiredCapabilities.Keys);
+        Assert.Empty(finding.Roles[0].Role.RequiredCapabilities.Keys);
+        Assert.Equal([CertX], finding.Roles[1].Role.RequiredCapabilities.Keys);
 
         // And the neighbouring signal really is silent here, which is what makes
         // this finding the only thing standing between the editor and a service
@@ -158,7 +158,7 @@ public class PoolSufficiencyTests
         var finding = await Check(booking, service.Id);
 
         Assert.NotNull(finding);
-        Assert.Equal([Therapist, Therapist], finding.Roles.Select(r => r.ResourceType));
+        Assert.Equal([Therapist, Therapist], finding.Roles.Select(r => r.Role.ResourceType));
         Assert.Equal(2, finding.Required);
         Assert.Equal(1, finding.Eligible);
     }
@@ -236,7 +236,7 @@ public class PoolSufficiencyTests
 
         Assert.NotNull(finding);
         Assert.Single(finding.Roles);
-        Assert.Equal(3, finding.Roles[0].Count);
+        Assert.Equal(3, finding.Roles[0].Role.Count);
         Assert.Equal(3, finding.Required);
         Assert.Equal(2, finding.Eligible);
     }
@@ -344,6 +344,55 @@ public class PoolSufficiencyTests
     }
 
     [Fact]
+    public async Task Each_named_role_carries_its_position_in_the_configuration()
+    {
+        // Nothing else identifies a role. The room sits first and is healthy, so
+        // the finding names positions 1 and 2 — not 0 and 1, which is what
+        // reading its own array would give, and not the positions of the roles
+        // within the finding.
+        var (booking, service, _) = Wire(
+            ServiceOf(Role(ResourceTypes.Room), Role(Therapist, 1, CertX), Role(Therapist)),
+            Room(1, "Red Room"),
+            Therapy(2, "Mary", CertX));
+
+        var finding = await Check(booking, service.Id);
+
+        Assert.NotNull(finding);
+        Assert.Equal([1, 2], finding.Roles.Select(r => r.Index));
+    }
+
+    [Fact]
+    public async Task Two_roles_alike_in_every_field_are_told_apart_by_position()
+    {
+        // A configuration the domain rejects but a preview must still answer: two
+        // roles equal in resource type AND required capabilities. They are equal
+        // as records, so a consumer has only the position to tell them apart —
+        // and rendering them without it produced two identical lines.
+        // One slot each, so the minimal deficient set really is the PAIR. With a
+        // count of 2 apiece the first role is short on its own and the tight
+        // witness correctly names it alone — which would make this fixture prove
+        // something else entirely.
+        var roles = new[] { Role(Therapist), Role(Therapist) };
+        var resourceStore = new InMemoryResourceStore();
+        resourceStore.Add(Therapy(1, "Mary"));
+
+        var booking = TestData.ServiceBooking(new InMemoryServiceStore(), resourceStore);
+
+        var pools = new List<RoleCandidates>();
+        foreach (var role in roles)
+        {
+            var chain = await booking.ResolveAsync(role, ServiceDuration.Variable(null, null).Value);
+            pools.Add(new RoleCandidates(role, chain.Candidates));
+        }
+
+        var finding = PoolSufficiency.FindShortfall(pools);
+
+        Assert.NotNull(finding);
+        Assert.Equal([0, 1], finding.Roles.Select(r => r.Index));
+        Assert.Equal(finding.Roles[0].Role, finding.Roles[1].Role);
+    }
+
+    [Fact]
     public async Task A_role_whose_pool_is_empty_is_reported_on_its_own()
     {
         // The degenerate shortfall, and worth pinning: one role needs one resource
@@ -357,7 +406,7 @@ public class PoolSufficiencyTests
         var finding = await Check(booking, service.Id);
 
         Assert.NotNull(finding);
-        Assert.Equal([Therapist], finding.Roles.Select(r => r.ResourceType));
+        Assert.Equal([Therapist], finding.Roles.Select(r => r.Role.ResourceType));
         Assert.Equal(1, finding.Required);
         Assert.Equal(0, finding.Eligible);
     }

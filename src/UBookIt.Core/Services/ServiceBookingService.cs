@@ -1,4 +1,4 @@
-using UBookIt.Core.Availability;
+﻿using UBookIt.Core.Availability;
 using UBookIt.Core.Bookings;
 using UBookIt.Core.Common;
 using UBookIt.Core.Stores;
@@ -1016,13 +1016,19 @@ public sealed class ServiceBookingService(
             if (shortfall.Required == 1)
             {
                 // A shortfall of "1 needed, 0 able" is the ordinary single-resource
-                // refusal wearing arithmetic, and it is by some margin the commonest
-                // `service-unavailable` in the product: every one-role service asked
-                // for a start outside its resource's open hours, off its grid, inside
-                // its lead time or beyond its horizon arrives here. Counting to one
-                // tells a booker nothing they could act on, so it says what it always
-                // said. The spec permits the richer message; it does not require it,
-                // and this is the case it buys nothing in.
+                // refusal wearing arithmetic. Counting to one tells a booker nothing
+                // they could act on, so it says what it always said — the spec
+                // permits the richer message rather than requiring it, and this is
+                // the case it buys nothing in.
+                //
+                // The condition is a property of the *deficient set*, not of the
+                // service: it holds for a one-role service, which is by some margin
+                // the commonest `service-unavailable` in the product, and equally for
+                // a multi-role service where a single count-1 role is the whole
+                // shortfall. Both are suppressed, deliberately — "needs 1 distinct
+                // resources for 'therapist'" is no better inside a two-role service
+                // than outside one, and keying this on the service's role count
+                // instead would buy a named role at the price of that sentence.
                 return "This service cannot be booked at that time.";
             }
 
@@ -1043,9 +1049,7 @@ public sealed class ServiceBookingService(
                 + $"{Describe(shortfall.Roles)} at that time, and "
                 + (shortfall.Eligible == 0
                     ? "none can provide it then."
-                    : shortfall.Eligible == 1
-                        ? "only 1 can provide it then."
-                        : $"only {shortfall.Eligible} can provide it then.");
+                    : $"only {shortfall.Eligible} can provide it then.");
         }
 
         /// <summary>
@@ -1055,10 +1059,11 @@ public sealed class ServiceBookingService(
         /// message naming "therapist and therapist" would leave a reader unable
         /// to tell which row is which.
         /// </summary>
-        private static string Describe(IReadOnlyList<ServiceRole> roles)
-            => string.Join(", ", roles.Select(role => role.RequiredCapabilities.Keys.Count == 0
-                ? $"'{role.ResourceType}'"
-                : $"'{role.ResourceType}' with {string.Join(" and ", role.RequiredCapabilities.Keys)}"));
+        private static string Describe(IReadOnlyList<ShortfallRole> roles)
+            => string.Join(", ", roles.Select(entry => entry.Role).Select(role =>
+                role.RequiredCapabilities.Keys.Count == 0
+                    ? $"'{role.ResourceType}'"
+                    : $"'{role.ResourceType}' with {string.Join(" and ", role.RequiredCapabilities.Keys)}"));
 
         /// <summary>
         /// Whether an assignment the pre-filter removed would have reached the

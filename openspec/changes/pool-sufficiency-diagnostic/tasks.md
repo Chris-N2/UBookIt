@@ -193,6 +193,59 @@ chain headings read "Requirement 1: psd1782a" / "Requirement 2: psd1782a" with n
 capability text anywhere in the readout; a distinct-type service keeps "gmdroom" /
 "gmdtherapist"; the collection view is unchanged; no dangling ids; save enabled.
 
+### QA round 2 — REJECT, remediated
+
+One MAJOR, and it was a fault **in the round-1 remediation** — which is why fixes
+get the same scrutiny as the original code.
+
+- **MAJOR — the ordinal named the wrong row.** `chainLabels` took the requirement
+  number from the response array's index, and `#buildPreviewRequest` drops rows
+  whose resource type is still blank *before* sending. The two indices differ
+  whenever a blank row sits above a same-type pair — the state of any row just
+  added, or whose type has been cleared to retype — so the chain headed
+  "Requirement 1" described the row legended "Requirement 2". Worse than the
+  ambiguity it replaced: round 1's heading referred to something never entered,
+  this one pointed confidently at the wrong control.
+  **Fixed by computing the mapping where the request is built and carrying it**,
+  never re-deriving it from an array position at render time. `preview-rows.ts`
+  is a new pure module holding exactly that seam, because the defect was
+  structurally invisible to every existing test: they called the renderer with an
+  already-filtered list, so the filter and the renderer were each right in
+  isolation while disagreeing about what an index meant. Reintroducing the exact
+  defect now turns three of its tests red.
+- **MINOR — two identical lines in the sufficiency report.** Pre-existing, missed
+  in round 1, and made conspicuous by the fix: the chains above had begun
+  numbering rows correctly while the report below could not tell two roles equal
+  in type *and* capabilities apart. Fixed by the same mechanism — `RoleShortfall`
+  now carries each role's position, `ShortfallRoleModel` publishes it, and the
+  editor maps it back to the row.
+- **A third gap found while verifying the second, in the same class.** The
+  sufficiency report is a **subset** of the configuration, so asking "do the named
+  roles share a type" asks the wrong question: a service with two `therapist` rows
+  can produce a finding naming one, which then reads as unambiguous while leaving
+  the editor unable to tell which row is short. The finding therefore names the
+  row **unconditionally** (`findingLabels`), where the chains still decide by
+  shared type — they see every role, and heading every chain would be noise.
+  Mutating the report back to the chain rule turns four tests red.
+- **NIT — dead `Eligible == 1` branch** removed; it was byte-identical to the
+  general case, and 607 tests could not tell the difference.
+- **NIT — the `Required == 1` comment overclaimed.** The condition is a property of
+  the deficient set, not of the service, so it also fires for a multi-role service
+  whose shortfall is one count-1 role. Comment corrected rather than the condition
+  narrowed: "needs 1 distinct resources for 'therapist'" is no better inside a
+  two-role service than outside one.
+- **Both deferred items resolved with the reviewer's view on the record.** The
+  out-of-range-count blanking stays as it is, with its note; `ShortfallRoleModel`
+  gained the index after all, because the MAJOR's fix wanted it anyway — exactly
+  the folding the reviewer recommended.
+
+Re-verified: clean build, **611** unit / 54 integration / **57** client, `validate
+--strict` under 1.6.0. Live, in the state that broke it — three rows, the first
+blank, the surviving pair deficient — the chains read "Requirement 2: psd1782a" and
+"Requirement 3: psd1782a" against legends 1/2/3, and the report reads "Requirement
+2: psd1782a — 2 required." The management API carries `roleIndex` 1 and 2 for a
+finding whose first role is healthy, and 0 and 1 for two byte-identical roles.
+
 ## 9. Handover
 
 - [x] 9.1 Record what ⑩ inherits: the delivery-API reason code ⑨-1a deferred is now more valuable, because two different structural faults (misalignment and insufficiency) both surface to a booker as an empty result, and Core can now distinguish them.

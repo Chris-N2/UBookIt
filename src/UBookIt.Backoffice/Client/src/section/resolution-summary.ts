@@ -16,6 +16,17 @@ export type ResolutionSnapshot = {
   resourceType: string;
 
   /**
+   * The requirement row this chain describes, 1-based as its legend shows it.
+   *
+   * Captured with the request rather than inferred from this chain's position in
+   * the response, because the two are not the same number: a row with no
+   * resource type yet is omitted from the request, so every chain below it sits
+   * one place earlier than its row. Inferring it headed chains with the wrong
+   * requirement number for as long as such a row existed.
+   */
+  rowNumber: number;
+
+  /**
    * The capabilities the configuration named for this role, as the response
    * echoed them.
    *
