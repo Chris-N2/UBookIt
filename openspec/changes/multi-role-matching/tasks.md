@@ -52,11 +52,13 @@
 
 ## 6. Management API and editor
 
-- [ ] 6.1 Carry `Count` on the management role model in both directions, and stop the editor hard-coding 1.
-- [ ] 6.2 Add a count control per requirement row: labelled, associated with its row as the other controls are, defaulting to 1, with server failures rendered against the offending row.
-- [ ] 6.3 The editor still must not enforce the duplicate rule (⑨-1 design D1) — it stays a server rule so changing it stays a change in one place.
+- [x] 6.1 Carry `Count` on the management role model in both directions, and stop the editor hard-coding 1.
+- [x] 6.2 Add a count control per requirement row: labelled, associated with its row as the other controls are, defaulting to 1, with server failures rendered against the offending row.
+- [x] 6.3 The editor still must not enforce the duplicate rule (⑨-1 design D1) — it stays a server rule so changing it stays a change in one place.
 - [ ] 6.4 Accessibility: the count control is labelled within the row's fieldset, its failure is associated, and every referenced id resolves in the same shadow root. Verify by reading the shadow DOM, not from screenshots.
+  - Built with its own `label[for]`, its own hint id and its own error id — deliberately not sharing the type control's, which would read the type's failure out against the count. **Verification is outstanding: it needs the running TestSite.**
 - [ ] 6.5 Regenerate the client against the running TestSite.
+  - **Outstanding: needs the running TestSite.** The existing generated client already carries `count` on the role model from ⑥, so the editor compiles against it today; the regeneration is to pick up the delivery API's new field and confirm nothing else drifted.
 
 ## 7. Delivery API
 

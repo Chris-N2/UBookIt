@@ -14,14 +14,19 @@ import { alignmentReport, type AlignmentSnapshot } from "./alignment-report.js";
 import "./capability-input.element.js";
 
 /**
- * One requirement row: the resource type a role needs and the capabilities a
- * resource must carry to fill it. The role's count is not surfaced — it is 1 in
- * this version — so adding it later is an addition to this row rather than a
- * restructuring of it.
+ * One requirement row: the resource type a role needs, the capabilities a
+ * resource must carry to fill it, and how many distinct resources it takes at
+ * once.
  */
 type RoleRow = {
   resourceType: string;
   requiredCapabilities: string[];
+
+  /**
+   * How many distinct resources of this requirement a booking needs at once.
+   * Defaults to 1, which is what every service expressed before counts existed.
+   */
+  count: number;
 };
 
 /**
@@ -50,8 +55,7 @@ const DURATION_FIELDS = ["Duration", "Duration.Min", "Duration.Max"];
  * Shape notes:
  * - Requirements render as one row per role, with add and remove; a service
  *   always keeps at least one, so the last row offers no remove control.
- *   `count` is not surfaced and is always sent as 1, so supporting a count
- *   greater than one is an addition to a row rather than a restructuring.
+ *   `count` is surfaced per row, defaulting to 1.
  * - Resource types are NOT filtered against the rows already using them. The
  *   duplicate-type rule is the server's, and enforcing it here as well would
  *   make relaxing it later a change in two places (multi-role design D1).
@@ -89,7 +93,7 @@ export class UBookItServiceEditorElement extends UmbLitElement {
    * only re-renders on identity change for an array-valued state.
    */
   @state()
-  private _roles: RoleRow[] = [{ resourceType: "", requiredCapabilities: [] }];
+  private _roles: RoleRow[] = [{ resourceType: "", requiredCapabilities: [], count: 1 }];
 
   @state()
   private _durationMode: DurationMode = "variable";
@@ -196,8 +200,11 @@ export class UBookItServiceEditorElement extends UmbLitElement {
         ? data.roles.map((role) => ({
             resourceType: role.resourceType,
             requiredCapabilities: [...(role.requiredCapabilities ?? [])],
+            // A server that omitted the count would leave the row unusable, and
+            // 1 is the only value a service saved before counts existed can have.
+            count: role.count ?? 1,
           }))
-        : [{ resourceType: "", requiredCapabilities: [] }];
+        : [{ resourceType: "", requiredCapabilities: [], count: 1 }];
 
     if (data.duration?.kind === "fixed") {
       this._durationMode = "fixed";
@@ -383,7 +390,7 @@ export class UBookItServiceEditorElement extends UmbLitElement {
       // chosen on screen. Shared with the preview so the summary can never
       // describe a different duration from the one a save would send.
       duration: this.#buildDuration(),
-      // Every row, in the order shown, count fixed at 1 in this version.
+      // Every row, in the order shown, each carrying its own count.
       // Trimmed to match what the hint evaluates: otherwise " room " looks known
       // (hint hidden) but is rejected server-side as an invalid type key.
       //
@@ -393,7 +400,7 @@ export class UBookItServiceEditorElement extends UmbLitElement {
       roles: this._roles.map((role) => ({
         resourceType: role.resourceType.trim(),
         requiredCapabilities: [...role.requiredCapabilities],
-        count: 1,
+        count: role.count,
       })),
     };
   }
@@ -614,6 +621,13 @@ export class UBookItServiceEditorElement extends UmbLitElement {
     const errorId = `err-requirement-${index}`;
     const hintId = `resource-type-hint-${index}`;
 
+    // The count's own error and hint ids. Distinct from the type control's, so
+    // `aria-describedby` on each control resolves to that control's own message
+    // — a shared id would read the type's failure out against the count.
+    const countErrors = this.#errorsForRole(index, "service-role-count-invalid");
+    const countErrorId = `err-requirement-count-${index}`;
+    const countHintId = `role-count-hint-${index}`;
+
     return html`
       <fieldset class="requirement">
         <legend>${this.localize.term("ubookitServices_requirementLegend", index + 1)}</legend>
@@ -658,6 +672,34 @@ export class UBookItServiceEditorElement extends UmbLitElement {
           }}
         ></ubookit-capability-input>
 
+        <div class="field">
+          <label for="role-count-${index}">${this.#term("requirementCount")}</label>
+          <input
+            id="role-count-${index}"
+            type="number"
+            min="1"
+            step="1"
+            inputmode="numeric"
+            .value=${String(role.count)}
+            aria-invalid=${countErrors.length > 0 ? "true" : nothing}
+            aria-describedby=${countErrors.length > 0 ? `${countHintId} ${countErrorId}` : countHintId}
+            @input=${(e: InputEvent) => {
+              const raw = (e.target as HTMLInputElement).value;
+              // Kept as typed where it is not a number at all, so clearing the
+              // field to retype it does not silently become 1 under the cursor.
+              // The server owns the bound, and reports it against this control.
+              const parsed = Number.parseInt(raw, 10);
+              this.#updateRole(index, { count: Number.isNaN(parsed) ? 1 : parsed });
+            }}
+          />
+          <p id=${countHintId} class="hint">${this.#term("requirementCountHint")}</p>
+          ${countErrors.length === 0
+            ? nothing
+            : html`<p class="group-error" id=${countErrorId}>
+                ${countErrors.map((e) => e.message).join(" ")}
+              </p>`}
+        </div>
+
         <!--
           Offered only while more than one row exists: a service always keeps at
           least one role, and a control that removes the last one would either
@@ -682,7 +724,7 @@ export class UBookItServiceEditorElement extends UmbLitElement {
   }
 
   #addRole() {
-    this._roles = [...this._roles, { resourceType: "", requiredCapabilities: [] }];
+    this._roles = [...this._roles, { resourceType: "", requiredCapabilities: [], count: 1 }];
     this.#dropRoleErrors();
   }
 

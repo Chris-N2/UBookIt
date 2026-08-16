@@ -114,6 +114,14 @@ export default {
     requirementAdd: "Add requirement",
     requirementRemove: "Remove requirement %0%",
 
+    // A count is "how many at once", not "how many bookings". Worded as
+    // resources rather than as a bare number because the distinctness is the
+    // whole point: two of a type means two different ones, free simultaneously,
+    // and an editor reading "2" alone could as easily take it to mean the same
+    // resource twice or a repeat visit.
+    requirementCount: "How many at once",
+    requirementCountHint: "Two or more means that many different resources, all free at the same time.",
+
     // ---------------------------------------------------------- resolution summary
     //
     // ⑧'s capability-only wording is gone. The summary now evaluates every
