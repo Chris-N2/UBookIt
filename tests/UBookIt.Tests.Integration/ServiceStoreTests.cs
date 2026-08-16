@@ -1,4 +1,5 @@
 using Microsoft.EntityFrameworkCore;
+using UBookIt.Core.Common;
 using UBookIt.Core.Services;
 using UBookIt.Persistence.Stores;
 using UBookIt.Tests.Integration.Support;
@@ -222,5 +223,59 @@ public class ServiceStoreTests(SqlServerFixture fixture)
         var result = await new SqlServiceManagementStore(context).DeleteAsync(Guid.NewGuid(), Ct);
 
         Assert.False(result.Succeeded);
+    }
+
+    /// <summary>
+    /// Two roles of one resource type, and a count above 1, against real SQL
+    /// Server — the shapes the domain rule forbade until this change.
+    /// <para>
+    /// The claim being tested is that <b>no migration is needed</b>: <c>Count</c> is
+    /// an existing column from ⑥ and the role table carries only a non-unique index
+    /// on <c>ServiceId</c>. That is verifiable from the model snapshot, but a
+    /// snapshot says what EF believes rather than what the database will accept, and
+    /// a unique constraint added by hand would be invisible to it. So the round trip
+    /// is run rather than reasoned about.
+    /// </para>
+    /// </summary>
+    [Fact]
+    public async Task Two_same_type_roles_and_a_count_round_trip_without_a_migration()
+    {
+        fixture.EnsureAvailable();
+
+        var senior = new ServiceRole("therapist", 1)
+        {
+            RequiredCapabilities = CapabilitySet.Create(["cert-x"], CapabilitySet.RequiredField).Value,
+        };
+
+        var service = Service.Create(
+            "Joint session",
+            ServiceDuration.Fixed(TimeSpan.FromMinutes(60)).Value,
+            [senior, new ServiceRole("therapist", 2), new ServiceRole("room", 1)]).Value;
+
+        await using (var context = fixture.CreateContext())
+        {
+            Assert.True((await new SqlServiceManagementStore(context).CreateAsync(service, Ct)).Succeeded);
+        }
+
+        // Re-read twice, from separate contexts, because a stable order that came
+        // from a change tracker rather than from the aggregate would satisfy one
+        // read and not two.
+        await using var first = fixture.CreateContext();
+        var once = await new SqlServiceStore(first).GetAsync(service.Id, Ct);
+
+        await using var second = fixture.CreateContext();
+        var twice = await new SqlServiceStore(second).GetAsync(service.Id, Ct);
+
+        Assert.NotNull(once);
+        Assert.NotNull(twice);
+
+        Assert.Equal(3, once!.Roles.Count);
+        Assert.Equal(once.Roles, twice!.Roles);
+
+        // The canonical order: `room` before `therapist` ordinally, then the two
+        // therapist roles separated by their capabilities — empty before {cert-x}.
+        Assert.Equal(["room", "therapist", "therapist"], once.Roles.Select(r => r.ResourceType));
+        Assert.Equal([1, 2, 1], once.Roles.Select(r => r.Count));
+        Assert.Equal(["cert-x"], once.Roles[2].RequiredCapabilities.Keys);
     }
 }

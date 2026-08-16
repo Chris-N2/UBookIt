@@ -27,12 +27,14 @@
 
 ## 4. Core — validation, counts and ordering
 
-- [ ] 4.1 `ServiceRole.Count` validated as at least 1 and at most the bound, with its own stable failure code carrying the offending role (design D8). Pick the ceiling at apply and record it.
-- [ ] 4.2 Narrow `service-role-duplicate-type` to reject only roles matching on type **and** capabilities, with the message naming the count as the correction (design D5). Update the code's own documentation, which currently states the restriction as type-only and names this change as the one that lifts it.
-- [ ] 4.3 A count exceeding the eligible pool is **accepted** — a property of the pool, not the service. Assert it, so nobody later "fixes" it into a rejection.
-- [ ] 4.4 Give the canonical role ordering a total tiebreak — type, then sorted capability keys, then count (design D6). It is total *only because* 4.2 rejects an exact duplicate, so the two move together.
-- [ ] 4.5 Test round-trip stability: a service with two same-type roles saved and re-read repeatedly returns them in the same order and compares equal. Vary the supplied order, or the test passes on an accident of insertion order.
-- [ ] 4.6 Confirm no migration is needed — `Count` is an existing column and the role table has no unique index on `(ServiceId, ResourceType)`. **Verify against the model snapshot, do not assume**, and confirm an integration round-trip of two same-type roles.
+- [x] 4.1 `ServiceRole.Count` validated as at least 1 and at most the bound, with its own stable failure code carrying the offending role (design D8). Pick the ceiling at apply and record it.
+  - **Ceiling chosen: `ServiceRole.MaxCount = 20`**, with its own code `service-role-count-invalid` against `Roles[i].Count`. A service needing more than a couple of dozen of one resource type is a different kind of product — a hall booking rather than an appointment — and twenty slots is trivial for the assignment either way. Nothing in the algorithm depends on the value, so it stays trivially adjustable. The boundary itself is tested in both directions (20 accepted, 21 rejected), because a test asserting only that 21 fails would pass an implementation that rejected 20 too.
+- [x] 4.2 Narrow `service-role-duplicate-type` to reject only roles matching on type **and** capabilities, with the message naming the count as the correction (design D5). Update the code's own documentation, which currently states the restriction as type-only and names this change as the one that lifts it.
+- [x] 4.3 A count exceeding the eligible pool is **accepted** — a property of the pool, not the service. Assert it, so nobody later "fixes" it into a rejection.
+- [x] 4.4 Give the canonical role ordering a total tiebreak — type, then sorted capability keys, then count (design D6). It is total *only because* 4.2 rejects an exact duplicate, so the two move together.
+- [x] 4.5 Test round-trip stability: a service with two same-type roles saved and re-read repeatedly returns them in the same order and compares equal. Vary the supplied order, or the test passes on an accident of insertion order.
+- [x] 4.6 Confirm no migration is needed — `Count` is an existing column and the role table has no unique index on `(ServiceId, ResourceType)`. **Verify against the model snapshot, do not assume**, and confirm an integration round-trip of two same-type roles.
+  - Verified in `UBookItDbContextModelSnapshot.cs`: `ServiceRoleRow` carries `Count` as an existing `int` column and its only index is the non-unique `HasIndex("ServiceId")`. A snapshot states what EF believes rather than what the database will accept, so the round trip is also run for real — `Two_same_type_roles_and_a_count_round_trip_without_a_migration`, re-read from two separate contexts so a stable order cannot come from a change tracker.
 
 ## 5. Core — the alignment check
 

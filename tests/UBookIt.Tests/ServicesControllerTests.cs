@@ -321,14 +321,14 @@ public class ServicesControllerTests
     }
 
     [Fact]
-    public async Task Two_roles_of_one_type_are_rejected_with_their_own_code_against_the_offending_row()
+    public async Task Two_identical_roles_are_rejected_with_their_own_code_against_the_offending_row()
     {
         var (controller, store) = Wire();
 
         var request = ValidRequest();
         request.Roles =
         [
-            new ServiceRoleModel { ResourceType = "therapist", RequiredCapabilities = ["cert-x"], Count = 1 },
+            new ServiceRoleModel { ResourceType = "therapist", Count = 1 },
             new ServiceRoleModel { ResourceType = "therapist", Count = 1 },
         ];
 
@@ -339,7 +339,7 @@ public class ServicesControllerTests
         Assert.Contains(FailureCodes.ServiceRoleDuplicateType, codes);
 
         // Distinguishable from a malformed key, because the two are corrected
-        // differently — and attributed to the row that repeated the type.
+        // differently — and attributed to the row that repeated the requirement.
         Assert.DoesNotContain(FailureCodes.TypeKeyInvalid, codes);
 
         var problem = Assert.IsType<ProblemDetails>(Assert.IsType<ObjectResult>(result).Value);
@@ -348,6 +348,81 @@ public class ServicesControllerTests
 
         Assert.Equal("Roles[1].ResourceType", duplicate.Field);
         Assert.Contains("therapist", duplicate.Message, StringComparison.Ordinal);
+
+        // The correction the editor needs, on the wire and not only in the domain.
+        Assert.Contains("count", duplicate.Message, StringComparison.OrdinalIgnoreCase);
+
+        Assert.Equal(0, (await store.ListAsync(0, 50)).Total);
+    }
+
+    [Fact]
+    public async Task Two_roles_of_one_type_differing_in_capabilities_round_trip()
+    {
+        // The configuration the change exists for, through the management edge:
+        // saving it must now succeed, and re-reading must return both rows
+        // distinguishable by their capabilities.
+        var (controller, _) = Wire();
+
+        var request = ValidRequest();
+        request.Roles =
+        [
+            new ServiceRoleModel { ResourceType = "therapist", RequiredCapabilities = ["cert-x"], Count = 1 },
+            new ServiceRoleModel { ResourceType = "therapist", Count = 1 },
+        ];
+
+        var created = Ok<ServiceResponseModel>(await controller.CreateService(request));
+        var fetched = Ok<ServiceResponseModel>(await controller.GetService(created.Id));
+
+        Assert.Equal(["therapist", "therapist"], fetched.Roles.Select(r => r.ResourceType));
+
+        // Canonical order, not submission order: the roles tie on type, so the
+        // capability tiebreak decides, and an empty set sorts before a non-empty
+        // one. Asserted as a sequence rather than a set — the deterministic order
+        // is the guarantee the delivery contract rests on.
+        Assert.Equal([[], ["cert-x"]], fetched.Roles.Select(r => r.RequiredCapabilities));
+    }
+
+    [Fact]
+    public async Task A_count_round_trips_through_the_management_edge()
+    {
+        // The editor could not express this before, and the mapper is where a
+        // hard-coded 1 would silently discard it.
+        var (controller, _) = Wire();
+
+        var request = ValidRequest();
+        request.Roles = [new ServiceRoleModel { ResourceType = "room", Count = 2 }];
+
+        var created = Ok<ServiceResponseModel>(await controller.CreateService(request));
+        var fetched = Ok<ServiceResponseModel>(await controller.GetService(created.Id));
+
+        Assert.Equal(2, Assert.Single(fetched.Roles).Count);
+    }
+
+    [Fact]
+    public async Task An_out_of_range_count_is_reported_against_its_own_row()
+    {
+        var (controller, store) = Wire();
+
+        var request = ValidRequest();
+        request.Roles =
+        [
+            new ServiceRoleModel { ResourceType = "room", Count = 1 },
+            new ServiceRoleModel { ResourceType = "therapist", Count = 0 },
+        ];
+
+        var result = await controller.CreateService(request);
+        var (status, codes) = Problem(result);
+
+        Assert.Equal(400, status);
+        Assert.Contains(FailureCodes.ServiceRoleCountInvalid, codes);
+
+        var problem = Assert.IsType<ProblemDetails>(Assert.IsType<ObjectResult>(result).Value);
+        var errors = Assert.IsType<UBookIt.Backoffice.Models.ApiErrorModel[]>(problem.Extensions["errors"]);
+        var invalid = Assert.Single(errors, e => e.Code == FailureCodes.ServiceRoleCountInvalid);
+
+        // The count control of the second row — the failure has to travel with the
+        // index or the editor marks the wrong row.
+        Assert.Equal("Roles[1].Count", invalid.Field);
 
         Assert.Equal(0, (await store.ListAsync(0, 50)).Total);
     }

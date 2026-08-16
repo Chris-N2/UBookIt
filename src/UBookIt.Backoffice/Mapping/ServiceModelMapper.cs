@@ -95,6 +95,12 @@ internal static class ServiceModelMapper
         // so an all-null list becomes the empty-list failure below.
         var supplied = (model.Roles ?? []).Where(r => r is not null).ToList();
 
+        // Count is fixed at 1 here rather than read from the request, and that is
+        // not an oversight: a preview asks what a role *resolves to*, and count is
+        // not an input to eligibility — a role of count 3 draws on exactly the pool
+        // a role of count 1 does. Passing the editor's count would only let an
+        // out-of-range one refuse to answer a question it does not affect, which is
+        // the same mistake as rejecting duplicate types here (⑧a design D1).
         var roles = supplied
             .Select((r, index) => ServiceRole.Create(r.ResourceType, r.RequiredCapabilities, 1, index))
             .ToList();

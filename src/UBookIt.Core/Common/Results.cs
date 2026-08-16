@@ -55,19 +55,42 @@ public static class FailureCodes
     public const string ServiceRoleInvalid = "service-role-invalid";
 
     /// <summary>
-    /// Two of a service's roles name the same resource type. Distinct from
-    /// <see cref="TypeKeyInvalid"/> because the two faults are corrected
-    /// differently: that one is a typo in a key, this one a composition this
-    /// version does not support.
+    /// Two of a service's roles name the same resource type <em>and</em> require
+    /// the same capabilities. Distinct from <see cref="TypeKeyInvalid"/> because
+    /// the two faults are corrected differently: that one is a typo in a key, this
+    /// one a requirement stated twice where a count was meant.
     /// <para>
-    /// A deliberate restriction of this version rather than a property of
-    /// services (multi-role-composition design D1): roles of the same type draw
-    /// from overlapping eligibility pools, where assigning each role its first
-    /// available candidate can report a service unavailable when it was
-    /// bookable. The change that implements real assignment lifts it.
+    /// Narrowed from "same type" by multi-role-matching design D5, once real
+    /// assignment made overlapping pools resolvable. Two roles of one type
+    /// requiring <em>different</em> capabilities are now valid and are the case
+    /// the assignment exists for — "a senior therapist and any therapist". What
+    /// remains rejected is two roles identical in both, which are two spellings of
+    /// one requirement: allowing both would leave two representations that compare
+    /// unequal and publish differently while meaning the same thing, and silently
+    /// merging them would rewrite what the editor entered. The message therefore
+    /// names the count as the correction.
     /// </para>
     /// </summary>
     public const string ServiceRoleDuplicateType = "service-role-duplicate-type";
+
+    /// <summary>
+    /// A service role's count is below 1 or above the permitted maximum. Its own
+    /// code rather than the general <see cref="ServiceRoleInvalid"/> so a consumer
+    /// can land the message on the count control of the offending row.
+    /// <para>
+    /// The upper bound is a sanity limit on work rather than a domain claim: each
+    /// unit is a slot the assignment must fill, so an unbounded count is an
+    /// unbounded amount of work for a configuration that cannot succeed — the
+    /// reasoning that made <c>NormalizedKey.MaxLength</c> turn an over-long key
+    /// into a validation failure rather than a 500 at INSERT (design D8).
+    /// </para>
+    /// <para>
+    /// A count exceeding the number of <em>eligible</em> resources is deliberately
+    /// NOT this failure, or any failure: that is a property of the pool rather than
+    /// of the service, and resources may be added later.
+    /// </para>
+    /// </summary>
+    public const string ServiceRoleCountInvalid = "service-role-count-invalid";
     public const string ServiceDurationInvalid = "service-duration-invalid";
     public const string ServiceNotFound = "service-not-found";
 
