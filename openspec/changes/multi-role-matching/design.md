@@ -61,6 +61,14 @@ work is in-memory over already-loaded candidates, and the complexity is `O(V·E)
 Hopcroft–Karp is asymptotically better and not worth its complexity at this size;
 if pools ever grow, the seam is one function.
 
+*Deliberately not built:* a strategy seam for selecting between algorithms. A site
+with thousands of eligible resources for one role would justify Hopcroft–Karp, and a
+pluggable selection is the natural shape for that — but it is a shape to adopt when a
+second algorithm exists, not before. One implementation behind one function is
+already the seam; introducing the abstraction now would add a decision point with
+nothing to decide between, and this repository's standing rule is that an
+abstraction with a single implementation is a liability rather than a design.
+
 *Determinism:* slots are processed in role order then slot index, and each slot
 tries candidates in resource-id order — the order ⑦-2 already established. Identical
 inputs therefore yield an identical assignment, which is what keeps placement
