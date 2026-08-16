@@ -11,6 +11,7 @@ import type {
 import { toApiErrors, type ApiError } from "./api-errors.js";
 import { resolutionGroups, type ResolutionSnapshot } from "./resolution-summary.js";
 import { alignmentReport, type AlignmentSnapshot } from "./alignment-report.js";
+import { sufficiencyReport, type ShortfallSnapshot } from "./sufficiency-report.js";
 import "./capability-input.element.js";
 
 /**
@@ -147,6 +148,23 @@ export class UBookItServiceEditorElement extends UmbLitElement {
    */
   @state()
   private _alignment: AlignmentSnapshot | null = null;
+
+  /**
+   * The requirements that cannot all be filled at once, when the configuration
+   * has such a group — otherwise null.
+   *
+   * Null covers "they can be filled together" and "not known" alike, on exactly
+   * the terms `_alignment` does: neither is a claim that the service can be
+   * booked, and the only thing this state may ever assert is the impossibility.
+   * A shortfall of zero is never stored — that is the number that tells an editor
+   * their configuration is wrong, and a failed request must not print it.
+   *
+   * Kept beside `_resolution` rather than inside it because the finding belongs
+   * to a SET of roles and to none of them individually: a chain reporting "2
+   * eligible" is not wrong merely because another role competes for the same two.
+   */
+  @state()
+  private _shortfall: ShortfallSnapshot | null = null;
 
   /** Guards against an earlier in-flight preview overwriting a later one. */
   #previewToken = 0;
@@ -290,6 +308,10 @@ export class UBookItServiceEditorElement extends UmbLitElement {
       .map((role) => ({
         resourceType: role.resourceType.trim(),
         requiredCapabilities: [...role.requiredCapabilities],
+        // Sent because the sufficiency finding is an assignment question and
+        // cannot be asked without it. The chains are unaffected: a role of count
+        // 3 draws on exactly the pool a role of count 1 does.
+        count: role.count,
       }));
 
     return roles.length === 0 ? null : { roles, duration: this.#buildDuration() };
@@ -315,6 +337,7 @@ export class UBookItServiceEditorElement extends UmbLitElement {
     if (body === null) {
       this._resolution = null;
       this._alignment = null;
+      this._shortfall = null;
       return;
     }
 
@@ -335,7 +358,7 @@ export class UBookItServiceEditorElement extends UmbLitElement {
           ? null
           : data.roles.map((chain) => ({
               resourceType: chain.resourceType,
-              requiresCapabilities: (chain.requiredCapabilities ?? []).length > 0,
+              requiredCapabilities: [...(chain.requiredCapabilities ?? [])],
               ofType: chain.ofType.total,
               withCapabilities: chain.withCapabilities.total,
               canProvide: chain.canProvide.total,
@@ -368,10 +391,30 @@ export class UBookItServiceEditorElement extends UmbLitElement {
             },
           }
         : null;
+
+      // From the SAME response as the chains and the alignment report, so all
+      // three describe one configuration. Absent means only that no structural
+      // impossibility was found — never that the roles can be filled, and never
+      // that the service can be booked — so it is stored as the same null a
+      // failed request produces.
+      const shortfall = error || !data ? null : data.poolShortfall;
+
+      this._shortfall = shortfall
+        ? {
+            roles: shortfall.roles.map((role) => ({
+              resourceType: role.resourceType,
+              requiredCapabilities: [...(role.requiredCapabilities ?? [])],
+              count: role.count,
+            })),
+            required: shortfall.required,
+            eligible: shortfall.eligible,
+          }
+        : null;
     } catch {
       if (token === this.#previewToken) {
         this._resolution = null;
         this._alignment = null;
+        this._shortfall = null;
       }
     }
   }
@@ -468,7 +511,8 @@ export class UBookItServiceEditorElement extends UmbLitElement {
       ${this.#renderErrorSummary()}
 
       <form @submit=${this.#save} novalidate>
-        ${this.#renderResolutionSummary()} ${this.#renderAlignmentReport()} ${this.#renderDetails()}
+        ${this.#renderResolutionSummary()} ${this.#renderSufficiencyReport()}
+        ${this.#renderAlignmentReport()} ${this.#renderDetails()}
         ${this.#renderRequirements()}
         ${this.#renderDuration()}
 
@@ -698,6 +742,12 @@ export class UBookItServiceEditorElement extends UmbLitElement {
               // nothing here needs to judge the number itself.
               if (!Number.isNaN(parsed)) {
                 this.#updateRole(index, { count: parsed });
+
+                // The count is now an input to the sufficiency finding, so the
+                // report has to follow it. Debounced like the other typed fields:
+                // backspacing "2" to reach "20" passes through 2, and a request
+                // per keystroke would mostly describe numbers nobody asked about.
+                this.#scheduleResolutionRefresh();
               }
             }}
             @blur=${(e: FocusEvent) => {
@@ -821,13 +871,54 @@ export class UBookItServiceEditorElement extends UmbLitElement {
                       pools, so an unlabelled list of lines would leave an
                       editor guessing which requirement each count is about.
                     -->
-                    <strong>${group.resourceType}</strong>
+                    <!--
+                      Labelled by what identifies the requirement, which is its
+                      type — plus what distinguishes it, where another
+                      requirement names the same type. Two headings reading
+                      "therapist" would present two overlapping pools as two
+                      independent ones, which is precisely the misreading the
+                      sufficiency report below exists to correct (design D6).
+                    -->
+                    <strong>${group.label}</strong>
                     <ul>
                       ${group.lines.map((line) => html`<li>${line}</li>`)}
                     </ul>
                   </li>
                 `,
               )}
+            </ul>`}
+      </div>
+    `;
+  }
+
+  /**
+   * The pool-sufficiency report, at form level beside the resolution summary and
+   * the start-times report — never against a requirement row.
+   *
+   * Row-level would be wrong, not merely inconvenient: the finding belongs to a
+   * set of requirements and the fault is as often a missing resource as a wrong
+   * count, so marking a row would tell an editor to correct one that may be
+   * perfectly well formed. Nothing here is styled as a validation failure and
+   * nothing here blocks saving — a configuration whose pool is too small today is
+   * corrected as often by adding a resource as by editing the service, and
+   * refusing the save would force those into one order (⑨-2 design D8).
+   *
+   * A live region on the same terms as the two reports beside it: always present,
+   * only its content changing, because a `role="status"` element inserted at the
+   * same moment as its text is frequently not announced. It is `aria-label`led and
+   * references no ids, so there is no association here that can dangle.
+   */
+  #renderSufficiencyReport() {
+    const lines = sufficiencyReport(this._shortfall, (key, ...args) =>
+      this.localize.term(`ubookitServices_${key}`, ...args),
+    );
+
+    return html`
+      <div class="sufficiency" role="status" aria-label=${this.#term("sufficiencyReport")}>
+        ${lines.length === 0
+          ? nothing
+          : html`<ul>
+              ${lines.map((line) => html`<li>${line}</li>`)}
             </ul>`}
       </div>
     `;
@@ -1077,6 +1168,23 @@ export class UBookItServiceEditorElement extends UmbLitElement {
       padding: var(--uui-size-space-3) var(--uui-size-space-4);
     }
     .alignment li + li {
+      margin-top: var(--uui-size-space-1);
+    }
+    /*
+      The same treatment as the start-times report and for the same reason: a
+      statement about the resources this service needs, not a validation failure,
+      and a service it describes still saves. The text carries the whole finding,
+      so the rule and the tint are decoration — nothing here is conveyed by
+      colour alone.
+    */
+    .sufficiency ul {
+      background: var(--uui-color-surface-alt, #f3f3f5);
+      border-left: 3px solid var(--uui-color-warning-standalone, #d29c00);
+      list-style: none;
+      margin: var(--uui-size-space-4) 0 0;
+      padding: var(--uui-size-space-3) var(--uui-size-space-4);
+    }
+    .sufficiency li + li {
       margin-top: var(--uui-size-space-1);
     }
     .requirement {

@@ -24,7 +24,7 @@ const t: TermResolver = (key, ...args) => (args.length === 0 ? key : `${key}(${a
 function snapshot(overrides: Partial<ResolutionSnapshot> = {}): ResolutionSnapshot {
   return {
     resourceType: "room",
-    requiresCapabilities: false,
+    requiredCapabilities: [],
     ofType: 10,
     withCapabilities: 10,
     canProvide: 10,
@@ -53,7 +53,7 @@ describe("not known", () => {
 describe("the stage that emptied the pool", () => {
   it("attributes an unused type to the type stage and stops there", () => {
     const lines = resolutionLines(
-      snapshot({ resourceType: "rooom", requiresCapabilities: true, ofType: 0, withCapabilities: 0, canProvide: 0 }),
+      snapshot({ resourceType: "rooom", requiredCapabilities: ["projector"], ofType: 0, withCapabilities: 0, canProvide: 0 }),
       t,
     );
 
@@ -65,7 +65,7 @@ describe("the stage that emptied the pool", () => {
 
   it("attributes an over-narrow capability set to the capability stage and stops there", () => {
     const lines = resolutionLines(
-      snapshot({ requiresCapabilities: true, withCapabilities: 0, canProvide: 0 }),
+      snapshot({ requiredCapabilities: ["projector"], withCapabilities: 0, canProvide: 0 }),
       t,
     );
 
@@ -78,7 +78,7 @@ describe("the stage that emptied the pool", () => {
   it("attributes a duration nothing can provide to the duration stage, and names the exclusions", () => {
     const lines = resolutionLines(
       snapshot({
-        requiresCapabilities: true,
+        requiredCapabilities: ["projector"],
         withCapabilities: 3,
         canProvide: 0,
         exclusions: [excluded("Red Room"), excluded("Blue Room")],
@@ -114,7 +114,7 @@ describe("capabilities that were never named", () => {
   // case, which is why live verification missed it.
   it("omits the capability line entirely when none are required", () => {
     const lines = resolutionLines(
-      snapshot({ requiresCapabilities: false, canProvide: 8, exclusions: [excluded("Red Room")] }),
+      snapshot({ requiredCapabilities: [], canProvide: 8, exclusions: [excluded("Red Room")] }),
       t,
     );
 
@@ -134,7 +134,7 @@ describe("capabilities that were never named", () => {
     // leaves the suite green while the summary emits a dangling
     // "Excluded by the length: " with nothing after it.
     const lines = resolutionLines(
-      snapshot({ requiresCapabilities: true, withCapabilities: 3, canProvide: 3, exclusions: [] }),
+      snapshot({ requiredCapabilities: ["projector"], withCapabilities: 3, canProvide: 3, exclusions: [] }),
       t,
     );
 
@@ -151,7 +151,7 @@ describe("capabilities that were never named", () => {
     // editor typed, not what the data happens to look like. This is the pair
     // that makes the test above non-vacuous.
     const lines = resolutionLines(
-      snapshot({ requiresCapabilities: true, canProvide: 8, exclusions: [excluded("Red Room")] }),
+      snapshot({ requiredCapabilities: ["projector"], canProvide: 8, exclusions: [excluded("Red Room")] }),
       t,
     );
 
@@ -162,7 +162,7 @@ describe("capabilities that were never named", () => {
 describe("singular and plural", () => {
   it("uses the singular type form for one resource of the type", () => {
     const lines = resolutionLines(
-      snapshot({ requiresCapabilities: true, ofType: 1, withCapabilities: 1, canProvide: 0, exclusions: [excluded("Red Room")] }),
+      snapshot({ requiredCapabilities: ["projector"], ofType: 1, withCapabilities: 1, canProvide: 0, exclusions: [excluded("Red Room")] }),
       t,
     );
 
@@ -172,7 +172,7 @@ describe("singular and plural", () => {
 
   it("uses the singular duration form for one surviving resource", () => {
     const lines = resolutionLines(
-      snapshot({ requiresCapabilities: true, withCapabilities: 3, canProvide: 1, exclusions: [excluded("Red Room")] }),
+      snapshot({ requiredCapabilities: ["projector"], withCapabilities: 3, canProvide: 1, exclusions: [excluded("Red Room")] }),
       t,
     );
 
@@ -229,7 +229,7 @@ describe("a chain per role", () => {
   it("groups each role's lines under its own resource type", () => {
     const groups = resolutionGroups(
       [
-        snapshot({ resourceType: "room", requiresCapabilities: true, withCapabilities: 3, canProvide: 3 }),
+        snapshot({ resourceType: "room", requiredCapabilities: ["projector"], withCapabilities: 3, canProvide: 3 }),
         snapshot({ resourceType: "therapist", ofType: 2, withCapabilities: 2, canProvide: 2 }),
       ],
       t,
@@ -238,10 +238,44 @@ describe("a chain per role", () => {
     expect(groups).toEqual([
       {
         resourceType: "room",
+        label: "room",
         lines: ["resolutionType(10,room)", "resolutionCapabilities(3)", "resolutionDuration(3)"],
       },
-      { resourceType: "therapist", lines: ["resolutionHealthy(2)"] },
+      { resourceType: "therapist", label: "therapist", lines: ["resolutionHealthy(2)"] },
     ]);
+  });
+
+  it("labels two roles of one type by what distinguishes them", () => {
+    // Two headings reading "therapist" present two overlapping pools as two
+    // independent ones — the misreading the sufficiency report beside them
+    // exists to correct, and this is the surface it lands on (design D6).
+    const groups = resolutionGroups(
+      [
+        snapshot({ resourceType: "therapist", requiredCapabilities: ["cert-x"] }),
+        snapshot({ resourceType: "therapist", requiredCapabilities: [] }),
+      ],
+      t,
+    );
+
+    expect(groups.map((g) => g.label)).toEqual([
+      "roleLabelCapabilities(therapist,cert-x)",
+      "roleLabelNoCapabilities(therapist)",
+    ]);
+  });
+
+  it("leaves the label bare where no two roles share a type", () => {
+    // The common case stays short: a `room` and a `therapist` are unambiguous
+    // already, and stating capabilities everywhere would make every service
+    // noisier in order to disambiguate the few (design D5).
+    const groups = resolutionGroups(
+      [
+        snapshot({ resourceType: "room", requiredCapabilities: ["projector"] }),
+        snapshot({ resourceType: "therapist", requiredCapabilities: ["cert-x"] }),
+      ],
+      t,
+    );
+
+    expect(groups.map((g) => g.label)).toEqual(["room", "therapist"]);
   });
 
   it("describes a role requiring no capabilities by its type alone, beside one that does", () => {
@@ -250,10 +284,10 @@ describe("a chain per role", () => {
     // the numbers happen to look like.
     const groups = resolutionGroups(
       [
-        snapshot({ resourceType: "room", requiresCapabilities: true, withCapabilities: 3, canProvide: 3 }),
+        snapshot({ resourceType: "room", requiredCapabilities: ["projector"], withCapabilities: 3, canProvide: 3 }),
         snapshot({
           resourceType: "therapist",
-          requiresCapabilities: false,
+          requiredCapabilities: [],
           ofType: 4,
           withCapabilities: 4,
           canProvide: 2,
@@ -279,7 +313,7 @@ describe("a chain per role", () => {
   it("attributes a type matching nothing to that role alone", () => {
     const groups = resolutionGroups(
       [
-        snapshot({ resourceType: "rooom", requiresCapabilities: true, ofType: 0, withCapabilities: 0, canProvide: 0 }),
+        snapshot({ resourceType: "rooom", requiredCapabilities: ["projector"], ofType: 0, withCapabilities: 0, canProvide: 0 }),
         snapshot({ resourceType: "therapist", ofType: 2, withCapabilities: 2, canProvide: 2 }),
       ],
       t,
@@ -295,7 +329,7 @@ describe("a chain per role", () => {
     // correcting the duplicate.
     const groups = resolutionGroups(
       [
-        snapshot({ resourceType: "room", requiresCapabilities: true, withCapabilities: 3, canProvide: 3 }),
+        snapshot({ resourceType: "room", requiredCapabilities: ["projector"], withCapabilities: 3, canProvide: 3 }),
         snapshot({ resourceType: "room" }),
       ],
       t,
@@ -320,19 +354,28 @@ describe("eligibility is not availability (design D5)", () => {
     // Reads the REAL strings, because the ban is on the words themselves. If a
     // future copy edit reintroduces "bookable", this fails.
     //
-    // Covers the alignment report as well as the chains. That report says
-    // something the chains do not — whether two roles' start times can ever
-    // coincide — but it is under the same ban: it may state that they never can,
-    // and may never state that a service is available, free or bookable. Its
-    // absence must not read as reassurance either, which is why there is no
-    // "these roles align" string for this test to have to exempt.
+    // Covers the alignment report and the pool-sufficiency report as well as the
+    // chains. Both say something the chains do not — whether two roles' start
+    // times can ever coincide, and whether the roles can be filled at once — but
+    // both are under the same ban: each may state that they never can, and
+    // neither may state that a service is available, free or bookable. Neither
+    // absence may read as reassurance either, which is why there is no "these
+    // roles align" or "the pool is sufficient" string for this test to exempt.
+    //
+    // One constraint stated in one place over all three, deliberately: the
+    // easiest way to get this subtly wrong is to add a fourth surface with its
+    // own vocabulary rule.
     const { default: terms } = await import("../localization/en-us.js");
     const services = (terms as Record<string, Record<string, string>>).ubookitServices;
 
     const forbidden = /\b(available|availability|free|bookable)\b/i;
 
     const covered = Object.keys(services).filter(
-      (key) => key.startsWith("resolution") || key.startsWith("alignment"),
+      (key) =>
+        key.startsWith("resolution") ||
+        key.startsWith("alignment") ||
+        key.startsWith("sufficiency") ||
+        key.startsWith("roleLabel"),
     );
 
     const offenders = covered
@@ -341,8 +384,10 @@ describe("eligibility is not availability (design D5)", () => {
 
     expect(offenders).toEqual([]);
 
-    // The filter has to actually match the alignment strings: a prefix typo
-    // would leave this test green while covering nothing.
+    // The filters have to actually match: a prefix typo would leave this test
+    // green while covering nothing.
     expect(covered).toContain("alignmentNever");
+    expect(covered).toContain("sufficiencyShort");
+    expect(covered).toContain("roleLabelNoCapabilities");
   });
 });

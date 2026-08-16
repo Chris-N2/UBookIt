@@ -95,14 +95,20 @@ internal static class ServiceModelMapper
         // so an all-null list becomes the empty-list failure below.
         var supplied = (model.Roles ?? []).Where(r => r is not null).ToList();
 
-        // Count is fixed at 1 here rather than read from the request, and that is
-        // not an oversight: a preview asks what a role *resolves to*, and count is
-        // not an input to eligibility — a role of count 3 draws on exactly the pool
-        // a role of count 1 does. Passing the editor's count would only let an
-        // out-of-range one refuse to answer a question it does not affect, which is
-        // the same mistake as rejecting duplicate types here (⑧a design D1).
+        // The count is read from the request now, where ⑧a fixed it at 1. Its
+        // argument then was that count is not an input to eligibility — a role of
+        // count 3 draws on exactly the pool a role of count 1 does — and that is
+        // still true of the *chains*, which are unchanged by it. It stopped being
+        // the whole story when the response gained the sufficiency finding, which
+        // is an assignment question and cannot be asked at all without knowing how
+        // many of each role are needed.
+        //
+        // So an out-of-range count is a validation failure here, exactly as a
+        // malformed type key already was: both make the answer describe something
+        // other than what is on screen, and refusing to answer is what stops the
+        // endpoint reporting on a configuration it silently narrowed.
         var roles = supplied
-            .Select((r, index) => ServiceRole.Create(r.ResourceType, r.RequiredCapabilities, 1, index))
+            .Select((r, index) => ServiceRole.Create(r.ResourceType, r.RequiredCapabilities, r.Count, index))
             .ToList();
 
         var failures = roles.SelectMany(r => r.Failures).Concat(duration.Failures).ToList();
@@ -124,18 +130,18 @@ internal static class ServiceModelMapper
     }
 
     /// <summary>
-    /// The preview response: the chains, plus the misalignment finding when Core
-    /// found one.
+    /// The preview response: the chains, plus whichever findings Core made.
     /// <para>
-    /// The finding is passed in rather than computed here, and it is computed
-    /// from the very chains being mapped — so the report cannot describe a
+    /// The findings are passed in rather than computed here, and both are computed
+    /// from the very chains being mapped — so a report cannot describe a
     /// different pool from the one the chains describe or the booking path acts
     /// on.
     /// </para>
     /// </summary>
     internal static ServicePreviewResponseModel ToModel(
         IEnumerable<(ServiceRole Role, ServiceResolution Chain)> chains,
-        RoleMisalignment? misalignment = null)
+        RoleMisalignment? misalignment = null,
+        RoleShortfall? shortfall = null)
         => new()
         {
             Roles = [.. chains.Select(c => ToModel(c.Role, c.Chain))],
@@ -144,6 +150,24 @@ internal static class ServiceModelMapper
             // reassurance: the endpoint never reports that a service is
             // bookable, so there is no positive value to carry.
             StartMisalignment = misalignment is null ? null : ToModel(misalignment),
+
+            // Null on the same terms and for the same reason. A sufficient pool is
+            // absence, never a shortfall of zero: zero is the number that tells an
+            // editor their configuration is wrong.
+            PoolShortfall = shortfall is null ? null : ToModel(shortfall),
+        };
+
+    private static PoolShortfallModel ToModel(RoleShortfall shortfall)
+        => new()
+        {
+            Roles = [.. shortfall.Roles.Select(role => new ShortfallRoleModel
+            {
+                ResourceType = role.ResourceType,
+                RequiredCapabilities = [.. role.RequiredCapabilities.Keys],
+                Count = role.Count,
+            })],
+            Required = shortfall.Required,
+            Eligible = shortfall.Eligible,
         };
 
     private static StartMisalignmentModel ToModel(RoleMisalignment misalignment)

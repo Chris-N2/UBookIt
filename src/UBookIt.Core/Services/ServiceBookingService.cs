@@ -430,7 +430,11 @@ public sealed class ServiceBookingService(
                     .ToList())
                 .ToList();
 
-            if (SlotAssignment.TrySaturate(eligible) is not null)
+            // Availability asks only whether an assignment exists. The witness a
+            // failure carries describes one length at one start, which is neither
+            // the configuration nor the instant a booker asked about, so it is
+            // deliberately dropped here rather than surfaced as a third claim.
+            if (SlotAssignment.TrySaturate(eligible).Assignment is not null)
             {
                 feasible.Add(length);
             }
@@ -715,7 +719,7 @@ public sealed class ServiceBookingService(
         // outcome has to be reasoned about rather than observed. The reasoning is
         // in RuleClassification, which asks the placement service the same
         // questions an attempt would have answered.
-        var rules = new RuleClassification(bookingService, request, attemptableSlots, freeSlots);
+        var rules = new RuleClassification(bookingService, request, pools, attemptableSlots, freeSlots);
 
         // Whether any assignment that actually ran reached the conflict check and
         // lost. The classification below adds what the excluded ones would have
@@ -824,8 +828,8 @@ public sealed class ServiceBookingService(
             .ToList();
 
         var assignment = preferredResourceId is { } preferred
-            ? SlotAssignment.TrySaturateIncluding(ids, preferred) ?? SlotAssignment.TrySaturate(ids)
-            : SlotAssignment.TrySaturate(ids);
+            ? SlotAssignment.TrySaturateIncluding(ids, preferred) ?? SlotAssignment.TrySaturate(ids).Assignment
+            : SlotAssignment.TrySaturate(ids).Assignment;
 
         if (assignment is null)
         {
@@ -915,6 +919,7 @@ public sealed class ServiceBookingService(
     private sealed class RuleClassification(
         IBookingService bookingService,
         ServiceBookingRequest request,
+        IReadOnlyList<RoleCandidates> pools,
         List<List<ServiceCandidate>> shortlists,
         List<List<ServiceCandidate>> free)
     {
@@ -958,24 +963,89 @@ public sealed class ServiceBookingService(
                 }
             }
 
-            return raced || ExcludedAssignmentCouldHaveRaced()
-                ? DomainResult<Booking>.Failure(
-                    FailureCodes.Conflict,
-                    "Every resource able to fulfil this service is already booked at that time.")
+            if (raced)
+            {
+                return Raced();
+            }
+
+            // The graph an attempt could actually have run over: the candidates
+            // whose own rules admit the request. Asked once, and its answer serves
+            // both decisions below — whether being claimed is what broke the
+            // placement, and what to say when nothing could have filled the slots
+            // in the first place.
+            var admitting = Ids(shortlists);
+            var saturation = SlotAssignment.TrySaturate(admitting);
+
+            if (saturation.Deficiency is { } deficiency)
+            {
+                // No saturating assignment exists among the rule-admitting
+                // candidates, so no attempt could ever have reached the conflict
+                // check — deterministic, whatever the claims say. The witness the
+                // assignment produced *is* the reason, so the message describes
+                // the failure that occurred rather than a second computation of
+                // it (design D2).
+                return Unavailable(Shortfall(deficiency));
+            }
+
+            return ClaimsBrokeIt()
+                ? Raced()
                 : Unavailable("This service cannot be booked at that time.");
         }
 
+        private static DomainResult<Booking> Raced()
+            => DomainResult<Booking>.Failure(
+                FailureCodes.Conflict,
+                "Every resource able to fulfil this service is already booked at that time.");
+
+        /// <summary>
+        /// What was short at this instant, in the roles the caller's service
+        /// declares.
+        /// <para>
+        /// About <em>that instant</em> and nothing more. A structurally
+        /// insufficient service and one whose resources merely happen to be busy
+        /// fail identically here, so this may not claim a configuration can never
+        /// be fulfilled — that is the configuration-time check's claim to make,
+        /// over a different graph, and it is what distinguishes the two.
+        /// </para>
+        /// </summary>
+        private string Shortfall(SlotDeficiency deficiency)
+        {
+            var shortfall = PoolSufficiency.Collapse(
+                deficiency, SlotRoles(pools), [.. pools.Select(p => p.Role)]);
+
+            // "at that time" is doing real work: it is what keeps this a statement
+            // about the instant rather than about the service. A message that read
+            // "this service needs two therapists and only one exists" would be the
+            // configuration-time claim, made on the evidence of one moment.
+            return $"This service needs {shortfall.Required} distinct resources for "
+                + $"{Describe(shortfall.Roles)} at that time, and only {shortfall.Eligible} "
+                + (shortfall.Eligible == 1 ? "was available." : "were available.");
+        }
+
+        /// <summary>
+        /// The roles a shortfall names, as an editor's configuration declares
+        /// them. Capabilities are stated when a role requires any, because two
+        /// roles of one resource type are told apart by nothing else — and a
+        /// message naming "therapist and therapist" would leave a reader unable
+        /// to tell which row is which.
+        /// </summary>
+        private static string Describe(IReadOnlyList<ServiceRole> roles)
+            => string.Join(", ", roles.Select(role => role.RequiredCapabilities.Keys.Count == 0
+                ? $"'{role.ResourceType}'"
+                : $"'{role.ResourceType}' with {string.Join(" and ", role.RequiredCapabilities.Keys)}"));
+
         /// <summary>
         /// Whether an assignment the pre-filter removed would have reached the
-        /// conflict check: a saturating assignment exists among the candidates whose
-        /// rules admit the request, and none exists once the claimed ones are taken
-        /// out — so being claimed is exactly what broke it.
+        /// conflict check: no saturating assignment survives once the claimed
+        /// candidates are taken out, so being claimed is exactly what broke it.
         /// <para>
-        /// Both halves are load-bearing. Without the first, a claimed candidate
-        /// would be read as a lost race even where some slot could never be filled
-        /// at all, reporting `conflict` for a request that can never succeed and
-        /// inviting a retry that cannot help. Without the second, a service with a
-        /// perfectly bookable assignment left over would be blamed on the claims.
+        /// Asked only after a saturating assignment has been shown to exist among
+        /// the rule-admitting candidates, and that ordering is load-bearing rather
+        /// than incidental. Without it a claimed candidate would be read as a lost
+        /// race even where some slot could never be filled at all, reporting
+        /// `conflict` for a request that can never succeed and inviting a retry
+        /// that cannot help. The caller now makes that check first because it also
+        /// wants its witness; the two halves are unchanged.
         /// </para>
         /// <para>
         /// Stated over assignments rather than "every role has an admitting
@@ -983,14 +1053,9 @@ public sealed class ServiceBookingService(
         /// pass while being unfillable.
         /// </para>
         /// </summary>
-        private bool ExcludedAssignmentCouldHaveRaced()
+        private bool ClaimsBrokeIt()
         {
             var admitting = Ids(shortlists);
-
-            if (SlotAssignment.TrySaturate(admitting) is null)
-            {
-                return false;
-            }
 
             var stillFree = free
                 .Select(slot => slot.Select(c => c.ResourceId).ToHashSet())
@@ -1000,7 +1065,7 @@ public sealed class ServiceBookingService(
                 .Select((slot, index) => (IReadOnlyList<Guid>)slot.Where(stillFree[index].Contains).ToList())
                 .ToList();
 
-            return SlotAssignment.TrySaturate(admittingAndFree) is null;
+            return SlotAssignment.TrySaturate(admittingAndFree).Assignment is null;
         }
 
         /// <summary>

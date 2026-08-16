@@ -4,6 +4,7 @@ import { UBookItBackofficeService } from "../api/index.js";
 import type { ServiceResponseModel } from "../api/index.js";
 import { toApiErrors } from "./api-errors.js";
 import { confirmDestructive } from "./confirm.js";
+import { requirementSummary } from "./requirement-summary.js";
 
 const PAGE_SIZE = 20;
 
@@ -104,17 +105,23 @@ export class UBookItServiceListElement extends UmbLitElement {
     await this.#load();
   }
 
-  /** "1 × room, 1 × masseur" — every role the service requires, in order. */
+  /**
+   * "1 × room, 1 × masseur" — every role the service requires, in order.
+   *
+   * Delegates to the pure {@link requirementSummary}, which owns the rule that
+   * two roles of one resource type are distinguished by what each requires. Two
+   * entries reading "1 × therapist, 1 × therapist" would render a configuration
+   * the domain accepts identically to one it rejects.
+   */
   #summarizeRequirements(service: ServiceResponseModel): string {
-    if (service.roles.length === 0) {
-      return this.#term("requirementNone");
-    }
-
-    return service.roles
-      .map((role) =>
-        this.localize.term("ubookitServices_requirementEntry", role.count, role.resourceType),
-      )
-      .join(", ");
+    return requirementSummary(
+      service.roles.map((role) => ({
+        resourceType: role.resourceType,
+        requiredCapabilities: [...(role.requiredCapabilities ?? [])],
+        count: role.count,
+      })),
+      (key, ...args) => this.localize.term(`ubookitServices_${key}`, ...args),
+    );
   }
 
   #summarizeDuration(service: ServiceResponseModel): string {

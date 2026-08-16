@@ -1,4 +1,5 @@
-using System.Reflection;
+﻿using System.Reflection;
+using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
 using UBookIt.Backoffice.Controllers;
 using UBookIt.Backoffice.Models;
@@ -71,8 +72,13 @@ public class ServicePreviewEndpointTests
         => Configuration(duration, Role(resourceType, capabilities));
 
     private static ServicePreviewRoleModel Role(
-        string resourceType = ResourceTypes.Room, string[]? capabilities = null)
-        => new() { ResourceType = resourceType, RequiredCapabilities = [.. capabilities ?? []] };
+        string resourceType = ResourceTypes.Room, string[]? capabilities = null, int count = 1)
+        => new()
+        {
+            ResourceType = resourceType,
+            RequiredCapabilities = [.. capabilities ?? []],
+            Count = count,
+        };
 
     private static ServicePreviewRequestModel Configuration(
         ServiceDurationModel? duration, params ServicePreviewRoleModel[] roles)
@@ -624,5 +630,140 @@ public class ServicePreviewEndpointTests
 
         Assert.NotNull(route);
         Assert.Equal("services/preview", route.Template);
+    }
+
+    // ---------------------------------------------------------------------
+    // The pool-sufficiency finding (resource-management spec, "The
+    // configuration preview reports a structurally insufficient pool").
+    // ---------------------------------------------------------------------
+
+    [Fact]
+    public async Task Spec_scenario_an_insufficient_configuration_is_reported()
+    {
+        // One role of count 2 over a single eligible room.
+        var (controller, _) = Wire(Room(1, "Red Room", 480));
+
+        var response = Ok(await controller.PreviewServiceConfiguration(
+            Configuration(null, Role(count: 2))));
+
+        Assert.NotNull(response.PoolShortfall);
+        Assert.Equal(2, response.PoolShortfall.Required);
+        Assert.Equal(1, response.PoolShortfall.Eligible);
+        Assert.Equal(
+            [ResourceTypes.Room],
+            response.PoolShortfall.Roles.Select(r => r.ResourceType));
+        Assert.Equal(2, Assert.Single(response.PoolShortfall.Roles).Count);
+
+        // And the chains come back unchanged beside it: the finding is a claim
+        // about the roles together, not a correction to what either resolves to.
+        Assert.Equal(1, Single(response).CanProvide.Total);
+    }
+
+    [Fact]
+    public async Task Spec_scenario_a_sufficient_configuration_reports_nothing()
+    {
+        var (controller, _) = Wire(TenRooms());
+
+        var response = Ok(await controller.PreviewServiceConfiguration(
+            Configuration(null, Role(count: 2))));
+
+        // Absence, not a zero-shortfall record — the endpoint adds no claim Core
+        // declines to make.
+        Assert.Null(response.PoolShortfall);
+    }
+
+    [Fact]
+    public async Task Spec_scenario_two_roles_competing_for_one_resource_are_reported_together()
+    {
+        var (controller, _) = Wire(Therapist(1, "Mary", "cert-x"));
+
+        var response = Ok(await controller.PreviewServiceConfiguration(
+            Configuration(
+                null,
+                Role("therapist", ["cert-x"]),
+                Role("therapist"))));
+
+        Assert.NotNull(response.PoolShortfall);
+
+        // One finding naming both roles, not one finding per role.
+        Assert.Equal(2, response.PoolShortfall.Roles.Count);
+        Assert.Equal(2, response.PoolShortfall.Required);
+        Assert.Equal(1, response.PoolShortfall.Eligible);
+
+        // In the order the request supplied them, and told apart by what each
+        // requires — the roles are otherwise indistinguishable on screen.
+        Assert.Equal(["cert-x"], response.PoolShortfall.Roles[0].RequiredCapabilities);
+        Assert.Empty(response.PoolShortfall.Roles[1].RequiredCapabilities);
+    }
+
+    [Fact]
+    public async Task Spec_scenario_the_chains_are_not_altered_by_the_finding()
+    {
+        // Two roles whose pools are the same two therapists, each needing two.
+        // Each chain still reports two — it is true of the role it describes — and
+        // the joint claim lives only in the new member.
+        var (controller, _) = Wire(Therapist(1, "Mary", "cert-x"), Therapist(2, "Gwen", "cert-x"));
+
+        var response = Ok(await controller.PreviewServiceConfiguration(
+            Configuration(
+                null,
+                Role("therapist", ["cert-x"], count: 2),
+                Role("therapist", count: 2))));
+
+        Assert.All(response.Roles, chain => Assert.Equal(2, chain.CanProvide.Total));
+
+        Assert.NotNull(response.PoolShortfall);
+        Assert.Equal(4, response.PoolShortfall.Required);
+        Assert.Equal(2, response.PoolShortfall.Eligible);
+    }
+
+    [Fact]
+    public async Task Spec_scenario_an_insufficient_configuration_is_still_previewed()
+    {
+        // Reported, never rejected — exactly as duplicate resource types are.
+        // Refusing to answer would withhold the information the fix needs.
+        var (controller, _) = Wire(Room(1, "Red Room", 480));
+
+        var result = await controller.PreviewServiceConfiguration(
+            Configuration(null, Role(count: 5)));
+
+        Assert.Equal(StatusCodes.Status200OK, Assert.IsType<OkObjectResult>(result).StatusCode);
+        Assert.NotEmpty(Ok(result).Roles);
+    }
+
+    [Fact]
+    public async Task An_omitted_count_is_one()
+    {
+        // Every request written before counts were carried means a count of 1, and
+        // must keep reporting what it always did.
+        var (controller, _) = Wire(Room(1, "Red Room", 480));
+
+        var response = Ok(await controller.PreviewServiceConfiguration(new ServicePreviewRequestModel
+        {
+            Roles = [new ServicePreviewRoleModel { ResourceType = ResourceTypes.Room }],
+            Duration = FixedMinutes(60),
+        }));
+
+        Assert.Null(response.PoolShortfall);
+        Assert.Equal(1, Single(response).CanProvide.Total);
+    }
+
+    [Fact]
+    public async Task An_out_of_range_count_is_a_validation_failure_against_its_own_row()
+    {
+        // The count is now an input to part of the answer, so a preview cannot
+        // silently narrow it — the same rule a malformed type key already follows,
+        // reported through the same code the save reports, against the row that
+        // carries it.
+        var (controller, _) = Wire(Room(1, "Red Room", 480));
+
+        var result = await controller.PreviewServiceConfiguration(
+            Configuration(null, Role(), Role("therapist", count: 0)));
+
+        var (status, codes) = Problem(result);
+
+        Assert.Equal(StatusCodes.Status400BadRequest, status);
+        Assert.Equal([FailureCodes.ServiceRoleCountInvalid], codes);
+        Assert.Equal(["Roles[1].Count"], Fields(result));
     }
 }

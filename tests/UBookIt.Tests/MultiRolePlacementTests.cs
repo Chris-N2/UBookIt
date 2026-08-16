@@ -792,4 +792,125 @@ public class MultiRolePlacementTests
 
         Assert.Equal(await Once(), await Once());
     }
+
+    // ---------------------------------------------------------------------
+    // The richer `service-unavailable` message (pool-sufficiency design D2).
+    // The code is contract and unchanged; the message becomes specific.
+    // ---------------------------------------------------------------------
+
+    /// <summary>
+    /// A therapist whose own opening hours start late, so a 09:00 request is a
+    /// <em>deterministic</em> refusal from it rather than a busy calendar. That is
+    /// what makes the shortfall a property of the instant: the resource is
+    /// eligible, and it cannot take this request.
+    /// </summary>
+    private static Resource LateOpening(int id)
+        => Res(id, Therapist, open: "13:00");
+
+    [Fact]
+    public async Task Spec_scenario_the_message_names_what_was_short()
+    {
+        // Two therapists needed; two exist and are eligible; only one of them can
+        // take a 09:00 request, because the other does not open until 13:00.
+        var service = Counted(Therapist, 2);
+        var harness = Wire(service, Res(3, Therapist), LateOpening(4));
+
+        var placed = await harness.Services.PlaceAsync(Request(service, "09:00", 60));
+
+        Assert.False(placed.Succeeded);
+
+        var failure = Assert.Single(placed.Failures);
+
+        Assert.Equal(FailureCodes.ServiceUnavailable, failure.Code);
+        Assert.Contains(Therapist, failure.Message);
+        Assert.Contains("2 distinct resources", failure.Message);
+        Assert.Contains("only 1 was available", failure.Message);
+    }
+
+    [Fact]
+    public async Task Spec_scenario_the_code_is_unchanged_by_the_richer_message()
+    {
+        // A consumer matching on the code sees exactly what it saw before, and the
+        // failure still carries no field — codes are contract, messages are not.
+        var service = Counted(Therapist, 2);
+        var harness = Wire(service, Res(3, Therapist), LateOpening(4));
+
+        var placed = await harness.Services.PlaceAsync(Request(service, "09:00", 60));
+
+        var failure = Assert.Single(placed.Failures);
+
+        Assert.Equal(FailureCodes.ServiceUnavailable, failure.Code);
+        Assert.Null(failure.Field);
+    }
+
+    [Fact]
+    public async Task Spec_scenario_a_placement_time_shortfall_is_not_a_configuration_fault()
+    {
+        // Structurally sufficient — three eligible therapists for a count of two —
+        // and short at this one instant, because two of them open at 13:00.
+        //
+        // The pairing is the test. The configuration check reports nothing, and the
+        // placement message must not claim what the configuration check declined
+        // to: no "never", no "cannot be fulfilled", nothing about the service as
+        // configured.
+        var service = Counted(Therapist, 2);
+        var harness = Wire(service, Res(3, Therapist), LateOpening(4), LateOpening(5));
+
+        var pools = await harness.Services.ResolveCandidatesAsync(service.Id);
+        Assert.Null(PoolSufficiency.FindShortfall(pools.Value));
+
+        var placed = await harness.Services.PlaceAsync(Request(service, "09:00", 60));
+        var message = Assert.Single(placed.Failures).Message;
+
+        Assert.Contains("at that time", message);
+        Assert.DoesNotContain("never", message, StringComparison.OrdinalIgnoreCase);
+        Assert.DoesNotContain("exist", message, StringComparison.OrdinalIgnoreCase);
+    }
+
+    [Fact]
+    public async Task Both_surfaces_report_the_same_shortfall_from_one_computation()
+    {
+        // Design D2's guarantee, in the only form a test can hold it to: over a
+        // configuration whose structural shortfall and instant shortfall coincide,
+        // the two surfaces produce the same roles and the same two numbers.
+        //
+        // What this cannot see is a second implementation that happens to agree
+        // today — for that, the deficiency detection is broken by hand and BOTH
+        // surfaces are confirmed to move (task 3.5, mutation-checked at apply).
+        var service = SameType(Therapist, [], ["cert-x"]);
+        var harness = Wire(service, ResWith(3, Therapist, "cert-x"));
+
+        var pools = await harness.Services.ResolveCandidatesAsync(service.Id);
+        var configured = PoolSufficiency.FindShortfall(pools.Value);
+
+        Assert.NotNull(configured);
+        Assert.Equal(2, configured.Required);
+        Assert.Equal(1, configured.Eligible);
+
+        var placed = await harness.Services.PlaceAsync(Request(service, "09:00", 60));
+        var message = Assert.Single(placed.Failures).Message;
+
+        Assert.Contains($"{configured.Required} distinct resources", message);
+        Assert.Contains($"only {configured.Eligible} was available", message);
+
+        // Both roles are named on both surfaces, and the capability that tells them
+        // apart is in the message — "therapist and therapist" would be useless.
+        Assert.Equal(2, configured.Roles.Count);
+        Assert.Contains("'therapist' with cert-x", message);
+    }
+
+    [Fact]
+    public async Task A_role_with_no_eligible_resource_at_all_keeps_its_own_message()
+    {
+        // The empty-pool guard fires before any of this and says something
+        // different — and better — than a shortfall would: no resource can fulfil
+        // the service, rather than an arithmetic about how many were free.
+        var service = Svc(ResourceTypes.Room, Therapist);
+        var harness = Wire(service, Res(1, ResourceTypes.Room));
+
+        var placed = await harness.Services.PlaceAsync(Request(service, "09:00", 60));
+
+        Assert.Equal(FailureCodes.ServiceUnavailable, Assert.Single(placed.Failures).Code);
+        Assert.DoesNotContain("distinct resources", placed.Failures[0].Message);
+    }
 }

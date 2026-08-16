@@ -1,4 +1,5 @@
 import type { DurationExclusionModel } from "../api/index.js";
+import { roleLabels } from "./role-label.js";
 
 /**
  * A resolution chain and the configuration it was computed for, captured
@@ -15,15 +16,20 @@ export type ResolutionSnapshot = {
   resourceType: string;
 
   /**
-   * Whether the configuration named any required capability.
+   * The capabilities the configuration named for this role, as the response
+   * echoed them.
    *
    * Snapshotted rather than inferred from `ofType === withCapabilities`: those
    * are equal both when no capability was required and when every resource
    * happens to carry the ones that were, and the two cases must be worded
    * differently. Inferring would make the summary's phrasing depend on the data
    * rather than on what the editor typed.
+   *
+   * Carried as the list rather than as a bare "any?" flag because it is also what
+   * tells two roles of one resource type apart, and a second copy of the same
+   * fact could drift from this one.
    */
-  requiresCapabilities: boolean;
+  requiredCapabilities: string[];
 
   ofType: number;
   withCapabilities: number;
@@ -45,6 +51,18 @@ export type TermResolver = (key: string, ...args: (string | number)[]) => string
  */
 export type RoleResolutionGroup = {
   resourceType: string;
+
+  /**
+   * How this role is named above its lines.
+   *
+   * Not simply the resource type. Two roles may name one type, and two groups
+   * headed "therapist" read as two independent pools — which is exactly the
+   * misreading the sufficiency report beside them exists to correct, and this is
+   * the surface it lands on. Where two roles share a type, each is headed by what
+   * distinguishes it, under the same rule the collection view uses (design D5/D6).
+   */
+  label: string;
+
   lines: string[];
 };
 
@@ -105,12 +123,25 @@ export function resolutionGroups(
     return [];
   }
 
-  // Each role is described from its own chain alone. Because every role of a
-  // saveable service names a distinct resource type, the pools are disjoint and
-  // each chain stays independently true: no role can consume a resource another
-  // role's chain counted.
-  return chains.map((chain) => ({
+  // Each role is described from its own chain alone, and each chain stays
+  // independently true of the role it describes: it states what that role
+  // resolves to, not what remains once another role has taken someone.
+  //
+  // The pools are NOT in general disjoint — two roles may name one resource type
+  // — so a resource can be counted in more than one chain. That is why there is
+  // no combined number here: it would double-count, and it would describe no
+  // filter that resolution applies. The joint claim is a different question
+  // altogether, about assignment rather than filters, and it belongs to the
+  // sufficiency report beside these (design D6).
+  //
+  // What the labels carry is the other half of that: where two roles share a
+  // type, each heading says what distinguishes it, so two groups cannot read as
+  // one pool counted twice.
+  const labels = roleLabels(chains, t);
+
+  return chains.map((chain, index) => ({
     resourceType: chain.resourceType,
+    label: labels[index],
     lines: resolutionLines(chain, t),
   }));
 }
@@ -147,7 +178,7 @@ export function resolutionLines(chain: ResolutionSnapshot | null, t: TermResolve
   // capabilities the editor never entered. ⑧ carried separate "…have this type"
   // strings for this case; omitting the line says the same thing without
   // needing a second phrasing of every count.
-  if (chain.requiresCapabilities) {
+  if (chain.requiredCapabilities.length > 0) {
     if (chain.withCapabilities === 0) {
       lines.push(t("resolutionCapabilitiesNone"));
       return lines;

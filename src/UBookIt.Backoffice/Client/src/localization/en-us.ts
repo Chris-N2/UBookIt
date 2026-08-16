@@ -179,6 +179,47 @@ export default {
     alignmentWindow: "%0% opens at %1% and starts every %2% minutes.",
     alignmentFix:
       "Change one resource's opening time or step size, or add a resource whose start times line up with the other requirement.",
+
+    // ------------------------------------------------------------- role labels
+    //
+    // How a requirement is named wherever one is named — the collection view's
+    // summary, the resolution chains, and the sufficiency report. Two roles may
+    // name one resource type, told apart only by the capabilities each requires,
+    // so a label of type alone renders a configuration the domain accepts
+    // identically to one it rejects. Stated only where two roles DO share a type:
+    // the common case stays short.
+    //
+    // "requires nothing" is an answer, not a gap — it is precisely what makes
+    // such a pair legal — so it is spelled out rather than left as an empty
+    // parenthesis.
+    roleLabelCapabilities: "%0% (%1%)",
+    roleLabelNoCapabilities: "%0% (no required capabilities)",
+
+    // -------------------------------------------------------- pool sufficiency
+    //
+    // A third statement beside the chains and the start-times report, and about a
+    // third thing: whether the resources that exist can fill every requirement AT
+    // ONCE. Each requirement having candidates is not enough — one resource can
+    // be the candidate for two of them, and a count of two needs two.
+    //
+    // Reported only when they cannot be. Its absence means only that no
+    // structural impossibility was found, never that the service can be booked,
+    // so the same ban applies as to the chains and the start-times report: never
+    // available, free, or bookable. Nothing here evaluates opening hours, lead
+    // time, booking horizon, or the booking calendar.
+    sufficiencyReport: "Resources needed at once",
+    sufficiencyShort:
+      "This service needs %0% distinct resources at once, and %1% resources are eligible for the requirements below.",
+    sufficiencyOneEligible:
+      "This service needs %0% distinct resources at once, and 1 resource is eligible for the requirements below.",
+    sufficiencyNoneEligible:
+      "This service needs %0% distinct resources at once, and no resource is eligible for the requirements below.",
+    sufficiencyRole: "%0%: %1% required.",
+    // Both repairs, because the fault is as often a missing resource as a wrong
+    // count — and saving is explicitly unaffected, so an editor can define the
+    // service first and add the people afterwards.
+    sufficiencyFix:
+      "Add a qualifying resource, or lower a requirement's count. This does not prevent saving.",
     save: "Save",
     cancel: "Cancel",
     back: "Back to services",

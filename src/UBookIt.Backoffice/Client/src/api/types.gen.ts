@@ -55,6 +55,12 @@ export type PagedServicesModel = {
     items: Array<ServiceResponseModel>;
 };
 
+export type PoolShortfallModel = {
+    roles: Array<ShortfallRoleModel>;
+    required: number;
+    eligible: number;
+};
+
 export type PreviewResourceModel = {
     id: string;
     displayName: string;
@@ -110,11 +116,13 @@ export type ServicePreviewRequestModel = {
 export type ServicePreviewResponseModel = {
     roles: Array<ServiceRoleChainModel>;
     startMisalignment?: StartMisalignmentModel | null;
+    poolShortfall?: PoolShortfallModel | null;
 };
 
 export type ServicePreviewRoleModel = {
     resourceType: string;
     requiredCapabilities: Array<string>;
+    count: number;
 };
 
 export type ServicePreviewStageModel = {
@@ -145,6 +153,12 @@ export type ServiceRoleChainModel = {
 };
 
 export type ServiceRoleModel = {
+    resourceType: string;
+    requiredCapabilities: Array<string>;
+    count: number;
+};
+
+export type ShortfallRoleModel = {
     resourceType: string;
     requiredCapabilities: Array<string>;
     count: number;

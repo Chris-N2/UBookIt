@@ -89,10 +89,26 @@ public class ServicesController(
         // It reports impossibility or nothing at all: alignment is never returned
         // as a positive finding, because a shared grid instant is necessary for a
         // bookable start and nowhere near sufficient.
-        var misalignment = StartAlignment.FindMisalignment(
-            [.. chains.Select(c => new RoleCandidates(c.Role, c.Chain.Candidates))]);
+        var pools = chains.Select(c => new RoleCandidates(c.Role, c.Chain.Candidates)).ToList();
 
-        return Ok(ServiceModelMapper.ToModel(chains, misalignment));
+        var misalignment = StartAlignment.FindMisalignment(pools);
+
+        // Whether the roles can be filled *at once*, from the same pools and by the
+        // same assignment the booking path runs — never a count comparison of this
+        // endpoint's own, which would be a second implementation of the rule free
+        // to disagree with the one that decides bookings (⑧a design D1).
+        //
+        // Like the misalignment finding it reports impossibility or nothing at all.
+        // Sufficiency is never returned positively: it says nothing about opening
+        // hours, lead time, horizon or the booking calendar, so a positive value
+        // would be read as a promise this endpoint cannot make.
+        //
+        // A configuration whose pools are insufficient is still previewed with 200,
+        // exactly as one with duplicate types is: seeing what is wrong is how an
+        // editor corrects it, and refusing to answer withholds what the fix needs.
+        var shortfall = PoolSufficiency.FindShortfall(pools);
+
+        return Ok(ServiceModelMapper.ToModel(chains, misalignment, shortfall));
     }
 
     [HttpGet("services")]

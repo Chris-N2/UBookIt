@@ -75,8 +75,7 @@ public class PagedServicesModel
 /// A service configuration to report on: its roles, and the duration they would
 /// be booked for. Deliberately not a <see cref="ServiceRequestModel"/> — this
 /// describes a service being <em>edited</em>, which need not be a valid service
-/// and in particular need not have a name (design D2). A role count is not
-/// carried either: it is fixed at 1 in v1 and plays no part in resolution.
+/// and in particular need not have a name (design D2).
 /// </summary>
 public class ServicePreviewRequestModel
 {
@@ -98,6 +97,19 @@ public class ServicePreviewRoleModel
 
     /// <summary>Omitted or empty matches every resource of the type.</summary>
     public List<string> RequiredCapabilities { get; set; } = [];
+
+    /// <summary>
+    /// How many <em>distinct</em> resources this role needs at once. Defaults to
+    /// 1, which is both the value every configuration had before counts existed
+    /// and what a caller omitting it means.
+    /// <para>
+    /// It plays no part in the resolution <b>chains</b> — a role of count 3 draws
+    /// on exactly the pool a role of count 1 does — and it is carried because the
+    /// sufficiency finding beside them is an assignment question, which cannot be
+    /// asked without knowing how many of each role are needed.
+    /// </para>
+    /// </summary>
+    public int Count { get; set; } = 1;
 }
 
 /// <summary>
@@ -148,6 +160,72 @@ public class ServicePreviewResponseModel
     /// </para>
     /// </summary>
     public StartMisalignmentModel? StartMisalignment { get; set; }
+
+    /// <summary>
+    /// The roles that cannot be filled <em>at once</em> by the resources that
+    /// exist, when the configuration has such a group — otherwise absent.
+    /// <para>
+    /// A member of its own, never folded into a chain. The finding belongs to a
+    /// <b>set</b> of roles and to none of them individually: each chain is
+    /// independently true of the role it describes, and one reporting "2 eligible"
+    /// is not wrong merely because another role competes for the same two. Folding
+    /// it in would also make a chain assert something no filter of resolution
+    /// applies.
+    /// </para>
+    /// <para>
+    /// Absent when the roles can be filled together — never a positive statement
+    /// of sufficiency, and never a shortfall of zero. The check is one-directional
+    /// and the endpoint adds no claim Core declines to make: a sufficient pool
+    /// says nothing about opening hours, lead time, horizon, or the booking
+    /// calendar, so reporting it would read as a promise about availability.
+    /// </para>
+    /// </summary>
+    public PoolShortfallModel? PoolShortfall { get; set; }
+}
+
+/// <summary>
+/// A reported shortfall: which roles cannot be filled together, how many distinct
+/// resources they need between them, and how many are eligible for any of them.
+/// <para>
+/// Both numbers travel, because they distinguish the two repairs. A count that is
+/// too high is corrected on the requirement row; a pool that is too small is
+/// corrected by adding or re-configuring a resource — and a reader cannot tell
+/// which without both.
+/// </para>
+/// </summary>
+public class PoolShortfallModel
+{
+    /// <summary>
+    /// The roles involved, in the order the request supplied them, so a reader can
+    /// point at the rows on screen.
+    /// </summary>
+    public List<ShortfallRoleModel> Roles { get; set; } = [];
+
+    /// <summary>How many distinct resources those roles need between them.</summary>
+    public int Required { get; set; }
+
+    /// <summary>
+    /// How many resources are eligible for any of them. Always less than
+    /// <see cref="Required"/> — this model is only ever present for a genuine
+    /// shortfall.
+    /// </summary>
+    public int Eligible { get; set; }
+}
+
+/// <summary>
+/// One role a shortfall names. Carries what <em>distinguishes</em> it as well as
+/// its type: two roles of one resource type are legal exactly when their required
+/// capabilities differ, so a finding naming two "therapist" rows and nothing else
+/// would leave a reader unable to tell which row is which.
+/// </summary>
+public class ShortfallRoleModel
+{
+    /// <summary>The role, identified as the chains identify one: by resource type.</summary>
+    public string ResourceType { get; set; } = string.Empty;
+
+    public List<string> RequiredCapabilities { get; set; } = [];
+
+    public int Count { get; set; }
 }
 
 /// <summary>

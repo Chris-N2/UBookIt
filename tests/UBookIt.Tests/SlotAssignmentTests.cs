@@ -39,15 +39,29 @@ public class SlotAssignmentTests
     private static IReadOnlyList<Guid> Pool(params Guid[] ids) => [.. ids.OrderBy(id => id)];
 
     private static Guid[]? Saturate(params IReadOnlyList<Guid>[] slots)
-        => SlotAssignment.TrySaturate(slots);
+        => SlotAssignment.TrySaturate(slots).Assignment;
 
     /// <summary>The assignment, asserted to exist, so the cases below can name it.</summary>
     private static Guid[] Assigned(params IReadOnlyList<Guid>[] slots)
     {
-        var assignment = SlotAssignment.TrySaturate(slots);
+        var saturation = SlotAssignment.TrySaturate(slots);
 
-        Assert.NotNull(assignment);
-        return assignment;
+        Assert.NotNull(saturation.Assignment);
+
+        // The two are exclusive by construction, and a test that only ever read
+        // one of them would not notice a failure reporting both.
+        Assert.Null(saturation.Deficiency);
+        return saturation.Assignment;
+    }
+
+    /// <summary>The deficient set, asserted to exist, so the cases below can name it.</summary>
+    private static SlotDeficiency Deficient(params IReadOnlyList<Guid>[] slots)
+    {
+        var saturation = SlotAssignment.TrySaturate(slots);
+
+        Assert.Null(saturation.Assignment);
+        Assert.NotNull(saturation.Deficiency);
+        return saturation.Deficiency;
     }
 
     private static Guid[] AssignedIncluding(Guid required, params IReadOnlyList<Guid>[] slots)
@@ -169,13 +183,77 @@ public class SlotAssignmentTests
         // Here nothing saturates at all: slot 1 needs R1 and slot 2 needs R2, so
         // slot 0 has nothing left, with or without a preference.
         Assert.Null(SlotAssignment.TrySaturateIncluding([Pool(R1, R2), Pool(R1), Pool(R2)], R1));
-        Assert.Null(SlotAssignment.TrySaturate([Pool(R1, R2), Pool(R1), Pool(R2)]));
+        Assert.Null(SlotAssignment.TrySaturate([Pool(R1, R2), Pool(R1), Pool(R2)]).Assignment);
 
         // The genuine fall-through — a preference that cannot be honoured while
         // some assignment still can — is not reachable here. It arises one level up,
         // where the claims pre-filter removes the preferred resource from the pool
         // before the assignment sees it, and is covered by
         // MultiRolePlacementTests.Spec_scenario_preferred_resource_falls_through_when_unavailable.
+    }
+
+    [Fact]
+    public void The_deficient_set_names_the_slots_that_cannot_be_filled()
+    {
+        // Two slots of one role over one candidate. Both slots are in the set and
+        // the single resource is its whole neighbourhood.
+        var deficiency = Deficient(Pool(R1), Pool(R1));
+
+        Assert.Equal([0, 1], deficiency.Slots);
+        Assert.Equal([R1], deficiency.Resources);
+    }
+
+    [Fact]
+    public void A_slot_with_no_candidate_is_deficient_on_its_own()
+    {
+        var deficiency = Deficient(Pool(R1), Pool());
+
+        Assert.Equal([1], deficiency.Slots);
+        Assert.Empty(deficiency.Resources);
+    }
+
+    [Fact]
+    public void The_deficient_set_is_the_smallest_group_that_cannot_be_satisfied()
+    {
+        // Slot 0 is perfectly satisfiable and shares nothing with the other two;
+        // slots 1 and 2 compete for one resource.
+        //
+        // This is the fixture that separates a real witness from a plausible one.
+        // Reporting *every* slot would name a set of three with a neighbourhood of
+        // three, which satisfies Hall's inequality and is therefore not deficient
+        // at all — a report that is not merely unhelpful but false. Reporting the
+        // neighbourhood as the union of every pool would say three resources are
+        // eligible for a group that can only reach one.
+        var deficiency = Deficient(Pool(R1, R2), Pool(R3), Pool(R3));
+
+        Assert.Equal([1, 2], deficiency.Slots);
+        Assert.Equal([R3], deficiency.Resources);
+    }
+
+    [Fact]
+    public void The_deficient_set_is_short_by_exactly_one()
+    {
+        // Three slots over two resources, reached only by displacement — the walk
+        // has to move R1 and R2 around before it can conclude anything. The set is
+        // still tight: three slots, two resources.
+        var deficiency = Deficient(Pool(R1, R2), Pool(R1, R2), Pool(R1, R2));
+
+        Assert.Equal([0, 1, 2], deficiency.Slots);
+        Assert.Equal([R1, R2], deficiency.Resources);
+        Assert.Equal(deficiency.Slots.Count - 1, deficiency.Resources.Count);
+    }
+
+    [Fact]
+    public void The_same_input_yields_the_same_deficient_set()
+    {
+        // Determinism matters as much here as it does for the assignment: this
+        // witness becomes a sentence naming resources, and an editor told to go
+        // and fix a different pair on every keystroke would not believe any of it.
+        var first = Deficient(Pool(R1, R2), Pool(R1, R2), Pool(R1, R2));
+        var second = Deficient(Pool(R1, R2), Pool(R1, R2), Pool(R1, R2));
+
+        Assert.Equal(first.Slots, second.Slots);
+        Assert.Equal(first.Resources, second.Resources);
     }
 
     [Fact]
