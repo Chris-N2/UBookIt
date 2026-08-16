@@ -69,8 +69,10 @@
 
 ## 8. Verification
 
-- [ ] 8.1 Full solution build with `--no-incremental`, TestSite stopped first. Only the known NU1903 advisories are acceptable.
-- [ ] 8.2 Full unit, integration and client runs green, including every ⑤/⑥/⑦/⑧/⑨-1/⑨-1a scenario unchanged.
+- [x] 8.1 Full solution build with `--no-incremental`, TestSite stopped first. Only the known NU1903 advisories are acceptable.
+  - Clean: `Build succeeded`, **76 NU1903 advisory lines and nothing else** — no compiler, analyzer or TypeScript warnings. 76 matches the ⑨-1a baseline.
+- [x] 8.2 Full unit, integration and client runs green, including every ⑤/⑥/⑦/⑧/⑨-1/⑨-1a scenario unchanged.
+  - **582 unit / 54 integration / 28 client.** Every pre-existing placement and composite-availability scenario passes without being edited, which is the differential guarantee in its strongest form: the only tests this change had to rewrite were the four that asserted the *rejections* it lifts.
 - [ ] 8.3 Live backoffice verification: a service with two `therapist` roles differing in capabilities saves; a role with a count of 2 saves and round-trips; two identical roles are rejected with a message naming the count.
 - [ ] 8.4 Live: book a service whose roles share a pool and confirm the booking carries two distinct resources; confirm a start only one resource can fill is not offered.
 - [ ] 8.5 Stop the TestSite and check port 44348 for orphaned processes.
