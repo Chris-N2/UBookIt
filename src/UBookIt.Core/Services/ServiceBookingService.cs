@@ -81,9 +81,13 @@ public interface IServiceBookingService
     /// lengths bookable there as arithmetic runs. Takes no duration: one
     /// response answers every length.
     /// <para>
-    /// Within a role that is the union over its candidates; across roles it is
-    /// the intersection, because a booking has one interval and one length and
-    /// every role has to be able to fulfil it (design D2).
+    /// A start and a length are offered exactly when every one of the service's
+    /// role slots can be filled simultaneously by <b>distinct</b> resources able to
+    /// provide that length there — a saturating assignment (design D2). Union
+    /// within a role and intersection across roles was correct only while the
+    /// pools were disjoint: two roles drawing on one pool in which a single
+    /// resource is free each have a candidate, and their start maps intersect to
+    /// keep every start, so the service advertised slots it could never honour.
     /// </para>
     /// </summary>
     Task<DomainResult<IReadOnlyList<ServiceBookableStart>>> GetBookableStartsAsync(
@@ -229,44 +233,93 @@ public sealed class ServiceBookingService(
                 cancellationToken)
             .ConfigureAwait(false);
 
-        Dictionary<DateTimeOffset, HashSet<LengthRun>>? composite = null;
+        // One map per role: at each start, which candidate offers which run. The
+        // candidate's identity is kept — the previous fold discarded it, and it is
+        // exactly what the assignment needs, since "some candidate of each role can
+        // do this" stops being sufficient once one resource can be that candidate
+        // for two roles at once.
+        var byRole = new List<Dictionary<DateTimeOffset, List<CandidateRun>>>(pools.Count);
 
         foreach (var pool in pools)
         {
-            var byStart = UnionOverPool(pool.Candidates, claims, fromDate, toDate, out var failures);
-            if (byStart is null)
+            var runs = RunsOverPool(pool.Candidates, claims, fromDate, toDate, out var failures);
+            if (runs is null)
             {
                 return DomainResult<IReadOnlyList<ServiceBookableStart>>.Failure(failures!);
             }
 
-            // Folded pairwise, left to right: the first role seeds the composite
-            // and each further role narrows it.
-            composite = composite is null ? byStart : Intersect(composite, byStart);
-
-            if (composite.Count == 0)
+            if (runs.Count == 0)
             {
-                break;
+                // A role offering nothing anywhere makes every start unsaturable.
+                return DomainResult<IReadOnlyList<ServiceBookableStart>>.Success([]);
+            }
+
+            byRole.Add(runs);
+        }
+
+        // Every role must offer *something* at a start for an assignment to be
+        // possible there, so the starts worth asking about are the ones common to
+        // all of them. That is necessary and no longer sufficient, which is the
+        // whole point — it is a cheap filter before the real question, not the
+        // answer it used to be.
+        var shared = byRole[0].Keys
+            .Where(start => byRole.All(role => role.ContainsKey(start)))
+            .OrderBy(start => start);
+
+        var slotsOfRole = SlotRoles(pools);
+        var offered = new List<ServiceBookableStart>();
+
+        foreach (var start in shared)
+        {
+            var runs = FeasibleRuns(byRole, slotsOfRole, start);
+
+            if (runs.Count > 0)
+            {
+                offered.Add(new ServiceBookableStart(start, runs));
             }
         }
 
-        IReadOnlyList<ServiceBookableStart> result = (composite ?? [])
-            .OrderBy(entry => entry.Key)
-            .Select(entry => new ServiceBookableStart(entry.Key, Collapse(entry.Value)))
-            .ToList();
+        return DomainResult<IReadOnlyList<ServiceBookableStart>>.Success(offered);
+    }
 
-        return DomainResult<IReadOnlyList<ServiceBookableStart>>.Success(result);
+    /// <summary>One candidate's offer at one start: who, and which lengths.</summary>
+    private readonly record struct CandidateRun(Guid ResourceId, LengthRun Run);
+
+    /// <summary>
+    /// The role each slot belongs to, in role order then slot index — a role of
+    /// count <c>N</c> contributing <c>N</c> entries.
+    /// </summary>
+    private static List<int> SlotRoles(IReadOnlyList<RoleCandidates> pools)
+    {
+        var slots = new List<int>();
+
+        for (var role = 0; role < pools.Count; role++)
+        {
+            for (var unit = 0; unit < pools[role].Role.Count; unit++)
+            {
+                slots.Add(role);
+            }
+        }
+
+        return slots;
     }
 
     /// <summary>
-    /// One role's availability: the union over its candidates of the lengths
-    /// each offers at each start.
+    /// One role's candidates and the lengths each offers at each start.
+    /// <para>
+    /// Deliberately not folded into a set of runs per start, as the union used to
+    /// be. Two candidates configured alike do produce the same run, and saying so
+    /// twice tells a consumer nothing — but it tells the <em>assignment</em> that
+    /// there are two of them, which is the difference between a start two roles can
+    /// both fill and one they cannot.
+    /// </para>
     /// <para>
     /// Returns null and sets <paramref name="failures"/> when a candidate's
-    /// projection fails, so the caller can report it rather than compose an
-    /// answer over a pool it could not read.
+    /// projection fails, so the caller can report it rather than compose an answer
+    /// over a pool it could not read.
     /// </para>
     /// </summary>
-    private Dictionary<DateTimeOffset, HashSet<LengthRun>>? UnionOverPool(
+    private Dictionary<DateTimeOffset, List<CandidateRun>>? RunsOverPool(
         IReadOnlyList<ServiceCandidate> candidates,
         IReadOnlyList<ClaimInfo> claims,
         DateOnly fromDate,
@@ -275,10 +328,7 @@ public sealed class ServiceBookingService(
     {
         failures = null;
 
-        // Runs are accumulated per start. A set per start collapses identical
-        // runs — two candidates configured alike offer the same lengths, and
-        // saying so twice tells a consumer nothing.
-        var byStart = new Dictionary<DateTimeOffset, HashSet<LengthRun>>();
+        var byStart = new Dictionary<DateTimeOffset, List<CandidateRun>>();
 
         foreach (var candidate in candidates)
         {
@@ -310,7 +360,8 @@ public sealed class ServiceBookingService(
                     byStart[start.StartUtc] = runs;
                 }
 
-                runs.Add(new LengthRun(min, max, candidate.Granularity));
+                runs.Add(new CandidateRun(
+                    candidate.ResourceId, new LengthRun(min, max, candidate.Granularity)));
             }
         }
 
@@ -318,54 +369,202 @@ public sealed class ServiceBookingService(
     }
 
     /// <summary>
-    /// Composes two roles' availability: the starts both offer, and at each of
-    /// those the lengths both offer.
+    /// The lengths bookable at one start, as runs: exactly those for which a
+    /// saturating assignment of distinct resources exists (design D2).
     /// <para>
-    /// Starts are absolute instants, so intersecting them is plain set
-    /// intersection — two roles on different granularities simply share fewer
-    /// starts. Lengths need more care: each role offers a <em>set</em> of runs
-    /// at a start, and set intersection distributes over union, so the composite
-    /// is every pairwise run intersection (design D2). Intersecting only the
-    /// outermost bounds would advertise lengths no pair of resources can book.
+    /// Feasibility is not a property of a start alone. Which lengths a candidate
+    /// admits there depends on its resolved range and its granularity, so the
+    /// bipartite graph is a function of <c>(start, length)</c> and the question has
+    /// to be asked once per candidate length.
+    /// </para>
+    /// <para>
+    /// The result cannot always be one run. Pools of <c>{30,90}</c>, <c>{30,90}</c>
+    /// and <c>{60}</c> across two roles yield feasible lengths <c>{30, 90}</c> — a
+    /// run of step 60 whose minimum is not a multiple of 60, which the anchored-at-
+    /// step invariant forbids. A start already carries a <em>set</em> of runs, so
+    /// the shape survives; only the composition changes.
     /// </para>
     /// </summary>
-    private static Dictionary<DateTimeOffset, HashSet<LengthRun>> Intersect(
-        Dictionary<DateTimeOffset, HashSet<LengthRun>> left,
-        Dictionary<DateTimeOffset, HashSet<LengthRun>> right)
+    private static List<LengthRun> FeasibleRuns(
+        List<Dictionary<DateTimeOffset, List<CandidateRun>>> byRole,
+        List<int> slotsOfRole,
+        DateTimeOffset start)
     {
-        var composed = new Dictionary<DateTimeOffset, HashSet<LengthRun>>();
+        var slots = slotsOfRole.Select(role => byRole[role][start]).ToList();
 
-        foreach (var (start, leftRuns) in left)
+        if (slots.Count == 1)
         {
-            if (!right.TryGetValue(start, out var rightRuns))
+            // One slot in total — a single role of count 1. A saturating assignment
+            // exists at a length exactly when some candidate admits it, so the
+            // feasible set is the plain union and the general path would agree about
+            // every length. It would not agree about the *runs*: rebuilding from the
+            // length set can merge two candidates' runs into one the union never
+            // emitted, and the spec's guarantee here is equality with that role's
+            // union availability, "unchanged".
+            //
+            // So the union is returned as the union, not recomputed into something
+            // equivalent. Deliberately NOT extended to a single role of count
+            // greater than 1, which requires that many distinct resources at once
+            // and is a genuine assignment question.
+            return Collapse([.. slots[0].Select(entry => entry.Run)]);
+        }
+
+        // Every length any candidate offers here is worth asking about, and nothing
+        // else can be feasible: a length no candidate admits cannot appear in an
+        // assignment.
+        var lengths = slots
+            .SelectMany(slot => slot)
+            .SelectMany(entry => entry.Run.Lengths())
+            .Distinct()
+            .OrderBy(length => length)
+            .ToList();
+
+        var feasible = new HashSet<TimeSpan>();
+
+        foreach (var length in lengths)
+        {
+            var eligible = slots
+                .Select(slot => (IReadOnlyList<Guid>)slot
+                    .Where(entry => entry.Run.Admits(length))
+                    .Select(entry => entry.ResourceId)
+                    .ToList())
+                .ToList();
+
+            if (SlotAssignment.TrySaturate(eligible) is not null)
             {
-                // A start only one role can fulfil is not a start the service
-                // can be booked at.
-                continue;
+                feasible.Add(length);
+            }
+        }
+
+        return feasible.Count == 0 ? [] : Collapse(RunsOver(feasible, slots));
+    }
+
+    /// <summary>
+    /// A set of bookable lengths expressed as anchored arithmetic runs denoting
+    /// exactly that set — no more and no fewer.
+    /// <para>
+    /// Two sources, and both are needed. The <b>step scan</b> supplies the compact
+    /// shape: for each step the candidates actually use, the maximal stretches of
+    /// its multiples that are feasible throughout. The <b>singletons</b> guarantee
+    /// exactness: every feasible length is emitted as a run of one, so no length can
+    /// be lost however the step set was chosen, and <see cref="Collapse"/> then
+    /// absorbs each singleton into whichever scanned run already denotes it. Without
+    /// the singletons the answer would depend on the step closure being complete;
+    /// without the scan it would be one run per length, which is exact and useless.
+    /// </para>
+    /// <para>
+    /// No run emitted here can contain an infeasible length, because a stretch stops
+    /// at the first multiple that is not feasible.
+    /// </para>
+    /// </summary>
+    private static HashSet<LengthRun> RunsOver(HashSet<TimeSpan> feasible, List<List<CandidateRun>> slots)
+    {
+        var runs = new HashSet<LengthRun>();
+
+        foreach (var length in feasible)
+        {
+            runs.Add(Run(length, length, length));
+        }
+
+        var longest = feasible.Max();
+
+        foreach (var step in Steps(slots, longest))
+        {
+            TimeSpan? from = null;
+            var to = TimeSpan.Zero;
+
+            for (var length = step; length <= longest; length += step)
+            {
+                if (feasible.Contains(length))
+                {
+                    from ??= length;
+                    to = length;
+                    continue;
+                }
+
+                if (from is { } open)
+                {
+                    runs.Add(Run(open, to, step));
+                    from = null;
+                }
             }
 
-            var shared = new HashSet<LengthRun>();
-
-            foreach (var a in leftRuns)
+            if (from is { } trailing)
             {
-                foreach (var b in rightRuns)
+                runs.Add(Run(trailing, to, step));
+            }
+        }
+
+        return runs;
+    }
+
+    /// <summary>
+    /// A run in canonical form: a stretch of exactly one length is anchored on
+    /// <em>itself</em> rather than on the step that found it.
+    /// <para>
+    /// The step of a single-length run says nothing — the run denotes one value
+    /// whatever it is — but subset elimination cannot know that. It compares two
+    /// runs by asking whether the inner step is a multiple of the outer, which is
+    /// sufficient for anchored runs and not necessary for a run of one: <c>{60}</c>
+    /// written with a step of 20 is plainly covered by <c>60, 120</c> stepping 60,
+    /// and the divisibility test says otherwise. Normalising the step to the length
+    /// makes the two agree, so the scan's leftovers are absorbed rather than
+    /// published beside the run that already denotes them.
+    /// </para>
+    /// </summary>
+    private static LengthRun Run(TimeSpan min, TimeSpan max, TimeSpan step)
+        => min == max ? new LengthRun(min, max, min) : new LengthRun(min, max, step);
+
+    /// <summary>
+    /// The steps worth scanning at a start: the candidates' own granularities and
+    /// the least common multiples reachable from them.
+    /// <para>
+    /// An assignment's common lengths are the multiples of the least common multiple
+    /// of its members' granularities, so every run this composition can produce is
+    /// anchored on a step in that closure. It is computed rather than assumed
+    /// because two roles on 30 and 45 minutes share only multiples of 90, which is
+    /// neither of their granularities.
+    /// </para>
+    /// <para>
+    /// Bounded: a step longer than the longest feasible length denotes nothing, and
+    /// the closure stops growing at a fixed ceiling. Truncating it can only cost
+    /// compactness, never correctness — the singleton runs carry every length
+    /// regardless.
+    /// </para>
+    /// </summary>
+    private static List<TimeSpan> Steps(List<List<CandidateRun>> slots, TimeSpan longest)
+    {
+        const int Ceiling = 32;
+
+        var steps = slots
+            .SelectMany(slot => slot)
+            .Select(entry => entry.Run.Step)
+            .Where(step => step <= longest)
+            .ToHashSet();
+
+        var frontier = steps.ToList();
+
+        while (frontier.Count > 0 && steps.Count < Ceiling)
+        {
+            var next = new List<TimeSpan>();
+
+            foreach (var left in frontier)
+            {
+                foreach (var right in steps.ToList())
                 {
-                    if (a.TryIntersect(b, out var run))
+                    var combined = DurationMath.Lcm(left, right);
+
+                    if (combined <= longest && steps.Add(combined))
                     {
-                        shared.Add(run);
+                        next.Add(combined);
                     }
                 }
             }
 
-            // No length common to both roles: the start goes too, rather than
-            // being offered with nothing bookable at it.
-            if (shared.Count > 0)
-            {
-                composed[start] = shared;
-            }
+            frontier = next;
         }
 
-        return composed;
+        return [.. steps.OrderBy(step => step)];
     }
 
     /// <summary>

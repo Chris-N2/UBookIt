@@ -12,10 +12,16 @@ namespace UBookIt.Tests;
 /// every role can fulfil, and at each of those the lengths every role can
 /// provide (service-booking spec, "Composite availability across roles").
 /// <para>
-/// Roles name distinct resource types throughout, because that is the only
-/// composition this version supports — and the reason it is supported: distinct
-/// types make the pools disjoint, so intersecting each role's union is correct
-/// rather than an approximation.
+/// The distinct-type cases below are now the <em>easy</em> half: their pools are
+/// disjoint, so a saturating assignment exists exactly when each role
+/// independently has a candidate, and the answer must be the one the intersection
+/// gave before assignment existed. They are kept unchanged for that reason —
+/// every one of them is a differential test (design D3).
+/// </para>
+/// <para>
+/// The overlapping-pool cases at the bottom are the new ground: two roles of one
+/// resource type, and counts above 1, where "every role has a candidate here" is
+/// necessary and no longer sufficient.
 /// </para>
 /// </summary>
 public class CompositeAvailabilityTests
@@ -52,6 +58,39 @@ public class CompositeAvailabilityTests
             "Massage",
             duration,
             types.Select(t => new ServiceRole(t, 1))).Value;
+
+    /// <summary>The same, carrying capabilities, so two roles of one type can be told apart.</summary>
+    private static Resource ResWith(
+        int id,
+        string type,
+        int granularity,
+        int min,
+        int max,
+        string[] capabilities,
+        string open = "09:00",
+        string close = "17:00")
+        => Resource.Create(
+            type,
+            $"Resource {id}",
+            capabilities: capabilities,
+            availability: TestData.Config(
+                TestData.Weekly(open, close, Date.DayOfWeek),
+                constraints: BookingConstraints.Create(
+                    granularity: Mins(granularity),
+                    minDuration: Mins(min),
+                    maxDuration: Mins(max)).Value),
+            id: Id(id)).Value;
+
+    /// <summary>Two roles of one resource type, distinguished by required capabilities.</summary>
+    private static Service SameType(ServiceDuration? duration, string type, string[] first, string[] second)
+        => Service.Create(
+            "Joint session",
+            duration,
+            [ServiceRole.Create(type, first).Value, ServiceRole.Create(type, second).Value]).Value;
+
+    /// <summary>One role requiring several distinct resources of one type.</summary>
+    private static Service Counted(ServiceDuration? duration, string type, int count)
+        => Service.Create("Workshop", duration, [new ServiceRole(type, count)]).Value;
 
     private sealed class Harness
     {
@@ -427,5 +466,314 @@ public class CompositeAvailabilityTests
         }
 
         return composed ?? [];
+    }
+
+    // ------------------------------------------------------ assignment (⑨-2)
+
+    [Fact]
+    public async Task Spec_scenario_a_start_two_roles_cannot_both_fill_is_not_offered()
+    {
+        // Two `therapist` roles over a pool in which exactly one resource is free.
+        // Each role considered alone has a candidate at every start, so the old
+        // intersection kept every one of them — and none was bookable.
+        var service = SameType(ServiceDuration.Fixed(Mins(60)).Value, Therapist, [], ["cert-x"]);
+        var harness = Wire(
+            service,
+            ResWith(1, Therapist, granularity: 60, min: 60, max: 60, capabilities: ["cert-x"]));
+
+        Assert.Empty(await Starts(harness, service));
+    }
+
+    [Fact]
+    public async Task Spec_scenario_a_count_is_not_satisfied_by_one_resource_counted_twice()
+    {
+        var service = Counted(ServiceDuration.Fixed(Mins(60)).Value, Therapist, 2);
+        var harness = Wire(service, Res(1, Therapist, granularity: 60, min: 60, max: 60));
+
+        Assert.Empty(await Starts(harness, service));
+    }
+
+    [Fact]
+    public async Task Spec_scenario_one_free_resource_each_is_enough_when_the_roles_can_be_told_apart()
+    {
+        // Two resources, each satisfying exactly one of the two roles. An
+        // assignment exists, so the start is offered.
+        var service = SameType(ServiceDuration.Fixed(Mins(60)).Value, Therapist, ["welsh"], ["cert-x"]);
+        var harness = Wire(
+            service,
+            ResWith(1, Therapist, granularity: 60, min: 60, max: 60, capabilities: ["cert-x"]),
+            ResWith(2, Therapist, granularity: 60, min: 60, max: 60, capabilities: ["welsh"]));
+
+        Assert.NotEmpty(await Starts(harness, service));
+    }
+
+    [Fact]
+    public async Task Spec_scenario_a_greedy_choice_that_strands_a_role_does_not_lose_a_bookable_start()
+    {
+        // Resource 1 holds `cert-x` and is eligible for both roles; resource 2 holds
+        // nothing and can fill only the unconstrained one. The start is bookable
+        // only if the shared resource goes to the role that has no alternative.
+        var service = SameType(ServiceDuration.Fixed(Mins(60)).Value, Therapist, [], ["cert-x"]);
+        var harness = Wire(
+            service,
+            ResWith(1, Therapist, granularity: 60, min: 60, max: 60, capabilities: ["cert-x"]),
+            Res(2, Therapist, granularity: 60, min: 60, max: 60));
+
+        Assert.NotEmpty(await Starts(harness, service));
+    }
+
+    [Fact]
+    public async Task A_count_of_two_over_two_free_candidates_is_offered()
+    {
+        // The positive half of the count case, so the negative one above cannot
+        // pass by the composition simply refusing every counted service.
+        var service = Counted(ServiceDuration.Fixed(Mins(60)).Value, Therapist, 2);
+        var harness = Wire(
+            service,
+            Res(1, Therapist, granularity: 60, min: 60, max: 60),
+            Res(2, Therapist, granularity: 60, min: 60, max: 60));
+
+        Assert.NotEmpty(await Starts(harness, service));
+    }
+
+    [Fact]
+    public async Task Spec_scenario_a_length_is_offered_only_where_an_assignment_provides_it()
+    {
+        // Both roles are `therapist`. Resource 1 holds `cert-x` and offers 60–120 on
+        // a 60 grid; resource 2 holds nothing and offers 60 only.
+        //
+        // The capability-constrained role can only be filled by resource 1, so the
+        // unconstrained one must take resource 2 — and 120 dies with it, even though
+        // resource 1 alone could have provided it and the union of what each role
+        // "could" offer contains it.
+        var service = SameType(null, Therapist, [], ["cert-x"]);
+        var harness = Wire(
+            service,
+            ResWith(1, Therapist, granularity: 60, min: 60, max: 120, capabilities: ["cert-x"]),
+            Res(2, Therapist, granularity: 60, min: 60, max: 60));
+
+        var starts = await Starts(harness, service);
+
+        Assert.NotEmpty(starts);
+        Assert.All(starts, start => Assert.Equal([Mins(60)], Lengths(start)));
+    }
+
+    [Fact]
+    public async Task Spec_scenario_a_feasible_length_set_that_is_not_one_anchored_run_is_expressed_exactly()
+    {
+        // Design D2's worked example, built for real. Two `therapist` roles:
+        //
+        //   role A ({cert-x}) → resource 1 only
+        //   role B (nothing)  → resources 1, 2, 3
+        //
+        //   resource 1  30-grid, 30–90  → offers {30, 60, 90}
+        //   resource 2  90-grid, 90–90  → offers {90}
+        //   resource 3  30-grid, 30–30  → offers {30}
+        //
+        // Role A can only ever be filled by resource 1, so role B must take one of
+        // the others:
+        //
+        //   30 → A takes 1, B takes 3        feasible
+        //   60 → neither 2 nor 3 offers 60   NOT feasible
+        //   90 → A takes 1, B takes 2        feasible
+        //
+        // {30, 90} is a run of step 60 whose minimum is not a multiple of 60, which
+        // the anchored-at-step invariant forbids — so it cannot be one run, and a
+        // composition that forced it into one would either advertise 60 or discard
+        // 90. A start carries a set of runs, so the shape survives.
+        var service = SameType(null, Therapist, [], ["cert-x"]);
+        var harness = Wire(
+            service,
+            ResWith(1, Therapist, granularity: 30, min: 30, max: 90, capabilities: ["cert-x"]),
+            Res(2, Therapist, granularity: 90, min: 90, max: 90),
+            Res(3, Therapist, granularity: 30, min: 30, max: 30));
+
+        var first = At(await Starts(harness, service), "09:00");
+
+        Assert.Equal([Mins(30), Mins(90)], Lengths(first));
+
+        // Stated separately, because it is the half that a run-merging bug breaks:
+        // 60 is bookable by resource 1 and by nobody who could partner it.
+        Assert.DoesNotContain(Mins(60), Lengths(first));
+    }
+
+    [Fact]
+    public async Task Spec_scenario_composite_availability_costs_one_claims_read()
+    {
+        // Asking the assignment question per start and per length must not turn into
+        // a read per start or per length. Asserted rather than assumed (task 2.6).
+        var service = SameType(null, Therapist, [], ["cert-x"]);
+        var harness = Wire(
+            service,
+            ResWith(1, Therapist, granularity: 30, min: 30, max: 480, capabilities: ["cert-x"]),
+            Res(2, Therapist, granularity: 30, min: 30, max: 480));
+
+        var before = harness.Store.BatchClaimReads;
+
+        var starts = await Starts(harness, service);
+
+        // A full day on a 30-minute grid, so there are many starts and many lengths
+        // — the assertion says nothing unless the query is a large one.
+        Assert.True(starts.Count > 4, $"expected a busy query, got {starts.Count} starts");
+        Assert.Equal(1, harness.Store.BatchClaimReads - before);
+    }
+
+    [Fact]
+    public async Task A_single_role_of_count_one_still_equals_that_roles_union_availability()
+    {
+        // The guarantee the spec keeps for count 1 and deliberately withdraws above
+        // it: a single role is its role's union availability, run for run, not an
+        // equivalent recomposition of the same lengths.
+        var service = Svc(null, Therapist);
+        var harness = Wire(
+            service,
+            Res(1, Therapist, granularity: 20, min: 20, max: 120),
+            Res(2, Therapist, granularity: 30, min: 30, max: 90));
+
+        var starts = await Starts(harness, service);
+        var first = At(starts, "09:00");
+
+        // Both candidates' runs survive, on their own grids — the union, unmerged.
+        Assert.Contains(first.Runs, r => r.Step == Mins(20) && r.Min == Mins(20));
+        Assert.Contains(first.Runs, r => r.Step == Mins(30) && r.Min == Mins(30));
+    }
+
+    [Fact]
+    public async Task Distinct_type_services_answer_exactly_as_the_intersection_did()
+    {
+        // The differential guarantee (design D3), against an oracle written from the
+        // *old* algorithm rather than from the new one: union the candidates' runs
+        // within each role, then intersect pairwise across roles.
+        //
+        // Several configurations, because one would only prove the composition works
+        // for the granularities it was written against. Compared on the lengths each
+        // start denotes, which is the guarantee — a rebuilt run set may express the
+        // same lengths more compactly than the pairwise intersection did.
+        (int Granularity, int Min, int Max)[][] configurations =
+        [
+            [(60, 60, 120), (60, 60, 120)],
+            [(30, 30, 120), (20, 20, 120)],
+            [(30, 30, 90), (45, 45, 180)],
+            [(20, 40, 200), (30, 30, 150)],
+        ];
+
+        foreach (var configuration in configurations)
+        {
+            var service = Svc(null, ResourceTypes.Room, Therapist);
+            var harness = Wire(
+                service,
+                Res(1, ResourceTypes.Room, configuration[0].Granularity, configuration[0].Min, configuration[0].Max),
+                Res(2, Therapist, configuration[1].Granularity, configuration[1].Min, configuration[1].Max));
+
+            var actual = await Starts(harness, service);
+            var expected = await Intersection(harness, service);
+
+            Assert.Equal(
+                expected.Select(e => e.Key),
+                actual.Select(a => a.StartUtc));
+
+            foreach (var start in actual)
+            {
+                Assert.Equal(expected[start.StartUtc], Lengths(start));
+            }
+        }
+    }
+
+    /// <summary>The lengths a start denotes, ascending and deduplicated.</summary>
+    private static List<TimeSpan> Lengths(ServiceBookableStart start)
+        => [.. start.Runs.SelectMany(run => run.Lengths()).Distinct().Order()];
+
+    /// <summary>
+    /// The answer the previous composition gave: within a role the union over its
+    /// candidates, across roles the pairwise intersection of their runs.
+    /// <para>
+    /// Written out here rather than called, because an oracle that shared code with
+    /// the thing it checks would agree with it by construction. It is correct only
+    /// for roles of distinct types and count 1 — which is exactly the case the
+    /// guarantee covers.
+    /// </para>
+    /// </summary>
+    private static async Task<SortedDictionary<DateTimeOffset, List<TimeSpan>>> Intersection(
+        Harness harness, Service service)
+    {
+        var pools = await harness.Services.ResolveCandidatesAsync(service.Id);
+        Assert.True(pools.Succeeded);
+
+        Dictionary<DateTimeOffset, HashSet<LengthRun>>? composite = null;
+
+        foreach (var pool in pools.Value)
+        {
+            var byStart = new Dictionary<DateTimeOffset, HashSet<LengthRun>>();
+
+            foreach (var candidate in pool.Candidates)
+            {
+                var projected = harness.Availability.ProjectBookableStarts(candidate.Resource, [], Date, Date);
+                Assert.True(projected.Succeeded);
+
+                foreach (var start in projected.Value)
+                {
+                    var min = start.MinDuration > candidate.Range.Min ? start.MinDuration : candidate.Range.Min;
+                    var max = start.MaxDuration < candidate.Range.Max ? start.MaxDuration : candidate.Range.Max;
+
+                    if (min > max)
+                    {
+                        continue;
+                    }
+
+                    if (!byStart.TryGetValue(start.StartUtc, out var runs))
+                    {
+                        runs = [];
+                        byStart[start.StartUtc] = runs;
+                    }
+
+                    runs.Add(new LengthRun(min, max, candidate.Granularity));
+                }
+            }
+
+            if (composite is null)
+            {
+                composite = byStart;
+                continue;
+            }
+
+            var composed = new Dictionary<DateTimeOffset, HashSet<LengthRun>>();
+
+            foreach (var (start, left) in composite)
+            {
+                if (!byStart.TryGetValue(start, out var right))
+                {
+                    continue;
+                }
+
+                var shared = new HashSet<LengthRun>();
+
+                foreach (var a in left)
+                {
+                    foreach (var b in right)
+                    {
+                        if (a.TryIntersect(b, out var run))
+                        {
+                            shared.Add(run);
+                        }
+                    }
+                }
+
+                if (shared.Count > 0)
+                {
+                    composed[start] = shared;
+                }
+            }
+
+            composite = composed;
+        }
+
+        var result = new SortedDictionary<DateTimeOffset, List<TimeSpan>>();
+
+        foreach (var (start, runs) in composite ?? [])
+        {
+            result[start] = [.. runs.SelectMany(run => run.Lengths()).Distinct().Order()];
+        }
+
+        return result;
     }
 }

@@ -168,6 +168,9 @@ public sealed class InMemoryBookingStore : IBookingStore
     private readonly Lock _gate = new();
     private readonly Dictionary<Guid, Booking> _bookings = [];
 
+    /// <summary>How many batched claim reads have been made against this store.</summary>
+    public int BatchClaimReads { get; private set; }
+
     public Task<IReadOnlyList<ClaimInfo>> GetClaimsAsync(
         Guid resourceId, DateTimeOffset fromUtc, DateTimeOffset toUtc, CancellationToken cancellationToken = default)
     {
@@ -192,6 +195,12 @@ public sealed class InMemoryBookingStore : IBookingStore
 
         lock (_gate)
         {
+            // Counted so a test can assert the cost rather than assume it: service
+            // availability composes one batched read over every role's pool, and a
+            // composition that slipped into reading per candidate — or per length —
+            // would still return the right answer.
+            BatchClaimReads++;
+
             IReadOnlyList<ClaimInfo> claims = _bookings.Values
                 .Where(b => b.Interval.Overlaps(fromUtc, toUtc))
                 .SelectMany(b => b.Claims
