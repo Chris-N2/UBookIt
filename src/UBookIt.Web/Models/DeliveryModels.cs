@@ -151,7 +151,13 @@ public sealed class ServiceReadModel
 
     /// <summary>
     /// Every role this service requires, in a deterministic order. A booking
-    /// claims one resource per role.
+    /// claims one <b>distinct</b> resource per role slot — a role of count
+    /// <c>N</c> consuming <c>N</c> of them.
+    /// <para>
+    /// Two roles may name the same resource type and be told apart only by the
+    /// capabilities they require, so the order is canonical over type, then
+    /// capabilities, then count rather than over type alone.
+    /// </para>
     /// <para>
     /// A collection even for a single-role service, so a consumer written
     /// against this contract needs no change when a service gains a role.
@@ -262,9 +268,15 @@ public sealed class ServicePlacementRequestModel
     public int? DurationMinutes { get; set; }
 
     /// <summary>
-    /// Optionally ask for a particular eligible resource. It is attempted first
-    /// and falls through when unavailable; naming a resource that cannot fulfil
-    /// the service is rejected rather than ignored.
+    /// Optionally ask for a particular eligible resource. Placement seeks an
+    /// assignment that <em>includes</em> it, in whichever slot it fits, and falls
+    /// through to any assignment when none does; naming a resource that cannot
+    /// fulfil the service is rejected rather than ignored.
+    /// <para>
+    /// A resource may be eligible for several of a service's roles, so this names
+    /// the booking rather than a role — "this resource must appear somewhere in
+    /// it". Per-role preference would need a request shape no consumer has yet.
+    /// </para>
     /// </summary>
     public Guid? PreferredResourceId { get; set; }
 
@@ -327,8 +339,10 @@ public sealed class ServicePlacementResponseModel
     public string Status { get; set; } = string.Empty;
 
     /// <summary>
-    /// Every resource the service resolved to, one per role, in a deterministic
-    /// order. Present and of length one for a single-role service.
+    /// Every resource the service resolved to, one per role <b>slot</b> and all
+    /// distinct, in a deterministic order. A role of count <c>N</c> contributes
+    /// <c>N</c> entries. Present and of length one for a single-role service of
+    /// count 1.
     /// </summary>
     public List<ResolvedResourceModel> Resources { get; set; } = [];
 

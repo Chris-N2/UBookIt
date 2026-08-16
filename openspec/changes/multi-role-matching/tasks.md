@@ -57,8 +57,8 @@
 - [x] 6.3 The editor still must not enforce the duplicate rule (⑨-1 design D1) — it stays a server rule so changing it stays a change in one place.
 - [ ] 6.4 Accessibility: the count control is labelled within the row's fieldset, its failure is associated, and every referenced id resolves in the same shadow root. Verify by reading the shadow DOM, not from screenshots.
   - Built with its own `label[for]`, its own hint id and its own error id — deliberately not sharing the type control's, which would read the type's failure out against the count. **Verification is outstanding: it needs the running TestSite.**
-- [ ] 6.5 Regenerate the client against the running TestSite.
-  - **Outstanding: needs the running TestSite.** The existing generated client already carries `count` on the role model from ⑥, so the editor compiles against it today; the regeneration is to pick up the delivery API's new field and confirm nothing else drifted.
+- [x] 6.5 Regenerate the client against the running TestSite.
+  - Regenerated against the running TestSite. **Diff is empty** apart from line endings — as expected, since `count` has been on the management role model since ⑥ and the delivery API is not in the `ubookitbackoffice` swagger group. `count: number` is present and **required** (not optional) on the generated role models, so the editor's `role.count ?? 1` on load is belt-and-braces rather than load-bearing. All 14 service/resource operations still present; no unrelated drift. File restored to keep the tree clean.
 
 ## 7. Delivery API
 
@@ -73,8 +73,17 @@
   - Clean: `Build succeeded`, **76 NU1903 advisory lines and nothing else** — no compiler, analyzer or TypeScript warnings. 76 matches the ⑨-1a baseline.
 - [x] 8.2 Full unit, integration and client runs green, including every ⑤/⑥/⑦/⑧/⑨-1/⑨-1a scenario unchanged.
   - **582 unit / 54 integration / 28 client.** Every pre-existing placement and composite-availability scenario passes without being edited, which is the differential guarantee in its strongest form: the only tests this change had to rewrite were the four that asserted the *rejections* it lifts.
-- [ ] 8.3 Live backoffice verification: a service with two `therapist` roles differing in capabilities saves; a role with a count of 2 saves and round-trips; two identical roles are rejected with a message naming the count.
-- [ ] 8.4 Live: book a service whose roles share a pool and confirm the booking carries two distinct resources; confirm a start only one resource can fill is not offered.
+- [x] 8.3 Live backoffice verification: a service with two `therapist` roles differing in capabilities saves; a role with a count of 2 saves and round-trips; two identical roles are rejected with a message naming the count.
+  - Verified against the running TestSite over the authenticated management API (the ⑥ technique — credentials read from the `umbraco-mcp-ubookit` entry, never printed), so no backoffice login was needed. Fixtures: three `therapist-mrm` resources with **incomparable** capability sets — `MRM Ana {cert-x}`, `MRM Bea {welsh}`, `MRM Cai {cert-x, welsh}` — which is the shape where greedy actually fails; nested sets would not have exercised it.
+  - **a** two roles `{cert-x}` / `{welsh}` → **200**, both roles round-trip.
+  - **b** one role, count 2 → **200**, re-read returns `"count":2`.
+  - **c** two identical roles → **400** `service-role-duplicate-type`, field `Roles[1].ResourceType`, message *"Two roles require resource type 'therapist-mrm' with no required capabilities. **Use a single role with a count instead.**"* — the correction named on the wire, not only in the domain.
+  - **d** count 0 → **400** `service-role-count-invalid`, field `Roles[0].Count`, *"A service role count must be between 1 and 20."*
+  - Both problem-details bodies carry the `type` member, so Umbraco's backoffice error interceptor will keep them rather than replacing the payload with a generic fatal-error message (the ⑦a gotcha).
+- [x] 8.4 Live: book a service whose roles share a pool and confirm the booking carries two distinct resources; confirm a start only one resource can fill is not offered.
+  - **a** Booked `MRM Joint Session` (roles `{cert-x}` and `{welsh}` over the overlapping pool) through the anonymous delivery API → **200**, one booking carrying **two distinct** resources: Ana into the `cert-x` slot, Cai into the `welsh` slot. Ana can fill only the first, so this is the assignment placing the shared resource where the other cannot go — not an arbitrary pair.
+  - **b** A role of `{cert-x}` with count 2 resolves to exactly `{Ana, Cai}`. Booking Ana directly at one start removed **that start alone** (6 → 5); no other start was lost.
+  - **The control that makes (b) mean anything**: an otherwise identical service with count **1** still offers that same start, because Cai is free there. So the count-2 service lost it because one resource cannot fill two slots — the assignment refusing — rather than because the pool was empty. Without this control the check could not tell those apart.
 - [ ] 8.5 Stop the TestSite and check port 44348 for orphaned processes.
 
 ## 9. Spec hygiene — this change replaces requirements
