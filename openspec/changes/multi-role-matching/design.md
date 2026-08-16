@@ -138,6 +138,22 @@ the correction.
 Two roles of one type requiring *different* capabilities stay valid — that is the
 case the whole change exists for ("a senior therapist and any therapist").
 
+**How this is expected to be used, which matters for testing.** Chris's observation
+from practice: a capability is usually needed by *one* of several resources, not all
+of them — two therapists of whom one holds `cert-x`. That is two roles of count 1
+with differing capabilities, **not** one role of count 2 requiring `cert-x`, which
+would demand the certificate of both. Capabilities on a counted role remain
+meaningful and are not restricted ("three rooms, each with a projector"), so the
+model keeps both.
+
+The consequence is a trap for the test suite rather than for the model. Pools for one
+resource type are nested exactly when the capability sets are comparable, and the
+common shape — `{cert-x}` against `{}` — *is* nested. **Greedy assignment is optimal
+over nested pools.** A suite built only from realistic configurations would therefore
+pass a greedy implementation and demonstrate nothing about the assignment. Fixtures
+must include **incomparable** capability sets (`{cert-x}` against `{welsh}`), where
+neither pool contains the other and greedy genuinely fails.
+
 ### D6 — Canonical role ordering needs a tiebreak, or round-tripping breaks
 
 `Service.Create` sorts roles by type key and documents that as a total order because
@@ -190,8 +206,10 @@ would repeat the mistake ⑨-1a explicitly avoided. ⑨-2a reports it.
 - **[A subtle matching bug silently under-reports availability]** → This is the
   dangerous failure, because it looks like ordinary unavailability. Mitigated by the
   differential test in D3 (distinct-type services must answer exactly as before) and
-  by property-style tests over pools where a greedy choice strands a role — the case
-  a naive implementation gets wrong and a hand-picked fixture usually misses.
+  by tests over pools where a greedy choice strands a slot. Note the trap recorded in
+  D5: the *realistic* configuration shape has nested pools, over which greedy is
+  optimal, so fixtures drawn from realistic examples alone would not detect a greedy
+  implementation at all.
 
 - **[`MODIFIED` requirements silently drop guarantees]** → The real procedural risk:
   unlike ⑨-1a, this change replaces requirements wholesale in three specs. Every
