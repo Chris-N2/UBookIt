@@ -19,12 +19,17 @@ namespace UBookIt.Core.Services;
 /// of <see cref="Step"/>, so the run denotes exactly the multiples of
 /// <see cref="Step"/> in <c>[Min, Max]</c> and two runs are in phase at zero.
 /// Enforced here rather than left to the sites that build runs, because more
-/// than one algorithm silently depends on it: subset elimination compares two
-/// runs of equal step assuming they are in phase, and intersection across roles
-/// takes the least common multiple of two steps on the same assumption. An
-/// out-of-phase run would break both without raising anything — advertising
-/// lengths no resource can book, or discarding lengths that were bookable
-/// (multi-role-composition design D3).
+/// than one algorithm silently depends on it, and an out-of-phase run would break
+/// them without raising anything — advertising lengths no resource can book, or
+/// discarding lengths that were bookable (multi-role-composition design D3).
+/// </para>
+/// <para>
+/// What depends on it changed with ⑨-2 and the property did not. Subset
+/// elimination still compares two runs assuming they are in phase. Intersection
+/// across roles — the other original reason — is gone: composition now asks the
+/// assignment which lengths are feasible and rebuilds runs from that set, by
+/// scanning the multiples of each candidate step. That scan is anchored by
+/// construction and only produces valid runs *because* every input run is.
 /// </para>
 /// <para>
 /// The bounds are get-only rather than <c>init</c> so that <c>with</c> cannot
@@ -85,41 +90,6 @@ public readonly record struct LengthRun
     /// <summary>Whether a length is one of the lengths this run denotes.</summary>
     public bool Admits(TimeSpan duration)
         => duration >= Min && duration <= Max && (duration - Min).Ticks % Step.Ticks == 0;
-
-    /// <summary>
-    /// The lengths this run and <paramref name="other"/> both offer, as a run.
-    /// <para>
-    /// Because every run is anchored at zero, the common lengths are exactly the
-    /// multiples of the least common multiple of the two steps inside the
-    /// overlap of the two ranges — arithmetic, with no congruence to solve. The
-    /// result is anchored too, so the representation is closed under
-    /// intersection (multi-role-composition design D3).
-    /// </para>
-    /// <para>
-    /// Returns false when the two offer no length in common, which is an answer
-    /// rather than a failure: a start where two roles share no bookable length
-    /// is simply not a start the service can be booked at.
-    /// </para>
-    /// </summary>
-    public bool TryIntersect(LengthRun other, out LengthRun result)
-    {
-        var step = DurationMath.Lcm(Step, other.Step);
-
-        // Inward to the shared grid from both ends: ceiling the minimum and
-        // flooring the maximum can only ever discard lengths one of the two
-        // cannot book.
-        var min = DurationMath.CeilTo(DurationMath.MaxOf(Min, other.Min), step);
-        var max = DurationMath.FloorTo(DurationMath.MinOf(Max, other.Max), step);
-
-        if (min > max)
-        {
-            result = default;
-            return false;
-        }
-
-        result = new LengthRun(min, max, step);
-        return true;
-    }
 
     /// <summary>The lengths this run denotes, ascending.</summary>
     public IEnumerable<TimeSpan> Lengths()

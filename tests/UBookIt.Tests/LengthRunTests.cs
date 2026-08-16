@@ -90,65 +90,6 @@ public class LengthRunTests
 
     // ------------------------------------------------------------- intersection
 
-    [Theory]
-    // The spec scenario: two grids meeting on their least common multiple.
-    [InlineData(30, 120, 30, 20, 120, 20, true, 60, 120, 60)]
-    // Equal steps: the lcm is that step, and both minima are already on it.
-    [InlineData(30, 90, 30, 60, 480, 30, true, 60, 90, 30)]
-    // Exactly one multiple of the lcm lies in the overlap.
-    [InlineData(30, 60, 30, 60, 120, 60, true, 60, 60, 60)]
-    // Ranges touching at one endpoint, on a shared grid.
-    [InlineData(30, 60, 30, 60, 90, 30, true, 60, 60, 30)]
-    // Single-length runs that agree, and ones that do not.
-    [InlineData(60, 60, 60, 60, 60, 30, true, 60, 60, 60)]
-    [InlineData(60, 60, 60, 90, 90, 90, false, 0, 0, 0)]
-    // Overlapping ranges whose grids share no length inside the overlap: the
-    // two meet only on multiples of 90, and the overlap [45, 60] contains none.
-    [InlineData(30, 60, 30, 45, 45, 45, false, 0, 0, 0)]
-    // Disjoint ranges.
-    [InlineData(30, 60, 30, 90, 120, 30, false, 0, 0, 0)]
-    public void Two_runs_intersect_to_their_common_lengths(
-        int minA, int maxA, int stepA,
-        int minB, int maxB, int stepB,
-        bool expected, int min, int max, int step)
-    {
-        var a = new LengthRun(Mins(minA), Mins(maxA), Mins(stepA));
-        var b = new LengthRun(Mins(minB), Mins(maxB), Mins(stepB));
-
-        Assert.Equal(expected, a.TryIntersect(b, out var result));
-
-        // Symmetric: intersection cannot depend on which run is the receiver,
-        // or folding roles left to right would answer differently from folding
-        // them right to left.
-        Assert.Equal(expected, b.TryIntersect(a, out var mirrored));
-
-        if (!expected)
-        {
-            return;
-        }
-
-        Assert.Equal(new LengthRun(Mins(min), Mins(max), Mins(step)), result);
-        Assert.Equal(result, mirrored);
-
-        // The definition the arithmetic is an optimisation of.
-        Assert.Equal(
-            a.Lengths().Intersect(b.Lengths()).OrderBy(l => l),
-            result.Lengths().OrderBy(l => l));
-    }
-
-    [Fact]
-    public void An_empty_intersection_denotes_no_lengths_either()
-    {
-        var a = new LengthRun(Mins(30), Mins(60), Mins(30));
-        var b = new LengthRun(Mins(45), Mins(45), Mins(45));
-
-        Assert.False(a.TryIntersect(b, out _));
-
-        // Not merely "the arithmetic said no": the two really do share nothing
-        // in the overlap, so a false here cannot be hiding a bookable length.
-        Assert.Empty(a.Lengths().Intersect(b.Lengths()));
-    }
-
     [Fact]
     public async Task Every_run_produced_by_availability_projection_is_anchored()
     {

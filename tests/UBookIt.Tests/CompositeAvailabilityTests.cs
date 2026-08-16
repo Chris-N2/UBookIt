@@ -679,6 +679,41 @@ public class CompositeAvailabilityTests
         }
     }
 
+    /// <summary>
+    /// The lengths two anchored runs both denote, as a run — the arithmetic the
+    /// previous composition used, written out here rather than called.
+    /// <para>
+    /// Because every run is anchored at zero, the common lengths are the multiples
+    /// of the least common multiple of the two steps inside the overlap of the two
+    /// ranges. Spelled out in the test rather than delegated to a production
+    /// helper: an oracle that shares code with the thing it checks agrees with it
+    /// by construction, including when both are wrong.
+    /// </para>
+    /// </summary>
+    private static bool IntersectRuns(LengthRun a, LengthRun b, out LengthRun result)
+    {
+        var stepTicks = a.Step.Ticks / Gcd(a.Step.Ticks, b.Step.Ticks) * b.Step.Ticks;
+        var step = TimeSpan.FromTicks(stepTicks);
+
+        var lowest = a.Min > b.Min ? a.Min : b.Min;
+        var highest = a.Max < b.Max ? a.Max : b.Max;
+
+        // Inward to the shared grid from both ends.
+        var min = TimeSpan.FromTicks((lowest.Ticks + stepTicks - 1) / stepTicks * stepTicks);
+        var max = TimeSpan.FromTicks(highest.Ticks / stepTicks * stepTicks);
+
+        if (min > max)
+        {
+            result = default;
+            return false;
+        }
+
+        result = new LengthRun(min, max, step);
+        return true;
+    }
+
+    private static long Gcd(long left, long right) => right == 0 ? left : Gcd(right, left % right);
+
     /// <summary>The lengths a start denotes, ascending and deduplicated.</summary>
     private static List<TimeSpan> Lengths(ServiceBookableStart start)
         => [.. start.Runs.SelectMany(run => run.Lengths()).Distinct().Order()];
@@ -751,7 +786,7 @@ public class CompositeAvailabilityTests
                 {
                     foreach (var b in right)
                     {
-                        if (a.TryIntersect(b, out var run))
+                        if (IntersectRuns(a, b, out var run))
                         {
                             shared.Add(run);
                         }
