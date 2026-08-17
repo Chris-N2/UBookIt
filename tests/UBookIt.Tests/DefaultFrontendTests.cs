@@ -31,7 +31,8 @@ public class DefaultFrontendTests
         // QA proved this decision could be reverted to the generic "try again
         // later" answer with the whole suite green — restoring exactly the
         // conflation this change exists to remove.
-        var model = BookingUnavailableModel.For(Res(directlyBookable: false), zoneResolved: true);
+        Assert.True(BookingUnavailableModel.IsUnavailable(
+            Res(directlyBookable: false), zoneResolved: true, out var model));
 
         Assert.NotNull(model);
         Assert.Equal(BookingUnavailableReason.NotOfferedIndividually, model.Reason);
@@ -42,7 +43,10 @@ public class DefaultFrontendTests
     {
         // The pair that makes the assertion above non-vacuous: a function that
         // always returned the permanent answer would pass it.
-        Assert.Null(BookingUnavailableModel.For(Res(directlyBookable: true), zoneResolved: true));
+        Assert.False(BookingUnavailableModel.IsUnavailable(
+            Res(directlyBookable: true), zoneResolved: true, out var model));
+
+        Assert.Null(model);
     }
 
     [Fact]
@@ -52,19 +56,22 @@ public class DefaultFrontendTests
         // a fault — "try again later" is honest for it and wrong for the other.
         // The ordering is load-bearing: a null resource must not be inspected for
         // a permission it cannot have.
-        Assert.Equal(
-            BookingUnavailableReason.Unknown,
-            BookingUnavailableModel.For(null, zoneResolved: true)!.Reason);
+        static BookingUnavailableReason ReasonFor(Resource? resource, bool zoneResolved)
+        {
+            Assert.True(BookingUnavailableModel.IsUnavailable(resource, zoneResolved, out var model));
+            return model.Reason;
+        }
 
+        Assert.Equal(BookingUnavailableReason.Unknown, ReasonFor(null, zoneResolved: true));
         Assert.Equal(
             BookingUnavailableReason.Unknown,
-            BookingUnavailableModel.For(Res(directlyBookable: true), zoneResolved: false)!.Reason);
+            ReasonFor(Res(directlyBookable: true), zoneResolved: false));
 
         // Including for a resource that ALSO withholds: the fault is reported as
         // a fault, not silently upgraded to the permanent answer.
         Assert.Equal(
             BookingUnavailableReason.Unknown,
-            BookingUnavailableModel.For(Res(directlyBookable: false), zoneResolved: false)!.Reason);
+            ReasonFor(Res(directlyBookable: false), zoneResolved: false));
     }
 
     [Fact]

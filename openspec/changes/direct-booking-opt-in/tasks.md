@@ -199,6 +199,50 @@ through the API, and QA hit exactly that trying to clean up a fixture it created
 ("QA Granting", type `qa875`, now inert in the resources list). That is a real
 product gap for a later change.
 
+### QA round 2 — REJECT, remediated
+
+One MAJOR, and it was introduced **by** the round-1 remediation — the pattern this
+project keeps hitting, and the reason a fix gets the same scrutiny as the code it
+fixes.
+
+- **MAJOR — the extraction lost a null-flow guarantee.** Pulling the decision into
+  `BookingUnavailableModel.For(resource, zoneResolved)` meant the compiler could no
+  longer infer that a null answer implied a non-null resource, so `resource` stayed
+  nullable to the end of the method and the build emitted **CS8604** — an error in
+  CI under `CLAUDE.md`'s "warnings are errors". Runtime behaviour was never wrong;
+  the *guarantee* was.
+  **Fixed by shape rather than by suppression:** `IsUnavailable(resource,
+  zoneResolved, out model)` with `[NotNullWhen(false)]` on the resource and
+  `[NotNullWhen(true)]` on the model. That states the thing that was always true
+  and had merely stopped being visible. A `!` would have silenced the symptom and
+  kept the loss.
+- **Why it slipped, and the rule that follows.** `dotnet test` builds
+  incrementally and never re-emitted the warning, so 637 green tests were not
+  evidence. I resubmitted saying "I have not re-run the clean build" as though that
+  were a caveat; it was a gap. **Treat an unrun `--no-incremental` build as
+  blocking, not deferrable** — it is the only gate that sees this class of fault.
+- **Both reason-selection mutations still bite on the new shape**: reverting the
+  permanent answer to the generic one → 1 red; inverting the order so the permanent
+  answer precedes the fault → 1 red.
+- **MINOR — the proposal's Modified Capabilities omitted `service-booking`**, which
+  gained a delta in round 1. A round whose subject was incomplete accounting, and
+  the accounting was still one short. Added.
+- **NIT closed — "contributes availability" had no assertion.** The new scenario's
+  middle clause: resolution and placement were each covered, composite availability
+  was not. One `GetBookableStartsAsync` assertion over a withholding-only pool now
+  closes it. Structurally safe either way, since the permission appears nowhere in
+  Core's services or availability code — but that is a guard against someone later
+  deciding it should.
+- **Two corrections to my own round-1 report, both caught by QA.** I wrote "scoping
+  all three scenarios" when only two needed it (the third's WHEN already presupposes
+  the permission), and I transposed which mapper mutation turned 2 red and which
+  turned 1. The artifacts were right and the summary was loose; recorded because a
+  report that is casually inaccurate is harder to trust than one that is silent.
+- **Left alone, with QA agreeing:** the four-subsystem negative assertion (better
+  served by the recorded grep than by four trivially-passing tests), and the
+  `Resource.Create` parameter position (id-last is Core's convention, nothing is
+  published, and the break is now declared).
+
 ### What follows this change
 
 - **The pin, next, and it is the same theme from the other actor's side.** This

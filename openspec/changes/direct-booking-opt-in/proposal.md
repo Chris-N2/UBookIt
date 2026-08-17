@@ -77,6 +77,11 @@ None. Every operation extends behaviour an existing spec already owns.
   the backoffice resource editor and list surface it.
 - `default-frontend`: the no-JS flow distinguishes "not offered on its own" from
   "no times available".
+- `service-booking`: the "direct-resource booking is unaffected" scenarios are
+  scoped to a resource that permits it, and gain the converse — withholding does
+  not remove a candidate. Added at QA round 1: the requirement's guarantee is
+  about *services* not changing direct booking, which is untouched, but its
+  scenarios presumed direct booking always succeeds.
 
 ## Non-goals
 

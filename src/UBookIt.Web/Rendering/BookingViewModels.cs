@@ -1,3 +1,4 @@
+using System.Diagnostics.CodeAnalysis;
 using UBookIt.Core.Resources;
 
 namespace UBookIt.Web.Rendering;
@@ -139,7 +140,7 @@ public sealed class BookingUnavailableModel
 
     /// <summary>
     /// Whether the flow has anything to offer for this resource, and if not, why.
-    /// Null means carry on and render the form.
+    /// False means carry on and render the form.
     /// <para>
     /// A function rather than a branch inside the ViewComponent, because this is
     /// where the distinction actually lives and a ViewComponent needs a host to
@@ -152,15 +153,35 @@ public sealed class BookingUnavailableModel
     /// zone that will not resolve, is a fault and honestly gets "try again"; only
     /// a resource that exists and withholds gets the permanent answer.
     /// </para>
+    /// <para>
+    /// Shaped as a Try-method rather than a nullable return so the <b>caller</b>
+    /// keeps its null-flow guarantee. An earlier version returned
+    /// <c>BookingUnavailableModel?</c>, and the compiler could not infer that a
+    /// null answer implied a non-null resource — so the resource stayed nullable
+    /// for the rest of the component and the build warned (CS8604), which is an
+    /// error in CI. <see cref="NotNullWhenAttribute"/> states the thing that was
+    /// always true and was merely no longer visible.
+    /// </para>
     /// </summary>
-    public static BookingUnavailableModel? For(Resource? resource, bool zoneResolved)
+    public static bool IsUnavailable(
+        [NotNullWhen(false)] Resource? resource,
+        bool zoneResolved,
+        [NotNullWhen(true)] out BookingUnavailableModel? model)
     {
         if (resource is null || !zoneResolved)
         {
-            return Unknown;
+            model = Unknown;
+            return true;
         }
 
-        return resource.DirectlyBookable ? null : NotOfferedIndividually;
+        if (!resource.DirectlyBookable)
+        {
+            model = NotOfferedIndividually;
+            return true;
+        }
+
+        model = null;
+        return false;
     }
 }
 

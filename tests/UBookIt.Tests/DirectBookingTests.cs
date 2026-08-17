@@ -158,6 +158,23 @@ public class DirectBookingTests
         Assert.Equal([Id(1)], pools.Value.Single().Candidates.Select(c => c.ResourceId));
     }
 
+    [Fact]
+    public async Task Spec_scenario_withholding_does_not_remove_a_candidate()
+    {
+        // The middle clause of the scenario, which resolution and placement do not
+        // between them cover: a withholding resource must also CONTRIBUTE
+        // AVAILABILITY. The mechanism cannot see the permission — it appears
+        // nowhere in Core's services or availability code — so this is a guard
+        // against someone later deciding it should.
+        var service = ServiceOf(ServiceRole.Create(Therapist, null).Value);
+        var harness = Wire(service, Res(1, directlyBookable: false, type: Therapist));
+
+        var starts = await harness.Services.GetBookableStartsAsync(service.Id, Date, Date);
+
+        Assert.True(starts.Succeeded);
+        Assert.NotEmpty(starts.Value);
+    }
+
     // ------------------------------------------------------------------
     // The guard, and where it sits
     // ------------------------------------------------------------------

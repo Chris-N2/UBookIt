@@ -40,7 +40,7 @@ public sealed class BookingViewComponent(
         // No form is offered for either. Rendering one that placement will always
         // refuse would invite someone to fill it in and lose their input to a
         // failure that was knowable before they started.
-        if (BookingUnavailableModel.For(resource, zoneResolved) is { } unavailable)
+        if (BookingUnavailableModel.IsUnavailable(resource, zoneResolved, out var unavailable))
         {
             return View("Unavailable", unavailable);
         }
