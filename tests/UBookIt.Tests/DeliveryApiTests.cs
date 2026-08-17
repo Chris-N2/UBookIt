@@ -1,5 +1,6 @@
-using System.Reflection;
+﻿using System.Reflection;
 using Microsoft.AspNetCore.Authorization;
+using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.Mvc.ModelBinding;
 using UBookIt.Core.Availability;
@@ -74,6 +75,139 @@ public class DeliveryApiTests
         Assert.False(string.IsNullOrWhiteSpace(problem.Type));
 
         return (obj.StatusCode!.Value, errors);
+    }
+
+    /// <summary>
+    /// A harness whose resource withholds direct booking, otherwise identical.
+    /// Built here rather than by flipping the shared helper, because the point of
+    /// every test below is which answer the resource gave.
+    /// </summary>
+    private sealed class WithholdingHarness
+    {
+        public Resource Room { get; }
+        public ResourcesController Resources { get; }
+        public AvailabilityController Availability { get; }
+        public BookingsController Bookings { get; }
+
+        public WithholdingHarness()
+        {
+            Room = Resource.Create(
+                ResourceTypes.Room,
+                "Meeting Room A",
+                directlyBookable: false,
+                availability: TestData.Config(
+                    TestData.Weekly("08:00", "18:00", BaseDate.DayOfWeek))).Value;
+
+            var resources = new InMemoryResourceStore().Add(Room);
+            var store = new InMemoryBookingStore();
+            var time = new FixedTimeProvider(TestData.Now);
+            var settings = TestData.Settings;
+
+            Resources = new ResourcesController(resources, settings);
+            Availability = new AvailabilityController(
+                new AvailabilityService(resources, store, time, settings), settings);
+            Bookings = new BookingsController(new BookingService(resources, store, time, settings));
+        }
+    }
+
+    // --- Direct bookability on the read model and at placement ---
+
+    [Fact]
+    public async Task Spec_scenario_direct_bookability_is_readable_before_it_is_needed()
+    {
+        var h = new WithholdingHarness();
+
+        var model = Ok<ResourceReadModel>(await h.Resources.GetResource(h.Room.Id));
+
+        Assert.False(model.DirectlyBookable);
+
+        // And present on the list too, so a consumer filtering a direct-booking UI
+        // never has to fetch each resource to find out.
+        var page = Ok<PagedResourcesModel>(await h.Resources.ListResources());
+        Assert.False(Assert.Single(page.Items).DirectlyBookable);
+    }
+
+    [Fact]
+    public async Task A_permitting_resource_reads_as_permitting()
+    {
+        // The pair that makes the assertion above non-vacuous: a member that were
+        // always false would pass it.
+        var h = new Harness();
+
+        Assert.True(Ok<ResourceReadModel>(await h.Resources.GetResource(h.Room.Id)).DirectlyBookable);
+    }
+
+    [Fact]
+    public async Task Spec_scenario_direct_placement_on_a_withholding_resource_is_refused()
+    {
+        var h = new WithholdingHarness();
+
+        var (status, errors) = Problem(await h.Bookings.PlaceBooking(new PlacementRequestModel
+        {
+            ResourceId = h.Room.Id,
+            Start = TestData.Utc(BaseDate, "09:00"),
+            DurationMinutes = 60,
+            Booker = new BookerModel { Name = "Test Person", Email = "test@example.com" },
+        }));
+
+        // 400 through the existing catch-all, asserted rather than assumed: the
+        // mapping requirement is not being modified, so this is the only thing
+        // holding the status.
+        Assert.Equal(StatusCodes.Status400BadRequest, status);
+        Assert.Equal(FailureCodes.ResourceNotDirectlyBookable, Assert.Single(errors).Code);
+    }
+
+    [Fact]
+    public async Task Spec_scenario_the_refusal_is_distinguishable_from_unavailability()
+    {
+        var withholding = new WithholdingHarness();
+        var permitting = new Harness();
+
+        var (_, refused) = Problem(await withholding.Bookings.PlaceBooking(new PlacementRequestModel
+        {
+            ResourceId = withholding.Room.Id,
+            Start = TestData.Utc(BaseDate, "09:00"),
+            DurationMinutes = 60,
+            Booker = new BookerModel { Name = "Test Person", Email = "test@example.com" },
+        }));
+
+        // The same shaped request against a permitting resource, at an hour it is
+        // closed, so the two failures differ only in their cause.
+        var (_, closed) = Problem(await permitting.Bookings.PlaceBooking(new PlacementRequestModel
+        {
+            ResourceId = permitting.Room.Id,
+            Start = TestData.Utc(BaseDate, "05:00"),
+            DurationMinutes = 60,
+            Booker = new BookerModel { Name = "Test Person", Email = "test@example.com" },
+        }));
+
+        Assert.NotEqual(closed.Single().Code, refused.Single().Code);
+        Assert.Equal(FailureCodes.OutsideOpenHours, closed.Single().Code);
+    }
+
+    [Fact]
+    public async Task Spec_scenario_availability_reads_answer_for_a_withholding_resource()
+    {
+        // The counter-intuitive half, asserted directly because it is the part most
+        // likely to be "tidied away" later: a resource nobody can book directly
+        // still publishes when it is free, because a composite booking needs that.
+        var withholding = new WithholdingHarness();
+        var permitting = new Harness();
+
+        var from = BaseDate;
+        var to = BaseDate;
+
+        var withheldStarts = Ok<BookableStartsResponseModel>(
+            await withholding.Availability.GetBookableStarts(withholding.Room.Id, from, to));
+        var permittedStarts = Ok<BookableStartsResponseModel>(
+            await permitting.Availability.GetBookableStarts(permitting.Room.Id, from, to));
+
+        Assert.NotEmpty(withheldStarts.Starts);
+
+        // Identically, not merely non-empty: the permission changes nothing here.
+        Assert.Equal(
+            permittedStarts.Starts.Select(s => s.StartUtc),
+            withheldStarts.Starts.Select(s => s.StartUtc));
     }
 
     // --- Resource read (6.3) ---

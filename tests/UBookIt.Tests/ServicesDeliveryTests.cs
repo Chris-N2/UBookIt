@@ -170,6 +170,38 @@ public class ServicesDeliveryTests
             Booker = new BookerModel { Name = "Test Person", Email = "test@example.com" },
         };
 
+    [Fact]
+    public async Task Spec_scenario_service_placement_on_a_withholding_resource_succeeds()
+    {
+        // The other half of the direct-booking permission, at the HTTP boundary
+        // rather than only in Core: a resource nobody may book on its own is
+        // booked through a service that resolves to it, and the request succeeds.
+        //
+        // Built explicitly rather than through the shared Room helper, because the
+        // helper grants the permission and this test is about a resource that does
+        // not — with the helper it would prove nothing.
+        var withholding = Resource.Create(
+            ResourceTypes.Room,
+            "Withholding Room",
+            directlyBookable: false,
+            availability: TestData.Config(
+                TestData.Weekly("09:00", "17:00", Date.DayOfWeek),
+                constraints: BookingConstraints.Create(
+                    granularity: TimeSpan.FromMinutes(30),
+                    minDuration: TimeSpan.FromMinutes(30),
+                    maxDuration: TimeSpan.FromMinutes(480)).Value),
+            id: new Guid("00000000-0000-0000-0000-0000000000aa")).Value;
+
+        var h = WireService(
+            Service.Create("Consultation", null, [new ServiceRole(ResourceTypes.Room, 1)]).Value,
+            withholding);
+
+        var placed = Ok<ServicePlacementResponseModel>(
+            await h.Controller.PlaceServiceBooking(h.Service.Id, Placement()));
+
+        Assert.Equal([withholding.Id], placed.Resources.Select(r => r.ResourceId));
+    }
+
     // --- service read ---
 
     [Fact]

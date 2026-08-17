@@ -1,4 +1,4 @@
-using System.ComponentModel.DataAnnotations;
+﻿using System.ComponentModel.DataAnnotations;
 
 namespace UBookIt.Web.Models;
 
@@ -32,6 +32,24 @@ public sealed class ResourceReadModel
     /// </para>
     /// </summary>
     public List<string> Capabilities { get; set; } = [];
+
+    /// <summary>
+    /// Whether this resource may be booked <em>on its own</em>.
+    /// <para>
+    /// Published for the same reason capabilities are: it is the one fact that
+    /// decides whether <c>POST /bookings</c> will accept this resource at all, so
+    /// a consumer that cannot read it could only discover it by being refused —
+    /// a poor contract, and disclosure-by-probing of exactly the kind the
+    /// capability publication exists to avoid.
+    /// </para>
+    /// <para>
+    /// It says nothing about availability. False does not mean the resource is
+    /// busy or closed, and true is not a promise that anything is free; a
+    /// resource that withholds it still publishes its free time, because a
+    /// composite booking needs to know when it is free.
+    /// </para>
+    /// </summary>
+    public bool DirectlyBookable { get; set; }
 
     public ConstraintsModel Constraints { get; set; } = new();
 

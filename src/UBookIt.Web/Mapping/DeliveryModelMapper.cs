@@ -1,4 +1,4 @@
-using UBookIt.Core.Availability;
+﻿using UBookIt.Core.Availability;
 using UBookIt.Core.Bookings;
 using UBookIt.Core.Common;
 using UBookIt.Core.Resources;
@@ -26,6 +26,7 @@ internal static class DeliveryModelMapper
             DisplayName = resource.DisplayName,
             Description = resource.Description,
             Capabilities = [.. resource.Capabilities.Keys],
+            DirectlyBookable = resource.DirectlyBookable,
             ZoneId = zoneId,
             Constraints = new ConstraintsModel
             {
