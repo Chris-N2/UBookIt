@@ -137,6 +137,34 @@ sentence differs.
 This is the ⑨-1a lesson applied before the mistake rather than after: a configuration
 fault that renders as ordinary emptiness is a fault nobody can find.
 
+### D7 — Per resource, and the per-type alternative is now the expensive one
+
+Explore reached "per type is enough" and this is per resource, so the reasoning is
+recorded rather than left to look like drift.
+
+Per-type was a compromise bought to avoid one specific cost: a role that names a
+resource, which would have made eligibility a fourth term after type, capabilities
+and duration — immediately after three consecutive changes built on there being
+three. That cost existed only because generating a service *per resource* needed a
+role capable of saying "Room 3". This design generates no service, so nothing needs
+to name a resource, and the cost is not incurred at any granularity.
+
+With that gone, per-type is strictly more expensive. There is no resource-type
+entity: a type is a string column on the resources table and the type list is a
+`GROUP BY` over it. A per-type permission would need a new aggregate, a new table,
+and a rule for what happens to it when the last resource of that type is deleted —
+against one boolean on a row that already exists.
+
+Per-resource is also more expressive at no extra cost, which matters for the case
+capabilities handle awkwardly: one room let out on its own while its neighbour is
+only ever used for treatments is two answers to one question, and a per-type
+permission cannot hold both.
+
+*Alternative considered — a per-type permission with a per-resource override.*
+Rejected as the worst of both: it needs the type entity anyway, and it introduces a
+precedence rule between two stored answers, which is a thing that can disagree with
+itself.
+
 ## Risks / Trade-offs
 
 - **[Every existing resource stops being directly bookable on upgrade]** → True, and
