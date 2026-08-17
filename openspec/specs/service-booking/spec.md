@@ -284,7 +284,7 @@ The property is load-bearing in more than one algorithm. Subset elimination reli
 
 ### Requirement: Booking a service resolves an assignment of distinct resources
 `UBookIt.Core` SHALL expose service placement taking a service id, a start instant,
-a requested length, booker details, and an optional preferred resource id. Placement
+a requested length, booker details, and an optional pinned resource id. Placement
 SHALL resolve **one resource per role slot**, all distinct, and SHALL place a single
 booking whose claims are those resources — all sharing the booking's one interval —
 through the atomic placement contract. A service SHALL NOT produce more than one
@@ -354,13 +354,39 @@ claims, which is what makes the placement atomic across them. Those locks SHALL 
 acquired in a deterministic order, so concurrent attempts sharing a resource cannot
 deadlock, and they SHALL be released together when the attempt commits or fails.
 
-When a preferred resource id is supplied and is eligible for some slot, placement
+When a **pinned resource id** is supplied and is eligible for some slot, placement
 SHALL seek a saturating assignment **including that resource**, in whichever slot it
-fits. A resource may now be eligible for several slots, so the preference identifies
-the booking rather than a role. Preference remains a hint only: when no saturating
-assignment includes it, placement SHALL fall back to any saturating assignment rather
-than failing. A preferred resource id eligible for no slot SHALL be rejected with
-`resource-not-eligible`.
+fits. A resource may be eligible for several slots, so the pin identifies the booking
+rather than a role, and the assignment chooses where it goes.
+
+A pin SHALL be honoured or reported, never substituted. When no saturating assignment
+includes the pinned resource **but one exists without it**, placement SHALL fail with
+the stable code `pinned-resource-unavailable` rather than booking a different
+resource. A caller who names a resource has chosen it; quietly confirming a booking
+on someone else answers a question that was not asked.
+
+Where no saturating assignment exists **either way**, the pin SHALL NOT be reported
+as the cause. Nothing could have been booked whoever was named, and answering "the
+resource you chose was unavailable" would invite a caller to pick another when there
+is no other to pick; the all-candidates-failed outcomes answer instead, exactly as
+they do for a request that named nobody.
+
+That failure SHALL be **transient**: the pinned resource may be free at another time
+or may free up, so a retry can succeed. It SHALL NOT be treated as a deterministic
+refusal, which exists to tell a caller not to bother.
+
+It SHALL be distinct from `conflict`, which reports that nothing could be booked and
+leaves a caller unable to tell that other resources were free; and from
+`resource-not-eligible`, which reports a resource that could never fulfil the service
+at any time. A pinned resource id eligible for no slot SHALL still be rejected with
+`resource-not-eligible`, before any question of availability arises — the caller's
+own mistake remains the more useful thing to report.
+
+Whether a pin can be honoured SHALL be judged over the same candidates the placement
+attempt acts on, never by a second computation of the question. The pin failure SHALL
+NOT be routed through the all-candidates-failed classification: assignments may exist
+in abundance without the pinned resource, so reporting it as a fact about the pool
+would describe a different failure from the one that occurred.
 
 On success the result SHALL identify every resource actually booked.
 
@@ -396,20 +422,36 @@ On success the result SHALL identify every resource actually booked.
 - **WHEN** a role of count 2 has two candidates of which only one is free
 - **THEN** no booking is placed, and the free one is not claimed
 
-#### Scenario: Preferred resource is used
-- **WHEN** a placement supplies a preferred resource id eligible for some slot and free
+#### Scenario: A pinned resource is used
+- **WHEN** a placement supplies a pinned resource id eligible for some slot and free
 - **THEN** the booking is placed using that resource
 
-#### Scenario: Preferred resource falls through when unavailable
-- **WHEN** a placement supplies a preferred resource id that is eligible but already booked at that start, and a saturating assignment exists without it
-- **THEN** the booking is placed on that assignment
+#### Scenario: A pin that cannot be honoured fails rather than substituting
+- **WHEN** a placement supplies a pinned resource id that is eligible but already booked at that start, and a saturating assignment exists without it
+- **THEN** placement fails with code `pinned-resource-unavailable`, and no booking is placed on that assignment
 
-#### Scenario: Preferred resource outside every pool is rejected
-- **WHEN** a placement supplies a preferred resource id eligible for no slot
+#### Scenario: A pin failure invites a retry
+- **WHEN** a placement fails because its pinned resource could not be included
+- **THEN** the code is not one of the deterministic refusals, because the resource may be free at another time
+
+#### Scenario: A pin failure is not reported as a pool failure
+- **WHEN** a placement supplies a pinned resource that cannot be included, for a service whose other candidates could have been assigned
+- **THEN** placement fails with `pinned-resource-unavailable`, not `conflict` or `service-unavailable`
+
+#### Scenario: A pool that could not be assigned at all is not blamed on the pin
+- **WHEN** a placement supplies a pinned resource for a service at an instant where no saturating assignment exists with or without it
+- **THEN** placement fails with the all-candidates-failed outcome it would have reported for an unpinned request, not with `pinned-resource-unavailable`
+
+#### Scenario: A pinned resource refused by its own rules is reported as the pin failing
+- **WHEN** a placement supplies a pinned resource that is eligible and free, but whose own configuration refuses the requested start
+- **THEN** placement fails with `pinned-resource-unavailable` rather than substituting a resource that would have accepted it
+
+#### Scenario: A pinned resource outside every pool is rejected
+- **WHEN** a placement supplies a pinned resource id eligible for no slot
 - **THEN** placement fails with code `resource-not-eligible` and no booking is placed, rather than silently booking a different resource
 
-#### Scenario: An ineligible preference is reported even when a pool is empty
-- **WHEN** a placement supplies a preferred resource id against a service one of whose roles has an empty candidate pool
+#### Scenario: An ineligible pin is reported even when a pool is empty
+- **WHEN** a placement supplies a pinned resource id against a service one of whose roles has an empty candidate pool
 - **THEN** placement fails with code `resource-not-eligible`, not `service-unavailable` — the caller's own mistake is the more useful thing to report
 
 #### Scenario: One attempt at a time
@@ -570,11 +612,19 @@ determines how many distinct resources a role consumes, so without it a caller c
 compute the pools and still not know what the service requires of them.
 
 This SHALL be treated as a standing constraint rather than a convenience. The
-`resource-not-eligible` failure returned for an out-of-pool `preferredResourceId`
+`resource-not-eligible` failure returned for an out-of-pool `pinnedResourceId`
 discloses pool membership; it is acceptable precisely because the same fact is
 already derivable. Any future change that constrains eligibility by data not
 published here SHALL either publish that data or revisit that failure, and SHALL NOT
 leave the two silently out of step.
+
+The `pinned-resource-unavailable` failure SHALL be held to the same standard, and
+SHALL be understood to disclose a resource's occupancy at an instant rather than its
+pool membership. It is acceptable on the same grounds and no others: a resource's
+free time is already published, so the failure tells a caller nothing a bookable-
+starts read would not. Any future change that hides per-resource availability
+SHALL revisit this failure, which would otherwise become an occupancy oracle for a
+resource whose calendar the API had stopped publishing.
 
 #### Scenario: A pool is computable from public reads
 - **WHEN** an anonymous caller reads a service and the resource list
@@ -585,8 +635,12 @@ leave the two silently out of step.
 - **THEN** the published role states that count
 
 #### Scenario: Probing an ineligible resource discloses nothing new
-- **WHEN** an anonymous caller submits a `preferredResourceId` naming a resource outside every pool and receives `resource-not-eligible`
+- **WHEN** an anonymous caller submits a `pinnedResourceId` naming a resource outside every pool and receives `resource-not-eligible`
 - **THEN** the disclosed fact was already derivable from the published resource and service reads
+
+#### Scenario: A refused pin discloses nothing not already published
+- **WHEN** an anonymous caller submits a `pinnedResourceId` naming an eligible resource and receives `pinned-resource-unavailable`
+- **THEN** the disclosed fact — that the resource is not free at that instant — was already derivable from that resource's published bookable starts
 
 ### Requirement: Overlapping eligibility pools are resolved by assignment
 Capability-constrained eligibility SHALL be understood to produce eligibility pools
