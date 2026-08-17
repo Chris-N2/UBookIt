@@ -34,7 +34,7 @@
 - [x] 5.3 The resource editor gains a control that states what withholding *means*: still bookable as part of a service, not bookable alone. A label reading only "bookable" is wrong and will be read as "can be booked at all".
 - [x] 5.4 The resources list shows it, because with the default withheld the editor's question is "why can nothing book this room?" and the list is where they will look.
 - [x] 5.5 Neither answer blocks a save, in either direction.
-- [ ] 5.6 Accessibility: the control is labelled in the same shadow root, its explanatory text is associated rather than merely adjacent, and the list column is not conveyed by colour or icon alone. **Read the rendered shadow DOM, not a screenshot**, and check the value both ways.
+- [x] 5.6 Accessibility: the control is labelled in the same shadow root, its explanatory text is associated rather than merely adjacent, and the list column is not conveyed by colour or icon alone. **Read the rendered shadow DOM, not a screenshot**, and check the value both ways.
 - [x] 5.7 Regenerate the client against the running TestSite and check the diff for unrelated drift.
 
 ## 6. Default front end
@@ -50,8 +50,8 @@
 - [x] 7.2 Unit, integration and client suites green, including every ⑤–⑨ scenario unchanged. The ⑨ suites are the guard for task 2.2 having been done right.
 - [x] 7.3 Live: a withholding resource refuses direct placement over HTTP and succeeds through a service that resolves to it.
 - [x] 7.4 Live: the no-JS flow renders the statement for a withholding resource and the ordinary flow for a permitting one.
-- [ ] 7.5 Live: the backoffice sets it both ways and the list reflects it.
-- [ ] 7.6 Stop the TestSite and check port 44348 for orphans. Umbraco 17 intermittently renders the backoffice shell without registering package extensions; a fresh navigation or a fresh login clears it, and importing the bundle to check `customElements.get(...)` is what distinguishes that flake from a real fault.
+- [x] 7.5 Live: the backoffice sets it both ways and the list reflects it.
+- [x] 7.6 Stop the TestSite and check port 44348 for orphans. Umbraco 17 intermittently renders the backoffice shell without registering package extensions; a fresh navigation or a fresh login clears it, and importing the bundle to check `customElements.get(...)` is what distinguishes that flake from a real fault.
 
 ## 8. Spec hygiene
 
@@ -123,9 +123,54 @@
   infrastructure only.
 - **Incidental confirmation of the migration:** all 23 pre-existing resources read
   back as withholding, which is the column default reaching the domain.
+- **The `uui-toggle` question, answered with evidence rather than asserted.** The
+  control is a native checkbox because the hint must be *associated*, and the
+  claim that a uui component would not carry it was tested in the live backoffice:
+  `aria-describedby` set on a `uui-toggle` stays on the **host**, and its inner
+  `<input>` — the element a screen reader focuses — receives nothing. So the hint
+  would have been silent. Reusable finding, of the same family as the existing
+  "a `uui-label` with `for` cannot pierce the shadow root" note.
+- **Live editor pass (5.6, 7.5).** Native checkbox, label resolving in the same
+  shadow root, `aria-describedby` resolving to the hint, no dangling ids anywhere
+  in the editor, and the checkbox reflecting the stored value. Set both ways
+  through the real control and saved: the API read back `false` then `true`, no
+  error summary either time, and a **freshly mounted** list — not a stale
+  in-memory one — showed "On its own" against "Service only".
+- **The registration flake hit again** and was ruled out the established way
+  before working around it: every chunk imports, the manifest exports its 5
+  entries, and both custom elements define on import.
 
 ## 9. Handover
 
-- [ ] 9.1 Record what the pin change inherits: it is the same theme from the other actor's side, and `preferredResourceId`'s silent fall-through is specified behaviour that has to be modified rather than fixed as a bug.
-- [ ] 9.2 Record what ⑩ inherits: one booking path per resource decided by the editor, and a read model that says which, so the front end can filter without probing.
-- [ ] 9.3 Record whether the default-withheld choice caused friction in practice, since it is the decision most likely to be revisited and the one with a real cost.
+- [x] 9.1 Record what the pin change inherits: it is the same theme from the other actor's side, and `preferredResourceId`'s silent fall-through is specified behaviour that has to be modified rather than fixed as a bug.
+- [x] 9.2 Record what ⑩ inherits: one booking path per resource decided by the editor, and a read model that says which, so the front end can filter without probing.
+- [x] 9.3 Record whether the default-withheld choice caused friction in practice, since it is the decision most likely to be revisited and the one with a real cost.
+
+### What follows this change
+
+- **The pin, next, and it is the same theme from the other actor's side.** This
+  change gave the *editor* control over which resources may be booked alone; the
+  pin gives the *booker* control over which resource they get.
+  `preferredResourceId` currently falls through silently to a different resource,
+  and that is **specified** behaviour — `service-booking`, scenario "a preferred
+  resource id that is eligible but already booked … falls through" — so it must be
+  modified deliberately, not fixed as though it were a bug. It is reachable in the
+  obvious front-end flow, because service bookable-starts do not say *who* is
+  free, and a race falls through rather than reporting a conflict.
+- **What ⑩ inherits.** One booking path per resource, decided by the editor, and a
+  read model that says which — so the service front end can filter a
+  direct-booking UI without probing and being refused. Availability reads stay
+  open for withholding resources, which is exactly what ⑩'s "who / any" picker
+  needs in order to offer a person who is not standalone-bookable.
+- **The default-withheld decision, and what would revisit it.** It cost nothing
+  here: nothing is published, and all 23 existing fixtures simply became
+  service-only. The friction it buys is the one D2 accepted — a newly created
+  resource cannot be booked until someone says so — and the mitigation is the list
+  column, which answers "why can nothing book this room?" on the screen where
+  rooms are managed. **Trigger to revisit:** a real editor reporting that the
+  first-run experience is confusing, not a hypothetical one. If it is ever
+  reversed, the safe default is the thing being given up, and the massage case is
+  the argument to re-read first.
+- **A residue worth knowing.** The TestSite's booking harness now takes
+  `?resourceId=`; without it the page renders the first resource by list order,
+  which is a withholding one and therefore only ever shows half the behaviour.
