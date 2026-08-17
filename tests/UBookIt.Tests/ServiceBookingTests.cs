@@ -499,7 +499,7 @@ public class ServiceBookingTests
     }
 
     [Fact]
-    public async Task An_ineligible_preference_is_reported_even_when_the_pool_is_empty()
+    public async Task An_ineligible_pin_is_reported_even_when_the_pool_is_empty()
     {
         // The empty-pool guard must not mask the caller's own mistake.
         var service = Svc(type: "nothing-of-this-type");
@@ -512,7 +512,7 @@ public class ServiceBookingTests
     }
 
     [Fact]
-    public async Task An_empty_pool_without_a_preference_is_service_unavailable()
+    public async Task An_empty_pool_without_a_pin_is_service_unavailable()
     {
         var service = Svc(type: "nothing-of-this-type");
         var harness = Wire(service, Room(1));
@@ -610,7 +610,7 @@ public class ServiceBookingTests
     }
 
     [Fact]
-    public async Task Spec_scenario_preferred_resource_is_tried_first()
+    public async Task Spec_scenario_a_pinned_resource_is_used()
     {
         var service = Svc();
         var harness = Wire(service, Room(1), Room(2));
@@ -668,7 +668,7 @@ public class ServiceBookingTests
     }
 
     [Fact]
-    public async Task Spec_scenario_preferred_resource_outside_the_pool_is_rejected()
+    public async Task Spec_scenario_a_pinned_resource_outside_every_pool_is_rejected()
     {
         var service = Svc();
         var harness = Wire(service, Room(1), Room(2), Room(9, type: "therapist"));

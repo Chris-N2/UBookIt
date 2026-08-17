@@ -6,8 +6,8 @@ using UBookIt.Core.Stores;
 namespace UBookIt.Core.Services;
 
 /// <summary>
-/// A request to book a service. The resource is resolved by the candidate loop,
-/// not supplied by the caller — except as an optional preference.
+/// A request to book a service. The resources are resolved by the assignment, not
+/// supplied by the caller — except that the caller may pin one of them.
 /// </summary>
 public sealed record ServiceBookingRequest
 {
@@ -26,10 +26,21 @@ public sealed record ServiceBookingRequest
     public required Booker Booker { get; init; }
 
     /// <summary>
-    /// An optional preference for which eligible resource fulfils the booking.
-    /// An in-pool preference is attempted first and falls through when it cannot
-    /// take the booking; a preference naming a resource outside the pool is
-    /// rejected rather than ignored (design D9).
+    /// Optionally require a particular eligible resource to fulfil the booking.
+    /// <para>
+    /// A <b>pin, not a preference</b>: when no saturating assignment can include
+    /// it — while one exists without it — placement fails with
+    /// <see cref="FailureCodes.PinnedResourceUnavailable"/> rather than booking a
+    /// different resource. A caller who names a resource has chosen it. Naming one
+    /// outside every pool is a different fault and is still
+    /// <see cref="FailureCodes.ResourceNotEligible"/>, rejected rather than ignored
+    /// (design D9).
+    /// </para>
+    /// <para>
+    /// It names the <b>booking</b>, not a role: a resource may be eligible for
+    /// several of a service's roles, so the pin requires only that it appear
+    /// somewhere in the assignment, and the assignment chooses which slot.
+    /// </para>
     /// </summary>
     public Guid? PinnedResourceId { get; init; }
 }
@@ -636,14 +647,14 @@ public sealed class ServiceBookingService(
         // every pool is equally wrong whether some pool is empty or merely lacks
         // that resource, and the caller's own mistake is the more useful thing
         // to report.
-        if (request.PinnedResourceId is { } preferred
-            && !pools.Any(p => p.Candidates.Any(c => c.ResourceId == preferred)))
+        if (request.PinnedResourceId is { } pinnedOutOfPool
+            && !pools.Any(p => p.Candidates.Any(c => c.ResourceId == pinnedOutOfPool)))
         {
             // Rejected rather than ignored: the caller named a resource, and
             // quietly booking a different one discards that invisibly (design D9).
             return DomainResult<Booking>.Failure(
                 FailureCodes.ResourceNotEligible,
-                $"Resource {preferred} cannot fulfil this service.",
+                $"Resource {pinnedOutOfPool} cannot fulfil this service.",
                 nameof(ServiceBookingRequest.PinnedResourceId));
         }
 
@@ -984,20 +995,30 @@ public sealed class ServiceBookingService(
             // this as `conflict` or `service-unavailable` would describe a
             // different failure from the one that occurred (design D5).
             //
-            // After the request-level scan above, deliberately: a broken site zone
-            // or an unrepresentable interval is identical for every candidate and
-            // is not the pin's doing.
+            // After the request-level scan above. That ordering is deliberate but
+            // is NOT what holds the guarantee, and the comment used to claim it
+            // was: a broken site zone makes every rule check fail, so the
+            // admitting-and-free graph is empty and the D4a guard below answers
+            // false whichever order these sit in. The scan stays first because it
+            // is the honest order to read, not because it is load-bearing.
+            // A lost race is a lost race, whichever slot lost it — and the store
+            // reports that a placement clashed, never which claim did. So a
+            // conflict is reported as a conflict even when a pin was supplied
+            // (design D4's table), because `Exclude` condemns the whole assignment
+            // including the pinned resource, and blaming the pin would tell a
+            // booker their chosen person was unavailable when it was the room that
+            // was taken. QA found this ordering the wrong way round.
+            if (raced)
+            {
+                return Raced();
+            }
+
             if (Pinned is { } pinned && SomethingCouldHaveBeenAssigned())
             {
                 return DomainResult<Booking>.Failure(
                     FailureCodes.PinnedResourceUnavailable,
                     $"Resource {pinned} could not be booked for this service at that time.",
                     nameof(ServiceBookingRequest.PinnedResourceId));
-            }
-
-            if (raced)
-            {
-                return Raced();
             }
 
             // The graph an attempt could actually have run over: the candidates

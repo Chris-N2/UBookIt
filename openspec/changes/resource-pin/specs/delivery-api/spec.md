@@ -20,12 +20,18 @@ when a resource became able to belong to several pools at once, and which
 booking — has always been the one the code implements.
 
 A pin SHALL be honoured or reported, never substituted. When no assignment including
-it can be made, the endpoint SHALL fail with `pinned-resource-unavailable`, mapping
+it can be made **but one exists without it**, the endpoint SHALL fail with
+`pinned-resource-unavailable`, mapping
 to 400 through the existing rule that every code outside the conflict and not-found
 families takes that status. The code SHALL be distinct from `conflict`, so a
 consumer can tell "the person you chose is not free then" from "nothing could be
 booked", and distinct from `resource-not-eligible`, which reports a resource that
 could never fulfil this service at all.
+
+When nothing could have been assigned with or without the pin, the endpoint SHALL
+answer as it does for an unpinned request — `conflict` or `service-unavailable` —
+rather than blaming the pin. Reporting the pin there would be true but misleading:
+it invites a consumer to offer the resources that were free, and there were none.
 
 The existing `POST /bookings` endpoint SHALL remain unchanged in route, request model, response model, and semantics: direct placement claims exactly one resource and continues to report it as it always has.
 
@@ -49,7 +55,7 @@ The existing `POST /bookings` endpoint SHALL remain unchanged in route, request 
 - **WHEN** a service placement for a fixed 60-minute service requests 90 minutes
 - **THEN** the response is 400 problem details carrying `duration-too-long`, and no booking exists at 60 minutes or any other length
 
-#### Scenario: Preferred resource is optional
+#### Scenario: The pin is optional
 - **WHEN** a service placement omits the pinned resource id
 - **THEN** placement proceeds over every role's full candidate pool in its deterministic order
 
@@ -70,8 +76,12 @@ The existing `POST /bookings` endpoint SHALL remain unchanged in route, request 
 - **THEN** its request and response are exactly as before, carrying a single resource id
 
 #### Scenario: A pin that cannot be honoured is reported, not substituted
-- **WHEN** a service placement names a pinned resource id that is eligible but cannot be included in any assignment at that instant
+- **WHEN** a service placement names a pinned resource id that is eligible but cannot be included in any assignment at that instant, while an assignment exists without it
 - **THEN** the response is 400 problem details carrying `pinned-resource-unavailable`, and no booking is created
+
+#### Scenario: Nothing bookable at all is not reported as the pin's failure
+- **WHEN** a service placement names an eligible pinned resource at an instant where no assignment can be made with or without it
+- **THEN** the response carries the ordinary all-fail code — `conflict` when a race could have been lost — and not `pinned-resource-unavailable`
 
 #### Scenario: A pin failure is distinguishable from a conflict
 - **WHEN** a consumer compares a refused pin with a placement that failed because nothing could be booked

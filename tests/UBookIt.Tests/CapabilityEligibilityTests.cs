@@ -201,7 +201,7 @@ public class CapabilityEligibilityTests
     }
 
     [Fact]
-    public async Task An_ineligible_preferred_resource_is_still_rejected_when_ineligibility_is_by_capability()
+    public async Task An_ineligible_pinned_resource_is_still_rejected_when_ineligibility_is_by_capability()
     {
         // D9's failure now fires for a capability-based exclusion as well as a
         // type-based one. It stays acceptable because both inputs are published,

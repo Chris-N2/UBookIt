@@ -206,8 +206,8 @@ internal static class SlotAssignment
     /// Returns a bare null rather than a deficient set, deliberately. Its failures
     /// are failures of the <em>constrained</em> graphs it built — one per slot the
     /// resource could have filled — and a witness drawn from one of those would
-    /// describe a question the caller never asked, since preference falling through
-    /// is not a shortage of resources. The caller that wants a reason asks
+    /// describe a question the caller never asked: a pin that cannot be honoured is
+    /// not a shortage of resources. The caller that wants a reason asks
     /// <see cref="TrySaturate"/> over the unconstrained graph.
     /// </para>
     /// </summary>

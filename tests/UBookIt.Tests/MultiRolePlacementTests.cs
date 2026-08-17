@@ -14,10 +14,10 @@ namespace UBookIt.Tests;
 /// booking, one interval (service-booking spec, "Booking a service resolves a
 /// resource by candidate loop").
 /// <para>
-/// The preference scenarios are carried forward from the single-role
-/// requirement rather than assumed to still hold: a preferred resource now has
-/// to constrain its own role and leave the others alone, which is a claim the
-/// single-role tests could not make.
+/// The pin scenarios are carried forward from the single-role requirement rather
+/// than assumed to still hold: a pinned resource names the BOOKING rather than a
+/// role — it must appear somewhere in the assignment, and the assignment chooses
+/// where — which is a claim the single-role tests could not make.
 /// </para>
 /// </summary>
 public class MultiRolePlacementTests
@@ -213,7 +213,7 @@ public class MultiRolePlacementTests
     }
 
     [Fact]
-    public async Task A_preferred_resource_constrains_the_booking_not_one_role()
+    public async Task A_pinned_resource_constrains_the_booking_not_one_role()
     {
         var service = Svc(ResourceTypes.Room, Therapist);
         var harness = TwoOfEach(service);
@@ -288,11 +288,42 @@ public class MultiRolePlacementTests
     [Fact]
     public async Task Spec_scenario_a_pin_failure_invites_a_retry()
     {
-        // Transient, not deterministic: the pinned resource may free up. Telling a
-        // booker not to bother because one named person is busy would be false.
-        Assert.DoesNotContain(
-            FailureCodes.PinnedResourceUnavailable,
-            DeterministicRefusalCodes());
+        // "Transient" asserted by RETRYING, not by inspecting a whitelist.
+        //
+        // The first version of this test compared the code against a hand-copied
+        // list of the deterministic refusals — the exact thing its own comment
+        // warned against, and QA proved it: adding the code to `IsDeterministic`
+        // left all 647 tests green. It could not fail, because whitelist
+        // membership is not observable from outside: the pin failure is returned
+        // by the all-fail classification and never travels as a per-candidate
+        // refusal, so `IsDeterministic` never sees it either way.
+        //
+        // What "transient" actually promises is that the same request can succeed
+        // later. So the test frees the pinned resource and asks again.
+        var service = Svc(ResourceTypes.Room, Therapist);
+        var harness = TwoOfEach(service);
+
+        var blocking = await harness.Bookings.PlaceAsync(new BookingRequest
+        {
+            ResourceId = Id(4),
+            Start = TestData.Utc(Date, "09:00"),
+            Duration = Mins(60),
+            Booker = TestData.Booker(),
+        });
+
+        Assert.True(blocking.Succeeded);
+
+        var refused = await harness.Services.PlaceAsync(Request(service, "09:00", 60, pinned: Id(4)));
+
+        Assert.Equal(FailureCodes.PinnedResourceUnavailable, Assert.Single(refused.Failures).Code);
+
+        // The pinned resource frees up; nothing else about the request changes.
+        Assert.True((await harness.Bookings.CancelAsync(blocking.Value.Id)).Succeeded);
+
+        var retried = await harness.Services.PlaceAsync(Request(service, "09:00", 60, pinned: Id(4)));
+
+        Assert.True(retried.Succeeded, "a transient failure must be able to come good on a retry");
+        Assert.Contains(Id(4), retried.Value.Claims.Select(c => c.ResourceId));
     }
 
     [Fact]
@@ -390,24 +421,9 @@ public class MultiRolePlacementTests
         Assert.NotEqual(FailureCodes.PinnedResourceUnavailable, Assert.Single(pinned.Failures).Code);
     }
 
-    /// <summary>
-    /// The deterministic-refusal whitelist, read from the placement path rather
-    /// than restated here — a copy would agree with itself while disagreeing with
-    /// the code.
-    /// </summary>
-    private static IEnumerable<string> DeterministicRefusalCodes()
-        => [
-            FailureCodes.IntervalInvalid,
-            FailureCodes.Granularity,
-            FailureCodes.DurationTooShort,
-            FailureCodes.DurationTooLong,
-            FailureCodes.LeadTime,
-            FailureCodes.Horizon,
-            FailureCodes.OutsideOpenHours,
-        ];
 
     [Fact]
-    public async Task Spec_scenario_preferred_resource_outside_every_pool_is_rejected()
+    public async Task Spec_scenario_a_pinned_resource_outside_every_pool_is_rejected()
     {
         var service = Svc(ResourceTypes.Room, Therapist);
         var harness = Wire(
@@ -424,9 +440,9 @@ public class MultiRolePlacementTests
     }
 
     [Fact]
-    public async Task Spec_scenario_an_ineligible_preference_is_reported_even_when_a_pool_is_empty()
+    public async Task Spec_scenario_an_ineligible_pin_is_reported_even_when_a_pool_is_empty()
     {
-        // No therapist exists, and the preference names a resource in no pool.
+        // No therapist exists, and the pin names a resource in no pool.
         // The caller's own mistake is the more useful thing to report.
         var service = Svc(ResourceTypes.Room, Therapist);
         var harness = Wire(service, Res(1, ResourceTypes.Room), Res(9, "equipment"));
@@ -502,6 +518,76 @@ public class MultiRolePlacementTests
         public Task<DomainResult<Booking>> CancelAsync(
             Guid bookingId, CancellationToken cancellationToken = default)
             => inner.CancelAsync(bookingId, cancellationToken);
+    }
+
+    /// <summary>
+    /// Loses the store-level race that a claims pre-filter cannot simulate: every
+    /// placement attempt is refused with <c>conflict</c>, as though another
+    /// booking committed between the free-set read and the insert.
+    /// </summary>
+    private sealed class RacingBookingService(IBookingService inner) : IBookingService
+    {
+        public Task<DomainResult<Booking>> PlaceAsync(
+            BookingRequest request, CancellationToken cancellationToken = default)
+            => inner.PlaceAsync(request, cancellationToken);
+
+        public Task<DomainResult<Booking>> PlaceAsync(
+            MultiClaimBookingRequest request, CancellationToken cancellationToken = default)
+            => Task.FromResult(DomainResult<Booking>.Failure(
+                FailureCodes.Conflict, "Another booking took it first."));
+
+        public DomainResult CheckPlacementRules(Resource resource, DateTimeOffset start, TimeSpan duration)
+            => inner.CheckPlacementRules(resource, start, duration);
+
+        public Task<DomainResult<Booking>> CancelAsync(
+            Guid bookingId, CancellationToken cancellationToken = default)
+            => inner.CancelAsync(bookingId, cancellationToken);
+    }
+
+    [Fact]
+    public async Task A_race_on_a_slot_the_pin_never_filled_is_a_conflict_not_the_pins_failure()
+    {
+        // Design D4's own table says a placement that loses a race answers
+        // `conflict` whether or not a pin was supplied — and the code had the two
+        // checks the wrong way round, so it blamed the pin. QA found it.
+        //
+        // The store reports that a placement clashed, never which claim clashed,
+        // so the racing slot here may well be the room. Telling a booker their
+        // chosen therapist was unavailable would then be simply false.
+        //
+        // Getting here needs the pin to be IN the graph, which is not obvious and
+        // is the reason the first draft of this test could not reach the case at
+        // all: when a pinned resource is already claimed, `Resolve` returns no
+        // assignment and the loop makes zero attempts, so `raced` is false and the
+        // pin genuinely is the only answer. A race is only reachable for a pinned
+        // request when attempts *were* made — and every one of those contained the
+        // pin. The store then says a placement clashed without saying which claim
+        // did, which is precisely why the pin must not be blamed. The claims
+        // pre-filter cannot produce that, hence the decorator.
+        var service = Svc(ResourceTypes.Room, Therapist);
+
+        var resourceStore = new InMemoryResourceStore();
+        foreach (var resource in new[] { Res(1, ResourceTypes.Room), Res(2, ResourceTypes.Room), Res(3, Therapist), Res(4, Therapist) })
+        {
+            resourceStore.Add(resource);
+        }
+
+        var serviceStore = new InMemoryServiceStore().Add(service);
+        var bookingStore = new InMemoryBookingStore();
+        var time = new FixedTimeProvider(TestData.Now);
+        var availability = new AvailabilityService(resourceStore, bookingStore, time, TestData.Settings);
+        var real = new BookingService(resourceStore, bookingStore, time, TestData.Settings);
+
+        // Everything is free, so the pinned therapist is in the graph, every
+        // attempt includes it, and each one loses to the racing store — leaving
+        // `raced` true with assignments still plainly available.
+        var racing = new ServiceBookingService(
+            serviceStore, resourceStore, bookingStore, availability, new RacingBookingService(real), TestData.Settings);
+
+        var placed = await racing.PlaceAsync(Request(service, "09:00", 60, pinned: Id(4)));
+
+        Assert.False(placed.Succeeded);
+        Assert.Equal(FailureCodes.Conflict, Assert.Single(placed.Failures).Code);
     }
 
     [Fact]
@@ -838,9 +924,9 @@ public class MultiRolePlacementTests
     {
         // Both roles name `therapist`; resource 3 holds `cert-x` and so sits in both
         // pools. Before assignment, `Combinations` generated (3, 3) — and because a
-        // preferred resource was ordered to the head of *every* pool containing it,
+        // pinned resource was ordered to the head of *every* pool containing it,
         // that duplicate was the FIRST attempt, which `Booking.Create` throws on
-        // rather than refusing. The preference is supplied here for exactly that
+        // rather than refusing. The pin is supplied here for exactly that
         // reason.
         var service = SameType(Therapist, [], ["cert-x"]);
         var harness = Wire(service, ResWith(3, Therapist, "cert-x"), Res(4, Therapist));
@@ -853,7 +939,7 @@ public class MultiRolePlacementTests
         Assert.Equal(2, claimed.Count);
         Assert.Equal(2, claimed.Distinct().Count());
 
-        // The preference is honoured — in whichever slot it fits, which is the
+        // The pin is honoured — in whichever slot it fits, which is the
         // capability-constrained one, since nothing else can fill it.
         Assert.Contains(Id(3), claimed);
         Assert.Contains(Id(4), claimed);
@@ -917,7 +1003,7 @@ public class MultiRolePlacementTests
     }
 
     [Fact]
-    public async Task A_preference_is_honoured_in_whichever_slot_admits_it()
+    public async Task A_pin_is_honoured_in_whichever_slot_admits_it()
     {
         // Resource 4 has no capabilities, so it can fill only the unconstrained
         // role. Preferring it must not be read as "fill role 1 with it" — the

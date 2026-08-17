@@ -265,6 +265,31 @@ public class ServicesDeliveryTests
         Assert.Equal(FailureCodes.Conflict, Assert.Single(poolFailure).Code);
     }
 
+    [Fact]
+    public async Task Spec_scenario_nothing_bookable_at_all_is_not_reported_as_the_pins_failure()
+    {
+        // Design D4a at the boundary. The pinned room is busy AND it is the only
+        // room, so no assignment exists with or without the pin. Blaming the pin
+        // would be true and misleading: it invites the front end to offer the
+        // resources that were free, and there are none.
+        var h = Wire(null, Room(1));
+
+        Assert.True((await h.Bookings.PlaceAsync(new BookingRequest
+        {
+            ResourceId = new Guid("00000000-0000-0000-0000-000000000001"),
+            Start = TestData.Utc(Date, "09:00"),
+            Duration = TimeSpan.FromMinutes(60),
+            Booker = TestData.Booker(),
+        })).Succeeded);
+
+        var (status, errors) = Problem(await h.Controller.PlaceServiceBooking(
+            h.Service.Id,
+            Placement(pinned: new Guid("00000000-0000-0000-0000-000000000001"))));
+
+        Assert.Equal(StatusCodes.Status409Conflict, status);
+        Assert.Equal(FailureCodes.Conflict, Assert.Single(errors).Code);
+    }
+
     // --- service read ---
 
     [Fact]
@@ -553,7 +578,7 @@ public class ServicesDeliveryTests
     }
 
     [Fact]
-    public async Task Spec_scenario_preferred_resource_is_optional()
+    public async Task Spec_scenario_the_pin_is_optional()
     {
         var h = Wire(null, Room(1), Room(2));
 
@@ -599,7 +624,7 @@ public class ServicesDeliveryTests
     }
 
     [Fact]
-    public async Task Spec_scenario_ineligible_preferred_resource_is_rejected()
+    public async Task Spec_scenario_ineligible_pinned_resource_is_rejected()
     {
         var h = Wire(null, Room(1), Room(9, type: "therapist"));
 
@@ -670,7 +695,7 @@ public class ServicesDeliveryTests
         Assert.DoesNotContain(
             typeof(PlacementRequestModel).GetProperties(),
             p => p.Name.Contains("Service", StringComparison.OrdinalIgnoreCase)
-                || p.Name.Contains("Preferred", StringComparison.OrdinalIgnoreCase));
+                || p.Name.Contains("Pinned", StringComparison.OrdinalIgnoreCase));
 
         Assert.DoesNotContain(
             typeof(ServicePlacementRequestModel).GetProperties(),

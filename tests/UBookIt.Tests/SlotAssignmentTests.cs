@@ -173,7 +173,7 @@ public class SlotAssignmentTests
         // This case asserts less than it looks like it does, and the reason is worth
         // stating so nobody strengthens it by mistake.
         //
-        // Whenever a saturating assignment exists AND the preferred resource is
+        // Whenever a saturating assignment exists AND the pinned resource is
         // eligible for some slot, an assignment *containing* it always exists: pin
         // it to that slot, and the original matching restricted to the remaining
         // slots avoids it, because a matching uses each resource at most once. So
@@ -185,11 +185,15 @@ public class SlotAssignmentTests
         Assert.Null(SlotAssignment.TrySaturateIncluding([Pool(R1, R2), Pool(R1), Pool(R2)], R1));
         Assert.Null(SlotAssignment.TrySaturate([Pool(R1, R2), Pool(R1), Pool(R2)]).Assignment);
 
-        // The genuine fall-through — a preference that cannot be honoured while
-        // some assignment still can — is not reachable here. It arises one level up,
-        // where the claims pre-filter removes the preferred resource from the pool
-        // before the assignment sees it, and is covered by
-        // MultiRolePlacementTests.Spec_scenario_preferred_resource_falls_through_when_unavailable.
+        // A pin that cannot be honoured while some assignment still can is not
+        // reachable here, and that is the whole point: it arises one level up, where
+        // the claims pre-filter removes the pinned resource from the pool before the
+        // assignment sees it. Covered by
+        // MultiRolePlacementTests.Spec_scenario_a_pin_that_cannot_be_honoured_fails_rather_than_substituting.
+        //
+        // This property is what design D4 of `resource-pin` rests on: a pin has no
+        // structural failure mode, so the only reason one fails is that the resource
+        // is out of the graph.
     }
 
     [Fact]
