@@ -1,4 +1,5 @@
 using System.ComponentModel.DataAnnotations;
+using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
 using UBookIt.Core.Availability;
 using UBookIt.Core.Bookings;
@@ -200,6 +201,68 @@ public class ServicesDeliveryTests
             await h.Controller.PlaceServiceBooking(h.Service.Id, Placement()));
 
         Assert.Equal([withholding.Id], placed.Resources.Select(r => r.ResourceId));
+    }
+
+    [Fact]
+    public async Task Spec_scenario_a_pin_that_cannot_be_honoured_is_reported_not_substituted()
+    {
+        // At the HTTP boundary: the pinned room is busy, the other is free, so the
+        // old behaviour would have returned 200 with a resource the caller never
+        // asked for.
+        var h = Wire(null, Room(1), Room(2));
+
+        Assert.True((await h.Bookings.PlaceAsync(new BookingRequest
+        {
+            ResourceId = new Guid("00000000-0000-0000-0000-000000000002"),
+            Start = TestData.Utc(Date, "09:00"),
+            Duration = TimeSpan.FromMinutes(60),
+            Booker = TestData.Booker(),
+        })).Succeeded);
+
+        var (status, errors) = Problem(await h.Controller.PlaceServiceBooking(
+            h.Service.Id,
+            Placement(pinned: new Guid("00000000-0000-0000-0000-000000000002"))));
+
+        // 400 through the existing catch-all, asserted rather than assumed — that
+        // mapping requirement is not modified, so this is the only thing holding it.
+        Assert.Equal(StatusCodes.Status400BadRequest, status);
+        Assert.Equal(FailureCodes.PinnedResourceUnavailable, Assert.Single(errors).Code);
+    }
+
+    [Fact]
+    public async Task Spec_scenario_a_pin_failure_is_distinguishable_from_a_conflict()
+    {
+        // The reason the code exists: a front end must be able to tell "the person
+        // you chose is not free" from "nothing could be booked", because only the
+        // first has a useful next step.
+        var pinnedBusy = Wire(null, Room(1), Room(2));
+        Assert.True((await pinnedBusy.Bookings.PlaceAsync(new BookingRequest
+        {
+            ResourceId = new Guid("00000000-0000-0000-0000-000000000002"),
+            Start = TestData.Utc(Date, "09:00"),
+            Duration = TimeSpan.FromMinutes(60),
+            Booker = TestData.Booker(),
+        })).Succeeded);
+
+        var (_, pinFailure) = Problem(await pinnedBusy.Controller.PlaceServiceBooking(
+            pinnedBusy.Service.Id,
+            Placement(pinned: new Guid("00000000-0000-0000-0000-000000000002"))));
+
+        // The same service with its ONLY room busy: nothing could be booked.
+        var allBusy = Wire(null, Room(1));
+        Assert.True((await allBusy.Bookings.PlaceAsync(new BookingRequest
+        {
+            ResourceId = new Guid("00000000-0000-0000-0000-000000000001"),
+            Start = TestData.Utc(Date, "09:00"),
+            Duration = TimeSpan.FromMinutes(60),
+            Booker = TestData.Booker(),
+        })).Succeeded);
+
+        var (_, poolFailure) = Problem(await allBusy.Controller.PlaceServiceBooking(
+            allBusy.Service.Id, Placement()));
+
+        Assert.NotEqual(Assert.Single(poolFailure).Code, Assert.Single(pinFailure).Code);
+        Assert.Equal(FailureCodes.Conflict, Assert.Single(poolFailure).Code);
     }
 
     // --- service read ---

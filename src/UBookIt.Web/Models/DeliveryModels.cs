@@ -286,14 +286,24 @@ public sealed class ServicePlacementRequestModel
     public int? DurationMinutes { get; set; }
 
     /// <summary>
-    /// Optionally ask for a particular eligible resource. Placement seeks an
-    /// assignment that <em>includes</em> it, in whichever slot it fits, and falls
-    /// through to any assignment when none does; naming a resource that cannot
-    /// fulfil the service is rejected rather than ignored.
+    /// Optionally require a particular eligible resource. Placement seeks an
+    /// assignment that <em>includes</em> it, in whichever slot it fits.
+    /// <para>
+    /// A <b>pin, not a preference</b>: when no assignment can include it, the
+    /// request fails with <c>pinned-resource-unavailable</c> rather than booking a
+    /// different resource. A caller who names a resource has chosen it, and
+    /// quietly confirming a booking on someone else answers a question they did
+    /// not ask. Naming a resource that could never fulfil the service is a
+    /// different fault and is still <c>resource-not-eligible</c>.
+    /// </para>
     /// <para>
     /// A resource may be eligible for several of a service's roles, so this names
     /// the booking rather than a role — "this resource must appear somewhere in
-    /// it". Per-role preference would need a request shape no consumer has yet.
+    /// it". Per-role pinning would need a request shape no consumer has yet.
+    /// </para>
+    /// <para>
+    /// Omitting it expresses no choice, and placement then books whichever
+    /// assignment it finds — unchanged.
     /// </para>
     /// </summary>
     public Guid? PinnedResourceId { get; set; }
