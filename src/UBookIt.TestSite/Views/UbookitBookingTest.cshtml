@@ -5,7 +5,15 @@
     Layout = null;
     // Dev harness for change ⑤: render the default booking flow for the first
     // bookable resource, so the flow is reachable without hardcoding an id.
-    var firstResource = (await ResourceStore.ListAsync(0, 1)).Items.FirstOrDefault();
+    //
+    // `?resourceId=` overrides it. Added for the direct-booking permission, which
+    // has two outcomes to look at — a resource offered on its own and one that is
+    // not — and the first-resource default can only ever show one of them.
+    var requested = Guid.TryParse(Context.Request.Query["resourceId"], out var id) ? id : (Guid?)null;
+
+    var firstResource = requested is { } wanted
+        ? await ResourceStore.GetAsync(wanted)
+        : (await ResourceStore.ListAsync(0, 1)).Items.FirstOrDefault();
 }
 <!doctype html>
 <html lang="en">

@@ -41,3 +41,28 @@ on its account at save time.
 #### Scenario: Withholding is not a validation failure
 - **WHEN** a resource withholding the permission is created or updated
 - **THEN** the operation succeeds, because the permission is an offer rather than a rule
+
+## MODIFIED Requirements
+
+### Requirement: Resource definition
+A bookable resource SHALL have a `Guid` identifier, a resource type key, a non-empty display name, an optional description, a set of capability keys, and whether it may be booked on its own. The v1 shipped resource type SHALL be `room`, provided as a constant. The capability set SHALL default to empty, and an empty set SHALL mean the resource carries no capabilities — never that it carries all of them. Whether it may be booked on its own SHALL default to withheld, and SHALL mean only that: a resource withholding it remains fully usable as part of a service.
+
+#### Scenario: Creating a valid room resource
+- **WHEN** a resource is created with type `room` and display name "Meeting Room A"
+- **THEN** the resource is valid, has a non-empty `Guid` id, and reports type `room`
+
+#### Scenario: Display name is required
+- **WHEN** a resource is created with an empty or whitespace display name
+- **THEN** creation is rejected with a validation failure
+
+#### Scenario: Capabilities default to empty
+- **WHEN** a resource is created without specifying capabilities
+- **THEN** the resource is valid and reports an empty capability set
+
+#### Scenario: A resource carries the capabilities it is given
+- **WHEN** a resource is created with capabilities `massage` and `cert-x`
+- **THEN** the resource reports both capabilities and no others
+
+#### Scenario: Direct bookability defaults to withheld
+- **WHEN** a resource is created without stating whether it may be booked on its own
+- **THEN** the resource is valid and does not permit direct booking
