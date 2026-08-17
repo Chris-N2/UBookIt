@@ -23,6 +23,27 @@ export default {
     capabilityRemove: "Remove %0%",
     capabilityNone: "This resource has no capabilities.",
     capabilityHint: "Lower-case, hyphenated, e.g. cert-x. Choose one already in use, or enter a new one.",
+
+    // ---------------------------------------------------------- direct booking
+    //
+    // The control must not read as "can this be booked at all". A resource that
+    // withholds this is still fully bookable as part of a service — withholding
+    // makes it unbookable BY ITSELF, never unbookable — and an editor who reads
+    // it the other way will tick it for a therapist and reopen the hole the
+    // field exists to close.
+    //
+    // So the label says "on its own" and the hint states the consequence in both
+    // directions, rather than describing the checkbox.
+    directlyBookable: "Can be booked on its own",
+    directlyBookableHint:
+      "Tick this if someone can book this resource by itself, like hiring a room. Leave it unticked for a resource that only makes sense as part of a service — a therapist who also needs a room, say. Either way it can still be used by services.",
+
+    // The list column. Words rather than a tick, so it is readable by a screen
+    // reader and not carried by colour; "Service only" says the resource IS
+    // bookable, where a bare "No" would suggest otherwise.
+    directBooking: "Direct booking",
+    directBookingOffered: "On its own",
+    directBookingServiceOnly: "Service only",
     save: "Save",
     cancel: "Cancel",
     back: "Back to resources",

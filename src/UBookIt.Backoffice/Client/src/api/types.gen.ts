@@ -82,6 +82,7 @@ export type ResourceRequestModel = {
     openingHours: Array<OpeningHoursModel>;
     exceptions: Array<AvailabilityExceptionModel>;
     capabilities: Array<string>;
+    directlyBookable: boolean;
     constraints?: ConstraintsModel | null;
 };
 
@@ -93,6 +94,7 @@ export type ResourceResponseModel = {
     openingHours: Array<OpeningHoursModel>;
     exceptions: Array<AvailabilityExceptionModel>;
     capabilities: Array<string>;
+    directlyBookable: boolean;
     constraints: ConstraintsModel;
 };
 

@@ -72,6 +72,17 @@ export class UBookItResourceEditorElement extends UmbLitElement {
   private _capabilities: string[] = [];
 
   /**
+   * Whether this resource may be booked on its own.
+   *
+   * False by default, matching the domain: a resource that has not been given
+   * the permission does not have it. That default is the point of the field —
+   * it is what stops a therapist being sold without a room — so this must never
+   * be initialised to true "to preserve existing behaviour".
+   */
+  @state()
+  private _directlyBookable = false;
+
+  /**
    * Keys already carried by some resource, offered as suggestions. Purely a
    * convenience — a failed lookup leaves this empty and the control degrades to
    * free text rather than blocking the save.
@@ -149,6 +160,7 @@ export class UBookItResourceEditorElement extends UmbLitElement {
     }));
     this._constraints = { ...data.constraints };
     this._capabilities = [...data.capabilities];
+    this._directlyBookable = data.directlyBookable;
     this._loading = false;
   }
 
@@ -173,6 +185,7 @@ export class UBookItResourceEditorElement extends UmbLitElement {
       // Sent verbatim. Trimming happens where the key is added; normalizing
       // here would submit something other than what the chips show.
       capabilities: [...this._capabilities],
+      directlyBookable: this._directlyBookable,
       openingHours: DAY_ORDER.flatMap((day) =>
         (this._hours.get(day) ?? []).map((w) => ({ day, start: w.start, end: w.end })),
       ),
@@ -354,6 +367,35 @@ export class UBookItResourceEditorElement extends UmbLitElement {
             .value=${this._description}
             @input=${(e: InputEvent) => (this._description = (e.target as HTMLTextAreaElement).value)}
           ></uui-textarea>
+        </div>
+        <!--
+          A native checkbox rather than uui-toggle, and the reason is the hint
+          below it. The explanation has to be ASSOCIATED with the control, not
+          merely sitting next to it — a control saying only "bookable directly"
+          reads as "can be booked at all", which is false and is the misreading
+          most likely to make an editor tick it for a therapist. A native input
+          takes aria-describedby in this shadow root, where a uui component's
+          internal input is not reliably reachable from the host attribute; the
+          editor already uses native inputs for the same reason elsewhere.
+
+          (No backticks in here: this is inside a Lit template literal, and one
+          would end the template.)
+        -->
+        <div class="field">
+          <div class="checkbox-field">
+            <input
+              id="resource-directly-bookable"
+              type="checkbox"
+              .checked=${this._directlyBookable}
+              aria-describedby="resource-directly-bookable-hint"
+              @change=${(e: Event) =>
+                (this._directlyBookable = (e.target as HTMLInputElement).checked)}
+            />
+            <label for="resource-directly-bookable">${this.#term("directlyBookable")}</label>
+          </div>
+          <p id="resource-directly-bookable-hint" class="hint">
+            ${this.#term("directlyBookableHint")}
+          </p>
         </div>
       </uui-box>
     `;
@@ -540,6 +582,11 @@ export class UBookItResourceEditorElement extends UmbLitElement {
   static override styles = css`
     uui-box {
       margin-top: var(--uui-size-space-4);
+    }
+    .checkbox-field {
+      align-items: center;
+      display: flex;
+      gap: var(--uui-size-space-2);
     }
     .field {
       display: flex;

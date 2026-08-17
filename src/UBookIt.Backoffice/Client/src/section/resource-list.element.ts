@@ -142,6 +142,7 @@ export class UBookItResourceListElement extends UmbLitElement {
           <uui-table-head-cell>${this.#term("name")}</uui-table-head-cell>
           <uui-table-head-cell>${this.#term("type")}</uui-table-head-cell>
           <uui-table-head-cell>${this.#term("availability")}</uui-table-head-cell>
+          <uui-table-head-cell>${this.#term("directBooking")}</uui-table-head-cell>
           <uui-table-head-cell><span class="visually-hidden">${this.#term("actions")}</span></uui-table-head-cell>
         </uui-table-head>
         ${this._items.map(
@@ -150,6 +151,19 @@ export class UBookItResourceListElement extends UmbLitElement {
               <uui-table-cell>${resource.displayName}</uui-table-cell>
               <uui-table-cell>${resource.type}</uui-table-cell>
               <uui-table-cell>${this.#summarize(resource)}</uui-table-cell>
+              <!--
+                Words, never a tick or a colour. With the permission withheld by
+                default the editor's question is "why can nothing book this
+                room?", and this column is where they will look — so it has to
+                answer in a form a screen reader reads and a colour-blind reader
+                sees. "Service only" also says the resource IS bookable, which a
+                bare "No" would not.
+              -->
+              <uui-table-cell>
+                ${resource.directlyBookable
+                  ? this.#term("directBookingOffered")
+                  : this.#term("directBookingServiceOnly")}
+              </uui-table-cell>
               <uui-table-cell>
                 <uui-button
                   look="secondary"
