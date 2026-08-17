@@ -31,7 +31,7 @@ public sealed record ServiceBookingRequest
     /// take the booking; a preference naming a resource outside the pool is
     /// rejected rather than ignored (design D9).
     /// </summary>
-    public Guid? PreferredResourceId { get; init; }
+    public Guid? PinnedResourceId { get; init; }
 }
 
 /// <summary>Availability and placement for a service, resolving its role to eligible resources.</summary>
@@ -636,7 +636,7 @@ public sealed class ServiceBookingService(
         // every pool is equally wrong whether some pool is empty or merely lacks
         // that resource, and the caller's own mistake is the more useful thing
         // to report.
-        if (request.PreferredResourceId is { } preferred
+        if (request.PinnedResourceId is { } preferred
             && !pools.Any(p => p.Candidates.Any(c => c.ResourceId == preferred)))
         {
             // Rejected rather than ignored: the caller named a resource, and
@@ -644,7 +644,7 @@ public sealed class ServiceBookingService(
             return DomainResult<Booking>.Failure(
                 FailureCodes.ResourceNotEligible,
                 $"Resource {preferred} cannot fulfil this service.",
-                nameof(ServiceBookingRequest.PreferredResourceId));
+                nameof(ServiceBookingRequest.PinnedResourceId));
         }
 
         if (pools.Any(p => p.Candidates.Count == 0))
@@ -663,7 +663,7 @@ public sealed class ServiceBookingService(
 
         // One shortlist per role, in resource-id order.
         //
-        // The preferred resource is deliberately NOT ordered to the head any more.
+        // The pinned resource is deliberately NOT ordered to the head.
         // It used to be, because a resource belonged to exactly one role's pool; now
         // that it can be eligible for several, hoisting it put the same resource at
         // the head of every one of them — making an assignment that claims it twice
@@ -732,7 +732,7 @@ public sealed class ServiceBookingService(
         // the bound the cartesian walk could not offer (task 3.5).
         var remaining = freeSlots.Select(slot => slot.ToList()).ToList();
 
-        while (Resolve(remaining, request.PreferredResourceId) is { } assignment)
+        while (Resolve(remaining, request.PinnedResourceId) is { } assignment)
         {
             // One booking claiming one resource per slot, all distinct by
             // construction, placed through the store's all-or-nothing contract:
@@ -810,25 +810,31 @@ public sealed class ServiceBookingService(
     }
 
     /// <summary>
-    /// One candidate per slot, all distinct, honouring a preferred resource where
-    /// an assignment can — or null when no assignment saturates the slots.
+    /// One candidate per slot, all distinct, including the pinned resource when one
+    /// was named — or null when no such assignment saturates the slots.
     /// <para>
-    /// Preference is a constraint on the booking rather than on a role (design D4):
-    /// the assignment is asked for a saturating matching that includes the resource
-    /// in whichever slot it fits, and only when none exists does the preference fall
-    /// through, as it does today. A preference naming a resource outside every pool
-    /// was already rejected before any of this ran.
+    /// A pin constrains the booking rather than a role (design D4): the assignment
+    /// is asked for a saturating matching that includes the resource in whichever
+    /// slot it fits. A pin naming a resource outside every pool was already
+    /// rejected before any of this ran.
+    /// </para>
+    /// <para>
+    /// <b>There is no fall-through.</b> When no assignment includes the pinned
+    /// resource this returns null, exactly as it does when nothing saturates at
+    /// all, and the caller reports the pin failure. Falling back to any assignment
+    /// — which this did until the pin replaced the preference — confirmed a booking
+    /// on a resource the caller had not asked for, silently.
     /// </para>
     /// </summary>
     private static List<ServiceCandidate>? Resolve(
-        List<List<ServiceCandidate>> slots, Guid? preferredResourceId)
+        List<List<ServiceCandidate>> slots, Guid? pinnedResourceId)
     {
         var ids = slots
             .Select(slot => (IReadOnlyList<Guid>)slot.Select(c => c.ResourceId).ToList())
             .ToList();
 
-        var assignment = preferredResourceId is { } preferred
-            ? SlotAssignment.TrySaturateIncluding(ids, preferred) ?? SlotAssignment.TrySaturate(ids).Assignment
+        var assignment = pinnedResourceId is { } pinned
+            ? SlotAssignment.TrySaturateIncluding(ids, pinned)
             : SlotAssignment.TrySaturate(ids).Assignment;
 
         if (assignment is null)
@@ -923,6 +929,14 @@ public sealed class ServiceBookingService(
         List<List<ServiceCandidate>> shortlists,
         List<List<ServiceCandidate>> free)
     {
+        /// <summary>
+        /// The pinned resource, when the caller named one. Its failure is reported
+        /// here only so it lands <em>after</em> the request-level scan below and
+        /// before any reasoning about the pool — never so it is classified as a
+        /// fact about the pool (design D5).
+        /// </summary>
+        private Guid? Pinned => request.PinnedResourceId;
+
         private readonly Dictionary<Guid, DomainResult> _checked = [];
 
         /// <summary>
@@ -963,6 +977,24 @@ public sealed class ServiceBookingService(
                 }
             }
 
+            // A pin that could not be honoured is its own answer, and reaching here
+            // with one supplied means exactly that: no assignment including it
+            // saturated the slots. Reported ahead of every question about the pool,
+            // because assignments may exist in abundance without it — classifying
+            // this as `conflict` or `service-unavailable` would describe a
+            // different failure from the one that occurred (design D5).
+            //
+            // After the request-level scan above, deliberately: a broken site zone
+            // or an unrepresentable interval is identical for every candidate and
+            // is not the pin's doing.
+            if (Pinned is { } pinned && SomethingCouldHaveBeenAssigned())
+            {
+                return DomainResult<Booking>.Failure(
+                    FailureCodes.PinnedResourceUnavailable,
+                    $"Resource {pinned} could not be booked for this service at that time.",
+                    nameof(ServiceBookingRequest.PinnedResourceId));
+            }
+
             if (raced)
             {
                 return Raced();
@@ -990,6 +1022,31 @@ public sealed class ServiceBookingService(
             return ClaimsBrokeIt(admitting)
                 ? Raced()
                 : Unavailable("This service cannot be booked at that time.");
+        }
+
+        /// <summary>
+        /// Whether an assignment existed at all once the pin is set aside — the
+        /// test that separates "the resource you chose was taken" from "nothing
+        /// could be booked whoever you chose" (design D4a).
+        /// <para>
+        /// Without it the pin would be blamed for an exhausted pool, inviting a
+        /// front end to offer the other people when there are none. Asked over the
+        /// same free-and-admitting graph the attempts ran on, by the same function
+        /// — one more evaluation, never a second implementation of the rule.
+        /// </para>
+        /// <para>
+        /// A pin cannot fail for any structural reason (design D4): whenever an
+        /// assignment exists and the pinned resource is eligible for a slot, an
+        /// assignment containing it exists too. So a true answer here means the
+        /// pinned resource is out of the graph — claimed, or refused by its own
+        /// rules — which is exactly what the code reports.
+        /// </para>
+        /// </summary>
+        private bool SomethingCouldHaveBeenAssigned()
+        {
+            var admittingAndFree = Ids(free);
+
+            return SlotAssignment.TrySaturate(admittingAndFree).Assignment is not null;
         }
 
         private static DomainResult<Booking> Raced()

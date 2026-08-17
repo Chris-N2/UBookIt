@@ -296,7 +296,7 @@ public sealed class ServicePlacementRequestModel
     /// it". Per-role preference would need a request shape no consumer has yet.
     /// </para>
     /// </summary>
-    public Guid? PreferredResourceId { get; set; }
+    public Guid? PinnedResourceId { get; set; }
 
     public BookerModel Booker { get; set; } = new();
 }

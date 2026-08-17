@@ -197,7 +197,7 @@ internal static class DeliveryModelMapper
             // Model validation guarantees the value is present.
             Duration = TimeSpan.FromMinutes(model.DurationMinutes!.Value),
             Booker = booker.Value,
-            PreferredResourceId = model.PreferredResourceId,
+            PinnedResourceId = model.PinnedResourceId,
         });
     }
 

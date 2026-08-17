@@ -191,7 +191,7 @@ internal static class SlotAssignment
     /// A saturating assignment that includes <paramref name="required"/>, or null
     /// when none does.
     /// <para>
-    /// A preferred resource names the booking rather than a role (design D4): a
+    /// A pinned resource names the booking rather than a role (design D4): a
     /// resource may be eligible for several slots, so "prefer this one" no longer
     /// identifies which slot it fills, and the assignment chooses. Each slot the
     /// resource is eligible for is tried in turn, with the resource pinned to that

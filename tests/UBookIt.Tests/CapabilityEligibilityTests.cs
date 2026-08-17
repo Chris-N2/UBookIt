@@ -215,7 +215,7 @@ public class CapabilityEligibilityTests
             Start = TestData.Utc(Date, "10:00"),
             Duration = TimeSpan.FromMinutes(60),
             Booker = TestData.Booker(),
-            PreferredResourceId = Frank.Id,
+            PinnedResourceId = Frank.Id,
         });
 
         Assert.False(placed.Succeeded);

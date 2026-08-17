@@ -109,7 +109,7 @@ public static class FailureCodes
     public const string ServiceUnavailable = "service-unavailable";
 
     /// <summary>
-    /// A service placement named a preferred resource that is not in the
+    /// A service placement named a pinned resource that is not in the
     /// service's candidate pool. Rejected rather than ignored: a caller who
     /// names a resource has stated an expectation, and silently booking a
     /// different one discards it invisibly.
@@ -127,6 +127,25 @@ public static class FailureCodes
     /// </para>
     /// </summary>
     public const string ResourceNotDirectlyBookable = "resource-not-directly-bookable";
+
+    /// <summary>
+    /// A service placement named a resource that is eligible, but no saturating
+    /// assignment at that instant could include it. The caller chose that
+    /// resource; confirming a booking on a different one would answer a question
+    /// they did not ask.
+    /// <para>
+    /// <b>Transient.</b> The pinned resource may be free at another time or may
+    /// free up, so a retry can succeed — unlike
+    /// <see cref="ServiceUnavailable"/>, which exists to say it cannot.
+    /// </para>
+    /// <para>
+    /// Distinct from <see cref="Conflict"/>, which says nothing could be booked
+    /// and leaves a caller unable to tell that other resources were free; and from
+    /// <see cref="ResourceNotEligible"/>, which says the named resource could never
+    /// fulfil this service at all.
+    /// </para>
+    /// </summary>
+    public const string PinnedResourceUnavailable = "pinned-resource-unavailable";
 }
 
 /// <summary>

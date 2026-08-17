@@ -95,14 +95,14 @@ public class ServiceBookingTests
     }
 
     private static ServiceBookingRequest Request(
-        Service service, string start, int durationMinutes, Guid? preferred = null)
+        Service service, string start, int durationMinutes, Guid? pinned = null)
         => new()
         {
             ServiceId = service.Id,
             Start = TestData.Utc(Date, start),
             Duration = Mins(durationMinutes),
             Booker = TestData.Booker(),
-            PreferredResourceId = preferred,
+            PinnedResourceId = pinned,
         };
 
     private static string SingleCode(DomainResult result) => Assert.Single(result.Failures).Code;
@@ -505,7 +505,7 @@ public class ServiceBookingTests
         var service = Svc(type: "nothing-of-this-type");
         var harness = Wire(service, Room(1));
 
-        var placed = await harness.Services.PlaceAsync(Request(service, "09:00", 60, preferred: Id(1)));
+        var placed = await harness.Services.PlaceAsync(Request(service, "09:00", 60, pinned: Id(1)));
 
         Assert.False(placed.Succeeded);
         Assert.Equal(FailureCodes.ResourceNotEligible, SingleCode(placed));
@@ -615,15 +615,18 @@ public class ServiceBookingTests
         var service = Svc();
         var harness = Wire(service, Room(1), Room(2));
 
-        var placed = await harness.Services.PlaceAsync(Request(service, "09:00", 60, preferred: Id(2)));
+        var placed = await harness.Services.PlaceAsync(Request(service, "09:00", 60, pinned: Id(2)));
 
         Assert.True(placed.Succeeded);
         Assert.Equal(Id(2), Assert.Single(placed.Value.Claims).ResourceId);
     }
 
     [Fact]
-    public async Task Spec_scenario_preferred_resource_falls_through_when_unavailable()
+    public async Task Spec_scenario_a_pin_that_cannot_be_honoured_fails_rather_than_substituting()
     {
+        // The single-role case. Room 2 is pinned and busy; room 1 is free — so the
+        // substitution the old behaviour made was not merely possible but obvious,
+        // which is what makes asserting the refusal worth doing.
         var service = Svc();
         var harness = Wire(service, Room(1), Room(2));
 
@@ -635,7 +638,30 @@ public class ServiceBookingTests
             Booker = TestData.Booker(),
         });
 
-        var placed = await harness.Services.PlaceAsync(Request(service, "09:00", 60, preferred: Id(2)));
+        var placed = await harness.Services.PlaceAsync(Request(service, "09:00", 60, pinned: Id(2)));
+
+        Assert.False(placed.Succeeded);
+        Assert.Equal(FailureCodes.PinnedResourceUnavailable, Assert.Single(placed.Failures).Code);
+    }
+
+    [Fact]
+    public async Task The_same_single_role_placement_without_the_pin_still_substitutes()
+    {
+        // The pair. Without a pin the caller expressed no preference, so booking
+        // room 1 is the right answer and always was — this change narrows what a
+        // NAMED resource means, not what an unnamed request does.
+        var service = Svc();
+        var harness = Wire(service, Room(1), Room(2));
+
+        await harness.Bookings.PlaceAsync(new BookingRequest
+        {
+            ResourceId = Id(2),
+            Start = TestData.Utc(Date, "09:00"),
+            Duration = Mins(60),
+            Booker = TestData.Booker(),
+        });
+
+        var placed = await harness.Services.PlaceAsync(Request(service, "09:00", 60));
 
         Assert.True(placed.Succeeded);
         Assert.Equal(Id(1), Assert.Single(placed.Value.Claims).ResourceId);
@@ -647,7 +673,7 @@ public class ServiceBookingTests
         var service = Svc();
         var harness = Wire(service, Room(1), Room(2), Room(9, type: "therapist"));
 
-        var placed = await harness.Services.PlaceAsync(Request(service, "09:00", 60, preferred: Id(9)));
+        var placed = await harness.Services.PlaceAsync(Request(service, "09:00", 60, pinned: Id(9)));
 
         Assert.False(placed.Succeeded);
         Assert.Equal(FailureCodes.ResourceNotEligible, SingleCode(placed));

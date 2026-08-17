@@ -161,12 +161,12 @@ public class ServicesDeliveryTests
     }
 
     private static ServicePlacementRequestModel Placement(
-        string start = "09:00", int? durationMinutes = 60, Guid? preferred = null)
+        string start = "09:00", int? durationMinutes = 60, Guid? pinned = null)
         => new()
         {
             Start = TestData.Utc(Date, start),
             DurationMinutes = durationMinutes,
-            PreferredResourceId = preferred,
+            PinnedResourceId = pinned,
             Booker = new BookerModel { Name = "Test Person", Email = "test@example.com" },
         };
 
@@ -495,7 +495,7 @@ public class ServicesDeliveryTests
         var h = Wire(null, Room(1), Room(2));
 
         var model = Ok<ServicePlacementResponseModel>(
-            await h.Controller.PlaceServiceBooking(h.Service.Id, Placement(preferred: null)));
+            await h.Controller.PlaceServiceBooking(h.Service.Id, Placement(pinned: null)));
 
         Assert.Equal(Id(1), Assert.Single(model.Resources).ResourceId);
     }
@@ -541,7 +541,7 @@ public class ServicesDeliveryTests
         var h = Wire(null, Room(1), Room(9, type: "therapist"));
 
         var (status, errors) = Problem(
-            await h.Controller.PlaceServiceBooking(h.Service.Id, Placement(preferred: Id(9))));
+            await h.Controller.PlaceServiceBooking(h.Service.Id, Placement(pinned: Id(9))));
 
         Assert.Equal(400, status);
         Assert.Equal(FailureCodes.ResourceNotEligible, Assert.Single(errors).Code);

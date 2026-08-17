@@ -78,10 +78,16 @@ fits. A resource may be eligible for several slots, so the pin identifies the bo
 rather than a role, and the assignment chooses where it goes.
 
 A pin SHALL be honoured or reported, never substituted. When no saturating assignment
-includes the pinned resource, placement SHALL fail with the stable code
-`pinned-resource-unavailable` rather than booking a different resource. A caller who
-names a resource has chosen it; quietly confirming a booking on someone else answers
-a question that was not asked.
+includes the pinned resource **but one exists without it**, placement SHALL fail with
+the stable code `pinned-resource-unavailable` rather than booking a different
+resource. A caller who names a resource has chosen it; quietly confirming a booking
+on someone else answers a question that was not asked.
+
+Where no saturating assignment exists **either way**, the pin SHALL NOT be reported
+as the cause. Nothing could have been booked whoever was named, and answering "the
+resource you chose was unavailable" would invite a caller to pick another when there
+is no other to pick; the all-candidates-failed outcomes answer instead, exactly as
+they do for a request that named nobody.
 
 That failure SHALL be **transient**: the pinned resource may be free at another time
 or may free up, so a retry can succeed. It SHALL NOT be treated as a deterministic
@@ -149,6 +155,10 @@ On success the result SHALL identify every resource actually booked.
 #### Scenario: A pin failure is not reported as a pool failure
 - **WHEN** a placement supplies a pinned resource that cannot be included, for a service whose other candidates could have been assigned
 - **THEN** placement fails with `pinned-resource-unavailable`, not `conflict` or `service-unavailable`
+
+#### Scenario: A pool that could not be assigned at all is not blamed on the pin
+- **WHEN** a placement supplies a pinned resource for a service at an instant where no saturating assignment exists with or without it
+- **THEN** placement fails with the all-candidates-failed outcome it would have reported for an unpinned request, not with `pinned-resource-unavailable`
 
 #### Scenario: A pinned resource refused by its own rules is reported as the pin failing
 - **WHEN** a placement supplies a pinned resource that is eligible and free, but whose own configuration refuses the requested start

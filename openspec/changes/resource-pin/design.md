@@ -82,22 +82,45 @@ Its status is 400 through the existing catch-all in the failure mapping. That
 requirement is not modified: it already routes every code outside the conflict and
 not-found families to 400, and a special case would be a second rule.
 
-### D4 — The pin is judged against the *rule-admitting, free* candidates, not the raw pool
+### D4 — A pin cannot fail structurally, which narrows what the new code means
 
-A pin can fail for three different reasons and they must not collapse:
+**Corrected at apply.** This decision first listed three reasons a pin might fail,
+including "claiming it would strand another slot". That reason does not exist, and
+the codebase already proved it: whenever a saturating assignment exists and the
+pinned resource is eligible for some slot, an assignment *containing* it also
+exists — pin it to that slot and the original matching, restricted to the rest,
+avoids it, because a matching uses each resource at most once.
+`TrySaturateIncluding` therefore returns null exactly when `TrySaturate` does, over
+the same graph. `SlotAssignmentTests.A_preference_is_reported_as_none_only_when_nothing_saturates`
+states this and warns against strengthening it.
+
+So a pin fails for exactly one reason: **the pinned resource is not in the graph the
+attempt is working over** — because the claims pre-filter removed it as busy, or
+because a failed attempt condemned it when its own rules refused the request.
 
 ```
-  pinned id in no candidate pool at all   → resource-not-eligible   (unchanged)
-  pinned resource eligible, but no saturating assignment contains it
-        because it is claimed, or its own rules refuse this request,
-        or claiming it strands another slot                          → pinned-resource-unavailable
-  pin honoured, but the placement then loses a race                  → conflict (unchanged)
+  pinned id in no candidate pool at all      → resource-not-eligible  (unchanged)
+  pinned resource eligible, but out of the
+    graph: claimed, or its own rules refuse  → pinned-resource-unavailable
+  pin honoured, placement then loses a race  → conflict               (unchanged)
 ```
 
-The middle case is judged where the assignment is already judged — over the slot
-graph placement is actually working with — so it cannot disagree with what the
-attempt would have done. That is ⑧a design D1 restated: a second computation of
-"could Mary have been used" would be free to differ from the one that decides.
+### D4a — When nothing could have been booked at all, say that instead
+
+A consequence of D4 that the first draft of this design missed. If no assignment
+saturates the slots *with or without* the pin, then "the resource you asked for was
+unavailable" is true and misleading: it invites a front end to offer the other
+people, and there are none.
+
+So the pin failure SHALL be reported only when an assignment existed **without** the
+pin — which is precisely the case the requirement's own words describe, "fail …
+rather than booking a different resource". When none existed, the ordinary all-fail
+classification answers, exactly as it does for an unpinned request: `conflict` if a
+race could have been lost, `service-unavailable` if nothing could ever have been
+placed.
+
+That test is one extra call to the same function over the same graph — not a second
+implementation of the rule, which is what ⑧a design D1 forbids.
 
 ### D5 — The pin failure is reported directly, never through the all-fail classification
 

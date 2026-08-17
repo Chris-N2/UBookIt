@@ -117,14 +117,14 @@ public class MultiRolePlacementTests
             Res(3, Therapist),
             Res(4, Therapist));
 
-    private static ServiceBookingRequest Request(Service service, string start, int minutes, Guid? preferred = null)
+    private static ServiceBookingRequest Request(Service service, string start, int minutes, Guid? pinned = null)
         => new()
         {
             ServiceId = service.Id,
             Start = TestData.Utc(Date, start),
             Duration = Mins(minutes),
             Booker = TestData.Booker(),
-            PreferredResourceId = preferred,
+            PinnedResourceId = pinned,
         };
 
     private static async Task<IReadOnlyList<ClaimInfo>> AllClaims(Harness harness)
@@ -220,7 +220,7 @@ public class MultiRolePlacementTests
 
         // Preferring the second therapist must not disturb the room role, which
         // still takes its lowest-id candidate.
-        var placed = await harness.Services.PlaceAsync(Request(service, "09:00", 60, preferred: Id(4)));
+        var placed = await harness.Services.PlaceAsync(Request(service, "09:00", 60, pinned: Id(4)));
 
         Assert.True(placed.Succeeded);
         Assert.Equal(
@@ -229,8 +229,16 @@ public class MultiRolePlacementTests
     }
 
     [Fact]
-    public async Task Spec_scenario_preferred_resource_falls_through_when_unavailable()
+    public async Task Spec_scenario_a_pin_that_cannot_be_honoured_fails_rather_than_substituting()
     {
+        // THE test of this change, and the one the old fixture was already shaped
+        // for: therapist 4 is pinned and busy, therapist 3 is free, both rooms are
+        // free — so a perfectly good assignment exists WITHOUT the pin, and the
+        // previous behaviour silently took it.
+        //
+        // A suite asserting only "the pinned resource is used when free" would pass
+        // the implementation this change removes. The alternative assignment being
+        // available is what makes the failure meaningful rather than incidental.
         var service = Svc(ResourceTypes.Room, Therapist);
         var harness = TwoOfEach(service);
 
@@ -242,14 +250,161 @@ public class MultiRolePlacementTests
             Booker = TestData.Booker(),
         })).Succeeded);
 
-        var placed = await harness.Services.PlaceAsync(Request(service, "09:00", 60, preferred: Id(4)));
+        var placed = await harness.Services.PlaceAsync(Request(service, "09:00", 60, pinned: Id(4)));
 
-        // Preference is an ordering hint: the other therapist still gets a turn.
+        Assert.False(placed.Succeeded);
+        Assert.Equal(FailureCodes.PinnedResourceUnavailable, Assert.Single(placed.Failures).Code);
+
+        // And nothing was booked on the assignment it used to fall through to.
+        var claims = await AllClaims(harness);
+        Assert.Equal([Id(4)], claims.Select(c => c.ResourceId));
+    }
+
+    [Fact]
+    public async Task The_same_placement_without_the_pin_succeeds()
+    {
+        // The pair that proves the failure above is the PIN's doing and not the
+        // pool's: identical fixture, identical instant, no pin — and the booking
+        // is placed on exactly the assignment the pinned request refused.
+        var service = Svc(ResourceTypes.Room, Therapist);
+        var harness = TwoOfEach(service);
+
+        Assert.True((await harness.Bookings.PlaceAsync(new BookingRequest
+        {
+            ResourceId = Id(4),
+            Start = TestData.Utc(Date, "09:00"),
+            Duration = Mins(60),
+            Booker = TestData.Booker(),
+        })).Succeeded);
+
+        var placed = await harness.Services.PlaceAsync(Request(service, "09:00", 60));
+
         Assert.True(placed.Succeeded);
         Assert.Equal(
             [Id(1), Id(3)],
             placed.Value.Claims.Select(c => c.ResourceId).OrderBy(id => id));
     }
+
+    [Fact]
+    public async Task Spec_scenario_a_pin_failure_invites_a_retry()
+    {
+        // Transient, not deterministic: the pinned resource may free up. Telling a
+        // booker not to bother because one named person is busy would be false.
+        Assert.DoesNotContain(
+            FailureCodes.PinnedResourceUnavailable,
+            DeterministicRefusalCodes());
+    }
+
+    [Fact]
+    public async Task Spec_scenario_a_pin_failure_is_not_reported_as_a_pool_failure()
+    {
+        // Assignments exist in abundance without the pinned resource — every room
+        // and the other therapist are free — so `conflict` and `service-unavailable`
+        // would both describe a failure that did not occur (design D5).
+        var service = Svc(ResourceTypes.Room, Therapist);
+        var harness = TwoOfEach(service);
+
+        Assert.True((await harness.Bookings.PlaceAsync(new BookingRequest
+        {
+            ResourceId = Id(4),
+            Start = TestData.Utc(Date, "09:00"),
+            Duration = Mins(60),
+            Booker = TestData.Booker(),
+        })).Succeeded);
+
+        var code = Assert.Single(
+            (await harness.Services.PlaceAsync(Request(service, "09:00", 60, pinned: Id(4)))).Failures).Code;
+
+        Assert.NotEqual(FailureCodes.Conflict, code);
+        Assert.NotEqual(FailureCodes.ServiceUnavailable, code);
+    }
+
+    [Fact]
+    public async Task Spec_scenario_a_pinned_resource_refused_by_its_own_rules_is_the_pin_failing()
+    {
+        // The second of the three reasons a pin fails, and it is NOT a busy
+        // calendar: therapist 4 opens at 13:00, so it is free at 09:00 and its own
+        // configuration refuses the request. Substituting therapist 3, who would
+        // have accepted, is exactly what must not happen.
+        var service = Svc(ResourceTypes.Room, Therapist);
+        var harness = Wire(
+            service,
+            Res(1, ResourceTypes.Room),
+            Res(3, Therapist),
+            Res(4, Therapist, open: "13:00"));
+
+        var placed = await harness.Services.PlaceAsync(Request(service, "09:00", 60, pinned: Id(4)));
+
+        Assert.False(placed.Succeeded);
+        Assert.Equal(FailureCodes.PinnedResourceUnavailable, Assert.Single(placed.Failures).Code);
+        Assert.Empty(await AllClaims(harness));
+    }
+
+    [Fact]
+    public async Task A_pin_cannot_fail_structurally_so_a_satisfiable_one_is_honoured()
+    {
+        // Design D4, corrected at apply: a pin has no structural failure mode.
+        // Whenever an assignment exists and the pinned resource is eligible for a
+        // slot, an assignment CONTAINING it exists — swap along an alternating
+        // path. So a pin over a role of count 2 with two free candidates is always
+        // honourable, and asserting otherwise would encode a reason that does not
+        // exist.
+        var service = Counted(Therapist, 2);
+        var harness = Wire(service, Res(3, Therapist), Res(4, Therapist));
+
+        var placed = await harness.Services.PlaceAsync(Request(service, "09:00", 60, pinned: Id(4)));
+
+        Assert.True(placed.Succeeded);
+        Assert.Contains(Id(4), placed.Value.Claims.Select(c => c.ResourceId));
+    }
+
+    [Fact]
+    public async Task Spec_scenario_a_pool_that_could_not_be_assigned_at_all_is_not_blamed_on_the_pin()
+    {
+        // Design D4a. Both therapists busy, so nothing could have been booked
+        // whoever was named — reporting "the resource you chose was unavailable"
+        // would be true and would invite a front end to offer the others, of whom
+        // there are none.
+        var service = Svc(ResourceTypes.Room, Therapist);
+        var harness = TwoOfEach(service);
+
+        foreach (var therapist in new[] { Id(3), Id(4) })
+        {
+            Assert.True((await harness.Bookings.PlaceAsync(new BookingRequest
+            {
+                ResourceId = therapist,
+                Start = TestData.Utc(Date, "09:00"),
+                Duration = Mins(60),
+                Booker = TestData.Booker(),
+            })).Succeeded);
+        }
+
+        var pinned = await harness.Services.PlaceAsync(Request(service, "09:00", 60, pinned: Id(4)));
+        var unpinned = await harness.Services.PlaceAsync(Request(service, "09:00", 60));
+
+        // The pinned request answers exactly as the unpinned one does: the pool is
+        // the cause, and the pin is not mentioned.
+        Assert.Equal(
+            Assert.Single(unpinned.Failures).Code,
+            Assert.Single(pinned.Failures).Code);
+        Assert.NotEqual(FailureCodes.PinnedResourceUnavailable, Assert.Single(pinned.Failures).Code);
+    }
+
+    /// <summary>
+    /// The deterministic-refusal whitelist, read from the placement path rather
+    /// than restated here — a copy would agree with itself while disagreeing with
+    /// the code.
+    /// </summary>
+    private static IEnumerable<string> DeterministicRefusalCodes()
+        => [
+            FailureCodes.IntervalInvalid,
+            FailureCodes.Granularity,
+            FailureCodes.DurationTooShort,
+            FailureCodes.DurationTooLong,
+            FailureCodes.LeadTime,
+            FailureCodes.Horizon,
+            FailureCodes.OutsideOpenHours,
+        ];
 
     [Fact]
     public async Task Spec_scenario_preferred_resource_outside_every_pool_is_rejected()
@@ -261,7 +416,7 @@ public class MultiRolePlacementTests
             Res(3, Therapist),
             Res(9, "equipment"));
 
-        var placed = await harness.Services.PlaceAsync(Request(service, "09:00", 60, preferred: Id(9)));
+        var placed = await harness.Services.PlaceAsync(Request(service, "09:00", 60, pinned: Id(9)));
 
         Assert.False(placed.Succeeded);
         Assert.Equal(FailureCodes.ResourceNotEligible, Assert.Single(placed.Failures).Code);
@@ -276,7 +431,7 @@ public class MultiRolePlacementTests
         var service = Svc(ResourceTypes.Room, Therapist);
         var harness = Wire(service, Res(1, ResourceTypes.Room), Res(9, "equipment"));
 
-        var placed = await harness.Services.PlaceAsync(Request(service, "09:00", 60, preferred: Id(9)));
+        var placed = await harness.Services.PlaceAsync(Request(service, "09:00", 60, pinned: Id(9)));
 
         Assert.False(placed.Succeeded);
         Assert.Equal(FailureCodes.ResourceNotEligible, Assert.Single(placed.Failures).Code);
@@ -690,7 +845,7 @@ public class MultiRolePlacementTests
         var service = SameType(Therapist, [], ["cert-x"]);
         var harness = Wire(service, ResWith(3, Therapist, "cert-x"), Res(4, Therapist));
 
-        var placed = await harness.Services.PlaceAsync(Request(service, "09:00", 60, preferred: Id(3)));
+        var placed = await harness.Services.PlaceAsync(Request(service, "09:00", 60, pinned: Id(3)));
 
         Assert.True(placed.Succeeded);
 
@@ -771,7 +926,7 @@ public class MultiRolePlacementTests
         var service = SameType(Therapist, [], ["cert-x"]);
         var harness = Wire(service, ResWith(3, Therapist, "cert-x"), Res(4, Therapist));
 
-        var placed = await harness.Services.PlaceAsync(Request(service, "09:00", 60, preferred: Id(4)));
+        var placed = await harness.Services.PlaceAsync(Request(service, "09:00", 60, pinned: Id(4)));
 
         Assert.True(placed.Succeeded);
         Assert.Contains(Id(4), placed.Value.Claims.Select(c => c.ResourceId));
