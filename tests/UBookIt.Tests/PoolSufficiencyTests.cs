@@ -44,6 +44,10 @@ public class PoolSufficiencyTests
         => Resource.Create(
             Therapist,
             name,
+            // Offered for direct booking. The domain default is the opposite;
+            // these fixtures stand for ordinary bookable resources, and the
+            // permission itself is exercised explicitly in DirectBookingTests.
+            directlyBookable: true,
             capabilities: capabilities,
             availability: TestData.Config(TestData.Weekly("09:00", "18:00", TestData.BaseDate.DayOfWeek)),
             id: Id(id)).Value;
@@ -53,6 +57,7 @@ public class PoolSufficiencyTests
         => Resource.Create(
             ResourceTypes.Room,
             name,
+            directlyBookable: true,
             availability: TestData.Config(TestData.Weekly(open, close, TestData.BaseDate.DayOfWeek)),
             id: Id(id)).Value;
 
@@ -300,6 +305,7 @@ public class PoolSufficiencyTests
             Resource.Create(
                 Therapist,
                 "Mary",
+            directlyBookable: true,
                 availability: TestData.Config(
                     TestData.Weekly("13:00", "18:00", TestData.BaseDate.DayOfWeek)),
                 id: Id(2)).Value);

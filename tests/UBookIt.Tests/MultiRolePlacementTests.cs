@@ -1,4 +1,4 @@
-using UBookIt.Core;
+﻿using UBookIt.Core;
 using UBookIt.Core.Availability;
 using UBookIt.Core.Bookings;
 using UBookIt.Core.Common;
@@ -34,6 +34,10 @@ public class MultiRolePlacementTests
         => Resource.Create(
             type,
             $"Resource {id}",
+            // Offered for direct booking. The domain default is the opposite;
+            // these fixtures stand for ordinary bookable resources, and the
+            // permission itself is exercised explicitly in DirectBookingTests.
+            directlyBookable: true,
             availability: TestData.Config(
                 TestData.Weekly(open, close, Date.DayOfWeek),
                 constraints: BookingConstraints.Create(
@@ -48,6 +52,7 @@ public class MultiRolePlacementTests
         => Resource.Create(
             type,
             $"Resource {id}",
+            directlyBookable: true,
             capabilities: capabilities,
             availability: TestData.Config(
                 TestData.Weekly("09:00", "17:00", Date.DayOfWeek),
@@ -467,6 +472,7 @@ public class MultiRolePlacementTests
         var room = Resource.Create(
             ResourceTypes.Room,
             "Only room",
+            directlyBookable: true,
             availability: TestData.Config(
                 TestData.Weekly(open, close, Date.DayOfWeek),
                 // The minimum has to be a multiple of the granularity, so it is
@@ -513,6 +519,7 @@ public class MultiRolePlacementTests
         var room = Resource.Create(
             ResourceTypes.Room,
             "Hourly room",
+            directlyBookable: true,
             availability: TestData.Config(
                 TestData.Weekly("09:00", "17:00", Date.DayOfWeek),
                 constraints: BookingConstraints.Create(
@@ -613,6 +620,7 @@ public class MultiRolePlacementTests
         var therapist = Resource.Create(
             Therapist,
             "Short shifts",
+            directlyBookable: true,
             availability: TestData.Config(
                 TestData.Weekly("09:00", "17:00", Date.DayOfWeek),
                 constraints: BookingConstraints.Create(

@@ -1,4 +1,4 @@
-namespace UBookIt.Core.Common;
+﻿namespace UBookIt.Core.Common;
 
 /// <summary>
 /// A single validation or operation failure with a stable machine-readable code.
@@ -115,6 +115,18 @@ public static class FailureCodes
     /// different one discards it invisibly.
     /// </summary>
     public const string ResourceNotEligible = "resource-not-eligible";
+
+    /// <summary>
+    /// A booking named a single resource that is not offered on its own. A
+    /// property of what the business offers, not of the calendar — so it is
+    /// deliberately distinct from every unavailability code: retrying at another
+    /// time cannot help, and the resource's opening hours are not wrong.
+    /// <para>
+    /// It says nothing about the resource being bookable <em>at all</em>: the same
+    /// resource is claimed by a service booking without ever reaching this rule.
+    /// </para>
+    /// </summary>
+    public const string ResourceNotDirectlyBookable = "resource-not-directly-bookable";
 }
 
 /// <summary>

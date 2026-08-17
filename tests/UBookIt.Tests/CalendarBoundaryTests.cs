@@ -1,4 +1,4 @@
-using UBookIt.Core;
+﻿using UBookIt.Core;
 using UBookIt.Core.Availability;
 using UBookIt.Core.Bookings;
 using UBookIt.Core.Common;
@@ -26,6 +26,10 @@ public class CalendarBoundaryTests
         => Resource.Create(
             type,
             "Boundary Room",
+            // Offered for direct booking. The domain default is the opposite;
+            // these fixtures stand for ordinary bookable resources, and the
+            // permission itself is exercised explicitly in DirectBookingTests.
+            directlyBookable: true,
             availability: TestData.Config(
                 WeeklyOpenHours.Create(
                     Enum.GetValues<DayOfWeek>().Select(d => (d, TestData.Win("09:00", "17:00")))).Value),
@@ -416,6 +420,7 @@ public class CalendarBoundaryTests
         var room = Resource.Create(
             ResourceTypes.Room,
             "Long Horizon",
+            directlyBookable: true,
             availability: TestData.Config(
                 TestData.Weekly("09:00", "17:00", TestData.BaseDate.DayOfWeek),
                 constraints: BookingConstraints.Create(horizonDays: int.MaxValue).Value),

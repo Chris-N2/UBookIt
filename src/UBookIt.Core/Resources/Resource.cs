@@ -1,4 +1,4 @@
-using UBookIt.Core.Availability;
+﻿using UBookIt.Core.Availability;
 using UBookIt.Core.Common;
 
 namespace UBookIt.Core.Resources;
@@ -23,7 +23,8 @@ public sealed class Resource
         string displayName,
         string? description,
         CapabilitySet capabilities,
-        AvailabilityConfiguration availability)
+        AvailabilityConfiguration availability,
+        bool directlyBookable)
     {
         Id = id;
         Type = type;
@@ -31,6 +32,7 @@ public sealed class Resource
         Description = description;
         Capabilities = capabilities;
         Availability = availability;
+        DirectlyBookable = directlyBookable;
     }
 
     public Guid Id { get; }
@@ -50,12 +52,45 @@ public sealed class Resource
 
     public AvailabilityConfiguration Availability { get; }
 
+    /// <summary>
+    /// Whether this resource may be booked <em>on its own</em>. False by default:
+    /// a resource that has not been given the permission does not have it.
+    /// <para>
+    /// A statement about what the business offers, not about what the system can
+    /// compute. A resource may be perfectly available, perfectly eligible, and
+    /// still meaningless alone — a therapist with no room to work in — and no rule
+    /// over type, capability or calendar distinguishes that from a room that is
+    /// genuinely lettable. Only the editor knows.
+    /// </para>
+    /// <para>
+    /// It constrains <b>direct</b> booking alone. A resource withholding it stays
+    /// fully usable as part of a service: it resolves into candidate pools,
+    /// contributes to composite availability, and is claimed by a service booking
+    /// exactly as before. Withholding makes a resource unbookable <em>by itself</em>,
+    /// never unbookable.
+    /// </para>
+    /// <para>
+    /// It is deliberately <b>not</b> part of eligibility. Candidate resolution is
+    /// type, then required capabilities, then a duration the service permits;
+    /// a fourth term here would make a service's pool depend on whether its members
+    /// happen to be separately lettable, which has nothing to do with whether they
+    /// can fulfil the service.
+    /// </para>
+    /// <para>
+    /// It is not a validation rule either. No configuration becomes invalid by
+    /// withholding it and none becomes valid by granting it, so
+    /// <see cref="Create"/> rejects neither answer.
+    /// </para>
+    /// </summary>
+    public bool DirectlyBookable { get; }
+
     public static DomainResult<Resource> Create(
         string? type,
         string? displayName,
         string? description = null,
         IEnumerable<string?>? capabilities = null,
         AvailabilityConfiguration? availability = null,
+        bool directlyBookable = false,
         Guid? id = null)
     {
         var failures = new List<DomainFailure>();
@@ -99,6 +134,10 @@ public sealed class Resource
                 displayName!.Trim(),
                 string.IsNullOrWhiteSpace(description) ? null : description.Trim(),
                 capabilitySet.Value,
-                availability ?? AvailabilityConfiguration.Closed));
+                availability ?? AvailabilityConfiguration.Closed,
+                // Defaulted to withheld, and never validated: neither answer makes
+                // a resource invalid, so there is no branch above that can reject
+                // one. A caller that says nothing is saying no.
+                directlyBookable));
     }
 }

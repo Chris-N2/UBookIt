@@ -1,4 +1,4 @@
-using UBookIt.Core.Availability;
+﻿using UBookIt.Core.Availability;
 using UBookIt.Core.Bookings;
 using UBookIt.Core.Resources;
 using UBookIt.Core.Services;
@@ -45,6 +45,10 @@ public class CompositeAvailabilityTests
         => Resource.Create(
             type,
             $"Resource {id}",
+            // Offered for direct booking. The domain default is the opposite;
+            // these fixtures stand for ordinary bookable resources, and the
+            // permission itself is exercised explicitly in DirectBookingTests.
+            directlyBookable: true,
             availability: TestData.Config(
                 TestData.Weekly(open, close, Date.DayOfWeek),
                 constraints: BookingConstraints.Create(
@@ -72,6 +76,7 @@ public class CompositeAvailabilityTests
         => Resource.Create(
             type,
             $"Resource {id}",
+            directlyBookable: true,
             capabilities: capabilities,
             availability: TestData.Config(
                 TestData.Weekly(open, close, Date.DayOfWeek),

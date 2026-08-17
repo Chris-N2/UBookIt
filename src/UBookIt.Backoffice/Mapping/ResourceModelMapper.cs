@@ -1,4 +1,4 @@
-using UBookIt.Backoffice.Models;
+﻿using UBookIt.Backoffice.Models;
 using UBookIt.Core.Availability;
 using UBookIt.Core.Common;
 using UBookIt.Core.Resources;
@@ -109,9 +109,18 @@ internal static class ResourceModelMapper
 
         // Run resource creation even when availability failed so name/type
         // failures are reported in the same response as availability failures.
+        // Named rather than positional: this call passed `id` sixth, and adding a
+        // parameter before it shifted every argument after the third. The compiler
+        // happened to catch it here and in the row mapper because the types
+        // differed — luck, not design.
         var resource = Resource.Create(
-            model.Type, model.DisplayName, model.Description, model.Capabilities,
-            availability ?? AvailabilityConfiguration.Closed, id);
+            type: model.Type,
+            displayName: model.DisplayName,
+            description: model.Description,
+            capabilities: model.Capabilities,
+            availability: availability ?? AvailabilityConfiguration.Closed,
+            directlyBookable: model.DirectlyBookable,
+            id: id);
 
         if (!resource.Succeeded)
         {
@@ -134,6 +143,7 @@ internal static class ResourceModelMapper
             DisplayName = resource.DisplayName,
             Description = resource.Description,
             Capabilities = [.. resource.Capabilities.Keys],
+            DirectlyBookable = resource.DirectlyBookable,
             OpeningHours = Enum.GetValues<DayOfWeek>()
                 .SelectMany(day => resource.Availability.OpenHours.WindowsFor(day)
                     .Select(window => new OpeningHoursModel { Day = day, Start = window.Start, End = window.End }))

@@ -1,4 +1,4 @@
-using UBookIt.Core.Availability;
+﻿using UBookIt.Core.Availability;
 using UBookIt.Core.Common;
 using UBookIt.Core.Resources;
 using UBookIt.Core.Stores;
@@ -90,9 +90,45 @@ public sealed class BookingService(
     TimeProvider timeProvider,
     SiteBookingSettings settings) : IBookingService
 {
-    public Task<DomainResult<Booking>> PlaceAsync(
+    public async Task<DomainResult<Booking>> PlaceAsync(
         BookingRequest request, CancellationToken cancellationToken = default)
-        => PlaceAsync(
+    {
+        // Direct booking, and the guard belongs here rather than in either caller:
+        // the delivery endpoint and the no-JavaScript flow both arrive at this
+        // overload, and the second of them never crosses an HTTP boundary at all,
+        // so a transport-layer check would not see it (design D1).
+        //
+        // It is also why there is no "this is a direct booking" flag on the request.
+        // Calling THIS overload is what being a direct booking means; service
+        // placement composes its own MultiClaimBookingRequest and cannot reach the
+        // check, whatever its resources permit. A flag would restate the call site
+        // in a form a caller can get wrong.
+        var resource = await resourceStore
+            .GetAsync(request.ResourceId, cancellationToken)
+            .ConfigureAwait(false);
+
+        // Only a resource that exists AND withholds the permission is refused here.
+        // A missing one falls through deliberately, so the pipeline below reports
+        // `resource-not-found` as it always has rather than this rule inventing a
+        // second opinion about a resource it could not read.
+        if (resource is { DirectlyBookable: false })
+        {
+            return DomainResult<Booking>.Failure(
+                FailureCodes.ResourceNotDirectlyBookable,
+                $"{resource.DisplayName} is not offered for booking on its own.",
+                nameof(BookingRequest.ResourceId));
+        }
+
+        // Ahead of the rule pipeline, not inside it: the request was never one this
+        // resource accepts, so reporting `outside-open-hours` for it would send a
+        // booker to look for a better time that does not exist.
+        //
+        // The cost is one extra read on the direct path, since the overload below
+        // loads the resource again. Deliberate: sharing the load would mean either
+        // threading a loaded aggregate through the multi-claim signature — visible
+        // to every service placement, which has no use for it — or hoisting the
+        // check down into that overload, which is exactly what must not happen.
+        return await PlaceAsync(
             new MultiClaimBookingRequest
             {
                 ResourceIds = [request.ResourceId],
@@ -100,7 +136,8 @@ public sealed class BookingService(
                 Duration = request.Duration,
                 Booker = request.Booker,
             },
-            cancellationToken);
+            cancellationToken).ConfigureAwait(false);
+    }
 
     public async Task<DomainResult<Booking>> PlaceAsync(
         MultiClaimBookingRequest request, CancellationToken cancellationToken = default)

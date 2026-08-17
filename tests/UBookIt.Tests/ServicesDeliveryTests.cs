@@ -1,4 +1,4 @@
-using System.ComponentModel.DataAnnotations;
+﻿using System.ComponentModel.DataAnnotations;
 using Microsoft.AspNetCore.Mvc;
 using UBookIt.Core.Availability;
 using UBookIt.Core.Bookings;
@@ -39,6 +39,10 @@ public class ServicesDeliveryTests
         => Resource.Create(
             type,
             $"Resource {id}",
+            // Offered for direct booking. The domain default is the opposite;
+            // these fixtures stand for ordinary bookable resources, and the
+            // permission itself is exercised explicitly in DirectBookingTests.
+            directlyBookable: true,
             availability: TestData.Config(
                 TestData.Weekly("09:00", "17:00", Date.DayOfWeek),
                 constraints: BookingConstraints.Create(
@@ -91,6 +95,7 @@ public class ServicesDeliveryTests
         var room = Resource.Create(
             ResourceTypes.Room,
             "Red Room",
+            directlyBookable: true,
             capabilities: ["projector"],
             availability: TestData.Config(TestData.Weekly("09:00", "17:00", Date.DayOfWeek)),
             id: Id(2)).Value;
@@ -98,6 +103,7 @@ public class ServicesDeliveryTests
         var therapist = Resource.Create(
             "therapist",
             "Mary",
+            directlyBookable: true,
             availability: TestData.Config(TestData.Weekly("09:00", "17:00", Date.DayOfWeek)),
             id: Id(1)).Value;
 

@@ -1,4 +1,4 @@
-using UBookIt.Core;
+﻿using UBookIt.Core;
 using UBookIt.Core.Availability;
 using UBookIt.Core.Bookings;
 using UBookIt.Core.Common;
@@ -293,11 +293,23 @@ public static class TestData
         BookingConstraints? constraints = null)
         => AvailabilityConfiguration.Create(openHours, exceptions, constraints).Value;
 
-    /// <summary>A room open 08:00–18:00 on <see cref="BaseDate"/>'s day of week (and only that day).</summary>
+    /// <summary>
+    /// A room open 08:00–18:00 on <see cref="BaseDate"/>'s day of week (and only
+    /// that day), offered for booking on its own.
+    /// <para>
+    /// <b>The domain default is the opposite.</b> A resource withholds direct
+    /// booking unless told otherwise; this helper grants it because it stands for
+    /// "an ordinary resource a visitor can book", which is what the placement,
+    /// availability and delivery suites are about. A test that means to exercise
+    /// the permission itself builds its own resource and says so explicitly —
+    /// see <c>DirectBookingTests</c>.
+    /// </para>
+    /// </summary>
     public static Resource Room(AvailabilityConfiguration? availability = null)
         => Resource.Create(
-            ResourceTypes.Room,
-            "Meeting Room A",
+            directlyBookable: true,
+            type: ResourceTypes.Room,
+            displayName: "Meeting Room A",
             availability: availability ?? Config(Weekly("08:00", "18:00", BaseDate.DayOfWeek))).Value;
 
     public static Booker Booker(Guid? memberKey = null)

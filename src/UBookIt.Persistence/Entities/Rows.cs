@@ -1,4 +1,4 @@
-using UBookIt.Core.Services;
+﻿using UBookIt.Core.Services;
 
 namespace UBookIt.Persistence.Entities;
 
@@ -22,6 +22,14 @@ internal sealed class ResourceRow
     public int LeadTimeMinutes { get; set; }
 
     public int HorizonDays { get; set; }
+
+    /// <summary>
+    /// Whether the resource may be booked on its own. Non-nullable with a default
+    /// of false, so every existing row takes the withheld answer — which is the
+    /// behaviour change this change exists to make, applied by the migration
+    /// rather than by a backfill.
+    /// </summary>
+    public bool DirectlyBookable { get; set; }
 
     public List<OpenHoursRow> OpenHours { get; set; } = [];
 

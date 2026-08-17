@@ -1,4 +1,4 @@
-using UBookIt.Core.Availability;
+﻿using UBookIt.Core.Availability;
 using UBookIt.Core.Bookings;
 using UBookIt.Core.Resources;
 using UBookIt.Core.Services;
@@ -33,6 +33,10 @@ public class LengthRunTests
         => Resource.Create(
             ResourceTypes.Room,
             $"Resource {id}",
+            // Offered for direct booking. The domain default is the opposite;
+            // these fixtures stand for ordinary bookable resources, and the
+            // permission itself is exercised explicitly in DirectBookingTests.
+            directlyBookable: true,
             availability: TestData.Config(
                 TestData.Weekly(open, close, Date.DayOfWeek),
                 constraints: BookingConstraints.Create(

@@ -1,4 +1,4 @@
-using UBookIt.Core.Availability;
+﻿using UBookIt.Core.Availability;
 using UBookIt.Core.Resources;
 using UBookIt.Persistence.Entities;
 
@@ -35,13 +35,19 @@ internal static class ResourceRowMapper
 
         var availability = AvailabilityConfiguration.Create(openHours, exceptions, constraints).Value;
 
+        // Named rather than positional, deliberately. This call passed `row.Id`
+        // as the sixth argument; adding one before it shifted the meaning of
+        // every argument after the third. The compiler caught it because the
+        // types differed, which is luck rather than design — naming them means
+        // the next parameter cannot silently land somewhere else.
         return Resource.Create(
-            row.Type,
-            row.DisplayName,
-            row.Description,
-            row.Capabilities.Select(c => (string?)c.Key),
-            availability,
-            row.Id).Value;
+            type: row.Type,
+            displayName: row.DisplayName,
+            description: row.Description,
+            capabilities: row.Capabilities.Select(c => (string?)c.Key),
+            availability: availability,
+            directlyBookable: row.DirectlyBookable,
+            id: row.Id).Value;
     }
 
     internal static ResourceRow ToRow(Resource resource)
@@ -73,6 +79,11 @@ internal static class ResourceRowMapper
         row.MaxDurationMinutes = (int)constraints.MaxDuration.TotalMinutes;
         row.LeadTimeMinutes = (int)constraints.LeadTime.TotalMinutes;
         row.HorizonDays = constraints.HorizonDays;
+
+        // Copied on every write, so a full update can withdraw the permission as
+        // well as grant it — the same full-replacement semantics the capability
+        // set has, rather than a value that can only ever be turned on.
+        row.DirectlyBookable = resource.DirectlyBookable;
     }
 
     internal static List<OpenHoursRow> ToOpenHoursRows(Resource resource)

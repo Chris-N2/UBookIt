@@ -1,4 +1,4 @@
-using System.Text.Json.Serialization;
+﻿using System.Text.Json.Serialization;
 
 namespace UBookIt.Backoffice.Models;
 
@@ -26,6 +26,18 @@ public class ResourceRequestModel
     /// </summary>
     public List<string> Capabilities { get; set; } = [];
 
+    /// <summary>
+    /// Whether this resource may be booked on its own. Omitted means <b>no</b>,
+    /// matching the domain default and the treatment of an omitted capability
+    /// collection — a caller that says nothing is saying no.
+    /// <para>
+    /// A full update replaces it rather than merging, so an update that omits it
+    /// withdraws the permission. That is the same full-replacement semantics as
+    /// the rest of this model.
+    /// </para>
+    /// </summary>
+    public bool DirectlyBookable { get; set; }
+
     /// <summary>Null applies the package defaults.</summary>
     public ConstraintsModel? Constraints { get; set; }
 }
@@ -45,6 +57,12 @@ public class ResourceResponseModel
     public List<AvailabilityExceptionModel> Exceptions { get; set; } = [];
 
     public List<string> Capabilities { get; set; } = [];
+
+    /// <summary>
+    /// Whether this resource may be booked on its own. Always present, so a
+    /// reader never has to infer it from absence.
+    /// </summary>
+    public bool DirectlyBookable { get; set; }
 
     public ConstraintsModel Constraints { get; set; } = new();
 }
