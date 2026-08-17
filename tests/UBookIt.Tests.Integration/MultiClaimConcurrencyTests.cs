@@ -1,4 +1,4 @@
-using Microsoft.EntityFrameworkCore;
+﻿using Microsoft.EntityFrameworkCore;
 using UBookIt.Core.Bookings;
 using UBookIt.Core.Common;
 using UBookIt.Persistence.Stores;
@@ -181,9 +181,20 @@ public class MultiClaimConcurrencyTests(SqlServerFixture fixture)
     {
         fixture.EnsureAvailable();
 
-        // The claims table has always been one row per claim, so this change
-        // adds no migration. Asserted rather than stated: a migration appearing
-        // here would mean the claim model had quietly changed shape.
+        // The claims table has always been one row per claim, so multi-claim
+        // placement added no migration. Pinned rather than stated — but note what
+        // the pin does and does not mean.
+        //
+        // It is a **prompt**, not a proof. Any new migration trips it, including
+        // ones with nothing to do with claims: `AddDirectBookability` adds a
+        // boolean column to the resources table and leaves the claim model exactly
+        // as it was. The value of the list is that someone has to look at each new
+        // entry and confirm that, which is why entries are added deliberately
+        // rather than the assertion being loosened.
+        //
+        // Anything that appears here and DOES touch the claims table means the
+        // guarantee this test names has been broken, and appending it would be the
+        // wrong response.
         await using var context = fixture.CreateContext();
         var applied = await context.Database.GetAppliedMigrationsAsync(Ct);
 
@@ -193,6 +204,10 @@ public class MultiClaimConcurrencyTests(SqlServerFixture fixture)
                 "20260727193625_ClaimResourceIndexIncludesBookingId",
                 "20260807125020_AddServices",
                 "20260814082537_AddCapabilities",
+
+                // Resources gain `DirectlyBookable`. Checked: no claim or booking
+                // table is touched, so the guarantee above still holds.
+                "20260817080001_AddDirectBookability",
             ],
             applied.OrderBy(name => name, StringComparer.Ordinal));
 

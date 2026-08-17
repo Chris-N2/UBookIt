@@ -1,4 +1,4 @@
-namespace UBookIt.Web.Rendering;
+﻿namespace UBookIt.Web.Rendering;
 
 /// <summary>
 /// View model for the booking form (default front-end). Purpose-built for
@@ -96,6 +96,44 @@ public sealed class FailedSubmission
     public string? Phone { get; init; }
 
     public List<BookingError> Errors { get; init; } = [];
+}
+
+/// <summary>
+/// Why the booking flow has nothing to offer. The two reasons must not be
+/// conflated: one is temporary and one is permanent, and they send a visitor to
+/// do entirely different things.
+/// </summary>
+public enum BookingUnavailableReason
+{
+    /// <summary>
+    /// The resource could not be read, or the site's time zone is unusable. A
+    /// fault rather than an answer, so "try again later" is honest.
+    /// </summary>
+    Unknown,
+
+    /// <summary>
+    /// The resource exists and is simply not offered for booking on its own.
+    /// Coming back tomorrow will not change it, and the site owner's opening
+    /// hours are not the problem — so this must never be phrased as "no times
+    /// available".
+    /// </summary>
+    NotOfferedIndividually,
+}
+
+/// <summary>
+/// View model for the unavailable state, carrying which of the two reasons
+/// applies. Rendered by one view rather than two, because the page's shape is
+/// identical and only the sentence differs.
+/// </summary>
+public sealed class BookingUnavailableModel
+{
+    public required BookingUnavailableReason Reason { get; init; }
+
+    public static BookingUnavailableModel Unknown { get; } =
+        new() { Reason = BookingUnavailableReason.Unknown };
+
+    public static BookingUnavailableModel NotOfferedIndividually { get; } =
+        new() { Reason = BookingUnavailableReason.NotOfferedIndividually };
 }
 
 /// <summary>View model for the confirmation page shown after a successful placement.</summary>

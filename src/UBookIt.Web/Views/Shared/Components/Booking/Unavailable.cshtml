@@ -1,4 +1,23 @@
-<section class="ubookit-booking" aria-label="Booking unavailable">
-    <h2>Booking unavailable</h2>
-    <p>This resource is not available for booking at the moment. Please try again later.</p>
+@model UBookIt.Web.Rendering.BookingUnavailableModel
+@{
+    // One view, two reasons. The page's shape is identical and only the sentence
+    // differs — and the difference matters: one is temporary, one is permanent,
+    // and they send a visitor to do entirely different things. Conflating them is
+    // how a correctly configured resource comes to look broken.
+    var notOffered = Model?.Reason == UBookIt.Web.Rendering.BookingUnavailableReason.NotOfferedIndividually;
+    var heading = notOffered ? "Not available on its own" : "Booking unavailable";
+}
+<section class="ubookit-booking" aria-label="@heading">
+    <h2>@heading</h2>
+    @if (notOffered)
+    {
+        <p>
+            This resource is not offered for booking on its own. It may still be
+            available as part of a service.
+        </p>
+    }
+    else
+    {
+        <p>This resource is not available for booking at the moment. Please try again later.</p>
+    }
 </section>

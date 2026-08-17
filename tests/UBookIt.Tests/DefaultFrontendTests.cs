@@ -1,4 +1,4 @@
-using UBookIt.Core.Availability;
+﻿using UBookIt.Core.Availability;
 using UBookIt.Core.Common;
 using UBookIt.Tests.Support;
 using UBookIt.Web.Rendering;
@@ -14,6 +14,22 @@ namespace UBookIt.Tests;
 public class DefaultFrontendTests
 {
     private static readonly DateOnly Date = TestData.BaseDate;
+
+    [Fact]
+    public void A_withdrawn_permission_does_not_fall_back_to_try_again()
+    {
+        // The form is never rendered for a resource that withholds the
+        // permission — but a visitor holding a page from before it was withdrawn
+        // can still submit one. The generic fallback would tell them to try
+        // again, which cannot work, so this code needs a message of its own.
+        var message = BookingMessages.ForCode(FailureCodes.ResourceNotDirectlyBookable);
+
+        Assert.NotEqual(BookingMessages.Fallback, message);
+        Assert.DoesNotContain("try again", message, StringComparison.OrdinalIgnoreCase);
+
+        // And it says the thing that is actually true and actionable.
+        Assert.Contains("on its own", message, StringComparison.OrdinalIgnoreCase);
+    }
 
     // --- 6.1 message map ---
 

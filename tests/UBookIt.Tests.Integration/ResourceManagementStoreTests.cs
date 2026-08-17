@@ -1,4 +1,4 @@
-using Microsoft.EntityFrameworkCore;
+﻿using Microsoft.EntityFrameworkCore;
 using UBookIt.Core.Availability;
 using UBookIt.Core.Common;
 using UBookIt.Core.Resources;
@@ -79,6 +79,77 @@ public class ResourceManagementStoreTests(SqlServerFixture fixture)
         // Paging honours skip/take ordering by display name.
         var skipFirstTwenty = mine.Select(r => r.DisplayName).Order().Skip(20).ToList();
         Assert.Equal(5, skipFirstTwenty.Count);
+    }
+
+    [Fact]
+    public async Task Direct_bookability_round_trips_and_can_be_withdrawn()
+    {
+        // Task 3.3. Two halves, and the second is the one worth having: a value
+        // that only ever travels one way would pass a test that granted it and
+        // read it back. A full update must be able to WITHDRAW it, which is the
+        // full-replacement semantics the capability set already has — and the
+        // shape a "preserve the prior row's value" bug would break.
+        fixture.EnsureAvailable();
+
+        var granting = Resource.Create(
+            "room",
+            "Direct Room",
+            directlyBookable: true,
+            availability: AvailabilityConfiguration.Create(
+                WeeklyOpenHours.Create(
+                    [(DayOfWeek.Monday, DayWindow.Create(new TimeOnly(9, 0), new TimeOnly(17, 0)).Value)]).Value).Value).Value;
+
+        await using (var context = fixture.CreateContext())
+        {
+            Assert.True((await new SqlResourceManagementStore(context).CreateAsync(granting, Ct)).Succeeded);
+        }
+
+        await using (var context = fixture.CreateContext())
+        {
+            var reloaded = await new SqlResourceStore(context).GetAsync(granting.Id, Ct);
+            Assert.NotNull(reloaded);
+            Assert.True(reloaded.DirectlyBookable);
+        }
+
+        var withdrawn = Resource.Create(
+            "room",
+            "Direct Room",
+            directlyBookable: false,
+            availability: granting.Availability,
+            id: granting.Id).Value;
+
+        await using (var context = fixture.CreateContext())
+        {
+            Assert.True((await new SqlResourceManagementStore(context).UpdateAsync(withdrawn, Ct)).Succeeded);
+        }
+
+        await using var readContext = fixture.CreateContext();
+        var afterUpdate = await new SqlResourceStore(readContext).GetAsync(granting.Id, Ct);
+
+        Assert.NotNull(afterUpdate);
+        Assert.False(afterUpdate.DirectlyBookable);
+    }
+
+    [Fact]
+    public async Task A_resource_stored_without_stating_it_withholds_direct_booking()
+    {
+        // The column's default reaching the domain, rather than the domain default
+        // being re-applied on read. Every row that existed before this change takes
+        // this answer, which is the behaviour change the proposal states.
+        fixture.EnsureAvailable();
+
+        var silent = BuildResource("Silent Room", [(DayOfWeek.Monday, "08:00", "12:00")], []);
+
+        await using (var context = fixture.CreateContext())
+        {
+            Assert.True((await new SqlResourceManagementStore(context).CreateAsync(silent, Ct)).Succeeded);
+        }
+
+        await using var readContext = fixture.CreateContext();
+        var reloaded = await new SqlResourceStore(readContext).GetAsync(silent.Id, Ct);
+
+        Assert.NotNull(reloaded);
+        Assert.False(reloaded.DirectlyBookable);
     }
 
     [Fact]

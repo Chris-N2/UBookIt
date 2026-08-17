@@ -1,4 +1,4 @@
-using UBookIt.Core.Bookings;
+﻿using UBookIt.Core.Bookings;
 using UBookIt.Persistence.Entities;
 
 namespace UBookIt.Tests.Integration.Support;
@@ -26,6 +26,13 @@ internal static class Seed
             MaxDurationMinutes = maxDurationMinutes,
             LeadTimeMinutes = 0,
             HorizonDays = 90,
+
+            // Offered for direct booking. The column default is the opposite, and
+            // these fixtures stand for ordinary bookable resources — the suites
+            // that use them place direct bookings to exercise storage behaviour,
+            // not to exercise the permission. `ResourceManagementStoreTests`
+            // covers the permission itself, both answers, explicitly.
+            DirectlyBookable = true,
             OpenHours = Enum.GetValues<DayOfWeek>()
                 .Select(day => new OpenHoursRow
                 {

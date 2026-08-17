@@ -1,4 +1,4 @@
-using System.Text.Json;
+﻿using System.Text.Json;
 using Microsoft.AspNetCore.Mvc;
 using UBookIt.Core;
 using UBookIt.Core.Availability;
@@ -30,7 +30,20 @@ public sealed class BookingViewComponent(
         var resource = await resourceStore.GetAsync(resourceId);
         if (resource is null || !BookingFormBuilder.TryResolveZone(settings.TimeZoneId, out var zone))
         {
-            return View("Unavailable");
+            return View("Unavailable", BookingUnavailableModel.Unknown);
+        }
+
+        // Not offered on its own, which is a different fact from having no free
+        // time and must not be rendered as one: "no times available" invites a
+        // visitor back tomorrow, when the answer will be the same, and tells the
+        // site owner their opening hours are wrong when they are not.
+        //
+        // No form is offered either. Rendering one that placement will always
+        // refuse would invite someone to fill it in and lose their input to a
+        // failure that was knowable before they started.
+        if (!resource.DirectlyBookable)
+        {
+            return View("Unavailable", BookingUnavailableModel.NotOfferedIndividually);
         }
 
         var today = BookingFormBuilder.TodayIn(timeProvider.GetUtcNow(), zone);

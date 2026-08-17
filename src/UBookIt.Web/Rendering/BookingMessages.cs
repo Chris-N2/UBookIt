@@ -1,4 +1,4 @@
-using UBookIt.Core.Bookings;
+﻿using UBookIt.Core.Bookings;
 using UBookIt.Core.Common;
 
 namespace UBookIt.Web.Rendering;
@@ -24,6 +24,14 @@ public static class BookingMessages
         [FailureCodes.EmailInvalid] = "Please enter a valid email address.",
         [FailureCodes.NameRequired] = "Please enter your name.",
         [FailureCodes.ResourceNotFound] = "This resource is not available for booking.",
+
+        // Reachable even though the form is never rendered for such a resource: a
+        // visitor holding a page from before the permission was withdrawn can
+        // still submit it. The fallback ("please try again") would be actively
+        // wrong here — trying again cannot work — so it says what happened and
+        // where the resource may still be bookable.
+        [FailureCodes.ResourceNotDirectlyBookable] =
+            "This resource is not offered for booking on its own. It may still be available as part of a service.",
         [FailureCodes.DateRangeInvalid] = "Please choose a valid date.",
         [FailureCodes.DateRangeTooLarge] = "Please choose a single date.",
     };
