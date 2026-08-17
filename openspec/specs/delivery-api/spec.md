@@ -20,9 +20,17 @@ Delivery API endpoints SHALL be reachable anonymously — they SHALL NOT be prot
 - **THEN** the placed booking's booker reflects only the request body, and no member key is inferred from the ambient context
 
 ### Requirement: Resource read model
-The delivery API SHALL expose a public resource read model over `GET /resources` (paged) and `GET /resources/{id}`. The read model SHALL carry only what a consumer needs to drive a booking UI: id, resource type key, display name, description, the resource's capability keys, booking constraints (granularity, minimum duration, maximum duration, lead time, horizon days), and the site time-zone id. It SHALL NOT expose management or internal configuration (raw weekly open-hours pattern, date exceptions). Capability keys SHALL be returned in a deterministic order, and a resource carrying none SHALL return an empty collection rather than a null or an omitted member. An unknown id SHALL yield a 404 problem-details response.
+The delivery API SHALL expose a public resource read model over `GET /resources` (paged) and `GET /resources/{id}`. The read model SHALL carry only what a consumer needs to drive a booking UI: id, resource type key, display name, description, the resource's capability keys, whether it may be booked on its own, booking constraints (granularity, minimum duration, maximum duration, lead time, horizon days), and the site time-zone id. It SHALL NOT expose management or internal configuration (raw weekly open-hours pattern, date exceptions). Capability keys SHALL be returned in a deterministic order, and a resource carrying none SHALL return an empty collection rather than a null or an omitted member. An unknown id SHALL yield a 404 problem-details response.
 
 Capabilities are published deliberately: they are an input to eligibility, and publishing them keeps a service's candidate pool derivable from public reads. Capability keys are therefore visible to anonymous callers and SHALL NOT be used to record information that is not intended to be public.
+
+Whether a resource may be booked on its own is published for the same reason and
+SHALL be carried on every read, as a value rather than by omission. It is the one
+fact that decides whether `POST /bookings` will accept the resource at all, so a
+consumer that cannot read it can only discover it by being refused — which is both
+a poor contract and the same disclosure-by-probing the capability publication
+exists to avoid. It says nothing about availability and SHALL NOT be read as an
+assertion that the resource is free.
 
 #### Scenario: List returns a page and total
 - **WHEN** `GET /resources` is requested with paging parameters
@@ -30,7 +38,7 @@ Capabilities are published deliberately: they are an input to eligibility, and p
 
 #### Scenario: Get by id returns the public model
 - **WHEN** `GET /resources/{id}` is requested for an existing resource
-- **THEN** the response carries its id, type, display name, description, capabilities, constraints, and site zone id
+- **THEN** the response carries its id, type, display name, description, capabilities, whether it may be booked on its own, constraints, and site zone id
 
 #### Scenario: A resource with no capabilities returns an empty collection
 - **WHEN** a resource carrying no capabilities is read
@@ -43,6 +51,10 @@ Capabilities are published deliberately: they are an input to eligibility, and p
 #### Scenario: Unknown resource id
 - **WHEN** `GET /resources/{id}` is requested for an id that does not exist
 - **THEN** the response is 404 problem details carrying the `resource-not-found` code
+
+#### Scenario: Direct bookability is readable before it is needed
+- **WHEN** a resource that withholds direct booking is read
+- **THEN** the response states that it may not be booked on its own, so a client can omit it from a direct-booking UI without attempting a placement
 
 ### Requirement: Availability and slot read
 The delivery API SHALL expose free-time and slot queries for a resource over an inclusive `[from, to]` date range, delegating to the Core availability query service. Instants SHALL be serialized as ISO-8601 UTC and each response SHALL carry the site time-zone id once at the top level. Slot duration SHALL be expressed as whole minutes. The slot query SHALL require a requested duration. A range wider than the configured maximum SHALL yield the `date-range-too-large` failure; a `from` after `to` SHALL yield `date-range-invalid`; an unknown resource SHALL yield `resource-not-found`.
@@ -353,3 +365,41 @@ This SHALL hold for every endpoint that accepts a date, an instant, or a duratio
 #### Scenario: Ordinary requests are unchanged
 - **WHEN** any availability query or placement is made with everyday dates and durations
 - **THEN** its status, body, and failure codes are exactly as before this change
+
+### Requirement: Direct placement is refused for a resource not offered on its own
+`POST /bookings` SHALL fail with the stable code `resource-not-directly-bookable`
+when the named resource withholds permission to be booked on its own, mapping to
+400 through the existing rule that every domain code other than the conflict and
+not-found families takes that status.
+
+The code SHALL be distinct from every unavailability code. A caller SHALL be able
+to tell "this resource is not offered by itself" from "this resource has no free
+time then" without inspecting a message, because the two have different remedies:
+the first is answered by booking a service, the second by choosing another time.
+
+The availability endpoints SHALL be unaffected. `GET /resources/{id}/free-time`,
+`/slots` and `/bookable-starts` SHALL answer for a resource that withholds the
+permission exactly as for one that grants it. Those reads describe when a resource
+is free, which a composite booking flow needs in order to offer it, and they were
+never an offer to book it directly.
+
+A conforming client SHALL be able to avoid the refusal entirely, because the
+permission is published on the resource read model. The refusal therefore behaves
+as a drift signal in the same way `service-unavailable` does: a client that reads
+before it writes cannot legitimately provoke it.
+
+#### Scenario: Direct placement on a withholding resource is refused
+- **WHEN** `POST /bookings` names a resource that withholds direct booking, for a time it is free and open
+- **THEN** the response is 400 problem details carrying `resource-not-directly-bookable`, and no booking is created
+
+#### Scenario: The refusal is distinguishable from unavailability
+- **WHEN** a client compares the refusal with a placement that failed because the resource was outside its open hours
+- **THEN** the two carry different stable codes
+
+#### Scenario: Availability reads answer for a withholding resource
+- **WHEN** `GET /resources/{id}/bookable-starts` is requested for a resource that withholds direct booking
+- **THEN** the response carries its bookable starts exactly as it would for any other resource
+
+#### Scenario: Service placement on a withholding resource succeeds
+- **WHEN** `POST /services/{id}/bookings` places a service whose role resolves to a resource that withholds direct booking
+- **THEN** the booking is created

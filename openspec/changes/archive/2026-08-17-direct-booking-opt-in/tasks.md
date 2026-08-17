@@ -243,6 +243,45 @@ fixes.
   `Resource.Create` parameter position (id-last is Core's convention, nothing is
   published, and the break is now declared).
 
+### QA round 3 — APPROVE
+
+Nothing new found. The reviewer checked the `[NotNullWhen]` contract path by path
+rather than accepting it, re-ran both reason-selection mutations, and added one of
+its own that is worth keeping: **making `DirectlyBookable` a fourth eligibility
+filter turns 52 tests red**, including the new "contributes availability" one.
+
+It also corrected its own round-1 worry, which is worth recording because it
+changes how the fixture flip should be read. It had said the flip left "almost
+every fixture permitting everything", so a guard regression could hide. In fact
+four suites — `CapabilityEligibilityTests`, `ServiceResolutionTests`,
+`StartAlignmentTests`, `ServicePreviewEndpointTests` — contain no mention of the
+permission at all and therefore run **entirely on default-withheld resources**,
+exercising candidate resolution, composite availability, start-grid alignment and
+the configuration preview. They are green precisely because the permission is not
+an eligibility term, and they go red the moment it becomes one. The suite's defence
+of the central guarantee is much stronger than the flip's diff suggests.
+
+**An environment fault I caused, diagnosed and fixed.** The reviewer found the
+TestSite returning 500 on every page — Razor runtime compilation failing on a
+missing `UBookIt.TestSite.deps.json` — and attributed it to Chris. It was mine: the
+backgrounded `dotnet run` I used to restart the site was killed mid-build, leaving
+a partial `bin` that later runs reused. `dotnet build src/UBookIt.TestSite`
+restored the manifests. **Lesson: launch the TestSite fully detached
+(`Start-Process`) rather than as a tracked background task**, or stopping the task
+truncates its build output and the next start silently serves a broken harness.
+
+That fault also meant the reviewer verified the Razor surface at `cc77286` and
+accepted `6fe7d00` by inference. That gap is now closed by observation: all three
+outcomes re-rendered at `6fe7d00` — "Not available on its own" with no form, the
+ordinary booking form with its anti-forgery token, and "No times are available on
+Sunday 23 August 2026".
+
+**Open NITs, all previously agreed as not-actioned:** the ViewComponent *call site*
+is untested (dropping the zone term there goes undetected — confined to the
+zone-fault path, and the repo has no ViewComponent harness); the four-subsystem
+negative assertion stays covered by the recorded grep; and `Resource.Create`'s
+parameter position stays, now declared as a source break.
+
 ### What follows this change
 
 - **The pin, next, and it is the same theme from the other actor's side.** This
