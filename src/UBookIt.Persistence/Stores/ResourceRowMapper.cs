@@ -1,4 +1,4 @@
-﻿using UBookIt.Core.Availability;
+using UBookIt.Core.Availability;
 using UBookIt.Core.Resources;
 using UBookIt.Persistence.Entities;
 

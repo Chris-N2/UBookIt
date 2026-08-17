@@ -1,4 +1,4 @@
-﻿using UBookIt.Core.Bookings;
+using UBookIt.Core.Bookings;
 using UBookIt.Persistence.Entities;
 
 namespace UBookIt.Tests.Integration.Support;

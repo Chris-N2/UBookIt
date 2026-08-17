@@ -1,4 +1,4 @@
-﻿using Microsoft.EntityFrameworkCore;
+using Microsoft.EntityFrameworkCore;
 using UBookIt.Core.Bookings;
 using UBookIt.Core.Common;
 using UBookIt.Persistence.Stores;

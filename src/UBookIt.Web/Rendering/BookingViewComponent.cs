@@ -1,4 +1,4 @@
-﻿using System.Text.Json;
+using System.Text.Json;
 using Microsoft.AspNetCore.Mvc;
 using UBookIt.Core;
 using UBookIt.Core.Availability;
@@ -28,22 +28,21 @@ public sealed class BookingViewComponent(
         }
 
         var resource = await resourceStore.GetAsync(resourceId);
-        if (resource is null || !BookingFormBuilder.TryResolveZone(settings.TimeZoneId, out var zone))
-        {
-            return View("Unavailable", BookingUnavailableModel.Unknown);
-        }
+        var zoneResolved = BookingFormBuilder.TryResolveZone(settings.TimeZoneId, out var zone);
 
-        // Not offered on its own, which is a different fact from having no free
-        // time and must not be rendered as one: "no times available" invites a
-        // visitor back tomorrow, when the answer will be the same, and tells the
-        // site owner their opening hours are wrong when they are not.
+        // Which of the two unavailable answers applies, if either — decided by a
+        // pure function so it can be tested without a host. The distinction is
+        // the point of it: "not offered on its own" is permanent and "no times
+        // available" is temporary, and rendering them alike invites a visitor
+        // back tomorrow when the answer will be the same, while telling the site
+        // owner their opening hours are wrong when they are not.
         //
-        // No form is offered either. Rendering one that placement will always
+        // No form is offered for either. Rendering one that placement will always
         // refuse would invite someone to fill it in and lose their input to a
         // failure that was knowable before they started.
-        if (!resource.DirectlyBookable)
+        if (BookingUnavailableModel.For(resource, zoneResolved) is { } unavailable)
         {
-            return View("Unavailable", BookingUnavailableModel.NotOfferedIndividually);
+            return View("Unavailable", unavailable);
         }
 
         var today = BookingFormBuilder.TodayIn(timeProvider.GetUtcNow(), zone);

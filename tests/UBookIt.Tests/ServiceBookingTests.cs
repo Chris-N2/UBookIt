@@ -1,4 +1,4 @@
-﻿using UBookIt.Core;
+using UBookIt.Core;
 using UBookIt.Core.Availability;
 using UBookIt.Core.Bookings;
 using UBookIt.Core.Common;

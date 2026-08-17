@@ -305,7 +305,7 @@ public class PoolSufficiencyTests
             Resource.Create(
                 Therapist,
                 "Mary",
-            directlyBookable: true,
+                directlyBookable: true,
                 availability: TestData.Config(
                     TestData.Weekly("13:00", "18:00", TestData.BaseDate.DayOfWeek)),
                 id: Id(2)).Value);

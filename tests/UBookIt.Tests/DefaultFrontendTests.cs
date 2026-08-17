@@ -1,5 +1,6 @@
-﻿using UBookIt.Core.Availability;
+using UBookIt.Core.Availability;
 using UBookIt.Core.Common;
+using UBookIt.Core.Resources;
 using UBookIt.Tests.Support;
 using UBookIt.Web.Rendering;
 
@@ -14,6 +15,57 @@ namespace UBookIt.Tests;
 public class DefaultFrontendTests
 {
     private static readonly DateOnly Date = TestData.BaseDate;
+
+    // --- which unavailable answer the flow gives (services spec / default-frontend) ---
+
+    private static Resource Res(bool directlyBookable)
+        => Resource.Create(
+            ResourceTypes.Room,
+            "Meeting Room A",
+            directlyBookable: directlyBookable,
+            availability: TestData.Config(TestData.Weekly("09:00", "17:00", Date.DayOfWeek))).Value;
+
+    [Fact]
+    public void Spec_scenario_a_withholding_resource_explains_itself()
+    {
+        // QA proved this decision could be reverted to the generic "try again
+        // later" answer with the whole suite green — restoring exactly the
+        // conflation this change exists to remove.
+        var model = BookingUnavailableModel.For(Res(directlyBookable: false), zoneResolved: true);
+
+        Assert.NotNull(model);
+        Assert.Equal(BookingUnavailableReason.NotOfferedIndividually, model.Reason);
+    }
+
+    [Fact]
+    public void A_permitting_resource_renders_the_ordinary_flow()
+    {
+        // The pair that makes the assertion above non-vacuous: a function that
+        // always returned the permanent answer would pass it.
+        Assert.Null(BookingUnavailableModel.For(Res(directlyBookable: true), zoneResolved: true));
+    }
+
+    [Fact]
+    public void A_fault_is_not_reported_as_a_permanent_answer()
+    {
+        // A resource that could not be read, or a zone that will not resolve, is
+        // a fault — "try again later" is honest for it and wrong for the other.
+        // The ordering is load-bearing: a null resource must not be inspected for
+        // a permission it cannot have.
+        Assert.Equal(
+            BookingUnavailableReason.Unknown,
+            BookingUnavailableModel.For(null, zoneResolved: true)!.Reason);
+
+        Assert.Equal(
+            BookingUnavailableReason.Unknown,
+            BookingUnavailableModel.For(Res(directlyBookable: true), zoneResolved: false)!.Reason);
+
+        // Including for a resource that ALSO withholds: the fault is reported as
+        // a fault, not silently upgraded to the permanent answer.
+        Assert.Equal(
+            BookingUnavailableReason.Unknown,
+            BookingUnavailableModel.For(Res(directlyBookable: false), zoneResolved: false)!.Reason);
+    }
 
     [Fact]
     public void A_withdrawn_permission_does_not_fall_back_to_try_again()

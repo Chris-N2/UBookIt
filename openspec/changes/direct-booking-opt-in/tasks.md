@@ -55,7 +55,7 @@
 
 ## 8. Spec hygiene
 
-- [x] 8.1 Guarantee diff for the one MODIFIED requirement, `Resource read model`. Only one sentence is extended in place; confirm nothing else moved. **A diff reporting nothing is as suspect as one reporting everything** — prove the tool can find a deletion before believing it.
+- [x] 8.1 Guarantee diff for **each** MODIFIED requirement — `Resource read model` (delivery-api), `Resource definition` (resources), and `Direct-resource booking is unaffected` (service-booking, added at QA round 1). Confirm nothing else moved. **A diff reporting nothing is as suspect as one reporting everything** — prove the tool can find a deletion before believing it.
 - [x] 8.2 The outward grep for sibling specs this change falsifies, **before and after** the sync. Grep the vocabulary of the *mechanisms*, not only of the change: "bookable", "book a resource", "single resource", "directly", "read model carries", "no times available", "unavailable". Every change but one has found something here.
 - [x] 8.3 Confirm the "everything optional" invariant is recorded as **narrowed, not inverted** — services remain opt-in sugar and the direct path survives; what changed is that it became editor-controlled. Update `openspec/specs` prose only if some requirement actually states the old form.
 
@@ -145,6 +145,59 @@
 - [x] 9.1 Record what the pin change inherits: it is the same theme from the other actor's side, and `preferredResourceId`'s silent fall-through is specified behaviour that has to be modified rather than fixed as a bug.
 - [x] 9.2 Record what ⑩ inherits: one booking path per resource decided by the editor, and a read model that says which, so the front end can filter without probing.
 - [x] 9.3 Record whether the default-withheld choice caused friction in practice, since it is the decision most likely to be revisited and the one with a real cost.
+
+### QA round 1 — REJECT, remediated
+
+Three MAJOR findings, all real. Two were gaps my own live pass had papered over:
+I had *verified* the behaviour end to end and mistaken that for having a guard
+against regression.
+
+- **MAJOR — a falsified sibling requirement my outward grep missed.**
+  `service-booking`'s "Direct-resource booking is unaffected" has three scenarios
+  that book a resource directly; all are false for a default-configured resource,
+  which after this change is every resource. **The miss has a specific cause worth
+  keeping:** task 8.2 lists "directly" among its candidate terms and the grep I
+  actually ran did not include it. Its covering tests stayed green only because
+  that file's `Room()` helper had been flipped to grant — the fixture-flip risk
+  materialising in the one requirement whose subject is "direct booking is
+  unaffected". Fixed as a MODIFIED entry scoping the scenarios to a permitting
+  resource, keeping the requirement's actual guarantee (services change nothing
+  about direct booking, which is still true) and adding a scenario for the
+  converse: withholding does not remove a candidate.
+- **MAJOR — the management-API half had no test.** Both directions of
+  `ResourceModelMapper` were freely mutable with 630/630 green; the store
+  round-trip covers a layer below and the live pass is not a regression guard.
+  Four tests added to `ResourceModelMapperTests`, the file that exists for exactly
+  this layer.
+- **MAJOR — the no-JS reason selection had no test.** It could be reverted to the
+  generic "try again later" answer — restoring precisely the conflation this
+  change exists to remove — with the suite green. Fixed by extracting the decision
+  into `BookingUnavailableModel.For(resource, zoneResolved)`, a pure function the
+  ViewComponent calls, and testing it: the permanent answer, the ordinary flow,
+  and the ordering that keeps a fault reported as a fault even for a resource that
+  also withholds.
+- **All three of QA's surviving mutations now fail**: management write hardcoded
+  to false → 2 red; management response member dropped → 1 red; no-JS reason
+  reverted to `Unknown` → 1 red.
+- **MINOR — the `Resource.Create` signature break is now named in the proposal.**
+  The parameter sits before the trailing optional `id`, so a positional caller
+  shifts; appending after `id` was considered and rejected, since `id` last is the
+  convention across Core's factories and nothing is published.
+- **NITs fixed**: 24 files had gained a UTF-8 BOM from the apply's own file writes
+  (the repo was 4-of-123 before, 30-of-123 after) — stripped back to what they
+  were; one misaligned insertion in `PoolSufficiencyTests`; and task 8.1's text,
+  which said "the one MODIFIED requirement" when there are now three.
+- **QA concurred on the delivery-api judgement call** — "Direct placement is
+  unchanged" is about response *shape*, this change adds no member in either
+  direction, and the new failure travels in the pre-existing `errors` array.
+  Independently reached, which is what it was asked for.
+
+**Two things QA surfaced that are NOT this change's problem**, recorded so they
+are not lost: `Booking.CancelAsync` exists in Core but is exposed by no endpoint,
+management or delivery — so a resource with any booking is permanently undeletable
+through the API, and QA hit exactly that trying to clean up a fixture it created
+("QA Granting", type `qa875`, now inert in the resources list). That is a real
+product gap for a later change.
 
 ### What follows this change
 

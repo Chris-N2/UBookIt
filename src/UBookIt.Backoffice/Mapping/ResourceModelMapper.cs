@@ -1,4 +1,4 @@
-﻿using UBookIt.Backoffice.Models;
+using UBookIt.Backoffice.Models;
 using UBookIt.Core.Availability;
 using UBookIt.Core.Common;
 using UBookIt.Core.Resources;

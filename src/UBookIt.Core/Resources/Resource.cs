@@ -1,4 +1,4 @@
-﻿using UBookIt.Core.Availability;
+using UBookIt.Core.Availability;
 using UBookIt.Core.Common;
 
 namespace UBookIt.Core.Resources;

@@ -19,9 +19,17 @@ nothing today and is a breaking change to every installation later.
 ## What Changes
 
 - **A resource carries whether it may be booked on its own**, defaulting to **not**.
-  **BREAKING (behaviour, not contract):** every resource that exists stops being
-  directly bookable until an editor says otherwise. No consumer exists to break;
-  this is the last moment that is true.
+  **BREAKING (behaviour):** every resource that exists stops being directly
+  bookable until an editor says otherwise. No consumer exists to break; this is
+  the last moment that is true.
+
+  **BREAKING (source):** `Resource.Create` gains the parameter *before* its
+  trailing optional `id`, so any positional caller passing an id shifts. Two
+  in-repo callers did, and the compiler caught both only because `bool` and
+  `Guid?` differ — luck, not design; both now pass arguments by name. Appending
+  after `id` would have been source-compatible and was rejected: `id` last is the
+  convention across every factory in Core, and nothing is published, so the
+  compatibility being spent is worth less than the consistency being kept.
 
 - **The single-resource placement path is refused in Core** for a resource that
   carries no such permission. The gate sits on `IBookingService.PlaceAsync(BookingRequest)`

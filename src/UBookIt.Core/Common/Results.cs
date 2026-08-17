@@ -1,4 +1,4 @@
-﻿namespace UBookIt.Core.Common;
+namespace UBookIt.Core.Common;
 
 /// <summary>
 /// A single validation or operation failure with a stable machine-readable code.

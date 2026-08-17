@@ -1,4 +1,6 @@
-﻿namespace UBookIt.Web.Rendering;
+using UBookIt.Core.Resources;
+
+namespace UBookIt.Web.Rendering;
 
 /// <summary>
 /// View model for the booking form (default front-end). Purpose-built for
@@ -134,6 +136,32 @@ public sealed class BookingUnavailableModel
 
     public static BookingUnavailableModel NotOfferedIndividually { get; } =
         new() { Reason = BookingUnavailableReason.NotOfferedIndividually };
+
+    /// <summary>
+    /// Whether the flow has anything to offer for this resource, and if not, why.
+    /// Null means carry on and render the form.
+    /// <para>
+    /// A function rather than a branch inside the ViewComponent, because this is
+    /// where the distinction actually lives and a ViewComponent needs a host to
+    /// exercise. QA proved the branch could be reverted to <see cref="Unknown"/>
+    /// — restoring the "not available at the moment, please try again later"
+    /// conflation this change exists to remove — with the whole suite green.
+    /// </para>
+    /// <para>
+    /// The order is load-bearing. A resource that could not be read, or a site
+    /// zone that will not resolve, is a fault and honestly gets "try again"; only
+    /// a resource that exists and withholds gets the permanent answer.
+    /// </para>
+    /// </summary>
+    public static BookingUnavailableModel? For(Resource? resource, bool zoneResolved)
+    {
+        if (resource is null || !zoneResolved)
+        {
+            return Unknown;
+        }
+
+        return resource.DirectlyBookable ? null : NotOfferedIndividually;
+    }
 }
 
 /// <summary>View model for the confirmation page shown after a successful placement.</summary>

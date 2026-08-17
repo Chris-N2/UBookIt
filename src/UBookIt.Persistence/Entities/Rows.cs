@@ -1,4 +1,4 @@
-﻿using UBookIt.Core.Services;
+using UBookIt.Core.Services;
 
 namespace UBookIt.Persistence.Entities;
 

@@ -8,6 +8,72 @@ namespace UBookIt.Tests;
 
 public class ResourceModelMapperTests
 {
+    // ------------------------------------------------------------------
+    // Direct bookability, both directions.
+    //
+    // QA proved this layer was unguarded: `ToDomain` could hardcode false and
+    // `ToModel` could drop the member, with all 630 tests still green. The store
+    // round-trip covers one layer below and the live pass covers the whole stack;
+    // neither is a regression guard on the mapper itself.
+    // ------------------------------------------------------------------
+
+    [Fact]
+    public void Spec_scenario_the_permission_round_trips_through_the_api()
+    {
+        var model = ValidModel();
+        model.DirectlyBookable = true;
+
+        var domain = ResourceModelMapper.ToDomain(model);
+
+        Assert.True(domain.Succeeded);
+        Assert.True(domain.Value.DirectlyBookable);
+
+        // And back out again, which is the direction a dropped member breaks.
+        Assert.True(ResourceModelMapper.ToModel(domain.Value).DirectlyBookable);
+    }
+
+    [Fact]
+    public void Spec_scenario_an_omitted_permission_withholds_it()
+    {
+        // The request model's default, which is what an omitted JSON member
+        // leaves behind. A caller that says nothing is saying no.
+        var domain = ResourceModelMapper.ToDomain(ValidModel());
+
+        Assert.True(domain.Succeeded);
+        Assert.False(domain.Value.DirectlyBookable);
+        Assert.False(ResourceModelMapper.ToModel(domain.Value).DirectlyBookable);
+    }
+
+    [Fact]
+    public void Spec_scenario_a_full_update_can_withdraw_it()
+    {
+        // Full-replacement semantics, as the capability set has. A mapper that
+        // could only ever turn the permission ON would pass the round-trip test
+        // above and fail here, which is the point of having both.
+        var granting = ValidModel();
+        granting.DirectlyBookable = true;
+        Assert.True(ResourceModelMapper.ToDomain(granting).Value.DirectlyBookable);
+
+        var withdrawing = ValidModel();
+        withdrawing.DirectlyBookable = false;
+
+        Assert.False(ResourceModelMapper.ToDomain(withdrawing).Value.DirectlyBookable);
+    }
+
+    [Fact]
+    public void The_permission_does_not_affect_whether_a_resource_is_valid()
+    {
+        // Neither answer is a validation rule, in either direction — so nothing
+        // may start rejecting on its account.
+        foreach (var answer in new[] { true, false })
+        {
+            var model = ValidModel();
+            model.DirectlyBookable = answer;
+
+            Assert.True(ResourceModelMapper.ToDomain(model).Succeeded);
+        }
+    }
+
     private static ResourceRequestModel ValidModel() => new()
     {
         Type = "room",
