@@ -545,6 +545,69 @@ public class MultiRolePlacementTests
     }
 
     [Fact]
+    public async Task Spec_scenario_a_refused_pin_discloses_nothing_not_already_published()
+    {
+        // Design D7, promoted from the design into a SHALL and therefore owed a
+        // test rather than an argument — the requirement's own convention, since
+        // its sibling scenarios are all discharged by CapabilityPublicationTests.
+        //
+        // `resource-not-eligible` is safe because pool membership is derivable
+        // from public reads. `pinned-resource-unavailable` has to clear the same
+        // bar on different ground: what it discloses is occupancy at an instant,
+        // and occupancy is published. So the test asks both questions and
+        // compares them — the refusal must tell the caller only what the
+        // resource's own bookable starts already told them.
+        //
+        // If a future change hides per-resource availability, this test is what
+        // goes red, which is the point of writing it rather than reasoning it.
+        var service = Svc(ResourceTypes.Room, Therapist);
+
+        var resourceStore = new InMemoryResourceStore();
+        foreach (var resource in new[] { Res(1, ResourceTypes.Room), Res(2, ResourceTypes.Room), Res(3, Therapist), Res(4, Therapist) })
+        {
+            resourceStore.Add(resource);
+        }
+
+        var serviceStore = new InMemoryServiceStore().Add(service);
+        var bookingStore = new InMemoryBookingStore();
+        var time = new FixedTimeProvider(TestData.Now);
+        var availability = new AvailabilityService(resourceStore, bookingStore, time, TestData.Settings);
+        var bookings = new BookingService(resourceStore, bookingStore, time, TestData.Settings);
+        var services = new ServiceBookingService(
+            serviceStore, resourceStore, bookingStore, availability, bookings, TestData.Settings);
+
+        Assert.True((await bookings.PlaceAsync(new BookingRequest
+        {
+            ResourceId = Id(4),
+            Start = TestData.Utc(Date, "09:00"),
+            Duration = Mins(60),
+            Booker = TestData.Booker(),
+        })).Succeeded);
+
+        var refused = await services.PlaceAsync(Request(service, "09:00", 60, pinned: Id(4)));
+
+        Assert.Equal(FailureCodes.PinnedResourceUnavailable, Assert.Single(refused.Failures).Code);
+
+        // The same fact, from the anonymous read the failure is being compared
+        // against: 09:00 is absent from that resource's published starts.
+        var published = await availability.GetBookableStartsAsync(Id(4), Date, Date);
+
+        Assert.True(published.Succeeded);
+
+        // Not vacuous: that resource still publishes starts, just not this one.
+        Assert.NotEmpty(published.Value);
+        Assert.DoesNotContain(TestData.Utc(Date, "09:00"), published.Value.Select(start => start.StartUtc));
+
+        // And the pair that keeps it honest: the free therapist IS published as
+        // available then, so the assertion above is about occupancy rather than
+        // about the read being empty.
+        var free = await availability.GetBookableStartsAsync(Id(3), Date, Date);
+
+        Assert.True(free.Succeeded);
+        Assert.Contains(TestData.Utc(Date, "09:00"), free.Value.Select(start => start.StartUtc));
+    }
+
+    [Fact]
     public async Task A_race_on_a_slot_the_pin_never_filled_is_a_conflict_not_the_pins_failure()
     {
         // Design D4's own table says a placement that loses a race answers

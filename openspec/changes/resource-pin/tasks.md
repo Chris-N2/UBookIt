@@ -15,6 +15,14 @@
 - [x] 2.4 A pin that CAN be honoured still books that resource, in a multi-role service, in whichever slot fits — the ⑨-2 guarantee, carried forward unchanged.
 - [x] 2.5 Every unpinned outcome is untouched: the ⑨-2 all-fail suite is the guard, and it must stay green without modification.
 - [x] 2.6 A pin naming a resource outside every pool still reports `resource-not-eligible`, including when a role's pool is empty.
+- [x] 2.7 **Added at remediation.** D4a at the HTTP boundary: a pin that is busy *and* the only candidate answers `conflict`, not the pin's code. The live pass proved it; nothing in the suite did, and the delivery delta had no scenario for it.
+- [x] 2.9 **Added after QA round 2.** The disclosure scenario promoted into the
+  spec at remediation was argued and not tested — QA's one remaining MINOR, and a
+  fair one, since that requirement's sibling scenarios are all discharged by
+  tests. Now asserted by comparing the two reads: a refused pin, and that
+  resource's published bookable starts lacking the same instant while still
+  publishing others. It is what goes red if per-resource availability is ever
+  hidden, which is exactly the future the SHALL guards against.
 - [x] 2.8 **Added at remediation.** The race/pin ordering (MINOR-2) is covered by a
   test that needed a `RacingBookingService` decorator to reach, and writing it
   corrected my understanding: a pin that is *claimed* makes the loop attempt
@@ -24,7 +32,6 @@
   "something clashed, and I will not say what" must not be reported as the pin's
   fault. The first draft of the test could not reach the case and failed, which is
   how this surfaced.
-- [x] 2.7 **Added at remediation.** D4a at the HTTP boundary: a pin that is busy *and* the only candidate answers `conflict`, not the pin's code. The live pass proved it; nothing in the suite did, and the delivery delta had no scenario for it.
 
 ## 3. Delivery API
 
@@ -58,7 +65,7 @@
   strand another slot" does not exist: whenever an assignment exists and the pinned
   resource is eligible for a slot, an assignment *containing* it exists too — swap
   along an alternating path. The codebase already proved it, in
-  `SlotAssignmentTests.A_preference_is_reported_as_none_only_when_nothing_saturates`,
+  `SlotAssignmentTests.A_pin_is_reported_as_none_only_when_nothing_saturates`,
   whose comment warns against strengthening exactly that. My test for the
   non-existent third reason failed, which is how I found it.
   **D4a followed from D4 and the first draft missed it.** If nothing saturates with

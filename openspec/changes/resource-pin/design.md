@@ -91,7 +91,7 @@ pinned resource is eligible for some slot, an assignment *containing* it also
 exists — pin it to that slot and the original matching, restricted to the rest,
 avoids it, because a matching uses each resource at most once.
 `TrySaturateIncluding` therefore returns null exactly when `TrySaturate` does, over
-the same graph. `SlotAssignmentTests.A_preference_is_reported_as_none_only_when_nothing_saturates`
+the same graph. `SlotAssignmentTests.A_pin_is_reported_as_none_only_when_nothing_saturates`
 states this and warns against strengthening it.
 
 So a pin fails for exactly one reason: **the pinned resource is not in the graph the

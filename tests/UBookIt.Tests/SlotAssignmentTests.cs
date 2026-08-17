@@ -168,7 +168,7 @@ public class SlotAssignmentTests
     }
 
     [Fact]
-    public void A_preference_is_reported_as_none_only_when_nothing_saturates()
+    public void A_pin_is_reported_as_none_only_when_nothing_saturates()
     {
         // This case asserts less than it looks like it does, and the reason is worth
         // stating so nobody strengthens it by mistake.
