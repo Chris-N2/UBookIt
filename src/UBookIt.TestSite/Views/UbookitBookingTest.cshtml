@@ -14,6 +14,13 @@
     var firstResource = requested is { } wanted
         ? await ResourceStore.GetAsync(wanted)
         : (await ResourceStore.ListAsync(0, 1)).Items.FirstOrDefault();
+
+    // Dev harness for change ⑩. `?flow` renders the dispatcher, which reads
+    // `ubBook` from the query and shows the catalogue when it says nothing;
+    // `?flow=<serviceId>` renders that service directly, which is the "entry at
+    // any point" case a site author with one service would use.
+    var flow = Context.Request.Query.ContainsKey("flow");
+    var namedService = Guid.TryParse(Context.Request.Query["flow"], out var svc) ? svc : (Guid?)null;
 }
 <!doctype html>
 <html lang="en">
@@ -25,7 +32,13 @@
 <body>
     <main>
         <h1>uBookIt booking test</h1>
-        @if (firstResource is not null)
+        @if (flow)
+        {
+            @(namedService is { } named
+                ? await Component.InvokeAsync("BookingFlow", new { serviceId = named })
+                : await Component.InvokeAsync("BookingFlow"))
+        }
+        else if (firstResource is not null)
         {
             @await Component.InvokeAsync("Booking", new { resourceId = firstResource.Id })
         }

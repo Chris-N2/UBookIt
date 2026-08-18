@@ -1,0 +1,42 @@
+@using UBookIt.Web.Rendering
+@model ServiceConfirmationModel
+
+<section class="ubookit-confirmation" aria-label="Booking confirmed">
+    <h2>Booking confirmed</h2>
+
+    <p>Thank you, @Model.BookerName. Your booking is confirmed.</p>
+
+    <dl>
+        <dt>Reference</dt>
+        <dd>@Model.BookingId</dd>
+
+        <dt>What</dt>
+        <dd>@Model.ServiceName</dd>
+
+        @* Every resource the service resolved to, never one of them and never a
+           count: a visitor who booked a room and a therapist was given both, and
+           naming one describes a different booking from the one that exists. A
+           single-role service lists its one resource by the same path. *@
+        <dt>Reserved for you</dt>
+        <dd>
+            <ul class="ubookit-booked-resources">
+                @foreach (var name in Model.ResourceNames)
+                {
+                    <li>@name</li>
+                }
+            </ul>
+        </dd>
+
+        <dt>When</dt>
+        <dd>@Model.LocalStart&nbsp;&ndash;&nbsp;@Model.LocalEnd</dd>
+
+        <dt>Email</dt>
+        <dd>@Model.BookerEmail</dd>
+
+        @if (!string.IsNullOrWhiteSpace(Model.BookerPhone))
+        {
+            <dt>Phone</dt>
+            <dd>@Model.BookerPhone</dd>
+        }
+    </dl>
+</section>

@@ -1,0 +1,6 @@
+@using UBookIt.Web.Rendering
+@model BookingFormModel
+@* The dispatcher's resource case renders the resource flow's own view, not a
+   copy of it. There is one single-resource booking view in the package, and this
+   is a second way in to it. *@
+@await Html.PartialAsync("~/Views/Shared/Components/Booking/Default.cshtml", Model)

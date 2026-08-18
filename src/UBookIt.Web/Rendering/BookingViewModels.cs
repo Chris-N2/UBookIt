@@ -8,11 +8,28 @@ namespace UBookIt.Web.Rendering;
 /// rendering — no domain aggregate on the surface. Times carry the exact UTC
 /// instant as their value and a site-zone wall-clock label for display.
 /// </summary>
-public sealed class BookingFormModel
+public sealed class BookingFormModel : IBookingFormView
 {
     public required Guid ResourceId { get; init; }
 
     public required string ResourceName { get; init; }
+
+    /// <inheritdoc />
+    /// <remarks>
+    /// Null unless the flow was entered through the dispatcher's query string.
+    /// A site author who invokes the <c>Booking</c> component with a resource id
+    /// has no flow state in the URL, and the rendered markup is then byte-for-byte
+    /// what it was before the service flow existed.
+    /// </remarks>
+    public string? FlowToken { get; init; }
+
+    /// <summary>
+    /// Always false: a resource's length is the visitor's choice from the grid
+    /// its constraints permit, even when that grid holds a single value. Stated
+    /// rather than inherited, because rendering a one-option grid as settled text
+    /// would change this flow's behaviour.
+    /// </summary>
+    public bool LengthIsFixed => false;
 
     public required DateOnly SelectedDate { get; init; }
 

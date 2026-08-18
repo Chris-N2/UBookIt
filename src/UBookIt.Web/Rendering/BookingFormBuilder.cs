@@ -4,39 +4,36 @@ using UBookIt.Core.Resources;
 namespace UBookIt.Web.Rendering;
 
 /// <summary>
-/// Assembles the booking form view model from Core data (host-independent, so
-/// it is unit-testable without an Umbraco host). Times are shown as site-zone
-/// wall-clock; each option's value is the exact UTC instant (round-trip "O"
-/// format) so the POST re-selects the precise slot without re-parsing display
-/// text. The booking length is the visitor's choice from the lengths the
-/// resource permits, defaulting to its minimum duration.
+/// Assembles the <em>resource</em> booking form view model from Core data
+/// (host-independent, so it is unit-testable without an Umbraco host). Times are
+/// shown as site-zone wall-clock; each option's value is the exact UTC instant
+/// (round-trip "O" format) so the POST re-selects the precise slot without
+/// re-parsing display text. The booking length is the visitor's choice from the
+/// lengths the resource permits, defaulting to its minimum duration.
+/// <para>
+/// What is generic to <em>any</em> booking form now lives in
+/// <see cref="BookingForm"/> and is shared with the service flow; the members
+/// below that merely forward to it are kept because they are this type's
+/// published surface and because the resource flow's tests are the guard that
+/// the extraction changed no behaviour — a guard worth nothing if the extraction
+/// is allowed to move the assertions.
+/// </para>
 /// </summary>
 public static class BookingFormBuilder
 {
     public static BookingTimeOption ToOption(DateTimeOffset startUtc, TimeZoneInfo zone)
-        => new(startUtc.ToString("O"), TimeZoneInfo.ConvertTime(startUtc, zone).ToString("HH:mm"));
+        => BookingForm.ToOption(startUtc, zone);
 
     public static IReadOnlyList<BookingTimeOption> ToOptions(IEnumerable<Slot> slots, TimeZoneInfo zone)
-        => slots.Select(slot => ToOption(slot.StartUtc, zone)).ToList();
+        => BookingForm.ToOptions(slots.Select(slot => slot.StartUtc), zone);
 
     /// <summary>Today in the site zone — the earliest selectable date and the render default.</summary>
     public static DateOnly TodayIn(DateTimeOffset nowUtc, TimeZoneInfo zone)
-        => DateOnly.FromDateTime(TimeZoneInfo.ConvertTime(nowUtc, zone).DateTime);
+        => BookingForm.TodayIn(nowUtc, zone);
 
     /// <summary>Resolves the site zone; false (with UTC) for an unknown/invalid id.</summary>
     public static bool TryResolveZone(string timeZoneId, out TimeZoneInfo zone)
-    {
-        try
-        {
-            zone = TimeZoneInfo.FindSystemTimeZoneById(timeZoneId);
-            return true;
-        }
-        catch (Exception ex) when (ex is TimeZoneNotFoundException or InvalidTimeZoneException)
-        {
-            zone = TimeZoneInfo.Utc;
-            return false;
-        }
-    }
+        => BookingForm.TryResolveZone(timeZoneId, out zone);
 
     /// <summary>
     /// The default booking length: the resource's minimum duration. A visitor
@@ -54,26 +51,11 @@ public static class BookingFormBuilder
     public static IReadOnlyList<int> DurationOptions(Resource resource)
     {
         var constraints = resource.Availability.Constraints;
-        var step = (int)constraints.Granularity.TotalMinutes;
-        var max = (int)constraints.MaxDuration.TotalMinutes;
 
-        // A sub-minute granularity truncates to a zero step, which would loop
-        // forever. BookingConstraints permits it (it only requires the bounds
-        // to be exact multiples), and this is a public method, so guard rather
-        // than assume the caller's constraints came from the minute-based
-        // management API.
-        if (step <= 0)
-        {
-            return [];
-        }
-
-        var options = new List<int>();
-        for (var minutes = (int)constraints.MinDuration.TotalMinutes; minutes <= max; minutes += step)
-        {
-            options.Add(minutes);
-        }
-
-        return options;
+        return BookingForm.LengthGrid(
+            (int)constraints.MinDuration.TotalMinutes,
+            (int)constraints.MaxDuration.TotalMinutes,
+            (int)constraints.Granularity.TotalMinutes);
     }
 
     /// <summary>
@@ -116,12 +98,14 @@ public static class BookingFormBuilder
         IReadOnlyList<BookableStart> starts,
         TimeSpan duration,
         TimeZoneInfo zone,
-        FailedSubmission? failed = null)
+        FailedSubmission? failed = null,
+        string? flowToken = null)
     {
         var constraints = resource.Availability.Constraints;
 
         return new BookingFormModel
         {
+            FlowToken = flowToken,
             ResourceId = resource.Id,
             ResourceName = resource.DisplayName,
             SelectedDate = selectedDate,
@@ -132,7 +116,7 @@ public static class BookingFormBuilder
             DurationMinutes = (int)duration.TotalMinutes,
             DurationOptions = DurationOptions(resource),
             LongestAvailableMinutes = LongestAvailableMinutes(starts),
-            Times = ToOptions(starts.Where(s => s.Admits(duration)).Select(s => new Slot(s.StartUtc, duration)), zone),
+            Times = BookingForm.ToOptions(starts.Where(s => s.Admits(duration)).Select(s => s.StartUtc), zone),
             SelectedTimeIso = failed?.SelectedTimeIso,
             Name = failed?.Name,
             Email = failed?.Email,

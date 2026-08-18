@@ -1,0 +1,53 @@
+@using System.Globalization
+@using UBookIt.Web.Rendering
+@model IBookingFormView
+@{
+    var timesError = Model.ErrorFor(BookingFieldIds.Times);
+}
+@*
+    Step 2's choices — the start times, or an explanation of why there are none.
+    Both live here because they answer one question, and separating them is how a
+    flow comes to render an empty list instead of a sentence.
+*@
+@if (Model.HasTimes)
+{
+    <fieldset id="@BookingFieldIds.Times" tabindex="-1" class="ubookit-times"
+              aria-invalid="@(timesError is not null ? "true" : null)"
+              aria-describedby="@(timesError is not null ? "ubookit-times-error" : null)">
+        <legend>Available start times on @Model.SelectedDate.ToString("dddd d MMMM yyyy", CultureInfo.InvariantCulture) for @BookingDurations.Label(Model.DurationMinutes)</legend>
+        @if (timesError is not null)
+        {
+            <p id="ubookit-times-error" class="ubookit-field-error">@timesError</p>
+        }
+        @foreach (var (option, index) in Model.Times.Select((option, index) => (option, index)))
+        {
+            var id = $"ubookit-time-{index}";
+            <div class="ubookit-time">
+                <input type="radio"
+                       id="@id"
+                       name="SelectedTime"
+                       value="@option.InstantIso"
+                       @(option.InstantIso == Model.SelectedTimeIso ? "checked" : null)
+                       required />
+                <label for="@id">@option.Label</label>
+            </div>
+        }
+    </fieldset>
+}
+else if (Model.LengthIsTheProblem)
+{
+    @* The date has availability, just not this much of it — say so, rather
+       than leaving the visitor to guess a shorter length by trial. *@
+    @* Phrased "for <length>" rather than "<length> times": the label is a
+       noun phrase ("4 hours"), so using it adjectivally reads as
+       "No 4 hours times are available". *@
+    <p class="ubookit-no-times" id="ubookit-length-unavailable">
+        No times are available for @BookingDurations.Label(Model.DurationMinutes) on @Model.SelectedDate.ToString("dddd d MMMM yyyy", CultureInfo.InvariantCulture).
+        The longest available that day is @BookingDurations.Label(Model.LongestAvailableMinutes!.Value).
+        Please choose a shorter length or another date.
+    </p>
+}
+else
+{
+    <p class="ubookit-no-times">No times are available on @Model.SelectedDate.ToString("dddd d MMMM yyyy", CultureInfo.InvariantCulture). Please choose another date.</p>
+}

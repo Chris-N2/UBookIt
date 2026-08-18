@@ -1,0 +1,29 @@
+@using UBookIt.Web.Rendering
+@model IBookingFormView
+@*
+    The error summary, rendered once for every flow. Each problem is stated in
+    text and links to the control it belongs to; the container is a live region
+    so a no-JavaScript redraw announces itself, and is focusable so the deferred
+    progressive-enhancement layer has something to move focus to.
+*@
+@if (Model.HasErrors)
+{
+    <div role="alert" tabindex="-1" class="ubookit-errors">
+        <h3>There is a problem</h3>
+        <ul>
+            @foreach (var error in Model.Errors)
+            {
+                <li>
+                    @if (error.FieldId is not null)
+                    {
+                        <a href="#@error.FieldId">@error.Message</a>
+                    }
+                    else
+                    {
+                        @error.Message
+                    }
+                </li>
+            }
+        </ul>
+    </div>
+}

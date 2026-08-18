@@ -1,0 +1,1040 @@
+using UBookIt.Core.Availability;
+using UBookIt.Core.Bookings;
+using UBookIt.Core.Common;
+using UBookIt.Core.Resources;
+using UBookIt.Core.Services;
+using UBookIt.Tests.Support;
+using UBookIt.Web.Rendering;
+
+namespace UBookIt.Tests;
+
+/// <summary>
+/// The service booking flow, the catalogue, and the dispatcher in front of them:
+/// everything the default front-end decides before a view is chosen.
+/// <para>
+/// The flows are exercised over the <b>real</b> Core collaborator graph rather
+/// than a double standing in for resolution. A double would let a test agree with
+/// itself about which resources a configuration resolves to, which is precisely
+/// the thing the multi-role cases are about.
+/// </para>
+/// </summary>
+public class ServiceFrontendTests
+{
+    private const string Therapist = "therapist";
+
+    private static readonly DateOnly Date = TestData.BaseDate;
+
+    private static TimeSpan Mins(int minutes) => TimeSpan.FromMinutes(minutes);
+
+    private static Guid Id(int n) => new($"00000000-0000-0000-0000-{n:x12}");
+
+    private static Resource Res(
+        int id,
+        string type,
+        string name,
+        string open = "09:00",
+        string close = "17:00",
+        int granularity = 30,
+        int min = 30,
+        int max = 480,
+        params string[] capabilities)
+        => Resource.Create(
+            type,
+            name,
+            directlyBookable: true,
+            capabilities: capabilities,
+            availability: TestData.Config(
+                TestData.Weekly(open, close, Date.DayOfWeek),
+                constraints: BookingConstraints.Create(
+                    granularity: Mins(granularity),
+                    minDuration: Mins(min),
+                    maxDuration: Mins(max)).Value),
+            id: Id(id)).Value;
+
+    private static Service Svc(string name, ServiceDuration? duration, params ServiceRole[] roles)
+        => Service.Create(name, duration, roles, id: Id(900)).Value;
+
+    private sealed record Harness(
+        ServiceBookingFlow Flow,
+        ServiceBookingService Core,
+        BookingService Bookings,
+        Service Service,
+        InMemoryResourceStore Resources,
+        InMemoryServiceStore ServiceStore);
+
+    private static Harness Build(Service service, params Resource[] resources)
+    {
+        var serviceStore = new InMemoryServiceStore().Add(service);
+        var resourceStore = new InMemoryResourceStore();
+
+        foreach (var resource in resources)
+        {
+            resourceStore.Add(resource);
+        }
+
+        var (core, bookings, _) = TestData.ServiceBookingWith(serviceStore, resourceStore);
+
+        return new Harness(
+            new ServiceBookingFlow(serviceStore, core, TestData.Settings, new FixedTimeProvider(TestData.Now)),
+            core,
+            bookings,
+            service,
+            resourceStore,
+            serviceStore);
+    }
+
+    /// <summary>A room and a therapist, both able to fulfil the massage all day.</summary>
+    private static Harness Massage()
+        => Build(
+            Svc("Massage", null, new ServiceRole(ResourceTypes.Room, 1), new ServiceRole(Therapist, 1)),
+            Res(1, ResourceTypes.Room, "Treatment Room"),
+            Res(2, Therapist, "Jane"));
+
+    private static BookingFlowInput On(DateOnly date, int? minutes = null, string? token = null)
+        => new() { Date = date, DurationMinutes = minutes, FlowToken = token };
+
+    private static async Task<IReadOnlyList<RoleCandidates>> PoolsOf(Harness harness)
+    {
+        var resolved = await harness.Core.ResolveCandidatesAsync(harness.Service.Id);
+        Assert.True(resolved.Succeeded);
+        return resolved.Value;
+    }
+
+    // ---------------------------------------------------------------------
+    // 2.2 — written for SEVERAL resources, including the confirmation.
+    // ---------------------------------------------------------------------
+
+    [Fact]
+    public async Task A_multi_role_confirmation_names_every_resolved_resource()
+    {
+        // The failure this guards is a `.First()` on the resolved set: it passes
+        // every single-role test and fails only the multi-role case the service
+        // flow exists to serve. So the covering assertion is that BOTH names are
+        // present — a count, or either one alone, is a different booking from the
+        // one that exists.
+        var harness = Massage();
+
+        var placed = await harness.Core.PlaceAsync(new ServiceBookingRequest
+        {
+            ServiceId = harness.Service.Id,
+            Start = TestData.Utc(Date, "09:00"),
+            Duration = Mins(60),
+            Booker = TestData.Booker(),
+        });
+
+        Assert.True(placed.Succeeded, string.Join("; ", placed.Failures.Select(f => f.Code)));
+        Assert.Equal(2, placed.Value.Claims.Count);
+
+        var confirmation = ServiceBookingFormBuilder.BuildConfirmation(
+            placed.Value, harness.Service.Name, await NamesOf(harness, placed.Value), TestData.London);
+
+        Assert.Equal(2, confirmation.ResourceNames.Count);
+        Assert.Contains("Treatment Room", confirmation.ResourceNames);
+        Assert.Contains("Jane", confirmation.ResourceNames);
+    }
+
+    [Fact]
+    public async Task A_single_role_confirmation_names_its_one_resource()
+    {
+        // The pair that makes the assertion above non-vacuous in the other
+        // direction: the single-role case is the resolved set too, not a special
+        // case of it, so it reports one name rather than none or a count.
+        var harness = Build(
+            Svc("Haircut", null, new ServiceRole(Therapist, 1)),
+            Res(2, Therapist, "Jane"));
+
+        var placed = await harness.Core.PlaceAsync(new ServiceBookingRequest
+        {
+            ServiceId = harness.Service.Id,
+            Start = TestData.Utc(Date, "09:00"),
+            Duration = Mins(60),
+            Booker = TestData.Booker(),
+        });
+
+        Assert.True(placed.Succeeded);
+
+        var confirmation = ServiceBookingFormBuilder.BuildConfirmation(
+            placed.Value, harness.Service.Name, await NamesOf(harness, placed.Value), TestData.London);
+
+        Assert.Equal("Jane", Assert.Single(confirmation.ResourceNames));
+    }
+
+    [Fact]
+    public async Task A_claim_whose_name_cannot_be_read_is_reported_rather_than_dropped()
+    {
+        // Dropping it would quietly turn a two-resource booking into a
+        // one-resource confirmation — the very shape the requirement forbids —
+        // and would do so without any code saying "first".
+        var harness = Massage();
+
+        var placed = await harness.Core.PlaceAsync(new ServiceBookingRequest
+        {
+            ServiceId = harness.Service.Id,
+            Start = TestData.Utc(Date, "09:00"),
+            Duration = Mins(60),
+            Booker = TestData.Booker(),
+        });
+
+        Assert.True(placed.Succeeded);
+
+        var confirmation = ServiceBookingFormBuilder.BuildConfirmation(
+            placed.Value, harness.Service.Name, new Dictionary<Guid, string>(), TestData.London);
+
+        Assert.Equal(placed.Value.Claims.Count, confirmation.ResourceNames.Count);
+    }
+
+    private static async Task<Dictionary<Guid, string>> NamesOf(Harness harness, Booking booking)
+    {
+        var names = new Dictionary<Guid, string>();
+
+        foreach (var claim in booking.Claims)
+        {
+            var resource = await harness.Resources.GetAsync(claim.ResourceId);
+            names[claim.ResourceId] = resource!.DisplayName;
+        }
+
+        return names;
+    }
+
+    // ---------------------------------------------------------------------
+    // 3 — refusals. The covering test is the PAIR, proved to differ.
+    // ---------------------------------------------------------------------
+
+    /// <summary>A service needing a therapist where none exists — never fulfillable.</summary>
+    private static Harness Unfulfillable()
+        => Build(
+            Svc("Massage", null, new ServiceRole(ResourceTypes.Room, 1), new ServiceRole(Therapist, 1)),
+            Res(1, ResourceTypes.Room, "Treatment Room"));
+
+    [Fact]
+    public async Task The_two_refusals_differ_and_only_the_transient_one_invites_a_retry()
+    {
+        // A suite proving "a service books on a good day" passes an
+        // implementation that renders every refusal as "no times available". So
+        // both refusals are provoked here and compared: rendering them alike is
+        // the failure, and only a comparison can see it.
+        var busy = Massage();
+
+        // Every resource able to fulfil the service is taken at 09:00, but the
+        // service is fulfillable in general.
+        await OccupyAsync(busy, Id(2), "09:00", 60);
+
+        var transient = await busy.Core.PlaceAsync(new ServiceBookingRequest
+        {
+            ServiceId = busy.Service.Id,
+            Start = TestData.Utc(Date, "09:00"),
+            Duration = Mins(60),
+            Booker = TestData.Booker(),
+        });
+
+        Assert.False(transient.Succeeded);
+        Assert.Equal(FailureCodes.Conflict, transient.Failures[0].Code);
+
+        var deterministic = await Unfulfillable().Core.PlaceAsync(new ServiceBookingRequest
+        {
+            ServiceId = Id(900),
+            Start = TestData.Utc(Date, "09:00"),
+            Duration = Mins(60),
+            Booker = TestData.Booker(),
+        });
+
+        Assert.False(deterministic.Succeeded);
+        Assert.Equal(FailureCodes.ServiceUnavailable, deterministic.Failures[0].Code);
+
+        var transientMessage = Rendered(transient.Failures);
+        var deterministicMessage = Rendered(deterministic.Failures);
+
+        // They differ, and the difference is carried in the text itself rather
+        // than by styling alone.
+        Assert.NotEqual(transientMessage, deterministicMessage);
+
+        // Neither falls back to the generic message, which would conflate them
+        // with each other and with everything else.
+        Assert.DoesNotContain(BookingMessages.Fallback, transientMessage, StringComparison.Ordinal);
+        Assert.DoesNotContain(BookingMessages.Fallback, deterministicMessage, StringComparison.Ordinal);
+
+        // The transient one invites another time. The deterministic one must not:
+        // it would be inviting the visitor to fail again.
+        Assert.Contains("choose another", transientMessage, StringComparison.OrdinalIgnoreCase);
+        Assert.DoesNotContain("another", deterministicMessage, StringComparison.OrdinalIgnoreCase);
+        Assert.DoesNotContain("try again", deterministicMessage, StringComparison.OrdinalIgnoreCase);
+    }
+
+    [Fact]
+    public void The_refusals_are_mapped_from_the_code_and_never_from_the_message_text()
+    {
+        // Two failures carrying the SAME code and wildly different domain text
+        // render identically. That is the property that keeps the backoffice
+        // diagnostic out of the visitor's page: the map has no way to read it.
+        var plain = Rendered([new DomainFailure(FailureCodes.ServiceUnavailable, "This service cannot be booked at that time.")]);
+
+        var diagnostic = Rendered(
+        [
+            new DomainFailure(
+                FailureCodes.ServiceUnavailable,
+                "This service needs 3 distinct resources for 'therapist' with cert-x at that time, "
+                + "and only 1 can provide it then."),
+        ]);
+
+        Assert.Equal(plain, diagnostic);
+    }
+
+    [Fact]
+    public async Task A_deterministic_refusal_names_no_role_type_capability_or_count()
+    {
+        // The tempting implementation pipes the pool-sufficiency shortfall text
+        // straight through, and it reads plausibly — which is why this needs a
+        // test rather than a review.
+        //
+        // A role needing two therapists with a capability, where one such
+        // therapist exists: the shortfall is real, so the domain produces its
+        // richest message and the assertion below is not vacuous.
+        var harness = Build(
+            Svc(
+                "Couples massage",
+                null,
+                ServiceRole.Create(Therapist, ["cert-x"], count: 2).Value),
+            Res(2, Therapist, "Jane", capabilities: "cert-x"));
+
+        var placed = await harness.Core.PlaceAsync(new ServiceBookingRequest
+        {
+            ServiceId = harness.Service.Id,
+            Start = TestData.Utc(Date, "09:00"),
+            Duration = Mins(60),
+            Booker = TestData.Booker(),
+        });
+
+        Assert.False(placed.Succeeded);
+
+        var failure = placed.Failures[0];
+        Assert.Equal(FailureCodes.ServiceUnavailable, failure.Code);
+
+        // Non-vacuity: the domain really is offering the configuration detail
+        // here. Were it not, the assertions below would pass against a fixture
+        // that had nothing to leak.
+        Assert.Contains(Therapist, failure.Message, StringComparison.Ordinal);
+        Assert.Contains("cert-x", failure.Message, StringComparison.Ordinal);
+        Assert.Contains("2", failure.Message, StringComparison.Ordinal);
+
+        var visitorFacing = Rendered(placed.Failures);
+
+        Assert.DoesNotContain(Therapist, visitorFacing, StringComparison.OrdinalIgnoreCase);
+        Assert.DoesNotContain("cert-x", visitorFacing, StringComparison.OrdinalIgnoreCase);
+        Assert.DoesNotContain("resource", visitorFacing, StringComparison.OrdinalIgnoreCase);
+        Assert.DoesNotContain("capabilit", visitorFacing, StringComparison.OrdinalIgnoreCase);
+        Assert.DoesNotContain(visitorFacing, "0123456789".ToCharArray().Select(c => c.ToString()).Where(visitorFacing.Contains));
+    }
+
+    [Fact]
+    public async Task The_backoffice_shortfall_report_is_unchanged()
+    {
+        // The visitor-facing rule is enforced at the point of rendering, never by
+        // suppressing the diagnostic at its source. The person who can fix the
+        // configuration still gets the role, its requirement and the arithmetic.
+        var harness = Build(
+            Svc("Couples massage", null, ServiceRole.Create(Therapist, ["cert-x"], count: 2).Value),
+            Res(2, Therapist, "Jane", capabilities: "cert-x"));
+
+        var shortfall = PoolSufficiency.FindShortfall(await PoolsOf(harness));
+
+        Assert.NotNull(shortfall);
+        Assert.Equal(2, shortfall.Required);
+        Assert.Equal(1, shortfall.Eligible);
+        Assert.Equal(Therapist, Assert.Single(shortfall.Roles).Role.ResourceType);
+        Assert.Contains("cert-x", Assert.Single(shortfall.Roles).Role.RequiredCapabilities.Keys);
+    }
+
+    [Fact]
+    public void The_unavailable_model_has_nowhere_to_carry_a_diagnostic()
+    {
+        // Structural, and deliberately so: the disclosure rule is easiest to break
+        // by adding a member to the model and rendering it. This fails the moment
+        // one appears, rather than when someone happens to write a message.
+        var members = typeof(ServiceUnavailableModel)
+            .GetProperties(System.Reflection.BindingFlags.Public | System.Reflection.BindingFlags.Instance)
+            .Select(p => p.Name)
+            .Order()
+            .ToArray();
+
+        Assert.Equal(["Reason", "ServiceName"], members);
+    }
+
+    // ---------------------------------------------------------------------
+    // 3 (render time) — the same distinction, before a form is offered.
+    // ---------------------------------------------------------------------
+
+    [Fact]
+    public async Task An_unfulfillable_service_is_refused_before_a_form_is_offered()
+    {
+        var outcome = await Unfulfillable().Flow.BuildAsync(Id(900), On(Date));
+
+        Assert.Null(outcome.Form);
+        Assert.NotNull(outcome.Unavailable);
+        Assert.Equal(ServiceUnavailableReason.NotFulfillable, outcome.Unavailable.Reason);
+    }
+
+    [Fact]
+    public async Task A_busy_service_still_offers_its_form_and_says_the_date_is_empty()
+    {
+        // The other half of the pair, at render time. A fulfillable service whose
+        // resources are all taken must NOT reach the deterministic page: the
+        // visitor is invited to choose another date, because another date can help.
+        var harness = Massage();
+        await OccupyAsync(harness, Id(2), "09:00", 480);
+
+        var outcome = await harness.Flow.BuildAsync(Id(900), On(Date));
+
+        Assert.Null(outcome.Unavailable);
+        Assert.NotNull(outcome.Form);
+        Assert.False(outcome.Form.HasTimes);
+
+        // And the form is still drawn, so there is a date control to change.
+        Assert.NotEmpty(outcome.Form.DurationOptions);
+        Assert.True(outcome.Form.MaxDate > outcome.Form.MinDate);
+    }
+
+    [Fact]
+    public async Task A_service_whose_roles_share_one_resource_is_deterministically_refused()
+    {
+        // Two roles of one type, told apart by capability, drawing on a single
+        // resource that satisfies both: each role has a candidate, and they cannot
+        // be filled at once. Every start would be empty, forever, and "no times
+        // available" would send the visitor back tomorrow.
+        var harness = Build(
+            Svc(
+                "Joint session",
+                null,
+                ServiceRole.Create(Therapist, ["cert-x"]).Value,
+                ServiceRole.Create(Therapist, ["cert-y"]).Value),
+            Res(2, Therapist, "Jane", capabilities: ["cert-x", "cert-y"]));
+
+        var outcome = await harness.Flow.BuildAsync(Id(900), On(Date));
+
+        Assert.NotNull(outcome.Unavailable);
+        Assert.Equal(ServiceUnavailableReason.NotFulfillable, outcome.Unavailable.Reason);
+    }
+
+    [Fact]
+    public async Task A_service_whose_start_grids_can_never_coincide_is_deterministically_refused()
+    {
+        // Grids anchored at each resource's opening time and stepped by its own
+        // granularity: 09:00/30 against 09:15/20 never meet, on any day. Both
+        // roles report perfectly healthy pools, and nothing else in the product
+        // would say why the service is permanently empty.
+        var harness = Build(
+            Svc("Massage", null, new ServiceRole(ResourceTypes.Room, 1), new ServiceRole(Therapist, 1)),
+            Res(1, ResourceTypes.Room, "Treatment Room", open: "09:00", granularity: 30, min: 30, max: 120),
+            Res(2, Therapist, "Jane", open: "09:15", granularity: 20, min: 20, max: 120));
+
+        var outcome = await harness.Flow.BuildAsync(Id(900), On(Date));
+
+        Assert.NotNull(outcome.Unavailable);
+        Assert.Equal(ServiceUnavailableReason.NotFulfillable, outcome.Unavailable.Reason);
+    }
+
+    [Fact]
+    public async Task A_service_no_single_length_can_satisfy_is_deterministically_refused()
+    {
+        // Each role is healthy on its own and their start grids do coincide, so
+        // neither the sufficiency check nor the alignment check has anything to
+        // say — but the room can only be booked for 30 minutes and the therapist
+        // only for 20, so no length exists that both can provide. Core answers
+        // with no starts, on every date, forever.
+        //
+        // Found by mutation: without the length clause this configuration renders
+        // "no times are available, please choose another date" for all eternity,
+        // which is exactly what the requirement exists to prevent.
+        var harness = Build(
+            Svc("Massage", null, new ServiceRole(ResourceTypes.Room, 1), new ServiceRole(Therapist, 1)),
+            Res(1, ResourceTypes.Room, "Treatment Room", granularity: 30, min: 30, max: 30),
+            Res(2, Therapist, "Jane", granularity: 20, min: 20, max: 20));
+
+        // Non-vacuity: the other two deterministic checks really are silent here,
+        // so this test cannot be passing for the wrong reason.
+        var pools = await PoolsOf(harness);
+        Assert.Null(PoolSufficiency.FindShortfall(pools));
+        Assert.Null(StartAlignment.FindMisalignment(pools));
+
+        var outcome = await harness.Flow.BuildAsync(Id(900), On(Date));
+
+        Assert.Null(outcome.Form);
+        Assert.NotNull(outcome.Unavailable);
+        Assert.Equal(ServiceUnavailableReason.NotFulfillable, outcome.Unavailable.Reason);
+    }
+
+    [Fact]
+    public async Task A_fault_is_not_reported_as_a_permanent_answer()
+    {
+        // A service that could not be read is a fault; "try again later" is honest
+        // for it and wrong for the other. Ordering is load-bearing.
+        var outcome = await Massage().Flow.BuildAsync(Id(404), On(Date));
+
+        Assert.NotNull(outcome.Unavailable);
+        Assert.Equal(ServiceUnavailableReason.Unknown, outcome.Unavailable.Reason);
+    }
+
+    [Fact]
+    public void A_fulfillable_service_is_not_refused()
+    {
+        // The pair that makes every deterministic assertion above non-vacuous: a
+        // predicate that always answered "not fulfillable" would pass them all.
+        var pools = FulfillablePools();
+
+        Assert.False(ServiceUnavailableModel.IsUnavailable(
+            Svc("Massage", null, new ServiceRole(ResourceTypes.Room, 1), new ServiceRole(Therapist, 1)),
+            pools,
+            zoneResolved: true,
+            out var model));
+
+        Assert.Null(model);
+    }
+
+    private static IReadOnlyList<RoleCandidates> FulfillablePools()
+    {
+        var harness = Massage();
+        return PoolsOf(harness).GetAwaiter().GetResult();
+    }
+
+    // ---------------------------------------------------------------------
+    // 2 — the flow itself.
+    // ---------------------------------------------------------------------
+
+    [Fact]
+    public async Task Choosing_a_date_reveals_the_services_times()
+    {
+        var outcome = await Massage().Flow.BuildAsync(Id(900), On(Date, 60));
+
+        Assert.NotNull(outcome.Form);
+        Assert.True(outcome.Form.HasTimes);
+        Assert.Equal(60, outcome.Form.DurationMinutes);
+        Assert.Equal("Massage", outcome.Form.ServiceName);
+    }
+
+    [Fact]
+    public async Task The_times_offered_are_the_services_not_one_resources()
+    {
+        // Rooms are free all day; the therapist only until 11:00. Starts at which
+        // a room is free but no therapist is must not be offered — a flow reading
+        // one role's availability would offer them.
+        var harness = Build(
+            Svc("Massage", null, new ServiceRole(ResourceTypes.Room, 1), new ServiceRole(Therapist, 1)),
+            Res(1, ResourceTypes.Room, "Treatment Room", open: "09:00", close: "17:00"),
+            Res(2, Therapist, "Jane", open: "09:00", close: "11:00"));
+
+        var outcome = await harness.Flow.BuildAsync(Id(900), On(Date, 60));
+
+        Assert.NotNull(outcome.Form);
+        Assert.True(outcome.Form.HasTimes);
+
+        var offered = outcome.Form.Times.Select(t => t.Label).ToList();
+
+        Assert.Contains("09:00", offered);
+
+        // The room is free then and the therapist is not.
+        Assert.DoesNotContain("11:00", offered);
+        Assert.DoesNotContain("14:00", offered);
+    }
+
+    [Fact]
+    public async Task An_empty_date_says_so_explicitly_rather_than_rendering_a_blank_list()
+    {
+        var harness = Massage();
+        await OccupyAsync(harness, Id(1), "09:00", 480);
+
+        var outcome = await harness.Flow.BuildAsync(Id(900), On(Date, 60));
+
+        Assert.NotNull(outcome.Form);
+        Assert.False(outcome.Form.HasTimes);
+
+        // Nothing at all is available, so this is the plain empty state rather
+        // than the "not this long" explanation.
+        Assert.Null(outcome.Form.LongestAvailableMinutes);
+        Assert.False(outcome.Form.LengthIsTheProblem);
+    }
+
+    [Fact]
+    public async Task A_length_with_no_times_explains_the_longest_that_is_available()
+    {
+        var harness = Build(
+            Svc("Massage", null, new ServiceRole(ResourceTypes.Room, 1), new ServiceRole(Therapist, 1)),
+            Res(1, ResourceTypes.Room, "Treatment Room", open: "09:00", close: "10:00", max: 60),
+            Res(2, Therapist, "Jane", open: "09:00", close: "10:00", max: 60));
+
+        var outcome = await harness.Flow.BuildAsync(Id(900), On(Date, 60));
+
+        Assert.NotNull(outcome.Form);
+        Assert.True(outcome.Form.HasTimes);
+        Assert.Equal(60, outcome.Form.LongestAvailableMinutes);
+    }
+
+    // --- 2.3 length control ---
+
+    [Fact]
+    public async Task A_variable_service_offers_the_lengths_every_role_can_provide()
+    {
+        // The room tops out at 60 minutes and the therapist at 120: the offered
+        // set is the intersection, not either role's own range.
+        var harness = Build(
+            Svc("Massage", ServiceDuration.Variable(Mins(30), Mins(240)).Value,
+                new ServiceRole(ResourceTypes.Room, 1), new ServiceRole(Therapist, 1)),
+            Res(1, ResourceTypes.Room, "Treatment Room", min: 30, max: 60),
+            Res(2, Therapist, "Jane", min: 30, max: 120));
+
+        var outcome = await harness.Flow.BuildAsync(Id(900), On(Date));
+
+        Assert.NotNull(outcome.Form);
+        Assert.Equal([30, 60], outcome.Form.DurationOptions);
+        Assert.False(outcome.Form.LengthIsFixed);
+    }
+
+    [Fact]
+    public async Task A_fixed_service_states_its_length_rather_than_offering_a_choice()
+    {
+        var harness = Build(
+            Svc("Massage", ServiceDuration.Fixed(Mins(60)).Value,
+                new ServiceRole(ResourceTypes.Room, 1), new ServiceRole(Therapist, 1)),
+            Res(1, ResourceTypes.Room, "Treatment Room"),
+            Res(2, Therapist, "Jane"));
+
+        var outcome = await harness.Flow.BuildAsync(Id(900), On(Date));
+
+        Assert.NotNull(outcome.Form);
+        Assert.True(outcome.Form.LengthIsFixed);
+        Assert.Equal(60, outcome.Form.DurationMinutes);
+        Assert.Equal([60], outcome.Form.DurationOptions);
+    }
+
+    [Fact]
+    public async Task A_hand_edited_length_still_renders_a_usable_form()
+    {
+        // Rendering only. This must NOT be read as permission to substitute a
+        // length when placing: submissions carry their length to Core unchanged.
+        var outcome = await Massage().Flow.BuildAsync(Id(900), On(Date, 37));
+
+        Assert.NotNull(outcome.Form);
+        Assert.Contains(outcome.Form.DurationMinutes, outcome.Form.DurationOptions);
+    }
+
+    [Fact]
+    public async Task An_unpermitted_submitted_length_is_rejected_and_places_nothing()
+    {
+        // The flow never substitutes on the write path. The surface controller
+        // needs a host, so this asserts the Core call it makes verbatim.
+        var harness = Build(
+            Svc("Massage", ServiceDuration.Fixed(Mins(60)).Value, new ServiceRole(Therapist, 1)),
+            Res(2, Therapist, "Jane"));
+
+        var placed = await harness.Core.PlaceAsync(new ServiceBookingRequest
+        {
+            ServiceId = harness.Service.Id,
+            Start = TestData.Utc(Date, "09:00"),
+            Duration = Mins(90),
+            Booker = TestData.Booker(),
+        });
+
+        Assert.False(placed.Succeeded);
+        Assert.DoesNotContain(
+            Rendered(placed.Failures), BookingMessages.Fallback, StringComparison.Ordinal);
+    }
+
+    // --- 2.5 the pin is absent, not defaulted ---
+
+    [Fact]
+    public void No_code_path_in_the_front_end_can_pin_a_resource()
+    {
+        // Design D7: not "pinning is off by default" — there is no control and no
+        // code path that could set one. That is an absence, and an absence has no
+        // runtime representation, so it is asserted over the shipped source.
+        //
+        // Scoped to the default front-end. The delivery API deliberately still
+        // accepts a pin — that is what keeps the feature exercised by headless
+        // consumers while the follow-up decides which role a visitor may choose
+        // from — so a scan over the whole assembly would be asserting the wrong
+        // thing, and would have to be relaxed rather than obeyed.
+        var offenders = RepoFiles
+            .Paths("src/UBookIt.Web/Rendering", "*.cs")
+            .Concat(RepoFiles.Paths("src/UBookIt.Web/Views", "*.cshtml"))
+            .Where(path => File.ReadLines(path).Any(Assigns))
+            .ToList();
+
+        Assert.Empty(offenders);
+
+        // Non-vacuity: the identifier really is one this scan would find. The
+        // delivery API sets it, in the same assembly, and the predicate says so.
+        Assert.Contains(
+            RepoFiles.Paths("src/UBookIt.Web/Mapping", "*.cs"),
+            path => File.ReadLines(path).Any(Assigns));
+
+        // A mention inside a comment is how the decision is recorded, so only an
+        // assignment counts — and the test has to be able to tell them apart.
+        static bool Assigns(string line)
+        {
+            var code = line.TrimStart();
+
+            return !code.StartsWith("//", StringComparison.Ordinal)
+                && !code.StartsWith("///", StringComparison.Ordinal)
+                && !code.StartsWith('*')
+                && code.Contains("PinnedResourceId", StringComparison.Ordinal)
+                && code.Contains('=', StringComparison.Ordinal);
+        }
+    }
+
+    // ---------------------------------------------------------------------
+    // 4 — catalogue and entry points.
+    // ---------------------------------------------------------------------
+
+    [Fact]
+    public async Task Services_and_directly_bookable_resources_are_listed_together()
+    {
+        var resources = new InMemoryResourceStore()
+            .Add(Res(1, ResourceTypes.Room, "Meeting Room A"))
+            .Add(Res(2, Therapist, "Jane"));
+
+        var services = new InMemoryServiceStore()
+            .Add(Svc("Massage", null, new ServiceRole(Therapist, 1)))
+            .Add(Service.Create("Haircut", null, [new ServiceRole(Therapist, 1)], id: Id(901)).Value);
+
+        var catalogue = await new BookingCatalogue(services, resources).BuildAsync();
+
+        Assert.Equal(4, catalogue.Entries.Count);
+        Assert.Contains(catalogue.Entries, e => e.Name == "Massage" && e.Subject.Kind == BookableKind.Service);
+        Assert.Contains(catalogue.Entries, e => e.Name == "Meeting Room A" && e.Subject.Kind == BookableKind.Resource);
+
+        // Presented alike: one ordering across both kinds, not services then
+        // resources. A visitor cannot tell which is which from the list's shape.
+        Assert.Equal(
+            ["Haircut", "Jane", "Massage", "Meeting Room A"],
+            catalogue.Entries.Select(e => e.Name).ToArray());
+    }
+
+    [Fact]
+    public async Task A_resource_that_withholds_direct_booking_is_not_offered()
+    {
+        // Both kinds are needed or the test cannot fail: a catalogue that listed
+        // nothing at all would satisfy the absence on its own.
+        var withholding = Resource.Create(
+            ResourceTypes.Room,
+            "Service-only Room",
+            directlyBookable: false,
+            availability: TestData.Config(TestData.Weekly("09:00", "17:00", Date.DayOfWeek)),
+            id: Id(3)).Value;
+
+        var resources = new InMemoryResourceStore()
+            .Add(Res(1, ResourceTypes.Room, "Meeting Room A"))
+            .Add(withholding);
+
+        var catalogue = await new BookingCatalogue(new InMemoryServiceStore(), resources).BuildAsync();
+
+        Assert.Equal("Meeting Room A", Assert.Single(catalogue.Entries).Name);
+    }
+
+    // --- 4.3 the dispatcher ---
+
+    [Fact]
+    public void No_id_anywhere_means_the_catalogue()
+        => Assert.Null(FlowEntry.Resolve(null, null, null).Subject);
+
+    [Fact]
+    public void A_query_subject_selects_its_own_flow()
+    {
+        var service = FlowEntry.Resolve(null, null, BookingSubject.Service(Id(900)));
+        Assert.Equal(BookableKind.Service, service.Subject!.Value.Kind);
+
+        var resource = FlowEntry.Resolve(null, null, BookingSubject.Resource(Id(1)));
+        Assert.Equal(BookableKind.Resource, resource.Subject!.Value.Kind);
+    }
+
+    [Fact]
+    public void An_explicitly_supplied_id_beats_the_query()
+    {
+        // What makes "a site with one service" work: the author names it, and no
+        // catalogue exists to be traversed — nor can a stale URL redirect the
+        // visitor away from the thing the author placed.
+        var entry = FlowEntry.Resolve(Id(900), null, BookingSubject.Resource(Id(1)));
+
+        Assert.Equal(BookingSubject.Service(Id(900)), entry.Subject);
+        Assert.True(entry.NamedByAuthor);
+
+        // And an author-named subject puts nothing in the URL, which is what keeps
+        // the existing component's Post-Redirect-Get target unchanged.
+        Assert.Null(entry.Token);
+    }
+
+    [Fact]
+    public void A_subject_reached_through_the_catalogue_carries_its_token()
+    {
+        var entry = FlowEntry.Resolve(null, null, BookingSubject.Service(Id(900)));
+
+        Assert.False(entry.NamedByAuthor);
+        Assert.Equal(BookingSubject.Service(Id(900)).Token, entry.Token);
+    }
+
+    [Fact]
+    public void A_subject_token_round_trips_and_a_malformed_one_is_no_subject_at_all()
+    {
+        foreach (var subject in new[] { BookingSubject.Service(Id(900)), BookingSubject.Resource(Id(1)) })
+        {
+            Assert.True(BookingSubject.TryParse(subject.Token, out var parsed));
+            Assert.Equal(subject, parsed);
+        }
+
+        foreach (var malformed in new[] { null, "", "s", "s:", "x:" + Id(1), Id(1).ToString(), "s:not-a-guid" })
+        {
+            Assert.False(BookingSubject.TryParse(malformed, out _));
+        }
+    }
+
+    // --- 4.5 the entry point does not change what follows ---
+
+    [Fact]
+    public async Task Reaching_a_service_directly_and_through_the_catalogue_give_the_same_step()
+    {
+        var direct = await Massage().Flow.BuildAsync(Id(900), On(Date, 60));
+        var viaCatalogue = await Massage().Flow.BuildAsync(
+            Id(900), On(Date, 60, BookingSubject.Service(Id(900)).Token));
+
+        Assert.NotNull(direct.Form);
+        Assert.NotNull(viaCatalogue.Form);
+
+        // Same steps and controls from that point on. The flow token is not a
+        // control — it is how the URL remembers the answer the author gave
+        // another way — and is the one thing permitted to differ.
+        Assert.Equal(direct.Form.ServiceId, viaCatalogue.Form.ServiceId);
+        Assert.Equal(direct.Form.SelectedDate, viaCatalogue.Form.SelectedDate);
+        Assert.Equal(direct.Form.DurationMinutes, viaCatalogue.Form.DurationMinutes);
+        Assert.Equal(direct.Form.DurationOptions, viaCatalogue.Form.DurationOptions);
+        Assert.Equal(direct.Form.LengthIsFixed, viaCatalogue.Form.LengthIsFixed);
+        Assert.Equal(
+            direct.Form.Times.Select(t => t.InstantIso),
+            viaCatalogue.Form.Times.Select(t => t.InstantIso));
+
+        Assert.Null(direct.Form.FlowToken);
+        Assert.NotNull(viaCatalogue.Form.FlowToken);
+    }
+
+    // --- 4.4 the existing component is unchanged ---
+
+    [Fact]
+    public async Task The_resource_flow_still_answers_as_it_did_when_invoked_with_an_id()
+    {
+        // Someone may already have the Booking component in a template. Its guts
+        // moved; its answers did not.
+        // One instance, not two: TestData.Room() mints a fresh id each call, and
+        // asking the flow about a resource the store never saw would prove only
+        // that an unknown id is a fault.
+        var room = TestData.Room();
+        var resources = new InMemoryResourceStore().Add(room);
+        var store = new InMemoryBookingStore();
+        var time = new FixedTimeProvider(TestData.Now);
+
+        var flow = new ResourceBookingFlow(
+            resources,
+            new AvailabilityService(resources, store, time, TestData.Settings),
+            TestData.Settings,
+            time);
+
+        var outcome = await flow.BuildAsync(room.Id, On(Date, 60));
+
+        Assert.Null(outcome.Unavailable);
+        Assert.NotNull(outcome.Form);
+        Assert.True(outcome.Form.HasTimes);
+
+        // Nothing in the URL, so nothing in the redirect: this is what makes the
+        // extraction invisible to a site already using the component.
+        Assert.Null(outcome.Form.FlowToken);
+
+        // And a resource's length stays a choice, even when the grid holds one
+        // value — rendering it as settled text would change this flow.
+        Assert.False(outcome.Form.LengthIsFixed);
+    }
+
+    [Fact]
+    public async Task A_withholding_resource_still_reaches_the_permanent_answer_through_the_flow()
+    {
+        var withholding = Resource.Create(
+            ResourceTypes.Room,
+            "Service-only Room",
+            directlyBookable: false,
+            availability: TestData.Config(TestData.Weekly("09:00", "17:00", Date.DayOfWeek)),
+            id: Id(3)).Value;
+
+        var resources = new InMemoryResourceStore().Add(withholding);
+        var store = new InMemoryBookingStore();
+        var time = new FixedTimeProvider(TestData.Now);
+
+        var flow = new ResourceBookingFlow(
+            resources,
+            new AvailabilityService(resources, store, time, TestData.Settings),
+            TestData.Settings,
+            time);
+
+        var outcome = await flow.BuildAsync(Id(3), On(Date));
+
+        Assert.Null(outcome.Form);
+        Assert.Equal(BookingUnavailableReason.NotOfferedIndividually, outcome.Unavailable!.Reason);
+    }
+
+    // ---------------------------------------------------------------------
+    // 5 — state in the URL, and what must never be in it.
+    // ---------------------------------------------------------------------
+
+    [Fact]
+    public async Task A_step_is_linkable_the_same_choices_come_back()
+    {
+        var first = await Massage().Flow.BuildAsync(Id(900), On(Date, 60));
+        var reopened = await Massage().Flow.BuildAsync(
+            Id(900), On(first.Form!.SelectedDate, first.Form.DurationMinutes));
+
+        Assert.Equal(first.Form.SelectedDate, reopened.Form!.SelectedDate);
+        Assert.Equal(first.Form.DurationMinutes, reopened.Form.DurationMinutes);
+        Assert.Equal(
+            first.Form.Times.Select(t => t.InstantIso), reopened.Form.Times.Select(t => t.InstantIso));
+    }
+
+    [Fact]
+    public void Contact_details_never_appear_in_a_URL()
+    {
+        // The place a later change would most plausibly leak them is the GET
+        // forms and the Post-Redirect-Get target, so both are asserted over the
+        // shipped source rather than over one rendered page.
+        //
+        // Every GET form the flows render: the date-and-length step and the
+        // catalogue. Neither may carry a contact field, whatever else it gains.
+        foreach (var view in new[]
+        {
+            "src/UBookIt.Web/Views/Shared/UBookIt/_DateAndLength.cshtml",
+            "src/UBookIt.Web/Views/Shared/Components/BookingFlow/Catalogue.cshtml",
+        })
+        {
+            var markup = RepoFiles.Read(view);
+
+            Assert.Contains("method=\"get\"", markup, StringComparison.Ordinal);
+
+            foreach (var field in new[] { "\"Name\"", "\"Email\"", "\"Phone\"" })
+            {
+                Assert.DoesNotContain(field, markup, StringComparison.Ordinal);
+            }
+        }
+
+        // And the redirect: the only query parameter either controller builds is
+        // the flow subject.
+        foreach (var controller in new[]
+        {
+            "src/UBookIt.Web/Rendering/BookingSurfaceController.cs",
+            "src/UBookIt.Web/Rendering/ServiceBookingSurfaceController.cs",
+        })
+        {
+            var source = RepoFiles.Read(controller);
+            var built = source.Split("QueryString.Create(").Skip(1).ToList();
+
+            Assert.NotEmpty(built);
+            Assert.All(built, call => Assert.StartsWith("BookingKeys.SubjectQuery,", call, StringComparison.Ordinal));
+        }
+    }
+
+    [Fact]
+    public void The_only_flow_state_in_the_URL_is_what_is_booked_the_date_and_the_length()
+    {
+        var keys = typeof(BookingKeys)
+            .GetFields()
+            .Where(f => f.IsLiteral && f.Name.EndsWith("Query", StringComparison.Ordinal))
+            .Select(f => (string)f.GetRawConstantValue()!)
+            .Order()
+            .ToArray();
+
+        Assert.Equal(["ubBook", "ubDate", "ubMins"], keys);
+    }
+
+    // ---------------------------------------------------------------------
+    // 6 — one accessibility bar, met by both flows and the catalogue.
+    // ---------------------------------------------------------------------
+
+    [Fact]
+    public void Both_flows_render_the_same_accessibility_critical_markup()
+    {
+        // The bar is stated once in the spec precisely so there is one place to
+        // satisfy it. This asserts the structure that makes that true: the clauses
+        // live in the shared partials, and both flows' views include them. A test
+        // that checked one flow's markup would leave the bar met by whichever flow
+        // was reviewed most recently.
+        var partials = new[] { "_ErrorSummary", "_DateAndLength", "_Times", "_YourDetails" };
+
+        foreach (var view in new[]
+        {
+            "src/UBookIt.Web/Views/Shared/Components/Booking/Default.cshtml",
+            "src/UBookIt.Web/Views/Shared/Components/BookingFlow/Service.cshtml",
+        })
+        {
+            var markup = RepoFiles.Read(view);
+
+            foreach (var partial in partials)
+            {
+                Assert.Contains(
+                    $"~/Views/Shared/UBookIt/{partial}.cshtml", markup, StringComparison.Ordinal);
+            }
+        }
+    }
+
+    [Fact]
+    public void The_shared_partials_carry_the_clauses_the_bar_names()
+    {
+        var times = RepoFiles.Read("src/UBookIt.Web/Views/Shared/UBookIt/_Times.cshtml");
+
+        // Start times are a grouped set of radio controls in a fieldset with a
+        // legend naming the group, each with an associated label.
+        Assert.Contains("<fieldset", times, StringComparison.Ordinal);
+        Assert.Contains("<legend>", times, StringComparison.Ordinal);
+        Assert.Contains("type=\"radio\"", times, StringComparison.Ordinal);
+        Assert.Contains("<label for=", times, StringComparison.Ordinal);
+
+        var details = RepoFiles.Read("src/UBookIt.Web/Views/Shared/UBookIt/_YourDetails.cshtml");
+
+        // Required inputs indicated in text, not by colour or placeholder alone,
+        // and error text associated with its control.
+        Assert.Contains("(required)", details, StringComparison.Ordinal);
+        Assert.Contains("aria-describedby", details, StringComparison.Ordinal);
+        Assert.Contains("aria-invalid", details, StringComparison.Ordinal);
+        Assert.DoesNotContain("placeholder=", details, StringComparison.Ordinal);
+
+        var summary = RepoFiles.Read("src/UBookIt.Web/Views/Shared/UBookIt/_ErrorSummary.cshtml");
+
+        // The summary lists each problem in text and links to the offending field.
+        Assert.Contains("role=\"alert\"", summary, StringComparison.Ordinal);
+        Assert.Contains("href=\"#@error.FieldId\"", summary, StringComparison.Ordinal);
+
+        var dateAndLength = RepoFiles.Read("src/UBookIt.Web/Views/Shared/UBookIt/_DateAndLength.cshtml");
+
+        Assert.Contains("<label for=\"ubookit-date\">", dateAndLength, StringComparison.Ordinal);
+        Assert.Contains("<label for=\"@BookingFieldIds.Duration\">", dateAndLength, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public void The_catalogue_is_a_grouped_set_with_a_legend_naming_what_is_chosen()
+    {
+        var markup = RepoFiles.Read("src/UBookIt.Web/Views/Shared/Components/BookingFlow/Catalogue.cshtml");
+
+        Assert.Contains("<fieldset", markup, StringComparison.Ordinal);
+        Assert.Contains("<legend>What would you like to book?</legend>", markup, StringComparison.Ordinal);
+        Assert.Contains("type=\"radio\"", markup, StringComparison.Ordinal);
+        Assert.Contains("<label for=\"@id\">@entry.Name</label>", markup, StringComparison.Ordinal);
+    }
+
+    // ---------------------------------------------------------------------
+
+    private static string Rendered(IReadOnlyList<DomainFailure> failures)
+        => string.Join(" ", BookingMessages.ForFailures(failures).Select(e => e.Message));
+
+    /// <summary>Books a resource solid over an interval, so it cannot fulfil anything there.</summary>
+    private static async Task OccupyAsync(Harness harness, Guid resourceId, string start, int minutes)
+    {
+        var placed = await harness.Bookings.PlaceAsync(new BookingRequest
+        {
+            ResourceId = resourceId,
+            Start = TestData.Utc(Date, start),
+            Duration = Mins(minutes),
+            Booker = TestData.Booker(),
+        });
+
+        Assert.True(placed.Succeeded, string.Join("; ", placed.Failures.Select(f => f.Code)));
+    }
+}

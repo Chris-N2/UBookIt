@@ -1,0 +1,39 @@
+@using UBookIt.Web.Rendering
+@using Umbraco.Extensions
+@model ServiceFormModel
+@*
+    The service booking flow. What is peculiar to it — the heading, the hidden
+    service id, the form it posts to — is here; the accessibility-critical markup
+    it shares with the resource flow is rendered from the shared partials, so
+    there is one copy to get right and one bar to meet (design D1).
+*@
+<section class="ubookit-booking ubookit-service-booking" aria-label="Book @Model.ServiceName">
+    <h2>Book @Model.ServiceName</h2>
+
+    @await Html.PartialAsync("~/Views/Shared/UBookIt/_ErrorSummary.cshtml", Model)
+
+    @await Html.PartialAsync("~/Views/Shared/UBookIt/_DateAndLength.cshtml", Model)
+
+    @* Choose a time and enter details (POST, anti-forgery via BeginUmbracoForm). *@
+    @using (Html.BeginUmbracoForm<ServiceBookingSurfaceController>(nameof(ServiceBookingSurfaceController.Submit)))
+    {
+        <input type="hidden" name="ServiceId" value="@Model.ServiceId" />
+        <input type="hidden" name="Date" value="@Model.SelectedDate.ToString("yyyy-MM-dd")" />
+
+        @* Sent for a fixed-duration service too: removing the control does not
+           remove the field, and a length is required of every service precisely
+           so a permitted one is never silently substituted (design D5). *@
+        <input type="hidden" name="DurationMinutes" value="@Model.DurationMinutes" />
+        @if (Model.FlowToken is { } token)
+        {
+            <input type="hidden" name="@nameof(ServiceBookingSubmission.Subject)" value="@token" />
+        }
+
+        @await Html.PartialAsync("~/Views/Shared/UBookIt/_Times.cshtml", Model)
+
+        @if (Model.HasTimes)
+        {
+            @await Html.PartialAsync("~/Views/Shared/UBookIt/_YourDetails.cshtml", Model)
+        }
+    }
+</section>

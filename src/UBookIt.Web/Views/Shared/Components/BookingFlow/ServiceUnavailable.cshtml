@@ -1,0 +1,29 @@
+@using UBookIt.Web.Rendering
+@model ServiceUnavailableModel
+@{
+    // One view, two reasons, and the difference is the point: one is a fault and
+    // one is an answer, and they send a visitor to do entirely different things.
+    //
+    // Neither says "no times available". That sentence sends a visitor back
+    // tomorrow when tomorrow cannot help, and tells the site owner their opening
+    // hours are wrong when they are not — which is exactly the conflation this
+    // page exists to remove.
+    var notFulfillable = Model?.Reason == ServiceUnavailableReason.NotFulfillable;
+    var heading = notFulfillable ? "Not available for booking" : "Booking unavailable";
+}
+<section class="ubookit-booking" aria-label="@heading">
+    <h2>@heading</h2>
+    @if (notFulfillable)
+    {
+        @* Deliberately no invitation to try another time: it would be inviting
+           the visitor to fail again. And deliberately nothing about the
+           configuration — not the role, the resource type, the capability, nor
+           how many resources exist. A visitor cannot fix it, and would otherwise
+           be told how many staff the business employs. *@
+        <p>This service is not currently available for booking.</p>
+    }
+    else
+    {
+        <p>This service is not available for booking at the moment. Please try again later.</p>
+    }
+</section>

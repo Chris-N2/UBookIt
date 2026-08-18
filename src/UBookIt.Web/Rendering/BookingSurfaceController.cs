@@ -1,5 +1,4 @@
 using System.Globalization;
-using System.Text.Json;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
 using UBookIt.Core;
@@ -108,7 +107,7 @@ public sealed class BookingSurfaceController : SurfaceController
             if (placed.Succeeded)
             {
                 Stash(BookingKeys.Confirmation, BuildConfirmation(placed.Value, resource.DisplayName, zone));
-                return SeeOther(RedirectToCurrentUmbracoPage());
+                return SeeOther(BackToFlow(form.Subject));
             }
 
             failures.AddRange(placed.Failures);
@@ -130,8 +129,30 @@ public sealed class BookingSurfaceController : SurfaceController
             Errors = [.. BookingMessages.ForFailures(failures)],
         });
 
-        return SeeOther(RedirectToCurrentUmbracoPage());
+        return SeeOther(BackToFlow(form.Subject));
     }
+
+    /// <summary>
+    /// The Post-Redirect-Get target: the current page, carrying the flow's
+    /// subject when the flow was entered through the dispatcher's query string.
+    /// <para>
+    /// Without it the redirect would drop the subject and the dispatcher would
+    /// land the visitor back at the catalogue, losing the confirmation with it.
+    /// <b>Only</b> when a subject was submitted: a form rendered by the
+    /// <c>Booking</c> component names the resource on the component instead, and
+    /// its redirect is byte-for-byte what it was before the service flow existed.
+    /// </para>
+    /// <para>
+    /// The token is re-serialised from the parsed value rather than echoed, so
+    /// nothing a caller typed reaches the Location header. Contact details are
+    /// never among the parameters — they arrived in the POST body and stay there
+    /// (design D3).
+    /// </para>
+    /// </summary>
+    private IActionResult BackToFlow(string? subject)
+        => BookingSubject.TryParse(subject, out var parsed)
+            ? RedirectToCurrentUmbracoPage(QueryString.Create(BookingKeys.SubjectQuery, parsed.Token))
+            : RedirectToCurrentUmbracoPage();
 
     /// <summary>
     /// Post-Redirect-Get with a literal 303 See Other (the spec's required
@@ -171,13 +192,20 @@ public sealed class BookingSurfaceController : SurfaceController
         };
     }
 
-    private void Stash<T>(string key, T value) => TempData[key] = JsonSerializer.Serialize(value);
+    private void Stash<T>(string key, T value) => TempData.Stash(key, value);
 }
 
 /// <summary>Bound form fields from the booking submission.</summary>
 public sealed class BookingSubmission
 {
     public Guid ResourceId { get; set; }
+
+    /// <summary>
+    /// The flow subject token to restore on the Post-Redirect-Get, present only
+    /// when the flow was entered through the dispatcher's query string. Parsed
+    /// strictly and re-serialised; never echoed.
+    /// </summary>
+    public string? Subject { get; set; }
 
     public DateOnly Date { get; set; }
 

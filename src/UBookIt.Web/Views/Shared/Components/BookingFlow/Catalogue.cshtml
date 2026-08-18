@@ -1,0 +1,40 @@
+@using UBookIt.Web.Rendering
+@model CatalogueModel
+@*
+    What can be booked, as one set of choices. Services and directly-bookable
+    resources are listed together and presented alike: whether a bookable thing is
+    a service or a resource is an implementation distinction, and a visitor is not
+    helped by being told which is which.
+
+    A grouped set of radio controls inside a fieldset whose legend names what is
+    being chosen — the same bar the start times meet, for the same reason.
+*@
+<section class="ubookit-catalogue" aria-label="Choose what to book">
+    <h2>Choose what to book</h2>
+
+    @if (Model.HasEntries)
+    {
+        <form method="get" class="ubookit-catalogue-form">
+            <fieldset class="ubookit-catalogue-choices">
+                <legend>What would you like to book?</legend>
+                @foreach (var (entry, index) in Model.Entries.Select((entry, index) => (entry, index)))
+                {
+                    var id = $"ubookit-book-{index}";
+                    <div class="ubookit-catalogue-choice">
+                        <input type="radio"
+                               id="@id"
+                               name="@BookingKeys.SubjectQuery"
+                               value="@entry.Subject.Token"
+                               required />
+                        <label for="@id">@entry.Name</label>
+                    </div>
+                }
+            </fieldset>
+            <button type="submit">Continue</button>
+        </form>
+    }
+    else
+    {
+        <p class="ubookit-no-choices">There is nothing available to book at the moment.</p>
+    }
+</section>

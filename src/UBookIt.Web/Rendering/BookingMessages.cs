@@ -34,6 +34,17 @@ public static class BookingMessages
             "This resource is not offered for booking on its own. It may still be available as part of a service.",
         [FailureCodes.DateRangeInvalid] = "Please choose a valid date.",
         [FailureCodes.DateRangeTooLarge] = "Please choose a single date.",
+
+        // The deterministic service refusal. Distinct from `conflict` in both
+        // substance and shape: it does not invite the visitor to try another
+        // time, because that would be inviting them to fail again.
+        //
+        // The domain's own message for this code names the roles that were short
+        // and how many resources could provide them — written for the backoffice,
+        // where someone can act on it. It is not carried here, and cannot be: the
+        // map is from the code, and the code alone.
+        [FailureCodes.ServiceUnavailable] = "This service is not currently available for booking.",
+        [FailureCodes.ServiceNotFound] = "This service is not available for booking.",
     };
 
     public const string Fallback = "Sorry, your booking could not be completed. Please try again.";

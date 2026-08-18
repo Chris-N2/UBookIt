@@ -1,0 +1,72 @@
+@using UBookIt.Web.Rendering
+@model IBookingFormView
+@{
+    var durationError = Model.ErrorFor(BookingFieldIds.Duration);
+
+    // The length control is described by whichever of these applies: the
+    // rejection message after a failed submission, or the explanation that the
+    // chosen length has no times on this date. Both are about that control.
+    var durationDescribedBy = durationError is not null
+        ? "ubookit-duration-error"
+        : Model.LengthIsTheProblem ? "ubookit-length-unavailable" : null;
+}
+@*
+    Step 1 — choose a date and a length (GET reload; no JavaScript required).
+    The length lives here rather than beside the times so that step 2 can only
+    offer starts which admit it: no invalid date/length/start combination is
+    submittable, and no extra round trip is needed to bound the control.
+*@
+<form method="get" class="ubookit-date-form">
+    @if (Model.FlowToken is { } token)
+    {
+        @* Keeps the subject in the URL across the reload, so the step stays
+           linkable and the back button lands on a page that agrees with itself. *@
+        <input type="hidden" name="@BookingKeys.SubjectQuery" value="@token" />
+    }
+    <div>
+        <label for="ubookit-date">Choose a date</label>
+        <input type="date"
+               id="ubookit-date"
+               name="@BookingKeys.DateQuery"
+               value="@Model.SelectedDate.ToString("yyyy-MM-dd")"
+               min="@Model.MinDate.ToString("yyyy-MM-dd")"
+               max="@Model.MaxDate.ToString("yyyy-MM-dd")" />
+    </div>
+    @if (Model.LengthIsFixed)
+    {
+        @* A settled length is stated, not offered: a labelled control with one
+           option is a choice of one. The value is still submitted (by the POST
+           form's hidden field) and still validated server-side — the control is
+           an affordance, not a trust boundary (design D5). *@
+        @* Carries the length control's id even though it is not a control: a
+           server-side length rejection is still possible on a hand-made POST, and
+           the error summary links to that id. Without a target the summary link
+           would go nowhere, which is worse than the control it replaced. *@
+        <div id="@BookingFieldIds.Duration" tabindex="-1">
+            <p class="ubookit-fixed-length">Length: @BookingDurations.Label(Model.DurationMinutes)</p>
+            @if (durationError is not null)
+            {
+                <span id="ubookit-duration-error" class="ubookit-field-error">@durationError</span>
+            }
+        </div>
+    }
+    else
+    {
+        <div>
+            <label for="@BookingFieldIds.Duration">How long do you need?</label>
+            <select id="@BookingFieldIds.Duration" name="@BookingKeys.DurationQuery"
+                    aria-invalid="@(durationError is not null ? "true" : null)"
+                    aria-describedby="@durationDescribedBy">
+                @foreach (var minutes in Model.DurationOptions)
+                {
+                    <option value="@minutes" selected="@(minutes == Model.DurationMinutes)">@BookingDurations.Label(minutes)</option>
+                }
+            </select>
+            @if (durationError is not null)
+            {
+                <span id="ubookit-duration-error" class="ubookit-field-error">@durationError</span>
+            }
+        </div>
+    }
+    <button type="submit">Show times</button>
+</form>
