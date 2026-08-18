@@ -164,6 +164,113 @@ Recorded because the alternative is tempting and wrong: a hidden field defaultin
 "any" invites someone to make it settable later without thinking about which role's
 resources belong in the list, which is the whole reason ⑩-1 exists.
 
+### D8 — `services` spec line 238 is about behaviour, and survives unmodified
+
+Decided at apply, as task 7.5 required, and deliberately not resolved the
+convenient way — so here is the argument rather than the conclusion.
+
+The requirement reads:
+
+> **Defining services does not affect direct-resource booking.** Introducing
+> services SHALL NOT change the existing single-resource booking path in any way.
+> A site that defines no services SHALL behave exactly as before this change;
+> availability, placement, and the default front-end for direct-resource booking
+> SHALL be unaffected.
+>
+> *Scenario: No services defined* — WHEN no service has been created THEN
+> direct-resource availability queries and booking placement behave exactly as
+> before this change.
+
+Three things fix its meaning as behavioural:
+
+1. **Its subject is "introducing services"** — the presence of service
+   *definitions* in a site, not the presence of service *code* in the package. Its
+   title says so, and its one scenario quantifies over sites with no services
+   rather than over source files.
+2. **"Behave exactly as before" is the operative clause.** A requirement about
+   the code path would have to name the code path, and this one names
+   availability, placement and the front end — the three things a visitor and a
+   site owner can observe.
+3. **The code-path reading is not satisfiable by anything.** Under it, no change
+   could ever touch a file the resource flow reads, which would freeze the flow
+   permanently rather than protect it.
+
+So: it survives unmodified, and **⑩ adds no MODIFIED delta for it**.
+
+That reading obliges evidence rather than assertion, which is task 1.2 and is
+discharged: the resource flow's guts moved onto the shared builder and the shared
+partials, and its tests passed before and after **unmodified** — `git diff` over
+`tests/` is empty for every pre-existing file. Two further guards were built for
+the same reason:
+
+- The `Booking` component's redirect target is unchanged, because the hidden
+  `Subject` field that would change it is emitted *only* when the dispatcher put
+  the subject in the URL. A component-invoked flow has no token, so its
+  Post-Redirect-Get is byte-for-byte what it was.
+- `LengthIsFixed` is `false` for a resource, always — even when its grid holds one
+  value. Rendering a one-option grid as settled text would have been a behaviour
+  change smuggled in as a shared-partial nicety.
+
+Verified live afterwards: the existing `Booking` component renders and books
+exactly as before, and its redirect carries no query string.
+
+### D9 — the deterministic refusal asks Core all three of its questions
+
+The spec's scenario names one deterministic cause ("a role with no eligible
+resource at all"), but the requirement it belongs to says *"can never be fulfilled
+as configured"* — and Core can already answer that in three ways, all of which
+render as an empty times list on every date, forever:
+
+```
+  PoolSufficiency.FindShortfall     the roles cannot be filled at once by
+                                    distinct resources (this subsumes an empty
+                                    pool: a slot with no candidates saturates
+                                    nothing, so it is not asked separately)
+  StartAlignment.FindMisalignment   two roles' start grids can never coincide
+  no common length                  no length every role can provide
+```
+
+All three are asked, over the resolved pools the booking path itself acts on.
+Answering only the first would leave the other two rendering "no times available,
+please choose another date" in perpetuity, which is the exact sentence the
+requirement exists to remove.
+
+This **partly discharges the reason code ⑨-1a deferred to ⑩** — the distinction
+is now drawn, and drawn from Core — but only in-process. The *delivery-API* reason
+code stays deferred: this change adds no contract surface, which is the claim that
+keeps it a rendering-only change, and a headless consumer can still ask Core's
+diagnostics through the backoffice surfaces. Carry it forward.
+
+The wording constraint holds in both directions and is tested: the page may say a
+service cannot currently be booked, never that one *is* available, and never which
+role was short of what.
+
+## Guarantee diff — the one MODIFIED requirement (task 7.1)
+
+Done by hand against `openspec/specs/default-frontend/spec.md`, reading for
+guarantees rather than for prose. Every clause and every scenario of *Accessible,
+semantic markup (WCAG 2.2 AA)* accounted for:
+
+| Guarantee as it stood | Disposition |
+| --- | --- |
+| The rendered flow SHALL meet WCAG 2.2 AA and use semantic HTML | Carried, **widened** to name all three surfaces |
+| Every form control SHALL have a programmatically associated label | Carried, verbatim |
+| Start times SHALL be radio controls in a `fieldset` with a naming `legend` | Carried, verbatim |
+| Hints and error text SHALL be associated with their controls | Carried, verbatim |
+| Required inputs SHALL be indicated in text, not colour or placeholder alone | Carried, verbatim |
+| The flow SHALL be fully operable by keyboard | Carried, **widened** ("Each flow") |
+| The page SHALL remain usable, logical order, no author stylesheet | Carried, **widened** ("Each page") |
+| *Scenario:* Every control is labelled | Carried, reworded "in either flow" |
+| *Scenario:* Start times are a labelled radio group | Carried, reworded "in either flow" |
+| *Scenario:* Usable without an author stylesheet | Carried, reworded "any flow" |
+
+**Nothing dropped, deliberately or otherwise.** Two scenarios are added inside the
+requirement (the catalogue; the service flow meeting every clause), and one clause
+is added (a set of related controls is a grouped set with a `legend`). The `-`
+lines of the sync diff must still be read at archive time, since a scenario-title
+comparison cannot tell a rename from a deletion — but the reworded titles above
+are the renames to expect.
+
 ## Risks / Trade-offs
 
 - **[Shared partials become a lowest-common-denominator component by accretion]** →
