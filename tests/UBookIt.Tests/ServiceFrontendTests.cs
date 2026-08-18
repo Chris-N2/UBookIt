@@ -1135,9 +1135,12 @@ public class ServiceFrontendTests
         // tests render no Razor at all.
         //
         // So the construct is banned outright rather than the one instance fixed.
-        // This does not make the accessibility requirement testable — see the
-        // handover; only rendering Razor would — but it closes the one defect
-        // class that has now bitten twice.
+        //
+        // This does NOT make the accessibility requirement testable — only
+        // rendering Razor would, and that is a host-test harness this project has
+        // never had. It is deferred deliberately and recorded as an obligation in
+        // the change's tasks.md §9.3, not left as an aspiration in a comment. What
+        // this closes is the one defect class that has now bitten twice.
         var offenders = new List<string>();
 
         foreach (var path in RepoFiles.Paths("src/UBookIt.Web/Views", "*.cshtml"))

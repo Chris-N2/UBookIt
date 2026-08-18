@@ -34,12 +34,31 @@
 
 ## 3. Refusals — the substance, not the trimming
 
-- [x] 3.1 Map `conflict` and `service-unavailable` to two distinct visitor-facing
-      shapes, from the **stable code** and never from message text.
-- [x] 3.2 **The covering test is the pair.** A suite proving "a service books on a
-      good day" passes an implementation that renders every refusal as "no times
-      available". Provoke both refusals and assert the messages differ *and* that the
-      deterministic one does not invite a retry.
+- [x] 3.1 ~~Map `conflict` and `service-unavailable` to two distinct visitor-facing
+      shapes, from the **stable code** and never from message text.~~
+      **SUPERSEDED at apply — this instruction was wrong and following it produced
+      QA's first MAJOR.** It assumed `service-unavailable` is a deterministic code.
+      It is not: Core raises it identically for a structurally impossible service
+      and for one whose resources merely happen to be busy, and documents it as
+      being "about that instant and nothing more". Mapping the two codes to two
+      shapes therefore told a perfectly bookable service it was "not currently
+      available for booking" above its own bookable times.
+      **What was done instead:** every *placement* failure maps to one shape — an
+      answer about one instant, inviting another time — and the permanent claim is
+      made only by the *configuration-time* check, before any form is offered. Still
+      from the stable code and never from message text; that half was never the
+      problem. See design D4, which keeps the false premise beside the correction.
+- [x] 3.2 ~~**The covering test is the pair.** Provoke both refusals and assert the
+      messages differ *and* that the deterministic one does not invite a retry.~~
+      **SUPERSEDED with 3.1.** Comparing two messages was the wrong pair, and QA
+      proved it: a test that never asks what *page* a message lands on cannot see a
+      bookable service being refused above its own times.
+      **What was done instead:** for a fulfillable service, assert that *every* code
+      it can produce invites another time (both are exercised, including the
+      out-of-hours case QA found); assert the permanent claim is reachable only from
+      the configuration-time refusal, which renders no form; and enumerate every
+      literal in `FailureCodes` to assert none of them can produce it — so the next
+      code nobody thinks to provoke is covered too.
 - [x] 3.3 **Disclosure:** assert the deterministic refusal names no role, no resource
       type, no capability and no count. The tempting implementation pipes ⑨-2a's
       shortfall text straight through, and it reads plausibly — which is why this
@@ -133,3 +152,24 @@
       than defaulted.
 - [x] 9.2 Record whether the shared partials held, or started taking per-flow flags —
       the risk design D1 names.
+- [x] 9.3 **DEFERRED, and it is an obligation rather than an aspiration: the C#
+      suite renders no Razor, so no test can fail on a markup defect.** Raised by QA
+      as its second MAJOR and accepted as adequately dispositioned for ⑩ on the
+      reasoning that the *demonstrated* gap is closed (tag helpers are now banned
+      outright, since this package registers none and every one degrades to visible
+      text rather than to an error) and that the residual is inherited from ⑤'s
+      architecture rather than introduced here.
+      **What is still true and must not be forgotten:** the accessibility
+      requirement — one bar over three surfaces, five scenarios — is *met* and
+      *un-regression-tested*. Its markup was verified live, twice, by two contexts;
+      nothing catches it breaking later. Two defects of this class have now shipped
+      into a green suite (the `<partial>` tag helper, and the path-scan that could
+      not see it), which is the evidence that review is not a substitute here.
+      **What a follow-up must decide, and why it is not a fix to bolt on now:**
+      which host (`WebApplicationFactory` over the TestSite, versus a Razor-only rig
+      with a stub `IUrlHelper`), how to satisfy `Html.BeginUmbracoForm` outside an
+      Umbraco request, and whether the shared partials — which use no Umbraco
+      helpers — can be rendered alone as a cheaper first slice. That is a propose
+      cycle, not a remediation, and building it under remediation pressure is the
+      scope drift this change's own risk register names.
+      **Carry to [[ubookit-deferred-obligations]] at archive.**
