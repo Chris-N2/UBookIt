@@ -102,7 +102,7 @@
       carried forward reworded to say "either flow", and every clause is restated.
       Read the sync diff's `-` lines rather than trusting the tool, which compares
       scenario titles and cannot tell a rename from a deletion.
-- [~] 7.2 The outward grep, **before and after** sync, for sibling specs this change
+- [x] 7.2 The outward grep, **before and after** sync, for sibling specs this change
       falsifies. Candidates — and put every one of them in the command, which is the
       step that failed on a previous change: "single-resource", "single resource",
       "the flow", "ViewComponent", "resource id", "one resource", "no times".
@@ -110,12 +110,22 @@
       excluding `default-frontend` itself. The only hit this change bears on is
       `services/spec.md:238`, resolved as task 7.5 / design D8. Every other hit is
       about the domain, persistence or the delivery API and is untouched.
-      **The AFTER pass is still owed, at sync.**
-- [ ] 7.3 The `default-frontend` spec's **Purpose** paragraph describes "a
+      **AFTER pass done at sync**, over the change's own vocabulary *and* the
+      vocabulary of the mechanisms it replaces ("default front end", "front-end",
+      "Razor", "ViewComponent", "no-JavaScript", "booking UI", "unaffected",
+      "unchanged", "catalogue", "the visitor"), over every file under
+      `openspec/specs` bar `default-frontend`. No sentence is falsified.
+      `services/spec.md:238` and `:5`, and `service-booking/spec.md:572`, survive
+      on the behavioural reading fixed by design D8. `bookings/spec.md:198` and
+      `delivery-api/spec.md:5`/`:8` are noted as loose-but-not-false and left for
+      the owner to decide.
+- [x] 7.3 The `default-frontend` spec's **Purpose** paragraph describes "a
       no-JavaScript single-resource booking flow". It is not a requirement and so
       will not appear in any delta, and it will be wrong the moment this ships.
-      Update it at sync time. **STILL OWED** — apply deliberately did not touch
-      `openspec/specs/`, and this is the one edit that no delta will make for you.
+      **Done at sync**: rewritten to name the three flows and the `BookingFlow`
+      dispatcher while keeping the original `Booking` component, and preserving
+      the in-process rule, anti-forgery, PRG, accessibility-as-first-class, and
+      the alternative-UI-consumes-the-delivery-API sentence.
 - [x] 7.4 Check whether `delivery-api` or `service-booking` say anything about the
       default front end that this change falsifies.
 - [x] 7.5 **One specific sibling, found at propose time and not yet resolved.**
