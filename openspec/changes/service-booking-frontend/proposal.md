@@ -45,6 +45,17 @@ one a visitor can reach without someone writing a client.
 - **No resource is named to the visitor.** Every service booking this change places
   is unpinned — `pinnedResourceId` is never sent. See Non-goals.
 
+- **BREAKING (unpublished): `BookingViewComponent`'s constructor changes** from
+  `(IResourceStore, IAvailabilityQueryService, SiteBookingSettings, TimeProvider)`
+  to `(ResourceBookingFlow)`, and the type now requires the rendering composer to
+  have run. Called out because the conventions require it, not because anything is
+  known to break: the component is resolved from the container and invoked by name
+  from a template, which is the only documented way to use it, and both are
+  unchanged. Only code constructing it directly is affected — and the package is
+  unpublished, so no such code exists outside this repository. The alternative,
+  keeping the old constructor as a shim, would mean two ways to build the same
+  component and a second wiring to keep in step.
+
 ## Capabilities
 
 ### New Capabilities

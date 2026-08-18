@@ -1,4 +1,5 @@
 using System.Globalization;
+using Microsoft.AspNetCore.Http;
 
 namespace UBookIt.Web.Rendering;
 
@@ -68,6 +69,55 @@ public readonly record struct BookingSubject(BookableKind Kind, Guid Id)
 
         subject = new BookingSubject(resolved, id);
         return true;
+    }
+
+    /// <summary>
+    /// The submitted subject, but only when it agrees with what was actually
+    /// booked; null otherwise.
+    /// <para>
+    /// The subject travels as a POST field, so a hand-made submission can name a
+    /// service while booking a resource. Redirecting on the submitted value alone
+    /// would place the booking and then land the visitor in the <em>other</em>
+    /// flow, which reads a different TempData key — so the confirmation for a real
+    /// booking is dropped. A disagreement is treated as no subject at all rather
+    /// than as an error: the booking succeeded, and the plain redirect still shows
+    /// it.
+    /// </para>
+    /// </summary>
+    public static BookingSubject? Agreeing(string? token, BookingSubject actual)
+        => TryParse(token, out var parsed) && parsed == actual ? parsed : null;
+}
+
+/// <summary>
+/// The query string a step is reached at: what is being booked, the chosen date
+/// and the chosen length — and nothing else, ever.
+/// <para>
+/// Built here rather than at each redirect so both flows produce one vocabulary,
+/// and so the rule that contact details never travel in a URL is a property of a
+/// function rather than of two call sites agreeing. Every value is re-serialised
+/// from parsed input; nothing a caller typed is echoed.
+/// </para>
+/// <para>
+/// The date and length are carried because a step has to be <b>linkable</b>: a
+/// redirect that dropped them would land the visitor on a URL disagreeing with
+/// the page it drew, which is the defect a server-side wizard state produces and
+/// the reason the choices live in the URL at all.
+/// </para>
+/// </summary>
+public static class BookingFlowLink
+{
+    public static QueryString For(BookingSubject subject, DateOnly date, int durationMinutes)
+    {
+        var query = QueryString.Create(BookingKeys.SubjectQuery, subject.Token)
+            .Add(BookingKeys.DateQuery, date.ToString("yyyy-MM-dd", CultureInfo.InvariantCulture));
+
+        // A length of zero is what an omitted form field binds to. Carrying it
+        // would put a value in the URL that no control could have produced.
+        return durationMinutes > 0
+            ? query.Add(
+                BookingKeys.DurationQuery,
+                durationMinutes.ToString(CultureInfo.InvariantCulture))
+            : query;
     }
 }
 

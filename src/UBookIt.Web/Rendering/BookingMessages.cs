@@ -35,16 +35,35 @@ public static class BookingMessages
         [FailureCodes.DateRangeInvalid] = "Please choose a valid date.",
         [FailureCodes.DateRangeTooLarge] = "Please choose a single date.",
 
-        // The deterministic service refusal. Distinct from `conflict` in both
-        // substance and shape: it does not invite the visitor to try another
-        // time, because that would be inviting them to fail again.
+        // A placement refusal is about THAT INSTANT, and this message says so.
+        //
+        // It is tempting to render `service-unavailable` as "this service is not
+        // available for booking" — the code sounds permanent, and an earlier
+        // version of this map did exactly that. It is wrong, and Core says so in
+        // as many words: the placement-time refusal is "about that instant and
+        // nothing more… this may not claim a configuration can never be fulfilled
+        // — that is the configuration-time check's claim to make, over a
+        // different graph" (ServiceBookingService.Shortfall). A structurally
+        // impossible service and one whose resources merely happen to be busy
+        // fail identically here.
+        //
+        // So the permanent claim is made in exactly one place — the flow's
+        // configuration-time refusal page, which asks the different graph — and
+        // never from this code. QA found the alternative live: a perfectly
+        // bookable service, submitted with a start outside its hours, told the
+        // visitor it was not available for booking while nine bookable times were
+        // listed underneath.
         //
         // The domain's own message for this code names the roles that were short
         // and how many resources could provide them — written for the backoffice,
         // where someone can act on it. It is not carried here, and cannot be: the
         // map is from the code, and the code alone.
-        [FailureCodes.ServiceUnavailable] = "This service is not currently available for booking.",
-        [FailureCodes.ServiceNotFound] = "This service is not available for booking.",
+        [FailureCodes.ServiceUnavailable] =
+            "That time is not available for this service. Please choose another.",
+        // Worded away from the placement refusal above and from the
+        // configuration-time page: this one means the service could not be found
+        // at all, which is a fault rather than an answer about times.
+        [FailureCodes.ServiceNotFound] = "Sorry, this service could not be found.",
     };
 
     public const string Fallback = "Sorry, your booking could not be completed. Please try again.";
@@ -89,7 +108,12 @@ public static class BookingMessages
                     or FailureCodes.LeadTime
                     or FailureCodes.Horizon
                     or FailureCodes.Granularity
-                    or FailureCodes.IntervalInvalid => BookingFieldIds.Times,
+                    or FailureCodes.IntervalInvalid
+
+                    // A placement refusal concerns the chosen start, like the
+                    // codes above it — so it points at the time list, which is
+                    // where the visitor acts on it.
+                    or FailureCodes.ServiceUnavailable => BookingFieldIds.Times,
                 _ => null,
             },
         };

@@ -9,7 +9,14 @@
     // hours are wrong when they are not — which is exactly the conflation this
     // page exists to remove.
     var notFulfillable = Model?.Reason == ServiceUnavailableReason.NotFulfillable;
-    var heading = notFulfillable ? "Not available for booking" : "Booking unavailable";
+
+    // Names what the visitor asked for when it could be read. That is not a
+    // configuration detail — they arrived by choosing it — and without it a site
+    // rendering several flows on one page gives no clue which one refused.
+    var subject = string.IsNullOrWhiteSpace(Model?.ServiceName) ? null : Model!.ServiceName;
+    var heading = notFulfillable
+        ? subject is null ? "Not available for booking" : $"{subject} is not available for booking"
+        : "Booking unavailable";
 }
 <section class="ubookit-booking" aria-label="@heading">
     <h2>@heading</h2>

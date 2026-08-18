@@ -109,17 +109,48 @@ linkable" change would breach without noticing.
 
 ### D4 — Refusals map to exactly two visitor-facing shapes
 
-The domain distinguishes `conflict` (transient) from `service-unavailable`
-(deterministic). The front end renders that distinction and nothing finer:
+**REVISED at apply, after QA rejected the original. The premise below was false and
+the correction matters, so both are kept.**
+
+*As proposed:* "The domain distinguishes `conflict` (transient) from
+`service-unavailable` (deterministic)", mapping `service-unavailable` → "This service
+is not currently available for booking", no retry.
+
+*Why that was wrong:* **`service-unavailable` is not a deterministic code.** Core says
+so in the method that raises it — the placement-time refusal is "about *that instant*
+and nothing more… this may not claim a configuration can never be fulfilled — that is
+the configuration-time check's claim to make, over a different graph, and it is what
+distinguishes the two" (`ServiceBookingService.Shortfall`). A structurally impossible
+service and one whose resources merely happen to be busy fail *identically* there.
+
+QA demonstrated the consequence live rather than arguing it: a perfectly bookable
+service, submitted with a start outside its opening hours, rendered "This service is
+not currently available for booking" **above its own nine bookable start times**. The
+change written to stop a refusal lying to a visitor had it lying from the other
+direction.
+
+*The rule that replaces it —* **the distinction is which question was asked, not which
+code came back:**
 
 ```
-  conflict              → "That time is no longer available." + refreshed times, retry invited
-  service-unavailable   → "This service is not currently available for booking."  no retry
-  duration-*            → the existing length messages, unchanged
+  ANY placement failure   → an answer about one instant → retry invited
+    conflict              → "That time is no longer available. Please choose another."
+    service-unavailable   → "That time is not available for this service. Please choose another."
+    duration-*            → the existing length messages, unchanged
+
+  The configuration-time check (D9), asked over the resolved pools before any form
+  is offered → "This service is not currently available for booking."  no retry
 ```
 
-The mapping is from the **stable code**, never from message text, which is the rule
-the failure-handling requirement already sets for the resource flow.
+So the permanent claim is made in exactly one place, by the only question that can
+support it, and *no* placement failure can produce it. The mapping is still from the
+**stable code** and never from message text — that rule was never the problem, and it
+is what keeps the shortfall diagnostic off the page.
+
+A consequence worth stating, because it is what makes the shapes safe: the
+deterministic page is reached *before* a form exists, so a failed submission against a
+genuinely unfulfillable service redraws to that page rather than to a form carrying an
+inviting message. A test names this rather than leaving it to be inferred.
 
 Deliberately *not* rendered: ⑨-2a's shortfall diagnostic. It names roles, counts and
 capabilities for the person who can fix the configuration. A visitor cannot fix it and

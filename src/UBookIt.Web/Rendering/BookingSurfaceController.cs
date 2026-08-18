@@ -107,7 +107,7 @@ public sealed class BookingSurfaceController : SurfaceController
             if (placed.Succeeded)
             {
                 Stash(BookingKeys.Confirmation, BuildConfirmation(placed.Value, resource.DisplayName, zone));
-                return SeeOther(BackToFlow(form.Subject));
+                return SeeOther(BackToFlow(form));
             }
 
             failures.AddRange(placed.Failures);
@@ -129,7 +129,7 @@ public sealed class BookingSurfaceController : SurfaceController
             Errors = [.. BookingMessages.ForFailures(failures)],
         });
 
-        return SeeOther(BackToFlow(form.Subject));
+        return SeeOther(BackToFlow(form));
     }
 
     /// <summary>
@@ -143,15 +143,29 @@ public sealed class BookingSurfaceController : SurfaceController
     /// its redirect is byte-for-byte what it was before the service flow existed.
     /// </para>
     /// <para>
-    /// The token is re-serialised from the parsed value rather than echoed, so
+    /// Every value is re-serialised from parsed input rather than echoed, so
     /// nothing a caller typed reaches the Location header. Contact details are
     /// never among the parameters — they arrived in the POST body and stay there
     /// (design D3).
     /// </para>
+    /// <para>
+    /// The date and length travel with the subject. Carrying the subject alone
+    /// would redraw the step at a URL that disagreed with the page — the visitor
+    /// would see the date they submitted while the address bar named another —
+    /// which is precisely the inconsistency the URL-state rule exists to prevent.
+    /// </para>
     /// </summary>
-    private IActionResult BackToFlow(string? subject)
-        => BookingSubject.TryParse(subject, out var parsed)
-            ? RedirectToCurrentUmbracoPage(QueryString.Create(BookingKeys.SubjectQuery, parsed.Token))
+    /// <remarks>
+    /// The subject must also <em>agree</em> with what was booked. It is a POST
+    /// field, so a hand-made submission can name a service while booking a
+    /// resource — placing the booking and then redirecting into the other flow,
+    /// which reads a different TempData key and drops the visitor's confirmation
+    /// on the floor. Only self-inflicted, but the check is one comparison.
+    /// </remarks>
+    private IActionResult BackToFlow(BookingSubmission form)
+        => BookingSubject.Agreeing(form.Subject, BookingSubject.Resource(form.ResourceId)) is { } subject
+            ? RedirectToCurrentUmbracoPage(
+                BookingFlowLink.For(subject, form.Date, form.DurationMinutes))
             : RedirectToCurrentUmbracoPage();
 
     /// <summary>

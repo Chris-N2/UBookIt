@@ -61,12 +61,26 @@ does not special-case it.
 ### Requirement: A service that cannot be booked says which kind of cannot
 When a service cannot be booked, the flow SHALL distinguish a **transient** refusal —
 the times are taken, and another date or time may work — from a **deterministic** one,
-where the service as configured can never be fulfilled. The domain already separates
-these as `conflict` and `service-unavailable`; rendering them alike discards a
-distinction the domain went to trouble to make.
+where the service as configured can never be fulfilled. Rendering them alike discards
+a distinction the domain went to trouble to make.
+
+The two SHALL be told apart by **which question was asked**, and not by the failure
+code alone. A placement refusal — whatever its code — is an answer about **one
+instant**: `service-unavailable` is raised identically for a structurally impossible
+service and for one whose resources merely happen to be busy, so it cannot support a
+permanent claim. Only the **configuration-time** check, asked over the resolved
+candidate pools rather than over a moment, may establish that a service can never be
+fulfilled.
+
+The permanent claim SHALL therefore be made in exactly one place: the flow's
+configuration-time refusal, rendered **before any form is offered**. No message
+derived from a placement failure may assert it.
 
 A transient refusal SHALL invite the visitor to try another time. A deterministic
-refusal SHALL NOT, because it would be inviting them to fail again.
+refusal SHALL NOT, because it would be inviting them to fail again. A refusal SHALL
+NOT be rendered in a shape that contradicts its own wording — a page stating that a
+service cannot be booked while offering bookable times for it is the same conflation
+arriving from the other direction.
 
 This is the same failure the withholding-resource requirement exists to prevent,
 arriving through a third door: a correctly configured thing that yields nothing and
@@ -85,6 +99,14 @@ they are not.
 #### Scenario: The two refusals are distinguishable on the page
 - **WHEN** a transient refusal and a deterministic refusal are each rendered
 - **THEN** their messages differ, and the difference is carried in text rather than by styling alone
+
+#### Scenario: A bookable service refused at one instant still invites another
+- **WHEN** a service that can be fulfilled is refused for the instant submitted, whatever the failure code
+- **THEN** the visitor is invited to choose another time, and is not told the service is unavailable for booking
+
+#### Scenario: A refusal is never rendered above the times it denies
+- **WHEN** a refusal message is shown on a page that also lists bookable start times for that service
+- **THEN** that message invites the visitor to choose one of them, rather than stating that the service cannot be booked
 
 ### Requirement: A visitor-facing refusal discloses no configuration detail
 A refusal rendered to a visitor SHALL state what it means for them and SHALL NOT

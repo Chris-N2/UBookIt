@@ -1,3 +1,4 @@
+using System.Text.RegularExpressions;
 using UBookIt.Core.Availability;
 using UBookIt.Core.Bookings;
 using UBookIt.Core.Common;
@@ -206,20 +207,32 @@ public class ServiceFrontendTests
             Svc("Massage", null, new ServiceRole(ResourceTypes.Room, 1), new ServiceRole(Therapist, 1)),
             Res(1, ResourceTypes.Room, "Treatment Room"));
 
+    /// <summary>
+    /// The deterministic sentence, which exactly one surface is allowed to say.
+    /// Held as a constant so every test below asks the same question of it.
+    /// </summary>
+    private const string PermanentClaim = "not currently available for booking";
+
     [Fact]
-    public async Task The_two_refusals_differ_and_only_the_transient_one_invites_a_retry()
+    public async Task Every_placement_refusal_of_a_fulfillable_service_invites_another_time()
     {
-        // A suite proving "a service books on a good day" passes an
-        // implementation that renders every refusal as "no times available". So
-        // both refusals are provoked here and compared: rendering them alike is
-        // the failure, and only a comparison can see it.
+        // The pair this test used to compare was the wrong pair, and QA proved it
+        // live: it compared two MESSAGES and never asked what page they land on,
+        // so it could not see a perfectly bookable service being told it was "not
+        // currently available for booking" above its own nine bookable times.
+        //
+        // The real rule is that a PLACEMENT failure is an answer about one
+        // instant, whatever its code — Core says so where it raises
+        // `service-unavailable` — so every one of them must invite another time.
+        // Both codes a fulfillable service can produce are therefore exercised
+        // here, and the assertion is made of each.
         var busy = Massage();
 
         // Every resource able to fulfil the service is taken at 09:00, but the
         // service is fulfillable in general.
         await OccupyAsync(busy, Id(2), "09:00", 60);
 
-        var transient = await busy.Core.PlaceAsync(new ServiceBookingRequest
+        var raced = await busy.Core.PlaceAsync(new ServiceBookingRequest
         {
             ServiceId = busy.Service.Id,
             Start = TestData.Utc(Date, "09:00"),
@@ -227,37 +240,111 @@ public class ServiceFrontendTests
             Booker = TestData.Booker(),
         });
 
-        Assert.False(transient.Succeeded);
-        Assert.Equal(FailureCodes.Conflict, transient.Failures[0].Code);
+        Assert.Equal(FailureCodes.Conflict, raced.Failures[0].Code);
 
-        var deterministic = await Unfulfillable().Core.PlaceAsync(new ServiceBookingRequest
+        // The case QA found. A fulfillable service, asked for a start outside its
+        // opening hours: every candidate's own rules refuse, so no assignment can
+        // reach the conflict check and Core reports `service-unavailable` — for a
+        // service that is bookable all day.
+        var outOfHours = await Massage().Core.PlaceAsync(new ServiceBookingRequest
         {
             ServiceId = Id(900),
-            Start = TestData.Utc(Date, "09:00"),
+            Start = TestData.Utc(Date, "03:00"),
             Duration = Mins(60),
             Booker = TestData.Booker(),
         });
 
-        Assert.False(deterministic.Succeeded);
-        Assert.Equal(FailureCodes.ServiceUnavailable, deterministic.Failures[0].Code);
+        Assert.Equal(FailureCodes.ServiceUnavailable, outOfHours.Failures[0].Code);
 
-        var transientMessage = Rendered(transient.Failures);
-        var deterministicMessage = Rendered(deterministic.Failures);
+        foreach (var failure in new[] { raced, outOfHours })
+        {
+            var message = Rendered(failure.Failures);
 
-        // They differ, and the difference is carried in the text itself rather
-        // than by styling alone.
-        Assert.NotEqual(transientMessage, deterministicMessage);
+            Assert.DoesNotContain(BookingMessages.Fallback, message, StringComparison.Ordinal);
 
-        // Neither falls back to the generic message, which would conflate them
-        // with each other and with everything else.
-        Assert.DoesNotContain(BookingMessages.Fallback, transientMessage, StringComparison.Ordinal);
-        Assert.DoesNotContain(BookingMessages.Fallback, deterministicMessage, StringComparison.Ordinal);
+            // Invites another time...
+            Assert.Contains("choose another", message, StringComparison.OrdinalIgnoreCase);
 
-        // The transient one invites another time. The deterministic one must not:
-        // it would be inviting the visitor to fail again.
-        Assert.Contains("choose another", transientMessage, StringComparison.OrdinalIgnoreCase);
-        Assert.DoesNotContain("another", deterministicMessage, StringComparison.OrdinalIgnoreCase);
-        Assert.DoesNotContain("try again", deterministicMessage, StringComparison.OrdinalIgnoreCase);
+            // ...and never makes the claim only the configuration-time check may.
+            Assert.DoesNotContain(PermanentClaim, message, StringComparison.OrdinalIgnoreCase);
+
+            // It is about the chosen start, so it points at the time list — where
+            // the visitor can act on it.
+            Assert.Equal(
+                BookingFieldIds.Times,
+                BookingMessages.ForFailures(failure.Failures).First().FieldId);
+        }
+    }
+
+    [Fact]
+    public async Task The_permanent_claim_is_made_only_by_the_configuration_time_check()
+    {
+        // The other half of the pair, and the one that keeps the first honest: the
+        // deterministic wording must still exist somewhere, or "no message says
+        // it" would be satisfied by never saying it at all.
+        var outcome = await Unfulfillable().Flow.BuildAsync(Id(900), On(Date));
+
+        Assert.NotNull(outcome.Unavailable);
+        Assert.Equal(ServiceUnavailableReason.NotFulfillable, outcome.Unavailable.Reason);
+
+        // And it is the refusal page — which offers no form and no times — that
+        // carries it, not a message on a form.
+        Assert.Null(outcome.Form);
+
+        var page = RepoFiles.Read(
+            "src/UBookIt.Web/Views/Shared/Components/BookingFlow/ServiceUnavailable.cshtml");
+
+        Assert.Contains(PermanentClaim, page, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public void No_placement_failure_can_produce_the_permanent_claim()
+    {
+        // Stated over EVERY code the map knows rather than over the two a fixture
+        // happens to produce. The defect QA found was a code nobody had thought to
+        // provoke, so enumerating the map is the assertion that scales.
+        var codes = typeof(FailureCodes)
+            .GetFields()
+            .Where(f => f.IsLiteral && f.FieldType == typeof(string))
+            .Select(f => (string)f.GetRawConstantValue()!)
+            .ToList();
+
+        Assert.NotEmpty(codes);
+
+        foreach (var code in codes)
+        {
+            Assert.DoesNotContain(PermanentClaim, BookingMessages.ForCode(code), StringComparison.OrdinalIgnoreCase);
+        }
+
+        Assert.DoesNotContain(PermanentClaim, BookingMessages.Fallback, StringComparison.OrdinalIgnoreCase);
+    }
+
+    [Fact]
+    public async Task A_failed_submission_against_an_unfulfillable_service_redraws_no_form()
+    {
+        // What makes the two shapes safe: a stale POST against a service that can
+        // never be fulfilled must not come back as a form carrying an inviting
+        // message. The configuration-time refusal is decided before the failed
+        // submission is consulted, so the redraw is the refusal page.
+        //
+        // Named by a test rather than left to be inferred from the order of two
+        // statements in a method, which is the kind of thing a later edit reorders
+        // without noticing.
+        var outcome = await Unfulfillable().Flow.BuildAsync(
+            Id(900),
+            new BookingFlowInput
+            {
+                Date = Date,
+                Failed = new FailedSubmission
+                {
+                    Date = Date,
+                    DurationMinutes = 60,
+                    Errors = [new BookingError("That time is not available for this service. Please choose another.", BookingFieldIds.Times)],
+                },
+            });
+
+        Assert.Null(outcome.Form);
+        Assert.Equal(ServiceUnavailableReason.NotFulfillable, outcome.Unavailable!.Reason);
     }
 
     [Fact]
@@ -892,23 +979,75 @@ public class ServiceFrontendTests
     }
 
     [Fact]
+    public void A_submitted_subject_that_disagrees_with_what_was_booked_is_discarded()
+    {
+        // The subject is a POST field, so a hand-made submission can name a
+        // service while booking a resource. Honouring it would place the booking
+        // and then redirect into the other flow, which reads a different TempData
+        // key — losing the confirmation for a booking that really happened.
+        Assert.Null(BookingSubject.Agreeing(
+            BookingSubject.Service(Id(900)).Token, BookingSubject.Resource(Id(1))));
+
+        // Same id, different kind: the pair that a comparison on the Guid alone
+        // would wave through.
+        Assert.Null(BookingSubject.Agreeing(
+            BookingSubject.Service(Id(1)).Token, BookingSubject.Resource(Id(1))));
+
+        // And the honest case still travels, or the guard would be a silent
+        // removal of the flow state it exists to protect.
+        Assert.Equal(
+            BookingSubject.Resource(Id(1)),
+            BookingSubject.Agreeing(BookingSubject.Resource(Id(1)).Token, BookingSubject.Resource(Id(1))));
+
+        // An absent subject is not a disagreement — it is the component-invoked
+        // flow, which has no URL state and must keep its bare redirect.
+        Assert.Null(BookingSubject.Agreeing(null, BookingSubject.Resource(Id(1))));
+    }
+
+    [Fact]
+    public void The_redirect_after_a_submission_carries_the_whole_step_not_just_the_subject()
+    {
+        // QA found the redraw landing on a URL that disagreed with the page it
+        // drew: the form showed the submitted date while the address bar named
+        // another, because only the subject survived the redirect. The step's
+        // choices are in the URL precisely so that cannot happen.
+        var query = BookingFlowLink.For(BookingSubject.Service(Id(900)), new DateOnly(2026, 8, 20), 90)
+            .ToUriComponent();
+
+        Assert.Contains("ubBook=s%3A" + Id(900), query, StringComparison.OrdinalIgnoreCase);
+        Assert.Contains("ubDate=2026-08-20", query, StringComparison.Ordinal);
+        Assert.Contains("ubMins=90", query, StringComparison.Ordinal);
+
+        // A length of zero is what an omitted field binds to; carrying it would
+        // put a value in the URL no control could have produced.
+        Assert.DoesNotContain(
+            "ubMins",
+            BookingFlowLink.For(BookingSubject.Resource(Id(1)), new DateOnly(2026, 8, 20), 0).ToUriComponent(),
+            StringComparison.Ordinal);
+    }
+
+    [Fact]
     public void Contact_details_never_appear_in_a_URL()
     {
         // The place a later change would most plausibly leak them is the GET
         // forms and the Post-Redirect-Get target, so both are asserted over the
         // shipped source rather than over one rendered page.
         //
-        // Every GET form the flows render: the date-and-length step and the
-        // catalogue. Neither may carry a contact field, whatever else it gains.
-        foreach (var view in new[]
-        {
-            "src/UBookIt.Web/Views/Shared/UBookIt/_DateAndLength.cshtml",
-            "src/UBookIt.Web/Views/Shared/Components/BookingFlow/Catalogue.cshtml",
-        })
-        {
-            var markup = RepoFiles.Read(view);
+        // EVERY GET form the package renders, found by scanning rather than by a
+        // list — a hardcoded pair would be blind to a third one added later, which
+        // is exactly the change that would introduce this leak.
+        var getForms = RepoFiles
+            .Paths("src/UBookIt.Web/Views", "*.cshtml")
+            .Where(path => File.ReadAllText(path).Contains("method=\"get\"", StringComparison.Ordinal))
+            .ToList();
 
-            Assert.Contains("method=\"get\"", markup, StringComparison.Ordinal);
+        // Non-vacuity: the scan must actually be finding the forms it claims to
+        // check, or an empty result would satisfy every assertion below.
+        Assert.Equal(2, getForms.Count);
+
+        foreach (var path in getForms)
+        {
+            var markup = File.ReadAllText(path);
 
             foreach (var field in new[] { "\"Name\"", "\"Email\"", "\"Phone\"" })
             {
@@ -916,8 +1055,10 @@ public class ServiceFrontendTests
             }
         }
 
-        // And the redirect: the only query parameter either controller builds is
-        // the flow subject.
+        // And the redirect. Every query string either controller produces is built
+        // by one function, so the rule is a property of that function rather than
+        // of two call sites happening to agree — assert BOTH halves, or a second
+        // builder added beside it would be invisible.
         foreach (var controller in new[]
         {
             "src/UBookIt.Web/Rendering/BookingSurfaceController.cs",
@@ -925,11 +1066,15 @@ public class ServiceFrontendTests
         })
         {
             var source = RepoFiles.Read(controller);
-            var built = source.Split("QueryString.Create(").Skip(1).ToList();
 
-            Assert.NotEmpty(built);
-            Assert.All(built, call => Assert.StartsWith("BookingKeys.SubjectQuery,", call, StringComparison.Ordinal));
+            Assert.Contains("BookingFlowLink.For(", source, StringComparison.Ordinal);
+            Assert.DoesNotContain("QueryString.Create(", source, StringComparison.Ordinal);
         }
+
+        var link = RepoFiles.Read("src/UBookIt.Web/Rendering/BookingSubject.cs");
+        var keys = Regex.Matches(link, @"BookingKeys\.(\w+)").Select(m => m.Groups[1].Value).Distinct().Order();
+
+        Assert.Equal(["DateQuery", "DurationQuery", "SubjectQuery"], keys.ToArray());
     }
 
     [Fact]
@@ -972,6 +1117,64 @@ public class ServiceFrontendTests
                 Assert.Contains(
                     $"~/Views/Shared/UBookIt/{partial}.cshtml", markup, StringComparison.Ordinal);
             }
+        }
+    }
+
+    [Fact]
+    public void No_view_uses_a_tag_helper_this_package_never_registers()
+    {
+        // The assertion above names a PATH, and a path appears in the file whether
+        // the construct around it renders or is emitted as literal text. QA proved
+        // the gap by restoring the original defect — `<partial name="~/…" />` in
+        // place of `@await Html.PartialAsync(…)` — with all 690 tests green.
+        //
+        // The cause is structural and permanent: `UBookIt.Web` has no
+        // `_ViewImports.cshtml`, so `Microsoft.AspNetCore.Mvc.TagHelpers` is never
+        // added and EVERY tag helper degrades to literal text on the page rather
+        // than to an error. Nothing else in the suite can see that, because the C#
+        // tests render no Razor at all.
+        //
+        // So the construct is banned outright rather than the one instance fixed.
+        // This does not make the accessibility requirement testable — see the
+        // handover; only rendering Razor would — but it closes the one defect
+        // class that has now bitten twice.
+        var offenders = new List<string>();
+
+        foreach (var path in RepoFiles.Paths("src/UBookIt.Web/Views", "*.cshtml"))
+        {
+            var markup = File.ReadAllText(path);
+            var name = Path.GetFileName(path);
+
+            if (markup.Contains("<partial", StringComparison.OrdinalIgnoreCase))
+            {
+                offenders.Add($"{name}: <partial> tag helper (use @await Html.PartialAsync)");
+            }
+
+            if (Regex.IsMatch(markup, @"\sasp-[a-z-]+\s*="))
+            {
+                offenders.Add($"{name}: asp-* tag helper attribute");
+            }
+        }
+
+        Assert.Empty(offenders);
+    }
+
+    [Fact]
+    public void The_shared_partials_are_all_reached_from_a_flow()
+    {
+        // Directory-driven rather than a hardcoded list, so a partial added later
+        // cannot sit unreferenced while the suite reports the seam intact.
+        var flows = new[]
+        {
+            RepoFiles.Read("src/UBookIt.Web/Views/Shared/Components/Booking/Default.cshtml"),
+            RepoFiles.Read("src/UBookIt.Web/Views/Shared/Components/BookingFlow/Service.cshtml"),
+        };
+
+        foreach (var path in RepoFiles.Paths("src/UBookIt.Web/Views/Shared/UBookIt", "*.cshtml"))
+        {
+            var name = Path.GetFileNameWithoutExtension(path);
+
+            Assert.Contains(flows, flow => flow.Contains($"UBookIt/{name}.cshtml", StringComparison.Ordinal));
         }
     }
 

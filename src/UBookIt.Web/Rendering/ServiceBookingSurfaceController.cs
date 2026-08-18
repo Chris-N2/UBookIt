@@ -128,7 +128,7 @@ public sealed class ServiceBookingSurfaceController : SurfaceController
                     BookingKeys.ServiceConfirmation,
                     await BuildConfirmationAsync(placed.Value, service.Name, zone));
 
-                return SeeOther(BackToFlow(form.Subject));
+                return SeeOther(BackToFlow(form));
             }
 
             failures.AddRange(placed.Failures);
@@ -156,20 +156,28 @@ public sealed class ServiceBookingSurfaceController : SurfaceController
             Errors = [.. BookingMessages.ForFailures(failures)],
         });
 
-        return SeeOther(BackToFlow(form.Subject));
+        return SeeOther(BackToFlow(form));
     }
 
     /// <summary>
     /// The Post-Redirect-Get target: the current page, carrying the flow's
-    /// subject when the flow was entered through the dispatcher's query string,
-    /// so the redirect lands back on this service rather than at the catalogue.
-    /// The token is re-serialised from the parsed value rather than echoed.
-    /// Contact details are never among the parameters — they arrived in the POST
-    /// body and stay there (design D3).
+    /// subject, date and length when the flow was entered through the
+    /// dispatcher's query string, so the redirect lands back on this service at
+    /// the step the visitor was on rather than at the catalogue or at a URL
+    /// disagreeing with the page it draws. Every value is re-serialised from
+    /// parsed input rather than echoed. Contact details are never among the
+    /// parameters — they arrived in the POST body and stay there (design D3).
     /// </summary>
-    private IActionResult BackToFlow(string? subject)
-        => BookingSubject.TryParse(subject, out var parsed)
-            ? RedirectToCurrentUmbracoPage(QueryString.Create(BookingKeys.SubjectQuery, parsed.Token))
+    /// <remarks>
+    /// The subject must also <em>agree</em> with what was booked — see the twin
+    /// on <see cref="BookingSurfaceController"/>. A submitted subject naming a
+    /// different thing redirects into the other flow, whose TempData key differs,
+    /// losing the confirmation for a booking that was actually placed.
+    /// </remarks>
+    private IActionResult BackToFlow(ServiceBookingSubmission form)
+        => BookingSubject.Agreeing(form.Subject, BookingSubject.Service(form.ServiceId)) is { } subject
+            ? RedirectToCurrentUmbracoPage(
+                BookingFlowLink.For(subject, form.Date, form.DurationMinutes))
             : RedirectToCurrentUmbracoPage();
 
     /// <summary>
