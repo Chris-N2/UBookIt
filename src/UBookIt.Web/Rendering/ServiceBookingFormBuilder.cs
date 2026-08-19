@@ -70,7 +70,13 @@ public static class ServiceBookingFormBuilder
     public readonly record struct ResourceChoiceState(
         IReadOnlyList<BookingResourceChoice> Choices, Guid? Chosen, int Count, bool WasReset)
     {
-        public static ResourceChoiceState None { get; } = new([], null, 0, false);
+        // There is deliberately no `None` singleton. There was one, and the
+        // round-1 defect was a branch returning it: "no selectable role" is NOT
+        // the same state as "no choice was made", because a request that named a
+        // resource still has to report that its choice was dropped. Leaving the
+        // value here would invite someone to reach for it and reintroduce exactly
+        // that. `default` covers the genuinely empty case, which is a flow that
+        // was never asked about a resource at all.
 
         /// <summary>
         /// What the flow offers and honours, from the resolved pools and whatever

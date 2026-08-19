@@ -285,3 +285,34 @@ independently re-verified by the reviewer.
 
 - [x] 11.9 Re-verify: clean `--no-incremental` build at **0 warnings**; 767 unit
       (was 762 — five added), 58 integration, 69 client, all green.
+
+## 12. QA round 2 — APPROVE WITH NITS, tidied
+
+Both round-1 MAJORs re-verified fixed by the reviewer's own mutations and a live
+pass, including the specific check that the reset notice now covers **all three**
+of D11's causes rather than two. The round-1 factual correction was accepted and
+independently reproduced. Both deferrals (11.7, 11.8) were judged legitimate and
+stay open as recorded.
+
+- [x] 12.1 **MINOR — the surface controller's own wiring had no net.** Both lines
+      survived mutation with 767 green: `ChosenResourceNameAsync` forced to null
+      (so a refused pin silently loses the visitor's own name from its wording),
+      and `ChosenResourceId = form.PinnedResourceId` cut (so the redraw drops the
+      choice on an author-named single-service site, where TempData is the only
+      carrier). The *decisions* were covered after round 1; what was not covered
+      was that the controller ever supplies them.
+      **Fix:** `The_surface_controller_wires_both_halves_of_the_choice_into_a_failed_submission`,
+      a source scan over the shipped controller — the technique this project
+      already uses for the Post-Redirect-Get query string in
+      `Contact_details_never_appear_in_a_URL`, and the strongest net available
+      without a host harness. It carries a non-vacuity assertion so a rename
+      cannot leave it passing. Mutation-checked: cutting either line turns it red.
+
+- [x] 12.2 **NIT — `ResourceChoiceState.None` was left dead by the round-1 fix.**
+      Deleted rather than kept, with a comment in its place saying why: it was the
+      value the defective branch returned, and "no selectable role" is not the
+      same state as "no choice was made". Leaving it would invite someone to reach
+      for it and reintroduce the defect. `default` covers the genuinely empty case.
+
+- [x] 12.3 Re-verify after tidying: clean `--no-incremental` build at **0
+      warnings**; **768** unit, 58 integration, 69 client, all green.

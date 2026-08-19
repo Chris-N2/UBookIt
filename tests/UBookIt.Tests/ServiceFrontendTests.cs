@@ -1063,6 +1063,41 @@ public class ServiceFrontendTests
     }
 
     [Fact]
+    public void The_surface_controller_wires_both_halves_of_the_choice_into_a_failed_submission()
+    {
+        // The controller needs an Umbraco host, which is why the decisions it used
+        // to make were moved out of it. What is left is wiring, and QA showed both
+        // lines could be cut with the whole suite green: the name never reaching
+        // the message map (so a refused pin loses the visitor's own choice from
+        // its wording), and the choice never reaching TempData (so the redraw
+        // silently drops it on an author-named single-service site, where that is
+        // the only carrier).
+        //
+        // Asserted over the shipped source, which is the technique this project
+        // already uses for the Post-Redirect-Get query string — see
+        // `Contact_details_never_appear_in_a_URL`. It is a weaker net than a
+        // behavioural test and it is the one available without a host harness.
+        var source = RepoFiles.Read("src/UBookIt.Web/Rendering/ServiceBookingSurfaceController.cs");
+
+        // The name is looked up and handed to the map, rather than the map being
+        // called without it.
+        Assert.Contains(
+            "BookingMessages.ForFailures(\n                failures, await ChosenResourceNameAsync(form, failures))",
+            source.Replace("\r\n", "\n"),
+            StringComparison.Ordinal);
+
+        // And the visitor's choice is carried back for the redraw.
+        Assert.Contains("ChosenResourceId = form.PinnedResourceId", source, StringComparison.Ordinal);
+
+        // Non-vacuity: the members these lines name really exist, so a rename that
+        // silently broke the wiring could not leave this test passing.
+        Assert.Contains("ChosenResourceNameAsync", source, StringComparison.Ordinal);
+        Assert.Contains(
+            nameof(FailedSubmission.ChosenResourceId),
+            typeof(FailedSubmission).GetProperties().Select(p => p.Name));
+    }
+
+    [Fact]
     public async Task A_failed_submission_redraws_the_visitors_own_choice()
     {
         // The choice survives POST → redirect → GET by two independent carriers,
