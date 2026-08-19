@@ -2,10 +2,10 @@
 
 ## Purpose
 
-Defines the public, anonymous, versioned delivery API that every booking UI consumes: resource read models, availability and slot reads, booking placement, and the mapping of domain failures to RFC 7807 problem details. The contract is data (endpoints + strongly-typed view models), never widgets, so any front-end (default Razor, a separate-repo DevExpress UI, a SPA, a mobile client) is a symmetric consumer.
+Defines the public, anonymous, versioned delivery API that every booking UI consumes: resource read models, availability and slot reads, booking placement, and the mapping of domain failures to RFC 7807 problem details. The contract is data (endpoints + strongly-typed view models), never widgets, so any *alternative* front-end (a separate-repo DevExpress UI, a SPA, a mobile client) is a symmetric consumer. The shipped default Razor front-end is deliberately **not** among them: it renders from the Core ports in-process, which `default-frontend` requires of it in as many words.
 ## Requirements
 ### Requirement: Anonymous access and auth stance
-Delivery API endpoints SHALL be reachable anonymously — they SHALL NOT be protected by a backoffice authorization policy. They SHALL NOT require, issue, or validate a cookie-based anti-forgery token. Write endpoints SHALL NOT derive booker or member identity from an ambient authentication cookie; all booker identity SHALL come from the request body. This keeps every UI (the default front-end, a separate-repo DevExpress UI, a SPA, a mobile client) a symmetric consumer of the same contract.
+Delivery API endpoints SHALL be reachable anonymously — they SHALL NOT be protected by a backoffice authorization policy. They SHALL NOT require, issue, or validate a cookie-based anti-forgery token. Write endpoints SHALL NOT derive booker or member identity from an ambient authentication cookie; all booker identity SHALL come from the request body. This keeps every *alternative* UI (a separate-repo DevExpress UI, a SPA, a mobile client) a symmetric consumer of the same contract.
 
 #### Scenario: Anonymous read succeeds
 - **WHEN** an unauthenticated caller requests availability for a resource
@@ -177,12 +177,13 @@ The delivery API SHALL expose a public service read model over `GET /services`
 (paged) and `GET /services/{id}`. The read model SHALL carry what a consumer needs to
 present and drive a service booking: id, name, the duration specification (its kind,
 and whichever bounds apply), and **every role**, each with its resource type key, its
-required capability keys, and its **count**. It SHALL NOT expose management-only or
-internal structure. Roles SHALL be returned in a deterministic order, and required
-capability keys SHALL be returned in a deterministic order; a role requiring none
-SHALL return an empty collection rather than a null or an omitted member. An unknown
-id SHALL yield a 404 problem-details response carrying `service-not-found`. The
-endpoints SHALL be anonymous, consistent with the delivery API's auth stance.
+required capability keys, its **count**, and whether a visitor may **choose** which
+resource fills it. It SHALL NOT expose management-only or internal structure. Roles
+SHALL be returned in a deterministic order, and required capability keys SHALL be
+returned in a deterministic order; a role requiring none SHALL return an empty
+collection rather than a null or an omitted member. An unknown id SHALL yield a 404
+problem-details response carrying `service-not-found`. The endpoints SHALL be
+anonymous, consistent with the delivery API's auth stance.
 
 Roles SHALL be published as a collection even for a single-role service, so a
 consumer written against this contract does not need changing when a service gains a
@@ -194,6 +195,16 @@ pool and still not know what the service requires of it, and would present "one
 therapist" for a service that needs two. The count SHALL always be present, carrying
 1 for a role requiring a single resource, so a consumer never has to treat its
 absence as a default.
+
+A role's **visitor-selectability** SHALL be published for the same reason: it is what
+tells a consumer which pool, if any, to offer as a choice. At most one role of a
+service carries it. It SHALL always be present, carrying false for a role that does
+not offer a choice, so a consumer never has to treat its absence as a default.
+
+Publishing it SHALL NOT be read as an access rule. It states which choice the service
+is configured to offer; it does not restrict which resource a placement request may
+pin, and it conceals nothing, since every role's candidate pool is already computable
+from these same reads.
 
 The deterministic role order SHALL remain stable across reads for a service whose
 roles share a resource type, since type alone no longer distinguishes them.
@@ -213,7 +224,7 @@ reads do not already make.
 
 #### Scenario: Get by id returns the public model
 - **WHEN** `GET /services/{id}` is requested for an existing service
-- **THEN** the response carries its id, name, duration specification, and every role with its resource type key, required capabilities, and count
+- **THEN** the response carries its id, name, duration specification, and every role with its resource type key, required capabilities, count, and visitor-selectability
 
 #### Scenario: A multi-role service publishes every role
 - **WHEN** a service requiring a `room` and a `therapist` is read
@@ -234,6 +245,14 @@ reads do not already make.
 #### Scenario: A count of one is stated rather than omitted
 - **WHEN** a service whose roles each require a single resource is read
 - **THEN** every role carries a count of 1 explicitly
+
+#### Scenario: A visitor-selectable role is identifiable
+- **WHEN** a service with a `room` role and a visitor-selectable `therapist` role is read
+- **THEN** the `therapist` role carries visitor-selectability true and the `room` role carries it false
+
+#### Scenario: Visitor-selectability is stated rather than omitted
+- **WHEN** a service offering no choice at all is read
+- **THEN** every role carries visitor-selectability explicitly as false
 
 #### Scenario: Two roles of one type are published separately and stably
 - **WHEN** a service with two roles naming `therapist` and differing in required capabilities is read twice
@@ -258,7 +277,13 @@ reads do not already make.
 ### Requirement: Service bookable-start read
 The delivery API SHALL expose a bookable-start query for a service over an inclusive `[from, to]` date range at `GET /services/{id}/bookable-starts`, delegating to the Core service availability query. Each entry SHALL carry the start instant as ISO-8601 UTC together with the lengths bookable at that start, expressed as a list of arithmetic runs, each `{ minDurationMinutes, maxDurationMinutes, stepMinutes }` in whole minutes. The response SHALL carry the site time-zone id once at the top level, consistent with the other availability responses.
 
-The query SHALL NOT take a requested duration. The response SHALL NOT collapse a start's runs into a single minimum/maximum pair, because a candidate pool of differing granularities and minimums does not offer a contiguous band of lengths and a collapsed pair would advertise unbookable lengths. The response SHALL NOT identify which resource backs any start or run.
+The query SHALL accept an **optional pinned resource id**. Supplied, it narrows the answer to the starts and lengths at which an assignment including that resource exists — the question "when can I book this service with this person". Omitted, the query and its response are exactly as they were: the answer is about the service, and no resource is named or implied.
+
+The query SHALL NOT take a requested duration. The response SHALL NOT collapse a start's runs into a single minimum/maximum pair, because a candidate pool of differing granularities and minimums does not offer a contiguous band of lengths and a collapsed pair would advertise unbookable lengths. The response SHALL NOT identify which resource backs any start or run, **pinned or not** — a pinned answer is conditional on a resource the caller already named, so the response body still carries no resource id, and an unpinned answer still makes no promise about which candidate a booker will get.
+
+A pinned response SHALL be honoured by placing with the same pin, and SHALL NOT be read as a reservation: the starts it reports are subject to the same races as any other availability read.
+
+A pinned resource id naming a resource in no role's candidate pool SHALL yield `resource-not-eligible`, rather than being ignored — the rule the placement endpoint already applies.
 
 Within a role, a run arises from one contributing candidate. Across roles a run is **rebuilt from the lengths a saturating assignment of distinct resources can provide**, so a run in a multi-role service's response is not attributable to any single candidate — and after subset elimination a candidate whose lengths another run already offers contributes no run at all. The response therefore SHALL NOT be read as one run per candidate.
 
@@ -269,6 +294,18 @@ The existing per-resource `GET /resources/{id}/bookable-starts` endpoint SHALL r
 #### Scenario: Service bookable-start read
 - **WHEN** bookable starts are requested for a service over a valid date range
 - **THEN** the response carries an ordered list of entries, each with an ISO-8601 UTC start instant and one or more length runs in whole minutes, plus the site zone id
+
+#### Scenario: A pinned query narrows the answer
+- **WHEN** bookable starts are requested for a service with a pinned resource id that is claimed for part of the range
+- **THEN** the response omits the starts at which no assignment including that resource exists, and carries the rest
+
+#### Scenario: An omitted pin leaves the response unchanged
+- **WHEN** bookable starts are requested for a service with no pinned resource id
+- **THEN** the response is identical to what it was before the parameter existed
+
+#### Scenario: A pin outside every pool is rejected
+- **WHEN** bookable starts are requested pinning a resource that fills no role of that service
+- **THEN** the response is 400 problem details carrying the `resource-not-eligible` code
 
 #### Scenario: Heterogeneous pool yields multiple runs
 - **WHEN** a start of a single-role service is backed by candidates of differing granularity, none of whose lengths another already offers
@@ -281,6 +318,10 @@ The existing per-resource `GET /resources/{id}/bookable-starts` endpoint SHALL r
 #### Scenario: Response names no resource
 - **WHEN** a service bookable-start response body is inspected
 - **THEN** no resource id appears anywhere in it
+
+#### Scenario: A pinned response names no resource either
+- **WHEN** a pinned service bookable-start response body is inspected
+- **THEN** no resource id appears anywhere in it, the pin having been supplied by the caller
 
 #### Scenario: Over-wide range is rejected
 - **WHEN** a service bookable-start query requests a range wider than the configured maximum
@@ -297,6 +338,58 @@ The existing per-resource `GET /resources/{id}/bookable-starts` endpoint SHALL r
 #### Scenario: The per-resource endpoint is untouched
 - **WHEN** `GET /resources/{id}/bookable-starts` is requested
 - **THEN** its route, response shape, and semantics are exactly as before this change
+
+### Requirement: An empty service availability response says when it is permanent
+When a service bookable-start query returns no starts, the response SHALL state
+whether the service is **permanently unfulfillable as configured** or merely has no
+availability in the queried range, as a stable machine-readable code carried on the
+response rather than as prose.
+
+An empty response is otherwise ambiguous in the way that matters most: a service whose
+roles can never be filled together, whose start grids can never coincide, or for which
+no length exists that every role can provide is indistinguishable from a fully booked
+week, and a consumer cannot tell whether to offer another date or to stop asking.
+
+The code SHALL derive from the Core structural-unfulfillability function, never from a
+second evaluation of the rules in the mapping layer.
+
+It SHALL be **one-directional**. It may report that the service can never be fulfilled
+as configured; it SHALL NOT report that a service *is* available, or that it will be
+available later, since the structural questions consult no calendar. Absence of the
+code on an empty response therefore means "not structurally impossible", never "try
+tomorrow and it will work".
+
+It SHALL disclose no configuration detail: not the role, the resource type, the
+required capability, the count, nor how many resources exist. The backoffice
+diagnostics that name those are for the person who can fix them, and this response is
+anonymous.
+
+A response carrying starts SHALL NOT carry the code, and the code SHALL NOT be
+accompanied by starts — the two answers are exclusive.
+
+#### Scenario: A structurally unfulfillable service says so
+- **WHEN** bookable starts are requested for a service whose two roles can never be filled by distinct resources
+- **THEN** the response carries no starts and the stable permanent-unfulfillability code
+
+#### Scenario: A busy week says nothing permanent
+- **WHEN** bookable starts are requested for a correctly configured service that is fully booked across the range
+- **THEN** the response carries no starts and no permanent-unfulfillability code
+
+#### Scenario: Grid misalignment is reported as permanent
+- **WHEN** bookable starts are requested for a service whose roles' start grids can never coincide
+- **THEN** the response carries the permanent-unfulfillability code
+
+#### Scenario: No common length is reported as permanent
+- **WHEN** bookable starts are requested for a service for which no length exists that every role can provide
+- **THEN** the response carries the permanent-unfulfillability code
+
+#### Scenario: The code discloses no configuration
+- **WHEN** a permanently unfulfillable service's response is inspected
+- **THEN** it names no role, resource type, capability, count, or resource, and reports no pool size
+
+#### Scenario: Starts and the code are exclusive
+- **WHEN** any service bookable-start response carrying one or more starts is inspected
+- **THEN** it carries no permanent-unfulfillability code
 
 ### Requirement: Service booking placement
 The delivery API SHALL place service bookings over `POST /services/{id}/bookings`. The request body SHALL carry the start instant, the requested length in whole minutes, booker contact details, and an optional pinned resource id. The requested length SHALL be required for every service, including a fixed-duration one, and SHALL never be replaced by a permitted length. As with direct placement, the request model SHALL NOT expose a member key.

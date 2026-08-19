@@ -138,9 +138,15 @@
       - the message read "Requirements 1 and 2 are **all** marked as choosable"
         for the commonest case. Now "both" for a pair, "all" for three or more,
         with a test for each.
-- [ ] 10.4 Sync-time outward grep for sibling specs this change falsifies. It has found something on five consecutive changes.
+- [x] 10.4 Sync-time outward grep for sibling specs this change falsifies. It has found something on five consecutive changes.
 
-      *Preliminary pass run during apply, to be repeated at sync.* Grepped
+      **Repeated at sync over the synced specs; still clean.** The only new hits
+      are this change's own: `default-frontend`'s "no control, hidden field, or
+      other means by which a pinned resource could be submitted" (correctly scoped
+      to a service with NO selectable role) and the "names no resource" sentences,
+      which this change strengthened to "pinned or not" rather than weakened.
+
+      *Preliminary pass run during apply.* Grepped
       `openspec/specs/` for "no control", "hidden field", "no code path",
       "deliberately absent", "names no resource", "choose which". Three hits, none
       falsified:
@@ -153,11 +159,15 @@
 
       Note the sentence this change *does* falsify is inside a requirement it
       modifies rather than a sibling: ⑩'s design D7 absence, handled in 8.3.
-- [ ] 10.5 **Manual edit at sync, which no delta will make for you**: correct `openspec/specs/delivery-api/spec.md` lines 5 and 8 so the delivery API stops naming the default Razor front end as one of its consumers — it reads Core in-process, and `default-frontend` forbids otherwise. Likely "any *alternative* front-end". Discharges the obligation parked at ⑩'s sync.
+- [x] 10.5 **Manual edit at sync, which no delta will make for you**: correct `openspec/specs/delivery-api/spec.md` lines 5 and 8 so the delivery API stops naming the default Razor front end as one of its consumers — it reads Core in-process, and `default-frontend` forbids otherwise. Likely "any *alternative* front-end". Discharges the obligation parked at ⑩'s sync.
 
-      *Located during apply; left unedited because main specs are the sync step's
-      to write.* Both sentences confirmed present and both name the default front
-      end:
+      **Done at sync, after Chris reviewed the wording.** Both sentences
+      corrected; `openspec validate --specs` passes 9/9, and the identical claim
+      was already removed from shipped source in §11.4, so spec and code now
+      agree. The auth stance's three SHALL/SHALL NOT sentences are untouched —
+      only the trailing rationale clause changed.
+
+      The sentences as they were:
       - line 5 (Purpose): "so any front-end (default Razor, a separate-repo
         DevExpress UI, a SPA, a mobile client) is a symmetric consumer."
       - line 8 (Anonymous access and auth stance): "This keeps every UI (the
@@ -166,11 +176,16 @@
 
       Both need the default Razor front end removed from the list — it consumes
       Core in-process and never this API.
-- [ ] 10.6 Diff the guarantees of every MODIFIED requirement one final time against `openspec/specs/`: list each SHALL and scenario in the current version and confirm it is carried forward, deliberately dropped with a reason in the proposal, or superseded by a stronger claim.
+- [x] 10.6 Diff the guarantees of every MODIFIED requirement one final time against `openspec/specs/`: list each SHALL and scenario in the current version and confirm it is carried forward, deliberately dropped with a reason in the proposal, or superseded by a stronger claim.
 
-      *Run during apply against the eight MODIFIED requirements; to be repeated at
-      sync as the task says.* Both halves checked mechanically — scenario titles
-      and body SHALL sentences:
+      **Re-run at sync, independently, by the syncing agent** — which repeated the
+      diff over all eight rather than trusting the apply pass's result, then
+      audited the git diff for deleted lines as a second check. Every deletion was
+      a paragraph reflow carrying its content forward, or one of two deliberate
+      in-place THEN rewordings. Nothing dropped.
+
+      *Original pass, run during apply.* Both halves checked mechanically —
+      scenario titles and body SHALL sentences:
 
       | requirement | scenarios (main → delta) | SHALLs dropped |
       |---|---|---|
