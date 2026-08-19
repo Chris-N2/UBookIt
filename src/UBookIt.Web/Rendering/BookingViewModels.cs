@@ -52,6 +52,25 @@ public sealed class BookingFormModel : IBookingFormView
     /// </summary>
     public int? LongestAvailableMinutes { get; init; }
 
+    /// <summary>
+    /// Always empty, and structurally so: a directly booked resource <b>is</b> the
+    /// resource the visitor chose, so there is nothing left to pick between. This
+    /// flow renders no such control and has no field that could carry one.
+    /// </summary>
+    public IReadOnlyList<BookingResourceChoice> ResourceChoices => [];
+
+    /// <inheritdoc />
+    public Guid? ChosenResourceId => null;
+
+    /// <inheritdoc />
+    public int ResourceChoiceCount => 0;
+
+    /// <inheritdoc />
+    public bool ResourceChoiceWasReset => false;
+
+    /// <inheritdoc />
+    public bool OffersResourceChoice => false;
+
     public IReadOnlyList<BookingTimeOption> Times { get; init; } = [];
 
     // Repopulation after a failed submission.
@@ -83,6 +102,17 @@ public sealed class BookingFormModel : IBookingFormView
 public sealed record BookingTimeOption(string InstantIso, string Label);
 
 /// <summary>
+/// One resource a visitor may choose to fulfil a service's selectable role: its
+/// id, and the name it is offered under.
+/// <para>
+/// The name is the resource's display name — the visitor is choosing a person or
+/// a room, not a key — and the id is what travels in the URL and reaches
+/// placement as the pin.
+/// </para>
+/// </summary>
+public sealed record BookingResourceChoice(Guid Id, string Name);
+
+/// <summary>
 /// A user-facing error message plus the id of the control it belongs to (null
 /// for a general error). Drives the error-summary links and per-field aria.
 /// </summary>
@@ -95,6 +125,13 @@ public static class BookingFieldIds
     public const string Email = "ubookit-email";
     public const string Times = "ubookit-times";
     public const string Duration = "ubookit-duration";
+
+    /// <summary>
+    /// The control choosing who fulfils a service. Rendered only where a service
+    /// offers that choice — a refusal naming it can only arise from a submission
+    /// that carried one.
+    /// </summary>
+    public const string Resource = "ubookit-who";
 }
 
 /// <summary>
@@ -108,6 +145,14 @@ public sealed class FailedSubmission
     public int DurationMinutes { get; init; }
 
     public string? SelectedTimeIso { get; init; }
+
+    /// <summary>
+    /// The resource the submission chose, where the service offered a choice, so
+    /// a redraw shows the visitor's own choice rather than dropping it back to
+    /// "any" — which would be a quiet substitution on the page they are about to
+    /// resubmit.
+    /// </summary>
+    public Guid? ChosenResourceId { get; init; }
 
     public string? Name { get; init; }
 

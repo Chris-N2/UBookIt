@@ -724,46 +724,523 @@ public class ServiceFrontendTests
             Rendered(placed.Failures), BookingMessages.Fallback, StringComparison.Ordinal);
     }
 
-    // --- 2.5 the pin is absent, not defaulted ---
+    // --- 2.5 a pin can only be submitted where a choice was offered ---
 
     [Fact]
-    public void No_code_path_in_the_front_end_can_pin_a_resource()
+    public void Only_the_who_control_can_put_a_pin_into_the_front_ends_markup()
     {
-        // Design D7: not "pinning is off by default" — there is no control and no
-        // code path that could set one. That is an absence, and an absence has no
-        // runtime representation, so it is asserted over the shipped source.
+        // ⑩'s scan asserted an absence: no control, no hidden field, no code path
+        // (design D7). The absence is now conditional rather than total, so the
+        // scan is narrowed to the same shape one step in: the ONLY markup that can
+        // carry a pin is the who control and the hidden field beside it, and both
+        // are guarded by the model saying a choice was offered or made.
         //
-        // Scoped to the default front-end. The delivery API deliberately still
-        // accepts a pin — that is what keeps the feature exercised by headless
-        // consumers while the follow-up decides which role a visitor may choose
-        // from — so a scan over the whole assembly would be asserting the wrong
-        // thing, and would have to be relaxed rather than obeyed.
-        var offenders = RepoFiles
-            .Paths("src/UBookIt.Web/Rendering", "*.cs")
-            .Concat(RepoFiles.Paths("src/UBookIt.Web/Views", "*.cshtml"))
-            .Where(path => File.ReadLines(path).Any(Assigns))
+        // Still scoped to the default front-end. The delivery API deliberately
+        // accepts a pin from any caller (design D8), so a scan over the whole
+        // assembly would assert the wrong thing.
+        var carriers = RepoFiles
+            .Paths("src/UBookIt.Web/Views", "*.cshtml")
+            .Where(path => File.ReadLines(path).Any(Mentions))
+            .Select(Path.GetFileName)
             .ToList();
 
-        Assert.Empty(offenders);
+        // Exactly one view emits the field, and it is the service flow's — not the
+        // resource flow's, and not the shared partials, whose GET form renders the
+        // control itself under its own guard (asserted below).
+        Assert.Equal(["Service.cshtml"], carriers);
 
-        // Non-vacuity: the identifier really is one this scan would find. The
-        // delivery API sets it, in the same assembly, and the predicate says so.
+        var service = RepoFiles.Read("src/UBookIt.Web/Views/Shared/Components/BookingFlow/Service.cshtml");
+
+        // Guarded on the visitor's own choice, so a service offering none emits no
+        // field at all rather than an empty one somebody could later make settable
+        // without thinking about which role's resources belong in the list.
+        Assert.Contains("@if (Model.ChosenResourceId is { } chosenResource)", service, StringComparison.Ordinal);
+
+        var dateAndLength = RepoFiles.Read("src/UBookIt.Web/Views/Shared/UBookIt/_DateAndLength.cshtml");
+
+        // And the control that produces the choice is guarded on the service
+        // offering one. Both halves, or a form could offer a control whose value
+        // nothing carries — or carry a value no control produced.
+        Assert.Contains("@if (Model.OffersResourceChoice)", dateAndLength, StringComparison.Ordinal);
+        Assert.Contains($"name=\"@BookingKeys.ResourceQuery\"", dateAndLength, StringComparison.Ordinal);
+
+        // Non-vacuity, kept from ⑩: the identifier really is one this scan would
+        // find. The delivery API sets it, in the same assembly, and the predicate
+        // says so.
         Assert.Contains(
             RepoFiles.Paths("src/UBookIt.Web/Mapping", "*.cs"),
-            path => File.ReadLines(path).Any(Assigns));
+            path => File.ReadLines(path).Any(Mentions));
 
-        // A mention inside a comment is how the decision is recorded, so only an
-        // assignment counts — and the test has to be able to tell them apart.
-        static bool Assigns(string line)
+        // A mention inside a comment is how a decision is recorded, so only code
+        // counts — and the test has to be able to tell them apart.
+        static bool Mentions(string line)
         {
             var code = line.TrimStart();
 
             return !code.StartsWith("//", StringComparison.Ordinal)
                 && !code.StartsWith("///", StringComparison.Ordinal)
+                && !code.StartsWith("@*", StringComparison.Ordinal)
                 && !code.StartsWith('*')
-                && code.Contains("PinnedResourceId", StringComparison.Ordinal)
-                && code.Contains('=', StringComparison.Ordinal);
+                && code.Contains("PinnedResourceId", StringComparison.Ordinal);
         }
+    }
+
+    [Fact]
+    public async Task A_service_with_no_selectable_role_offers_no_choice_at_all()
+    {
+        // The runtime half of the scan above: the markup is guarded on this
+        // model, so the guard is only as good as what the flow puts in it.
+        var outcome = await Massage().Flow.BuildAsync(Id(900), On(Date, 60));
+
+        Assert.NotNull(outcome.Form);
+        Assert.False(outcome.Form.OffersResourceChoice);
+        Assert.Empty(outcome.Form.ResourceChoices);
+        Assert.Null(outcome.Form.ChosenResourceId);
+
+        // And a hand-edited URL naming an eligible resource changes nothing: with
+        // no role marked selectable there is no choice for this flow to honour.
+        var pinned = await Massage().Flow.BuildAsync(
+            Id(900),
+            new BookingFlowInput { Date = Date, DurationMinutes = 60, ChosenResourceId = Id(2) });
+
+        Assert.NotNull(pinned.Form);
+        Assert.Null(pinned.Form.ChosenResourceId);
+        Assert.False(pinned.Form.OffersResourceChoice);
+
+        // Non-vacuity: Id(2) really is an eligible resource for this service, so
+        // the assertion is about the flag rather than about an unknown id.
+        var pools = await PoolsOf(Massage());
+        Assert.Contains(pools.SelectMany(p => p.Candidates), c => c.ResourceId == Id(2));
+    }
+
+    // ---------------------------------------------------------------------
+    // 8 — the who control: what a visitor is offered, and what it does.
+    // ---------------------------------------------------------------------
+
+    /// <summary>
+    /// A massage whose therapist role a visitor may choose from: two therapists,
+    /// one room. The room role is deliberately NOT selectable — the honest list of
+    /// pinnable resources would otherwise include it, which is a choice nobody
+    /// wants offered beside the one they do (design D1).
+    /// </summary>
+    private static Harness Choosable(params Resource[] extra)
+        => Build(
+            Svc(
+                "Massage",
+                null,
+                new ServiceRole(ResourceTypes.Room, 1),
+                new ServiceRole(Therapist, 1) { VisitorSelectable = true }),
+            [.. new[] { Res(1, ResourceTypes.Room, "Treatment Room"), Res(2, Therapist, "Jane"), Res(3, Therapist, "Sam") }
+                .Concat(extra)]);
+
+    private static BookingFlowInput Choosing(Guid? who, int? minutes = 60)
+        => new() { Date = Date, DurationMinutes = minutes, ChosenResourceId = who };
+
+    [Fact]
+    public async Task A_service_offering_a_choice_offers_each_eligible_resource_by_name()
+    {
+        var outcome = await Choosable().Flow.BuildAsync(Id(900), On(Date, 60));
+
+        Assert.NotNull(outcome.Form);
+        Assert.True(outcome.Form.OffersResourceChoice);
+
+        // The selectable role's pool, and only that role's — the room is not among
+        // the choices even though a pin naming it would be perfectly eligible.
+        Assert.Equal(["Jane", "Sam"], outcome.Form.ResourceChoices.Select(c => c.Name));
+        Assert.DoesNotContain(outcome.Form.ResourceChoices, c => c.Id == Id(1));
+
+        // Defaulting to no particular choice.
+        Assert.Null(outcome.Form.ChosenResourceId);
+    }
+
+    [Fact]
+    public async Task The_choices_are_ordered_for_reading_by_name()
+    {
+        // Display order is by name with the id as the tiebreak, so it is total and
+        // stable. Presentation only: pool order stays ascending by resource id,
+        // which three changes draw determinism guarantees from — so the fixture
+        // names them in the opposite order to their ids, and the assertion would
+        // fail if the list were merely the pool.
+        var harness = Build(
+            Svc("Massage", null, new ServiceRole(Therapist, 1) { VisitorSelectable = true }),
+            Res(2, Therapist, "Zoe"),
+            Res(3, Therapist, "Adam"));
+
+        var outcome = await harness.Flow.BuildAsync(Id(900), On(Date, 60));
+
+        Assert.Equal(["Adam", "Zoe"], outcome.Form!.ResourceChoices.Select(c => c.Name));
+
+        // Non-vacuity: pool order really is the other way round, so this is the
+        // display rule and not a coincidence.
+        var pools = await PoolsOf(harness);
+        Assert.Equal([Id(2), Id(3)], pools.Single().Candidates.Select(c => c.ResourceId));
+    }
+
+    [Fact]
+    public async Task Choosing_a_person_narrows_the_times()
+    {
+        // Jane is booked all morning; Sam is free all day. The times shown for
+        // Jane are the times Jane can actually be assigned, not the service's.
+        var harness = Choosable();
+        await OccupyAsync(harness, Id(2), "09:00", 180);
+
+        var jane = await harness.Flow.BuildAsync(Id(900), Choosing(Id(2)));
+        var anyone = await harness.Flow.BuildAsync(Id(900), Choosing(null));
+
+        Assert.NotNull(jane.Form);
+        Assert.True(jane.Form.HasTimes);
+        Assert.DoesNotContain("09:00", jane.Form.Times.Select(t => t.Label));
+
+        // And the service itself is bookable then, on Sam — which is exactly the
+        // promise a dropped pin would have made.
+        Assert.Contains("09:00", anyone.Form!.Times.Select(t => t.Label));
+
+        // The choice is reflected back, so the control redraws on the visitor's
+        // own answer rather than resetting under them.
+        Assert.Equal(Id(2), jane.Form.ChosenResourceId);
+    }
+
+    [Fact]
+    public async Task Choosing_nobody_offers_the_services_own_times()
+    {
+        // "Any" leaves the flow behaving exactly as it does for a service that
+        // offers no choice at all — asserted against that very service, so the
+        // claim is a comparison rather than a restatement of the implementation.
+        var choosable = await Choosable().Flow.BuildAsync(Id(900), Choosing(null));
+        var plain = await Massage().Flow.BuildAsync(Id(900), On(Date, 60));
+
+        Assert.Equal(
+            plain.Form!.Times.Select(t => t.Label),
+            choosable.Form!.Times.Select(t => t.Label));
+    }
+
+    [Fact]
+    public async Task A_person_with_no_times_that_day_is_still_offered()
+    {
+        // The list is the role's pool, unfiltered by date (design D10). Filtering
+        // it would make a name vanish from under the cursor as the visitor changes
+        // the date, and would answer with the control a question the times already
+        // answer directly.
+        var harness = Choosable();
+        await OccupyAsync(harness, Id(2), "09:00", 480);
+
+        var outcome = await harness.Flow.BuildAsync(Id(900), Choosing(Id(2)));
+
+        Assert.NotNull(outcome.Form);
+        Assert.Contains(outcome.Form.ResourceChoices, c => c.Id == Id(2));
+
+        // And the start list is what reports the emptiness — the form is still
+        // drawn, so there is a date control to change and a choice to revise.
+        Assert.False(outcome.Form.HasTimes);
+        Assert.Null(outcome.Unavailable);
+    }
+
+    [Fact]
+    public async Task A_stale_choice_in_a_link_resets_to_any_and_says_so()
+    {
+        // A bookmarked URL can name someone this service can no longer be
+        // fulfilled by. Falling back silently would quietly make it a different
+        // booking; refusing to render would punish a visitor for a change they had
+        // no part in. Nothing is committed at GET, so the honest answer is to reset
+        // and say so (design D11).
+        var harness = Choosable();
+
+        var outcome = await harness.Flow.BuildAsync(Id(900), Choosing(Id(404)));
+
+        Assert.NotNull(outcome.Form);
+        Assert.Null(outcome.Form.ChosenResourceId);
+        Assert.True(outcome.Form.ResourceChoiceWasReset);
+
+        // Still a usable form, with the choice offered again.
+        Assert.True(outcome.Form.OffersResourceChoice);
+        Assert.True(outcome.Form.HasTimes);
+
+        // Non-vacuity: an offered resource is NOT reported as reset, so the flag
+        // means "your choice was dropped" rather than "a choice was supplied".
+        var honoured = await harness.Flow.BuildAsync(Id(900), Choosing(Id(2)));
+        Assert.False(honoured.Form!.ResourceChoiceWasReset);
+        Assert.Equal(Id(2), honoured.Form.ChosenResourceId);
+    }
+
+    [Fact]
+    public async Task A_choice_whose_role_is_no_longer_selectable_is_stale_too()
+    {
+        // The same reset, reached the other way: the resource still exists and is
+        // still eligible, but the editor has turned the choice off. A link carrying
+        // it must not go on pinning a resource the site no longer offers.
+        var outcome = await Massage().Flow.BuildAsync(Id(900), Choosing(Id(2)));
+
+        Assert.NotNull(outcome.Form);
+        Assert.Null(outcome.Form.ChosenResourceId);
+        Assert.False(outcome.Form.OffersResourceChoice);
+    }
+
+    [Fact]
+    public async Task A_selectable_role_of_count_two_says_what_a_visitor_chooses()
+    {
+        // "This one, plus N−1 chosen for you" (design D5). The control has to say
+        // so, or a picker implies a choice and then books resources the visitor
+        // never chose.
+        var harness = Build(
+            Svc("Couples massage", null,
+                ServiceRole.Create(Therapist, null, count: 2, visitorSelectable: true).Value),
+            Res(2, Therapist, "Jane"),
+            Res(3, Therapist, "Sam"));
+
+        var outcome = await harness.Flow.BuildAsync(Id(900), On(Date, 60));
+
+        Assert.NotNull(outcome.Form);
+        Assert.Equal(2, outcome.Form.ResourceChoiceCount);
+
+        // And the wording lives in the shared partial, guarded on the count — the
+        // markup is where the obligation is discharged, and no C# test renders it.
+        var markup = RepoFiles.Read("src/UBookIt.Web/Views/Shared/UBookIt/_DateAndLength.cshtml");
+
+        Assert.Contains("Model.ResourceChoiceCount > 1", markup, StringComparison.Ordinal);
+        Assert.Contains("You choose one of them", markup, StringComparison.Ordinal);
+
+        // The ordinary case says nothing about several, or the sentence would be
+        // noise on every single-resource service.
+        var single = await Choosable().Flow.BuildAsync(Id(900), On(Date, 60));
+        Assert.Equal(1, single.Form!.ResourceChoiceCount);
+    }
+
+    [Fact]
+    public async Task Only_the_selectable_roles_pool_is_offered_where_two_roles_share_a_type()
+    {
+        // Design D1's decisive clause, and the one with no other covering test: a
+        // service-level flag naming the role by TYPE KEY was rejected because two
+        // roles may name one type and be told apart only by their capabilities.
+        //
+        // Here both roles are `therapist`; only the cert-x one is selectable, and
+        // its pool is a strict subset of the other's. A flag resolved by type
+        // would offer the union — including Sam, who cannot fill the role the
+        // visitor is choosing for.
+        var harness = Build(
+            Svc(
+                "Joint session",
+                null,
+                ServiceRole.Create(Therapist, ["cert-x"], visitorSelectable: true).Value,
+                ServiceRole.Create(Therapist, null).Value),
+            Res(2, Therapist, "Jane", capabilities: "cert-x"),
+            Res(3, Therapist, "Sam"),
+            Res(4, Therapist, "Ada", capabilities: "cert-x"));
+
+        var outcome = await harness.Flow.BuildAsync(Id(900), On(Date, 60));
+
+        Assert.NotNull(outcome.Form);
+
+        // Only the cert-x therapists, and Sam — eligible for the OTHER role, and
+        // pinnable at placement — is not among the choices.
+        Assert.Equal(["Ada", "Jane"], outcome.Form.ResourceChoices.Select(c => c.Name));
+
+        // Non-vacuity: Sam really is a candidate of this service, so his absence
+        // is the flag's doing rather than the pool's.
+        var pools = await PoolsOf(harness);
+        Assert.Contains(pools.SelectMany(p => p.Candidates), c => c.ResourceId == Id(3));
+    }
+
+    [Fact]
+    public async Task A_pin_is_honoured_for_a_role_that_is_not_visitor_selectable()
+    {
+        // Design D8, stated as a test because it is the clause a later change is
+        // most likely to "fix" into an access control. Placement is UNCHANGED: the
+        // flag decides what is OFFERED, never what placement accepts, and a
+        // booking pinning an eligible resource on an unflagged role is perfectly
+        // deliverable — nothing about it is wrong.
+        //
+        // It is not concealment either: every role's pool is already computable
+        // from the public reads, so gating placement would buy nothing.
+        var harness = Massage();
+
+        Assert.All(harness.Service.Roles, role => Assert.False(role.VisitorSelectable));
+
+        var placed = await harness.Core.PlaceAsync(new ServiceBookingRequest
+        {
+            ServiceId = harness.Service.Id,
+            Start = TestData.Utc(Date, "09:00"),
+            Duration = Mins(60),
+            Booker = TestData.Booker(),
+            PinnedResourceId = Id(2),
+        });
+
+        Assert.True(placed.Succeeded, string.Join("; ", placed.Failures.Select(f => f.Code)));
+        Assert.Contains(placed.Value.Claims, claim => claim.ResourceId == Id(2));
+
+        // And the availability query answers the same question the same way: a pin
+        // on an unflagged role narrows the times rather than being refused.
+        var starts = await harness.Core.GetBookableStartsAsync(Id(900), Date, Date, Id(2));
+
+        Assert.True(starts.Succeeded);
+        Assert.NotEmpty(starts.Value);
+    }
+
+    [Fact]
+    public async Task The_choice_is_honoured_at_placement_and_reported_on_the_confirmation()
+    {
+        var harness = Choosable();
+
+        var placed = await harness.Core.PlaceAsync(new ServiceBookingRequest
+        {
+            ServiceId = harness.Service.Id,
+            Start = TestData.Utc(Date, "09:00"),
+            Duration = Mins(60),
+            Booker = TestData.Booker(),
+            PinnedResourceId = Id(3),
+        });
+
+        Assert.True(placed.Succeeded, string.Join("; ", placed.Failures.Select(f => f.Code)));
+        Assert.Contains(placed.Value.Claims, claim => claim.ResourceId == Id(3));
+
+        var confirmation = ServiceBookingFormBuilder.BuildConfirmation(
+            placed.Value, harness.Service.Name, await NamesOf(harness, placed.Value), TestData.London);
+
+        // The person they chose, named back to them — and the room they were given
+        // beside them, because the confirmation describes the booking that exists.
+        Assert.Contains("Sam", confirmation.ResourceNames);
+        Assert.Contains("Treatment Room", confirmation.ResourceNames);
+        Assert.DoesNotContain("Jane", confirmation.ResourceNames);
+    }
+
+    [Fact]
+    public async Task A_busy_choice_is_refused_by_name_rather_than_reported_as_no_availability()
+    {
+        // The two facts have different next steps: one is answered by choosing
+        // another time or another person, the other by choosing another date. The
+        // page must not collapse one into the other — which is the whole reason
+        // `pinned-resource-unavailable` exists.
+        var harness = Choosable();
+        await OccupyAsync(harness, Id(2), "09:00", 60);
+
+        var placed = await harness.Core.PlaceAsync(new ServiceBookingRequest
+        {
+            ServiceId = harness.Service.Id,
+            Start = TestData.Utc(Date, "09:00"),
+            Duration = Mins(60),
+            Booker = TestData.Booker(),
+            PinnedResourceId = Id(2),
+        });
+
+        Assert.False(placed.Succeeded);
+
+        // Non-vacuity: Sam is free at that time, so this is a refused CHOICE and
+        // not an exhausted service — an unpinned request succeeds.
+        Assert.Equal(FailureCodes.PinnedResourceUnavailable, placed.Failures[0].Code);
+
+        var rendered = Rendered(placed.Failures);
+
+        Assert.DoesNotContain(BookingMessages.Fallback, rendered, StringComparison.Ordinal);
+        Assert.DoesNotContain("no times", rendered, StringComparison.OrdinalIgnoreCase);
+        Assert.DoesNotContain(PermanentClaim, rendered, StringComparison.OrdinalIgnoreCase);
+
+        // Named, because the visitor named them. The message the flow renders is
+        // built from the resource's own display name.
+        Assert.Contains("Jane", BookingMessages.PinnedUnavailable("Jane"), StringComparison.Ordinal);
+
+        // And it offers the way forward: another time, or anyone.
+        Assert.Contains("another time", rendered, StringComparison.OrdinalIgnoreCase);
+        Assert.Contains("anyone", rendered, StringComparison.OrdinalIgnoreCase);
+
+        // It points at the control that made the choice, where "anyone" is one
+        // keystroke away — not at the time list, which offers only half the way
+        // forward.
+        Assert.Equal(
+            BookingFieldIds.Resource,
+            BookingMessages.ForFailures(placed.Failures).First().FieldId);
+    }
+
+    [Fact]
+    public void A_refused_choice_names_the_resource_and_nothing_else()
+    {
+        // The narrow permission (design D12): a refusal about a resource the
+        // visitor themselves chose may name it, and nothing more. None of the five
+        // prohibited facts — role, resource type, required capability, count, pool
+        // size — may appear.
+        var message = BookingMessages.PinnedUnavailable("Jane");
+
+        Assert.Contains("Jane", message, StringComparison.Ordinal);
+        Assert.DoesNotContain(Therapist, message, StringComparison.OrdinalIgnoreCase);
+        Assert.DoesNotContain("capabilit", message, StringComparison.OrdinalIgnoreCase);
+        Assert.DoesNotContain("role", message, StringComparison.OrdinalIgnoreCase);
+        Assert.DoesNotContain(message, "0123456789".Select(c => c.ToString()).Where(message.Contains));
+    }
+
+    [Fact]
+    public async Task A_deterministic_refusal_names_nothing_even_where_a_choice_was_offered()
+    {
+        // The other side of D12, and the one it would be easiest to get wrong: a
+        // service that offers a picker and then becomes permanently unfulfillable
+        // still discloses nothing — including any resource the visitor had chosen.
+        var harness = Build(
+            Svc(
+                "Massage",
+                null,
+                new ServiceRole(ResourceTypes.Room, 1),
+                new ServiceRole(Therapist, 1) { VisitorSelectable = true }),
+            Res(2, Therapist, "Jane"));
+
+        var outcome = await harness.Flow.BuildAsync(Id(900), Choosing(Id(2)));
+
+        Assert.Null(outcome.Form);
+        Assert.NotNull(outcome.Unavailable);
+        Assert.Equal(ServiceUnavailableReason.NotFulfillable, outcome.Unavailable.Reason);
+
+        // The model has nowhere to carry a resource, which is what makes the claim
+        // structural rather than a property of today's wording.
+        Assert.Equal("Massage", outcome.Unavailable.ServiceName);
+    }
+
+    [Fact]
+    public void Only_a_failure_about_the_visitors_own_choice_points_at_the_choice_control()
+    {
+        // Enumerated over every code the map knows, rather than over the two a
+        // fixture happens to produce — ⑩'s technique, applied to the new control.
+        // A code wrongly landed here would put "choose someone else" on a failure
+        // that has nothing to do with who.
+        var expected = new[] { FailureCodes.PinnedResourceUnavailable, FailureCodes.ResourceNotEligible };
+
+        foreach (var code in AllFailureCodes())
+        {
+            var field = BookingMessages.ForFailures([new DomainFailure(code, "x")]).Single().FieldId;
+
+            Assert.Equal(expected.Contains(code), field == BookingFieldIds.Resource);
+        }
+    }
+
+    [Fact]
+    public void No_failure_message_claims_the_service_has_no_availability()
+    {
+        // The no-availability page's sentence is the start list's to say, and only
+        // when the start list is empty. A failure message asserting it would send a
+        // visitor to change the date when the date is not the problem — the exact
+        // collapse the pin refusal exists to prevent, stated over the whole map so
+        // a code nobody thought to provoke cannot reintroduce it.
+        foreach (var code in AllFailureCodes())
+        {
+            Assert.DoesNotContain("no times", BookingMessages.ForCode(code), StringComparison.OrdinalIgnoreCase);
+        }
+
+        Assert.DoesNotContain("no times", BookingMessages.Fallback, StringComparison.OrdinalIgnoreCase);
+        Assert.DoesNotContain("no times", BookingMessages.PinnedUnavailable("Jane"), StringComparison.OrdinalIgnoreCase);
+
+        // Non-vacuity: the sentence really is one the front end says, on the page
+        // that is entitled to say it.
+        Assert.Contains(
+            "No times are available",
+            RepoFiles.Read("src/UBookIt.Web/Views/Shared/UBookIt/_Times.cshtml"),
+            StringComparison.Ordinal);
+    }
+
+    private static IReadOnlyList<string> AllFailureCodes()
+    {
+        var codes = typeof(FailureCodes)
+            .GetFields()
+            .Where(f => f.IsLiteral && f.FieldType == typeof(string))
+            .Select(f => (string)f.GetRawConstantValue()!)
+            .ToList();
+
+        Assert.NotEmpty(codes);
+        return codes;
     }
 
     // ---------------------------------------------------------------------
@@ -1074,12 +1551,16 @@ public class ServiceFrontendTests
         var link = RepoFiles.Read("src/UBookIt.Web/Rendering/BookingSubject.cs");
         var keys = Regex.Matches(link, @"BookingKeys\.(\w+)").Select(m => m.Groups[1].Value).Distinct().Order();
 
-        Assert.Equal(["DateQuery", "DurationQuery", "SubjectQuery"], keys.ToArray());
+        Assert.Equal(["DateQuery", "DurationQuery", "ResourceQuery", "SubjectQuery"], keys.ToArray());
     }
 
     [Fact]
-    public void The_only_flow_state_in_the_URL_is_what_is_booked_the_date_and_the_length()
+    public void The_only_flow_state_in_the_URL_is_what_is_booked_the_date_the_length_and_the_chosen_resource()
     {
+        // The enumeration is the point: it is what stops flow state accreting in
+        // the URL unnoticed. It grew by exactly one when the who control arrived,
+        // and a resource id in a URL discloses nothing a public read does not
+        // already carry.
         var keys = typeof(BookingKeys)
             .GetFields()
             .Where(f => f.IsLiteral && f.Name.EndsWith("Query", StringComparison.Ordinal))
@@ -1087,7 +1568,7 @@ public class ServiceFrontendTests
             .Order()
             .ToArray();
 
-        Assert.Equal(["ubBook", "ubDate", "ubMins"], keys);
+        Assert.Equal(["ubBook", "ubDate", "ubMins", "ubWho"], keys);
     }
 
     // ---------------------------------------------------------------------

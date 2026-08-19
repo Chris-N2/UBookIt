@@ -121,6 +121,10 @@ public sealed class UBookItDbContext(DbContextOptions<UBookItDbContext> options)
             role.ToTable("uBookItServiceRole");
             role.HasKey(r => r.Id);
             role.Property(r => r.ResourceType).HasMaxLength(64);
+
+            // Additive and non-nullable with a false default, so existing rows
+            // load as not selectable and no service changes behaviour.
+            role.Property(r => r.VisitorSelectable).HasDefaultValue(false);
             role.HasIndex(r => r.ServiceId);
             role.HasMany(r => r.Capabilities).WithOne().HasForeignKey(c => c.ServiceRoleId).OnDelete(DeleteBehavior.Cascade);
         });

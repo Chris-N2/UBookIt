@@ -38,6 +38,33 @@ public sealed class ServiceFormModel : IBookingFormView
     /// <inheritdoc />
     public int? LongestAvailableMinutes { get; init; }
 
+    /// <summary>
+    /// The resources a visitor may choose between for this service's
+    /// visitor-selectable role, by display name — empty when no role is
+    /// selectable, in which case no control is rendered and the flow is exactly as
+    /// it was.
+    /// <para>
+    /// The role's resolved candidate pool, <b>not</b> filtered by the chosen date
+    /// (design D10). Filtering the people by date would make the control's
+    /// contents change under the visitor as they change the date, so a name could
+    /// vanish from under the cursor — and it would answer with the control a
+    /// question the start list already answers directly and better.
+    /// </para>
+    /// </summary>
+    public IReadOnlyList<BookingResourceChoice> ResourceChoices { get; init; } = [];
+
+    /// <inheritdoc />
+    public Guid? ChosenResourceId { get; init; }
+
+    /// <inheritdoc />
+    public int ResourceChoiceCount { get; init; }
+
+    /// <inheritdoc />
+    public bool ResourceChoiceWasReset { get; init; }
+
+    /// <inheritdoc />
+    public bool OffersResourceChoice => ResourceChoices.Count > 0;
+
     public IReadOnlyList<BookingTimeOption> Times { get; init; } = [];
 
     // Repopulation after a failed submission.
@@ -131,11 +158,14 @@ public sealed class ServiceUnavailableModel
     /// service that exists and cannot be fulfilled gets the permanent answer.
     /// </para>
     /// <para>
-    /// Each deterministic test below is asked of Core, over the resolved pools the
+    /// The deterministic test is asked of Core, over the resolved pools the
     /// booking path itself acts on — never of a second implementation of the rule.
-    /// An empty pool is not tested separately: a slot with no candidates has no
-    /// saturating assignment, so <see cref="PoolSufficiency.FindShortfall"/>
-    /// already reports it, and asking twice would be two answers to one question.
+    /// All three of its questions live in
+    /// <see cref="ServiceFulfillability.IsPermanentlyUnfulfillable"/>, which the
+    /// public availability read asks too, so the two surfaces cannot disagree. An
+    /// empty pool is not tested separately: a slot with no candidates has no
+    /// saturating assignment, so the shortfall finding already reports it, and
+    /// asking twice would be two answers to one question.
     /// </para>
     /// <para>
     /// What it must never do is <em>say</em> any of this. The shortfall, the
@@ -156,20 +186,12 @@ public sealed class ServiceUnavailableModel
             return true;
         }
 
-        // The roles cannot be filled at once by distinct resources — including
-        // the case where some role has no eligible resource at all.
-        var deterministic = PoolSufficiency.FindShortfall(pools) is not null
-
-            // Two roles whose start grids can never coincide: a correctly
-            // configured service that is permanently unbookable, and the case
-            // "no times available" describes most misleadingly of all.
-            || StartAlignment.FindMisalignment(pools) is not null
-
-            // No length every role can provide. The service can be fulfilled by
-            // nobody for any duration, whatever the calendar says.
-            || ServiceBookingFormBuilder.DurationOptions(pools).Count == 0;
-
-        if (deterministic)
+        // All three structural questions, asked of the one Core function that
+        // answers them (design D6). It used to ask them here, over a length
+        // intersection that lived in this project — which is why the delivery API
+        // could not reach it, and why publishing the same answer would have meant
+        // a second implementation of the rule free to disagree with this one.
+        if (ServiceFulfillability.IsPermanentlyUnfulfillable(pools))
         {
             model = NotFulfillable(service.Name);
             return true;

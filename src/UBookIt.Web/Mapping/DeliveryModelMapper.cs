@@ -69,6 +69,7 @@ internal static class DeliveryModelMapper
                     ResourceType = role.ResourceType,
                     RequiredCapabilities = [.. role.RequiredCapabilities.Keys],
                     Count = role.Count,
+                    VisitorSelectable = role.VisitorSelectable,
                 }),
             ],
             Duration = ToDurationModel(service.Duration),

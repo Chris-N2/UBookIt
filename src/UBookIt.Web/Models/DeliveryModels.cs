@@ -1,4 +1,5 @@
 using System.ComponentModel.DataAnnotations;
+using UBookIt.Core.Services;
 
 namespace UBookIt.Web.Models;
 
@@ -220,6 +221,23 @@ public sealed class ServiceRoleReadModel
     /// </para>
     /// </summary>
     public int Count { get; set; } = 1;
+
+    /// <summary>
+    /// Whether a visitor may <b>choose</b> which resource fills this role — what
+    /// tells a consumer which pool, if any, to offer as a choice. At most one role
+    /// of a service carries it.
+    /// <para>
+    /// Always present, carrying false for a role that offers no choice, so a
+    /// consumer never has to treat its absence as a default.
+    /// </para>
+    /// <para>
+    /// <b>Not an access rule.</b> It states which choice the service is configured
+    /// to offer; it does not restrict which resource a placement request may pin,
+    /// and it conceals nothing — every role's candidate pool is already computable
+    /// from these same reads (design D8).
+    /// </para>
+    /// </summary>
+    public bool VisitorSelectable { get; set; }
 }
 
 public sealed class PagedServicesModel
@@ -265,6 +283,33 @@ public sealed class ServiceBookableStartsResponseModel
     public string ZoneId { get; set; } = string.Empty;
 
     public List<ServiceBookableStartModel> Starts { get; set; } = [];
+
+    /// <summary>
+    /// Why an empty answer is empty, when the reason is <b>permanent</b>: the
+    /// stable <c>service-not-fulfillable</c> code, otherwise null.
+    /// <para>
+    /// An empty response is otherwise ambiguous in the way that matters most. A
+    /// service whose roles can never be filled together, whose start grids can
+    /// never coincide, or for which no length exists that every role can provide
+    /// is indistinguishable from a fully booked week, and a consumer cannot tell
+    /// whether to offer another date or to stop asking.
+    /// </para>
+    /// <para>
+    /// <b>One-directional.</b> It may report that the service can never be
+    /// fulfilled as configured; it never reports that a service <em>is</em>
+    /// available, or that it will be later, since the structural questions consult
+    /// no calendar. Its absence on an empty response means "not structurally
+    /// impossible", never "try tomorrow and it will work".
+    /// </para>
+    /// <para>
+    /// Derived from Core's <see cref="ServiceFulfillability"/>, never from a
+    /// second evaluation of the rules here. It discloses no configuration detail —
+    /// not the role, the resource type, the required capability, the count, nor
+    /// how many resources exist — and it is exclusive with
+    /// <see cref="Starts"/>: a response carrying starts never carries it.
+    /// </para>
+    /// </summary>
+    public string? Reason { get; set; }
 }
 
 /// <summary>

@@ -148,6 +148,14 @@ internal sealed class ServiceRoleRow
 
     public int Count { get; set; }
 
+    /// <summary>
+    /// Whether a visitor may choose which resource fills this role. A
+    /// non-nullable <c>bit</c> defaulting to <c>false</c>, so every role stored
+    /// before the column existed loads as not selectable and no service changes
+    /// behaviour — the shape <c>AddDirectBookability</c> established.
+    /// </summary>
+    public bool VisitorSelectable { get; set; }
+
     public List<ServiceRoleCapabilityRow> Capabilities { get; set; } = [];
 }
 

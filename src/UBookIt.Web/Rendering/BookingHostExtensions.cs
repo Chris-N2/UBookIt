@@ -21,6 +21,16 @@ internal static class BookingHostExtensions
     public static int? ReadDurationQuery(this HttpRequest request)
         => int.TryParse(request.Query[BookingKeys.DurationQuery], out var minutes) ? minutes : null;
 
+    /// <summary>
+    /// The resource a visitor chose to fulfil a service's selectable role, per the
+    /// URL, or null when the URL does not say. A malformed value is read as no
+    /// choice; a well-formed one naming a resource that cannot fulfil the service
+    /// is a <em>stale</em> choice, which the flow resets and says it has (design
+    /// D11) rather than this parsing step silently dropping.
+    /// </summary>
+    public static Guid? ReadResourceQuery(this HttpRequest request)
+        => Guid.TryParse(request.Query[BookingKeys.ResourceQuery], out var id) ? id : null;
+
     /// <summary>What is being booked, per the URL, or null when the URL does not say.</summary>
     public static BookingSubject? ReadSubjectQuery(this HttpRequest request)
         => BookingSubject.TryParse(request.Query[BookingKeys.SubjectQuery], out var subject) ? subject : null;

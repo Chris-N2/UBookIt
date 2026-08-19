@@ -9,6 +9,17 @@
     var durationDescribedBy = durationError is not null
         ? "ubookit-duration-error"
         : Model.LengthIsTheProblem ? "ubookit-length-unavailable" : null;
+
+    var whoError = Model.ErrorFor(BookingFieldIds.Resource);
+
+    // The choice control is described by whichever applies: the refusal after a
+    // failed submission, the notice that a stale choice was reset, or the standing
+    // note that it is the times below which narrow to the choice. All three are
+    // about that control, and the relationship between the choice and the times is
+    // stated in text rather than implied by layout.
+    var whoDescribedBy = whoError is not null
+        ? "ubookit-who-error"
+        : Model.ResourceChoiceWasReset ? "ubookit-who-reset" : "ubookit-who-hint";
 }
 @*
     Step 1 — choose a date and a length (GET reload; no JavaScript required).
@@ -65,6 +76,58 @@
             @if (durationError is not null)
             {
                 <span id="ubookit-duration-error" class="ubookit-field-error">@durationError</span>
+            }
+        </div>
+    }
+    @if (Model.OffersResourceChoice)
+    {
+        @* Who, chosen before when, in this same step — so no page appears between
+           the times and the contact details, which a no-JS flow would otherwise
+           need. Nothing at all is rendered for a service offering no choice: no
+           control, no hidden field, no way for a pin to be submitted. *@
+        <div>
+            <label for="@BookingFieldIds.Resource">Who would you like?</label>
+            <select id="@BookingFieldIds.Resource" name="@BookingKeys.ResourceQuery"
+                    aria-invalid="@(whoError is not null ? "true" : null)"
+                    aria-describedby="@whoDescribedBy">
+                @* "Any" is the default and is a real option rather than a blank:
+                   choosing nobody leaves the flow behaving exactly as it does for
+                   a service that offers no choice at all. *@
+                <option value="" selected="@(Model.ChosenResourceId is null)">Anyone who is available</option>
+                @foreach (var choice in Model.ResourceChoices)
+                {
+                    <option value="@choice.Id" selected="@(choice.Id == Model.ChosenResourceId)">@choice.Name</option>
+                }
+            </select>
+            @if (whoError is not null)
+            {
+                <span id="ubookit-who-error" class="ubookit-field-error">@whoError</span>
+            }
+            else if (Model.ResourceChoiceWasReset)
+            {
+                @* A bookmarked link can name someone this service can no longer be
+                   fulfilled by. Saying so is the point: falling back silently
+                   would quietly make it a different booking. *@
+                <p id="ubookit-who-reset" class="ubookit-field-error">
+                    The person you chose is no longer offered for this service, so the choice has been reset. Please choose again.
+                </p>
+            }
+            else if (Model.ResourceChoiceCount > 1)
+            {
+                @* A role of count N with a choice means "this one, plus N−1 chosen
+                   for you". Saying so is a requirement, not a nicety: a control
+                   that implies a choice and then books resources the visitor never
+                   chose is a substitution however friendly its wording. *@
+                <p id="ubookit-who-hint" class="ubookit-hint">
+                    This booking needs @Model.ResourceChoiceCount people. You choose one of them, and we will assign the rest.
+                    The times below are the times your choice is available.
+                </p>
+            }
+            else
+            {
+                <p id="ubookit-who-hint" class="ubookit-hint">
+                    The times below are the times your choice is available.
+                </p>
             }
         </div>
     }

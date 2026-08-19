@@ -62,6 +62,17 @@ public class ServiceRoleModel
     public List<string> RequiredCapabilities { get; set; } = [];
 
     public int Count { get; set; } = 1;
+
+    /// <summary>
+    /// Whether a visitor booking this service may choose which resource fills
+    /// this requirement. At most one role of a service may carry it; a second is
+    /// rejected with the domain's own stable code.
+    /// <para>
+    /// Always present rather than omitted when false, so a client never has to
+    /// treat its absence as a default.
+    /// </para>
+    /// </summary>
+    public bool VisitorSelectable { get; set; }
 }
 
 public class PagedServicesModel

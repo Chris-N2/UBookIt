@@ -331,4 +331,161 @@ public class ServiceTests
         Assert.Contains(result.Failures, f => f.Code == FailureCodes.ServiceNameRequired);
         Assert.Contains(result.Failures, f => f.Code == FailureCodes.TypeKeyInvalid);
     }
+
+    // ---------------------------------------------------------------------
+    // Visitor-selectability (design D1): at most one role, defaulting to off.
+    // ---------------------------------------------------------------------
+
+    private static ServiceRole Selectable(ServiceRole role) => role with { VisitorSelectable = true };
+
+    [Fact]
+    public void A_role_is_not_visitor_selectable_unless_said_to_be()
+    {
+        // Defaulting off is the decision, not an accident of a bool's default: a
+        // picker publishes the site's staffing as a list, and whether to do that
+        // is knowledge only the business has (design D9). Asserted through both
+        // constructors, since a service can be built either way.
+        var result = Service.Create("Massage", null, [Role("person")]);
+
+        Assert.True(result.Succeeded);
+        Assert.False(Assert.Single(result.Value.Roles).VisitorSelectable);
+
+        Assert.False(ServiceRole.Create("person", null).Value.VisitorSelectable);
+    }
+
+    [Fact]
+    public void One_visitor_selectable_role_among_several_is_accepted()
+    {
+        var result = Service.Create(
+            "Massage", null, [Role("room"), Selectable(Role("therapist")), Role("assistant")]);
+
+        Assert.True(result.Succeeded, string.Join("; ", result.Failures.Select(f => f.Code)));
+
+        // The flag survives canonicalisation and lands on the role that carries
+        // it, not on whichever role sorts first.
+        var selectable = Assert.Single(result.Value.Roles, r => r.VisitorSelectable);
+        Assert.Equal("therapist", selectable.ResourceType);
+    }
+
+    [Fact]
+    public void Two_visitor_selectable_roles_are_rejected_and_both_are_named()
+    {
+        // The fault is a property of the SERVICE — either role would be legal
+        // alone — so a failure blaming one of them arbitrarily would send the
+        // editor to change a row they may have meant to keep. Both are named, and
+        // both carry the code.
+        var result = Service.Create(
+            "Massage", null, [Selectable(Role("room")), Role("assistant"), Selectable(Role("therapist"))]);
+
+        Assert.False(result.Succeeded);
+
+        var failures = result.Failures
+            .Where(f => f.Code == FailureCodes.ServiceRoleMultipleSelectable)
+            .ToList();
+
+        Assert.Equal(2, failures.Count);
+
+        // Against the two rows in conflict, by the index the caller supplied —
+        // never against the innocent row between them.
+        Assert.Equal(
+            ["Roles[0].VisitorSelectable", "Roles[2].VisitorSelectable"],
+            failures.Select(f => f.Field ?? string.Empty).Order().ToArray());
+
+        // And each message names both rows, 1-based as the editor's legends number
+        // them, so a reader of either message knows what the other half is.
+        foreach (var failure in failures)
+        {
+            Assert.Contains("Requirements 1 and 3 are both marked", failure.Message, StringComparison.Ordinal);
+        }
+    }
+
+    [Fact]
+    public void Three_selectable_roles_name_all_three()
+    {
+        // The list generalises past the pair, and reads as a list rather than as
+        // "1 and 2 and 3". Found by reading the real message in the editor, where
+        // "requirements 1 and 2 are all marked" was clumsy for the commonest case.
+        var result = Service.Create(
+            "Massage",
+            null,
+            [Selectable(Role("room")), Selectable(Role("therapist")), Selectable(Role("assistant"))]);
+
+        Assert.False(result.Succeeded);
+
+        var failures = result.Failures
+            .Where(f => f.Code == FailureCodes.ServiceRoleMultipleSelectable)
+            .ToList();
+
+        Assert.Equal(3, failures.Count);
+        Assert.All(failures, f => Assert.Contains(
+            "Requirements 1, 2 and 3 are all marked", f.Message, StringComparison.Ordinal));
+    }
+
+    [Fact]
+    public void The_multiple_selectable_code_is_distinct_from_every_other_role_failure()
+    {
+        // Its own code, so a consumer can render it against the selectable control
+        // rather than against the type or the count — the two faults are corrected
+        // in different places and by different edits.
+        Assert.NotEqual(FailureCodes.ServiceRoleDuplicateType, FailureCodes.ServiceRoleMultipleSelectable);
+        Assert.NotEqual(FailureCodes.ServiceRoleCountInvalid, FailureCodes.ServiceRoleMultipleSelectable);
+        Assert.NotEqual(FailureCodes.ServiceRoleInvalid, FailureCodes.ServiceRoleMultipleSelectable);
+    }
+
+    [Fact]
+    public void The_flag_is_not_cleared_on_all_but_one()
+    {
+        // The tempting repair, and the wrong one: which role the editor meant is
+        // not derivable, and choosing for them discards a decision they made. The
+        // save is refused instead, so nothing is silently rewritten.
+        var result = Service.Create("Massage", null, [Selectable(Role("room")), Selectable(Role("therapist"))]);
+
+        Assert.False(result.Succeeded);
+
+        // Non-vacuity: the same pair with one flag cleared is accepted, so the
+        // rejection above is about the second flag rather than about the roles.
+        Assert.True(Service.Create("Massage", null, [Role("room"), Selectable(Role("therapist"))]).Succeeded);
+    }
+
+    [Fact]
+    public void Visitor_selectability_does_not_make_two_identical_roles_distinct()
+    {
+        // The flag says how a role is OFFERED, not what it requires — so it cannot
+        // tell two roles apart for the duplicate rule. Were it an input there, an
+        // editor could save two "therapist" rows requiring the same capabilities
+        // by flipping one switch, and the canonical order would stop being total.
+        var result = Service.Create(
+            "Joint session", null, [Selectable(Role("therapist")), Role("therapist")]);
+
+        Assert.False(result.Succeeded);
+        Assert.Contains(result.Failures, f => f.Code == FailureCodes.ServiceRoleDuplicateType);
+    }
+
+    [Fact]
+    public void The_canonical_order_is_unchanged_by_the_flag()
+    {
+        // Two roles differing ONLY in the flag are rejected as duplicates above,
+        // so the type/capabilities/count comparison stays total. This states the
+        // other half: the flag is not a tiebreak, and supplying the same roles in
+        // either order yields the same service.
+        var forwards = Service.Create(
+            "X", null, [Role("room"), Selectable(WithCapabilities(Role("therapist"), "cert-x"))]);
+
+        var backwards = Service.Create(
+            "X", null, [Selectable(WithCapabilities(Role("therapist"), "cert-x")), Role("room")]);
+
+        Assert.True(forwards.Succeeded);
+        Assert.True(backwards.Succeeded);
+        Assert.Equal(forwards.Value.Roles, backwards.Value.Roles);
+        Assert.Equal(["room", "therapist"], forwards.Value.Roles.Select(r => r.ResourceType));
+    }
+
+    [Fact]
+    public void A_visitor_selectable_role_with_no_eligible_resources_still_saves()
+    {
+        // Which resources exist is not a property of the service, and a service
+        // may legitimately be configured before its resources are — the same
+        // reasoning that accepts a count larger than the pool.
+        Assert.True(Service.Create("X", null, [Selectable(Role("unicorn"))]).Succeeded);
+    }
 }

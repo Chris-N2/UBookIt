@@ -428,6 +428,75 @@ public class ServicesControllerTests
     }
 
     [Fact]
+    public async Task Visitor_selectability_round_trips_through_the_API()
+    {
+        var (controller, _) = Wire();
+
+        var request = ValidRequest();
+        request.Roles =
+        [
+            new ServiceRoleModel { ResourceType = "room", Count = 1 },
+            new ServiceRoleModel { ResourceType = "therapist", Count = 1, VisitorSelectable = true },
+        ];
+
+        var created = Ok<ServiceResponseModel>(await controller.CreateService(request));
+        var fetched = Ok<ServiceResponseModel>(await controller.GetService(created.Id));
+
+        // The flag lands on the role that carries it, not on whichever role sorts
+        // first — and the other reports it explicitly as false.
+        Assert.True(Assert.Single(fetched.Roles, r => r.ResourceType == "therapist").VisitorSelectable);
+        Assert.False(Assert.Single(fetched.Roles, r => r.ResourceType == "room").VisitorSelectable);
+    }
+
+    [Fact]
+    public async Task Visitor_selectability_defaults_to_off_when_the_client_omits_it()
+    {
+        // Always present on the way out even where the client never mentioned it,
+        // so a consumer never has to treat an absence as a default.
+        var (controller, _) = Wire();
+
+        var created = Ok<ServiceResponseModel>(await controller.CreateService(ValidRequest()));
+
+        Assert.False(Assert.Single(created.Roles).VisitorSelectable);
+    }
+
+    [Fact]
+    public async Task Two_visitor_selectable_roles_are_rejected_with_the_domains_code()
+    {
+        // The domain's stable code, verbatim, like every other rule — never a
+        // second implementation of it in the mapper or a message invented here.
+        var (controller, _) = Wire();
+
+        var request = ValidRequest();
+        request.Roles =
+        [
+            new ServiceRoleModel { ResourceType = "room", Count = 1, VisitorSelectable = true },
+            new ServiceRoleModel { ResourceType = "therapist", Count = 1, VisitorSelectable = true },
+        ];
+
+        var (status, codes) = Problem(await controller.CreateService(request));
+
+        Assert.Equal(400, status);
+        Assert.All(codes, code => Assert.Equal(FailureCodes.ServiceRoleMultipleSelectable, code));
+
+        // Reported against BOTH rows in conflict, by the field the editor's
+        // per-row lookup uses — the fault is the service's, and blaming one row
+        // would send the editor to change the one they meant to keep.
+        var errors = Errors(await controller.CreateService(request));
+
+        Assert.Equal(
+            ["Roles[0].VisitorSelectable", "Roles[1].VisitorSelectable"],
+            errors.Select(e => e.Field ?? string.Empty).Order().ToArray());
+    }
+
+    private static UBookIt.Backoffice.Models.ApiErrorModel[] Errors(IActionResult result)
+    {
+        var obj = Assert.IsType<ObjectResult>(result);
+        var problem = Assert.IsType<ProblemDetails>(obj.Value);
+        return Assert.IsType<UBookIt.Backoffice.Models.ApiErrorModel[]>(problem.Extensions["errors"]);
+    }
+
+    [Fact]
     public void Controller_inherits_the_authorized_backoffice_base()
     {
         Assert.True(typeof(UBookItBackofficeApiControllerBase).IsAssignableFrom(typeof(ServicesController)));

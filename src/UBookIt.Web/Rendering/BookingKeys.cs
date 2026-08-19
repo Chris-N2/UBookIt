@@ -16,6 +16,19 @@ public static class BookingKeys
     /// <summary>Query parameter carrying the chosen booking length in whole minutes.</summary>
     public const string DurationQuery = "ubMins";
 
+    /// <summary>
+    /// Query parameter carrying the resource a visitor chose to fulfil a
+    /// service's visitor-selectable role, where one was offered.
+    /// <para>
+    /// Its own parameter beside the date and the length, and for the same reason:
+    /// every step of the flow stays linkable, bookmarkable and reachable by the
+    /// back button. A resource id in the URL discloses nothing a public read does
+    /// not already carry, and a link naming a resource that no longer fulfils the
+    /// service is handled as a stale choice rather than as an error (design D11).
+    /// </para>
+    /// </summary>
+    public const string ResourceQuery = "ubWho";
+
     /// <summary>TempData key for a failed submission redrawn on the form (design D3).</summary>
     public const string FailedSubmission = "UBookIt.Booking.Failed";
 

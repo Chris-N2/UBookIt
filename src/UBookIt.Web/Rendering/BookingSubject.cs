@@ -106,17 +106,28 @@ public readonly record struct BookingSubject(BookableKind Kind, Guid Id)
 /// </summary>
 public static class BookingFlowLink
 {
-    public static QueryString For(BookingSubject subject, DateOnly date, int durationMinutes)
+    public static QueryString For(
+        BookingSubject subject, DateOnly date, int durationMinutes, Guid? chosenResourceId = null)
     {
         var query = QueryString.Create(BookingKeys.SubjectQuery, subject.Token)
             .Add(BookingKeys.DateQuery, date.ToString("yyyy-MM-dd", CultureInfo.InvariantCulture));
 
         // A length of zero is what an omitted form field binds to. Carrying it
         // would put a value in the URL that no control could have produced.
-        return durationMinutes > 0
-            ? query.Add(
+        if (durationMinutes > 0)
+        {
+            query = query.Add(
                 BookingKeys.DurationQuery,
-                durationMinutes.ToString(CultureInfo.InvariantCulture))
+                durationMinutes.ToString(CultureInfo.InvariantCulture));
+        }
+
+        // The chosen resource travels for the same reason the date and the length
+        // do: the redraw after a failed submission must land on a URL that agrees
+        // with the page it draws, and "who" is now one of the step's choices.
+        // Absent when the visitor chose nobody, so a flow offering no choice
+        // produces exactly the query string it produced before.
+        return chosenResourceId is { } chosen
+            ? query.Add(BookingKeys.ResourceQuery, chosen.ToString("D", CultureInfo.InvariantCulture))
             : query;
     }
 }

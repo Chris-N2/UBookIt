@@ -64,7 +64,7 @@ public sealed class ServiceBookingSurfaceController : SurfaceController
         var service = await _serviceStore.GetAsync(form.ServiceId);
         if (service is null || !BookingForm.TryResolveZone(_settings.TimeZoneId, out var zone))
         {
-            return Fail(form, [new DomainFailure(FailureCodes.ServiceNotFound, "Service unavailable.")]);
+            return await FailAsync(form, [new DomainFailure(FailureCodes.ServiceNotFound, "Service unavailable.")]);
         }
 
         var failures = new List<DomainFailure>();
@@ -104,16 +104,25 @@ public sealed class ServiceBookingSurfaceController : SurfaceController
 
         if (failures.Count == 0)
         {
-            // PinnedResourceId is deliberately absent — not defaulted, not
-            // hidden-fielded, absent (design D7). There is no control for it and
-            // no code path here that could set one. A hidden field defaulting to
-            // "any" would invite someone to make it settable later without
-            // thinking about which role's resources belong in the list, which is
-            // the whole reason the follow-up exists.
             var placed = await _serviceBooking.PlaceAsync(new ServiceBookingRequest
             {
                 ServiceId = service.Id,
                 Start = startUtc,
+
+                // The visitor's choice, carried through to placement unchanged, so
+                // the booking that is placed is the booking that was offered. A
+                // pin, never a preference: when it cannot be honoured Core refuses
+                // with `pinned-resource-unavailable` rather than booking somebody
+                // else, and the page below says so by name.
+                //
+                // Submitted only where a choice was offered: the field is rendered
+                // inside the who control, which exists only for a service with a
+                // visitor-selectable role. Passed through rather than re-validated
+                // here — a resource that cannot fulfil the service is
+                // `resource-not-eligible` from Core, which is a refusal, where
+                // dropping it here would absorb the visitor's choice into a
+                // booking they did not ask for.
+                PinnedResourceId = form.PinnedResourceId,
 
                 // The submitted length goes to Core exactly as submitted. It must
                 // never be silently substituted: placing a booking of a length the
@@ -134,10 +143,55 @@ public sealed class ServiceBookingSurfaceController : SurfaceController
             failures.AddRange(placed.Failures);
         }
 
-        return Fail(form, failures);
+        return await FailAsync(form, failures);
     }
 
-    private IActionResult Fail(ServiceBookingSubmission form, IReadOnlyList<DomainFailure> failures)
+    /// <summary>
+    /// The message for a refused pin, naming the resource the visitor chose.
+    /// <para>
+    /// "That person is not available at the time you chose" is a different fact
+    /// from "there are no times", with a different next step, and the flow must not
+    /// collapse one into the other — the failure `resource-pin` built exists
+    /// precisely so a front end can say which.
+    /// </para>
+    /// <para>
+    /// Naming the resource is compatible with the disclosure rule rather than an
+    /// exception to it (design D12): the visitor supplied the name, and none of
+    /// the five prohibited facts — the role, the resource type, the required
+    /// capability, the count, the pool size — is disclosed. It is a narrow
+    /// permission for a resource the visitor themselves chose, and no licence to
+    /// name one they did not.
+    /// </para>
+    /// <para>
+    /// Falls back to the code's own wording when the name cannot be read, which
+    /// still says what happened rather than "no times available".
+    /// </para>
+    /// </summary>
+    private async Task<IReadOnlyList<BookingError>> ErrorsForAsync(
+        ServiceBookingSubmission form, IReadOnlyList<DomainFailure> failures)
+    {
+        var errors = BookingMessages.ForFailures(failures);
+
+        if (form.PinnedResourceId is not { } pinned
+            || !failures.Any(f => f.Code == FailureCodes.PinnedResourceUnavailable))
+        {
+            return errors;
+        }
+
+        var resource = await _resourceStore.GetAsync(pinned);
+        if (resource is null)
+        {
+            return errors;
+        }
+
+        return [.. errors.Select(error =>
+            error.Message == BookingMessages.ForCode(FailureCodes.PinnedResourceUnavailable)
+                ? new BookingError(BookingMessages.PinnedUnavailable(resource.DisplayName), error.FieldId)
+                : error)];
+    }
+
+    private async Task<IActionResult> FailAsync(
+        ServiceBookingSubmission form, IReadOnlyList<DomainFailure> failures)
     {
         // Mapped from the stable codes and never from the domain's message text.
         // That is what keeps the pool-sufficiency diagnostic out of the visitor's
@@ -150,10 +204,15 @@ public sealed class ServiceBookingSurfaceController : SurfaceController
             Date = form.Date,
             DurationMinutes = form.DurationMinutes,
             SelectedTimeIso = form.SelectedTime,
+
+            // Carried back so the redraw shows the visitor's own choice. Dropping
+            // it would quietly turn their next submission into a booking for
+            // anyone, on a page that had said otherwise.
+            ChosenResourceId = form.PinnedResourceId,
             Name = form.Name,
             Email = form.Email,
             Phone = form.Phone,
-            Errors = [.. BookingMessages.ForFailures(failures)],
+            Errors = [.. await ErrorsForAsync(form, failures)],
         });
 
         return SeeOther(BackToFlow(form));
@@ -177,7 +236,7 @@ public sealed class ServiceBookingSurfaceController : SurfaceController
     private IActionResult BackToFlow(ServiceBookingSubmission form)
         => BookingSubject.Agreeing(form.Subject, BookingSubject.Service(form.ServiceId)) is { } subject
             ? RedirectToCurrentUmbracoPage(
-                BookingFlowLink.For(subject, form.Date, form.DurationMinutes))
+                BookingFlowLink.For(subject, form.Date, form.DurationMinutes, form.PinnedResourceId))
             : RedirectToCurrentUmbracoPage();
 
     /// <summary>
@@ -247,6 +306,18 @@ public sealed class ServiceBookingSubmission
 
     /// <summary>The chosen slot's exact UTC instant, round-trip ("O") formatted.</summary>
     public string? SelectedTime { get; set; }
+
+    /// <summary>
+    /// The resource the visitor chose to fulfil the service's visitor-selectable
+    /// role, where one was offered. Null is "any", which is what every service
+    /// offering no choice submits — and what the field's absence binds to.
+    /// <para>
+    /// A pin rather than a preference: no other resource is substituted for it.
+    /// It is passed to Core unchanged; a resource that cannot fulfil the service
+    /// is refused there, never absorbed here.
+    /// </para>
+    /// </summary>
+    public Guid? PinnedResourceId { get; set; }
 
     public string? Name { get; set; }
 

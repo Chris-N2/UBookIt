@@ -13,6 +13,7 @@ import { resolutionGroups, type ResolutionSnapshot } from "./resolution-summary.
 import { alignmentReport, type AlignmentSnapshot } from "./alignment-report.js";
 import { sufficiencyReport, type ShortfallSnapshot } from "./sufficiency-report.js";
 import { carriedRows, rowNumbers } from "./preview-rows.js";
+import { attributedFields, errorsForRole, selectableHintKey, summaryLines } from "./role-fields.js";
 import "./capability-input.element.js";
 
 /**
@@ -29,6 +30,18 @@ type RoleRow = {
    * Defaults to 1, which is what every service expressed before counts existed.
    */
   count: number;
+
+  /**
+   * Whether a visitor booking this service may choose which resource fills this
+   * requirement. Off by default: turning it on publishes that requirement's
+   * resources as a list of choices on the site, and whether to do that is the
+   * business's call rather than the product's.
+   *
+   * At most one requirement may carry it. The rule is NOT enforced here — the
+   * server owns it and reports it against the rows in conflict, so relaxing it
+   * later stays a change in one place and no form state is lost to a guard.
+   */
+  visitorSelectable: boolean;
 };
 
 /**
@@ -61,6 +74,10 @@ const DURATION_FIELDS = ["Duration", "Duration.Min", "Duration.Max"];
  * - Resource types are NOT filtered against the rows already using them. The
  *   duplicate-type rule is the server's, and enforcing it here as well would
  *   make relaxing it later a change in two places (multi-role design D1).
+ * - `visitorSelectable` is surfaced per row, defaulting to off, and a second row
+ *   may be switched on: the at-most-one rule is the server's too, for the same
+ *   reason, and its failure renders against every row in conflict with no data
+ *   lost from the form.
  * - Duration is an explicit choice, never an empty box meaning "inherit"
  *   (design D4).
  *
@@ -95,7 +112,7 @@ export class UBookItServiceEditorElement extends UmbLitElement {
    * only re-renders on identity change for an array-valued state.
    */
   @state()
-  private _roles: RoleRow[] = [{ resourceType: "", requiredCapabilities: [], count: 1 }];
+  private _roles: RoleRow[] = [{ resourceType: "", requiredCapabilities: [], count: 1, visitorSelectable: false }];
 
   @state()
   private _durationMode: DurationMode = "variable";
@@ -222,8 +239,11 @@ export class UBookItServiceEditorElement extends UmbLitElement {
             // A server that omitted the count would leave the row unusable, and
             // 1 is the only value a service saved before counts existed can have.
             count: role.count ?? 1,
+            // A server that omitted it means "not selectable", which is what
+            // every service saved before the flag existed is.
+            visitorSelectable: role.visitorSelectable ?? false,
           }))
-        : [{ resourceType: "", requiredCapabilities: [], count: 1 }];
+        : [{ resourceType: "", requiredCapabilities: [], count: 1, visitorSelectable: false }];
 
     if (data.duration?.kind === "fixed") {
       this._durationMode = "fixed";
@@ -461,6 +481,10 @@ export class UBookItServiceEditorElement extends UmbLitElement {
         resourceType: role.resourceType.trim(),
         requiredCapabilities: [...role.requiredCapabilities],
         count: role.count,
+        // Always sent, never omitted when false, so the server never has to read
+        // an absence as a default. Rows are sent exactly as entered, including a
+        // second one switched on: the at-most-one rule is the server's.
+        visitorSelectable: role.visitorSelectable,
       })),
     };
   }
@@ -553,11 +577,16 @@ export class UBookItServiceEditorElement extends UmbLitElement {
   #renderErrorSummary() {
     if (this._errors.length === 0) return nothing;
 
+    // One line per distinct sentence: a rule reported against several rows would
+    // otherwise stutter here. The rule lives in a pure function so it can be
+    // exercised without a DOM.
+    const summary = summaryLines(this._errors);
+
     return html`
       <div id="error-summary" role="alert" tabindex="-1" class="error-summary">
         <strong>${this.#term("errorSummary")}</strong>
         <ul>
-          ${this._errors.map((e) => html`<li>${e.message ?? e.code}</li>`)}
+          ${summary.map((e) => html`<li>${e.message ?? e.code}</li>`)}
         </ul>
       </div>
     `;
@@ -596,24 +625,8 @@ export class UBookItServiceEditorElement extends UmbLitElement {
     `;
   }
 
-  /**
-   * The failure field the server attributes to one role's control, mirrored from
-   * `ServiceRole.FieldFor`. Without the index every message would land on the
-   * first row.
-   */
-  #roleField(index: number, field: string): string {
-    return `Roles[${index}].${field}`;
-  }
-
   #errorsForRole(index: number, ...codes: string[]): ApiError[] {
-    return this._errors.filter(
-      (e) =>
-        e.code !== undefined &&
-        codes.includes(e.code) &&
-        (e.field === this.#roleField(index, "ResourceType") ||
-          e.field === this.#roleField(index, "RequiredCapabilities") ||
-          e.field === this.#roleField(index, "Count")),
-    );
+    return errorsForRole(this._errors, index, codes);
   }
 
   /**
@@ -622,18 +635,16 @@ export class UBookItServiceEditorElement extends UmbLitElement {
    * stay on the group rather than vanishing.
    */
   #unattributedRoleErrors(): ApiError[] {
-    const attributed = new Set(
-      this._roles.flatMap((_, index) => [
-        this.#roleField(index, "ResourceType"),
-        this.#roleField(index, "RequiredCapabilities"),
-        this.#roleField(index, "Count"),
-      ]),
-    );
+    const attributed = attributedFields(this._roles.length);
 
     return this.#errorsFor(
       "service-role-invalid",
       "type-key-invalid",
       "service-role-duplicate-type",
+      // Reported against every row in conflict, so it is normally attributed —
+      // but a row removed since the save would strand its copy, and the rule is
+      // exactly the one an editor must be told about.
+      "service-role-multiple-selectable",
     ).filter((e) => e.field === undefined || e.field === null || !attributed.has(e.field));
   }
 
@@ -688,6 +699,13 @@ export class UBookItServiceEditorElement extends UmbLitElement {
     const countErrors = this.#errorsForRole(index, "service-role-count-invalid");
     const countErrorId = `err-requirement-count-${index}`;
     const countHintId = `role-count-hint-${index}`;
+
+    // The at-most-one-selectable failure, which the server reports against EVERY
+    // row in conflict — so each of them renders its own copy and neither editor
+    // is left guessing which other row is the other half of the conflict.
+    const selectableErrors = this.#errorsForRole(index, "service-role-multiple-selectable");
+    const selectableErrorId = `err-requirement-selectable-${index}`;
+    const selectableHintId = `role-selectable-hint-${index}`;
 
     return html`
       <fieldset class="requirement">
@@ -786,6 +804,39 @@ export class UBookItServiceEditorElement extends UmbLitElement {
               </p>`}
         </div>
 
+        <div class="field">
+          <label for="role-selectable-${index}">${this.#term("requirementSelectable")}</label>
+          <input
+            id="role-selectable-${index}"
+            type="checkbox"
+            .checked=${role.visitorSelectable}
+            aria-invalid=${selectableErrors.length > 0 ? "true" : nothing}
+            aria-describedby=${selectableErrors.length > 0
+              ? `${selectableHintId} ${selectableErrorId}`
+              : selectableHintId}
+            @change=${(e: Event) => {
+              // No client-side guard against switching a second row on. The
+              // at-most-one rule is the server's and its failure renders against
+              // the rows in conflict, so nothing is lost from the form and the
+              // rule lives in one place — exactly as the duplicate-role rule
+              // already does.
+              //
+              // The resolution summary is untouched by this: the flag is not an
+              // input to eligibility, so a role of a selectable requirement draws
+              // on exactly the pool it drew on before. No preview refresh.
+              this.#updateRole(index, {
+                visitorSelectable: (e.target as HTMLInputElement).checked,
+              });
+            }}
+          />
+          <p id=${selectableHintId} class="hint">${this.#term(selectableHintKey(role.count))}</p>
+          ${selectableErrors.length === 0
+            ? nothing
+            : html`<p class="group-error" id=${selectableErrorId}>
+                ${selectableErrors.map((e) => e.message).join(" ")}
+              </p>`}
+        </div>
+
         <!--
           Offered only while more than one row exists: a service always keeps at
           least one role, and a control that removes the last one would either
@@ -810,7 +861,7 @@ export class UBookItServiceEditorElement extends UmbLitElement {
   }
 
   #addRole() {
-    this._roles = [...this._roles, { resourceType: "", requiredCapabilities: [], count: 1 }];
+    this._roles = [...this._roles, { resourceType: "", requiredCapabilities: [], count: 1, visitorSelectable: false }];
     this.#dropRoleErrors();
   }
 

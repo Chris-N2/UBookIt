@@ -64,6 +64,7 @@ public sealed class BookingFlowViewComponent(
                 Date = Request.ReadDateQuery(),
                 DurationMinutes = Request.ReadDurationQuery(),
                 Failed = TempData.Read<FailedSubmission>(BookingKeys.ServiceFailedSubmission),
+                ChosenResourceId = Request.ReadResourceQuery(),
                 FlowToken = token,
             });
 

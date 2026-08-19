@@ -158,6 +158,7 @@ export type ServiceRoleModel = {
     resourceType: string;
     requiredCapabilities: Array<string>;
     count: number;
+    visitorSelectable: boolean;
 };
 
 export type ShortfallRoleModel = {

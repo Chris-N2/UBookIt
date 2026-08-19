@@ -44,6 +44,7 @@ internal static class ServiceModelMapper
                 RequiredCapabilities = capabilities[index].Succeeded
                     ? capabilities[index].Value
                     : CapabilitySet.Empty,
+                VisitorSelectable = r.VisitorSelectable,
             }),
             id);
 
@@ -108,7 +109,11 @@ internal static class ServiceModelMapper
         // other than what is on screen, and refusing to answer is what stops the
         // endpoint reporting on a configuration it silently narrowed.
         var roles = supplied
-            .Select((r, index) => ServiceRole.Create(r.ResourceType, r.RequiredCapabilities, r.Count, index))
+            // Every optional argument by name. `direct-booking-opt-in` recorded a
+            // positional shift caught by luck rather than by design, and this call
+            // gained an argument between the count and the index.
+            .Select((r, index) => ServiceRole.Create(
+                r.ResourceType, r.RequiredCapabilities, count: r.Count, roleIndex: index))
             .ToList();
 
         var failures = roles.SelectMany(r => r.Failures).Concat(duration.Failures).ToList();
@@ -233,6 +238,7 @@ internal static class ServiceModelMapper
                     ResourceType = r.ResourceType,
                     RequiredCapabilities = [.. r.RequiredCapabilities.Keys],
                     Count = r.Count,
+                    VisitorSelectable = r.VisitorSelectable,
                 })
                 .ToList(),
         };

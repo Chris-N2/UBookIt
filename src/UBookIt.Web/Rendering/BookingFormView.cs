@@ -63,6 +63,60 @@ public interface IBookingFormView
     /// </summary>
     int? LongestAvailableMinutes { get; }
 
+    /// <summary>
+    /// The resources a visitor may choose between to fulfil what they are
+    /// booking, or empty when no choice is offered.
+    /// <para>
+    /// Answerable from <em>what is being booked</em>, which is what earns it a
+    /// place here: a service with a visitor-selectable role offers its pool, a
+    /// service without one offers nothing, and a directly booked resource offers
+    /// nothing because it is already the resource the visitor chose. No partial
+    /// asks which flow is rendering it.
+    /// </para>
+    /// <para>
+    /// The choice sits in the same GET step as the date and the length precisely
+    /// so it needs no page of its own: a control that had to follow the start
+    /// would need a third page in a no-JS flow.
+    /// </para>
+    /// </summary>
+    IReadOnlyList<BookingResourceChoice> ResourceChoices { get; }
+
+    /// <summary>The chosen resource, or null for "any".</summary>
+    Guid? ChosenResourceId { get; }
+
+    /// <summary>
+    /// How many resources the choice is one <em>of</em>: the selectable role's
+    /// count. Greater than 1 means the visitor chooses one and the remainder are
+    /// assigned, which the control must say — a picker that implies a choice and
+    /// then books resources the visitor never chose is a substitution, however
+    /// friendly its wording (design D5).
+    /// </summary>
+    int ResourceChoiceCount { get; }
+
+    /// <summary>
+    /// True when the request named a resource that no longer fulfils this
+    /// service — deleted, no longer eligible, or its role no longer selectable —
+    /// and the choice was reset to "any".
+    /// <para>
+    /// Rendered as a message rather than absorbed. A bookmarked link can carry a
+    /// stale choice; falling back silently would quietly make it a different
+    /// booking, and refusing to render the form at all would punish a visitor for
+    /// a change they had no part in.
+    /// </para>
+    /// </summary>
+    bool ResourceChoiceWasReset { get; }
+
+    /// <summary>
+    /// Whether a choice of resource is offered at all — the guard the who control
+    /// is rendered under.
+    /// <para>
+    /// Declared rather than defaulted, so it is answerable on the concrete models
+    /// too. A default interface member is invisible to a caller holding the model
+    /// itself, and a test asserting what a page offers holds the model.
+    /// </para>
+    /// </summary>
+    bool OffersResourceChoice { get; }
+
     IReadOnlyList<BookingTimeOption> Times { get; }
 
     /// <summary>The previously selected instant, repopulated after a failed submission.</summary>

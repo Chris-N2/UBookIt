@@ -58,25 +58,14 @@ public static class BookingForm
     /// Every whole-minute length on a grid, from a minimum to a maximum
     /// inclusive, ascending.
     /// <para>
-    /// A sub-minute granularity truncates to a zero step, which would loop
-    /// forever. The domain permits it (it only requires the bounds to be exact
-    /// multiples), and callers hand this values that came from a domain
-    /// aggregate, so it guards rather than assumes.
+    /// Delegates to Core rather than computing it here. The rule moved when the
+    /// structural-unfulfillability triad lifted (design D6): "does any length
+    /// exist that every role can provide" is a domain question, and it had to
+    /// become answerable without this project so the delivery API could publish
+    /// the same answer instead of deriving a second one. This stays as the front
+    /// end's spelling of it, so the resource flow's call sites are unchanged.
     /// </para>
     /// </summary>
     public static IReadOnlyList<int> LengthGrid(int minMinutes, int maxMinutes, int stepMinutes)
-    {
-        if (stepMinutes <= 0)
-        {
-            return [];
-        }
-
-        var options = new List<int>();
-        for (var minutes = minMinutes; minutes <= maxMinutes; minutes += stepMinutes)
-        {
-            options.Add(minutes);
-        }
-
-        return options;
-    }
+        => Core.Availability.LengthGrid.Minutes(minMinutes, maxMinutes, stepMinutes);
 }

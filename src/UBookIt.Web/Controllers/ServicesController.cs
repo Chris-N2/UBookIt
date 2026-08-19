@@ -54,24 +54,77 @@ public sealed class ServicesController(
     /// lengths available at each. Takes no duration — one response answers every
     /// length — and names no resource, because the resource is resolved when the
     /// booking is placed.
+    /// <para>
+    /// <paramref name="pinnedResourceId"/> narrows the answer to the starts and
+    /// lengths at which an assignment <b>including</b> that resource exists: the
+    /// question "when can I book this service with this person". Omitted, the
+    /// query and its response are exactly as they were. Supplied, the response
+    /// body still names no resource — the caller already named it — and the answer
+    /// is honoured by placing with the same pin.
+    /// </para>
+    /// <para>
+    /// A pin naming a resource in no role's candidate pool yields
+    /// <c>resource-not-eligible</c> rather than being ignored, the rule the
+    /// placement endpoint already applies.
+    /// </para>
     /// </summary>
     [HttpGet("services/{id:guid}/bookable-starts")]
     [ProducesResponseType<ServiceBookableStartsResponseModel>(StatusCodes.Status200OK)]
     [ProducesResponseType<ProblemDetails>(StatusCodes.Status400BadRequest)]
     [ProducesResponseType<ProblemDetails>(StatusCodes.Status404NotFound)]
     public async Task<IActionResult> GetServiceBookableStarts(
-        Guid id, DateOnly from, DateOnly to, CancellationToken cancellationToken = default)
+        Guid id,
+        DateOnly from,
+        DateOnly to,
+        Guid? pinnedResourceId = null,
+        CancellationToken cancellationToken = default)
     {
-        var result = await serviceBooking.GetBookableStartsAsync(id, from, to, cancellationToken);
+        var result = await serviceBooking.GetBookableStartsAsync(id, from, to, pinnedResourceId, cancellationToken);
 
-        return result.Succeeded
-            ? Ok(new ServiceBookableStartsResponseModel
-            {
-                ServiceId = id,
-                ZoneId = settings.TimeZoneId,
-                Starts = result.Value.Select(DeliveryModelMapper.ToServiceBookableStartModel).ToList(),
-            })
-            : result.Failures.ToProblemResult();
+        if (!result.Succeeded)
+        {
+            return result.Failures.ToProblemResult();
+        }
+
+        return Ok(new ServiceBookableStartsResponseModel
+        {
+            ServiceId = id,
+            ZoneId = settings.TimeZoneId,
+            Starts = result.Value.Select(DeliveryModelMapper.ToServiceBookableStartModel).ToList(),
+
+            // Asked only of an empty answer, which is the only answer it can
+            // describe: the two are exclusive, and a response carrying starts
+            // cannot be structurally impossible.
+            Reason = result.Value.Count == 0
+                ? await StructuralReasonAsync(id, cancellationToken)
+                : null,
+        });
+    }
+
+    /// <summary>
+    /// Whether an empty answer is <b>permanent</b>, derived from Core's one
+    /// structural-unfulfillability function — never from a second evaluation of
+    /// the rules here, which would be free to disagree with the in-process flow in
+    /// exactly the case it exists to detect (design D6).
+    /// <para>
+    /// Null rather than a claim when the pools could not be resolved: the code is
+    /// one-directional, so silence means "not known to be structurally
+    /// impossible" and never "available".
+    /// </para>
+    /// <para>
+    /// Deliberately blind to the pin. The question is about the service's
+    /// configuration, and a resource the caller chose being busy is not a property
+    /// of the configuration — reporting it as permanent would tell a consumer to
+    /// stop asking about a service that is bookable all week.
+    /// </para>
+    /// </summary>
+    private async Task<string?> StructuralReasonAsync(Guid serviceId, CancellationToken cancellationToken)
+    {
+        var pools = await serviceBooking.ResolveCandidatesAsync(serviceId, cancellationToken);
+
+        return pools.Succeeded && ServiceFulfillability.IsPermanentlyUnfulfillable(pools.Value)
+            ? ServiceFulfillability.NotFulfillableCode
+            : null;
     }
 
     /// <summary>

@@ -100,9 +100,38 @@ public interface IServiceBookingService
     /// resource is free each have a candidate, and their start maps intersect to
     /// keep every start, so the service advertised slots it could never honour.
     /// </para>
+    /// <para>
+    /// <paramref name="pinnedResourceId"/> answers the question
+    /// <em>conditionally</em>: given that resource, when can the service be
+    /// booked. A start and a length are then offered exactly when a saturating
+    /// assignment <b>including</b> it exists there — the same feasibility test
+    /// placement applies to a pinned request, over the same pools, so a pinned
+    /// answer cannot disagree with placement in the case it exists to serve.
+    /// </para>
+    /// <para>
+    /// The answer is honoured only when the same pin is supplied at placement, and
+    /// it is a new guarantee <em>beside</em> the unpinned one rather than a
+    /// replacement for it (design D3): supplied no pin, the query's behaviour, its
+    /// result and its guarantees are exactly as they were — the response still
+    /// names no resource and still promises nothing about which candidate a booker
+    /// will get. A pinned response names no resource either; the resource is in
+    /// the request.
+    /// </para>
+    /// <para>
+    /// A pin naming a resource in no role's pool fails with
+    /// <see cref="FailureCodes.ResourceNotEligible"/> rather than being ignored
+    /// (design D7) — the rule placement already applies, one step earlier, because
+    /// a query that discarded the pin would answer about the service while the
+    /// caller believed it had asked about a resource, and the caller would then
+    /// submit a start it had been told was good.
+    /// </para>
     /// </summary>
     Task<DomainResult<IReadOnlyList<ServiceBookableStart>>> GetBookableStartsAsync(
-        Guid serviceId, DateOnly fromDate, DateOnly toDate, CancellationToken cancellationToken = default);
+        Guid serviceId,
+        DateOnly fromDate,
+        DateOnly toDate,
+        Guid? pinnedResourceId = null,
+        CancellationToken cancellationToken = default);
 
     /// <summary>
     /// Places a booking on the first candidate that accepts it, running the
@@ -200,7 +229,11 @@ public sealed class ServiceBookingService(
     }
 
     public async Task<DomainResult<IReadOnlyList<ServiceBookableStart>>> GetBookableStartsAsync(
-        Guid serviceId, DateOnly fromDate, DateOnly toDate, CancellationToken cancellationToken = default)
+        Guid serviceId,
+        DateOnly fromDate,
+        DateOnly toDate,
+        Guid? pinnedResourceId = null,
+        CancellationToken cancellationToken = default)
     {
         // Range and zone first, before any load: an over-wide range costs
         // nothing, and it fails identically to the per-resource queries whether
@@ -218,6 +251,27 @@ public sealed class ServiceBookingService(
         }
 
         var pools = candidateResult.Value;
+
+        // The pin, before any question about the pool — as `PlaceAsync` checks it
+        // (design D7). A pin naming a resource outside every pool is equally wrong
+        // whether some pool is empty or merely lacks that resource, and the
+        // caller's own mistake is the more useful thing to report.
+        //
+        // After the range and service checks above, deliberately: those bound
+        // whether the question can be asked at all, so they are reported in
+        // preference.
+        if (pinnedResourceId is { } pinnedOutOfPool
+            && !pools.Any(p => p.Candidates.Any(c => c.ResourceId == pinnedOutOfPool)))
+        {
+            // Rejected rather than ignored. Answering "here is when this service is
+            // available" while discarding the resource the caller named is the
+            // placement-path fault one step earlier, and worse there: the caller
+            // would go on to submit a start it had been told was good.
+            return DomainResult<IReadOnlyList<ServiceBookableStart>>.Failure(
+                FailureCodes.ResourceNotEligible,
+                $"Resource {pinnedOutOfPool} cannot fulfil this service.",
+                nameof(ServiceBookingRequest.PinnedResourceId));
+        }
 
         // A role nothing can fill makes the whole service unbookable: the
         // intersection with an empty set is empty, whichever role it was.
@@ -282,7 +336,7 @@ public sealed class ServiceBookingService(
 
         foreach (var start in shared)
         {
-            var runs = FeasibleRuns(byRole, slotsOfRole, start);
+            var runs = FeasibleRuns(byRole, slotsOfRole, start, pinnedResourceId);
 
             if (runs.Count > 0)
             {
@@ -395,16 +449,42 @@ public sealed class ServiceBookingService(
     /// step invariant forbids. A start already carries a <em>set</em> of runs, so
     /// the shape survives; only the composition changes.
     /// </para>
+    /// <para>
+    /// Under a pin the question becomes "does a saturating assignment
+    /// <b>including this resource</b> exist" — one call site, the same
+    /// computation, <see cref="SlotAssignment.TrySaturate"/> giving way to
+    /// <see cref="SlotAssignment.TrySaturateIncluding"/> (design D2). Pinning can
+    /// only constrain the assignment, so the pinned answer is a subset of the
+    /// unpinned one at every start and length.
+    /// </para>
     /// </summary>
     private static List<LengthRun> FeasibleRuns(
         List<Dictionary<DateTimeOffset, List<CandidateRun>>> byRole,
         List<int> slotsOfRole,
-        DateTimeOffset start)
+        DateTimeOffset start,
+        Guid? pinnedResourceId)
     {
         var slots = slotsOfRole.Select(role => byRole[role][start]).ToList();
 
         if (slots.Count == 1)
         {
+            // The fast path FILTERS under a pin; it does not bypass it (design D4).
+            //
+            // A single role of count 1 is by some margin the commonest
+            // configuration in the product, so threading the pin only through the
+            // general path below would ship a picker silently ignored on most
+            // sites while every multi-role test passed. Offering a start at which
+            // only *another* candidate is free is a promise the pinned placement
+            // then refuses.
+            var offers = pinnedResourceId is { } pinned
+                ? slots[0].Where(entry => entry.ResourceId == pinned).ToList()
+                : slots[0];
+
+            if (offers.Count == 0)
+            {
+                return [];
+            }
+
             // One slot in total — a single role of count 1. A saturating assignment
             // exists at a length exactly when some candidate admits it, so the
             // feasible set is the plain union and the general path would agree about
@@ -417,7 +497,7 @@ public sealed class ServiceBookingService(
             // equivalent. Deliberately NOT extended to a single role of count
             // greater than 1, which requires that many distinct resources at once
             // and is a genuine assignment question.
-            return Collapse([.. slots[0].Select(entry => entry.Run)]);
+            return Collapse([.. offers.Select(entry => entry.Run)]);
         }
 
         // Every length any candidate offers here is worth asking about, and nothing
@@ -445,7 +525,15 @@ public sealed class ServiceBookingService(
             // failure carries describes one length at one start, which is neither
             // the configuration nor the instant a booker asked about, so it is
             // deliberately dropped here rather than surfaced as a third claim.
-            if (SlotAssignment.TrySaturate(eligible).Assignment is not null)
+            //
+            // One computation with two behaviours, not two computations: the same
+            // graph, differing only in whether the assignment is required to
+            // include the pinned resource.
+            var saturates = pinnedResourceId is { } pinned
+                ? SlotAssignment.TrySaturateIncluding(eligible, pinned) is not null
+                : SlotAssignment.TrySaturate(eligible).Assignment is not null;
+
+            if (saturates)
             {
                 feasible.Add(length);
             }

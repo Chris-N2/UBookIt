@@ -91,6 +91,22 @@ public static class FailureCodes
     /// </para>
     /// </summary>
     public const string ServiceRoleCountInvalid = "service-role-count-invalid";
+
+    /// <summary>
+    /// A service names more than one visitor-selectable role. Its own code,
+    /// distinct from every other role failure, because the fault is a property of
+    /// the <em>service</em> rather than of any one role: either role would be
+    /// legal alone (visitor-selectable-role design D1).
+    /// <para>
+    /// A pinned resource names the booking rather than a role, so a booking
+    /// request carries at most one — two selectable roles could not both be
+    /// honoured by it. The failure is reported against every role in conflict, so
+    /// a consumer can mark all the rows involved rather than one chosen
+    /// arbitrarily, and it is never resolved by clearing the flag on all but one:
+    /// which one the editor meant is not derivable.
+    /// </para>
+    /// </summary>
+    public const string ServiceRoleMultipleSelectable = "service-role-multiple-selectable";
     public const string ServiceDurationInvalid = "service-duration-invalid";
     public const string ServiceNotFound = "service-not-found";
 

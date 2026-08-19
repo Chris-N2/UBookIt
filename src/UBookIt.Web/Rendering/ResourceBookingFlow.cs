@@ -18,6 +18,13 @@ public sealed record BookingFlowInput
     public FailedSubmission? Failed { get; init; }
 
     /// <summary>
+    /// The resource the URL asked for, where a service offers a choice of who
+    /// fulfils it. Null when none was named — and ignored entirely by the resource
+    /// flow, which books the resource the visitor already chose.
+    /// </summary>
+    public Guid? ChosenResourceId { get; init; }
+
+    /// <summary>
     /// The subject token to carry through the step, or null when a site author
     /// named the subject on the component and there is no flow state in the URL.
     /// </summary>

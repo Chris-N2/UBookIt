@@ -208,6 +208,13 @@ public class MultiClaimConcurrencyTests(SqlServerFixture fixture)
                 // Resources gain `DirectlyBookable`. Checked: no claim or booking
                 // table is touched, so the guarantee above still holds.
                 "20260817080001_AddDirectBookability",
+
+                // Service roles gain `VisitorSelectable`. Checked: one additive
+                // `bit` column with a false default on `uBookItServiceRole`, and
+                // no claim or booking table is touched — the guarantee above still
+                // holds. It changes what a service OFFERS, never what a booking
+                // claims.
+                "20260819103548_AddVisitorSelectableRole",
             ],
             applied.OrderBy(name => name, StringComparer.Ordinal));
 

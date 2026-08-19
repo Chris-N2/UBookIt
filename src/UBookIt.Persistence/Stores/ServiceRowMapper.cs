@@ -24,6 +24,7 @@ internal static class ServiceRowMapper
                 RequiredCapabilities = CapabilitySet
                     .Create(r.Capabilities.Select(c => (string?)c.Key), CapabilitySet.RequiredField)
                     .Value,
+                VisitorSelectable = r.VisitorSelectable,
             }),
             row.Id).Value;
 
@@ -80,6 +81,7 @@ internal static class ServiceRowMapper
                 ServiceId = service.Id,
                 ResourceType = role.ResourceType,
                 Count = role.Count,
+                VisitorSelectable = role.VisitorSelectable,
 
                 // The role's own id is database-generated, so the capability
                 // rows are attached through the navigation and let EF fill the

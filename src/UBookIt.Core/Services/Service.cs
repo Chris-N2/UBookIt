@@ -38,6 +38,31 @@ public sealed record ServiceRole(string ResourceType, int Count)
     public CapabilitySet RequiredCapabilities { get; init; } = CapabilitySet.Empty;
 
     /// <summary>
+    /// Whether a visitor booking this service may choose which resource fills
+    /// this role. Defaults to <c>false</c>, and at most one role of a service may
+    /// carry it (design D1).
+    /// <para>
+    /// Per role rather than per service because a pinned resource names the
+    /// <b>booking</b> and not a role — a resource eligible for several slots may
+    /// be pinned into any of them — so "this service offers a choice" does not say
+    /// which pool to show. For a massage needing a room and a therapist, the
+    /// honest list of pinnable resources is every room and every therapist: a
+    /// choice no visitor wants, offered beside the one they do.
+    /// </para>
+    /// <para>
+    /// It governs only what is <b>offered</b>: which pool a front end presents,
+    /// and which role a public read advertises as choosable. It is <b>not</b> a
+    /// condition of placement (design D8) — a pinned resource eligible for a role
+    /// that is not visitor-selectable is still honoured, because such a booking is
+    /// perfectly deliverable and nothing about it is wrong. Neither is it
+    /// concealment: every role's candidate pool is already computable from the
+    /// public reads, so the flag decides what is presented, never what is knowable.
+    /// A later change must not mistake it for an access control.
+    /// </para>
+    /// </summary>
+    public bool VisitorSelectable { get; init; }
+
+    /// <summary>
     /// The one validating factory for a role, so the same rules apply whether a
     /// role is being saved as part of a service or evaluated on its own for a
     /// configuration preview. A preview asks what a role resolves to, which is a
@@ -45,10 +70,17 @@ public sealed record ServiceRole(string ResourceType, int Count)
     /// role itself must still be well formed, or the answer describes something
     /// other than what was asked.
     /// </summary>
+    /// <remarks>
+    /// The at-most-one-selectable rule is deliberately NOT enforced here: it is a
+    /// property of a <em>service</em> — either role would be legal alone — so it
+    /// belongs to <see cref="Service.Create"/>, which is the only caller that can
+    /// see both roles.
+    /// </remarks>
     public static DomainResult<ServiceRole> Create(
         string? resourceType,
         IEnumerable<string?>? requiredCapabilities,
         int count = 1,
+        bool visitorSelectable = false,
         int? roleIndex = null)
     {
         var failures = new List<DomainFailure>();
@@ -67,7 +99,11 @@ public sealed record ServiceRole(string ResourceType, int Count)
         return failures.Count > 0
             ? DomainResult<ServiceRole>.Failure(failures)
             : DomainResult<ServiceRole>.Success(
-                new ServiceRole(resourceType!, count) { RequiredCapabilities = capabilities.Value });
+                new ServiceRole(resourceType!, count)
+                {
+                    RequiredCapabilities = capabilities.Value,
+                    VisitorSelectable = visitorSelectable,
+                });
     }
 
     /// <summary>
@@ -204,6 +240,8 @@ public sealed class Service
 
         failures.AddRange(DuplicateRoleFailures(roleList));
 
+        failures.AddRange(MultipleSelectableFailures(roleList));
+
         if (failures.Count > 0)
         {
             return DomainResult<Service>.Failure(failures);
@@ -297,6 +335,59 @@ public sealed class Service
                     ServiceRole.FieldFor(index, nameof(ServiceRole.ResourceType)));
             }
         }
+    }
+
+    /// <summary>
+    /// Rejects a service naming more than one visitor-selectable role (design D1).
+    /// <para>
+    /// The restriction is what keeps a booking request's pin a single
+    /// <c>Guid?</c>: a pinned resource names the booking rather than a role, so a
+    /// request carries at most one, and two selectable roles could not both be
+    /// honoured by it.
+    /// </para>
+    /// <para>
+    /// The fault is a property of the <b>service</b> rather than of any one role —
+    /// either role would be legal alone — so a failure is reported against
+    /// <em>every</em> role in conflict rather than blaming one of them
+    /// arbitrarily, and each message names all the rows involved. An editor whose
+    /// second row was marked has no way to know the first one already was, and a
+    /// message on one row would send them to change the wrong one.
+    /// </para>
+    /// <para>
+    /// Deliberately NOT resolved by clearing the flag on all but one: which one
+    /// the editor meant is not derivable, and choosing for them discards a
+    /// decision they made.
+    /// </para>
+    /// </summary>
+    private static IEnumerable<DomainFailure> MultipleSelectableFailures(List<ServiceRole> roles)
+    {
+        var selectable = roles
+            .Select((role, index) => (role, index))
+            .Where(entry => entry.role.VisitorSelectable)
+            .ToList();
+
+        if (selectable.Count < 2)
+        {
+            return [];
+        }
+
+        // Rows as an editor numbers them: the fieldset legends are 1-based, and a
+        // message naming "requirements 0 and 1" points at rows that do not exist.
+        var numbers = selectable.Select(entry => (entry.index + 1).ToString()).ToList();
+
+        var rows = numbers.Count == 2
+            ? string.Join(" and ", numbers)
+            : $"{string.Join(", ", numbers[..^1])} and {numbers[^1]}";
+
+        // "both" for the pair, which is the case an editor will almost always be
+        // in, and "all" only where there really are more than two.
+        var quantifier = numbers.Count == 2 ? "both" : "all";
+
+        return selectable.Select(entry => new DomainFailure(
+            FailureCodes.ServiceRoleMultipleSelectable,
+            "Only one requirement may let a visitor choose which resource fills it. "
+            + $"Requirements {rows} are {quantifier} marked as choosable — turn all but one off.",
+            ServiceRole.FieldFor(entry.index, nameof(ServiceRole.VisitorSelectable))));
     }
 
     /// <summary>

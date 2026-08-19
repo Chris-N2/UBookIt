@@ -57,6 +57,18 @@ public sealed class ServiceBookingFlow(
 
         var selectedDate = BookingForm.NotBefore(failed?.Date ?? input.Date ?? today, today);
 
+        // Who, before when. The choice joins this step rather than introducing a
+        // page between the times and the contact details, and the start list below
+        // is then filtered to it — "I want Jane, when can I have her?" is the
+        // question the control exists to answer (design D2).
+        //
+        // A stale choice — deleted, no longer eligible, or its role no longer
+        // selectable — resets to "any" here and the form says it has (design D11).
+        // Falling back silently would be quiet substitution; refusing to render the
+        // form would punish a visitor for a change they had no part in.
+        var choice = ServiceBookingFormBuilder.ResourceChoiceState.Resolve(
+            pools, failed?.ChosenResourceId ?? input.ChosenResourceId);
+
         var options = ServiceBookingFormBuilder.DurationOptions(pools);
 
         // Never null: an empty option set is one of the deterministic refusals
@@ -67,15 +79,20 @@ public sealed class ServiceBookingFlow(
         // One query answers every length: the form filters these starts for the
         // chosen length and reads the longest available off the same result, so
         // an unavailable length can explain itself instead of rendering blank.
+        //
+        // Pinned to the visitor's choice where they made one, so the times offered
+        // are the times that choice can actually be honoured rather than the
+        // service's own — offering a start only somebody else could serve would be
+        // a promise the pinned placement then refuses.
         var startsResult = await serviceBooking
-            .GetBookableStartsAsync(serviceId, selectedDate, selectedDate, cancellationToken)
+            .GetBookableStartsAsync(serviceId, selectedDate, selectedDate, choice.Chosen, cancellationToken)
             .ConfigureAwait(false);
 
         IReadOnlyList<ServiceBookableStart> starts = startsResult.Succeeded ? startsResult.Value : [];
 
         return new ServiceFlowOutcome(
             ServiceBookingFormBuilder.Build(
-                service, pools, selectedDate, today, starts, duration, zone, failed, input.FlowToken),
+                service, pools, selectedDate, today, starts, duration, zone, failed, input.FlowToken, choice),
             null);
     }
 }

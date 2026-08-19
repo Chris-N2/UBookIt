@@ -31,35 +31,107 @@ public static class ServiceBookingFormBuilder
     /// possibly book, which is what a control is for.
     /// </para>
     /// </summary>
+    /// <remarks>
+    /// Delegates to Core. The computation lifted when the
+    /// structural-unfulfillability triad did (design D6): an empty result here is
+    /// the third of the three questions "can this service ever be fulfilled" asks,
+    /// and the delivery API has to be able to publish the same answer. Keeping a
+    /// second implementation beside it is the fault ⑧a design D1 exists to
+    /// prevent.
+    /// </remarks>
     public static IReadOnlyList<int> DurationOptions(IReadOnlyList<RoleCandidates> pools)
+        => ServiceFulfillability.CommonLengthMinutes(pools);
+
+    /// <summary>
+    /// The visitor's choice of resource for this service: what may be chosen,
+    /// what was chosen, how many the choice is one of, and whether a stale
+    /// request had its choice reset.
+    /// <para>
+    /// A value resolved by a pure function rather than a branch inside the flow,
+    /// for the reason the two unavailable decisions are: it decides what a visitor
+    /// is offered and what reaches placement as the pin, and it must be
+    /// attackable without a host.
+    /// </para>
+    /// </summary>
+    /// <param name="Choices">
+    /// The selectable role's resolved candidate pool, by display name. Empty when
+    /// the service has no visitor-selectable role, which is the whole of "render
+    /// no control".
+    /// </param>
+    /// <param name="Chosen">The chosen resource, or null for "any".</param>
+    /// <param name="Count">
+    /// The selectable role's count. Greater than 1 means the visitor chooses one
+    /// and the rest are assigned, which the control has to say (design D5).
+    /// </param>
+    /// <param name="WasReset">
+    /// Whether a resource was requested that this service can no longer be
+    /// fulfilled by, and the choice fell back to "any" (design D11).
+    /// </param>
+    public readonly record struct ResourceChoiceState(
+        IReadOnlyList<BookingResourceChoice> Choices, Guid? Chosen, int Count, bool WasReset)
     {
-        if (pools.Count == 0)
+        public static ResourceChoiceState None { get; } = new([], null, 0, false);
+
+        /// <summary>
+        /// What the flow offers and honours, from the resolved pools and whatever
+        /// the request asked for.
+        /// <para>
+        /// The list is the selectable role's pool <b>unfiltered by date</b>
+        /// (design D10): a resource with no free time on the chosen date is still
+        /// offered, and the start list then reports that there are no times.
+        /// Filtering the people by date would make the control's contents change
+        /// under the visitor as they change the date.
+        /// </para>
+        /// <para>
+        /// Ordered by display name with the resource id as the tiebreak, so the
+        /// order is total and stable. <b>Presentation only</b> — pool order stays
+        /// ascending by resource id, which `resource-pin`, ⑦-2 and ⑨-2 all draw
+        /// determinism guarantees from, and which decides ⑨-1a's misalignment
+        /// witness.
+        /// </para>
+        /// <para>
+        /// A requested resource outside the offered list is a <em>stale</em>
+        /// choice: reset to "any" and reported as reset, never silently honoured
+        /// and never silently dropped. Nothing has been committed at this point,
+        /// so saying "the person you chose is no longer offered — choose again" is
+        /// both honest and unblocking.
+        /// </para>
+        /// </summary>
+        public static ResourceChoiceState Resolve(
+            IReadOnlyList<RoleCandidates> pools, Guid? requestedResourceId)
         {
-            return [];
-        }
+            // At most one role of a service may be visitor-selectable, so the
+            // first is the only one. `Service.Create` rejects a second, and this
+            // takes no view of its own on which one an editor meant.
+            var selectable = pools.FirstOrDefault(pool => pool.Role.VisitorSelectable);
 
-        HashSet<int>? shared = null;
-
-        foreach (var pool in pools)
-        {
-            var offered = pool.Candidates
-                .SelectMany(candidate => BookingForm.LengthGrid(
-                    (int)candidate.Range.Min.TotalMinutes,
-                    (int)candidate.Range.Max.TotalMinutes,
-                    (int)candidate.Granularity.TotalMinutes))
-                .ToHashSet();
-
-            if (shared is null)
+            if (selectable is null)
             {
-                shared = offered;
+                // No control, and therefore no choice to honour — including for a
+                // request that named one. A pin offered by no control is not this
+                // flow's to act on; placement still accepts one from a caller that
+                // has its own reasons (design D8), and this flow is not one.
+                return None;
             }
-            else
-            {
-                shared.IntersectWith(offered);
-            }
-        }
 
-        return [.. shared!.Order()];
+            var choices = selectable.Candidates
+                .Select(candidate => new BookingResourceChoice(
+                    candidate.ResourceId, candidate.Resource.DisplayName))
+                .OrderBy(choice => choice.Name, StringComparer.CurrentCultureIgnoreCase)
+                .ThenBy(choice => choice.Id)
+                .ToList();
+
+            var honoured = requestedResourceId is { } requested
+                && choices.Any(choice => choice.Id == requested)
+                    ? requestedResourceId
+                    : null;
+
+            return new ResourceChoiceState(
+                choices,
+                honoured,
+                selectable.Role.Count,
+                WasReset: requestedResourceId is not null && honoured is null);
+        }
     }
 
     /// <summary>
@@ -170,12 +242,17 @@ public static class ServiceBookingFormBuilder
         int durationMinutes,
         TimeZoneInfo zone,
         FailedSubmission? failed = null,
-        string? flowToken = null)
+        string? flowToken = null,
+        ResourceChoiceState choice = default)
     {
         var duration = TimeSpan.FromMinutes(durationMinutes);
 
         return new ServiceFormModel
         {
+            ResourceChoices = choice.Choices ?? [],
+            ChosenResourceId = choice.Chosen,
+            ResourceChoiceCount = choice.Count,
+            ResourceChoiceWasReset = choice.WasReset,
             FlowToken = flowToken,
             ServiceId = service.Id,
             ServiceName = service.Name,

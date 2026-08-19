@@ -24,6 +24,16 @@
            remove the field, and a length is required of every service precisely
            so a permitted one is never silently substituted (design D5). *@
         <input type="hidden" name="DurationMinutes" value="@Model.DurationMinutes" />
+
+        @* The visitor's choice of who, carried to the POST so the booking placed
+           is the booking that was offered. Rendered only when a choice was
+           actually made through the control above — a service with no
+           visitor-selectable role has no choices, renders no control, and emits
+           no field by which a pin could be submitted. *@
+        @if (Model.ChosenResourceId is { } chosenResource)
+        {
+            <input type="hidden" name="@nameof(ServiceBookingSubmission.PinnedResourceId)" value="@chosenResource" />
+        }
         @if (Model.FlowToken is { } token)
         {
             <input type="hidden" name="@nameof(ServiceBookingSubmission.Subject)" value="@token" />

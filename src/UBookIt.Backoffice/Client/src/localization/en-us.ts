@@ -143,6 +143,21 @@ export default {
     requirementCount: "How many at once",
     requirementCountHint: "Two or more means that many different resources, all free at the same time.",
 
+    // Turning this on publishes that requirement's resources as a list of
+    // choices on the site, so the label says the consequence rather than leaving
+    // it to be discovered there. Off by default: whether to publish who works
+    // here is the business's call — a salon wants it, a clinic rotating whoever
+    // is free may actively not.
+    requirementSelectable: "Let visitors choose who",
+    requirementSelectableHint:
+      "Visitors booking this service will see the resources that can fill this requirement, by name, and may choose one.",
+
+    // Where the count is greater than one the choice is one OF that many, and the
+    // rest are assigned. An editor who believed they were offering a choice of
+    // all of them would be configuring something the product does not do.
+    requirementSelectableManyHint:
+      "Visitors will see the resources that can fill this requirement, by name, and may choose ONE of them. The rest are assigned automatically.",
+
     // ---------------------------------------------------------- resolution summary
     //
     // ⑧'s capability-only wording is gone. The summary now evaluates every

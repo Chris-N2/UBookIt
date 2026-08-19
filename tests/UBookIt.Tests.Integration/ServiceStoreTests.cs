@@ -278,4 +278,71 @@ public class ServiceStoreTests(SqlServerFixture fixture)
         Assert.Equal([1, 2, 1], once.Roles.Select(r => r.Count));
         Assert.Equal(["cert-x"], once.Roles[2].RequiredCapabilities.Keys);
     }
+
+    [Fact]
+    public async Task A_visitor_selectable_role_round_trips_and_others_load_as_not_selectable()
+    {
+        fixture.EnsureAvailable();
+
+        var service = Service.Create(
+            "Massage",
+            ServiceDuration.Fixed(TimeSpan.FromMinutes(60)).Value,
+            [
+                new ServiceRole("room", 1),
+                new ServiceRole("therapist", 1) { VisitorSelectable = true },
+            ]).Value;
+
+        await using (var context = fixture.CreateContext())
+        {
+            Assert.True((await new SqlServiceManagementStore(context).CreateAsync(service, Ct)).Succeeded);
+        }
+
+        await using var read = fixture.CreateContext();
+        var fetched = await new SqlServiceStore(read).GetAsync(service.Id, Ct);
+
+        Assert.NotNull(fetched);
+
+        // Value-equal to what was saved, which is the whole claim: the flag is
+        // part of the role's identity, so a column that failed to round-trip would
+        // make the re-read service compare unequal.
+        Assert.Equal(service.Roles, fetched!.Roles);
+
+        Assert.True(Assert.Single(fetched.Roles, r => r.ResourceType == "therapist").VisitorSelectable);
+        Assert.False(Assert.Single(fetched.Roles, r => r.ResourceType == "room").VisitorSelectable);
+    }
+
+    [Fact]
+    public async Task A_role_row_written_without_the_column_loads_as_not_selectable()
+    {
+        // The migration's promise: the column is a `bit` with a false default, so
+        // every role stored before it existed loads as not selectable and no
+        // service changes behaviour. Written by an INSERT that names no
+        // VisitorSelectable at all — which is exactly what a pre-upgrade row is.
+        fixture.EnsureAvailable();
+
+        var service = Service.Create(
+            "Legacy",
+            ServiceDuration.Fixed(TimeSpan.FromMinutes(60)).Value,
+            [new ServiceRole("room", 1)]).Value;
+
+        await using (var context = fixture.CreateContext())
+        {
+            await context.Database.ExecuteSqlRawAsync(
+                "INSERT INTO uBookItService (Id, Name, DurationKind, MinDurationMinutes, MaxDurationMinutes) "
+                + "VALUES ({0}, {1}, {2}, {3}, {4})",
+                [service.Id, service.Name, nameof(ServiceDurationKind.Fixed), 60, 60],
+                Ct);
+
+            await context.Database.ExecuteSqlRawAsync(
+                "INSERT INTO uBookItServiceRole (ServiceId, ResourceType, Count) VALUES ({0}, {1}, {2})",
+                [service.Id, "room", 1],
+                Ct);
+        }
+
+        await using var read = fixture.CreateContext();
+        var fetched = await new SqlServiceStore(read).GetAsync(service.Id, Ct);
+
+        Assert.NotNull(fetched);
+        Assert.False(Assert.Single(fetched!.Roles).VisitorSelectable);
+    }
 }

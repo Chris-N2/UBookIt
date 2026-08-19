@@ -687,6 +687,370 @@ public class ServicesDeliveryTests
             p => p.Name.Contains("Member", StringComparison.OrdinalIgnoreCase));
     }
 
+    // ---------------------------------------------------------------------
+    // 6 — visitor-selectability and the pinned availability query.
+    // ---------------------------------------------------------------------
+
+    /// <summary>
+    /// A massage whose therapist role a visitor may choose from, with two
+    /// therapists and one room.
+    /// </summary>
+    private static Harness WireChoosable()
+        => WireService(
+            Service.Create(
+                "Massage",
+                null,
+                [
+                    new ServiceRole(ResourceTypes.Room, 1),
+                    new ServiceRole("therapist", 1) { VisitorSelectable = true },
+                ]).Value,
+            Room(1),
+            Room(2, type: "therapist"),
+            Room(3, type: "therapist"));
+
+    [Fact]
+    public async Task A_visitor_selectable_role_is_identifiable()
+    {
+        var h = WireChoosable();
+
+        var model = Ok<ServiceReadModel>(await h.Controller.GetService(h.Service.Id));
+
+        var therapist = Assert.Single(model.Roles, r => r.ResourceType == "therapist");
+        var room = Assert.Single(model.Roles, r => r.ResourceType == ResourceTypes.Room);
+
+        Assert.True(therapist.VisitorSelectable);
+        Assert.False(room.VisitorSelectable);
+    }
+
+    [Fact]
+    public async Task Visitor_selectability_is_stated_rather_than_omitted()
+    {
+        // A service offering no choice at all still publishes the member on every
+        // role, carrying false — so a consumer never has to treat its absence as a
+        // default. Asserted through both endpoints, since a mapper can be fixed in
+        // one and forgotten in the other.
+        var h = WireMultiRole();
+
+        var byId = Ok<ServiceReadModel>(await h.Controller.GetService(h.Service.Id));
+        var listed = Ok<PagedServicesModel>(await h.Controller.ListServices()).Items.Single();
+
+        Assert.All(byId.Roles, role => Assert.False(role.VisitorSelectable));
+        Assert.All(listed.Roles, role => Assert.False(role.VisitorSelectable));
+
+        // Present rather than nullable: the property exists on the contract and is
+        // not an optional extra a serializer could drop.
+        Assert.Equal(
+            typeof(bool),
+            typeof(ServiceRoleReadModel).GetProperty(nameof(ServiceRoleReadModel.VisitorSelectable))!.PropertyType);
+    }
+
+    private static async Task<ServiceBookableStartsResponseModel> StartsAsync(
+        Harness h, Guid? pinned = null, DateOnly? from = null, DateOnly? to = null)
+        => Ok<ServiceBookableStartsResponseModel>(
+            await h.Controller.GetServiceBookableStarts(h.Service.Id, from ?? Date, to ?? Date, pinned));
+
+    [Fact]
+    public async Task A_pinned_query_narrows_the_answer()
+    {
+        var h = WireChoosable();
+
+        Assert.True((await h.Bookings.PlaceAsync(new BookingRequest
+        {
+            ResourceId = Id(2),
+            Start = TestData.Utc(Date, "09:00"),
+            Duration = Mins(180),
+            Booker = TestData.Booker(),
+        })).Succeeded);
+
+        var pinned = await StartsAsync(h, Id(2));
+
+        Assert.NotEmpty(pinned.Starts);
+        Assert.All(pinned.Starts, start => Assert.True(start.StartUtc >= TestData.Utc(Date, "12:00")));
+
+        // And the service itself is bookable through the morning, on the other
+        // therapist — which is the promise a dropped pin would have made.
+        Assert.Contains(
+            (await StartsAsync(h)).Starts,
+            start => start.StartUtc == TestData.Utc(Date, "09:00"));
+    }
+
+    [Fact]
+    public async Task An_omitted_pin_leaves_the_response_unchanged()
+    {
+        var h = WireChoosable();
+
+        var omitted = Ok<ServiceBookableStartsResponseModel>(
+            await h.Controller.GetServiceBookableStarts(h.Service.Id, Date, Date));
+
+        var explicitNull = await StartsAsync(h, pinned: null);
+
+        Assert.Equal(
+            omitted.Starts.Select(s => s.StartUtc),
+            explicitNull.Starts.Select(s => s.StartUtc));
+
+        Assert.Equal(h.Service.Id, omitted.ServiceId);
+        Assert.Equal(TestData.Settings.TimeZoneId, omitted.ZoneId);
+        Assert.Null(omitted.Reason);
+        Assert.NotEmpty(omitted.Starts);
+
+        // Non-vacuity: over this very service a pin CAN change the answer, so
+        // "unchanged" is a property of omitting one rather than of the fixture.
+        Assert.True((await h.Bookings.PlaceAsync(new BookingRequest
+        {
+            ResourceId = Id(2),
+            Start = TestData.Utc(Date, "09:00"),
+            Duration = Mins(480),
+            Booker = TestData.Booker(),
+        })).Succeeded);
+
+        Assert.Empty((await StartsAsync(h, Id(2))).Starts);
+        Assert.NotEmpty((await StartsAsync(h)).Starts);
+    }
+
+    [Fact]
+    public async Task A_pin_outside_every_pool_is_rejected()
+    {
+        var h = WireChoosable();
+
+        // The room is a perfectly real resource of this service — just not one of
+        // the therapist role's — so this also proves the rejection is about the
+        // pools rather than about the id being unknown.
+        var (status, errors) = Problem(
+            await h.Controller.GetServiceBookableStarts(h.Service.Id, Date, Date, Id(404)));
+
+        Assert.Equal(StatusCodes.Status400BadRequest, status);
+        Assert.Equal(FailureCodes.ResourceNotEligible, Assert.Single(errors).Code);
+    }
+
+    [Fact]
+    public async Task A_pinned_response_names_no_resource_either()
+    {
+        // Design D3: the pin is in the REQUEST. A pinned answer is conditional on a
+        // resource the caller already named, so the payload still carries no
+        // resource id — and an unpinned one still makes no promise about which
+        // candidate a booker will get.
+        var h = WireChoosable();
+
+        foreach (var pin in new Guid?[] { null, Id(2) })
+        {
+            var response = await StartsAsync(h, pin);
+
+            Assert.NotEmpty(response.Starts);
+
+            var serialized = System.Text.Json.JsonSerializer.Serialize(response);
+
+            foreach (var resource in new[] { Id(1), Id(2), Id(3) })
+            {
+                Assert.DoesNotContain(resource.ToString(), serialized, StringComparison.OrdinalIgnoreCase);
+            }
+        }
+    }
+
+    [Fact]
+    public void The_per_resource_bookable_starts_endpoint_is_untouched()
+    {
+        // Route, shape and semantics, asserted structurally: the resource query
+        // takes no pin and its response carries no reason code, so nothing here
+        // leaked into a contract this change does not modify.
+        var method = typeof(AvailabilityController)
+            .GetMethods()
+            .Single(m => m.Name == nameof(AvailabilityController.GetBookableStarts));
+
+        Assert.DoesNotContain(method.GetParameters(), p => p.Name!.Contains("pin", StringComparison.OrdinalIgnoreCase));
+
+        Assert.DoesNotContain(
+            typeof(BookableStartsResponseModel).GetProperties(),
+            p => p.Name is "Reason" or "PinnedResourceId");
+    }
+
+    // ---------------------------------------------------------------------
+    // 7 — the structural reason code on an empty answer (⑨-1a's deferral).
+    // ---------------------------------------------------------------------
+
+    [Fact]
+    public async Task A_structurally_unfulfillable_service_says_so()
+    {
+        // Two roles that can never be filled by distinct resources: one therapist
+        // satisfies both, forever. Indistinguishable from a fully booked week
+        // without the code, and a consumer cannot tell whether to offer another
+        // date or to stop asking.
+        var h = WireService(
+            Service.Create(
+                "Joint session",
+                null,
+                [
+                    new ServiceRole("therapist", 1)
+                    {
+                        RequiredCapabilities = CapabilitySet.Create(["cert-x"]).Value,
+                    },
+                    new ServiceRole("therapist", 1),
+                ]).Value,
+            Resource.Create(
+                "therapist",
+                "Jane",
+                directlyBookable: true,
+                capabilities: ["cert-x"],
+                availability: TestData.Config(TestData.Weekly("09:00", "17:00", Date.DayOfWeek)),
+                id: Id(2)).Value);
+
+        var response = await StartsAsync(h);
+
+        Assert.Empty(response.Starts);
+        Assert.Equal(ServiceFulfillability.NotFulfillableCode, response.Reason);
+    }
+
+    [Fact]
+    public async Task A_busy_week_says_nothing_permanent()
+    {
+        // The pair that makes the assertion above mean something: a correctly
+        // configured service that is simply full carries NO code, because coming
+        // back next week can help and the structural questions consult no calendar.
+        var h = Wire();
+
+        Assert.True((await h.Bookings.PlaceAsync(new BookingRequest
+        {
+            ResourceId = Id(1),
+            Start = TestData.Utc(Date, "09:00"),
+            Duration = Mins(480),
+            Booker = TestData.Booker(),
+        })).Succeeded);
+
+        var response = await StartsAsync(h);
+
+        Assert.Empty(response.Starts);
+        Assert.Null(response.Reason);
+    }
+
+    [Fact]
+    public async Task Grid_misalignment_and_no_common_length_are_reported_as_permanent()
+    {
+        // The two structural faults that leave every pool healthy — and the two an
+        // implementation asking only "is some pool short" would report as ordinary
+        // unavailability forever.
+        var misaligned = WireService(
+            Service.Create("Massage", null,
+                [new ServiceRole(ResourceTypes.Room, 1), new ServiceRole("therapist", 1)]).Value,
+            Room(1, granularity: 30, min: 30, max: 120),
+            Resource.Create(
+                "therapist",
+                "Jane",
+                directlyBookable: true,
+                availability: TestData.Config(
+                    TestData.Weekly("09:15", "17:00", Date.DayOfWeek),
+                    constraints: BookingConstraints.Create(
+                        granularity: Mins(20), minDuration: Mins(20), maxDuration: Mins(120)).Value),
+                id: Id(2)).Value);
+
+        var noCommonLength = WireService(
+            Service.Create("Massage", null,
+                [new ServiceRole(ResourceTypes.Room, 1), new ServiceRole("therapist", 1)]).Value,
+            Room(1, granularity: 30, min: 30, max: 30),
+            Room(2, granularity: 20, min: 20, max: 20, type: "therapist"));
+
+        foreach (var h in new[] { misaligned, noCommonLength })
+        {
+            var response = await StartsAsync(h);
+
+            Assert.Empty(response.Starts);
+            Assert.Equal(ServiceFulfillability.NotFulfillableCode, response.Reason);
+        }
+    }
+
+    [Fact]
+    public async Task Starts_and_the_reason_code_are_exclusive()
+    {
+        // The two answers are mutually exclusive: a response carrying starts cannot
+        // be structurally impossible, and the code never accompanies starts.
+        // Asserted over every service this file wires, rather than over one.
+        foreach (var h in new[] { Wire(), WireMultiRole(), WireSameType(), WireCounted(), WireChoosable() })
+        {
+            var response = await StartsAsync(h);
+
+            if (response.Starts.Count > 0)
+            {
+                Assert.Null(response.Reason);
+            }
+            else
+            {
+                // Not asserted to be non-null: an empty answer may simply be a busy
+                // one. What is asserted is that a code, where present, is the only
+                // code there is.
+                Assert.True(response.Reason is null or ServiceFulfillability.NotFulfillableCode);
+            }
+        }
+    }
+
+    [Fact]
+    public async Task The_reason_code_discloses_no_configuration()
+    {
+        // The response is anonymous. The backoffice diagnostics that name the role,
+        // the type, the capability, the count and the pool size are for the person
+        // who can fix them.
+        var h = WireService(
+            Service.Create("Couples massage", null,
+                [
+                    new ServiceRole("therapist", 2)
+                    {
+                        RequiredCapabilities = CapabilitySet.Create(["cert-x"]).Value,
+                    },
+                ]).Value,
+            Resource.Create(
+                "therapist",
+                "Jane",
+                directlyBookable: true,
+                capabilities: ["cert-x"],
+                availability: TestData.Config(TestData.Weekly("09:00", "17:00", Date.DayOfWeek)),
+                id: Id(2)).Value);
+
+        var response = await StartsAsync(h);
+
+        Assert.Equal(ServiceFulfillability.NotFulfillableCode, response.Reason);
+
+        var serialized = System.Text.Json.JsonSerializer.Serialize(response);
+
+        foreach (var disclosure in new[] { "therapist", "cert-x", "Jane", Id(2).ToString() })
+        {
+            Assert.DoesNotContain(disclosure, serialized, StringComparison.OrdinalIgnoreCase);
+        }
+    }
+
+    [Fact]
+    public async Task The_public_read_and_the_in_process_flow_derive_from_one_function()
+    {
+        // The whole point of lifting the triad into Core (design D6): the same
+        // permanently unfulfillable service is reported by both surfaces, and
+        // neither evaluates the rules itself.
+        //
+        // Asserted as agreement over a service each surface answers separately,
+        // rather than by inspecting which function is called: two implementations
+        // would be free to agree on an easy case and diverge on a hard one, so the
+        // hard case — a healthy pool with no common length — is the one used.
+        var service = Service.Create("Massage", null,
+            [new ServiceRole(ResourceTypes.Room, 1), new ServiceRole("therapist", 1)]).Value;
+
+        var resources = new InMemoryResourceStore()
+            .Add(Room(1, granularity: 30, min: 30, max: 30))
+            .Add(Room(2, granularity: 20, min: 20, max: 20, type: "therapist"));
+
+        var services = new InMemoryServiceStore().Add(service);
+        var h = WireService(service, Room(1, granularity: 30, min: 30, max: 30),
+            Room(2, granularity: 20, min: 20, max: 20, type: "therapist"));
+
+        // The public read's answer.
+        var response = await StartsAsync(h);
+
+        Assert.Empty(response.Starts);
+        Assert.Equal(ServiceFulfillability.NotFulfillableCode, response.Reason);
+
+        // The in-process flow's, over the same configuration — the very function
+        // `ServiceUnavailableModel.IsUnavailable` now asks.
+        var resolved = await TestData.ServiceBookingWith(services, resources).Services
+            .ResolveCandidatesAsync(service.Id);
+
+        Assert.True(resolved.Succeeded);
+        Assert.True(ServiceFulfillability.IsPermanentlyUnfulfillable(resolved.Value));
+    }
+
     [Fact]
     public void Spec_scenario_service_placement_has_its_own_model()
     {

@@ -64,7 +64,47 @@ public static class BookingMessages
         // configuration-time page: this one means the service could not be found
         // at all, which is a fault rather than an answer about times.
         [FailureCodes.ServiceNotFound] = "Sorry, this service could not be found.",
+
+        // A refused CHOICE, which is a different fact from the service having no
+        // availability and has a different next step: choose another time, or let
+        // the service assign anyone. Collapsing it into "no times available" would
+        // send the visitor to change the date when the date is not the problem.
+        //
+        // This is the wording for a chosen resource whose name could not be read.
+        // Where it can, the flow says it — see PinnedUnavailable.
+        [FailureCodes.PinnedResourceUnavailable] =
+            "The person you chose is not available at the time you chose. "
+            + "Please choose another time, or let us assign anyone who is free.",
+
+        // The visitor named a resource this service cannot be fulfilled by at all
+        // — a stale link, or a hand-made submission. Refused rather than absorbed
+        // into a booking for somebody else, and worded so the way forward is the
+        // choice control rather than the calendar.
+        [FailureCodes.ResourceNotEligible] =
+            "The person you chose is no longer offered for this service. "
+            + "Please choose again, or let us assign anyone who is free.",
     };
+
+    /// <summary>
+    /// The refusal for a pinned resource that could not be booked, naming the
+    /// resource the visitor chose.
+    /// <para>
+    /// Naming it is compatible with the rule that a visitor-facing refusal carries
+    /// no configuration (design D12) rather than an exception to it: the visitor
+    /// supplied the name, and none of the five prohibited facts — the role, the
+    /// resource type, the required capability, the count, how many resources exist
+    /// — is disclosed. A narrow permission for a resource the visitor themselves
+    /// chose, and no licence to name one they did not.
+    /// </para>
+    /// <para>
+    /// A function rather than a map entry because the map is from the code, and
+    /// the code alone — which is exactly what keeps the backoffice diagnostic out
+    /// of the visitor's page, and must stay true.
+    /// </para>
+    /// </summary>
+    public static string PinnedUnavailable(string resourceName)
+        => $"{resourceName} is not available at the time you chose. "
+            + "Please choose another time, or let us assign anyone who is free.";
 
     public const string Fallback = "Sorry, your booking could not be completed. Please try again.";
 
@@ -97,6 +137,13 @@ public static class BookingMessages
                 // Duration bounds concern the length control specifically.
                 FailureCodes.DurationTooShort
                     or FailureCodes.DurationTooLong => BookingFieldIds.Duration,
+
+                // Both concern the resource the visitor chose, so they point at
+                // the control that chose it — where "anyone" is one keystroke
+                // away. Pointing at the time list would offer only half the way
+                // forward, and for an ineligible resource none of it.
+                FailureCodes.PinnedResourceUnavailable
+                    or FailureCodes.ResourceNotEligible => BookingFieldIds.Resource,
 
                 // `granularity` is deliberately left on the time list: Core
                 // raises it both for a misaligned start and for a length off
