@@ -186,4 +186,102 @@
       Every requirement grew; none shrank, and no scenario title or SHALL sentence
       from the current spec is absent from its replacement. Nothing was
       deliberately dropped, so the proposal needs no removal statement.
-- [ ] 10.7 Hand to `qa-review` in a **fresh context or subagent** — never the context that wrote the code.
+- [x] 10.7 Hand to `qa-review` in a **fresh context or subagent** — never the context that wrote the code.
+
+## 11. QA round 1 — REJECT, remediated
+
+Two MAJORs, three MINORs, three NITs. Both MAJORs were on the Web edge and both
+were real; the Core work was found well covered, and the D4 and D6 claims were
+independently re-verified by the reviewer.
+
+- [x] 11.1 **MAJOR — a flag-cleared stale choice reset silently.**
+      `ResourceChoiceState.Resolve` returned `None` when no role was selectable,
+      and `None` carries `WasReset: false`; the notice also lived inside the
+      view's `@if (Model.OffersResourceChoice)` branch. So for the third of design
+      D11's three causes — the editor turns the picker off while a bookmarked
+      "book with Jane" link is in the wild — the message was *structurally
+      unreachable*, and the visitor got a form that would book anyone with nothing
+      saying their choice had been dropped. That is exactly the quiet substitution
+      D11 exists to prevent.
+      **Fix:** `Resolve` now reports `WasReset` for a request that named a
+      resource even when there is no selectable role, and the view renders the
+      notice in its own branch outside the control's guard.
+      **Test:** `A_choice_whose_role_is_no_longer_selectable_is_reset_and_said_so`
+      now asserts the "says so" half (it previously asserted only the reset — a
+      test written to the implementation), plus
+      `The_reset_notice_is_rendered_even_where_no_control_remains` over the
+      markup, since no C# test renders Razor. Mutation-checked: restoring `None`
+      turns it red.
+
+- [x] 11.2 **MAJOR — the path that names a refused pin had no covering test.**
+      QA proved it: forcing the controller's guard to always use the generic
+      wording left all 762 tests green. The only assertion touching it was
+      `Assert.Contains("Jane", BookingMessages.PinnedUnavailable("Jane"))` — a
+      tautology over the helper that never exercised the controller.
+      **Fix:** the decision moved out of the surface controller into
+      `BookingMessages.ForFailures(failures, chosenResourceName)`, host-free for
+      the same reason `BuildConfirmation` is. The controller keeps only the store
+      read, and only when a pin was actually refused.
+      **Test:** `A_refused_pin_is_named_on_the_page_the_visitor_sees` and
+      `An_unreadable_name_still_says_what_happened`, the second checking the
+      fallback *and* that no other code's message changes when a name is present.
+      Mutation-checked: dropping the substitution turns both red.
+
+      *One correction to the QA report, on a fact rather than a finding.* It
+      states the refusal "is also not reachable in the TestSite as configured" and
+      that §9.2's claim to have exercised a busy person is therefore unsupported.
+      The first half is right and useful: via the documented `?flow=<id>` harness
+      the subject is author-named, so the redirect is bare and the redraw never
+      renders the flow. The apply pass reached it the other way — `?flow&ubBook=s:<id>`,
+      the catalogue-token form — and did observe the rendered page: *"Frank (cap)
+      is not available at the time you chose…"*, with the summary linking to
+      `#ubookit-who` and the select carrying `aria-invalid="true"`. So the
+      behaviour had been seen; what it lacked, and what mattered, was a test. The
+      finding stands.
+
+- [x] 11.3 **MINOR — both carriers of the choice across POST→redirect→GET were
+      individually disableable with the suite green.** Now covered by
+      `A_failed_submission_redraws_the_visitors_own_choice` (the TempData carrier,
+      which is the only live one for an author-named single-service site) and
+      `The_redirect_after_a_submission_carries_the_chosen_resource` (the URL
+      carrier), the latter also asserting no empty parameter appears when nobody
+      was chosen.
+
+- [x] 11.4 **MINOR — the delivery API base controller repeated the falsehood task
+      10.5 corrects in the spec.** Its doc comment listed the default front end as
+      a symmetric consumer of the delivery API. Corrected in source, with the
+      reason stated, so the shipped code and the spec will agree once 10.5 lands.
+
+- [x] 11.5 **NIT — the reset notice carried `class="ubookit-field-error"`.** It is
+      a notice rather than a validation failure and correctly sets no
+      `aria-invalid`, so the class disagreed with the semantics. Now
+      `ubookit-notice`.
+
+- [x] 11.6 **NIT — the new messages said "The person you chose".** Nothing
+      restricts a visitor-selectable role to a person-like type, so a site
+      offering a choice of room was told about a person. The two failure messages
+      are now type-neutral ("Your choice…", "let us pick for you"). The control's
+      own wording — "Who would you like?", "Anyone who is available" — is left as
+      the spec's own vocabulary: the requirement is titled "A visitor may choose
+      **who** fulfils a service" and every scenario is about people, so changing
+      that is a propose-time decision rather than an apply-time one.
+
+- [ ] 11.7 **MINOR, accepted with reason — `StructuralReasonAsync` resolves the
+      pools a second time.** Correct but wasteful: every empty availability
+      response pays a second pool resolution, and a fully booked week is the
+      common empty answer. Not fixed here because the cheap fixes are worse than
+      the cost — threading the pools out means either widening
+      `GetBookableStartsAsync`'s return type (a published contract, for a
+      performance detail) or resolving them in the controller and passing them in,
+      which would give the controller a second way to compute what Core already
+      computes, and that is the drift design D6 exists to prevent. Flagged for
+      whoever next touches the availability contract, where the change belongs.
+
+- [ ] 11.8 **NIT, accepted — a pin with no times renders "No times are available
+      on \<date\>".** Literally false about the *service*, and offers only one of
+      the two ways forward. It is what the spec's own scenario asks for ("choosing
+      them shows the no-times message", design D10), so changing it needs a spec
+      change rather than an implementation one. Recorded for a follow-up.
+
+- [x] 11.9 Re-verify: clean `--no-incremental` build at **0 warnings**; 767 unit
+      (was 762 — five added), 58 integration, 69 client, all green.

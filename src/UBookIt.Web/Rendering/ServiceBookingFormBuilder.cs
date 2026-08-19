@@ -111,7 +111,16 @@ public static class ServiceBookingFormBuilder
                 // request that named one. A pin offered by no control is not this
                 // flow's to act on; placement still accepts one from a caller that
                 // has its own reasons (design D8), and this flow is not one.
-                return None;
+                //
+                // But a request that DID name one is still a stale choice, and the
+                // third of D11's three causes: the resource may be perfectly
+                // eligible and the editor has simply turned the picker off. It
+                // resets like the other two, and it SAYS SO like the other two —
+                // returning `None` here made the notice structurally unreachable
+                // for this cause, so a bookmarked "book with Jane" link quietly
+                // became a booking for anyone. QA found it.
+                return new ResourceChoiceState(
+                    [], null, 0, WasReset: requestedResourceId is not null);
             }
 
             var choices = selectable.Candidates

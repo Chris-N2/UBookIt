@@ -963,16 +963,152 @@ public class ServiceFrontendTests
     }
 
     [Fact]
-    public async Task A_choice_whose_role_is_no_longer_selectable_is_stale_too()
+    public async Task A_choice_whose_role_is_no_longer_selectable_is_reset_and_said_so()
     {
-        // The same reset, reached the other way: the resource still exists and is
-        // still eligible, but the editor has turned the choice off. A link carrying
-        // it must not go on pinning a resource the site no longer offers.
+        // The third of design D11's three causes, and the one QA found silently
+        // dropping its message: the resource still exists and is still perfectly
+        // eligible, and the editor has simply turned the picker off. A link
+        // carrying it must not go on pinning a resource the site no longer offers
+        // — and must not do so QUIETLY, which is the half this test used to miss.
         var outcome = await Massage().Flow.BuildAsync(Id(900), Choosing(Id(2)));
 
         Assert.NotNull(outcome.Form);
         Assert.Null(outcome.Form.ChosenResourceId);
         Assert.False(outcome.Form.OffersResourceChoice);
+
+        // Says so. Without this the visitor gets a form that will book anyone,
+        // with nothing on the page reporting that their choice was dropped.
+        Assert.True(outcome.Form.ResourceChoiceWasReset);
+
+        // Non-vacuity: a request naming NOBODY is not a reset, so the flag means
+        // "your choice was dropped" rather than "this service offers no choice".
+        var unchosen = await Massage().Flow.BuildAsync(Id(900), On(Date, 60));
+        Assert.False(unchosen.Form!.ResourceChoiceWasReset);
+    }
+
+    [Fact]
+    public void The_reset_notice_is_rendered_even_where_no_control_remains()
+    {
+        // The markup half, because no C# test renders Razor and the defect was
+        // exactly a message put where it could never appear: the notice lived
+        // inside the control's own branch, so for the flag-cleared cause — the one
+        // with no control left — it was structurally unreachable.
+        var markup = RepoFiles.Read("src/UBookIt.Web/Views/Shared/UBookIt/_DateAndLength.cshtml");
+
+        Assert.Contains(
+            "@if (!Model.OffersResourceChoice && Model.ResourceChoiceWasReset)",
+            markup,
+            StringComparison.Ordinal);
+
+        // And both branches say it, or the guard above would merely move the gap.
+        Assert.Equal(2, Regex.Matches(markup, @"id=""ubookit-who-reset""").Count);
+    }
+
+    [Fact]
+    public void A_refused_pin_is_named_on_the_page_the_visitor_sees()
+    {
+        // QA's mutation: with the naming inside the surface controller, forcing the
+        // generic wording left all 762 tests green, because the only covering
+        // assertion was a tautology over the message helper. The decision now lives
+        // where it can be attacked without a host, and this exercises THAT.
+        var failures = new[]
+        {
+            new DomainFailure(
+                FailureCodes.PinnedResourceUnavailable,
+                "Resource 00000000-0000-0000-0000-000000000002 could not be booked for this service at that time.",
+                nameof(ServiceBookingRequest.PinnedResourceId)),
+        };
+
+        var named = BookingMessages.ForFailures(failures, "Jane").Single();
+
+        Assert.Contains("Jane", named.Message, StringComparison.Ordinal);
+        Assert.Equal(BookingFieldIds.Resource, named.FieldId);
+
+        // Never the domain's own text, which names a raw id.
+        Assert.DoesNotContain("00000000", named.Message, StringComparison.Ordinal);
+
+        // And it discloses nothing else about the configuration (design D12).
+        foreach (var forbidden in new[] { Therapist, "capabilit", "role" })
+        {
+            Assert.DoesNotContain(forbidden, named.Message, StringComparison.OrdinalIgnoreCase);
+        }
+    }
+
+    [Fact]
+    public void An_unreadable_name_still_says_what_happened()
+    {
+        // The fallback, and the pair that keeps the assertion above honest: a
+        // rule that always used the generic wording would pass a test that only
+        // checked this one.
+        var failures = new[] { new DomainFailure(FailureCodes.PinnedResourceUnavailable, "x") };
+
+        var generic = BookingMessages.ForFailures(failures, chosenResourceName: null).Single();
+        var named = BookingMessages.ForFailures(failures, "Jane").Single();
+
+        Assert.NotEqual(generic.Message, named.Message);
+
+        // Still says what happened rather than "no times available", and still
+        // offers both ways forward.
+        Assert.DoesNotContain("no times", generic.Message, StringComparison.OrdinalIgnoreCase);
+        Assert.Contains("another time", generic.Message, StringComparison.OrdinalIgnoreCase);
+
+        // A name is used ONLY for the code it belongs to: every other failure
+        // renders identically whether or not a resource was chosen.
+        foreach (var code in AllFailureCodes().Where(c => c != FailureCodes.PinnedResourceUnavailable))
+        {
+            Assert.Equal(
+                BookingMessages.ForFailures([new DomainFailure(code, "x")], null).Single().Message,
+                BookingMessages.ForFailures([new DomainFailure(code, "x")], "Jane").Single().Message);
+        }
+    }
+
+    [Fact]
+    public async Task A_failed_submission_redraws_the_visitors_own_choice()
+    {
+        // The choice survives POST → redirect → GET by two independent carriers,
+        // and QA showed either could be disabled with the whole suite green. This
+        // covers the one that is the ONLY live carrier for an author-named service
+        // flow — the single-service site the design explicitly supports, where
+        // there is no subject token and so no query string to ride on.
+        var harness = Choosable();
+
+        var outcome = await harness.Flow.BuildAsync(
+            Id(900),
+            new BookingFlowInput
+            {
+                Date = Date,
+                Failed = new FailedSubmission
+                {
+                    Date = Date,
+                    DurationMinutes = 60,
+                    ChosenResourceId = Id(3),
+                    Errors = [new BookingError("…", BookingFieldIds.Resource)],
+                },
+            });
+
+        Assert.NotNull(outcome.Form);
+        Assert.Equal(Id(3), outcome.Form.ChosenResourceId);
+    }
+
+    [Fact]
+    public void The_redirect_after_a_submission_carries_the_chosen_resource()
+    {
+        // The other carrier, for the flow reached through the catalogue: the
+        // redraw must land on a URL that agrees with the page it draws, which is
+        // why the choice is in the URL at all.
+        var query = BookingFlowLink
+            .For(BookingSubject.Service(Id(900)), new DateOnly(2026, 8, 20), 90, Id(3))
+            .ToUriComponent();
+
+        Assert.Contains("ubWho=" + Id(3), query, StringComparison.OrdinalIgnoreCase);
+
+        // And a flow where nobody was chosen produces exactly the query string it
+        // produced before this change — no empty parameter.
+        Assert.DoesNotContain(
+            "ubWho",
+            BookingFlowLink.For(BookingSubject.Service(Id(900)), new DateOnly(2026, 8, 20), 90)
+                .ToUriComponent(),
+            StringComparison.Ordinal);
     }
 
     [Fact]
@@ -1137,9 +1273,11 @@ public class ServiceFrontendTests
         // built from the resource's own display name.
         Assert.Contains("Jane", BookingMessages.PinnedUnavailable("Jane"), StringComparison.Ordinal);
 
-        // And it offers the way forward: another time, or anyone.
+        // And it offers both ways forward: another time, or letting the service
+        // choose. One of the two alone would send the visitor down a single path
+        // when the other may suit them better.
         Assert.Contains("another time", rendered, StringComparison.OrdinalIgnoreCase);
-        Assert.Contains("anyone", rendered, StringComparison.OrdinalIgnoreCase);
+        Assert.Contains("pick for you", rendered, StringComparison.OrdinalIgnoreCase);
 
         // It points at the control that made the choice, where "anyone" is one
         // keystroke away — not at the time list, which offers only half the way

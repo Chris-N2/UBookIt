@@ -7,9 +7,16 @@ namespace UBookIt.Web.Controllers;
 /// <summary>
 /// Base for the public delivery API. Anonymous by design (delivery-api spec,
 /// "Anonymous access and auth stance"): no backoffice authorization policy, no
-/// cookie anti-forgery, and no ambient identity is trusted for writes. Every UI
-/// — the default front-end, a separate-repo DevExpress UI, a SPA, mobile — is a
-/// symmetric consumer of this same contract.
+/// cookie anti-forgery, and no ambient identity is trusted for writes. Every
+/// <b>alternative</b> UI — a separate-repo DevExpress UI, a SPA, a mobile client
+/// — is a symmetric consumer of this same contract.
+/// <para>
+/// The default Razor front end is deliberately <b>not</b> among them, and used to
+/// be listed here. It reads Core in-process, which `default-frontend` requires of
+/// it: an in-process read cannot be told apart from the caller's own, and routing
+/// a server render through the public API would buy a network hop, an auth
+/// surface and a second failure mode for nothing.
+/// </para>
 /// </summary>
 [ApiController]
 [AllowAnonymous]

@@ -147,47 +147,31 @@ public sealed class ServiceBookingSurfaceController : SurfaceController
     }
 
     /// <summary>
-    /// The message for a refused pin, naming the resource the visitor chose.
+    /// The display name of the resource the visitor chose, so a refused pin can be
+    /// reported by name — or null when they chose nobody or it could not be read.
     /// <para>
-    /// "That person is not available at the time you chose" is a different fact
-    /// from "there are no times", with a different next step, and the flow must not
-    /// collapse one into the other — the failure `resource-pin` built exists
-    /// precisely so a front end can say which.
+    /// Looking the name up is this controller's job, because it needs the store.
+    /// <b>Deciding what the visitor is told is not</b>, and lives in
+    /// <see cref="BookingMessages.ForFailures(IEnumerable{DomainFailure}, string?)"/>
+    /// where it can be attacked without an Umbraco host. QA proved why: with the
+    /// decision here, mutating it to always use the generic wording left the whole
+    /// suite green.
     /// </para>
     /// <para>
-    /// Naming the resource is compatible with the disclosure rule rather than an
-    /// exception to it (design D12): the visitor supplied the name, and none of
-    /// the five prohibited facts — the role, the resource type, the required
-    /// capability, the count, the pool size — is disclosed. It is a narrow
-    /// permission for a resource the visitor themselves chose, and no licence to
-    /// name one they did not.
-    /// </para>
-    /// <para>
-    /// Falls back to the code's own wording when the name cannot be read, which
-    /// still says what happened rather than "no times available".
+    /// Read only when a pin was actually refused, so an ordinary failed submission
+    /// costs no extra store read.
     /// </para>
     /// </summary>
-    private async Task<IReadOnlyList<BookingError>> ErrorsForAsync(
+    private async Task<string?> ChosenResourceNameAsync(
         ServiceBookingSubmission form, IReadOnlyList<DomainFailure> failures)
     {
-        var errors = BookingMessages.ForFailures(failures);
-
         if (form.PinnedResourceId is not { } pinned
             || !failures.Any(f => f.Code == FailureCodes.PinnedResourceUnavailable))
         {
-            return errors;
+            return null;
         }
 
-        var resource = await _resourceStore.GetAsync(pinned);
-        if (resource is null)
-        {
-            return errors;
-        }
-
-        return [.. errors.Select(error =>
-            error.Message == BookingMessages.ForCode(FailureCodes.PinnedResourceUnavailable)
-                ? new BookingError(BookingMessages.PinnedUnavailable(resource.DisplayName), error.FieldId)
-                : error)];
+        return (await _resourceStore.GetAsync(pinned))?.DisplayName;
     }
 
     private async Task<IActionResult> FailAsync(
@@ -212,7 +196,8 @@ public sealed class ServiceBookingSurfaceController : SurfaceController
             Name = form.Name,
             Email = form.Email,
             Phone = form.Phone,
-            Errors = [.. await ErrorsForAsync(form, failures)],
+            Errors = [.. BookingMessages.ForFailures(
+                failures, await ChosenResourceNameAsync(form, failures))],
         });
 
         return SeeOther(BackToFlow(form));

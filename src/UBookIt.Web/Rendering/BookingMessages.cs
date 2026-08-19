@@ -72,17 +72,21 @@ public static class BookingMessages
         //
         // This is the wording for a chosen resource whose name could not be read.
         // Where it can, the flow says it — see PinnedUnavailable.
+        //
+        // "Your choice" rather than "the person you chose": nothing restricts a
+        // visitor-selectable role to a person-like type, and a site offering a
+        // choice of room would otherwise be told about a person.
         [FailureCodes.PinnedResourceUnavailable] =
-            "The person you chose is not available at the time you chose. "
-            + "Please choose another time, or let us assign anyone who is free.",
+            "Your choice is not available at the time you chose. "
+            + "Please choose another time, or let us pick for you.",
 
         // The visitor named a resource this service cannot be fulfilled by at all
         // — a stale link, or a hand-made submission. Refused rather than absorbed
         // into a booking for somebody else, and worded so the way forward is the
         // choice control rather than the calendar.
         [FailureCodes.ResourceNotEligible] =
-            "The person you chose is no longer offered for this service. "
-            + "Please choose again, or let us assign anyone who is free.",
+            "Your choice is no longer offered for this service. "
+            + "Please choose again, or let us pick for you.",
     };
 
     /// <summary>
@@ -104,7 +108,7 @@ public static class BookingMessages
     /// </summary>
     public static string PinnedUnavailable(string resourceName)
         => $"{resourceName} is not available at the time you chose. "
-            + "Please choose another time, or let us assign anyone who is free.";
+            + "Please choose another time, or let us pick for you.";
 
     public const string Fallback = "Sorry, your booking could not be completed. Please try again.";
 
@@ -117,10 +121,40 @@ public static class BookingMessages
     /// (WCAG 2.2 AA). Deduped by message.
     /// </summary>
     public static IReadOnlyList<BookingError> ForFailures(IEnumerable<DomainFailure> failures)
+        => ForFailures(failures, chosenResourceName: null);
+
+    /// <summary>
+    /// The same mapping, with the name of the resource the visitor chose so a
+    /// refused pin can be reported by name.
+    /// <para>
+    /// <b>Host-free, and separated from the controller for that reason</b> — the
+    /// same reason <see cref="ServiceBookingFormBuilder.BuildConfirmation"/> is.
+    /// This is the claim the flow makes to a visitor about their own choice, and
+    /// it must be attackable without an Umbraco host. QA proved the earlier shape:
+    /// with the substitution inside the surface controller, forcing it to use the
+    /// generic wording left all 762 tests green, because nothing but the message
+    /// helper itself was ever exercised.
+    /// </para>
+    /// <para>
+    /// A null name — the resource could not be read — falls back to the code's own
+    /// wording, which still says what happened rather than "no times available".
+    /// </para>
+    /// </summary>
+    public static IReadOnlyList<BookingError> ForFailures(
+        IEnumerable<DomainFailure> failures, string? chosenResourceName)
         => failures
-            .Select(f => new BookingError(ForCode(f.Code), FieldIdFor(f)))
+            .Select(f => new BookingError(MessageFor(f.Code, chosenResourceName), FieldIdFor(f)))
             .DistinctBy(e => e.Message, StringComparer.Ordinal)
             .ToList();
+
+    /// <summary>
+    /// The message for one code, naming the visitor's own choice where the code is
+    /// about that choice and the name could be read.
+    /// </summary>
+    private static string MessageFor(string code, string? chosenResourceName)
+        => code == FailureCodes.PinnedResourceUnavailable && !string.IsNullOrWhiteSpace(chosenResourceName)
+            ? PinnedUnavailable(chosenResourceName)
+            : ForCode(code);
 
     /// <summary>
     /// Resolves the offending control id: the domain field where present,
