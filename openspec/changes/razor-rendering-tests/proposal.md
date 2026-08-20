@@ -83,6 +83,12 @@ review.
   `BookingFlow/Default` reads as Umbraco-free and is not: it is a single
   `PartialAsync` into `Booking/Default`, so it inherits the dependency.
 
+  The four shared partials are rendered **composed into one document**, in the order
+  the flow views render them, rather than individually: id uniqueness and reference
+  resolution are properties of a document, and a partial is not one (design D7).
+  What that does not cover is the flow view itself, which is what the deferred
+  follow-up takes.
+
 - **No product behaviour changes** — unless the rules find a defect, in which case
   fixing it is in scope. That is the point of building them.
 
@@ -94,7 +100,8 @@ review.
   Settling it here would hold eleven views hostage to three. A follow-up takes them,
   and with them the **composition** of flow view and partial, which this change
   leaves untested: the four partials are only ever included by the three deferred
-  views, so here they are rendered standalone.
+  views, so here they are rendered as a composed document of their own rather than
+  through the view that includes them.
 - **Full HTTP through the TestSite.** `WebApplicationFactory` over `UBookIt.TestSite`
   would exercise routing, anti-forgery and Post-Redirect-Get for real, and needs SQL
   Server and an Umbraco boot per run. A different change with a different cost.
@@ -113,23 +120,26 @@ review.
 
 ### New Capabilities
 
-None. Both new requirements are guarantees about what the default front end
+None. All three new requirements are guarantees about what the default front end
 renders, so they belong to the capability that already owns that.
 
 ### Modified Capabilities
 
-- `default-frontend`: two ADDED requirements — that rendered markup resolves its
-  own internal references, and that a view renders every state its model can
-  express. No existing requirement is modified: the WCAG bar is unchanged and these
-  sit beside it, which also avoids replacing a requirement wholesale for an
-  adjacent guarantee.
+- `default-frontend`: three ADDED requirements — that rendered markup resolves its
+  own internal references, that a view renders every state its model can express,
+  and that every branch a view carries can be taken. The third was added during
+  apply, when mutation showed the first two did not subsume it. No existing
+  requirement is modified: the WCAG bar is unchanged and these sit beside it, which
+  also avoids replacing a requirement wholesale for an adjacent guarantee.
 
 ## Impact
 
 **Code**
 
-- **New**: `tests/UBookIt.Tests.Rendering/` — the Razor rig, the two rule suites,
-  and the model fixtures. Added to the solution and to CI.
+- **New**: `tests/UBookIt.Tests.Rendering/` — the Razor rig, the three rule suites,
+  and the model fixtures. Added to the solution. **Not** added to CI, because this
+  repository has none yet — there is no pipeline definition of any kind. The
+  eventual CI change picks it up along with the other three suites.
 - **New test-only dependency**: AngleSharp, for parsing rendered HTML. Assertions
   like "every `aria-describedby` resolves" want a real DOM rather than a regex. It
   has no bearing on the package's dependency-free promise: nothing ships.

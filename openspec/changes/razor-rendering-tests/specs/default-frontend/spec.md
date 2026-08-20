@@ -66,23 +66,25 @@ requirement. A flag live wherever one condition holds and dead where it does not
 passes the weaker form and is exactly the defect this requirement exists to catch:
 ⑩-1's notice was reachable for two of its three causes.
 
-The stronger form SHALL be applied only where the model **sets** the flag, and only
-in the states where it is **set**. Neither restriction weakens the guarantee, and
-both are needed for it to be true: a property may be settable on one model
-implementing a shared contract and computed on another, and a flag may be
-legitimately silent where a higher-priority message about the same thing takes
-precedence.
+The stronger form SHALL apply wherever the model can **set** the flag — in every
+such state, whichever value it currently holds. It is restricted only to states
+that can express the flag at all, because a property may be settable on one model
+implementing a shared contract and computed on another, and a state that cannot
+express it cannot be evidence about it.
 
-The properties checked SHALL be **derived from the view's own source** rather than
-listed by hand. A hand-maintained list fails the way the defect it guards against
-fails: someone adds a branch, does not add it to the list, and nothing notices. The
-derivation SHALL account for every form a reference can take in Razor, including
-the null-conditional (`Model?.X`), or a view whose references it cannot see would
-be reported as having none and pass vacuously.
+A state where a flag is legitimately silent — because a higher-priority message
+about the same thing takes precedence — SHALL be an explicit reasoned exemption
+rather than excluded by a broader rule. Excluding the class rather than the case
+would switch the guarantee off far beyond the case it was meant to accommodate.
+
+The set of properties this applies to SHALL be **every property the view actually
+refers to**, and SHALL NOT be a list maintained separately from the view: a
+separate list fails the way the defect it guards against fails, by being silent
+about what it omits.
 
 A property SHALL be exempt only by an explicit, reasoned entry — never by being
-absent from a list — so that exempting one is a decision someone made rather than
-something that happened.
+absent from a list, and never by a rule that skips a whole class of states — so
+that exempting one is a decision someone made rather than something that happened.
 
 This is a guarantee about the front end and not merely a testing technique. The
 flow decides what a visitor is told; the view decides whether they are told it. A
@@ -106,8 +108,8 @@ the quiet substitution the reset exists to prevent, and it has happened.
 - **THEN** the exclusion is recorded with its reason, and a property that is merely unlisted is not excluded
 
 #### Scenario: A flag live in one state and dead in another fails
-- **WHEN** a model sets a flag whose job is to show a message, and the view renders nothing different for it in some state where it is set
-- **THEN** the check fails, even though other states render it
+- **WHEN** a model can set a flag whose job is to show a message, and the view renders nothing different for it in some state that can express it
+- **THEN** the check fails, even though other states render it, unless that state is an explicit reasoned exemption
 
 #### Scenario: The shipped views satisfy it
 - **WHEN** every view in scope is checked against the properties its source references
@@ -118,17 +120,19 @@ A view SHALL NOT carry markup that no state its model can express will render.
 Markup a view can emit but never does is a branch that cannot be reached, and a
 message in it is a message no visitor will ever see.
 
-This SHALL be checked <b>separately</b> from whether each model property changes the
-output, because the two catch different faults and neither subsumes the other. A
-property can be perfectly live while one of the branches it selects is dead: forcing
-a condition to be always-true leaves both the flag and its underlying collection
-changing the output — the two states still differ — while the alternative branch
-becomes unreachable. The property rule passes; only a rule about branches does not.
+This is a guarantee distinct from the one above and neither implies the other. A
+property can be perfectly live while a branch it selects is dead: forcing a
+condition always-true leaves both the flag and its underlying collection changing
+the output — the two states still differ — while the alternative branch becomes
+unreachable.
 
-Where a branch is not reached because no exercised state reaches it, the remedy
-SHALL be to exercise that state rather than to exempt the branch. A branch nothing
-renders is either dead or untested, and the second is a gap in what the flows are
-known to do, not a licence to stop asking.
+A branch that nothing renders SHALL be treated as unproven rather than accepted: it
+is either dead markup or untested behaviour, and the second is a gap in what the
+flows are known to do rather than a licence to stop asking.
+
+Where reachability cannot be established for a branch, that SHALL be recorded
+explicitly rather than left implicit, so the limits of the guarantee are known
+rather than discovered.
 
 #### Scenario: An unreachable branch fails
 - **WHEN** a view carries markup that no state its model can express will render

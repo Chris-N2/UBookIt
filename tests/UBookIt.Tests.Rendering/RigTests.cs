@@ -65,17 +65,21 @@ public class RigTests
     }
 
     [Fact]
-    public async Task Rendering_reads_no_cshtml_from_disk()
+    public async Task Rendering_succeeds_with_no_file_provider_to_read_from()
     {
-        // The other half, and the one that would actually catch a regression to
-        // runtime compilation: the rig's content root is a NullFileProvider, so
-        // there is no directory of .cshtml files to fall back to. A view that
-        // resolves can only have come from the compiled assembly.
+        // Named for what it actually asserts, after QA pointed out the previous
+        // name promised more than the body delivered.
         //
-        // Asserted by rendering with the repository's own Views directory present
-        // but unreachable from the rig — if the engine were reading source, the
-        // render would fail rather than succeed.
+        // The rig's content root and web root are both NullFileProvider, so there is
+        // no directory of .cshtml files for the engine to fall back to — the claim
+        // is structural, in ViewRenderer, and this demonstrates the consequence: a
+        // view still resolves and renders, so it can only have come from the
+        // compiled assembly. The source tree is present and unreachable, which is
+        // what makes the demonstration mean something.
         Assert.True(Directory.Exists(Path.Combine(RepoFiles.Root, "src", "UBookIt.Web", "Views")));
+
+        Assert.IsType<Microsoft.Extensions.FileProviders.NullFileProvider>(
+            _renderer.ContentRootFileProvider);
 
         var html = await _renderer.RenderAsync(
             ViewInventory.ServiceUnavailable,

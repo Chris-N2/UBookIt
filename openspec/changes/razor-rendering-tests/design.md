@@ -29,7 +29,7 @@ hazard this change exists to catch.)
          ▼           ▼          ▼           ▼
    _ErrorSummary  _DateAndLength  _Times  _YourDetails        IN SCOPE
                                                               (rendered
-  Catalogue    Booking/Confirmation ◄── BookingFlow/Confirmation  standalone)
+  Catalogue    Booking/Confirmation ◄── BookingFlow/Confirmation  composed, D7)
                Booking/Unavailable  ◄── BookingFlow/Unavailable
                ServiceConfirmation      ServiceUnavailable
 ```
@@ -94,16 +94,18 @@ spike first and decides with the answer in hand.
 
 **What this change therefore does not cover, stated plainly** so it is not
 mistaken for coverage: the four partials are only ever *included* by the three
-deferred views. Rendering them standalone proves each partial is internally sound;
-it does not prove `Service.cshtml` composes them, which is exactly what ⑤'s tag
-helper broke. The existing source scan asserting that each flow view names each
+deferred views. Rendering them — composed into one document, per D7, rather than
+individually — proves the partial set is internally sound; it does not prove
+`Service.cshtml` composes them, which is exactly what ⑤'s tag helper broke. The existing source scan asserting that each flow view names each
 partial's path stays, and stays load-bearing, until the follow-up lands.
 
 ### D3 — The property list is derived from view source, and the derivation must be non-vacuous
 
 For each view, the rule extracts the model properties its source references —
 `Model.X`, `Model?.X`, and any other form Razor admits — and requires each to
-change the rendered output in at least one exercised state.
+change the rendered output. **How strictly is decided in D8**, which supersedes the
+"at least one exercised state" this decision originally carried: that turned out
+not to catch the defect the change exists for.
 
 Deriving beats declaring for one reason: a declared list fails the same way the
 defect does. Someone adds a branch, does not add it to the list, and the list is
@@ -133,9 +135,11 @@ those as dead.
 
 So each view supplies a small set of base states spanning its own shape (has
 errors / no errors, has times / none, length fixed / chosen, offers a choice / not),
-and the rule is satisfied when varying a property changes the output in **at least
-one** of them. That keeps the rule honest without demanding a state matrix nobody
-can read.
+and a *value* is satisfied by changing the output in at least one of them. That
+keeps the rule honest for content without demanding a state matrix nobody can read.
+
+**Flags are held to more than this** — see D8. Applying "at least one" to them is
+precisely what let ⑩-1's defect through when the rule was first written.
 
 The per-type variation strategy is mechanical: flip a bool, change a string, empty
 or populate a collection, move a number. Where a property's type admits no
@@ -228,9 +232,18 @@ discharged them.
 
 ## Risks / Trade-offs
 
-**The rig renders views the site never renders that way** — standalone partials,
-without their host view → Accepted and named in D2. It is the difference between
-"this partial is sound" and "this page is sound"; the second needs the follow-up.
+**The rig renders views the site never renders that way** — the partials composed
+into a document of their own rather than through the flow view that includes them
+→ Accepted and named in D2 and D7. It is the difference between "this partial set
+is sound" and "this page is sound"; the second needs the follow-up.
+
+QA sharpened this: the composition must match what the flow views actually do, or
+it masks. Both flow views render `_YourDetails` only `@if (Model.HasTimes)`, and
+composing it unconditionally meant an error against a booker field always found its
+target — including in states where the real page renders no booker fields at all.
+The composition now carries the same guard, and the state that exposes it (errors
+with no times) is exercised. That found a real defect: the error summary linked to
+controls that were not on the page.
 
 **A vacuous derivation passes silently** (D3) → The two non-vacuity guards, both
 asserted rather than assumed. This is the failure mode most likely to make the

@@ -21,6 +21,35 @@ public class ModelPropertyTests
 {
     private readonly ViewRenderer _renderer = new();
 
+    /// <summary>
+    /// The (view, flag, state) combinations where a flag legitimately changes
+    /// nothing, each with its reason.
+    /// <para>
+    /// Explicit and narrow, because the spec requires it: a property may be exempt
+    /// "only by an explicit, reasoned entry — never by being absent from a list".
+    /// A blanket rule that skipped a whole class of states would be exemption by
+    /// absence, and QA showed what that costs — a real defect passing all 212 tests.
+    /// </para>
+    /// <para>
+    /// Every entry is asserted to be <em>needed</em> by
+    /// <see cref="Every_suppression_is_still_earning_its_place"/>, so one that stops
+    /// applying fails rather than lingering as a hole nobody rechecks.
+    /// </para>
+    /// </summary>
+    private static readonly Dictionary<(string View, string Member, string State), string> Suppressed =
+        new()
+        {
+            [(ViewInventory.DateAndLength, "ResourceChoiceWasReset", "service: refused choice")] =
+                "An error against the who control takes precedence over the reset notice and says "
+                + "the same thing more strongly, so setting the flag from this state correctly "
+                + "changes nothing. The visitor is told their choice is no longer offered either way.",
+
+            [(ViewInventory.DateAndLength, "ResourceChoiceWasReset", "service: with errors")] =
+                "The same precedence, in the branch that renders when there is no control left to "
+                + "render on: an error against the choice is shown instead of the reset notice, "
+                + "because 'your choice is no longer offered' is what both of them say.",
+        };
+
     public static TheoryData<string> InScopeViews()
     {
         var data = new TheoryData<string>();
@@ -94,36 +123,57 @@ public class ModelPropertyTests
     }
 
     [Fact]
+    public async Task Every_suppression_is_still_earning_its_place()
+    {
+        // A stale exemption is a hole nobody rechecks. Each entry must still be a
+        // state where the flag genuinely changes nothing — if the view is fixed so
+        // that it does, the entry must go rather than sit there excusing a check
+        // that would now pass.
+        foreach (var ((view, member, state), reason) in Suppressed)
+        {
+            Assert.NotEmpty(reason);
+
+            var model = Assert.Single(ViewFixtures.For(view), c => c.State == state).Model;
+
+            Assert.True(
+                ModelVariation.Vary(model, member) is { } flipped
+                    && await RendersTheSameAsync(view, model, flipped),
+                $"{view}: the suppression for '{member}' in state '{state}' is no longer needed — "
+                + "varying it now changes the output. Remove the entry.");
+        }
+    }
+
+    [Fact]
     public void The_strong_rule_is_actually_applied_to_something()
     {
-        // Non-vacuity for design D8, and the guard that matters most now that the
-        // strong rule is restricted twice — to settable flags, and to the states
-        // where they are set. If either restriction ever excluded everything, every
-        // member would quietly fall back to the weak rule, ⑩-1's defect would pass
-        // again, and nothing would say so.
+        // Non-vacuity for the strong rule. If the settable restriction ever excluded
+        // everything, every member would quietly fall back to the weak rule, ⑩-1's
+        // defect would pass again, and nothing would say so.
         //
-        // Asserted on the member the defect was in.
-        var flippable = ViewFixtures
-            .For(ViewInventory.DateAndLength)
-            .Where(state => state.Model.GetType()
-                    .GetProperty(nameof(UBookIt.Web.Rendering.ServiceFormModel.ResourceChoiceWasReset))
-                is { CanWrite: true })
-            .Where(state => ModelVariation.Evaluate(
-                state.Model,
-                nameof(UBookIt.Web.Rendering.ServiceFormModel.ResourceChoiceWasReset)) == bool.TrueString)
+        // Asserted over EVERY settable flag on the service form model rather than
+        // over one member: QA's point was that guarding a single member leaves a
+        // flag added later unguarded.
+        var flags = typeof(UBookIt.Web.Rendering.ServiceFormModel)
+            .GetProperties()
+            .Where(p => p.PropertyType == typeof(bool) && p.CanWrite)
+            .Select(p => p.Name)
             .ToList();
 
-        Assert.NotEmpty(flippable);
+        Assert.NotEmpty(flags);
 
-        // And more than one, or "every state where it is set" would be the same
-        // claim as "some state" and the strengthening would be words only. The
-        // defect was invisible precisely because one such state rendered it and
-        // another did not.
-        Assert.True(
-            flippable.Count > 1,
-            "The reset flag is set in only one exercised state, so the strong rule "
-            + "cannot distinguish 'live somewhere' from 'live wherever set' — which "
-            + "is the distinction it exists to make.");
+        foreach (var flag in flags)
+        {
+            var settable = ViewFixtures
+                .For(ViewInventory.DateAndLength)
+                .Count(state => IsSettableBoolean(state.Model, flag));
+
+            // More than one, or "every settable state" would be the same claim as
+            // "some state" and the strengthening would be words only.
+            Assert.True(
+                settable > 1,
+                $"'{flag}' is settable in {settable} exercised state(s) of _DateAndLength, so the "
+                + "strong rule cannot distinguish 'live somewhere' from 'live wherever settable'.");
+        }
     }
 
     // -----------------------------------------------------------------------
@@ -182,31 +232,39 @@ public class ModelPropertyTests
         // A boolean on these models is a claim that something is SHOWN. If setting
         // it changes nothing from some state a visitor can be in, the thing it
         // promises to show cannot appear from there.
-        // Judged over the states where the flag is settable AND currently TRUE.
+        // Judged over EVERY state where the flag is settable — both values, not only
+        // the states where it is currently set.
         //
-        // Two restrictions, each earned by a false positive:
+        // One restriction only, and it is genuinely necessary: the shared partials
+        // render both form models, and a member settable on one is computed on the
+        // other (`LengthIsFixed` is init-only on the service model and `=> false` on
+        // the resource model). Judging a state that cannot express the flag reports
+        // a fault that is not one.
         //
-        // - settable, because the shared partials render BOTH form models and a
-        //   member settable on one is computed on the other (`LengthIsFixed` is
-        //   init-only on the service model and `=> false` on the resource model);
+        // An earlier version ALSO skipped every state where the flag was false, to
+        // accommodate one state where it is legitimately silent. QA showed what that
+        // cost: `@if (Model.LengthIsFixed && !Model.LengthIsTheProblem)` passed all
+        // 212 tests — a fixed-length service would render a length dropdown on a
+        // date with no times, offering a choice the service does not permit. It also
+        // contradicted this change's own spec, which says a property may be exempt
+        // "only by an explicit, reasoned entry — never by being absent from a list",
+        // and a blanket skip is exemption by absence.
         //
-        // - true, because the claim is "if the model says show this, the page shows
-        //   something it otherwise would not" — not "turning this on from any state
-        //   whatsoever changes something". Turning the reset flag on in the
-        //   refused-choice state changes nothing, correctly: the error against that
-        //   control takes precedence and says the same thing in stronger terms.
-        //
-        // Narrowed to true-states rather than exempted, because an exemption would
-        // have switched the rule off for the very member ⑩-1's defect was in.
+        // So the legitimately-silent case is now an explicit entry, and everything
+        // else is checked.
         var flippable = states
-            .Where(state => IsSettableBoolean(state.Model, member)
-                && ModelVariation.Evaluate(state.Model, member) == bool.TrueString)
+            .Where(state => IsSettableBoolean(state.Model, member))
             .ToList();
 
         if (flippable.Count > 0)
         {
             foreach (var state in flippable)
             {
+                if (Suppressed.ContainsKey((view, member, state.State)))
+                {
+                    continue;
+                }
+
                 if (ModelVariation.Vary(state.Model, member) is not { } flipped
                     || await RendersTheSameAsync(view, state.Model, flipped))
                 {

@@ -55,13 +55,11 @@ public class BranchReachabilityTests
     {
         var states = ViewFixtures.For(view);
 
-        if (states.Count == 0)
-        {
-            // A delegating view emits nothing of its own; the view it hands to is
-            // checked in its own right.
-            Assert.Contains(view, ModelReferences.DelegatingViews.Keys);
-            return;
-        }
+        // Every in-scope view has states, delegating views included — asserted
+        // rather than escaped. An `if (states.Count == 0) return;` here was
+        // unreachable today and would have let a fixture-less view pass this rule
+        // vacuously the moment it stopped being.
+        Assert.NotEmpty(states);
 
         var rendered = new List<string>(states.Count);
 
@@ -113,6 +111,80 @@ public class BranchReachabilityTests
                 .Order(StringComparer.Ordinal),
         ];
     }
+
+    [Fact]
+    public void The_literals_that_cannot_distinguish_a_branch_are_enumerated()
+    {
+        // Rule 3's known blind spot, made visible instead of silent.
+        //
+        // The check is a proxy: it asks whether a literal a view can emit ever
+        // appears. Where two branches emit the SAME literal, one can die while the
+        // other keeps it alive, and the rule cannot tell. QA demonstrated it —
+        // deleting the duration-error span from the settled-length branch left all
+        // 212 tests green, because the sibling branch emits an identical span.
+        //
+        // The blind spot cannot be removed without parsing Razor's branch structure,
+        // which is a great deal of machinery for a proxy. It can be BOUNDED: every
+        // literal emitted more than once in a view is listed here with the reason it
+        // is safe, so the set is reviewed rather than discovered. A new shared
+        // literal fails this test and has to be justified — which is the moment to
+        // ask whether the branches need distinguishing.
+        var shared = ViewInventory.InScope
+            .SelectMany(view => DuplicatedLiteralsOf(view).Select(literal => $"{Name(view)}:{literal}"))
+            .Order(StringComparer.Ordinal)
+            .ToList();
+
+        Assert.Equal(
+            [
+                // Listed in ordinal order, which is the order the scan produces.
+                //
+                // _DateAndLength: both length branches render the same rejection
+                // span (settled and chosen), the standing note under the choice
+                // control comes from two branches, and the reset notice and choice
+                // error each appear twice — inside the control, and in the wrapper
+                // rendered when there is no control. Each is covered instead by
+                // fixtures reaching both sides.
+                "_DateAndLength.cshtml:ubookit-duration-error",
+                "_DateAndLength.cshtml:ubookit-field-error",
+                "_DateAndLength.cshtml:ubookit-hint",
+                "_DateAndLength.cshtml:ubookit-notice",
+                "_DateAndLength.cshtml:ubookit-who-error",
+                "_DateAndLength.cshtml:ubookit-who-hint",
+                "_DateAndLength.cshtml:ubookit-who-reset",
+
+                // The two empty states of the time list, which differ in text
+                // rather than in class.
+                "_Times.cshtml:ubookit-no-times",
+
+                // One error span per booker field.
+                "_YourDetails.cshtml:ubookit-field-error",
+            ],
+            shared);
+    }
+
+    /// <summary>Literals a view's markup emits from more than one place.</summary>
+    private static IReadOnlyList<string> DuplicatedLiteralsOf(string view)
+    {
+        var source = Regex.Replace(
+            RepoFiles.Read(ViewInventory.SourcePathOf(view)),
+            @"@\*.*?\*@",
+            string.Empty,
+            RegexOptions.Singleline);
+
+        return
+        [
+            .. Regex
+                .Matches(source, @"(?:id|class)=""(?<value>[^""@]+)""")
+                .Select(m => m.Groups["value"].Value.Trim())
+                .Where(value => value.Length > 0)
+                .GroupBy(value => value, StringComparer.Ordinal)
+                .Where(group => group.Count() > 1)
+                .Select(group => group.Key)
+                .Order(StringComparer.Ordinal),
+        ];
+    }
+
+    private static string Name(string viewPath) => viewPath[(viewPath.LastIndexOf('/') + 1)..];
 
     [Fact]
     public void The_literal_extraction_is_not_vacuous()

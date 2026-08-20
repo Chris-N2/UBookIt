@@ -75,6 +75,14 @@ public sealed class ViewRenderer
         _tempData = _services.GetRequiredService<ITempDataProvider>();
     }
 
+    /// <summary>
+    /// The content root the view engine was given — a <c>NullFileProvider</c>, so
+    /// there is no directory of <c>.cshtml</c> files to fall back to. Exposed so a
+    /// test can assert the rig's central claim structurally rather than infer it.
+    /// </summary>
+    public IFileProvider ContentRootFileProvider
+        => _services.GetRequiredService<IWebHostEnvironment>().ContentRootFileProvider;
+
     /// <summary>The assembly the rig renders from — asserted, not assumed.</summary>
     public static System.Reflection.Assembly ViewAssembly => typeof(BookingKeys).Assembly;
 

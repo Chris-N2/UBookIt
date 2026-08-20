@@ -32,7 +32,16 @@ public sealed record ViewCase(string ViewPath, string State, object Model)
 /// </summary>
 public sealed record DocumentCase(string Name, string State, IReadOnlyList<ViewCase> Parts)
 {
-    public override string ToString() => $"{Name} [{State}]";
+    /// <summary>
+    /// Names the views the document was built from, not just the document, so a
+    /// failure says which file to open. The spec's scenarios all say the check
+    /// "fails, naming the view"; for a composed document that means naming its
+    /// parts.
+    /// </summary>
+    public override string ToString()
+        => Parts.Count == 1
+            ? $"{Name} [{State}]"
+            : $"{Name} ({string.Join(" + ", Parts.Select(p => p.ViewPath[(p.ViewPath.LastIndexOf('/') + 1)..]))}) [{State}]";
 }
 
 /// <summary>
@@ -107,13 +116,30 @@ public static class ViewFixtures
         // the whole document.
         foreach (var (state, model) in FormStates())
         {
-            yield return new DocumentCase("the shared partials", state,
-            [
-                new ViewCase(ViewInventory.ErrorSummary, state, model),
-                new ViewCase(ViewInventory.DateAndLength, state, model),
-                new ViewCase(ViewInventory.Times, state, model),
-                new ViewCase(ViewInventory.YourDetails, state, model),
-            ]);
+            var parts = new List<ViewCase>
+            {
+                new(ViewInventory.ErrorSummary, state, model),
+                new(ViewInventory.DateAndLength, state, model),
+                new(ViewInventory.Times, state, model),
+            };
+
+            // The booker fields only where the flow renders them. BOTH flow views
+            // guard `_YourDetails` with `@if (Model.HasTimes)` — `Service.cshtml`
+            // and `Booking/Default.cshtml` alike — and composing it unconditionally
+            // made this document something neither flow produces.
+            //
+            // It masked rather than over-constrained, which is the worse direction:
+            // an error against a booker field, on a page with no times, would link
+            // into a control the real page never rendered, and a document that
+            // always includes those fields always resolves it. The "errors and no
+            // times" state above is that case, and it is honest only with this
+            // guard in place.
+            if (model.HasTimes)
+            {
+                parts.Add(new ViewCase(ViewInventory.YourDetails, state, model));
+            }
+
+            yield return new DocumentCase("the shared partials", state, parts);
         }
 
         // Every other in-scope view is a page in its own right.
@@ -201,6 +227,23 @@ public static class ViewFixtures
             new BookingError("Ada is not available at the time you chose.", BookingFieldIds.Resource),
         ]));
         yield return ("service: fixed length", Service(lengthIsFixed: true));
+
+        // A settled length AND a rejection of it. Reachable through a hand-made
+        // POST, which is the whole reason the settled-length branch carries the
+        // duration control's id at all. QA found that no state reached that
+        // branch's error span — rule 3 could not see it, because the sibling
+        // branch emits the identical markup.
+        yield return ("service: fixed length rejected", Service(
+            lengthIsFixed: true,
+            errors: [new BookingError("That booking length is not offered.", BookingFieldIds.Duration)]));
+
+        // Errors with no times at all. The composed document renders the booker
+        // fields only when there are times, exactly as both flow views do, so this
+        // is the state in which an error could link into a control that is not on
+        // the page — the masking QA identified in the composition.
+        yield return ("service: errors and no times", Service(
+            times: [],
+            errors: [new BookingError("Please enter your name.", BookingFieldIds.Name)]));
         yield return ("service: offers a choice", Service(choices: Choices));
         yield return ("service: choice made", Service(choices: Choices, chosen: Choices[0].Id));
         yield return ("service: choice of several", Service(choices: Choices, chosen: Choices[0].Id, count: 2));

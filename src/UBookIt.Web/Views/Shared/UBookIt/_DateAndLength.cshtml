@@ -79,20 +79,39 @@
             }
         </div>
     }
-    @if (!Model.OffersResourceChoice && Model.ResourceChoiceWasReset)
+    @if (!Model.OffersResourceChoice && (Model.ResourceChoiceWasReset || whoError is not null))
     {
-        @* The third of design D11's three causes: the resource is still perfectly
-           eligible and the editor has turned the picker off, so there is no
-           control left to hang the notice on — and it still has to be said. A
-           visitor holding a "book with Jane" link is owed the fact that their
-           choice was dropped, whichever of the three reasons dropped it.
+        @* What is said about the visitor's choice when there is no control left to
+           say it on — the picker having been turned off since the page they came
+           from was drawn.
 
-           Outside the control's own branch deliberately: putting it inside made
-           it unreachable for exactly this cause, which is the defect QA found. *@
-        <p id="ubookit-who-reset" class="ubookit-notice">
-            The person you chose is no longer offered for this service, so the choice has been reset.
-            This booking will be filled by whoever is available.
-        </p>
+           Two things reach here. The reset notice, because a visitor holding a
+           "book with Jane" link is owed the fact that their choice was dropped
+           whichever of design D11's three causes dropped it; putting that inside
+           the control's own branch made it unreachable for exactly this cause.
+
+           And a submitted choice that was refused: `resource-not-eligible` arrives
+           against this control after the flag was cleared between render and
+           submit, so the error exists while the control does not.
+
+           The wrapper carries the control's id even though it is not a control —
+           the same idiom as the settled-length div above, and for the same reason:
+           the error summary links to that id, and a link with no target is worse
+           than the control it replaced. Found by the rendering suite, which noticed
+           the summary pointing at nothing. *@
+        <div id="@BookingFieldIds.Resource" tabindex="-1">
+            @if (whoError is not null)
+            {
+                <span id="ubookit-who-error" class="ubookit-field-error">@whoError</span>
+            }
+            else
+            {
+                <p id="ubookit-who-reset" class="ubookit-notice">
+                    The person you chose is no longer offered for this service, so the choice has been reset.
+                    This booking will be filled by whoever is available.
+                </p>
+            }
+        </div>
     }
     @if (Model.OffersResourceChoice)
     {

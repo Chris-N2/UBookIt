@@ -126,3 +126,102 @@ was written for.
 - Rendering suite runtime is not annoying and does not need splitting further.
 - **No product code changed.** Both rules found only fixture gaps and one rig
   error; the shipped markup was correct throughout.
+
+## 10. QA round 1 — REJECT, remediated
+
+Three MAJORs, each demonstrated by a mutation that left all 212 tests green. All
+three were real. Two were refinements of rules that already caught what they were
+built for; the third was a clause simply missing.
+
+- [x] 10.1 **MAJOR — the strong rule's "only where set" restriction lost real
+      coverage.** `@if (Model.LengthIsFixed && !Model.LengthIsTheProblem)` passed
+      everything: a fixed-length service on a date with no times would render a
+      length *dropdown*, offering a choice the service does not permit — the same
+      substitution class as ⑩-1.
+
+      The restriction was earned by a genuine false positive, but it was an
+      over-broad fix: it discarded every false-state to accommodate one legitimately
+      silent state, and it contradicted this change's own spec ("exempt only by an
+      explicit, reasoned entry — never by being absent from a list"). Now the flag
+      is checked in **every** state that can express it, with the two legitimately
+      silent states as explicit keyed entries carrying their reasons, and
+      `Every_suppression_is_still_earning_its_place` failing if one stops applying.
+      QA's mutation now dies.
+
+      Restriction (a), *only where settable*, QA checked and found genuinely
+      necessary. It stays.
+
+- [x] 10.2 **MAJOR — rule 1 never checked in-page fragment links.** Pointing every
+      error-summary link at nothing passed all 212 tests. `a[href^="#"]` is the
+      internal reference the views themselves worry about — `_DateAndLength` carries
+      the length control's id on a plain `div` *solely* so that link has a target —
+      and it was the one clause missing.
+
+      **Adding it found a real defect**: an error against the choice control, on a
+      page where the picker had been turned off since the visitor's page was drawn,
+      linked to an id nothing rendered. Fixed in the view by the idiom already
+      established for the settled length — the wrapper carries the control's id.
+
+- [x] 10.3 **MAJOR — rule 3 is blind where two branches emit the same literal**,
+      and that was hiding a live gap: deleting the settled-length error span left
+      everything green, because the sibling branch emits an identical one.
+
+      The blind spot cannot be removed without parsing Razor's branch structure. It
+      is now **bounded**: every literal a view emits more than once is enumerated in
+      `The_literals_that_cannot_distinguish_a_branch_are_enumerated` with the reason
+      it is safe, so a new shared literal fails and has to be justified. The gap it
+      was hiding is closed by a fixture reaching the settled-length rejection.
+
+- [x] 10.4 **MINOR — the composed document was not what the flow views do.** Both
+      guard `_YourDetails` with `@if (Model.HasTimes)`; the composition included it
+      unconditionally, which *masked*. Now guarded, and the state that exposes it
+      (errors with no times) is exercised — **which found the second real defect**:
+      the error summary linking to booker fields the page had not rendered. Fixed by
+      linking only to controls that are on the page.
+
+- [x] 10.5 **MINOR — the spec prescribed method rather than guarantee.** Four
+      clauses telling an implementer to derive from source, to check separately, and
+      how to remedy a gap. `default-frontend` is implemented by any alternative
+      front end, and none of them owe this repository a regex. Trimmed to the
+      guarantees; the technique lives in design and code, where it belongs.
+
+- [x] 10.6 **MINOR — rule 1 had no codified non-vacuity guard** while rules 2 and 3
+      each had one. Closed rather than deferred, since it was two lines:
+      `Every_in_scope_view_appears_in_some_document` asserts the document set is
+      non-empty and covers every in-scope view, so rule 1 can no longer pass over
+      nothing.
+
+- [x] 10.7 **NITs** — rule 1 now names the composed document's parts, so a failure
+      says which file to open; the "added to CI" claim is corrected (**this
+      repository has no CI definition at all**); the standalone/composed
+      contradiction between D2, D7 and the proposal is reconciled;
+      `Rendering_reads_no_cshtml_from_disk` is renamed to what it asserts and now
+      also asserts the `NullFileProvider` structurally; the unreachable
+      `states.Count == 0` escape in rule 3 is replaced by an assertion.
+
+- [x] 10.8 **One existing test needed updating**, and the reason is worth recording:
+      `ServiceFrontendTests.The_reset_notice_is_rendered_even_where_no_control_remains`
+      asserted the exact `@if` source line, which the product fix legitimately
+      changed. It now matches the condition rather than the spelling, with a note
+      that the behavioural guarantee has moved to the rendering suite. This is the
+      brittleness of source-scanning tests, demonstrated on the very change that
+      exists to replace them.
+
+## 11. What the two product defects were
+
+Both found by rules added in response to QA, and both narrow but real:
+
+- **An error against the choice control, with no choice control on the page.**
+  Reachable when the role's visitor-selectable flag is cleared between a visitor
+  loading the form and submitting it: `resource-not-eligible` comes back against a
+  control that is no longer rendered, and the error summary linked to nothing.
+  Fixed with the idiom the settled length already used — a wrapper carrying the
+  control's id.
+- **An error against a booker field, on a page with no times.** Reachable when a
+  submission fails validation and the last slot goes in the meantime: the redraw
+  renders no booker fields, and the summary still linked to them. Fixed by linking
+  only to controls that are on the page.
+
+Neither is dramatic. Both are exactly the class this suite was built for — a
+message pointing somewhere that does not exist — and neither was findable by any
+test that existed before it.

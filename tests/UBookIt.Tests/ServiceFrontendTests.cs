@@ -995,10 +995,17 @@ public class ServiceFrontendTests
         // with no control left — it was structurally unreachable.
         var markup = RepoFiles.Read("src/UBookIt.Web/Views/Shared/UBookIt/_DateAndLength.cshtml");
 
-        Assert.Contains(
-            "@if (!Model.OffersResourceChoice && Model.ResourceChoiceWasReset)",
-            markup,
-            StringComparison.Ordinal);
+        // Matched on the CONDITION rather than the whole line. This asserted the
+        // exact `@if` text until that branch legitimately gained a second reason to
+        // render — an error against the choice, which also arrives when no control
+        // remains — and a test pinned to one spelling fails on a correct change.
+        //
+        // The behavioural guarantee now has a better home: `UBookIt.Tests.Rendering`
+        // renders this partial and requires the reset flag to change the output in
+        // every state that can express it, which is what "the notice is reachable
+        // for all three causes" actually means. This stays as the cheap structural
+        // half — the branch exists outside the control's own guard.
+        Assert.Contains("@if (!Model.OffersResourceChoice", markup, StringComparison.Ordinal);
 
         // And both branches say it, or the guard above would merely move the gap.
         Assert.Equal(2, Regex.Matches(markup, @"id=""ubookit-who-reset""").Count);

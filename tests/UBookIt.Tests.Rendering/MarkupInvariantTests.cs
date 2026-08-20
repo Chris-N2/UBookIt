@@ -38,6 +38,29 @@ public class MarkupInvariantTests
         return data;
     }
 
+    [Fact]
+    public void Every_in_scope_view_appears_in_some_document()
+    {
+        // Non-vacuity for rule 1, which is the one rule that lacked its own guard.
+        // Its five clauses iterate documents; if a fixture change emptied that set,
+        // or dropped a view from it, all five would pass over nothing. Rules 2 and 3
+        // would still fail loudly, so the suite would not be silent — but rule 1
+        // alone would be, and that asymmetry is the thing worth removing.
+        var covered = ViewFixtures.Documents
+            .SelectMany(document => document.Parts.Select(part => part.ViewPath))
+            .ToHashSet(StringComparer.Ordinal);
+
+        Assert.NotEmpty(ViewFixtures.Documents);
+
+        foreach (var view in ViewInventory.InScope)
+        {
+            Assert.True(
+                covered.Contains(view),
+                $"{view} is in scope but appears in no rendered document, so rule 1 never "
+                + "asks anything of it.");
+        }
+    }
+
     [Theory]
     [MemberData(nameof(Cases))]
     public async Task Every_label_points_at_a_control_that_exists(DocumentCase rendered)
@@ -81,6 +104,42 @@ public class MarkupInvariantTests
                         $"{rendered}: {attribute}=\"{id}\" resolves to nothing.");
                 }
             }
+        }
+    }
+
+    [Theory]
+    [MemberData(nameof(Cases))]
+    public async Task Every_in_page_link_points_at_something(DocumentCase rendered)
+    {
+        // The error summary's links, and the omission QA found: rule 1 checked
+        // `label[for]` and the aria references and left out the one the views
+        // themselves worry about.
+        //
+        // `_DateAndLength.cshtml` carries the length control's id on a plain `div`
+        // when the length is settled — a div that is not a control — for no reason
+        // except that the summary links to it: "Without a target the summary link
+        // would go nowhere, which is worse than the control it replaced." Nothing
+        // asserted that, and pointing every summary link at nothing passed all 212
+        // tests.
+        //
+        // This is the mechanism the whole "accessible failure handling" requirement
+        // rests on: a summary that lists each problem and takes you to the field.
+        var document = await ParseAsync(rendered);
+
+        foreach (var link in document.QuerySelectorAll("a[href^=\"#\"]"))
+        {
+            var target = link.GetAttribute("href")![1..];
+
+            // A bare "#" is a link to the top of the page, not a broken reference.
+            if (target.Length == 0)
+            {
+                continue;
+            }
+
+            Assert.True(
+                document.GetElementById(target) is not null,
+                $"{rendered}: <a href=\"#{target}\"> points at no element in the document. "
+                + "An error summary that links nowhere is worse than one that does not link.");
         }
     }
 
