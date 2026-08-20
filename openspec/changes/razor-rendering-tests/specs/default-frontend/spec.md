@@ -5,9 +5,15 @@ Every view the default front end renders SHALL, in every state its model can
 express, produce a document whose internal references resolve: each `label`
 carrying a `for` names an element that exists in that document; each
 `aria-describedby` and `aria-labelledby` names, for every id it lists, an element
-that exists in that document; no id is emitted more than once; and every form
-control carries an accessible name, whether from an associated `label`, an
-`aria-label`, or an `aria-labelledby` that resolves.
+that exists in that document; every in-page link — an `href` naming a fragment of
+the same document — names an element that exists in it; no id is emitted more than
+once; and every form control carries an accessible name, whether from an associated
+`label`, an `aria-label`, or an `aria-labelledby` that resolves.
+
+The in-page link is not a lesser member of that list. It is the reference the error
+summary is built on, and the reason a control replaced by settled text still carries
+its identity — the summary links to it, and a link with no target is worse than the
+control it replaced. It is also the clause whose absence hid two real faults.
 
 This SHALL be checked against the **rendered document**, not against view source.
 The distinction is the whole requirement. A path or an attribute appears in a
@@ -36,6 +42,10 @@ accessibility requirement already states and that nothing has ever checked.
 - **WHEN** a view renders a `label` whose `for` names no control in the document
 - **THEN** the check fails, naming the view
 
+#### Scenario: A link into the page that lands nowhere fails
+- **WHEN** a view renders an `href` naming a fragment that no element in the document carries
+- **THEN** the check fails, naming the view
+
 #### Scenario: A duplicated id fails
 - **WHEN** a view renders the same id on two elements
 - **THEN** the check fails, naming the view
@@ -50,7 +60,7 @@ accessibility requirement already states and that nothing has ever checked.
 
 #### Scenario: The shipped views satisfy it in every exercised state
 - **WHEN** every view in scope is rendered across the model states its own properties can express
-- **THEN** every rendered document resolves its references, carries no duplicate id, names every control, and shows no tag-helper residue
+- **THEN** every rendered document resolves its references and its in-page links, carries no duplicate id, names every control, and shows no tag-helper residue
 
 ### Requirement: A view renders every state its model can express
 For each model property a view references, varying that property SHALL change the
@@ -145,3 +155,54 @@ rather than discovered.
 #### Scenario: An unreached branch is covered rather than excused
 - **WHEN** a branch is reached by no exercised state
 - **THEN** a state reaching it is added, rather than the branch being exempted
+
+## MODIFIED Requirements
+
+### Requirement: Accessible failure handling with input preservation
+When a submission fails validation or placement, the form SHALL be redrawn with an
+error summary that lists each problem in text and is associated with the offending
+fields, and the visitor's entered contact details SHALL be preserved. Stable domain
+failure codes SHALL be mapped to user-facing messages. A time that became
+unavailable between rendering and submission (a `conflict`) SHALL produce a clear
+"no longer available" message with refreshed availability, not a raw error.
+
+A problem SHALL be associated with its field **where that field is on the page**,
+and SHALL still be listed in text where it is not. A redraw does not always render
+every control the previous submission carried: the booker fields and the time list
+are shown only where there are times, and the choice control only where a choice is
+still offered — so a failure about the length, the chosen resource, the times or the
+booker can outlive the control it names.
+
+An association pointing at a control that was not rendered SHALL NOT be emitted. It
+reads as a route to the problem and is none: a summary that says "please enter your
+name" and takes the visitor nowhere is worse than one that says it plainly, because
+it spends their trust on a link that cannot work. This is a narrowing of the
+association guarantee and not of the reporting guarantee — every problem is still
+stated in text, which is what the visitor needs in order to know what went wrong.
+
+Where a control is replaced by settled text rather than removed — a fixed length, a
+choice that is no longer offered — the replacement SHALL carry the control's
+identity, so the association survives. Removing the control is not a licence to drop
+the link when something can still stand in its place.
+
+The standing requirement that hints and error text are associated with their
+controls is unaffected and unmodified: it governs text belonging to a control that
+is rendered. Where the control is absent, the problem is stated as text in its own
+right and there is nothing to bind it to — which is a case that requirement does not
+reach rather than one it forbids.
+
+#### Scenario: Validation failure redraws accessibly and preserves input
+- **WHEN** a visitor submits with a missing email
+- **THEN** the form is redrawn with an error summary identifying the email field and the previously entered name is preserved
+
+#### Scenario: A now-unavailable time is reported clearly
+- **WHEN** the selected time was taken by another booking between page load and submission
+- **THEN** the visitor sees a clear "no longer available" message and refreshed availability, and no booking is created
+
+#### Scenario: A problem about a control that is no longer rendered is still stated
+- **WHEN** a redraw carries a failure about a control the page no longer renders — a booker field on a date with no times, or a choice the service no longer offers
+- **THEN** the summary states the problem in text and does not link to the absent control
+
+#### Scenario: Settled text keeps the association
+- **WHEN** a control is replaced by settled text rather than removed, and a failure names it
+- **THEN** the replacement carries the control's identity and the summary still links to it

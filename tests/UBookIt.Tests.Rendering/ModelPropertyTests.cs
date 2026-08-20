@@ -22,6 +22,12 @@ public class ModelPropertyTests
     private readonly ViewRenderer _renderer = new();
 
     /// <summary>
+    /// The state a flag was found dead in, carried out of the check so the failure
+    /// message can name it rather than only the count of states tried.
+    /// </summary>
+    private string? DeadIn { get; set; }
+
+    /// <summary>
     /// The (view, flag, state) combinations where a flag legitimately changes
     /// nothing, each with its reason.
     /// <para>
@@ -192,10 +198,12 @@ public class ModelPropertyTests
         {
             Assert.True(
                 await IsLiveAsync(view, member, states),
-                $"{view}: '{member}' is referenced by the view but changes nothing it renders, "
-                + $"across {states.Count} model states. Either the reference is dead, or it sits "
-                + "behind a branch that cannot be reached — which is a message placed where it "
-                + "can never appear.");
+                $"{view}: '{member}' is referenced by the view but changes nothing it renders"
+                + (DeadIn is { } state
+                    ? $" in state '{state}'."
+                    : $", across {states.Count} model states.")
+                + " Either the reference is dead, or it sits behind a branch that cannot be "
+                + "reached — which is a message placed where it can never appear.");
         }
     }
 
@@ -268,6 +276,9 @@ public class ModelPropertyTests
                 if (ModelVariation.Vary(state.Model, member) is not { } flipped
                     || await RendersTheSameAsync(view, state.Model, flipped))
                 {
+                    // The state is the piece needed to act on the failure, now that
+                    // the rule checks per state and suppressions are keyed by one.
+                    DeadIn = state.State;
                     return false;
                 }
             }

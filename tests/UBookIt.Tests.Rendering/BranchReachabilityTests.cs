@@ -162,6 +162,50 @@ public class BranchReachabilityTests
             shared);
     }
 
+    [Theory]
+    [MemberData(nameof(InScopeViews))]
+    public async Task Each_shared_literal_is_rendered_by_more_than_one_state(string view)
+    {
+        // The enumeration above records WHY each shared literal is safe — "covered
+        // instead by fixtures reaching both sides" — and that was prose. This makes
+        // it a check.
+        //
+        // Where two branches emit the same literal, rule 3 cannot tell which one
+        // produced it. The mitigation is that fixtures reach both, and the evidence
+        // for that is the literal appearing in more than one distinct rendered
+        // state. One state alone would mean only one branch is exercised, and the
+        // other could die unnoticed.
+        //
+        // It does not close the blind spot — QA showed a branch can be disabled
+        // while a sibling keeps the literal alive — but it does convert the stated
+        // reason into something that fails when it stops being true.
+        var states = ViewFixtures.For(view);
+        var duplicated = DuplicatedLiteralsOf(view);
+
+        if (duplicated.Count == 0)
+        {
+            return;
+        }
+
+        var rendered = new List<string>(states.Count);
+
+        foreach (var state in states)
+        {
+            rendered.Add(await _renderer.RenderAsync(view, state.Model));
+        }
+
+        foreach (var literal in duplicated)
+        {
+            var reached = rendered.Count(html => html.Contains(literal, StringComparison.Ordinal));
+
+            Assert.True(
+                reached > 1,
+                $"{view}: '{literal}' is emitted from more than one branch but rendered in only "
+                + $"{reached} state, so only one of those branches is exercised and the others "
+                + "could die unnoticed. Add a state reaching the other.");
+        }
+    }
+
     /// <summary>Literals a view's markup emits from more than one place.</summary>
     private static IReadOnlyList<string> DuplicatedLiteralsOf(string view)
     {

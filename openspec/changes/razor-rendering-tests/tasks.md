@@ -225,3 +225,80 @@ Both found by rules added in response to QA, and both narrow but real:
 Neither is dramatic. Both are exactly the class this suite was built for — a
 message pointing somewhere that does not exist — and neither was findable by any
 test that existed before it.
+
+## 12. QA round 2 — REJECT, remediated
+
+Narrower than round 1, and notably **both MAJORs were about the product code the
+round-1 remediation introduced**, not about the rig. QA re-ran every round-1
+mutation and confirmed each now dies; it also confirmed the two suppressions are
+load-bearing (deleting either makes the main rule fail) and that enumeration was the
+right shape for them rather than a rule.
+
+- [x] 12.1 **MAJOR — the new `IsOnThePage` guard had an untested path.** Adding
+      `|| fieldId == BookingFieldIds.Times` passed all 260 tests: every Times error
+      in the fixtures came with times still present. That is the *most likely real
+      instance* of the fault the guard was written for, and the one
+      `default-frontend` names explicitly — a conflict redraw where nothing is left
+      that day. Closed with the state "service: time taken and none left"; QA's
+      mutation now dies.
+
+- [x] 12.2 **MAJOR — the product change narrowed a sibling requirement, and task
+      6.5 had not been re-run since the change acquired product code.**
+      `default-frontend`'s "Accessible failure handling with input preservation"
+      says the summary "lists each problem in text **and is associated with the
+      offending fields**", unqualified; the fix deliberately renders some problems
+      with no association. That is a narrowing of a shipped guarantee and lived only
+      in implementation notes.
+
+      Now a **MODIFIED requirement** in the delta — the first in this change —
+      restating every SHALL and both existing scenarios verbatim and adding two.
+      Guarantees diffed mechanically: 2 scenarios → 4, no SHALL dropped.
+
+      Task 6.5 re-run against the product changes. One further edge found and
+      addressed in the same requirement: the standing clause that hints and error
+      text are associated with their controls governs text belonging to a control
+      that *is* rendered, and the new branch renders error text where no control
+      exists — a case it does not reach rather than one it forbids. Stated rather
+      than left to inference. Everything else clean.
+
+- [x] 12.3 **MINOR — the in-page-link clause was in the code and not the spec.**
+      The check that found *both* real product defects had no requirement clause and
+      no scenario. Both added, with the reason it is not a lesser member of that
+      list: it is the reference the error summary is built on.
+
+- [x] 12.4 **MINOR — rule 3's enumeration stated its safety reason in prose.**
+      "Covered instead by fixtures reaching both sides" is now asserted:
+      `Each_shared_literal_is_rendered_by_more_than_one_state` fails if a shared
+      literal is rendered from only one state, since that means only one of its
+      branches is exercised. It does not close the blind spot — QA is right that a
+      branch can be disabled while a sibling keeps the literal alive — but it makes
+      the stated mitigation fail when it stops being true.
+
+- [x] 12.5 **MINOR — `IsOnThePage` expressed a whitelist as a fallthrough.** Now an
+      exhaustive `switch` over all five field ids, with an unknown id not linked.
+      A sixth added later can no longer inherit `HasTimes` semantics by silence,
+      which is the absence-is-not-a-decision shape this change rejects elsewhere.
+
+- [x] 12.6 **NIT — the strong rule's failure now names the state** it found the
+      flag dead in, which is the piece needed to act on it now that the rule checks
+      per state and suppressions are keyed by one.
+
+- [x] 12.7 Re-verified: clean `--no-incremental` build at **0 warnings**; 768 unit,
+      **277** rendering, 58 integration, 69 client.
+
+## 13. Outstanding — recorded, not claimed
+
+- **The keyboard pass over the two product fixes is NOT done.** QA recommended it
+  before archive and was right to: both fixes concern focus targets, and a
+  `tabindex="-1"` wrapper receiving focus is exactly what a DOM assertion cannot
+  judge. I confirmed over HTTP that the wrapper renders live with
+  `id="ubookit-who" tabindex="-1"` carrying the reset notice, but the browser
+  extension was unavailable, so focus behaviour is **unverified**. The pattern is
+  identical to the settled-length wrapper that shipped in ⑩ and was reviewed then,
+  which is a reason to expect it works and not evidence that it does.
+
+- **The page is now honest but still incoherent in one state** (QA's observation,
+  for a follow-up rather than this change): a redraw with no times tells the visitor
+  "Please enter your name" while rendering no name field. The summary fix makes the
+  *link* honest and arguably makes the incoherence less visible. Not introduced
+  here; worth an obligation rather than silence.

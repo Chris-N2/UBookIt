@@ -19,10 +19,29 @@
     // reason.
     //
     // Found by the rendering suite: it noticed the summary pointing at nothing.
+    // Stated exhaustively over the field ids that exist, rather than as a couple of
+    // exceptions with everything else inheriting `HasTimes`. A field added later
+    // would otherwise take on that meaning silently — absence deciding behaviour,
+    // which is the shape this package rejects everywhere else. An unknown id is not
+    // linked, because nothing here can say it is on the page.
     bool IsOnThePage(string fieldId)
-        => Model.HasTimes
-            || fieldId == BookingFieldIds.Duration
-            || fieldId == BookingFieldIds.Resource;
+        => fieldId switch
+        {
+            // Always rendered: both length branches carry the id, the settled one on
+            // a wrapper precisely so this link has a target.
+            BookingFieldIds.Duration => true,
+
+            // Rendered wherever an error about it can exist — the select when a
+            // choice is offered, the wrapper when it is not.
+            BookingFieldIds.Resource => true,
+
+            // The time list and the booker fields are shown only where there are
+            // times to choose between.
+            BookingFieldIds.Times or BookingFieldIds.Name or BookingFieldIds.Email
+                => Model.HasTimes,
+
+            _ => false,
+        };
 }
 @if (Model.HasErrors)
 {

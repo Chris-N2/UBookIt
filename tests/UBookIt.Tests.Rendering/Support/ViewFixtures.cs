@@ -262,6 +262,19 @@ public static class ViewFixtures
         yield return ("service: time no longer available", Service(
             errors: [new BookingError("That time is no longer available.", BookingFieldIds.Times)]));
 
+        // The same conflict with NOTHING left that day — the most likely real
+        // instance of the fault the summary-link guard was written for, and the one
+        // `default-frontend`'s own scenario names: "a time that became unavailable
+        // between rendering and submission produces a clear message with refreshed
+        // availability". Refreshed availability can be empty.
+        //
+        // QA found this path untested: adding `|| fieldId == BookingFieldIds.Times`
+        // to the guard passed all 260 tests, because every Times error in the
+        // fixtures came with times still present.
+        yield return ("service: time taken and none left", Service(
+            times: [],
+            errors: [new BookingError("That time is no longer available.", BookingFieldIds.Times)]));
+
         yield return ("service: choice reset", Service(choices: Choices, wasReset: true));
         yield return ("service: choice reset with no control", Service(wasReset: true));
         yield return ("service: entered details", Service(
