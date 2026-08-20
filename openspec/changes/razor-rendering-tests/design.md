@@ -152,6 +152,69 @@ The cost is failure-message quality, and it is paid off directly: every assertio
 carries the view path and, for the property rule, the property name. A failure says
 which view and which reference, which is the information needed to find it.
 
+### D7 — Rule 1 is asked of a document, and the four partials form one together
+
+*Added at apply time.* Rule 1's clauses — ids unique, aria references resolve —
+are properties of a **document**. A shared partial is not one.
+
+`_DateAndLength.cshtml` describes its length control with
+`aria-describedby="ubookit-length-unavailable"`, an id that `_Times.cshtml` owns.
+Rendered apart, that reference dangles and rule 1 fails; rendered together it
+resolves, and together is what the site serves. Forward references are legal ARIA,
+so the view is correct and the rig was wrong.
+
+So the unit rule 1 is asked of is a document, built by rendering its parts in the
+order a flow renders them. For ten views that is one view; for the four partials it
+is the four. **Exempting the id would have been the easy fix and the wrong one** —
+it would have switched off a real check to accommodate a rig error.
+
+### D8 — "Changes the output in some state" is not enough for a flag
+
+*Added at apply time, and the most important correction in this change.* The rule
+as proposed — for each referenced property, some state in which varying it changes
+the output — **does not catch ⑩-1's defect**. Verified by reintroducing the defect
+and watching the rule stay green.
+
+The reason is exactly why that defect was hard to see: `ResourceChoiceWasReset` was
+live wherever a choice control existed and dead only where none did. An
+exists-a-state rule finds the live states and passes.
+
+So a settable boolean is held to a stronger form: wherever the model **sets** it,
+the page must render something it would not render otherwise. Two restrictions,
+each earned by a false positive rather than assumed:
+
+- **Only where it is settable.** The shared partials render both form models, and
+  `LengthIsFixed` is init-only on the service model and `=> false` on the resource
+  one. Judging a state that cannot express the flag reports a fault that is not one.
+- **Only where it is set.** Turning the reset flag *on* in the refused-choice state
+  changes nothing, correctly — the error against that control takes precedence and
+  says the same thing more strongly. The claim is "if the model says show this, the
+  page shows it", not "toggling this from anywhere changes something".
+
+Narrowing beat exempting: an exemption would have switched the rule off for the
+very member the defect was in.
+
+### D9 — A live property does not mean a live branch, so branches are checked too
+
+*Added at apply time, and found by the control mutation (task 5.6a) rather than by
+reasoning.* Forcing the catalogue's `@if (Model.HasEntries)` to `true ||` leaves
+both `HasEntries` and `Entries` changing the output — the two states still render
+differently — while "there is nothing available to book" becomes unreachable. The
+property rule passes.
+
+A property can be live while a branch it selects is dead, so branches are checked
+separately: every literal `id` and `class` a view can emit must appear in some
+rendered state. That is a **proxy** for branch coverage rather than instrumentation
+of the Razor, which is why it is paired with the property rule rather than replacing
+it — neither catches the other's case, and the pair was arrived at by mutation from
+opposite directions.
+
+It found two unreached branches immediately, both fixture gaps rather than dead
+markup, and both real pages: the refused-pin redraw (a choice control *with* an
+error against it) and the conflict redraw (times *with* an error). Fixed by adding
+those states, per task 3.3 — a branch nothing renders is either dead or untested,
+and exempting it would have recorded the second as the first.
+
 ### D6 — These rules do not claim a page is accessible
 
 Stated in the spec, and worth stating twice: a document can resolve every reference

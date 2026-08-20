@@ -30,5 +30,10 @@
     <PackageVersion Include="xunit" Version="2.9.3" />
     <PackageVersion Include="xunit.v3" Version="3.2.2" />
     <PackageVersion Include="xunit.runner.visualstudio" Version="3.1.4" />
+
+    <!-- Rendering tests parse the HTML the views produce; assertions like "every
+         aria-describedby resolves" want a real DOM rather than a regex. Test-only:
+         nothing here ships in the package. -->
+    <PackageVersion Include="AngleSharp" Version="1.7.1" />
   </ItemGroup>
 </Project>

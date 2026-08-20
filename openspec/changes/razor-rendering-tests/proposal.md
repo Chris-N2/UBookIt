@@ -47,17 +47,30 @@ review.
   has ever checked.
 
 - **A view must render every state its model can express.** For each model property
-  a view references, varying that property must change the rendered output.
+  a view references, varying that property must change the rendered output — and
+  for a flag whose job is to say something is shown, that must hold **wherever the
+  model sets it**, not merely somewhere.
 
-  This is the ⑩-1 defect caught **generically**. `ResourceChoiceWasReset` was
-  referenced by `_DateAndLength.cshtml` and, for one of its three causes, changed
-  nothing — because the notice sat inside a branch that cause could not reach. A
-  rule stated per-property rather than per-branch fails on that without anyone
-  having thought about that branch.
+  That last clause is not a refinement, it is the requirement. As first written —
+  "changes the output in some state" — the rule **did not catch ⑩-1's defect**,
+  which apply proved by reintroducing it and watching the rule stay green.
+  `ResourceChoiceWasReset` was live wherever a choice control existed and dead only
+  where none did, so an exists-a-state rule finds the live states and passes. See
+  design D8.
 
   The property list is **derived from the view's own source**, not hand-maintained.
   A hand-written list has the obvious hole: someone adds a branch, forgets to list
   it, and the unreachable-message defect walks back in.
+
+- **Every branch a view carries must be takeable.** A property can be live while a
+  branch it selects is dead — forcing a condition always-true leaves the property
+  changing the output while the alternative becomes unreachable — so branches are
+  checked separately, by requiring every literal `id` and `class` a view can emit to
+  appear in some rendered state.
+
+  Found by mutation rather than by reasoning (design D9), and it immediately found
+  two branches nothing rendered: the refused-pin redraw and the conflict redraw,
+  both real pages, both fixture gaps rather than dead markup.
 
 - **Eleven views come into scope; three do not.** The partition is by *transitive*
   dependency on Umbraco, not by which file mentions it:

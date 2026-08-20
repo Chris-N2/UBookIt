@@ -1,0 +1,56 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <TargetFramework>net10.0</TargetFramework>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <Nullable>enable</Nullable>
+    <IsPackable>false</IsPackable>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <PackageReference Include="AngleSharp" />
+    <PackageReference Include="coverlet.collector" />
+    <PackageReference Include="Microsoft.NET.Test.Sdk" />
+    <PackageReference Include="xunit" />
+    <PackageReference Include="xunit.runner.visualstudio" />
+  </ItemGroup>
+
+  <!--
+    The MVC/Razor runtime the rig renders through. A FrameworkReference rather
+    than package references: the view engine lives in the shared framework, and
+    UBookIt.Web is itself built against it.
+  -->
+  <ItemGroup>
+    <FrameworkReference Include="Microsoft.AspNetCore.App" />
+  </ItemGroup>
+
+  <!--
+    UBookIt.Web only, and deliberately NOT UBookIt.TestSite.
+
+    The views are compiled into UBookIt.Web.dll, and
+    Microsoft.AspNetCore.Mvc.Razor.RuntimeCompilation is absent from its
+    dependency closure entirely — the TestSite carries it, but only via
+    Umbraco.Cms.DevelopmentMode.Backoffice. Referencing the TestSite would drag
+    runtime compilation back in and quietly turn "we render the shipped
+    artefact" into a claim this suite could no longer make.
+  -->
+  <ItemGroup>
+    <ProjectReference Include="..\..\src\UBookIt.Core\UBookIt.Core.csproj" />
+    <ProjectReference Include="..\..\src\UBookIt.Web\UBookIt.Web.csproj" />
+  </ItemGroup>
+
+  <!--
+    Shared by link rather than copied. RepoFiles locates the repository root from
+    its own compile-time path (CallerFilePath), which is the path of the ORIGINAL
+    file, so a linked copy resolves to the same root. Asserted by a test rather
+    than assumed.
+  -->
+  <ItemGroup>
+    <Compile Include="..\UBookIt.Tests\Support\RepoFiles.cs" Link="Support\RepoFiles.cs" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <Using Include="Xunit" />
+  </ItemGroup>
+
+</Project>
