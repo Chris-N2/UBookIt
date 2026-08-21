@@ -10,6 +10,23 @@ the same document — names an element that exists in it; no id is emitted more 
 once; and every form control carries an accessible name, whether from an associated
 `label`, an `aria-label`, or an `aria-labelledby` that resolves.
 
+**A reference SHALL resolve to something that says something.** Every element an
+`aria-describedby` or `aria-labelledby` names SHALL carry non-whitespace text, an
+accessible name SHALL be non-empty, and a `fieldset`'s `legend` SHALL be present and
+non-empty. An association pointing at an empty element resolves perfectly and
+describes nothing: the screen reader announces the relationship and then has nothing
+to read, and for a group the boundary is announced with no name at all. That the
+same text may also appear in the error summary does not repair it — the summary
+serves the visitor reading the list of problems, and this serves the one standing on
+the field.
+
+This clause is the difference between a reference existing and a reference working,
+and it is the second half of what "carries an accessible name" already meant: a
+check for a labelling *element* rather than for a *name* passes an empty
+`<label for="…"></label>`, which leaves the control unnamed. Ten mutations of this
+shape — emptied labels, emptied legends, emptied described targets — were silent
+under the earlier rules.
+
 The in-page link is not a lesser member of that list. It is the reference the error
 summary is built on, and the reason a control replaced by settled text still carries
 its identity — the summary links to it, and a link with no target is worse than the
@@ -66,13 +83,25 @@ accessibility requirement already states and that nothing has ever checked.
 - **WHEN** a view renders an input or select with no associated label, `aria-label`, or resolving `aria-labelledby`
 - **THEN** the check fails, naming the view
 
+#### Scenario: A control whose label is empty fails
+- **WHEN** a view renders a control whose only labelling element carries no text
+- **THEN** the check fails, naming the view — a labelling element is not a name
+
+#### Scenario: A description that resolves to an empty element fails
+- **WHEN** a view renders an `aria-describedby` or `aria-labelledby` naming an element that carries no text
+- **THEN** the check fails, naming the view and the reference
+
+#### Scenario: A group with an empty or missing legend fails
+- **WHEN** a view renders a `fieldset` whose `legend` is absent or carries no text
+- **THEN** the check fails, naming the view
+
 #### Scenario: A tag helper reaching the page fails
 - **WHEN** a view renders a `<partial>` element or an `asp-` attribute as literal output
 - **THEN** the check fails, naming the view
 
 #### Scenario: The shipped views satisfy it in every exercised state
 - **WHEN** every view in scope is rendered across the model states its own properties can express
-- **THEN** every rendered document resolves its references and its in-page links, carries no duplicate id, names every control, and shows no tag-helper residue
+- **THEN** every rendered document resolves its references and its in-page links, carries no duplicate id, names every control and every group non-emptily, describes with elements that carry text, and shows no tag-helper residue
 
 ### Requirement: A view renders every state its model can express
 For each model property a view references, varying that property SHALL change the

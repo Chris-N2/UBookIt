@@ -41,6 +41,11 @@ review.
   (`<partial`, `asp-*`) survives into the output. Asserted over every view in scope
   and every model state exercised, by one test that names the view it failed on.
 
+  Every reference must also resolve to something that *says* something — a
+  describing element that carries text, a label that carries a name, a `legend`
+  that names its group. A reference into an empty element resolves perfectly and
+  announces nothing, and ten mutations of that shape were silent.
+
   A link into the page must also land somewhere that can take focus, and every
   problem the redraw carries must reach the page — linked with the message as the
   link's own text, or stated plainly where its control is absent. Both were added

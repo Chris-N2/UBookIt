@@ -100,9 +100,26 @@ public class MarkupInvariantTests
 
                 foreach (var id in value!.Split(' ', StringSplitOptions.RemoveEmptyEntries))
                 {
+                    var target = document.GetElementById(id);
+
                     Assert.True(
-                        document.GetElementById(id) is not null,
+                        target is not null,
                         $"{rendered}: {attribute}=\"{id}\" resolves to nothing.");
+
+                    // Resolving is not describing. An empty attribute was already a
+                    // defect here; an attribute pointing at an EMPTY ELEMENT is the
+                    // same defect one step along, and it was invisible — emptying any
+                    // of the four described targets passed the whole suite. A screen
+                    // reader announces the association and then has nothing to read.
+                    //
+                    // The message being in the error summary does not save it: the
+                    // reporting rule is satisfied, and the visitor on the field still
+                    // hears nothing.
+                    Assert.True(
+                        HasText(target!),
+                        $"{rendered}: {attribute}=\"{id}\" resolves to an empty "
+                        + $"<{target!.LocalName}>. The association is announced and "
+                        + "describes nothing.");
                 }
             }
         }
@@ -363,6 +380,39 @@ public class MarkupInvariantTests
 
     [Theory]
     [MemberData(nameof(Cases))]
+    public async Task Every_group_is_named_by_its_legend(DocumentCase rendered)
+    {
+        // The same fault as an empty label, on the construct the accessibility bar
+        // names explicitly: the start times are a `fieldset` with a `legend`, and the
+        // booker fields are a group. A `fieldset` whose `legend` is empty is a group
+        // announced with no name — the structure is there and says nothing, which is
+        // arguably worse than no grouping, because a screen reader will announce the
+        // boundary either way.
+        //
+        // Emptying either legend passed the whole suite. Nothing here checked the
+        // legend at all; the fieldset was verified by eye.
+        var document = await ParseAsync(rendered);
+
+        foreach (var group in document.QuerySelectorAll("fieldset"))
+        {
+            var legend = group.QuerySelector("legend");
+
+            Assert.True(
+                legend is not null,
+                $"{rendered}: <fieldset"
+                + (group.Id is { Length: > 0 } id ? $" id=\"{id}\"" : string.Empty)
+                + "> has no <legend>, so the group it creates has no name.");
+
+            Assert.True(
+                HasText(legend!),
+                $"{rendered}: <fieldset"
+                + (group.Id is { Length: > 0 } named ? $" id=\"{named}\"" : string.Empty)
+                + "> has an empty <legend>. The group is announced and unnamed.");
+        }
+    }
+
+    [Theory]
+    [MemberData(nameof(Cases))]
     public async Task No_tag_helper_reaches_the_page(DocumentCase rendered)
     {
         // Asserted against the RAW STRING, not the parsed document, and that is the
@@ -409,13 +459,18 @@ public class MarkupInvariantTests
     /// </summary>
     private static bool HasAccessibleName(IDocument document, IElement control)
     {
+        // A name, not a labelling ELEMENT. The requirement says "accessible name";
+        // this asked whether a `label` existed, and an empty `<label for="…"></label>`
+        // gives a control no name at all while satisfying that. The `aria-label`
+        // branch below always checked for content, which is what gave the
+        // inconsistency away.
         if (control.Id is { Length: > 0 } id
-            && document.QuerySelector($"label[for=\"{id}\"]") is not null)
+            && document.QuerySelectorAll($"label[for=\"{id}\"]").Any(HasText))
         {
             return true;
         }
 
-        if (control.Closest("label") is not null)
+        if (control.Closest("label") is { } wrapping && HasText(wrapping))
         {
             return true;
         }
@@ -430,8 +485,16 @@ public class MarkupInvariantTests
         return labelledBy is { Length: > 0 }
             && labelledBy
                 .Split(' ', StringSplitOptions.RemoveEmptyEntries)
-                .All(target => document.GetElementById(target) is not null);
+                .All(target => document.GetElementById(target) is { } named && HasText(named));
     }
+
+    /// <summary>
+    /// Whether an element contributes text a screen reader can announce. Whitespace
+    /// is not text: an element containing only a newline and indentation is as empty
+    /// as one containing nothing, and Razor produces plenty of both.
+    /// </summary>
+    private static bool HasText(IElement element)
+        => !string.IsNullOrWhiteSpace(element.TextContent);
 
     private async Task<IDocument> ParseAsync(DocumentCase rendered)
         => await Parser.ParseDocumentAsync(await RenderAsync(rendered));
