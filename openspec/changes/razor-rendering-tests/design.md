@@ -259,6 +259,18 @@ happily.
 change fixes what they find. But it means the work is not purely additive and the
 estimate should not assume it is.
 
+**`role="alert"` on the summary is unguarded, and is now the largest such property
+of the surface these rules cover.** Deleting it passes the whole suite. It is the
+announcement mechanism for a no-JavaScript redraw: without it a screen-reader user
+lands on a re-rendered page with the problems stated and nothing said. → Named here
+rather than fixed, because a DOM assertion cannot judge whether the announcement
+*works* — that is the human pass still owed since ⑤ — and asserting only that the
+attribute is present would be a rule about markup wearing the clothes of a rule
+about behaviour. The reason it stands out is that everything around it now dies
+under mutation, so the gap is worth writing down before someone later finds it and
+assumes nobody looked. The WCAG requirement is out of this change's scope by its
+own statement; this is where the boundary happens to fall.
+
 **Test-only dependency added** → AngleSharp ships nothing. The package's
 dependency-free promise is about what a site installs, and nothing here is
 installed. Worth stating because "no dependencies" is an invariant of this repo and

@@ -41,6 +41,13 @@ review.
   (`<partial`, `asp-*`) survives into the output. Asserted over every view in scope
   and every model state exercised, by one test that names the view it failed on.
 
+  A link into the page must also land somewhere that can take focus, and every
+  problem the redraw carries must reach the page — linked with the message as the
+  link's own text, or stated plainly where its control is absent. Both were added
+  after mutation showed the earlier rules asked only whether links *resolved*, so a
+  message that never rendered, and a target that could not be focused, were
+  invisible to all of them.
+
   This is the accessibility bar made executable. It does not replace the WCAG 2.2
   AA requirement — a document can satisfy every clause here and still be
   inaccessible — but every clause here is one the bar already states and no test

@@ -137,11 +137,125 @@ public class MarkupInvariantTests
                 continue;
             }
 
+            var destination = document.GetElementById(target);
+
             Assert.True(
-                document.GetElementById(target) is not null,
+                destination is not null,
                 $"{rendered}: <a href=\"#{target}\"> points at no element in the document. "
                 + "An error summary that links nowhere is worse than one that does not link.");
+
+            // Resolving is not arriving. Following the link moves focus only if the
+            // target can take it, and half of these targets are a plain `div` that
+            // carries the control's id because the control itself was replaced by
+            // settled text. A `div` without `tabindex` is not focusable, so the link
+            // would resolve, the viewport would jump, and focus would stay in the
+            // summary — which for a keyboard or screen-reader user is the failure the
+            // link exists to prevent.
+            //
+            // Verified by hand once during ⑩-1's keyboard pass (focus landed on
+            // `DIV#ubookit-who`); QA showed both `tabindex="-1"` attributes could be
+            // deleted with the whole suite green. Announcement is not something a DOM
+            // assertion can judge, but focusability is, so it should not rest on a
+            // one-off observation.
+            Assert.True(
+                IsFocusable(destination!),
+                $"{rendered}: <a href=\"#{target}\"> resolves to <{destination!.LocalName}>, "
+                + "which cannot take focus. Following the link would move the viewport and "
+                + "leave focus in the summary.");
         }
+    }
+
+    [Theory]
+    [MemberData(nameof(Cases))]
+    public async Task Every_problem_is_stated_in_the_document(DocumentCase rendered)
+    {
+        // The same blind spot as the linked-problem rule, one level up.
+        //
+        // Every rule about the summary asks something about LINKS — that they
+        // resolve, that they exist where the control does. A problem whose message
+        // never reaches the page at all satisfies all of them: no link, nothing to
+        // resolve, nothing dangling. QA deleted the `else { @error.Message }` branch
+        // and the suite stayed green, so an unlinked problem could vanish silently.
+        //
+        // This is the SHALL that justifies narrowing the association guarantee —
+        // "and SHALL still be listed in text where it is not" — and it was the half
+        // nothing checked. Replacing the link text with "click here" passed too: the
+        // problem linked correctly and was never stated.
+        var document = await ParseAsync(rendered);
+        var text = document.Body?.TextContent ?? string.Empty;
+
+        foreach (var form in rendered.Parts.Select(p => p.Model).OfType<IBookingFormView>().Take(1))
+        {
+            foreach (var error in form.Errors)
+            {
+                Assert.True(
+                    text.Contains(error.Message, StringComparison.Ordinal),
+                    $"{rendered}: '{error.Message}' is in the model and nowhere on the page. "
+                    + "A problem the visitor is never told about is the worst outcome the "
+                    + "summary has.");
+
+                var links = document
+                    .QuerySelectorAll("a[href]")
+                    .Where(a => a.GetAttribute("href") == "#" + error.FieldId)
+                    .ToList();
+
+                if (links.Count == 0)
+                {
+                    continue;
+                }
+
+                // Where it IS linked, the message must be what the link says. A link
+                // reading "click here" beside the message elsewhere satisfies the
+                // check above and is exactly the anti-pattern the accessibility bar
+                // exists to prevent: a link name that describes nothing.
+                Assert.True(
+                    links.Any(a => string.Equals(
+                        a.TextContent.Trim(), error.Message, StringComparison.Ordinal)),
+                    $"{rendered}: the link to '{error.FieldId}' does not say "
+                    + $"'{error.Message}'. The link's own text is its accessible name.");
+            }
+        }
+    }
+
+    [Fact]
+    public async Task Both_halves_of_the_reporting_rule_are_exercised()
+    {
+        // Non-vacuity, and it has to count the two halves separately: the linked and
+        // the unlinked branch of the summary are different code, and a fixture set
+        // that only ever produced one would leave the other's deletion invisible —
+        // which is precisely how the deleted `else` survived.
+        var linked = 0;
+        var unlinked = 0;
+
+        foreach (var rendered in ViewFixtures.Documents)
+        {
+            var document = await ParseAsync(rendered);
+
+            foreach (var form in rendered.Parts.Select(p => p.Model).OfType<IBookingFormView>().Take(1))
+            {
+                foreach (var error in form.Errors)
+                {
+                    var isLinked = document
+                        .QuerySelectorAll("a[href]")
+                        .Any(a => a.GetAttribute("href") == "#" + error.FieldId);
+
+                    if (isLinked)
+                    {
+                        linked++;
+                    }
+                    else
+                    {
+                        unlinked++;
+                    }
+                }
+            }
+        }
+
+        Assert.True(linked >= 4, $"only {linked} problem(s) render as a link, so the "
+            + "link-text half of the reporting rule is barely exercised.");
+
+        Assert.True(unlinked >= 2, $"only {unlinked} problem(s) render unlinked, so the "
+            + "'still listed in text' half of the reporting rule is barely exercised.");
     }
 
     [Theory]
@@ -263,6 +377,29 @@ public class MarkupInvariantTests
         Assert.False(
             Regex.IsMatch(html, @"\sasp-[a-z-]+\s*="),
             $"{rendered}: an asp-* tag helper attribute reached the rendered page.");
+    }
+
+    /// <summary>
+    /// Whether an element can receive focus: natively, or because it carries a
+    /// <c>tabindex</c>. A negative <c>tabindex</c> counts — it is focusable
+    /// programmatically and by a fragment link, and merely absent from the sequential
+    /// tab order, which is what a wrapper around settled text should be.
+    /// </summary>
+    private static bool IsFocusable(IElement element)
+    {
+        if (element.HasAttribute("tabindex"))
+        {
+            return true;
+        }
+
+        return element.LocalName switch
+        {
+            "button" or "select" or "textarea" => true,
+            "input" => !string.Equals(
+                element.GetAttribute("type"), "hidden", StringComparison.OrdinalIgnoreCase),
+            "a" or "area" => element.HasAttribute("href"),
+            _ => false,
+        };
     }
 
     /// <summary>

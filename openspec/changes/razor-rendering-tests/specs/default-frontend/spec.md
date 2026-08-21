@@ -15,6 +15,14 @@ summary is built on, and the reason a control replaced by settled text still car
 its identity — the summary links to it, and a link with no target is worse than the
 control it replaced. It is also the clause whose absence hid two real faults.
 
+An in-page link's target SHALL be able to receive focus — natively, or by carrying
+a `tabindex`. Resolving is not arriving: following a link into a plain `div` moves
+the viewport and leaves focus where it was, which for a keyboard or screen-reader
+user is the failure the link exists to prevent. This bites precisely where a
+control has been replaced by settled text, because what carries the identity is
+then a wrapper rather than a control. A negative `tabindex` satisfies it: such a
+wrapper should be reachable by the link and absent from the sequential tab order.
+
 This SHALL be checked against the **rendered document**, not against view source.
 The distinction is the whole requirement. A path or an attribute appears in a
 `.cshtml` file whether the construct around it renders or is emitted as literal
@@ -44,6 +52,10 @@ accessibility requirement already states and that nothing has ever checked.
 
 #### Scenario: A link into the page that lands nowhere fails
 - **WHEN** a view renders an `href` naming a fragment that no element in the document carries
+- **THEN** the check fails, naming the view
+
+#### Scenario: A link into the page whose target cannot take focus fails
+- **WHEN** a view renders an `href` naming an element that is neither natively focusable nor carries a `tabindex`
 - **THEN** the check fails, naming the view
 
 #### Scenario: A duplicated id fails
@@ -182,6 +194,14 @@ it spends their trust on a link that cannot work. This is a narrowing of the
 association guarantee and not of the reporting guarantee — every problem is still
 stated in text, which is what the visitor needs in order to know what went wrong.
 
+Because that reporting guarantee is what the narrowing rests on, it SHALL be
+checked and not assumed: every problem the redraw carries SHALL appear in the
+rendered document, linked or not. And where a problem is linked, **the link's text
+SHALL be the problem's own message**. A link's text is its accessible name, so a
+summary of "click here" beside the messages somewhere else states every problem and
+names none of them — it satisfies the letter of both guarantees while destroying
+what they are for.
+
 Where a control is replaced by settled text rather than removed — a fixed length, a
 choice that is no longer offered — the replacement SHALL carry the control's
 identity, so the association survives. Removing the control is not a licence to drop
@@ -204,6 +224,14 @@ reach rather than one it forbids.
 #### Scenario: A problem about a control that is no longer rendered is still stated
 - **WHEN** a redraw carries a failure about a control the page no longer renders — a booker field on a date with no times, or a choice the service no longer offers
 - **THEN** the summary states the problem in text and does not link to the absent control
+
+#### Scenario: A problem missing from the page fails
+- **WHEN** a redraw carries a failure whose message appears nowhere in the rendered document
+- **THEN** the check fails, naming the view and the message
+
+#### Scenario: A link that does not say what the problem is fails
+- **WHEN** a problem is linked to its control but the link's text is something other than the problem's message
+- **THEN** the check fails, naming the view and the control
 
 #### Scenario: Settled text keeps the association
 - **WHEN** a control is replaced by settled text rather than removed, and a failure names it
