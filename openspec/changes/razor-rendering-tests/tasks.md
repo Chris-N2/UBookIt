@@ -98,8 +98,47 @@
 
 ## 7. Follow-up, to be written up rather than remembered
 
-- [ ] 7.1 Record the deferred three as an obligation with its spike named: does `BeginUmbracoForm` need a booted Umbraco context, or only `AddDataProtection()` and `AddAntiforgery()` over a `DefaultHttpContext`? The answer decides whether that suite stays fast, and it should be settled **before** the follow-up's design is written, not during it.
-- [ ] 7.2 Record that flow-view/partial **composition** remains untested until that follow-up, and that the existing source scan asserting each flow view names each partial path is load-bearing until then.
+- [x] 7.1 Record the deferred three as an obligation with its spike named: does `BeginUmbracoForm` need a booted Umbraco context, or only `AddDataProtection()` and `AddAntiforgery()` over a `DefaultHttpContext`? The answer decides whether that suite stays fast, and it should be settled **before** the follow-up's design is written, not during it.
+
+      Written to `ubookit-deferred-obligations`. QA agrees the spike belongs before
+      the design rather than inside it.
+
+- [x] 7.2 Record that flow-view/partial **composition** remains untested until that follow-up, and that the existing source scan asserting each flow view names each partial path is load-bearing until then.
+
+      Recorded, and QA's judgement recorded with it: **this is the one deferred item
+      that still carries real risk.** The composed-document fixture is hand-built —
+      `_ErrorSummary`, `_DateAndLength`, `_Times`, `_YourDetails` in flow order with
+      `_YourDetails` guarded by `HasTimes` — and nothing checks that it matches what
+      `Service.cshtml` and `Default.cshtml` actually render. It has already drifted
+      once: composing `_YourDetails` unconditionally masked a real defect (§10.4).
+      A second drift would be silent in the same way.
+
+      One consequence worth naming: an `_ErrorSummary` included **twice** by a flow
+      view would be invisible to every rule here, because the summary carries no
+      ids. QA probed it this round and judged it belongs to the composition gap
+      rather than to this change.
+
+- [x] 7.3 Record the `role="alert"` blind spot. In `design.md` under Risks, with the
+      reasoning rather than as a bare note: deleting it passes the whole suite, and
+      it is now the largest unguarded property of this surface — but whether the
+      announcement *works* is not something a DOM assertion can judge, and asserting
+      that the attribute is merely present would be a markup rule wearing a
+      behaviour rule's clothes. Written down so a later reader does not assume
+      nobody looked.
+
+- [x] 7.4 Record that the human keyboard-only and screen-reader pass owed since ⑤
+      **stays its own obligation** and is not discharged by this change. §13's
+      keyboard pass covered the two product fixes in one scenario; it did not cover
+      the flows. QA asked explicitly that this not be absorbed into this change's
+      record, and it is right to: an obligation that quietly acquires a tick because
+      something adjacent was verified is worse than one still open.
+
+- [x] 7.5 Record the two branches of `HasAccessibleName` that **no fixture
+      exercises**: the wrapping-`label` case and the `aria-labelledby` case. No view
+      uses either — all seven labels are `for=`-based — so both are correct,
+      consistent with their siblings, and have never fired. Not worth manufacturing
+      a fixture for; worth knowing, so that whoever first writes an
+      `aria-labelledby` into a view knows that path is untried.
 
 ## 8. What apply changed about the design
 
@@ -121,11 +160,23 @@ was written for.
 
 ## 9. Numbers
 
+*Written before QA. Superseded on both counts — kept as written, with the
+corrections beneath it, because the second line is exactly the claim six rounds of
+review overturned.*
+
 - 212 rendering tests, ~2s. `UBookIt.Tests` unchanged at 768 in under a second,
   which was the point of the separate project.
 - Rendering suite runtime is not annoying and does not need splitting further.
 - **No product code changed.** Both rules found only fixture gaps and one rig
   error; the shipped markup was correct throughout.
+
+**As merged: 415 rendering tests, ~5s.** `UBookIt.Tests` still 768 in under a
+second, so the separation held its purpose. The runtime claim survives.
+
+**The "no product code changed" line was wrong**, and it was wrong at the moment it
+was written rather than overtaken by scope creep: two real defects were sitting in
+the shipped markup, and the rules as first designed could not see either (§11). Two
+product files changed in the end, both `.cshtml`, both narrow.
 
 ## 10. QA round 1 — REJECT, remediated
 
@@ -393,3 +444,152 @@ the one it found. There were three.
 
 - [x] 14.7 Re-verified: clean `--no-incremental` build at **0 warnings**; 768 unit,
       **336** rendering, 58 integration, 69 client.
+
+## 15. QA round 4 — REJECT, remediated
+
+One MAJOR, and it was **the same shape as round 3's, one level up**. Round 3's
+diagnosis had been: every rule asked "does this link resolve", and a link never
+emitted resolves vacuously. That shape survived the fix — every rule now asked
+about *links*, so a message that never reached the page satisfied all of them.
+
+- [x] 15.1 **MAJOR — nothing asserted that an error message reaches the document
+      at all.** Two mutations, both 336 green: deleting the summary's
+      `else { @error.Message }` branch, and replacing the link's text with
+      "click here".
+
+      The first violates a SHALL this change had written **that same round**. The
+      MODIFIED requirement narrows the association guarantee — don't link to a
+      control that isn't there — and the entire compensating argument is "every
+      problem is still stated in text". Nothing checked the compensation. I wrote
+      the clause and did not implement it, which is worth naming separately from
+      missing a case: the spec was right and the code silently did not follow it.
+
+      Closed by `Every_problem_is_stated_in_the_document`: every message in
+      `Model.Errors` appears in the document's text, and where the problem is
+      linked, the link's own text is the message. Both assertions, not one — the
+      first alone kills "click here" today only because that mutation happens to
+      leave the message nowhere else; a view rendering the message in a sibling
+      span would slip past. A link's text is its accessible name, and that is the
+      property being stated.
+
+      Non-vacuity: `Both_halves_of_the_reporting_rule_are_exercised` counts linked
+      and unlinked problems **separately** (floors 4 and 2, actuals 9 and 3). A
+      single total would have sat green over precisely the hole — a fixture set
+      producing only linked problems is the state in which the deleted `else`
+      survives.
+
+- [x] 15.2 **MINOR — a summary link's target was never required to be focusable.**
+      Dropping `tabindex="-1"` from both `_DateAndLength` wrappers passed 336.
+      Resolving is not arriving: a plain `div` moves the viewport and leaves focus
+      in the summary, which for a keyboard or screen-reader user is the failure the
+      link exists to prevent.
+
+      This had been verified **by hand, once**, in §13's keyboard pass, and I had
+      filed it under "things a DOM assertion cannot judge". That was a conflation:
+      *announcement* is not checkable, *focusability* plainly is. Folded into rule
+      1's in-page-link clause rather than made a separate test, since it is a
+      property of the same link and separating them would let one drift from the
+      other. A negative `tabindex` satisfies it — such a wrapper should be a target
+      and absent from the tab order.
+
+      A fourth mutation QA had not named: the `_Times` `fieldset` is a link target
+      too, and a `fieldset` is not natively focusable. Same exposure; also now dead.
+
+- [x] 15.3 **MINOR — `role="alert"` recorded rather than fixed.** See §7.3.
+
+- [x] 15.4 Spec additive on both requirements — nothing rewritten, so no guarantee
+      could be dropped by construction. 4 → 6 scenarios. Re-verified: 0 warnings;
+      768 unit, **376** rendering, 58 integration, 69 client.
+
+## 16. QA round 5 — REJECT, remediated
+
+I had asked QA two questions of my own, having noticed the pattern, and the more
+useful half of its answer was that **both of my candidates were wrong**.
+
+- [x] 16.1 **Both proposed next levels rejected, with reasons worth keeping.**
+
+      *Is the rendered message the right one for the failure code?* No — and joining
+      them would be a **regression**. The fixtures carry arbitrary strings
+      deliberately; this suite's property is *whatever message the model carries
+      reaches the page*, which should be content-agnostic. `BookingMessages` is unit
+      tested for code → message, the flow tests assert the model carries the right
+      message, and this suite asserts message → page. The chain closes at
+      `BookingError.Message`. Re-joining it here would break rendering tests on
+      every copy edit.
+
+      *Extra or stale problems?* Already covered — the rule iterates the **model's**
+      errors, so filtering or truncating fails. Only an *invented* problem escapes,
+      and a hardcoded list item is not a plausible regression. The one plausible
+      variant, `_ErrorSummary` included twice by a flow view, belongs to the
+      composition gap (§7.2).
+
+      Recorded because asking "what else" is only useful if the answer is allowed to
+      be "nothing, and here is why" — otherwise it manufactures work.
+
+- [x] 16.2 **MAJOR — requirement 1's own clause was not implemented.** The
+      requirement says every control "carries an **accessible name**".
+      `HasAccessibleName` returned true on `label[for="…"] is not null` —
+      **existence, not a name**. An empty `<label for="ubookit-name"></label>`
+      leaves the control unnamed and passed.
+
+      The tell was inside the method the whole time: the `aria-label` branch checked
+      `{ Length: > 0 }` while both element-based branches checked only existence.
+      That kind of internal inconsistency is visible by reading, without any
+      mutation — a cheaper detector than mutation for this class, and worth
+      remembering as one.
+
+- [x] 16.3 **MINOR, same class — a reference can resolve to an empty element.** An
+      `aria-describedby` pointing at an empty span resolves perfectly, and the
+      message is still in the summary, so §15.1's rule is satisfied too. The visitor
+      standing on the field hears the association announced and nothing else. Empty
+      `legend`s the same: a group boundary announced with no name, which is worse
+      than no grouping.
+
+      One predicate — `HasText`, non-whitespace `TextContent` — applied at three
+      sites: described and labelling targets, accessible names (all three branches,
+      including the wrapping-`label` case QA had not named), and a new
+      `Every_group_is_named_by_its_legend`, which checks the `legend` is present as
+      well as non-empty since nothing had ever checked the legend at all.
+
+      `IsNullOrWhiteSpace` rather than `IsNullOrEmpty` is load-bearing, not
+      incidental: Razor readily produces an element containing only a newline and
+      indentation, and `IsNullOrEmpty` would have left the hole open. QA confirmed
+      by mutation.
+
+- [x] 16.4 **Ten mutations, all previously green, all dead.** Labels emptied
+      (name 17, date 25); legends emptied (details 17, times 17); described targets
+      emptied (name 1, email 1, who 1, times 1, duration 2); email hint emptied (17).
+      The duration target is a **tenth QA did not name** — I swept every described
+      target rather than the four listed, on the principle that a list handed to you
+      is a sample. Each mutation was verified to have actually applied (md5 before
+      and after) before its result was trusted.
+
+- [x] 16.5 **No product code changed** — the first round where the finding was
+      purely a hole in the rules and the shipped views already satisfied it.
+      Spec additive on requirement 1: one clause, three scenarios. Re-verified:
+      0 warnings; 768 unit, **415** rendering, 58 integration, 69 client.
+
+## 17. QA round 6 — APPROVE
+
+No blocking findings. QA re-ran all ten mutations independently and every failure
+count matched, then probed four further edges that held: a whitespace-only label, a
+whitespace-only described target, a single-space described target, and `<legend>`
+removed outright from each fieldset. The guarantee diff on the MODIFIED requirement
+was re-run mechanically after all three rounds of editing it — every SHALL carried,
+both original scenarios byte-verbatim, 2 → 6 scenarios.
+
+**The shape of the review, worth stating once.** The rig was sound from round 1 and
+never needed rework. Every round after found the same fault at a different altitude:
+**a rule checking the mechanism rather than the guarantee the mechanism serves.**
+
+    links resolve → are they emitted → is anything said → does the target speak
+
+Each level was invisible from the one below, and every one was found by mutation
+rather than by reading. That is the transferable lesson, and it generalises past
+this suite: a rule that checks a mechanism passes whenever the mechanism is absent,
+and absence is the failure mode nobody writes a test for.
+
+The pattern is exhausted on this surface. The next level up is "does the text say
+the *right* thing", which is §16.1 — deliberately out of scope, because the chain
+already closes elsewhere and coupling the rig to wording would cost more than it
+buys.
