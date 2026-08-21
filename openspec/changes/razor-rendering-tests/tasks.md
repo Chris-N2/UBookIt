@@ -288,14 +288,34 @@ right shape for them rather than a rule.
 
 ## 13. Outstanding — recorded, not claimed
 
-- **The keyboard pass over the two product fixes is NOT done.** QA recommended it
-  before archive and was right to: both fixes concern focus targets, and a
-  `tabindex="-1"` wrapper receiving focus is exactly what a DOM assertion cannot
-  judge. I confirmed over HTTP that the wrapper renders live with
-  `id="ubookit-who" tabindex="-1"` carrying the reset notice, but the browser
-  extension was unavailable, so focus behaviour is **unverified**. The pattern is
-  identical to the settled-length wrapper that shipped in ⑩ and was reviewed then,
-  which is a reason to expect it works and not evidence that it does.
+- ~~**The keyboard pass over the two product fixes is NOT done.**~~ **Done
+  2026-08-21**, in a real browser against the real scenario, and it passes.
+
+  The scenario was produced end to end rather than simulated: a hand-made POST
+  carrying a pin to a service with no picker returns `resource-not-eligible`, and
+  the redraw renders the summary link to `#ubookit-who` — the exact case that linked
+  nowhere before the fix.
+
+  **Verified by real interaction:** clicking that link moves focus to the wrapper
+  (`document.activeElement` becomes `DIV#ubookit-who`), and the focused element's
+  text is the error message, so a screen reader announces the problem on arrival.
+  That is precisely the thing a DOM assertion cannot judge, and it is the reason QA
+  asked for the pass.
+
+  **Verified structurally:** the wrapper carries `tabIndex === -1` and is absent
+  from the sequential focus order — a target, not a control. The who control itself
+  is a native `<select>` with `tabIndex 0`, a `label[for]` that resolves and an
+  `aria-describedby` that resolves. Reading order is date → length → who → show
+  times → times → booker fields → book.
+
+  **Not verified, and stated as such:** sequential traversal by actually pressing
+  Tab. The browser extension's synthetic key events do not drive native focus
+  traversal — five Tab presses left focus inside the date input's segments — so tab
+  ORDER rests on DOM order plus `tabIndex`, not on keys pressed. A native `<select>`
+  with `tabIndex 0` is keyboard operable by construction, so this does not cast
+  doubt on the control; it means one link in the chain is reasoned rather than
+  observed. A human keyboard pass is still owed for the flows generally, as it has
+  been since ⑤.
 
 - **The page is now honest but still incoherent in one state** (QA's observation,
   for a follow-up rather than this change): a redraw with no times tells the visitor
