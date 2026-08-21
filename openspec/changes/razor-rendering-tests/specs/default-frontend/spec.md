@@ -161,17 +161,19 @@ rather than discovered.
 ### Requirement: Accessible failure handling with input preservation
 When a submission fails validation or placement, the form SHALL be redrawn with an
 error summary that lists each problem in text and is associated with the offending
-fields, and the visitor's entered contact details SHALL be preserved. Stable domain
+fields (qualified below, where the field is no longer on the page), and the
+visitor's entered contact details SHALL be preserved. Stable domain
 failure codes SHALL be mapped to user-facing messages. A time that became
 unavailable between rendering and submission (a `conflict`) SHALL produce a clear
 "no longer available" message with refreshed availability, not a raw error.
 
 A problem SHALL be associated with its field **where that field is on the page**,
 and SHALL still be listed in text where it is not. A redraw does not always render
-every control the previous submission carried: the booker fields and the time list
-are shown only where there are times, and the choice control only where a choice is
-still offered — so a failure about the length, the chosen resource, the times or the
-booker can outlive the control it names.
+every control the previous submission carried — in the shipped front end, for
+example, the booker fields appear only where there are times and the choice control
+only where a choice is still offered — so a failure can outlive the control it
+names. Which controls a given front end drops is its own business; that some may be
+dropped is what this requirement has to account for.
 
 An association pointing at a control that was not rendered SHALL NOT be emitted. It
 reads as a route to the problem and is none: a summary that says "please enter your

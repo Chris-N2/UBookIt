@@ -322,3 +322,74 @@ right shape for them rather than a rule.
   "Please enter your name" while rendering no name field. The summary fix makes the
   *link* honest and arguably makes the incoherence less visible. Not introduced
   here; worth an obligation rather than silence.
+
+## 14. QA round 3 — REJECT, remediated
+
+One MAJOR, of the same shape as round 2's, which is why QA held the line. I had
+asked it to hunt for a fifth uncovered path rather than accept that I had closed
+the one it found. There were three.
+
+- [x] 14.1 **MAJOR — three of the five `IsOnThePage` arms were silently mutable.**
+      `Duration => Model.HasTimes`, `Resource => Model.HasTimes` and `_ => true` all
+      passed 277 tests. The first two are the **opposite** fault from the one this
+      code was written to fix: a *working* association silently dropped rather than a
+      dangling one emitted.
+
+      Closing it needed more than fixtures, and that is the finding. Every rule so
+      far asked "does this link resolve", and a link that is never emitted resolves
+      vacuously — **dropping an association was invisible to the entire suite**. Two
+      changes:
+
+      - three fixture states: a duration failure and a refused choice each with no
+        times, and an error naming an unrecognised control (the default arm, added
+        last round so a sixth field id could not inherit `HasTimes` by silence, and
+        then exercised by nothing);
+      - a new rule, `Every_problem_whose_control_is_on_the_page_is_linked_to_it`,
+        asserting the direction nothing asserted. The spec already required it — "a
+        problem SHALL be associated with its field where that field is on the page" —
+        so only the check was missing.
+
+      All five arms now die under mutation, and so does removing the guard entirely.
+      Non-vacuity guarded: `The_linked_problem_rule_is_exercised` fails if the
+      fixtures stop producing errors that name rendered controls.
+
+- [x] 14.2 **A third suppression of one shape appeared**, which QA had named in
+      advance as the signal to revisit — "and even then it should be a narrow rule
+      tied to the specific field, with each instance still recorded". Taken as
+      given: the three entries stay enumerated and visible, the shared reason is a
+      constant rather than three restatements, and
+      `Every_suppression_is_of_the_shape_it_claims` proves each entry really is a
+      flag silenced by an error against the control it speaks about. A blanket rule
+      would have swallowed a genuine defect coexisting with such an error; a shared
+      *reason* without a check would have let an unrelated exemption hide behind the
+      wording.
+
+- [x] 14.3 **NIT — the MODIFIED requirement's explanatory sentence over-fitted**,
+      stating this front end's composition as a property of the capability inside a
+      requirement alternative UIs implement. Reworded as an example, with the
+      general claim ("that some controls may be dropped") kept.
+
+- [x] 14.4 **NIT — the requirement's first paragraph stated the association
+      guarantee unqualified** while the second narrowed it, so a reader who greps
+      and stops gets a false answer. A parenthetical pointer added; no guarantee
+      touched, and the guarantee diff re-run afterwards — 2 → 4 scenarios, no SHALL
+      dropped.
+
+- [x] 14.5 **Recorded, per QA:** the `:102` calculus. The interpretation that a
+      clause about associating error text with its control does not reach the case
+      where no control exists now lives inside a *different* requirement, so an
+      editor rewriting `:102` will not see it. The alternative — a second MODIFIED
+      entry adding one cross-reference sentence to a requirement carrying eight
+      SHALLs and five scenarios — carries more wholesale-replacement risk than it
+      removes. That trade is the reason, not an oversight.
+
+- [x] 14.6 **Correcting my own record, in the other direction.** §12.4 said the
+      shared-literal assertion "does not close the blind spot". QA checked and found
+      it closes the specific instance demonstrated in round 1 — disabling the
+      settled-length error branch while its sibling keeps the literal alive now
+      fails. The general limitation survives (the guard counts states, not
+      branches), but I under-claimed, and an under-claim in a record is as wrong as
+      an over-claim.
+
+- [x] 14.7 Re-verified: clean `--no-incremental` build at **0 warnings**; 768 unit,
+      **336** rendering, 58 integration, 69 client.

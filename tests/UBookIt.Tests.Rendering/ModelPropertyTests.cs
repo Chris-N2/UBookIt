@@ -1,4 +1,5 @@
 using UBookIt.Tests.Rendering.Support;
+using UBookIt.Web.Rendering;
 
 namespace UBookIt.Tests.Rendering;
 
@@ -28,32 +29,51 @@ public class ModelPropertyTests
     private string? DeadIn { get; set; }
 
     /// <summary>
+    /// Why a flag is legitimately silent in a state: an error against the very
+    /// control the flag speaks about is already saying the same thing, more
+    /// strongly.
+    /// </summary>
+    private const string SupersededByAnError =
+        "An error against the control this flag speaks about takes precedence and says the same "
+        + "thing more strongly, so setting the flag from this state correctly changes nothing. "
+        + "The visitor is told either way.";
+
+    /// <summary>
+    /// Which control each flag speaks about, so a suppression can be checked to be
+    /// of the shape it claims rather than taken on trust.
+    /// </summary>
+    private static readonly Dictionary<string, string> FlagSpeaksAbout = new(StringComparer.Ordinal)
+    {
+        ["ResourceChoiceWasReset"] = BookingFieldIds.Resource,
+    };
+
+    /// <summary>
     /// The (view, flag, state) combinations where a flag legitimately changes
     /// nothing, each with its reason.
     /// <para>
-    /// Explicit and narrow, because the spec requires it: a property may be exempt
-    /// "only by an explicit, reasoned entry — never by being absent from a list".
-    /// A blanket rule that skipped a whole class of states would be exemption by
-    /// absence, and QA showed what that costs — a real defect passing all 212 tests.
+    /// Enumerated rather than expressed as a blanket rule, because the spec requires
+    /// it: a property may be exempt "only by an explicit, reasoned entry — never by
+    /// being absent from a list". A rule that skipped every state carrying such an
+    /// error would swallow a genuine defect that happened to coexist with one.
     /// </para>
     /// <para>
-    /// Every entry is asserted to be <em>needed</em> by
-    /// <see cref="Every_suppression_is_still_earning_its_place"/>, so one that stops
-    /// applying fails rather than lingering as a hole nobody rechecks.
+    /// There are now three of one shape, which is the point at which a shared reason
+    /// beats three restatements — so the reason is a constant, and
+    /// <see cref="Every_suppression_is_of_the_shape_it_claims"/> proves each entry
+    /// really is that shape. The list stays visible; only the prose is shared.
     /// </para>
     /// </summary>
     private static readonly Dictionary<(string View, string Member, string State), string> Suppressed =
         new()
         {
             [(ViewInventory.DateAndLength, "ResourceChoiceWasReset", "service: refused choice")] =
-                "An error against the who control takes precedence over the reset notice and says "
-                + "the same thing more strongly, so setting the flag from this state correctly "
-                + "changes nothing. The visitor is told their choice is no longer offered either way.",
+                SupersededByAnError,
 
             [(ViewInventory.DateAndLength, "ResourceChoiceWasReset", "service: with errors")] =
-                "The same precedence, in the branch that renders when there is no control left to "
-                + "render on: an error against the choice is shown instead of the reset notice, "
-                + "because 'your choice is no longer offered' is what both of them say.",
+                SupersededByAnError,
+
+            [(ViewInventory.DateAndLength, "ResourceChoiceWasReset", "service: refused choice and none left")] =
+                SupersededByAnError,
         };
 
     public static TheoryData<string> InScopeViews()
@@ -146,6 +166,29 @@ public class ModelPropertyTests
                     && await RendersTheSameAsync(view, model, flipped),
                 $"{view}: the suppression for '{member}' in state '{state}' is no longer needed — "
                 + "varying it now changes the output. Remove the entry.");
+        }
+    }
+
+    [Fact]
+    public void Every_suppression_is_of_the_shape_it_claims()
+    {
+        // The exemptions all claim one shape: a flag silenced by an error against
+        // the control it speaks about. Claimed in prose until now. This checks it —
+        // so an exemption cannot be added for a different reason under cover of the
+        // shared wording, which is exactly what a shared reason makes easy.
+        foreach (var ((view, member, state), reason) in Suppressed)
+        {
+            Assert.Equal(SupersededByAnError, reason);
+
+            var field = Assert.Contains(member, FlagSpeaksAbout);
+            var model = (IBookingFormView)Assert.Single(
+                ViewFixtures.For(view), c => c.State == state).Model;
+
+            Assert.True(
+                model.ErrorFor(field) is not null,
+                $"{view}: the suppression for '{member}' in state '{state}' claims an error "
+                + $"against '{field}' takes precedence, but that state carries no such error. "
+                + "Either the reason is wrong or the entry is.");
         }
     }
 

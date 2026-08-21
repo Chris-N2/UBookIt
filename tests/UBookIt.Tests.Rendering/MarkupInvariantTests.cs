@@ -2,6 +2,7 @@ using System.Text.RegularExpressions;
 using AngleSharp.Dom;
 using AngleSharp.Html.Parser;
 using UBookIt.Tests.Rendering.Support;
+using UBookIt.Web.Rendering;
 
 namespace UBookIt.Tests.Rendering;
 
@@ -141,6 +142,66 @@ public class MarkupInvariantTests
                 $"{rendered}: <a href=\"#{target}\"> points at no element in the document. "
                 + "An error summary that links nowhere is worse than one that does not link.");
         }
+    }
+
+    [Theory]
+    [MemberData(nameof(Cases))]
+    public async Task Every_problem_whose_control_is_on_the_page_is_linked_to_it(DocumentCase rendered)
+    {
+        // The other direction, and the one every rule so far was blind to.
+        //
+        // "Every link resolves" cannot see a link that was never emitted: dropping a
+        // WORKING association is silent, and QA showed two arms of the summary's
+        // guard could be flipped to drop one with all 277 tests green. That is the
+        // opposite fault from the dangling link, and just as bad — the summary
+        // states a problem and gives the visitor no way to it.
+        //
+        // The spec already required this ("a problem SHALL be associated with its
+        // field where that field is on the page"); only the check was missing.
+        var document = await ParseAsync(rendered);
+
+        foreach (var form in rendered.Parts.Select(p => p.Model).OfType<IBookingFormView>().Take(1))
+        {
+            foreach (var error in form.Errors)
+            {
+                // No field, or a control the page does not render: legitimately
+                // unlinked, and covered by the resolution rule above.
+                if (error.FieldId is null || document.GetElementById(error.FieldId) is null)
+                {
+                    continue;
+                }
+
+                Assert.True(
+                    document.QuerySelectorAll("a[href]")
+                        .Any(a => a.GetAttribute("href") == "#" + error.FieldId),
+                    $"{rendered}: '{error.Message}' names control '{error.FieldId}', which IS on "
+                    + "the page, but the summary does not link to it. A problem the visitor can "
+                    + "act on should take them there.");
+            }
+        }
+    }
+
+    [Fact]
+    public async Task The_linked_problem_rule_is_exercised()
+    {
+        // Non-vacuity: the rule above skips errors whose control is absent, so a
+        // fixture set in which no error ever names a rendered control would satisfy
+        // it without checking anything.
+        var exercised = 0;
+
+        foreach (var rendered in ViewFixtures.Documents)
+        {
+            var document = await ParseAsync(rendered);
+
+            foreach (var form in rendered.Parts.Select(p => p.Model).OfType<IBookingFormView>().Take(1))
+            {
+                exercised += form.Errors.Count(e =>
+                    e.FieldId is not null && document.GetElementById(e.FieldId) is not null);
+            }
+        }
+
+        Assert.True(exercised >= 4, $"only {exercised} error(s) name a control that is on the page, "
+            + "so the linked-problem rule is barely exercised.");
     }
 
     [Theory]

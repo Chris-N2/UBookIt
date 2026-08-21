@@ -275,6 +275,29 @@ public static class ViewFixtures
             times: [],
             errors: [new BookingError("That time is no longer available.", BookingFieldIds.Times)]));
 
+        // The three states that make every arm of the summary's "is this control on
+        // the page" rule mutation-detectable. QA found three of five arms silently
+        // mutable — two of them in the OPPOSITE direction from the fault that was
+        // fixed: a working association quietly dropped rather than a dangling one
+        // emitted.
+        //
+        // Both are reachable. A hand-made POST with a disallowed length, or a
+        // refused pin, on a date whose availability has since emptied.
+        yield return ("service: length rejected and none left", Service(
+            times: [],
+            errors: [new BookingError("That booking length is not offered.", BookingFieldIds.Duration)]));
+
+        yield return ("service: refused choice and none left", Service(
+            times: [],
+            errors: [new BookingError(
+                "Your choice is no longer offered for this service.", BookingFieldIds.Resource)]));
+
+        // The default arm, added last round precisely so a sixth field id could not
+        // inherit `HasTimes` semantics by silence — and then exercised by nothing.
+        // A failure may carry any field id, so an unrecognised one is a real shape.
+        yield return ("service: error against an unknown control", Service(
+            errors: [new BookingError("Something else went wrong.", "ubookit-not-a-control")]));
+
         yield return ("service: choice reset", Service(choices: Choices, wasReset: true));
         yield return ("service: choice reset with no control", Service(wasReset: true));
         yield return ("service: entered details", Service(
