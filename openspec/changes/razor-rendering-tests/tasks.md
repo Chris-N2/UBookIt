@@ -94,7 +94,7 @@
 - [x] 6.3 Confirm `UBookIt.Tests` is unchanged in `git diff` apart from any linked-file plumbing, and that its runtime has not moved.
 - [x] 6.4 Attack each clause of designs D2, D3 and D4 for a clause with no covering test — the technique that found the no-common-length gap in ⑩ and two uncovered clauses in ⑩-1. Record what was found.
 - [x] 6.5 Sync-time outward grep for sibling specs this change falsifies. It has found something on six consecutive changes. In particular check whether any spec claims the accessibility bar is unverified or verified only by review.
-- [ ] 6.6 Hand to `qa-review` in a **fresh context or subagent** — never the context that wrote the code.
+- [x] 6.6 Hand to `qa-review` in a **fresh context or subagent** — never the context that wrote the code. **Six rounds** (§10, §12, §14, §15, §16, §17): REJECT ×5, then APPROVE.
 
 ## 7. Follow-up, to be written up rather than remembered
 
