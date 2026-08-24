@@ -194,4 +194,7 @@
 
 - [x] 12.1 Zero warnings; 770 + 598 + 58 = **1426** passing; `openspec validate
       --strict` clean; `src/` untouched; tree clean.
-- [ ] 12.2 Sync + archive + merge — **held for Chris**, who asks to be present.
+- [x] 12.2 Sync + archive + merge — done with Chris present (2026-08-24). Specs
+      synced as their own commit first, so `openspec archive` runs with
+      `--skip-specs`; re-applying an ADDED delta over an already-synced spec aborts,
+      which is the CLI protecting against a double-apply rather than a problem.
