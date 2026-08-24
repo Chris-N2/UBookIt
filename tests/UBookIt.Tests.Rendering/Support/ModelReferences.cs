@@ -76,6 +76,54 @@ public static class ModelReferences
         return targets.Count == 1 ? targets[0] : null;
     }
 
+    /// <summary>
+    /// Every view a view renders into itself, transitively — the partials it
+    /// includes, and whatever those include.
+    /// </summary>
+    public static IReadOnlyList<string> IncludedViewsOf(string viewPath)
+    {
+        var found = new List<string>();
+        var seen = new HashSet<string>(StringComparer.Ordinal) { viewPath };
+        var pending = new Queue<string>([viewPath]);
+
+        while (pending.Count > 0)
+        {
+            var source = StripComments(RepoFiles.Read(ViewInventory.SourcePathOf(pending.Dequeue())));
+
+            foreach (var included in Regex
+                .Matches(source, @"PartialAsync\(""(?<target>~/[^""]+)""")
+                .Select(m => m.Groups["target"].Value))
+            {
+                if (seen.Add(included))
+                {
+                    found.Add(included);
+                    pending.Enqueue(included);
+                }
+            }
+        }
+
+        return found;
+    }
+
+    /// <summary>
+    /// The members a view refers to that a view it renders <b>also</b> refers to.
+    /// <para>
+    /// These are the members rule 2 cannot judge for that view: when the page's own
+    /// reference to one dies, the partial keeps it changing the output, and the
+    /// rule sees a live member. Enumerated by
+    /// <c>The_members_a_partial_keeps_alive_are_enumerated</c> rather than left to
+    /// be discovered.
+    /// </para>
+    /// </summary>
+    public static IReadOnlyList<string> MaskedByIncludesIn(string viewPath)
+    {
+        var fromIncludes = IncludedViewsOf(viewPath)
+            .SelectMany(Of)
+            .ToHashSet(StringComparer.Ordinal);
+
+        return [.. Of(viewPath).Where(fromIncludes.Contains).Order(StringComparer.Ordinal)];
+    }
+
     /// <summary>The model members one view's source refers to, in name order.</summary>
     public static IReadOnlyList<string> Of(string viewPath)
     {

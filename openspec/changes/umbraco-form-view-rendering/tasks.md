@@ -140,9 +140,58 @@
 - [x] 9.8 **NITs** — stale "deferred" / "in-scope" comments corrected in
       `ViewInventory`, `ViewFixtures`, `ModelReferences`, `BranchReachabilityTests`.
       Remaining uses are deliberate historical references.
-- [ ] 9.9 **Open, for Chris — there is no CI definition in this repository.** QA found
-      no `.github/`, no `azure-pipelines.yml`. The `.slnx` regression (a suite
-      silently not running) is exactly the class CI is supposed to catch, and the
-      commit message for `90eba80` claims "and in CI", which is unverifiable from
-      here. If the pipeline lives outside the repo it needs checking separately.
-- [ ] 9.10 Re-review by the same QA subagent, with its round-1 context.
+- [x] 9.9 **CI answered by Chris (2026-08-24): there is none, and the repo moves from
+      Azure DevOps to GitHub later.** So `90eba80`'s commit message overclaims when
+      it says the exclusion hid the tests "and in CI" — corrected here rather than by
+      rewriting a mid-branch commit for a prose error. The substantive consequence is
+      worse than first framed: with no pipeline, **nothing runs any suite
+      unattended**, so 415 tests stopping was not a near-miss with a net behind it.
+      No `azure-pipelines.yml` written — it would be built for a home the project is
+      leaving.
+- [x] 9.10 Re-review by the same QA subagent: **APPROVE WITH NITS.** It verified the
+      MAJOR fix in both directions and ran two mutations I had not: patterns
+      matching nothing, and — the important one — patterns matching **too much**,
+      which is the silent direction. Over-stripping destroys rule 2's signal while
+      everything still passes; `The_stripping_fires_where_there_is_something_to_strip`
+      catches it via the `partial == 0` arm.
+
+## 10. QA round 2 — nits accepted
+
+- [x] 10.1 **MINOR 1 — `Two_renders_of_one_model_compare_equal` was itself vacuous.**
+      It used `ViewFixtures.For(view)[0]`, and `_ErrorSummary`'s first state has no
+      errors, so it compared `""` against `""`. A guard against vacuity, vacuous.
+      Now loops **every** state and requires at least one to render something.
+      Mutation-checked: stripping to empty fails it, naming `_ErrorSummary` and
+      `_YourDetails` among others.
+- [x] 10.2 **MINOR 2 — rule 2's partial-masking bound is now enumerated, not just
+      recorded.** QA said recording in D5 would be enough and bounding would be
+      better; bounding is what rule 3's shared-literal blind spot already gets, so
+      consistency argued for it. `The_members_a_partial_keeps_alive_are_enumerated`
+      lists all nine, with a non-vacuity arm. Mutation-checked: adding a reference
+      to `Name` in `Service.cshtml` fails it, naming the new member.
+      Note the enumeration is **more pessimistic than QA's summary** — QA listed
+      `HasTimes` as genuinely checked, which is true of rule 1 catching it, not of
+      rule 2. The list reflects rule 2 alone, and D5 says so.
+- [x] 10.3 D5 extended with QA's refinement of the lesson: a precondition never
+      asserted is a rule never verified to run.
+
+## 11. The regression class that started this
+
+- [x] 11.1 **`SolutionIntegrityTests` added to `UBookIt.Tests`** — deliberately not
+      to the rendering suite, because a project excluded from the build cannot report
+      its own absence. Asserts no project carries a build exclusion, and that every
+      test project on disk is in the solution. Both carry non-vacuity arms.
+- [x] 11.2 Mutation-checked by reintroducing the **exact** original regression
+      (`<Build Solution="Debug|*" Project="false" />` on the rendering project): the
+      guard fails, naming the project — and the run itself shows the rendering suite
+      absent, which is the silence being guarded against.
+- [x] 11.3 Scope note: this is beyond the change as proposed. It is here because the
+      `.slnx` fix is on this branch, and a fix whose regression nothing can detect is
+      the pattern this whole change exists to argue against. With no CI, this test is
+      the substitute for a pipeline rather than a supplement to it.
+
+## 12. Ready
+
+- [x] 12.1 Zero warnings; 770 + 598 + 58 = **1426** passing; `openspec validate
+      --strict` clean; `src/` untouched; tree clean.
+- [ ] 12.2 Sync + archive + merge — **held for Chris**, who asks to be present.

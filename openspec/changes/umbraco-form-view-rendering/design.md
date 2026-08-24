@@ -195,11 +195,38 @@ Standing consequence, unchanged from the original: the id-uniqueness rule passes
 partly on an id nobody chose. The honest version of "every id is unique" is "every id
 we author is unique, plus one that is unique by GUID".
 
-**The transferable lesson is not about tokens.** It is that admitting a new
-collaborator (`BeginUmbracoForm`) admitted a new *property* (non-determinism), and
-the design reasoned about that property against the wrong rule. D1 and D2 examined
-what the collaborator needed; nothing examined what it changed about the output the
-existing rules read.
+**What rule 2 now covers on the flow views, and what it does not.** Making rule 2
+function on these views is not the same as making it strong on them, and the
+difference must not be read off the test count. A flow page renders partials that
+refer to the same model, so when the *page's own* reference to a shared member dies,
+the partial keeps that member changing the output and rule 2 sees nothing. Measured
+by matched pair: `ChosenResourceId` moved into a dead branch in `Service.cshtml`
+passes (`_DateAndLength` also names it); page-unique `ServiceId` in the same shape
+fails.
+
+Nine such members exist — four on each flow page plus `ChosenResourceId`. This is
+inherent to a per-view rule asked of a composed page and cannot be removed without
+attributing rendered output back to the view that emitted it. It is instead
+**bounded**, exactly as rule 3's shared-literal blind spot already is: enumerated in
+`The_members_a_partial_keeps_alive_are_enumerated`, so a new instance fails a test
+and has to be justified rather than being discovered later.
+
+Masked by rule 2 is not the same as unchecked. `HasTimes` is on the list and is
+still caught — by rule 1, since neutralising its guard puts booker fields on a page
+whose error summary points at them.
+
+**The transferable lesson is not about tokens.** Admitting a new collaborator
+(`BeginUmbracoForm`) admitted a new *property* (non-determinism), and the design
+reasoned about that property against the wrong rule. D1 and D2 examined what the
+collaborator needed; nothing examined what it changed about the output the existing
+rules read.
+
+Its operational form, which is the reusable part: **a rule has preconditions, and a
+precondition never asserted is a rule never verified to run.** Rule 2's precondition
+was "two renders of one model are equal". It held silently for eleven views, so
+nobody looked when three more arrived. `Two_renders_of_one_model_compare_equal` is
+not primarily a regression guard — it is that assumption promoted to an assertion,
+which is the move to repeat whenever a rule acquires a new kind of input.
 
 ### D6 — The exemption scenario is forward-looking, and says so
 

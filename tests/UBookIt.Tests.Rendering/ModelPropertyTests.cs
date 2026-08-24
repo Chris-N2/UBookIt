@@ -130,11 +130,35 @@ public class ModelPropertyTests
         // Asserted for every shipped view rather than the three, so a fourth source
         // of per-render variance is caught the day it appears rather than the day
         // someone notices a rule has stopped working.
-        var model = ViewFixtures.For(view)[0].Model;
+        //
+        // Across EVERY state, not the first. Asking only state [0] would leave
+        // variance that appears in any later state unseen for every view — and it
+        // was worse than that: `_ErrorSummary`'s first state has no errors, so the
+        // partial renders nothing and the check compared "" against "". A guard
+        // against vacuity, itself vacuous, on the view where it mattered least to
+        // notice and most to be right.
+        var rendered = 0;
 
-        Assert.Equal(
-            await RenderForComparisonAsync(view, model),
-            await RenderForComparisonAsync(view, model));
+        foreach (var state in ViewFixtures.For(view))
+        {
+            var once = await RenderForComparisonAsync(view, state.Model);
+            var twice = await RenderForComparisonAsync(view, state.Model);
+
+            Assert.Equal(once, twice);
+
+            if (once.Trim().Length > 0)
+            {
+                rendered++;
+            }
+        }
+
+        // Non-vacuity: a view all of whose states render nothing would satisfy the
+        // equality above without comparing anything. A view legitimately renders
+        // nothing in SOME states — an error summary with no errors — so the bar is
+        // that at least one state produced a document to compare.
+        Assert.True(
+            rendered > 0,
+            $"{view} rendered nothing in every state, so this guard compared nothing.");
     }
 
     [Fact]
@@ -170,6 +194,74 @@ public class ModelPropertyTests
             ViewFixtures.For(ViewInventory.DateAndLength)[0].Model);
 
         Assert.Equal(0, RenderNondeterminism.CountIn(partial));
+    }
+
+    [Fact]
+    public void The_members_a_partial_keeps_alive_are_enumerated()
+    {
+        // Rule 2's blind spot on a composite page, made visible instead of silent —
+        // the same treatment rule 3's shared-literal case already gets.
+        //
+        // A flow page renders partials that refer to the same model. If the PAGE's
+        // own reference to a shared member dies, the partial keeps that member
+        // changing the output, and rule 2 reports it live. Demonstrated: moving
+        // `ChosenResourceId` in Service.cshtml into a dead branch leaves the suite
+        // green, because `_DateAndLength` still refers to it — while the same
+        // mutation on page-unique `ServiceId` fails.
+        //
+        // The blind spot is inherent to a per-view rule asked of a composed page and
+        // cannot be removed without attributing rendered output to the view that
+        // emitted it. It can be BOUNDED: every masked member is listed here, so the
+        // set is reviewed rather than discovered, and a NEW one fails this test and
+        // has to be justified.
+        //
+        // This matters most right now, because rule 2 has never run on these views
+        // before, and "rule 2 is live on the flow views" is otherwise about to be
+        // read as stronger than it is.
+        var masked = ViewInventory.All
+            .Where(view => !ModelReferences.DelegatingViews.ContainsKey(view))
+            .SelectMany(view => ModelReferences
+                .MaskedByIncludesIn(view)
+                .Select(member => $"{view[(view.LastIndexOf('/') + 1)..]}:{member}"))
+            .Order(StringComparer.Ordinal)
+            .ToList();
+
+        Assert.Equal(
+            [
+                // Both flow pages hand their whole model to `_DateAndLength`,
+                // `_Times`, `_ErrorSummary` and `_YourDetails`, so any member the
+                // page and a partial both name is one rule 2 cannot judge FOR THE
+                // PAGE. Each is judged for the partial itself, where it is not
+                // masked — the loss is the page's own reference, not the member.
+                //
+                // Booking/Default.cshtml — the resource flow.
+                "Default.cshtml:DurationMinutes",
+                "Default.cshtml:FlowToken",
+                "Default.cshtml:HasTimes",
+                "Default.cshtml:SelectedDate",
+
+                // BookingFlow/Service.cshtml — the service flow, the same four
+                // plus the visitor's choice of who, which `_DateAndLength` renders
+                // the control for.
+                "Service.cshtml:ChosenResourceId",
+                "Service.cshtml:DurationMinutes",
+                "Service.cshtml:FlowToken",
+                "Service.cshtml:HasTimes",
+                "Service.cshtml:SelectedDate",
+            ],
+            masked);
+
+        // Worth knowing, and the reason this bound is narrower than it reads:
+        // masked by rule 2 does not mean unchecked. `HasTimes` is the guard on
+        // `_YourDetails`, and neutralising it fails a rule 1 check
+        // (`Every_problem_whose_control_is_on_the_page_is_linked_to_it`) because the
+        // booker fields then appear on a page whose errors point at them. A member
+        // here is one RULE 2 cannot speak for, not one nothing can.
+
+        // Non-vacuity: the enumeration is only meaningful while the views it
+        // describes still compose partials. A scan that found nothing would satisfy
+        // the equality by matching an empty list against an empty list.
+        Assert.NotEmpty(masked);
     }
 
     [Fact]
