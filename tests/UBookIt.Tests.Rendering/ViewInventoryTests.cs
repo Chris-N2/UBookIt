@@ -142,27 +142,42 @@ public class ViewInventoryTests
     }
 
     [Fact]
-    public async Task The_dispatcher_page_adds_no_markup_to_the_view_it_delegates_to()
+    public async Task An_exempted_delegate_adds_no_markup_to_the_view_it_delegates_to()
     {
-        // The delegate exemption in ModelReferences.DelegatingViews rests on this
-        // claim — "checked itself" is only true if the delegate contributes nothing
-        // of its own. That was asserted from source shape and never from output.
+        // The delegate exemption in ModelReferences.DelegatingViews switches off two
+        // rules, and its stated reason is "checked itself" — true only if the
+        // delegate contributes nothing of its own. That half was asserted from
+        // source shape, which cannot see it: a view can name one partial and still
+        // render arbitrary markup around it.
         //
-        // Measured: the two differ by exactly one trailing "\r\n" (the newline after
-        // the PartialAsync line), 3460 bytes against 3458, and are identical once
-        // trimmed. Compared here by TAG SEQUENCE rather than by bytes: the form
-        // carries a per-render GUID id and two freshly-encrypted tokens, so the
-        // documents are never byte-equal, and scrubbing them would be snapshot
-        // infrastructure this suite deliberately does not have (design D5).
-        var model = ViewFixtures.For(ViewInventory.ResourceFlow)
-            .First(c => c.State == "resource: times, no errors")
-            .Model;
+        // Asked of EVERY exempted view rather than the one that prompted it. Only
+        // the dispatcher had this check; its two siblings were exempted on the same
+        // stated reason with nothing testing it.
+        //
+        // Compared by TAG SEQUENCE rather than by bytes, because a delegate into a
+        // form view carries a per-render GUID id and two fresh tokens. (Measured for
+        // the dispatcher: the two outputs differ by exactly one trailing "\r\n" —
+        // the newline after the PartialAsync line — 3460 bytes against 3458, and are
+        // identical once trimmed.)
+        Assert.NotEmpty(ModelReferences.DelegatingViews);
 
-        var direct = await Structure(ViewInventory.ResourceFlow, model);
-        var viaDispatcher = await Structure(ViewInventory.ResourceFlowViaDispatcher, model);
+        foreach (var (view, _) in ModelReferences.DelegatingViews)
+        {
+            var target = ModelReferences.DelegationTargetOf(view);
 
-        Assert.NotEmpty(direct);
-        Assert.Equal(direct, viaDispatcher);
+            Assert.True(
+                target is not null,
+                $"{view} is exempted as a delegate but its source does not hand its "
+                + "model to exactly one view.");
+
+            var model = ViewFixtures.For(view)[0].Model;
+
+            var direct = await Structure(target!, model);
+            var viaDelegate = await Structure(view, model);
+
+            Assert.NotEmpty(direct);
+            Assert.Equal(direct, viaDelegate);
+        }
     }
 
     /// <summary>The rendered document's element names, in document order.</summary>

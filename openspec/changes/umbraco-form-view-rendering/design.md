@@ -112,6 +112,29 @@ The shared partials keep their standalone per-view cases (rule 2 and rule 3 are
 per-view rules and are unaffected). It is only the **document**-level rule whose
 input changes.
 
+### D4a — QA's correction: the silent half is the attribute, not the markup
+
+D4 below discusses the *markup* — the rendered token — and QA's review showed it
+points at the wrong half, which is worth keeping because the reasoning error is
+instructive.
+
+The markup half fails **loudly**: delete `__RequestVerificationToken` from the
+rendered form and every submission is rejected by `[ValidateAntiForgeryToken]`, so
+the flow visibly breaks. A test for it would be guarding something that already
+announces itself.
+
+The **silent** half is the attribute. `BookingSurfaceController.cs` and
+`ServiceBookingSurfaceController.cs` carry `[ValidateAntiForgeryToken]`, and nothing
+in any suite asserts it. Delete either and submissions succeed **unprotected**, with
+the whole solution green. That is a live requirement in the spec
+(`default-frontend`, "Anti-forgery-protected submission") guarded by nothing.
+
+Pre-existing and genuinely outside this change — it is a controller-attribute
+concern, not a rendering one, and this change touches no `src/` file. Carried to
+`ubookit-deferred-obligations` as its own item rather than resolved here, because an
+obligation recorded inside a paragraph about something else is an obligation nobody
+finds.
+
 ### D4 — The form's `action` and token stay unguarded, and that is recorded
 
 The spike makes both testable and both are deliberately not tested. The consequence
@@ -124,20 +147,86 @@ assertion is not a behaviour guarantee, and dressing one as the other is worse t
 an honest gap. It is recorded here and in Risks so that "the rig renders the form"
 is never mistaken for "the form is checked".
 
-### D5 — Non-determinism is tolerated, not scrubbed
+### D5 — Non-determinism is stripped at the comparison, never in the renderer
 
-Three values vary per render: the GUID form id and the two tokens. The existing
-rules are structural and are unaffected — none compares rendered output against a
-stored expectation.
+**This decision was wrong as first written, was caught by QA, and is restated here
+with the error left visible rather than quietly replaced.**
 
-Do **not** add scrubbing infrastructure. It would exist to support snapshot testing
-that nothing does, and the id's uniqueness-by-construction is a fact about the page
-worth leaving visible to the id-uniqueness rule rather than hidden from it.
+The original text read: *"The existing rules are structural and are unaffected — none
+compares rendered output against a stored expectation. Do not add scrubbing
+infrastructure."* The first clause is true of a **stored** expectation and false of
+the thing that matters. Rule 2 decides whether a model member is live by rendering
+twice and comparing **one render against another** — and non-determinism breaks that
+harder than a snapshot, because a snapshot at least fails loudly. Here both routes
+through `IsLiveAsync` silently invert: the strong route's equality is never true, the
+weak route's inequality always is, and `CoVariesAsync` is never reached. **Every
+member of the three new views was reported live while nothing was checked** — rule 2
+made vacuous on precisely the views this change exists to cover, and on the views
+hardest to check by reading.
 
-Consequence to know: the id-uniqueness rule now passes partly on an id nobody chose.
-That weakens what a pass means by a little, and is worth stating because the honest
-version of "every id is unique" is now "every id we author is unique, plus one that
-is unique by GUID".
+Demonstrated, not argued: a provably dead `ServiceName` branch in `Service.cshtml`
+passed the entire suite, while the identical shape in the deterministic
+`_DateAndLength.cshtml` failed. The fix is confirmed by the complementary run —
+with stripping disabled the dead branch passes again, so the strip is what catches
+it.
+
+The decision now: three values vary per render (the GUID form id, the anti-forgery
+token, the `ufprt` token). They are removed **at the comparison** — one home,
+`RenderNondeterminism` — and never in the renderer. Every other rule still reads the
+real output: the id-uniqueness rule still sees the form id, the markup rules still
+see the tokens. Only "did changing the model change the page" is asked of a
+projection, because only that question is corrupted by an answer that changes on its
+own.
+
+The tokens are matched by **name** (`__RequestVerificationToken`, `ufprt`) rather
+than by payload shape, since a data-protection prefix is an ASP.NET Core
+implementation detail while those two names are the contract the form posts under.
+
+Two guards keep this from silently reverting, which matters because the failure mode
+is a rule that passes: `Two_renders_of_one_model_compare_equal` over **every** shipped
+view, so a fourth source of variance is caught when it appears rather than when
+someone notices a rule stopped working; and
+`The_stripping_fires_where_there_is_something_to_strip`, which asserts the flow view
+carries exactly three varying values and a deterministic partial carries none — so
+if an Umbraco version changes either shape and the patterns match nothing, it fails
+naming the count instead of going quietly vacuous.
+
+Standing consequence, unchanged from the original: the id-uniqueness rule passes
+partly on an id nobody chose. The honest version of "every id is unique" is "every id
+we author is unique, plus one that is unique by GUID".
+
+**The transferable lesson is not about tokens.** It is that admitting a new
+collaborator (`BeginUmbracoForm`) admitted a new *property* (non-determinism), and
+the design reasoned about that property against the wrong rule. D1 and D2 examined
+what the collaborator needed; nothing examined what it changed about the output the
+existing rules read.
+
+### D6 — The exemption scenario is forward-looking, and says so
+
+QA observed that requirement 1's scenario *"an exemption is recorded with its reason
+and with what would lift it"* has no mechanism behind it and is vacuously satisfied:
+`ViewInventory` now has no exemption facility at all, because nothing is exempt.
+
+That is correct, and it is not repaired by inventing a facility with no user — an
+abstraction with zero implementations is the liability this project has declined to
+build before (⑨-2 D1). It is left as a constraint on the **next** change that needs
+to defer a view, which is what a spec is for.
+
+But the sentence blurs two different things, and the distinction is worth fixing in
+whichever change next legitimately touches that requirement:
+
+- A **deferral** is temporary and owes "what would lift it" — the shape the three
+  `BeginUmbracoForm` views had, where the answer was "a rig that can host the
+  helper", and its absence is how the deferral stayed invisible.
+- A **structural exemption** is permanent and cannot have one. `ModelReferences.
+  DelegatingViews` is this: a pure delegate names no model member and emits no
+  literal because of what it *is*, not because of what the rig cannot yet do.
+  Nothing would ever lift it, so demanding the phrase would produce a ritual
+  sentence.
+
+Recorded rather than acted on, because rewriting the requirement now would mean
+replacing a requirement this change only just added — for a wording refinement, which
+is the failure mode the whole ADDED-not-MODIFIED decision was made to avoid.
 
 ## Risks / Trade-offs
 
@@ -194,15 +283,22 @@ so there is nothing to migrate and no upgrade path to provide.
 
 ## What the mutations established
 
-Every claim below is measured, not argued:
+Every claim below is measured, not argued. **Re-derived on the final 597-test shape
+after QA observed the first table had been tabulated on an earlier one** — the exact
+hazard this project names by name, and worth recording as having recurred.
 
 | Mutation | Result |
 |---|---|
-| Remove `SurfaceControllerTypeCollection` | 386 of 581 fail — required |
-| Remove `IUmbracoContextAccessor` | 386 of 581 fail — required |
-| **Add** `AddDataProtection()` + `AddAntiforgery()` | 581 pass, output unchanged — genuinely not required, D2 holds |
-| Ship a view the suite does not exercise | 7 fail, naming it: *"is shipped and no fixture renders it, so every rule passes over it while reporting green"* |
+| Remove `SurfaceControllerTypeCollection` | 391 of 597 fail — required |
+| Remove `IUmbracoContextAccessor` | 391 of 597 fail — required |
+| **Add** `AddDataProtection()` + `AddAntiforgery()` | all pass, output unchanged — genuinely not required, D2 holds |
+| Ship a view the suite does not exercise | fails, naming it: *"is shipped and no fixture renders it, so every rule passes over it while reporting green"* |
 | Empty the exercised set | The vacuity guard fails, as the spec requires |
 | Flow view renders `_YourDetails` **twice** | Duplicate-id rule fails across many states, **with no fixture edited** — the composition tracks the view |
-| Flow view renders `_ErrorSummary` **twice** | **581 pass** — the known blind spot, confirmed still exactly that and no larger |
-| Dispatcher adds a `<div>` | The new structural test fails |
+| Flow view renders `_ErrorSummary` **twice** | **597 pass** — the known blind spot, confirmed still exactly that and no larger |
+| Exempted delegate adds a `<div>` | The structural test fails |
+| **Dead `ServiceName` branch in `Service.cshtml`** | **fails**, naming view and member — rule 2 is live on a flow view |
+| The same, with stripping disabled | **passes** — the pre-fix behaviour, so the strip is what catches it |
+
+The last two are a matched pair on purpose. The first alone would only show the test
+failing; the pair shows *this fix* is why.

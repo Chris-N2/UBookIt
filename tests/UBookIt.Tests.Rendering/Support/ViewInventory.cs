@@ -3,12 +3,17 @@ using UBookIt.Tests.Support;
 namespace UBookIt.Tests.Rendering.Support;
 
 /// <summary>
-/// Which views this suite renders, and which it cannot yet.
+/// Which views this suite renders — which is all of them.
 /// <para>
-/// Discovered by scanning the shipped <c>Views</c> directory and subtracting the
-/// deferred set, rather than by a hardcoded list. A list would decay: a view added
-/// later would sit outside the suite while every rule reported green, which is the
-/// same shape as the defect this suite exists to catch.
+/// Discovered by scanning the shipped <c>Views</c> directory rather than by a
+/// hardcoded list. A list would decay: a view added later would sit outside the
+/// suite while every rule reported green, which is the same shape as the defect
+/// this suite exists to catch.
+/// </para>
+/// <para>
+/// There is no longer anything to subtract. Three views were once held back
+/// because the rig could not host <c>Html.BeginUmbracoForm</c>; it can now, so
+/// the shipped set and the exercised set are one set.
 /// </para>
 /// </summary>
 public static class ViewInventory

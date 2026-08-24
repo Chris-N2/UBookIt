@@ -106,4 +106,43 @@
       obligation. Re-run at sync.
 - [x] 8.5 `ref/` ignored (`.gitignore:494`) and untracked; no file under `ref/`
       reaches the build. `src/` is untouched by this change.
-- [ ] 8.6 QA review in a **fresh context or subagent** — never this one.
+- [x] 8.6 QA review in a fresh subagent. **Round 1: REJECT**, one MAJOR.
+
+## 9. QA round 1 — findings and dispositions
+
+- [x] 9.1 **MAJOR — rule 2 was vacuous on the three newly-rendered views.**
+      `IsLiveAsync` compares two renders; `BeginUmbracoForm` emits a per-render GUID
+      form id and two fresh tokens, so two renders of one model were never equal and
+      every member was reported live. Fixed by stripping the three varying values
+      **at the comparison** (`RenderNondeterminism`), never in the renderer, so every
+      other rule still reads real output. Both routes go through it —
+      `CoVariesAsync` had the same defect and QA's report named only the first.
+      Proven by a matched pair: dead `ServiceName` branch **fails** with the strip,
+      **passes** without it.
+- [x] 9.2 Two guards added against silent reversion: `Two_renders_of_one_model_compare_equal`
+      over every shipped view, and `The_stripping_fires_where_there_is_something_to_strip`
+      (exactly 3 varying values on a flow view, 0 on a deterministic partial).
+- [x] 9.3 **design.md D5 rewritten**, with the original wrong claim left visible and
+      the reasoning error named: the design examined what the new collaborator
+      *needed* and never what it *changed* about the output existing rules read.
+- [x] 9.4 **MINOR (a)** — mutation table re-derived on the final 597-test shape.
+      Corrected: 391/597, not 386/581.
+- [x] 9.5 **MINOR (b)** — `An_exempted_delegate_adds_no_markup_to_the_view_it_delegates_to`
+      now runs over **every** entry in `DelegatingViews`, not just the dispatcher.
+      Delegation target extraction moved to `ModelReferences.DelegationTargetOf` so
+      both halves of the exemption's reason use one rule.
+- [x] 9.6 **MINOR (c)** — recorded as design D6, with the deferral/structural-exemption
+      distinction the spec sentence blurs. Deliberately not repaired by inventing an
+      exemption facility with no user.
+- [x] 9.7 **MINOR (d)** — accepted, and it is the sharper finding: the *silent* gap is
+      `[ValidateAntiForgeryToken]` on the two surface controllers, asserted by
+      nothing. Recorded as design D4a and carried to deferred obligations.
+- [x] 9.8 **NITs** — stale "deferred" / "in-scope" comments corrected in
+      `ViewInventory`, `ViewFixtures`, `ModelReferences`, `BranchReachabilityTests`.
+      Remaining uses are deliberate historical references.
+- [ ] 9.9 **Open, for Chris — there is no CI definition in this repository.** QA found
+      no `.github/`, no `azure-pipelines.yml`. The `.slnx` regression (a suite
+      silently not running) is exactly the class CI is supposed to catch, and the
+      commit message for `90eba80` claims "and in CI", which is unverifiable from
+      here. If the pipeline lives outside the repo it needs checking separately.
+- [ ] 9.10 Re-review by the same QA subagent, with its round-1 context.

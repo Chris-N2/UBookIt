@@ -57,7 +57,7 @@ public sealed record DocumentCase(ViewCase Page)
 }
 
 /// <summary>
-/// The model states each in-scope view is rendered across.
+/// The model states each shipped view is rendered across.
 /// <para>
 /// Several per view rather than one, because a property is often only live in a
 /// particular state — <c>LongestAvailableMinutes</c> renders only when the length
@@ -94,8 +94,9 @@ public static class ViewFixtures
 
     /// <summary>
     /// The views that are fragments rather than pages. They are included only by the
-    /// three deferred flow views, so nothing in this suite renders them as a page —
-    /// and rule 1 asks a question only a page can answer.
+    /// flow views, so nothing in this suite renders them as a page — and rule 1 asks
+    /// a question only a page can answer. They reach rule 1 inside the flow pages
+    /// that render them, which is the composition the site serves.
     /// </summary>
     public static IReadOnlyList<string> Partials { get; } =
     [

@@ -55,7 +55,7 @@ public class BranchReachabilityTests
     {
         var states = ViewFixtures.For(view);
 
-        // Every in-scope view has states, delegating views included — asserted
+        // Every shipped view has states, delegating views included — asserted
         // rather than escaped. An `if (states.Count == 0) return;` here was
         // unreachable today and would have let a fixture-less view pass this rule
         // vacuously the moment it stopped being.
