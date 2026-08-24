@@ -488,3 +488,8 @@ src/UBookIt.Backoffice/wwwroot/App_Plugins/
 # Serena MCP local state
 .serena/
 
+# Local reference copies of third-party source (e.g. the Umbraco CMS tree), kept
+# for reading only. Never a dependency and never redistributed: the package's
+# build must not reference anything here.
+ref/
+
