@@ -15,6 +15,11 @@ using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.FileProviders;
 using Microsoft.Extensions.Logging;
 using UBookIt.Web.Rendering;
+using Umbraco.Cms.Core.PublishedCache;
+using Umbraco.Cms.Core.Routing;
+using Umbraco.Cms.Core.Web;
+using Umbraco.Cms.Web.Website.Collections;
+using Umbraco.Cms.Web.Website.Controllers;
 
 namespace UBookIt.Tests.Rendering.Support;
 
@@ -69,6 +74,18 @@ public sealed class ViewRenderer
             .ConfigureApplicationPartManager(parts =>
                 parts.ApplicationParts.Add(
                     new CompiledRazorAssemblyPart(typeof(BookingKeys).Assembly)));
+
+        // What `Html.BeginUmbracoForm` needs, and nothing more.
+        //
+        // Measured against the resolved Umbraco 17.6.2 binaries by rendering the
+        // views, not inferred: the call resolves exactly these two services.
+        // `AddDataProtection()` and `AddAntiforgery()` are deliberately ABSENT —
+        // `AddMvcCore` already supplies both, and the forms emit a real
+        // `__RequestVerificationToken` and a real encrypted `ufprt` without them.
+        // Adding them "for safety" would make this rig overstate what the shipped
+        // artefact needs, which is the one thing it exists not to do (design D2).
+        services.AddSingleton(new SurfaceControllerTypeCollection(SurfaceControllerTypes));
+        services.AddSingleton<IUmbracoContextAccessor, RenderingUmbracoContextAccessor>();
 
         _services = services.BuildServiceProvider();
         _viewEngine = _services.GetRequiredService<IRazorViewEngine>();
@@ -137,6 +154,110 @@ public sealed class ViewRenderer
         }
 
         return result.View;
+    }
+
+    /// <summary>
+    /// The package's surface controllers, discovered rather than listed.
+    /// <para>
+    /// `BeginUmbracoForm&lt;T&gt;` resolves this collection to map a surface
+    /// controller <b>type</b> to its controller <b>name</b>, and throws if the type
+    /// is not a member. Scanning means a surface controller added later is a member
+    /// automatically; a hand-kept list would leave its view failing to render for a
+    /// reason pointing at this file rather than at the omission.
+    /// </para>
+    /// </summary>
+    private static IEnumerable<Type> SurfaceControllerTypes()
+        => typeof(BookingKeys).Assembly
+            .GetTypes()
+            .Where(type => type is { IsAbstract: false, IsPublic: true }
+                && typeof(SurfaceController).IsAssignableFrom(type));
+
+    /// <summary>
+    /// Answers "is there an Umbraco request in flight" with a context that knows
+    /// one thing: the URL the page was requested at.
+    /// <para>
+    /// It must answer <c>true</c>. The call site is
+    /// <c>GetRequiredUmbracoContext()</c>, so an accessor that holds nothing throws
+    /// "Wasn't able to get an UmbracoContext" rather than degrading.
+    /// </para>
+    /// </summary>
+    private sealed class RenderingUmbracoContextAccessor : IUmbracoContextAccessor
+    {
+        public bool TryGetUmbracoContext(out IUmbracoContext umbracoContext)
+        {
+            umbracoContext = new RenderingUmbracoContext();
+            return true;
+        }
+
+        public void Clear()
+        {
+        }
+
+        public void Set(IUmbracoContext umbracoContext)
+        {
+        }
+    }
+
+    /// <summary>
+    /// The one fact <c>BeginUmbracoForm</c> reads off an Umbraco context, and
+    /// nothing else.
+    /// <para>
+    /// <c>HtmlHelperRenderExtensions</c> takes exactly
+    /// <c>OriginalRequestUrl.PathAndQuery</c> and makes it the form's
+    /// <c>action</c>. Every other member is unread, so every other member throws.
+    /// </para>
+    /// <para>
+    /// <b>The throwing members are the design, not an unfinished stub — do not
+    /// give them benign return values</b> (design D1). If a future Umbraco version
+    /// reads <c>PublishedRequest</c> or a cache, this rig fails loudly, naming the
+    /// member, and someone decides what the honest answer is. A stub returning
+    /// plausible empties would instead let the rig render a page the site cannot
+    /// produce and report it green — which is precisely the class of fault this
+    /// suite exists to catch, reintroduced inside the suite itself.
+    /// </para>
+    /// <para>
+    /// <c>CleanedUmbracoUrl</c> throws alongside the rest even though it exists and
+    /// would be trivial to populate: it is not read, and populating it would invent
+    /// a fact about the collaboration.
+    /// </para>
+    /// </summary>
+    private sealed class RenderingUmbracoContext : IUmbracoContext
+    {
+        /// <summary>The form's <c>action</c> is this URL's path and query.</summary>
+        public Uri OriginalRequestUrl { get; } = new("https://example.org/book");
+
+        public Uri CleanedUmbracoUrl => throw Unread();
+
+        public DateTime ObjectCreated => throw Unread();
+
+        public IPublishedContentCache Content => throw Unread();
+
+        public IPublishedMediaCache Media => throw Unread();
+
+        public IDomainCache Domains => throw Unread();
+
+        public IPublishedRequest? PublishedRequest
+        {
+            get => throw Unread();
+            set => throw Unread();
+        }
+
+        public bool IsDebug => throw Unread();
+
+        public bool InPreviewMode => throw Unread();
+
+        public void Dispose()
+        {
+        }
+
+        private static NotSupportedException Unread(
+            [System.Runtime.CompilerServices.CallerMemberName] string member = "")
+            => new(
+                $"The rendering rig's Umbraco context does not answer '{member}'. "
+                + "Only OriginalRequestUrl is read when rendering the shipped views "
+                + "(BeginUmbracoForm takes its PathAndQuery as the form action). "
+                + "Something now reads more than that: decide what the honest answer "
+                + "is rather than making this member return an empty value.");
     }
 
     /// <summary>

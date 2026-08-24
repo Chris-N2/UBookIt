@@ -19,33 +19,45 @@ public sealed record ViewCase(string ViewPath, string State, object Model)
 }
 
 /// <summary>
-/// One rendered <b>document</b>: the parts that make up a page, in the order a
-/// flow renders them.
+/// One rendered <b>document</b>: a whole page, as one shipped view renders it.
 /// <para>
-/// Rule 1 is a document-level rule — ids are unique within a document, and an
-/// aria reference resolves against a document — so it must be asked of a
-/// document. A shared partial is not one. The four form a page together, and
-/// `_DateAndLength` deliberately describes its length control with an id that
-/// `_Times` owns; rendered apart that reference dangles, rendered together it
-/// resolves, and the second is what the site serves (design D7).
+/// Rule 1 is a document-level rule — ids are unique within a document, and an aria
+/// reference resolves against a document — so it must be asked of a document, and a
+/// shared partial is not one. The partials become a document by being rendered by
+/// the flow view that includes them.
+/// </para>
+/// <para>
+/// <b>This type holds exactly one view, and that is the guarantee, not a
+/// simplification.</b> It previously held a list, and the suite assembled the shared
+/// partials into what it believed was flow order. Nothing checked the belief and it
+/// was wrong: the assembly included the booker fields unconditionally, where both
+/// flows guard them, so an error summary linking to a booker field always resolved —
+/// concealing exactly the defect rule 1 exists to catch. A type that cannot express
+/// an assembled document cannot drift from the page it is standing in for.
 /// </para>
 /// </summary>
-public sealed record DocumentCase(string Name, string State, IReadOnlyList<ViewCase> Parts)
+public sealed record DocumentCase(ViewCase Page)
 {
+    public string ViewPath => Page.ViewPath;
+
+    public string State => Page.State;
+
+    public object Model => Page.Model;
+
     /// <summary>
-    /// Names the views the document was built from, not just the document, so a
-    /// failure says which file to open. The spec's scenarios all say the check
-    /// "fails, naming the view"; for a composed document that means naming its
-    /// parts.
+    /// The form model this page renders, as none-or-one. Most document rules ask
+    /// about the model's errors; pages that carry no form model (the catalogue, the
+    /// confirmations) yield nothing and those rules pass over them.
     /// </summary>
-    public override string ToString()
-        => Parts.Count == 1
-            ? $"{Name} [{State}]"
-            : $"{Name} ({string.Join(" + ", Parts.Select(p => p.ViewPath[(p.ViewPath.LastIndexOf('/') + 1)..]))}) [{State}]";
+    public IEnumerable<IBookingFormView> Forms
+        => Model is IBookingFormView form ? [form] : [];
+
+    /// <summary>Names the view and the state, so a failure says which file to open.</summary>
+    public override string ToString() => $"{ViewPath} [{State}]";
 }
 
 /// <summary>
-/// The model states each in-scope view is rendered across.
+/// The model states each shipped view is rendered across.
 /// <para>
 /// Several per view rather than one, because a property is often only live in a
 /// particular state — <c>LongestAvailableMinutes</c> renders only when the length
@@ -82,8 +94,9 @@ public static class ViewFixtures
 
     /// <summary>
     /// The views that are fragments rather than pages. They are included only by the
-    /// three deferred flow views, so nothing in this suite renders them as a page —
-    /// and rule 1 asks a question only a page can answer.
+    /// flow views, so nothing in this suite renders them as a page — and rule 1 asks
+    /// a question only a page can answer. They reach rule 1 inside the flow pages
+    /// that render them, which is the composition the site serves.
     /// </summary>
     public static IReadOnlyList<string> Partials { get; } =
     [
@@ -107,45 +120,34 @@ public static class ViewFixtures
     /// </summary>
     public static IReadOnlyList<DocumentCase> Documents { get; } = [.. BuildDocuments()];
 
+    /// <summary>
+    /// Every document the rules are asked of — each one the rendered output of a
+    /// shipped view.
+    /// <para>
+    /// There is deliberately <b>no hand-composed document</b> here. The shared
+    /// partials were once concatenated in what someone believed was flow order and
+    /// the result called a page; nothing checked the belief, and it was wrong —
+    /// composing <c>_YourDetails</c> unconditionally produced a document neither
+    /// flow renders, in which an error summary linking to booker fields always
+    /// resolved. That is the very defect class the document-level rule exists to
+    /// catch, concealed by the fixture the rule was reading.
+    /// </para>
+    /// <para>
+    /// Now the flow views render, so the composition is theirs. Change what
+    /// <c>Service.cshtml</c> includes, or the condition it includes it under, and
+    /// the documents these rules see change with it — with nothing here to edit,
+    /// and so nothing here to forget to edit.
+    /// </para>
+    /// </summary>
     private static IEnumerable<DocumentCase> BuildDocuments()
     {
-        // The shared partials, composed as `Service.cshtml` composes them:
-        // the error summary, then the date-and-length GET form, then the times and
-        // the booker fields inside the POST form. Concatenation preserves exactly
-        // what this rule asks about — id uniqueness and reference resolution across
-        // the whole document.
-        foreach (var (state, model) in FormStates())
-        {
-            var parts = new List<ViewCase>
-            {
-                new(ViewInventory.ErrorSummary, state, model),
-                new(ViewInventory.DateAndLength, state, model),
-                new(ViewInventory.Times, state, model),
-            };
-
-            // The booker fields only where the flow renders them. BOTH flow views
-            // guard `_YourDetails` with `@if (Model.HasTimes)` — `Service.cshtml`
-            // and `Booking/Default.cshtml` alike — and composing it unconditionally
-            // made this document something neither flow produces.
-            //
-            // It masked rather than over-constrained, which is the worse direction:
-            // an error against a booker field, on a page with no times, would link
-            // into a control the real page never rendered, and a document that
-            // always includes those fields always resolves it. The "errors and no
-            // times" state above is that case, and it is honest only with this
-            // guard in place.
-            if (model.HasTimes)
-            {
-                parts.Add(new ViewCase(ViewInventory.YourDetails, state, model));
-            }
-
-            yield return new DocumentCase("the shared partials", state, parts);
-        }
-
-        // Every other in-scope view is a page in its own right.
+        // Every shipped view that is a page in its own right — which now includes
+        // the three flow views, and so includes the real composition of the shared
+        // partials. The partials themselves are fragments and are excluded: rule 1
+        // asks a question only a page can answer.
         foreach (var rendered in All.Where(c => !Partials.Contains(c.ViewPath)))
         {
-            yield return new DocumentCase(rendered.ViewPath, rendered.State, [rendered]);
+            yield return new DocumentCase(rendered);
         }
     }
 
@@ -162,6 +164,34 @@ public static class ViewFixtures
             foreach (var (state, model) in FormStates())
             {
                 yield return new ViewCase(partial, state, model);
+            }
+        }
+
+        // The flow views: whole pages, each rendering the shared partials in the
+        // order and under the conditions it actually uses.
+        //
+        // Each takes only the form model it declares — `Service.cshtml` is
+        // `@model ServiceFormModel`, the two resource pages `BookingFormModel` — so
+        // the states are partitioned by model type rather than crossed. A state a
+        // model cannot express is not evidence about the view that renders it.
+        foreach (var (state, model) in FormStates())
+        {
+            switch (model)
+            {
+                case ServiceFormModel:
+                    yield return new ViewCase(ViewInventory.ServiceFlow, state, model);
+                    break;
+
+                case BookingFormModel:
+                    yield return new ViewCase(ViewInventory.ResourceFlow, state, model);
+
+                    // The dispatcher's page delegates to the one above with a single
+                    // `PartialAsync`. Rendered separately rather than assumed
+                    // equivalent: "it only delegates" is a claim about source, and
+                    // the wrapper it adds is part of the document the rules judge.
+                    yield return new ViewCase(
+                        ViewInventory.ResourceFlowViaDispatcher, state, model);
+                    break;
             }
         }
 
@@ -305,6 +335,18 @@ public static class ViewFixtures
             selectedTimeIso: Times[0].InstantIso));
         yield return ("service: via the catalogue", Service(flowToken: "s:00000000-0000-0000-0000-000000000900"));
 
+        // The resource flow's states mirror the service flow's wherever
+        // `BookingFormModel` can express them. It cannot express a choice control
+        // (`ResourceChoices` is structurally empty — a directly booked resource IS
+        // the resource chosen) nor a fixed length (`LengthIsFixed` is always false),
+        // so the choice and settled-length states have no resource counterpart. That
+        // is the model being narrower, not the coverage being thinner.
+        //
+        // Every other state does have one, and until this change none of them
+        // existed: the resource flow reached the document rules through five states
+        // where the service flow reached them through nineteen, on partials the two
+        // flows SHARE. A defect live only in a resource-flow state would have been
+        // invisible.
         yield return ("resource: times, no errors", Resource());
         yield return ("resource: no times", Resource(times: []));
         yield return ("resource: length is the problem", Resource(times: [], longest: 60));
@@ -312,6 +354,32 @@ public static class ViewFixtures
         [
             new BookingError("Please enter a valid email address.", BookingFieldIds.Email),
         ]));
+
+        // Errors with no times: the state in which an error can link into a booker
+        // field the page never rendered. This is the exact fault the hand-built
+        // composition concealed, and the resource flow had no state for it.
+        yield return ("resource: errors and no times", Resource(
+            times: [],
+            errors: [new BookingError("Please enter your name.", BookingFieldIds.Name)]));
+
+        yield return ("resource: time no longer available", Resource(
+            errors: [new BookingError("That time is no longer available.", BookingFieldIds.Times)]));
+
+        yield return ("resource: time taken and none left", Resource(
+            times: [],
+            errors: [new BookingError("That time is no longer available.", BookingFieldIds.Times)]));
+
+        yield return ("resource: length rejected and none left", Resource(
+            times: [],
+            errors: [new BookingError("That booking length is not offered.", BookingFieldIds.Duration)]));
+
+        yield return ("resource: error against an unknown control", Resource(
+            errors: [new BookingError("Something else went wrong.", "ubookit-not-a-control")]));
+
+        yield return ("resource: entered details", Resource(
+            name: "Ada Lovelace", email: "ada@example.com", phone: "07700 900123",
+            selectedTimeIso: Times[0].InstantIso));
+
         yield return ("resource: via the catalogue", Resource(flowToken: "r:00000000-0000-0000-0000-000000000001"));
     }
 
@@ -357,6 +425,10 @@ public static class ViewFixtures
         IReadOnlyList<BookingTimeOption>? times = null,
         IReadOnlyList<BookingError>? errors = null,
         int? longest = null,
+        string? name = null,
+        string? email = null,
+        string? phone = null,
+        string? selectedTimeIso = null,
         string? flowToken = null)
         => new()
         {
@@ -370,6 +442,10 @@ public static class ViewFixtures
             DurationOptions = [30, 60, 90],
             LongestAvailableMinutes = longest,
             Times = times ?? Times,
+            SelectedTimeIso = selectedTimeIso,
+            Name = name,
+            Email = email,
+            Phone = phone,
             Errors = errors ?? [],
         };
 

@@ -37,11 +37,11 @@ public class BranchReachabilityTests
     {
     };
 
-    public static TheoryData<string> InScopeViews()
+    public static TheoryData<string> ShippedViews()
     {
         var data = new TheoryData<string>();
 
-        foreach (var view in ViewInventory.InScope)
+        foreach (var view in ViewInventory.All)
         {
             data.Add(view);
         }
@@ -50,12 +50,12 @@ public class BranchReachabilityTests
     }
 
     [Theory]
-    [MemberData(nameof(InScopeViews))]
+    [MemberData(nameof(ShippedViews))]
     public async Task Every_literal_the_view_can_emit_appears_in_some_state(string view)
     {
         var states = ViewFixtures.For(view);
 
-        // Every in-scope view has states, delegating views included — asserted
+        // Every shipped view has states, delegating views included — asserted
         // rather than escaped. An `if (states.Count == 0) return;` here was
         // unreachable today and would have let a fixture-less view pass this rule
         // vacuously the moment it stopped being.
@@ -129,7 +129,7 @@ public class BranchReachabilityTests
         // is safe, so the set is reviewed rather than discovered. A new shared
         // literal fails this test and has to be justified — which is the moment to
         // ask whether the branches need distinguishing.
-        var shared = ViewInventory.InScope
+        var shared = ViewInventory.All
             .SelectMany(view => DuplicatedLiteralsOf(view).Select(literal => $"{Name(view)}:{literal}"))
             .Order(StringComparer.Ordinal)
             .ToList();
@@ -163,7 +163,7 @@ public class BranchReachabilityTests
     }
 
     [Theory]
-    [MemberData(nameof(InScopeViews))]
+    [MemberData(nameof(ShippedViews))]
     public async Task Each_shared_literal_is_rendered_by_more_than_one_state(string view)
     {
         // The enumeration above records WHY each shared literal is safe — "covered
@@ -243,7 +243,7 @@ public class BranchReachabilityTests
         Assert.Contains("ubookit-who-hint", literals);
         Assert.Contains("ubookit-date-form", literals);
 
-        Assert.All(ViewInventory.InScope, view =>
+        Assert.All(ViewInventory.All, view =>
         {
             if (!ModelReferences.DelegatingViews.ContainsKey(view))
             {

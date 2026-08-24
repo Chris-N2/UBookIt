@@ -15,7 +15,7 @@ namespace UBookIt.Tests.Rendering.Support;
 /// The derivation is itself a test asset and can fail <em>vacuously</em> — a
 /// pattern that missed a reference form would report a view as referring to
 /// nothing, and a view referring to nothing passes every property check trivially.
-/// That is why <c>ModelPropertyTests</c> asserts both that every in-scope view
+/// That is why <c>ModelPropertyTests</c> asserts both that every shipped view
 /// yields at least one member, and that one known view yields exactly the set it
 /// should.
 /// </para>
@@ -47,7 +47,82 @@ public static class ModelReferences
                 "one-line delegate into Booking/Confirmation.cshtml, which is checked itself",
             ["~/Views/Shared/Components/BookingFlow/Unavailable.cshtml"] =
                 "one-line delegate into Booking/Unavailable.cshtml, which is checked itself",
+            ["~/Views/Shared/Components/BookingFlow/Default.cshtml"] =
+                "one-line delegate into Booking/Default.cshtml, which is checked itself. "
+                + "The third of this shape, and absent here only because it was deferred "
+                + "out of the suite until the rig could host Html.BeginUmbracoForm — not "
+                + "because anything about it differs from its two siblings.",
         };
+
+    /// <summary>
+    /// The single view a delegating view hands its whole model to, or null if its
+    /// source does not have exactly that shape.
+    /// <para>
+    /// Used both to check an exemption's stated reason and to render the pair and
+    /// compare them. Source is the right authority for "what does this file
+    /// delegate to"; it is emphatically not the authority for "and adds nothing
+    /// else", which is asked of the rendered output instead.
+    /// </para>
+    /// </summary>
+    public static string? DelegationTargetOf(string viewPath)
+    {
+        var source = RepoFiles.Read(ViewInventory.SourcePathOf(viewPath));
+
+        var targets = Regex
+            .Matches(StripComments(source), @"PartialAsync\(""(?<target>~/[^""]+)"",\s*Model\s*\)")
+            .Select(m => m.Groups["target"].Value)
+            .ToList();
+
+        return targets.Count == 1 ? targets[0] : null;
+    }
+
+    /// <summary>
+    /// Every view a view renders into itself, transitively — the partials it
+    /// includes, and whatever those include.
+    /// </summary>
+    public static IReadOnlyList<string> IncludedViewsOf(string viewPath)
+    {
+        var found = new List<string>();
+        var seen = new HashSet<string>(StringComparer.Ordinal) { viewPath };
+        var pending = new Queue<string>([viewPath]);
+
+        while (pending.Count > 0)
+        {
+            var source = StripComments(RepoFiles.Read(ViewInventory.SourcePathOf(pending.Dequeue())));
+
+            foreach (var included in Regex
+                .Matches(source, @"PartialAsync\(""(?<target>~/[^""]+)""")
+                .Select(m => m.Groups["target"].Value))
+            {
+                if (seen.Add(included))
+                {
+                    found.Add(included);
+                    pending.Enqueue(included);
+                }
+            }
+        }
+
+        return found;
+    }
+
+    /// <summary>
+    /// The members a view refers to that a view it renders <b>also</b> refers to.
+    /// <para>
+    /// These are the members rule 2 cannot judge for that view: when the page's own
+    /// reference to one dies, the partial keeps it changing the output, and the
+    /// rule sees a live member. Enumerated by
+    /// <c>The_members_a_partial_keeps_alive_are_enumerated</c> rather than left to
+    /// be discovered.
+    /// </para>
+    /// </summary>
+    public static IReadOnlyList<string> MaskedByIncludesIn(string viewPath)
+    {
+        var fromIncludes = IncludedViewsOf(viewPath)
+            .SelectMany(Of)
+            .ToHashSet(StringComparer.Ordinal);
+
+        return [.. Of(viewPath).Where(fromIncludes.Contains).Order(StringComparer.Ordinal)];
+    }
 
     /// <summary>The model members one view's source refers to, in name order.</summary>
     public static IReadOnlyList<string> Of(string viewPath)

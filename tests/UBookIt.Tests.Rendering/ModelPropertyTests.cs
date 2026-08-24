@@ -1,4 +1,6 @@
+using System.Text.RegularExpressions;
 using UBookIt.Tests.Rendering.Support;
+using UBookIt.Tests.Support;
 using UBookIt.Web.Rendering;
 
 namespace UBookIt.Tests.Rendering;
@@ -76,11 +78,11 @@ public class ModelPropertyTests
                 SupersededByAnError,
         };
 
-    public static TheoryData<string> InScopeViews()
+    public static TheoryData<string> ShippedViews()
     {
         var data = new TheoryData<string>();
 
-        foreach (var view in ViewInventory.InScope)
+        foreach (var view in ViewInventory.All)
         {
             data.Add(view);
         }
@@ -95,7 +97,7 @@ public class ModelPropertyTests
     // -----------------------------------------------------------------------
 
     [Theory]
-    [MemberData(nameof(InScopeViews))]
+    [MemberData(nameof(ShippedViews))]
     public void Every_view_refers_to_at_least_one_model_member(string view)
     {
         // Guard A. "This view refers to nothing" is precisely what a broken
@@ -109,6 +111,190 @@ public class ModelPropertyTests
         }
 
         Assert.NotEmpty(ModelReferences.Of(view));
+    }
+
+    [Theory]
+    [MemberData(nameof(ShippedViews))]
+    public async Task Two_renders_of_one_model_compare_equal(string view)
+    {
+        // Rule 2's own precondition, and it had none.
+        //
+        // Both routes through IsLiveAsync ask "did changing the model change the
+        // page" by comparing two renders. That question is meaningless on a view
+        // that never renders twice alike — the strong route's equality is never
+        // true, the weak route's inequality always is, and EVERY member of the view
+        // is reported live while nothing is checked. Rule 2 was vacuous on the three
+        // views carrying an Umbraco form, which are the ones hardest to check by
+        // reading.
+        //
+        // Asserted for every shipped view rather than the three, so a fourth source
+        // of per-render variance is caught the day it appears rather than the day
+        // someone notices a rule has stopped working.
+        //
+        // Across EVERY state, not the first. Asking only state [0] would leave
+        // variance that appears in any later state unseen for every view — and it
+        // was worse than that: `_ErrorSummary`'s first state has no errors, so the
+        // partial renders nothing and the check compared "" against "". A guard
+        // against vacuity, itself vacuous, on the view where it mattered least to
+        // notice and most to be right.
+        var rendered = 0;
+
+        foreach (var state in ViewFixtures.For(view))
+        {
+            var once = await RenderForComparisonAsync(view, state.Model);
+            var twice = await RenderForComparisonAsync(view, state.Model);
+
+            Assert.Equal(once, twice);
+
+            if (once.Trim().Length > 0)
+            {
+                rendered++;
+            }
+        }
+
+        // Non-vacuity: a view all of whose states render nothing would satisfy the
+        // equality above without comparing anything. A view legitimately renders
+        // nothing in SOME states — an error summary with no errors — so the bar is
+        // that at least one state produced a document to compare.
+        Assert.True(
+            rendered > 0,
+            $"{view} rendered nothing in every state, so this guard compared nothing.");
+    }
+
+    [Fact]
+    public async Task The_stripping_fires_where_there_is_something_to_strip()
+    {
+        // Non-vacuity for the rule above, which passes trivially on any view that
+        // was already deterministic. This asserts the flow view is NOT one of those:
+        // its raw output really does vary between renders, and it is the stripping
+        // that makes the comparison sound rather than the view being well-behaved.
+        //
+        // Without this, an Umbraco version that changed the form id's shape or
+        // renamed a token field would make the patterns match nothing; the strip
+        // would become a no-op and rule 2 would go quietly back to vacuous. Here it
+        // fails instead, naming the count it expected.
+        var flow = await _renderer.RenderAsync(
+            ViewInventory.ServiceFlow,
+            ViewFixtures.For(ViewInventory.ServiceFlow)[0].Model);
+
+        Assert.Equal(3, RenderNondeterminism.CountIn(flow));
+
+        // And that the raw output really does vary, so the strip is not decorative.
+        var again = await _renderer.RenderAsync(
+            ViewInventory.ServiceFlow,
+            ViewFixtures.For(ViewInventory.ServiceFlow)[0].Model);
+
+        Assert.NotEqual(flow, again);
+        Assert.Equal(RenderNondeterminism.Strip(flow), RenderNondeterminism.Strip(again));
+
+        // A deterministic view has nothing to strip: the patterns are specific to
+        // the Umbraco form rather than matching whatever they happen to see.
+        var partial = await _renderer.RenderAsync(
+            ViewInventory.DateAndLength,
+            ViewFixtures.For(ViewInventory.DateAndLength)[0].Model);
+
+        Assert.Equal(0, RenderNondeterminism.CountIn(partial));
+    }
+
+    [Fact]
+    public void The_members_a_partial_keeps_alive_are_enumerated()
+    {
+        // Rule 2's blind spot on a composite page, made visible instead of silent —
+        // the same treatment rule 3's shared-literal case already gets.
+        //
+        // A flow page renders partials that refer to the same model. If the PAGE's
+        // own reference to a shared member dies, the partial keeps that member
+        // changing the output, and rule 2 reports it live. Demonstrated: moving
+        // `ChosenResourceId` in Service.cshtml into a dead branch leaves the suite
+        // green, because `_DateAndLength` still refers to it — while the same
+        // mutation on page-unique `ServiceId` fails.
+        //
+        // The blind spot is inherent to a per-view rule asked of a composed page and
+        // cannot be removed without attributing rendered output to the view that
+        // emitted it. It can be BOUNDED: every masked member is listed here, so the
+        // set is reviewed rather than discovered, and a NEW one fails this test and
+        // has to be justified.
+        //
+        // This matters most right now, because rule 2 has never run on these views
+        // before, and "rule 2 is live on the flow views" is otherwise about to be
+        // read as stronger than it is.
+        var masked = ViewInventory.All
+            .Where(view => !ModelReferences.DelegatingViews.ContainsKey(view))
+            .SelectMany(view => ModelReferences
+                .MaskedByIncludesIn(view)
+                .Select(member => $"{view[(view.LastIndexOf('/') + 1)..]}:{member}"))
+            .Order(StringComparer.Ordinal)
+            .ToList();
+
+        Assert.Equal(
+            [
+                // Both flow pages hand their whole model to `_DateAndLength`,
+                // `_Times`, `_ErrorSummary` and `_YourDetails`, so any member the
+                // page and a partial both name is one rule 2 cannot judge FOR THE
+                // PAGE. Each is judged for the partial itself, where it is not
+                // masked — the loss is the page's own reference, not the member.
+                //
+                // Booking/Default.cshtml — the resource flow.
+                "Default.cshtml:DurationMinutes",
+                "Default.cshtml:FlowToken",
+                "Default.cshtml:HasTimes",
+                "Default.cshtml:SelectedDate",
+
+                // BookingFlow/Service.cshtml — the service flow, the same four
+                // plus the visitor's choice of who, which `_DateAndLength` renders
+                // the control for.
+                "Service.cshtml:ChosenResourceId",
+                "Service.cshtml:DurationMinutes",
+                "Service.cshtml:FlowToken",
+                "Service.cshtml:HasTimes",
+                "Service.cshtml:SelectedDate",
+            ],
+            masked);
+
+        // Worth knowing, and the reason this bound is narrower than it reads:
+        // masked by rule 2 does not mean unchecked. `HasTimes` is the guard on
+        // `_YourDetails`, and neutralising it fails a rule 1 check
+        // (`Every_problem_whose_control_is_on_the_page_is_linked_to_it`) because the
+        // booker fields then appear on a page whose errors point at them. A member
+        // here is one RULE 2 cannot speak for, not one nothing can.
+
+        // Non-vacuity: the enumeration is only meaningful while the views it
+        // describes still compose partials. A scan that found nothing would satisfy
+        // the equality by matching an empty list against an empty list.
+        Assert.NotEmpty(masked);
+    }
+
+    [Fact]
+    public void An_exempted_view_really_is_a_delegate()
+    {
+        // The exemption registry is the one hand-kept list in this suite, and it
+        // switches off two rules for whatever it names. Nothing checked that a named
+        // view is actually the harmless shape the exemption is written for, so a
+        // view with real markup could be silenced by adding a line here — the rule
+        // turned off by the same mechanism meant to document turning it off.
+        //
+        // This half checks the source shape: the view hands its whole model to
+        // exactly one other shipped view. The other half of the stated reason — that
+        // it renders nothing else — is not visible in source and is asserted against
+        // rendered output by
+        // ViewInventoryTests.An_exempted_delegate_adds_no_markup_to_the_view_it_delegates_to.
+        // Neither half alone is the claim.
+        Assert.NotEmpty(ModelReferences.DelegatingViews);
+
+        foreach (var (view, reason) in ModelReferences.DelegatingViews)
+        {
+            Assert.Contains(view, ViewInventory.All);
+            Assert.NotEmpty(reason);
+
+            var target = ModelReferences.DelegationTargetOf(view);
+
+            Assert.True(
+                target is not null,
+                $"{view} is exempted as a delegate but does not hand its model to "
+                + "exactly one view; the exemption's reason does not hold.");
+
+            Assert.Contains(target!, ViewInventory.All);
+        }
     }
 
     [Fact]
@@ -230,7 +416,7 @@ public class ModelPropertyTests
     // -----------------------------------------------------------------------
 
     [Theory]
-    [MemberData(nameof(InScopeViews))]
+    [MemberData(nameof(ShippedViews))]
     public async Task Every_referenced_member_changes_what_the_view_renders(string view)
     {
         var states = ViewFixtures.For(view);
@@ -356,9 +542,23 @@ public class ModelPropertyTests
 
     private async Task<bool> RendersTheSameAsync(string view, object before, object after)
         => string.Equals(
-            await _renderer.RenderAsync(view, before),
-            await _renderer.RenderAsync(view, after),
+            await RenderForComparisonAsync(view, before),
+            await RenderForComparisonAsync(view, after),
             StringComparison.Ordinal);
+
+    /// <summary>
+    /// A render with the values that vary on their own removed — see
+    /// <see cref="RenderNondeterminism"/>.
+    /// <para>
+    /// Both routes through <see cref="IsLiveAsync"/> compare rendered output, and
+    /// both are corrupted the same way by a document that never renders twice
+    /// alike: the strong route's equality is never true, and the weak route's
+    /// inequality is always true. So both go through here, and nothing in this file
+    /// compares a raw render.
+    /// </para>
+    /// </summary>
+    private async Task<string> RenderForComparisonAsync(string view, object model)
+        => RenderNondeterminism.Strip(await _renderer.RenderAsync(view, model));
 
     /// <summary>
     /// The fallback route: some pair of states on which the member evaluates
@@ -372,7 +572,7 @@ public class ModelPropertyTests
         {
             rendered.Add((
                 ModelVariation.Evaluate(state.Model, member),
-                await _renderer.RenderAsync(view, state.Model)));
+                await RenderForComparisonAsync(view, state.Model)));
         }
 
         return rendered.Any(a => rendered.Any(b =>
