@@ -47,6 +47,11 @@ public static class ModelReferences
                 "one-line delegate into Booking/Confirmation.cshtml, which is checked itself",
             ["~/Views/Shared/Components/BookingFlow/Unavailable.cshtml"] =
                 "one-line delegate into Booking/Unavailable.cshtml, which is checked itself",
+            ["~/Views/Shared/Components/BookingFlow/Default.cshtml"] =
+                "one-line delegate into Booking/Default.cshtml, which is checked itself. "
+                + "The third of this shape, and absent here only because it was deferred "
+                + "out of the suite until the rig could host Html.BeginUmbracoForm — not "
+                + "because anything about it differs from its two siblings.",
         };
 
     /// <summary>The model members one view's source refers to, in name order.</summary>

@@ -1,4 +1,6 @@
+using System.Text.RegularExpressions;
 using UBookIt.Tests.Rendering.Support;
+using UBookIt.Tests.Support;
 using UBookIt.Web.Rendering;
 
 namespace UBookIt.Tests.Rendering;
@@ -76,11 +78,11 @@ public class ModelPropertyTests
                 SupersededByAnError,
         };
 
-    public static TheoryData<string> InScopeViews()
+    public static TheoryData<string> ShippedViews()
     {
         var data = new TheoryData<string>();
 
-        foreach (var view in ViewInventory.InScope)
+        foreach (var view in ViewInventory.All)
         {
             data.Add(view);
         }
@@ -95,7 +97,7 @@ public class ModelPropertyTests
     // -----------------------------------------------------------------------
 
     [Theory]
-    [MemberData(nameof(InScopeViews))]
+    [MemberData(nameof(ShippedViews))]
     public void Every_view_refers_to_at_least_one_model_member(string view)
     {
         // Guard A. "This view refers to nothing" is precisely what a broken
@@ -109,6 +111,39 @@ public class ModelPropertyTests
         }
 
         Assert.NotEmpty(ModelReferences.Of(view));
+    }
+
+    [Fact]
+    public void An_exempted_view_really_is_a_delegate()
+    {
+        // The exemption registry is the one hand-kept list in this suite, and it
+        // switches off two rules for whatever it names. Nothing checked that a named
+        // view is actually the harmless shape the exemption is written for, so a
+        // view with real markup could be silenced by adding a line here — the rule
+        // turned off by the same mechanism meant to document turning it off.
+        //
+        // A delegate hands its whole model to exactly one other shipped view and
+        // renders nothing else. Asserted against source, which is sufficient here:
+        // the claim is about what the file contains, not about what it composes.
+        foreach (var (view, reason) in ModelReferences.DelegatingViews)
+        {
+            Assert.Contains(view, ViewInventory.All);
+            Assert.NotEmpty(reason);
+
+            var source = RepoFiles.Read(ViewInventory.SourcePathOf(view));
+
+            var delegations = Regex
+                .Matches(source, @"PartialAsync\(""(?<target>~/[^""]+)"",\s*Model\s*\)")
+                .Select(m => m.Groups["target"].Value)
+                .ToList();
+
+            Assert.True(
+                delegations.Count == 1,
+                $"{view} is exempted as a delegate but hands its model to "
+                + $"{delegations.Count} view(s); the exemption's reason does not hold.");
+
+            Assert.Contains(delegations[0], ViewInventory.All);
+        }
     }
 
     [Fact]
@@ -230,7 +265,7 @@ public class ModelPropertyTests
     // -----------------------------------------------------------------------
 
     [Theory]
-    [MemberData(nameof(InScopeViews))]
+    [MemberData(nameof(ShippedViews))]
     public async Task Every_referenced_member_changes_what_the_view_renders(string view)
     {
         var states = ViewFixtures.For(view);

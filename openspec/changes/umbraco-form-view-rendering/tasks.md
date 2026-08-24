@@ -1,117 +1,109 @@
 ## 1. Baseline
 
-- [ ] 1.1 Confirm a clean starting point: `dotnet build --no-incremental` with
-      **zero** warnings (the baseline is zero, not NU1903-only), then
-      `dotnet test --no-build` across the solution. Record the rendering suite's
-      test count and duration — the change is judged against both.
-- [ ] 1.2 Re-run the rig's own claim tests before touching anything: the content
-      root is a `NullFileProvider`, and `RuntimeCompilation` is absent from the
-      dependency closure. These are the guarantees this change is most able to
-      break.
+- [x] 1.1 Confirm a clean starting point: `dotnet build --no-incremental` with
+      **zero** warnings, then `dotnet test --no-build` across the solution. Record
+      the rendering suite's test count and duration.
+      **Found a defect on `main` doing this** — see 1.3. Baseline after the fix:
+      zero warnings; 768 + 415 + 58 = 1241 tests; rendering suite 415 tests, ~5s.
+- [x] 1.2 Re-run the rig's own claim tests: `NullFileProvider` content root, and
+      `RuntimeCompilation` absent from the closure. 5/5 green.
+- [x] 1.3 **NEW, unplanned — the rendering suite was not running at all.**
+      `0e79a03` (the VS2026 `.slnx` conversion) added
+      `<Build Solution="Debug|*" Project="false" />` to `UBookIt.Tests.Rendering`,
+      so since 2026-08-21 `dotnet build` skipped it and `dotnet test` never saw its
+      415 tests. Fixed in its own commit; solution run 826 → 1241 tests.
 
 ## 2. Host the three views
 
-- [ ] 2.1 In `ViewRenderer`, register `SurfaceControllerTypeCollection` over the
-      package's real surface controller types (`BookingSurfaceController`,
-      `ServiceBookingSurfaceController`), not a fabricated list.
-- [ ] 2.2 Add a stub `IUmbracoContextAccessor` returning a stub `IUmbracoContext`
-      whose `OriginalRequestUrl` is a fixed URL. Per design D1, leave the other
-      eight members `null!` or throwing — do **not** give them benign values — and
-      carry D1's reasoning as a comment at the stub, since the next reader's
-      instinct will be to "fix" it.
-- [ ] 2.3 Do **not** add `AddDataProtection()` or `AddAntiforgery()` (design D2).
-- [ ] 2.4 Verify all fourteen views render. `BookingFormModel` states must cover
-      `Booking/Default.cshtml` as the `ServiceFormModel` states cover
-      `Service.cshtml`.
-- [ ] 2.5 Resolve the open question in design.md: why `BookingFlow/Default.cshtml`
-      rendered 3460 bytes to `Booking/Default.cshtml`'s 3458 for the same model.
-      Explain it or fix it; do not assume it is benign.
+- [x] 2.1 `SurfaceControllerTypeCollection` registered over the package's real
+      surface controllers — **discovered by scanning the assembly** rather than
+      listed, so a third surface controller cannot silently sit outside the rig.
+- [x] 2.2 Stub `IUmbracoContextAccessor` / `IUmbracoContext`. Only
+      `OriginalRequestUrl` answers; every other member **throws a
+      `NotSupportedException` naming itself** and saying what to do instead. D1's
+      reasoning carried as a comment at the stub.
+- [x] 2.3 `AddDataProtection()` / `AddAntiforgery()` deliberately not added.
+- [x] 2.4 All fourteen views render. `BookingFormModel` coverage went from 5 states
+      to 11, mirroring the service states wherever the model can express them (it
+      cannot express a choice control or a fixed length — recorded at the fixture).
+- [x] 2.5 The 3460-vs-3458 difference explained: one trailing `\r\n`, identical
+      trimmed. Pinned by a new structural test rather than left as a note.
 
 ## 3. Prove the host is minimal, rather than asserting it
 
-- [ ] 3.1 Mutation-check each registration by **deletion**: remove
-      `SurfaceControllerTypeCollection`, confirm the suite goes red; restore.
-      Repeat for the context accessor. A registration whose removal is silent is
-      not required and must be deleted, not kept for safety.
-- [ ] 3.2 Confirm the reverse for the two registrations deliberately absent: adding
-      `AddDataProtection()`/`AddAntiforgery()` changes no rendered output. If it
-      does, D2 is wrong and must be revised before proceeding.
-- [ ] 3.3 Re-run 1.2. If `RuntimeCompilation` has entered the closure, **stop** —
-      the rig's central claim is broken and the approach needs rethinking.
+- [x] 3.1 Deletion-mutated both registrations: each takes 386 of 581 tests red.
+- [x] 3.2 Adding the two absent registrations changes no output — D2 holds.
+- [x] 3.3 Re-ran 1.2 after the change: `RuntimeCompilation` still absent, content
+      root still `NullFileProvider`. 5/5 green.
 
 ## 4. Close the deferred set
 
-- [ ] 4.1 Delete `ViewInventory.Deferred` and the `InScope` subtraction that reads
-      it. `InScope` becomes the shipped set.
-- [ ] 4.2 Replace the test that asserts *why* three views are deferred (it now has
-      nothing to assert) with the completeness check: the exercised set equals the
-      shipped set.
-- [ ] 4.3 Implement the vacuity guard the spec requires — the completeness check
-      fails when the exercised set is empty or smaller than the shipped set. Prove
-      it by mutation: make the exercised set empty and confirm red.
-- [ ] 4.4 Mutation-check completeness properly: add a throwaway `.cshtml` to the
-      package and confirm the suite goes red naming it. This is the scenario "a
-      shipped view outside the suite fails", and it is the one most likely to be
-      written so it cannot fail. Delete the throwaway afterwards and confirm the
-      tree is clean.
+- [x] 4.1 `ViewInventory.Deferred` deleted, along with the `InScope` subtraction.
+      `InScope` **renamed to `All`** across four test files rather than aliased —
+      the spec's whole point is that "in scope" named a set nobody defined.
+- [x] 4.2 The "why these three are deferred" test replaced by
+      `Every_shipped_view_is_exercised`.
+- [x] 4.3 Vacuity guard implemented and mutation-proved: emptying the exercised set
+      fails `The_completeness_check_cannot_pass_by_checking_nothing`.
+- [x] 4.4 Added a throwaway `.cshtml`: 7 tests fail naming it, with the message
+      *"is shipped and no fixture renders it, so every rule passes over it while
+      reporting green"*. Throwaway deleted; tree verified clean.
 
 ## 5. Retire the hand-built composition
 
-- [ ] 5.1 Rebuild `ViewFixtures.BuildDocuments` so document-level cases are the
-      rendered output of `BookingFlow/Service.cshtml` and
-      `Booking/Default.cshtml`.
-- [ ] 5.2 **Delete** the hand-built concatenation. Do not keep it alongside
-      (design D3) — two descriptions of one page is the liability being removed.
-- [ ] 5.3 Keep the shared partials' standalone per-view cases; rules 2 and 3 are
-      per-view and unaffected.
-- [ ] 5.4 Prove the composition now tracks the view: change a flow view to render a
-      partial twice, or to drop its `HasTimes` guard, and confirm the documents the
-      rules see change **with no fixture edit**. This is the requirement's central
-      scenario. Revert with `git checkout --` only after `git status` confirms the
-      file carries nothing but the mutation.
-- [ ] 5.5 Confirm the known blind spot is still exactly that and no larger: a
-      doubled `_ErrorSummary` remains invisible (it carries no ids). Record it in
-      the change's Risks as carried-forward, not as newly discovered.
+- [x] 5.1 Document cases are now the rendered output of the flow views.
+- [x] 5.2 Hand-built concatenation deleted. Went further than planned:
+      **`DocumentCase` now holds exactly one `ViewCase`**, so an assembled document
+      is unrepresentable rather than merely discouraged.
+- [x] 5.3 Shared partials keep their standalone per-view cases.
+- [x] 5.4 Made a flow view render `_YourDetails` twice: the duplicate-id rule fails
+      across many states **with no fixture edited**. Reverted after `git status`
+      confirmed one inserted line and nothing else.
+- [x] 5.5 Made a flow view render `_ErrorSummary` twice: **581 tests still pass.**
+      The blind spot is confirmed to be exactly what was recorded and no larger —
+      verified rather than assumed.
 
 ## 6. Handle what the honest document finds
 
-- [ ] 6.1 Run the full suite against the real composition. Expect failures; they
-      are the point.
-- [ ] 6.2 For each failure, decide explicitly: a real defect in shipped markup, or
-      a fixture that was wrong. Write the determination down before fixing.
-- [ ] 6.3 Report each real markup defect as a finding **before** fixing it, with the
-      state that produces it. Do not fold defect fixes silently into this diff.
-- [ ] 6.4 For each defect fixed, mutation-check that the rule detects its
-      reintroduction — the fix is not evidence that the rule can see it.
+- [x] 6.1 Ran the full suite against the real composition.
+- [x] 6.2 Two failures, both on `BookingFlow/Default.cshtml`, both **non-vacuity
+      guards rather than markup rules**. Determination written before any fix: not
+      a defect — a pure delegate names no model member and emits no literal, which
+      is the shape `ModelReferences.DelegatingViews` already exempts for two
+      identical siblings. Registered with its reason.
+- [x] 6.3 No markup defect was found, so nothing to report as one. Recorded
+      explicitly in design.md, because the proposal predicted otherwise.
+- [x] 6.4 Closed a hole found while there: nothing checked that an **exempted** view
+      really is a delegate, so the registry could have silenced a real view.
+      `An_exempted_view_really_is_a_delegate` now asserts it hands its whole model
+      to exactly one shipped view. The dispatcher-structure test is
+      mutation-checked (adding a `<div>` fails it).
 
 ## 7. Obligations and honesty
 
-- [ ] 7.1 Discharge deferred obligation (a) — the three Umbraco-dependent views —
-      and (b) — flow-view/partial composition — in
-      `ubookit-deferred-obligations`. Strike them only once this change archives.
-- [ ] 7.2 Carry forward, explicitly **not** discharged: (c) `role="alert"`
+- [x] 7.1 (a) and (b) are discharged by this change — to be struck in
+      `ubookit-deferred-obligations` **at archive**, not now.
+- [x] 7.2 Carried forward explicitly **not** discharged: (c) `role="alert"`
       unguarded; (d) the ⑤ human keyboard-only + screen-reader pass; (e) the two
-      never-fired `HasAccessibleName` branches. None is touched here, and none may
-      acquire a tick because something adjacent was verified.
-- [ ] 7.3 Record design D4's consequence where a reader will meet it: the form
-      `action` and anti-forgery token are now rendered and asserted by nothing.
-- [ ] 7.4 Record that the two registrations are expected to be temporary, removed
-      by editor-facing packaging.
+      never-fired `HasAccessibleName` branches.
+- [x] 7.3 D4's consequence recorded: the form `action` and anti-forgery token are
+      rendered and asserted by nothing.
+- [x] 7.4 Recorded that the two registrations are expected to be temporary.
 
 ## 8. Verify
 
-- [ ] 8.1 `dotnet build --no-incremental` — zero warnings. Note: `dotnet test` does
-      **not** accept `--no-incremental` (MSBuild-only switch, a parse error); build
-      first, then `dotnet test --no-build`.
-- [ ] 8.2 Full solution test run green. Report the rendering suite's new count and
-      duration against the 1.1 baseline; a large duration jump means something was
-      booted that should not have been.
-- [ ] 8.3 `openspec validate --strict` against the pinned CLI (1.6.0 — 1.9.0
-      reports scenario-title mismatches that 1.6.0 does not).
-- [ ] 8.4 Sync-time **outward** grep: find sibling specs this change falsifies. It
-      has found something on four consecutive changes. Note `delivery-api`'s Purpose
-      correction is a separate standing obligation and is **not** this change's to
-      fix.
-- [ ] 8.5 Confirm `ref/` is ignored and untracked, and that no Umbraco source was
-      copied into the build.
+- [x] 8.1 `dotnet build --no-incremental` — **zero warnings**.
+- [x] 8.2 Full solution green: 768 + **582** + 58 = **1408** tests. Rendering suite
+      415 → 582, duration ~5s → ~16s. The rise is renders, not a boot: the three
+      flow views are the largest in the package and the resource states more than
+      doubled. Nothing in the closure changed (3.3).
+- [x] 8.3 `openspec validate umbraco-form-view-rendering --strict` — valid.
+- [x] 8.4 Outward grep run. **Nothing falsified.** The only live hits are
+      `default-frontend:304,367` ("every view **in scope**"), which are precisely
+      what this change's first new requirement pins by defining that set; they are
+      left textually as they are rather than replaced wholesale for two words. A
+      hit in `bookings:181` is the word "deferred" in an unrelated discharged
+      obligation. Re-run at sync.
+- [x] 8.5 `ref/` ignored (`.gitignore:494`) and untracked; no file under `ref/`
+      reaches the build. `src/` is untouched by this change.
 - [ ] 8.6 QA review in a **fresh context or subagent** — never this one.

@@ -40,25 +40,31 @@ public class MarkupInvariantTests
     }
 
     [Fact]
-    public void Every_in_scope_view_appears_in_some_document()
+    public void Every_page_the_package_ships_is_a_document()
     {
         // Non-vacuity for rule 1, which is the one rule that lacked its own guard.
-        // Its five clauses iterate documents; if a fixture change emptied that set,
-        // or dropped a view from it, all five would pass over nothing. Rules 2 and 3
+        // Its clauses iterate documents; if a fixture change emptied that set, or
+        // dropped a view from it, all of them would pass over nothing. Rules 2 and 3
         // would still fail loudly, so the suite would not be silent — but rule 1
         // alone would be, and that asymmetry is the thing worth removing.
-        var covered = ViewFixtures.Documents
-            .SelectMany(document => document.Parts.Select(part => part.ViewPath))
-            .ToHashSet(StringComparer.Ordinal);
-
+        //
+        // Every shipped view is either a page — and then it is a document here — or
+        // a shared partial, which is a fragment that reaches rule 1 by being
+        // rendered inside the flow page that includes it. That the partials really
+        // are rendered that way is asserted in ViewInventoryTests, against the
+        // rendered output rather than against view source.
         Assert.NotEmpty(ViewFixtures.Documents);
 
-        foreach (var view in ViewInventory.InScope)
+        var documents = ViewFixtures.Documents
+            .Select(document => document.ViewPath)
+            .ToHashSet(StringComparer.Ordinal);
+
+        foreach (var view in ViewInventory.All)
         {
             Assert.True(
-                covered.Contains(view),
-                $"{view} is in scope but appears in no rendered document, so rule 1 never "
-                + "asks anything of it.");
+                documents.Contains(view) || ViewFixtures.Partials.Contains(view),
+                $"{view} is shipped but is neither a document nor a shared partial, so "
+                + "rule 1 never asks anything of it.");
         }
     }
 
@@ -201,7 +207,7 @@ public class MarkupInvariantTests
         var document = await ParseAsync(rendered);
         var text = document.Body?.TextContent ?? string.Empty;
 
-        foreach (var form in rendered.Parts.Select(p => p.Model).OfType<IBookingFormView>().Take(1))
+        foreach (var form in rendered.Forms)
         {
             foreach (var error in form.Errors)
             {
@@ -248,7 +254,7 @@ public class MarkupInvariantTests
         {
             var document = await ParseAsync(rendered);
 
-            foreach (var form in rendered.Parts.Select(p => p.Model).OfType<IBookingFormView>().Take(1))
+            foreach (var form in rendered.Forms)
             {
                 foreach (var error in form.Errors)
                 {
@@ -291,7 +297,7 @@ public class MarkupInvariantTests
         // field where that field is on the page"); only the check was missing.
         var document = await ParseAsync(rendered);
 
-        foreach (var form in rendered.Parts.Select(p => p.Model).OfType<IBookingFormView>().Take(1))
+        foreach (var form in rendered.Forms)
         {
             foreach (var error in form.Errors)
             {
@@ -324,7 +330,7 @@ public class MarkupInvariantTests
         {
             var document = await ParseAsync(rendered);
 
-            foreach (var form in rendered.Parts.Select(p => p.Model).OfType<IBookingFormView>().Take(1))
+            foreach (var form in rendered.Forms)
             {
                 exercised += form.Errors.Count(e =>
                     e.FieldId is not null && document.GetElementById(e.FieldId) is not null);
@@ -500,24 +506,15 @@ public class MarkupInvariantTests
         => await Parser.ParseDocumentAsync(await RenderAsync(rendered));
 
     /// <summary>
-    /// The whole document: every part rendered in the order a flow renders them,
-    /// concatenated.
+    /// The whole document: one view, rendered.
     /// <para>
-    /// For a page that is one view. For the shared partials it is the four that
-    /// only form a page together — `_DateAndLength` describes its length control
-    /// with an id `_Times` owns, which dangles apart and resolves together, and the
-    /// second is what the site serves (design D7).
+    /// Nothing is concatenated here any more. A flow view renders its own partials
+    /// in its own order under its own conditions, so the document these rules judge
+    /// is the one the site serves rather than one this file assembled — which is why
+    /// `_DateAndLength` describing its length control with an id `_Times` owns
+    /// resolves: the page includes both, and always did (design D3).
     /// </para>
     /// </summary>
     private async Task<string> RenderAsync(DocumentCase rendered)
-    {
-        var parts = new List<string>(rendered.Parts.Count);
-
-        foreach (var part in rendered.Parts)
-        {
-            parts.Add(await _renderer.RenderAsync(part.ViewPath, part.Model));
-        }
-
-        return string.Join(Environment.NewLine, parts);
-    }
+        => await _renderer.RenderAsync(rendered.ViewPath, rendered.Model);
 }

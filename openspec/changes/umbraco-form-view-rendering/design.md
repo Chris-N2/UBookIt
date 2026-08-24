@@ -169,12 +169,40 @@ is unique by GUID".
 None. Test-only change; no shipped code, public API, contract or schema is altered,
 so there is nothing to migrate and no upgrade path to provide.
 
-## Open Questions
+## Open Questions — both resolved at apply
 
-- Does the real composition fail any existing rule? Unknown until rendered, and
-  deliberately not pre-judged — pre-empting the answer would shape the fixtures to
-  the expectation. If it fails, the finding is reported before any fix is written.
-- `BookingFlow/Default.cshtml` rendered 3460 bytes against `Booking/Default.cshtml`'s
-  3458 for the same model. A two-byte difference is probably a wrapper element, but
-  it is unexplained, and an unexplained difference between a view and the view it
-  delegates to is worth resolving during apply rather than assuming benign.
+- **Does the real composition fail any existing rule? No — it found no markup
+  defect.** Stated plainly because the proposal predicted it might, and a prediction
+  that did not come true should be recorded as such rather than quietly dropped.
+  Two tests did fail, and neither was a markup defect: `BookingFlow/Default.cshtml`
+  failed the two **non-vacuity guards** (`Every_view_refers_to_at_least_one_model_member`
+  and `The_literal_extraction_is_not_vacuous`), because a pure delegate names no
+  model member and emits no literal of its own. Both guards already consult an
+  explicit exemption registry, `ModelReferences.DelegatingViews`, holding two
+  siblings of identical shape; the third was missing only because it was deferred
+  and so never reached the rule. Registered with its reason. **The suite's silence
+  is load-bearing here, so it was mutation-checked rather than trusted** — see
+  below.
+- **The two-byte difference is explained: one trailing `\r\n`.** The dispatcher's
+  output is the delegated view's output plus the newline after its `PartialAsync`
+  line — 3460 against 3458, and 3456 for both once trimmed. No markup difference.
+  The delegate exemption rests on exactly this claim and had only ever been checked
+  against view *source*, so it is now asserted against rendered output
+  (`The_dispatcher_page_adds_no_markup_to_the_view_it_delegates_to`), comparing tag
+  sequences rather than bytes — the form carries a per-render GUID id and two fresh
+  tokens, and scrubbing them would be the snapshot infrastructure D5 rules out.
+
+## What the mutations established
+
+Every claim below is measured, not argued:
+
+| Mutation | Result |
+|---|---|
+| Remove `SurfaceControllerTypeCollection` | 386 of 581 fail — required |
+| Remove `IUmbracoContextAccessor` | 386 of 581 fail — required |
+| **Add** `AddDataProtection()` + `AddAntiforgery()` | 581 pass, output unchanged — genuinely not required, D2 holds |
+| Ship a view the suite does not exercise | 7 fail, naming it: *"is shipped and no fixture renders it, so every rule passes over it while reporting green"* |
+| Empty the exercised set | The vacuity guard fails, as the spec requires |
+| Flow view renders `_YourDetails` **twice** | Duplicate-id rule fails across many states, **with no fixture edited** — the composition tracks the view |
+| Flow view renders `_ErrorSummary` **twice** | **581 pass** — the known blind spot, confirmed still exactly that and no larger |
+| Dispatcher adds a `<div>` | The new structural test fails |
