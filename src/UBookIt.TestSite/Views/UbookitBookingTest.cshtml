@@ -3,6 +3,19 @@
 @inherits Umbraco.Cms.Web.Common.Views.UmbracoViewPage
 @{
     Layout = null;
+    // A DEV HARNESS, not an example. This is NOT how a site puts uBookIt on a page.
+    //
+    // The package now ships a Booking Page document type and template — install it,
+    // create a page, publish. See docs/booking-page.md. Nothing here should be copied
+    // into a real site: it hardcodes a layout, resolves a resource by reaching into
+    // IResourceStore, and reads query keys the shipped page does not expose.
+    //
+    // Kept deliberately rather than deleted, because it is still the only way to
+    // reach two things the shipped page cannot: `?resourceId=` for a NAMED resource
+    // (the shipped page routes by `ubBook`, and a resource that withholds direct
+    // booking has two outcomes worth looking at), and the raw `Booking` component
+    // invoked without any flow state in the URL.
+    //
     // Dev harness for change ⑤: render the default booking flow for the first
     // bookable resource, so the flow is reachable without hardcoding an id.
     //

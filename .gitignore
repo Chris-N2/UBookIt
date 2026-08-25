@@ -493,3 +493,9 @@ src/UBookIt.Backoffice/wwwroot/App_Plugins/
 # build must not reference anything here.
 ref/
 
+# Templates uBookIt's package migration writes into the TestSite on install.
+# Generated from src/UBookIt.Web/Packaging/package.xml, which is the authoritative
+# copy — committing them would put a second, silently-diverging copy in the repo,
+# and the import rewrites them on every manifest change anyway.
+src/UBookIt.TestSite/Views/uBookItBookingPage.cshtml
+

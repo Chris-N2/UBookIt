@@ -1,0 +1,102 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  What uBookIt installs into a site.
+
+  READ THIS BEFORE ADDING ANYTHING HERE. Umbraco re-imports this entire manifest
+  whenever the file changes for ANY reason — the migration plan's state is a hash
+  of it — and the import OVERWRITES what it finds:
+
+    * a template's contents are replaced wholesale, even when the template's own
+      XML has not changed;
+    * a document type's Name, Icon, Description and AllowAtRoot are reset to the
+      values here.
+
+  It never removes anything, so an editor's own properties survive and properties
+  added in a later release do reach existing installs.
+
+  Measured against Umbraco 17.6.2 on 2026-08-25. The Umbraco documentation says
+  existing schema is not overwritten; that is true of content and false of schema.
+
+  Consequence: nothing here may carry anything a site would mind losing. The
+  template below is a delegate for that reason and must stay one.
+-->
+<umbPackage>
+  <info>
+    <package>
+      <name>uBookIt</name>
+    </package>
+  </info>
+
+  <!--
+    Deliberately no <Documents> element. The package installs a document TYPE and
+    never a document: which pages exist, where they sit and what they are called
+    are the editor's decisions. Installing a page would put a URL on a site nobody
+    asked for, and a later import would then have opinions about it.
+  -->
+
+  <Templates>
+    <Template>
+      <Name>Booking Page</Name>
+      <Alias>uBookItBookingPage</Alias>
+      <Key>b7b1f1a6-8f0e-4d2a-9c3e-6a1d5e0f7a01</Key>
+      <!--
+        A delegate, and nothing else. Two lines: the base-class directive Umbraco
+        templates require, and the component invocation.
+
+        No Layout is set on purpose, so the site's own _ViewStart applies and the
+        booking page wears the site's chrome. Setting one here would impose our
+        idea of a layout on every consumer.
+
+        To change what this renders, do NOT edit this template — the next release
+        will overwrite it. Override the package's views instead, by placing your
+        own file at the same path under Views/Shared/UBookIt/.
+      -->
+      <Design><![CDATA[@inherits Umbraco.Cms.Web.Common.Views.UmbracoViewPage
+@await Component.InvokeAsync("BookingFlow")]]></Design>
+    </Template>
+  </Templates>
+
+  <DocumentTypes>
+    <DocumentType>
+      <Info>
+        <Name>Booking Page</Name>
+        <Alias>uBookItBookingPage</Alias>
+        <Key>b7b1f1a6-8f0e-4d2a-9c3e-6a1d5e0f7a02</Key>
+        <Icon>icon-calendar-alt</Icon>
+        <Thumbnail>folder.png</Thumbnail>
+        <Description>Renders the uBookIt booking flow. Shows the catalogue of bookable things, or a single service or resource when the URL names one.</Description>
+        <!--
+          Allowed at root so a fresh install can create the page immediately. With
+          this false the type is creatable nowhere until a site author wires
+          allowed-children, and the package reads as broken on first use. It does
+          not prevent composition: a site remains free to allow it under its own
+          page types.
+
+          Changing this later is upgrade-visible — the import resets it.
+        -->
+        <AllowAtRoot>True</AllowAtRoot>
+        <IsListView>False</IsListView>
+        <IsElement>False</IsElement>
+        <Variations>Nothing</Variations>
+        <Compositions />
+        <AllowedTemplates>
+          <Template>uBookItBookingPage</Template>
+        </AllowedTemplates>
+        <DefaultTemplate>uBookItBookingPage</DefaultTemplate>
+      </Info>
+      <Structure />
+      <!--
+        No properties in v1. The page needs no configuration: the flow reads its
+        state from the URL, and with nothing named it renders the catalogue.
+
+        Deferring is safe rather than merely tolerable, and this is the measured
+        part: a property added in a later release DOES reach sites that installed
+        this version, and nothing is ever removed. So configuration can be added
+        additively when there is a demonstrated need for it, instead of being
+        designed inside a packaging change.
+      -->
+      <GenericProperties />
+      <Tabs />
+    </DocumentType>
+  </DocumentTypes>
+</umbPackage>

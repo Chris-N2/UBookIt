@@ -14,6 +14,16 @@
     <PackageReference Include="Umbraco.Cms.Web.Website" />
   </ItemGroup>
 
+  <!--
+    The package manifest BookingPagePackageMigrationPlan installs from. It is
+    resolved by resource name, which is derived from this path — so the folder and
+    the plan's namespace must agree. A mismatch is silent: the plan finds nothing
+    and the site starts without uBookIt's schema. PackagingTests asserts it.
+  -->
+  <ItemGroup>
+    <EmbeddedResource Include="Packaging\package.xml" />
+  </ItemGroup>
+
   <ItemGroup>
     <InternalsVisibleTo Include="UBookIt.Tests" />
   </ItemGroup>
