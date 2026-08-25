@@ -94,23 +94,40 @@ the mechanism for form posts. Chris's recollection, from hitting this directly, 
 needed. Nothing here is measured, and a design resting on unmeasured behaviour is the
 defect QA caught last change.
 
-**A better hypothesis is now available, and it should be tested before any design.**
-TempData was adopted because `RedirectToCurrentUmbracoPage()` loses ModelState, and the
-idiomatic alternative — returning `CurrentUmbracoPage()` and re-rendering with ModelState
-— needs a **real published page route**. There has never been one: the flow has only ever
-been reached through a dev-harness template, and deferred obligation (e) records a raw
-surface-route POST failing for precisely that reason.
+**The real obstacle is the ViewComponent boundary, and it is not what ⑤ recorded.**
+Established here by reading the code rather than assuming, after Chris confirmed from a
+live v17 project that a surface controller *can* return `CurrentUmbracoPage()`:
 
-**This change ships that missing page.** So the next change's spike should ask, in this
-order:
+- The form is rendered by a **ViewComponent**, invoked from the page's template.
+- `BookingViewComponent` reads the failure payload out of **TempData itself**
+  (`BookingViewComponent.cs:23,34`), and the surface controller stashes it and redirects
+  (`BookingSurfaceController.cs:121,167`).
+- On a re-render the template invokes the component with only `resourceId`. **ModelState
+  does not cross a ViewComponent boundary**, and the template has no model to pass.
 
-1. With a real published Booking Page, can the **existing** surface controller return
-   `CurrentUmbracoPage()` on failure and drop TempData entirely?
-2. Only if not — does a `RenderController` change anything, and can it take a POST at all?
+So returning `CurrentUmbracoPage()` instead of redirecting **would not remove TempData**.
+TempData is currently the only channel from the POST handler to the thing that renders
+the form. Any design that treats "stop redirecting" as the fix will find this out late.
 
-If (1) holds, the deferred change is much smaller than ⑤ anticipated, needs no
-`RenderController`, and keeps `BeginUmbracoForm` — which would also mean ⑪'s two DI
-registrations **stay**, and should stop being described as scaffolding awaiting demolition.
+**Which rehabilitates the `RenderController` — for a reason ⑤ did not state.** Its value
+is not that it owns the POST (it does not, and a surface controller is still needed for
+that). Its value is that it gives the **page a model**, which is the only way a template
+can hand a failed submission to the ViewComponent. The alternatives are to have the
+surface controller return a view that renders the flow directly with an explicit model,
+bypassing the template's invocation, or to give the ViewComponent a parameter the
+template fills — and both still need the page to carry the payload somehow.
+
+So the deferred change's likely shape, to be **measured before it is designed**:
+
+1. The surface controller keeps the POST and the anti-forgery token.
+2. On failure it returns `CurrentUmbracoPage()` rather than redirecting.
+3. Something gives the page a model so the failure reaches the ViewComponent without
+   TempData — a `RenderController` being the obvious candidate.
+4. `BeginUmbracoForm` therefore **stays**, and with it ⑪'s two DI registrations. They
+   should stop being described as scaffolding awaiting demolition.
+
+The spike for that change should start at (3), since (1) and (2) are now known to be
+possible and (3) is the part nobody has measured.
 
 ### D5 — The manifest/namespace coupling is silent when wrong, so it is asserted
 

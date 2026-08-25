@@ -66,13 +66,16 @@
 
 ## 7. Obligations
 
-- [ ] 7.1 Record design D4's finding against the deferred POST-path change: test
-      whether the **existing** surface controller can return `CurrentUmbracoPage()`
-      now that a real published page exists, **before** assuming a `RenderController`
-      is needed. If it can, that change is far smaller than ⑤ anticipated.
+- [ ] 7.1 Carry design D4's finding to the deferred POST-path change: **TempData is not
+      a consequence of redirecting, it is a consequence of the ViewComponent
+      boundary.** The component reads the failure payload itself and ModelState cannot
+      reach it, so "return `CurrentUmbracoPage()` instead of redirecting" does not
+      remove TempData. That change's spike starts at "how does the page get a model",
+      not at the controller.
 - [ ] 7.2 Correct the standing note that ⑪'s two DI registrations are scaffolding
-      awaiting demolition — that was predicated on `BeginUmbracoForm` going away, which
-      is now in doubt. Do not delete them here.
+      awaiting demolition. `BeginUmbracoForm` now looks likely to **stay** — a surface
+      controller remains the POST mechanism — so the registrations stay too. Do not
+      delete them here, and stop describing them as temporary.
 - [ ] 7.3 The `[ValidateAntiForgeryToken]` obligation stays **open** and moves to the
       POST-path change. It must not acquire a tick because this change touched
       packaging.
