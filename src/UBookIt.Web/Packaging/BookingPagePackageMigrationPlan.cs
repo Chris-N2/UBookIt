@@ -1,44 +1,50 @@
-using Umbraco.Cms.Infrastructure.Packaging;
+using Umbraco.Cms.Core.Packaging;
 
 namespace UBookIt.Web.Packaging;
 
 /// <summary>
 /// Installs uBookIt's schema — the Booking Page document type and its template —
-/// into a site, from the <c>package.xml</c> embedded beside this class.
+/// into a site, from the <c>package.xml</c> embedded beside this plan.
 /// </summary>
 /// <remarks>
 /// <para>
-/// The manifest is resolved as an embedded resource named for <b>this type's
-/// namespace</b>: <c>UBookIt.Web.Packaging.package.xml</c>. Move either the class or
-/// the file, rename the namespace, or drop the <c>&lt;EmbeddedResource&gt;</c> entry
-/// from the project file, and the plan finds nothing — <b>with no error</b>. The site
-/// starts, reports success, and simply has no schema. <c>PackagingTests</c> asserts
-/// the coupling for that reason.
+/// <b>A custom <see cref="PackageMigrationPlan"/>, deliberately, and NOT an
+/// <c>AutomaticPackageMigrationPlan</c>.</b> The difference is the whole design.
 /// </para>
 /// <para>
-/// The plan's final state is a <b>hash of the manifest</b>, so it re-runs whenever
-/// that file changes. Everything the manifest declares is then re-imported, which is
-/// why nothing in it may carry anything a site would mind losing — see the comment at
-/// the top of <c>package.xml</c> for the measured behaviour.
+/// An automatic plan's final state is a <b>hash of the manifest</b>, so it re-runs
+/// every time that file changes for any reason — and the import overwrites a
+/// template's contents wholesale. A site that edited the shipped template would lose
+/// that work on any release that touched schema, including one that did not mention
+/// templates. Measured against 17.6.2, so this is not a theoretical objection.
 /// </para>
 /// <para>
-/// <see cref="AutomaticPackageMigrationPlan"/> rather than a custom
-/// <c>PackageMigrationPlan</c> deliberately. The custom route offers finer control and
-/// defaults <c>IgnoreCurrentState</c> to <c>true</c>, re-executing every migration —
-/// so here the "more control" option is the more dangerous one, and the simple one is
-/// also the one whose behaviour has been measured.
+/// A custom plan's states are the explicit ids below. Once a site reaches the final
+/// one the import never runs again, however the manifest changes. The shipped
+/// template therefore becomes <b>the site's own file</b> after install, which is what
+/// makes it safe to edit — and it is what the Clean starter kit relies on for the
+/// same reason.
+/// </para>
+/// <para>
+/// <b>Adding a step re-imports everything.</b> That is the cost, and it is the right
+/// one: overwriting becomes a decision someone makes rather than a side effect of
+/// editing a file. A future step that must add schema without disturbing a site's
+/// templates should import a manifest that declares only the new schema.
 /// </para>
 /// </remarks>
-public sealed class BookingPagePackageMigrationPlan : AutomaticPackageMigrationPlan
+public sealed class BookingPagePackageMigrationPlan : PackageMigrationPlan
 {
     /// <summary>
     /// Named for the product, which is what an editor looks for under installed
     /// packages — not <c>UBookIt.Backoffice</c>, which is the id of the backoffice
     /// <i>extension</i> manifest and a different concern from what a site has
-    /// installed. The base class exposes it as <c>PackageName</c>.
+    /// installed.
     /// </summary>
     public BookingPagePackageMigrationPlan()
         : base("uBookIt")
     {
     }
+
+    protected override void DefinePlan()
+        => To<ImportBookingPageSchema>(new Guid("3f7c9d21-5a48-4c6e-9b03-0d2a6f1e8c40"));
 }
