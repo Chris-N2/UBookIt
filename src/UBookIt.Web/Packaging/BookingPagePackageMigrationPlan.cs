@@ -26,10 +26,18 @@ namespace UBookIt.Web.Packaging;
 /// same reason.
 /// </para>
 /// <para>
-/// <b>Adding a step re-imports everything.</b> That is the cost, and it is the right
-/// one: overwriting becomes a decision someone makes rather than a side effect of
-/// editing a file. A future step that must add schema without disturbing a site's
-/// templates should import a manifest that declares only the new schema.
+/// <b>Adding a step re-imports everything the manifest it names declares.</b> That is
+/// the cost, and it is the right one: overwriting becomes a decision someone makes
+/// rather than a side effect of editing a file.
+/// </para>
+/// <para>
+/// A future step that must add schema <i>without</i> disturbing a site's template can
+/// import a <b>separate, narrower manifest</b> declaring only the new schema — it is
+/// the manifest a step names that gets re-imported, not this one by default. That is a
+/// real option and it is why this is worth stating; but until such a step exists,
+/// <c>docs/booking-page.md</c> deliberately tells site authors the conservative worst
+/// case — that a release carrying a step replaces the template — because promising
+/// them a narrower one commits every future maintainer to it.
 /// </para>
 /// </remarks>
 public sealed class BookingPagePackageMigrationPlan : PackageMigrationPlan
@@ -39,6 +47,13 @@ public sealed class BookingPagePackageMigrationPlan : PackageMigrationPlan
     /// packages — not <c>UBookIt.Backoffice</c>, which is the id of the backoffice
     /// <i>extension</i> manifest and a different concern from what a site has
     /// installed.
+    /// <para>
+    /// <b>DO NOT RENAME THIS ONCE RELEASED.</b> Umbraco keys a plan's stored state on
+    /// its name, so a rename makes every existing install look uninstalled and
+    /// re-imports — silently replacing whatever the site had edited, with one INFO
+    /// line and no error. Changing the state id below, or the plan's type, breaks
+    /// existing installs too; those at least fail loudly.
+    /// </para>
     /// </summary>
     public BookingPagePackageMigrationPlan()
         : base("uBookIt")

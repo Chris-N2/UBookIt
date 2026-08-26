@@ -102,8 +102,19 @@ change adds a way to reach them, not a change to them.
   this change, and it is why the upgrade behaviour is documented rather than assumed.
 - **Public API surface grows** by two public types — `BookingPagePackageMigrationPlan`
   and `ImportBookingPageSchema` — which are a compatibility promise once published, and
-  must be public for Umbraco's type finder to discover them. The plan's state ids are a
-  stronger commitment still: they cannot be changed, and the plan type cannot be
-  swapped, without breaking every installed site.
+  must be public for Umbraco's type finder to discover them.
+- **Three things about the plan are frozen at first release**, and each breaks existing
+  installs differently:
+  - its **state ids** — changing one makes the stored state unreachable;
+  - its **type** — swapping automatic for custom, or back, is a hard boot failure
+    (`does not support migrating from state …`, 500 on every request);
+  - its **name** — `PendingPackageMigrations` keys on it, so renaming the plan makes
+    every existing install look uninstalled and **re-imports**, destroying whatever the
+    site had edited. Measured by QA: an edited template was silently replaced with the
+    shipped delegate and the document type's description reset, with one INFO line and
+    no error.
+
+  The name is the nastiest of the three, because the other two fail loudly and it does
+  not.
 - No persistence or EF Core migration change, no delivery or management contract
   change. No breaking change to anything already published.

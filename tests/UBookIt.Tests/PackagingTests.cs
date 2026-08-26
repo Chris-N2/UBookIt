@@ -4,6 +4,7 @@ using System.Xml.Linq;
 using Microsoft.AspNetCore.Mvc;
 using UBookIt.Tests.Support;
 using UBookIt.Web.Packaging;
+using Umbraco.Cms.Web.Common.Views;
 
 namespace UBookIt.Tests;
 
@@ -68,12 +69,17 @@ public class PackagingTests
         // The rule for whoever wants to add "just a wrapper div" later: anything
         // worth keeping in the shipped template is worth not shipping there. Put it
         // in a view the site can override instead.
-        var design = Manifest()
-            .Descendants("Template")
-            .Select(t => t.Element("Design")?.Value)
-            .FirstOrDefault(d => d is not null);
+        // Exactly one template, and this is load-bearing rather than tidiness: taking
+        // the FIRST template let a SECOND one carry `<div class="branding"><h1>…`
+        // through this check untouched. The constraint is on what the package ships,
+        // not on whichever template happens to sort first.
+        var templates = Manifest().Descendants("Template")
+            .Where(element => element.Element("Design") is not null)
+            .ToList();
 
-        Assert.NotNull(design);
+        Assert.Single(templates);
+
+        var design = templates[0].Element("Design")!.Value;
 
         var lines = design!
             .Split('\n')
@@ -94,7 +100,14 @@ public class PackagingTests
         // silently replaces. Anchored matching is what closes that.
         Assert.Equal(2, lines.Count);
 
-        Assert.Matches(@"^@inherits\s+[\w.]+$", lines[0]);
+        // The base type is named, not merely shaped. `@inherits System.Object` passed
+        // a shape-only check while making every published booking page fail to
+        // compile — the same "a string with no tie to a type" family as the component
+        // name below.
+        Assert.Equal(
+            $"@inherits {typeof(UmbracoViewPage).FullName}",
+            lines[0]);
+
         Assert.Matches(@"^@await\s+Component\.InvokeAsync\(""\w+""\)$", lines[1]);
 
         // No layout imposed on the consumer: unset means the site's own _ViewStart
@@ -156,24 +169,35 @@ public class PackagingTests
     }
 
     [Fact]
-    public void The_manifest_writes_no_files_into_the_site()
+    public void The_manifest_declares_only_the_sections_the_package_needs()
     {
-        // `PackageDataInstallation` imports these sections by writing FILES into the
-        // consumer's site. The package installs exactly one file — the Booking Page
-        // template — and everything else it ships is compiled into the assembly.
+        // An ALLOWLIST, deliberately, and this replaced a denylist that named four
+        // file-writing sections. The denylist read as a fence and was not one:
+        // `<DataTypes>`, `<DictionaryItems>` and `<Languages>` sailed through it —
+        // they write no files, so they missed the files check, and they are not
+        // content, so they missed the content check. All three install schema and
+        // configuration into a consumer's site; a `<Language>` entry adds a language.
         //
-        // Checked because the alternative is discovering it on someone else's site.
-        // A manifest that gained a <PartialViews> or <Stylesheets> entry would start
-        // writing into paths the site owns, on every install, with nothing here
-        // objecting. The one section deliberately used, <Templates>, is asserted
-        // elsewhere to contain exactly one delegating template.
-        foreach (var section in new[] { "PartialViews", "Stylesheets", "Scripts", "Files" })
-        {
-            Assert.True(
-                Manifest().Descendants(section).All(element => !element.HasElements),
-                $"package.xml declares <{section}>, which writes files into the "
-                + "consumer's site. Only the Booking Page template may be installed.");
-        }
+        // A denylist can only ever fence the sections someone thought of. This fences
+        // everything, so a manifest section added later has to be argued for here
+        // rather than discovered on someone else's site.
+        var permitted = new[] { "info", "Templates", "DocumentTypes" };
+
+        var declared = Manifest().Root!.Elements()
+            .Select(element => element.Name.LocalName)
+            .Where(name => !permitted.Contains(name, StringComparer.Ordinal))
+            .ToList();
+
+        Assert.True(
+            declared.Count == 0,
+            $"package.xml declares {string.Join(", ", declared.Select(name => $"<{name}>"))}, "
+            + "which this package has not justified installing into a consumer's site. "
+            + $"Permitted: {string.Join(", ", permitted.Select(name => $"<{name}>"))}. "
+            + "Anything else writes files, schema or configuration a site did not ask "
+            + "for — add it here only with a reason.");
+
+        // Non-vacuity: an allowlist over an empty document permits everything.
+        Assert.NotEmpty(Manifest().Root!.Elements());
     }
 
     [Fact]

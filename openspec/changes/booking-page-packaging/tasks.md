@@ -158,4 +158,58 @@
       wrapping uBookIt's flow. Reverted afterwards; Umbraco removed the template file
       with the template. Also answers NIT-3 — the flow starts at `<h2>` and the site's
       template supplies the `<h1>`, which the docs example now shows.
-- [ ] 9.13 Re-review by the same QA subagent, with its round-1 context.
+- [x] 9.13 Re-review: **REJECT**, 2 MAJORs + 6 minors. Round 3 below.
+
+## 10. QA round 2 — findings and dispositions
+
+- [x] 10.1 **MAJOR-A — run-once + `RunSchemaAndContentMigrations: false` = permanently
+      inert install, and the docs recommended the setting.** QA measured it: the import
+      is skipped but the migration still completes, so the state is recorded and
+      run-once never retries. Turning the setting back on does nothing. **This is a real
+      cost of my own D1 fix**, and the automatic plan was self-healing here. Chris's
+      decision: docs + design record, no runtime code. The docs now warn against having
+      it set at install time and give the recovery; D1 records the trade and why it is
+      still taken — a rare, recoverable, detectable failure beats a routine, silent,
+      unrecoverable one.
+- [x] 10.2 **MAJOR-B — the Requirement 3 rewrite silently dropped a guarantee.** "The
+      package SHALL NOT install, replace or remove anything in that override path"
+      vanished, and `The_manifest_writes_no_files_into_the_site` was left implementing
+      no requirement. **I rewrote a requirement without running the guarantee diff
+      CLAUDE.md mandates** — the exact failure that rule exists for, inside the change
+      that was rewriting the requirement. Restated as its own requirement, "The package
+      installs nothing on paths the site owns", so a future rewrite cannot take it
+      along.
+- [x] 10.3 **MINOR-1 — the plan NAME is frozen too**, and it is the nastiest of the
+      three commitments: renaming makes every install look uninstalled and re-imports,
+      destroying site edits with one INFO line and no error, where the state id and
+      plan type at least fail loudly. Recorded in the proposal and as a DO NOT RENAME
+      note on the constructor.
+- [x] 10.4 **MINOR-2 — the production half of the override claim was inference.**
+      Softened in all three places to what was measured, with the reason it was not
+      measured stated (a published site needs a connection string from a user-secrets
+      file I chose not to read). The spec now carries a SHALL that the documentation
+      must not assert more than has been measured — a correction that repeats the habit
+      is not a correction.
+- [x] 10.5 **MINOR-3** `@inherits` is pinned to `typeof(UmbracoViewPage).FullName`, not
+      a shape. Mutation-checked: `@inherits System.Object` → red.
+- [x] 10.6 **MINOR-4 — the fence is now an ALLOWLIST, not a denylist.** QA got
+      `<DataTypes>`, `<DictionaryItems>` and `<Languages>` past the old one: they write
+      no files and are not content, so they missed both checks. A denylist fences only
+      what someone thought of. Mutation-checked: `<Languages>` → red.
+- [x] 10.7 **MINOR-5** the template guard took `FirstOrDefault`, so a *second* template
+      could carry branding. Now asserts exactly one and reads that one.
+      Mutation-checked: a second template with `<div class="branding"><h1>` → red, and
+      now from the right test.
+- [x] 10.8 **MINOR-6** the docs and the plan's own comment pointed different ways on
+      whether a step re-imports "the whole manifest". Reconciled: a step re-imports
+      whatever manifest it names, a narrower one is a real option, and the docs
+      deliberately state the conservative worst case because promising narrower commits
+      every future maintainer.
+- [x] 10.9 Nits: the precompilation causal chain corrected (it is a csproj setting, not
+      runtime mode itself); the empty `Views/Shared` directory removed.
+- [ ] 10.10 Carry forward, NOT fixed: Requirement 1's headline scenario and Requirement
+      3's "the documented route works" are both verified live but have **no regression
+      guard**. A change to the shipped doctype's `AllowedTemplates` could break the
+      documented route with a green suite. Needs a host-level test to close properly —
+      the same question ⑪ answered for rendering, asked now of installation.
+- [ ] 10.11 Re-review (round 3) by the same QA subagent.

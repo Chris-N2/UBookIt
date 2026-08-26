@@ -28,11 +28,12 @@ chrome — that is Umbraco's normal behaviour, not a uBookIt setting.
 Installing writes `Views/uBookItBookingPage.cshtml` into your project **at runtime**.
 On a development machine it is compiled on the fly and works immediately.
 
-A site running in Umbraco's `Production` runtime mode precompiles its views when you
-publish, and does **not** compile `.cshtml` files that appear afterwards. So install
-locally first, **commit `Views/uBookItBookingPage.cshtml` to source control**, and
-deploy it with the rest of your views. A booking page that renders locally and 500s on
-your production server is almost always this.
+Most production deployments precompile their views when publishing (`RazorCompileOnBuild`
+or `RazorCompileOnPublish`), and a site running in Umbraco's `Production` runtime mode
+does not have the development-mode compiler that would pick up a `.cshtml` appearing
+later. So install locally first, **commit `Views/uBookItBookingPage.cshtml` to source
+control**, and deploy it with the rest of your views. A booking page that renders
+locally and 500s on your production server is almost always this.
 
 ## What an upgrade does, and what it never touches
 
@@ -83,12 +84,28 @@ Recovering means clearing uBookIt's migration record in the database
 again. If you do not want the Booking Page, delete the *page* and leave the type alone
 — an unused document type costs nothing.
 
-**If you would rather uBookIt never wrote schema again**, Umbraco has a switch for
-that. It is global, not per-package, so it stops *every* package migration:
+### Do not install uBookIt with `RunSchemaAndContentMigrations` turned off
+
+Umbraco has a global switch that stops package migrations importing schema:
 
 ```json
 { "Umbraco": { "CMS": { "PackageMigration": { "RunSchemaAndContentMigrations": false } } } }
 ```
+
+**If that is set when uBookIt first starts, uBookIt is permanently broken on that
+site.** Umbraco skips the import but still records the migration as done, and because
+uBookIt's migration runs once, it never runs again. You get no Booking Page type, no
+template, and **no error** — just one INFO line in the log of a boot that may have been
+months ago. Turning the setting back on does not help.
+
+If that has already happened, recover the same way as for a deleted document type:
+delete the `Umbraco.Core.Upgrader.State+uBookIt` row from `umbracoKeyValue` and restart.
+
+If your organisation sets this flag as policy, turn it off for the boot that installs
+uBookIt, then put it back.
+
+(The setting is global rather than per-package, so it is a blunt instrument for
+freezing schema in any case.)
 
 ### Changing how the booking page looks
 
@@ -118,8 +135,12 @@ overwritten — including by a release carrying a migration step.
 
 **The markup *inside* the booking flow is not customisable.** Placing your own file at
 the same path as one of uBookIt's views does **not** work: those views are compiled
-into `UBookIt.Web.dll` without source checksums, so ASP.NET Core uses the compiled
-copy and never consults your file. This is true in development and in production.
+into `UBookIt.Web.dll` without source checksums, so ASP.NET Core uses the compiled copy
+and never consults your file.
+
+Verified on a development site. We expect the same on a production site — nothing there
+makes the compiled view *less* preferred — but treat the flow's markup as fixed either
+way.
 
 We would like to fix this properly, with a theme mechanism that looks in a path the
 package deliberately does not compile into itself. It is not built yet. Until it is,

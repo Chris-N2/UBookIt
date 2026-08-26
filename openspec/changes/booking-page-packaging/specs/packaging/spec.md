@@ -63,10 +63,16 @@ safe; and how a site changes the page's appearance.
 
 **The package SHALL NOT claim a customisation route it does not have.** Overriding the
 package's compiled views does not work — they carry no source checksums, so ASP.NET Core
-uses the compiled copy and never consults a site's file, in development and in
-production alike. Documenting that route would send a site author to a path where their
-work has no effect and no error explains why. What the documentation offers SHALL be
-something a site can actually do.
+uses the compiled copy and never consults a site's file. Documenting that route would
+send a site author to a path where their work has no effect and no error explains why.
+What the documentation offers SHALL be something a site can actually do.
+
+**The documentation SHALL NOT assert more than has been measured.** The override failure
+is measured on a development site and expected to hold at least as strongly without
+runtime compilation, where precompiled views are all there is — but expectation and
+measurement SHALL be distinguishable to a reader. This clause exists because the
+requirement it replaces asserted a mechanism nobody had run, and a correction that
+repeats the habit is not a correction.
 
 #### Scenario: A site author can find out whether their change survives
 - **WHEN** a site author asks whether an edit of theirs will survive a uBookIt release
@@ -79,6 +85,32 @@ something a site can actually do.
 #### Scenario: An unavailable route is stated as unavailable
 - **WHEN** a site author wants to restyle the markup inside the booking flow
 - **THEN** the documentation says plainly that this is not yet supported, rather than offering a route that silently does nothing
+
+### Requirement: The package installs nothing on paths the site owns
+The package SHALL install exactly what it needs to put a booking page on a site — a
+document type and one template — and SHALL NOT write files, schema or configuration a
+site did not ask for. In particular it SHALL NOT install partial views, stylesheets,
+scripts, arbitrary files, data types, dictionary items or languages.
+
+**This guarantee was carried by the requirement that described customisation-by-override,
+and was dropped when that requirement was rewritten after the override mechanism proved
+not to exist.** It survives its original home because it never depended on it: whether or
+not a site can override the package's views, the package has no business writing into
+paths the site owns. Restated as its own requirement so that the next rewrite cannot take
+it with it.
+
+The check SHALL be an **allowlist** of the manifest sections the package declares, not a
+list of forbidden ones. A denylist fences only what someone thought of: the first version
+named four file-writing sections and let `DataTypes`, `DictionaryItems` and `Languages`
+straight through, each of which installs schema or configuration into a consumer's site.
+
+#### Scenario: A manifest section the package has not justified fails
+- **WHEN** the package manifest declares any section beyond those the package needs
+- **THEN** the check fails, naming the section, whether or not it writes files
+
+#### Scenario: The fence cannot pass by fencing nothing
+- **WHEN** the manifest declares no sections at all
+- **THEN** the check fails rather than being trivially satisfied
 
 ### Requirement: Installation adds schema and never creates content
 The package SHALL install a document *type* and SHALL NOT create documents. Which pages

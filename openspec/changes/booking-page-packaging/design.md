@@ -16,19 +16,23 @@ Spiked 2026-08-25 against the pinned **Umbraco 17.6.2** (not the v18 source in `
 by installing schema through a package migration plan, editing it over the
 management API as an editor would, shipping a "v2", and restarting:
 
-| Editor's change | After upgrade |
+| Editor's change | When an import runs |
 |---|---|
 | Customised the template's Razor | **destroyed** — reset to the shipped text |
 | Changed the doctype's description | **overwritten** with ours |
 | Added their own property | survived |
 | — (we added a property in v2) | arrived on the existing install |
+| Deleted the document type | **never restored** (see Risks) |
+
+This is what an import *does*. **When** one runs is D1's subject, and the two were
+conflated in the first version of this design.
 
 Two details matter more than the table:
 
-1. **The template's XML was identical in v1 and v2 and was destroyed anyway.** The
-   manifest re-imports whole whenever its hash changes for any reason, so a release
-   touching only the document type still wipes template customisation. A test that
-   changed the template deliberately would have missed this.
+1. **The template's XML was identical in v1 and v2 and was destroyed anyway.** An import
+   replaces the whole manifest, not the parts that changed — so a release touching only
+   the document type still rewrites the template. A test that changed the template
+   deliberately would have missed this.
 2. **The Umbraco documentation says the opposite** — *"Existing schema or content will
    not be overwritten in this process."* True of content, false of schema. The v18
    source agrees with the measurement, so this is a documentation error rather than a
@@ -75,6 +79,30 @@ the database**, and the manifest's changed description never reached the site.
 The cost is real and is the right one: shipping new schema now needs an explicit new
 step, and adding one re-imports the whole manifest. Overwriting becomes a decision
 someone makes rather than a side effect of editing a file.
+
+**The cost this decision does carry, found by QA and measured.** Run-once removes
+self-healing. If `RunSchemaAndContentMigrations` is `false` at the boot that installs
+uBookIt, Umbraco skips the import — `ImportPackageBuilderExpression.cs:97` returns
+early — but the migration still **completes**, so the executor records the final state.
+Under run-once that state is terminal: turning the setting back on changes nothing, and
+the site has uBookIt installed with no schema, no error, and one INFO line in an old
+boot log.
+
+The automatic plan was self-healing here, because any manifest change produced a new
+hash and a fresh import. So this is a genuine trade rather than a free win: run-once
+converts a transient misconfiguration into a permanent one, in exchange for never
+destroying a site's edits.
+
+Taken anyway, and the reasoning is the asymmetry between the two failures. The
+misconfiguration is **rare, detectable and recoverable** — one row deleted and a
+restart, documented. The overwrite it replaces was **routine, silent and
+unrecoverable**: it destroyed work on every release touching schema, with no way to get
+it back. A rare recoverable failure beats a routine unrecoverable one.
+
+What follows for the documentation is not optional: `docs/booking-page.md` previously
+*recommended* that setting as a way to freeze schema. It now warns against having it set
+at install time and gives the recovery. Shipping the recommendation unqualified would
+have been this change actively steering sites into its own worst failure.
 
 **A trap for anyone revisiting this: the plan type cannot be changed after release.**
 Booting a custom plan against a site holding an automatic plan's hash state fails hard
@@ -123,9 +151,19 @@ returns `SupportsCompilation = false` and uses the precompiled view *as-is*, wit
 
 Confirmed as precedence rather than discovery: runtime compilation is live (editing the
 site's own template with the site running took effect with no rebuild) and the override
-still lost. And it is **worse in production** — that code path belongs to
-`Umbraco.Cms.DevelopmentMode.Backoffice`; without it the standard non-runtime compiler
-is used and precompiled views win outright. So overrides work in neither mode.
+still lost.
+
+**Measured on a development site only, and this is stated rather than glossed.** The
+code path above belongs to `Umbraco.Cms.DevelopmentMode.Backoffice`; a production site
+uses the standard non-runtime compiler, where precompiled views are all there is, so
+overrides should fail there too — but that is reasoning, not measurement. It was not
+measured because a published site needs a connection string that lives in a
+user-secrets file, and reading it to settle a point already settled in the direction
+that matters was not worth it: the mechanism only gets *more* absolute without runtime
+compilation.
+
+Recorded explicitly because this change has already shipped one confident, wrong claim
+about exactly this, and the correction must not quietly ship a second.
 
 **Why this is not simply a gap we failed to fill.** The Clean starter kit ships front-end
 files the same way — its manifest carries 14 templates, its partial views and 466KB of
