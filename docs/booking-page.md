@@ -138,9 +138,10 @@ the same path as one of uBookIt's views does **not** work: those views are compi
 into `UBookIt.Web.dll` without source checksums, so ASP.NET Core uses the compiled copy
 and never consults your file.
 
-Verified on a development site. We expect the same on a production site — nothing there
-makes the compiled view *less* preferred — but treat the flow's markup as fixed either
-way.
+Verified on a development site. We have not established what happens on a fully
+precompiled production site, where your override would also be compiled and the outcome
+depends on assembly load order — so treat the flow's markup as fixed either way, and
+do not build anything on an override taking effect.
 
 We would like to fix this properly, with a theme mechanism that looks in a path the
 package deliberately does not compile into itself. It is not built yet. Until it is,

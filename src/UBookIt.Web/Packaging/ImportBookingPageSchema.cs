@@ -62,7 +62,7 @@ public sealed class ImportBookingPageSchema : AsyncPackageMigrationBase
                 + "document type and template will never be created, and re-enabling "
                 + "the setting will not install them. To recover, delete the "
                 + "'Umbraco.Core.Upgrader.State+uBookIt' row from umbracoKeyValue and "
-                + "restart with the setting enabled. See docs/booking-page.md.");
+                + "restart with the setting enabled.");
         }
 
         ImportPackage.FromEmbeddedResource(GetType()).Do();

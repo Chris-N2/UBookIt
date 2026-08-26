@@ -251,7 +251,11 @@
       was not true. `ImportBookingPageSchema` now warns, naming the package, the
       permanence and the recovery. Reachability established from source
       (`ImportPackageBuilderExpression.cs:97` skips *inside* `Do()`, after the migration
-      body starts); the line has not been observed in a live boot.
+      body starts) and **observed live by QA in round 4**: on a virgin database with the
+      flag set the warning appears immediately after `Execute ImportBookingPageSchema`
+      and immediately before Umbraco's own skip line. Negative controls also run — it
+      does not fire with the setting at default, nor on a site where the migration is
+      already recorded.
 - [x] 11.7 **Nit — the dropped guarantee's "or remove" half** was not carried into the
       restatement. Restored, with a note that dropping half a clause because it is
       currently unreachable is how the whole clause went missing.
@@ -262,4 +266,34 @@
       headline scenario or Requirement 3's documented route (10.10), and the deleted-
       *property* case remains unmeasured. **QA's caveat, accepted: 10.10 must reach
       `ubookit-deferred-obligations` at sync or it vanishes when this change archives.**
-- [ ] 11.10 Re-review (round 4).
+- [x] 11.10 Re-review: **APPROVE**, 1 MINOR + 2 NITs. Round 4 below.
+
+## 12. QA round 4 — APPROVED
+
+- [x] 12.1 **MINOR — the production sweep reached `design.md`, `proposal.md` and
+      `spec.md`, and stopped short of `docs/booking-page.md`**, which still carried the
+      justification the same commit repudiated ("nothing there makes the compiled view
+      less preferred"). Corrected. **This was the third consecutive sweep to leave one
+      artifact behind, and the pattern has a shape: the OpenSpec artifacts get swept and
+      `docs/` — the only one a consumer reads — gets swept last or not at all.** Sweep
+      `docs/` first.
+- [x] 12.2 **NIT — the startup warning cited `docs/booking-page.md`**, a path a site that
+      installed the NuGet package does not have. Dropped; the rest of the message is
+      self-contained and actionable.
+- [x] 12.3 **NIT recorded, no action — two displacement routes are unguardable by any
+      resource-name assertion**: `FromXmlDataManifest(XDocument)` and
+      `FromEmbeddedResource<TPackageMigration>()`. A future step could import an
+      arbitrary document, or a second migration class in another namespace with its own
+      manifest, and every check here would keep fencing `package.xml`. No test over
+      embedded resources can see either. `spec.md` already requires the check be made
+      against "the manifest that actually installs", which is the right level to catch
+      this at review; recorded so the next person knows the fence's edge.
+- [x] 12.4 QA confirmed the `.package.zip` fence is complete for the embedded-resource
+      mechanism, and slightly conservative in the right direction: the lookup builds
+      exactly one case-sensitive name from the plan's namespace, and the assertion
+      matches case-insensitively on any `.package.zip`, in the same assembly the lookup
+      uses. Casing, a differently-named zip, another assembly and `LogicalName` renaming
+      are all covered or inert.
+
+**Verdict: APPROVE.** Remaining: nothing. The change is ready to sync, archive and
+merge — held for Chris, who asks to be present.
