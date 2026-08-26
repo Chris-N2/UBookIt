@@ -1,0 +1,115 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  What uBookIt installs into a site.
+
+  READ THIS BEFORE ADDING ANYTHING HERE.
+
+  This manifest is imported ONCE, by a run-once migration plan. Changing this file
+  does not re-import it on an existing site — only adding a new step to
+  BookingPagePackageMigrationPlan does. Editing here therefore reaches new installs
+  and nothing else.
+
+  When an import DOES run, it OVERWRITES what it finds:
+
+    * a template's contents are replaced wholesale, even when the template's own
+      XML has not changed;
+    * a document type's Name, Icon, Description and AllowAtRoot are reset to the
+      values here.
+
+  It never removes anything, so an editor's own properties survive and properties
+  added in a later release do reach existing installs.
+
+  Measured against Umbraco 17.6.2 on 2026-08-25. The Umbraco documentation says
+  existing schema is not overwritten; that is true of content and false of schema.
+
+  Consequence: adding a migration step is a decision to overwrite every site's copy
+  of everything declared here. Keep what is declared small enough that this stays
+  acceptable — which today means one delegating template and one document type.
+-->
+<umbPackage>
+  <info>
+    <package>
+      <name>uBookIt</name>
+    </package>
+  </info>
+
+  <!--
+    Deliberately no <Documents> element. The package installs a document TYPE and
+    never a document: which pages exist, where they sit and what they are called
+    are the editor's decisions. Installing a page would put a URL on a site nobody
+    asked for, and a later import would then have opinions about it.
+  -->
+
+  <Templates>
+    <Template>
+      <Name>Booking Page</Name>
+      <Alias>uBookItBookingPage</Alias>
+      <Key>b7b1f1a6-8f0e-4d2a-9c3e-6a1d5e0f7a01</Key>
+      <!--
+        A delegate, and nothing else. Two lines: the base-class directive Umbraco
+        templates require, and the component invocation.
+
+        No Layout is set on purpose, so the site's own _ViewStart applies and the
+        booking page wears the site's chrome. Setting one here would impose our
+        idea of a layout on every consumer.
+
+        After install this file is the SITE'S, and editing it is safe: the plan is
+        run-once, so no ordinary release re-imports it. Only adding a migration step
+        overwrites it, and that is a decision someone makes deliberately.
+
+        It stays a delegate anyway. A site that wants different markup should add
+        its own template and make that the document type's default — the package
+        never touches a template it did not declare. Overriding the package's VIEWS
+        does not work: they are compiled into UBookIt.Web.dll with no source
+        checksums, so a same-path file in the site is never consulted. See
+        docs/booking-page.md.
+      -->
+      <Design><![CDATA[@inherits Umbraco.Cms.Web.Common.Views.UmbracoViewPage
+@await Component.InvokeAsync("BookingFlow")]]></Design>
+    </Template>
+  </Templates>
+
+  <DocumentTypes>
+    <DocumentType>
+      <Info>
+        <Name>Booking Page</Name>
+        <Alias>uBookItBookingPage</Alias>
+        <Key>b7b1f1a6-8f0e-4d2a-9c3e-6a1d5e0f7a02</Key>
+        <Icon>icon-calendar-alt</Icon>
+        <Thumbnail>folder.png</Thumbnail>
+        <Description>Renders the uBookIt booking flow. Shows the catalogue of bookable things, or a single service or resource when the URL names one.</Description>
+        <!--
+          Allowed at root so a fresh install can create the page immediately. With
+          this false the type is creatable nowhere until a site author wires
+          allowed-children, and the package reads as broken on first use. It does
+          not prevent composition: a site remains free to allow it under its own
+          page types.
+
+          Changing this later is upgrade-visible — the import resets it.
+        -->
+        <AllowAtRoot>True</AllowAtRoot>
+        <IsListView>False</IsListView>
+        <IsElement>False</IsElement>
+        <Variations>Nothing</Variations>
+        <Compositions />
+        <AllowedTemplates>
+          <Template>uBookItBookingPage</Template>
+        </AllowedTemplates>
+        <DefaultTemplate>uBookItBookingPage</DefaultTemplate>
+      </Info>
+      <Structure />
+      <!--
+        No properties in v1. The page needs no configuration: the flow reads its
+        state from the URL, and with nothing named it renders the catalogue.
+
+        Deferring is safe rather than merely tolerable, and this is the measured
+        part: a property added in a later release DOES reach sites that installed
+        this version, and nothing is ever removed. So configuration can be added
+        additively when there is a demonstrated need for it, instead of being
+        designed inside a packaging change.
+      -->
+      <GenericProperties />
+      <Tabs />
+    </DocumentType>
+  </DocumentTypes>
+</umbPackage>
