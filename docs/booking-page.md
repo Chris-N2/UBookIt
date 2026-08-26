@@ -96,12 +96,23 @@ that. It is global, not per-package, so it stops *every* package migration:
 touches templates it declares, so a template you create is never overwritten — this is
 the supported way to change the page, and it survives everything.
 
-Your template can render the booking flow wherever you want it:
+Your template can put the booking flow wherever you want it, inside whatever markup
+you like:
 
 ```cshtml
 @inherits Umbraco.Cms.Web.Common.Views.UmbracoViewPage
-@await Component.InvokeAsync("BookingFlow")
+<div class="my-site-chrome">
+    <h1>Book with My Site</h1>
+    @await Component.InvokeAsync("BookingFlow")
+</div>
 ```
+
+Worth supplying an `<h1>` as above: uBookIt's flow starts at `<h2>`, on the assumption
+that the page around it provides the heading.
+
+To use it: create the template, allow it on the **Booking Page** document type, and
+select it on your page. uBookIt only touches templates it declares, so yours is never
+overwritten — including by a release carrying a migration step.
 
 ### What you cannot change yet
 

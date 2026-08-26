@@ -150,7 +150,12 @@
       is an upstream nit fixed in v18 and deliberately not silenced (adding a `Layout`
       would impose ours on every consumer); the overwrite log line and
       `RunSchemaAndContentMigrations` are now both documented.
-- [ ] 9.12 Verify live that the documented template-swap route actually works — the new
-      Requirement 3 scenario says "the documented customisation route works", and that
-      must not be another unmeasured claim.
+- [x] 9.12 **Verified live that the documented template-swap route works**, because the
+      new Requirement 3 scenario asserts it and this change has already shipped one
+      unmeasured customisation claim. Created a site-owned template, allowed it on the
+      shipped document type, pointed the page at it, republished: `/book` rendered the
+      site's chrome (`<div class="my-site-chrome">`, `<h1>Book with My Site</h1>`)
+      wrapping uBookIt's flow. Reverted afterwards; Umbraco removed the template file
+      with the template. Also answers NIT-3 — the flow starts at `<h2>` and the site's
+      template supplies the `<h1>`, which the docs example now shows.
 - [ ] 9.13 Re-review by the same QA subagent, with its round-1 context.
