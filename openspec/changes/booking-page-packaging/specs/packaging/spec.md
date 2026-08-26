@@ -25,16 +25,21 @@ Anything the package installs and re-imports SHALL carry nothing a site is expec
 customise. The shipped template SHALL delegate rendering and SHALL NOT carry markup,
 styling or content of its own.
 
-This is a hard constraint derived from measured behaviour, not a preference. A package
-migration re-imports its entire manifest whenever that manifest changes for any reason,
-and the re-import **overwrites** a template's contents and a document type's name, icon,
-description and allow-at-root. A site that customised the shipped template loses that
-work on the next release that touches schema — including a release that does not touch
-the template at all.
+This is derived from measured behaviour, not preference. An import **overwrites** a
+template's contents and a document type's name, icon, description and allow-at-root.
+The import is run-once, so an ordinary release does not trigger it — but a release
+carrying a migration step re-imports the **whole** manifest, including parts that
+release did not change.
 
-A template that is a delegate makes this harmless: there is nothing in it to lose. A
-template carrying real markup would make every future schema release destructive, and
-silently, at startup.
+So the exposure is not "every release" but "every release we choose to make
+destructive", and the shipped template is the only thing in the manifest a site would
+plausibly have edited. Keeping it a delegate keeps the cost of that decision near
+zero: there is nothing in it to lose. A template carrying real markup would make each
+future schema release a choice between shipping the schema and destroying sites' work.
+
+It also keeps the choice honest. If the shipped template held something valuable, the
+pressure would be to avoid adding migration steps at all — which would mean never
+shipping schema changes existing sites need.
 
 #### Scenario: The shipped template carries no markup of its own
 - **WHEN** the shipped template's contents are inspected
@@ -44,23 +49,36 @@ silently, at startup.
 - **WHEN** a release changes the shipped schema and the import replaces the template
 - **THEN** nothing a site depends on is lost, because the template held nothing but the delegation
 
-### Requirement: Customisation is by override, and the package never overwrites an override
-A site SHALL change the booking flow's appearance by **overriding the package's views**,
-and the package SHALL NOT install, replace or remove anything in that override path.
-The supported customisation surface is therefore untouched by any upgrade, by
-construction rather than by care.
+### Requirement: What the package owns and what the site owns is documented
+A site author SHALL be able to find out, from the package's own documentation, which
+of their changes survive a uBookIt release and which do not. Ownership SHALL be stated
+rather than left to be inferred from behaviour, because the cost of inferring it wrongly
+is discovering that work has been destroyed.
 
-The distinction that matters to a site author is ownership, and it SHALL be documented
-rather than inferred: what the package owns and will replace on upgrade, and what the
-site owns and the package will never write to.
+The documentation SHALL state at least: that the schema is imported once and an ordinary
+release does not re-import it; that a release carrying a migration step does re-import,
+replacing the template's contents and the document type's name, icon, description and
+allow-at-root; that nothing is ever removed, so an editor's own properties and pages are
+safe; and how a site changes the page's appearance.
 
-#### Scenario: An overriding view survives an upgrade
-- **WHEN** a site overrides one of the package's views and a later release changes the shipped schema
-- **THEN** the site's overriding view is unchanged, because the package installs nothing on that path
+**The package SHALL NOT claim a customisation route it does not have.** Overriding the
+package's compiled views does not work — they carry no source checksums, so ASP.NET Core
+uses the compiled copy and never consults a site's file, in development and in
+production alike. Documenting that route would send a site author to a path where their
+work has no effect and no error explains why. What the documentation offers SHALL be
+something a site can actually do.
 
-#### Scenario: What an upgrade replaces is documented
-- **WHEN** a site author needs to know whether a change of theirs will survive an upgrade
-- **THEN** the answer is stated in the package's own documentation, including that renaming the shipped document type or changing its icon or description is reverted
+#### Scenario: A site author can find out whether their change survives
+- **WHEN** a site author asks whether an edit of theirs will survive a uBookIt release
+- **THEN** the package's documentation answers it, distinguishing an ordinary release from one carrying a migration step
+
+#### Scenario: The documented customisation route works
+- **WHEN** the documentation names a way to change how the booking page looks
+- **THEN** following it changes what the site renders
+
+#### Scenario: An unavailable route is stated as unavailable
+- **WHEN** a site author wants to restyle the markup inside the booking flow
+- **THEN** the documentation says plainly that this is not yet supported, rather than offering a route that silently does nothing
 
 ### Requirement: Installation adds schema and never creates content
 The package SHALL install a document *type* and SHALL NOT create documents. Which pages

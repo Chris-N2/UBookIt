@@ -2,9 +2,14 @@
 <!--
   What uBookIt installs into a site.
 
-  READ THIS BEFORE ADDING ANYTHING HERE. Umbraco re-imports this entire manifest
-  whenever the file changes for ANY reason — the migration plan's state is a hash
-  of it — and the import OVERWRITES what it finds:
+  READ THIS BEFORE ADDING ANYTHING HERE.
+
+  This manifest is imported ONCE, by a run-once migration plan. Changing this file
+  does not re-import it on an existing site — only adding a new step to
+  BookingPagePackageMigrationPlan does. Editing here therefore reaches new installs
+  and nothing else.
+
+  When an import DOES run, it OVERWRITES what it finds:
 
     * a template's contents are replaced wholesale, even when the template's own
       XML has not changed;
@@ -17,8 +22,9 @@
   Measured against Umbraco 17.6.2 on 2026-08-25. The Umbraco documentation says
   existing schema is not overwritten; that is true of content and false of schema.
 
-  Consequence: nothing here may carry anything a site would mind losing. The
-  template below is a delegate for that reason and must stay one.
+  Consequence: adding a migration step is a decision to overwrite every site's copy
+  of everything declared here. Keep what is declared small enough that this stays
+  acceptable — which today means one delegating template and one document type.
 -->
 <umbPackage>
   <info>
@@ -47,9 +53,16 @@
         booking page wears the site's chrome. Setting one here would impose our
         idea of a layout on every consumer.
 
-        To change what this renders, do NOT edit this template — the next release
-        will overwrite it. Override the package's views instead, by placing your
-        own file at the same path under Views/Shared/UBookIt/.
+        After install this file is the SITE'S, and editing it is safe: the plan is
+        run-once, so no ordinary release re-imports it. Only adding a migration step
+        overwrites it, and that is a decision someone makes deliberately.
+
+        It stays a delegate anyway. A site that wants different markup should add
+        its own template and make that the document type's default — the package
+        never touches a template it did not declare. Overriding the package's VIEWS
+        does not work: they are compiled into UBookIt.Web.dll with no source
+        checksums, so a same-path file in the site is never consulted. See
+        docs/booking-page.md.
       -->
       <Design><![CDATA[@inherits Umbraco.Cms.Web.Common.Views.UmbracoViewPage
 @await Component.InvokeAsync("BookingFlow")]]></Design>

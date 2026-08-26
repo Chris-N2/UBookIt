@@ -23,64 +23,96 @@ The page uses **your site's layout**, via your `_ViewStart.cshtml`. uBookIt does
 set one. If your site has no `_ViewStart.cshtml`, the page renders without your site
 chrome — that is Umbraco's normal behaviour, not a uBookIt setting.
 
-## What an upgrade replaces, and what it never touches
+### Commit the template before you deploy
 
-This is the part worth reading before you customise anything, because it is not what
-you might expect and it is **not** what the Umbraco documentation says.
+Installing writes `Views/uBookItBookingPage.cshtml` into your project **at runtime**.
+On a development machine it is compiled on the fly and works immediately.
 
-Upgrading uBookIt re-imports everything the package installs. That import **overwrites
-some things and never removes anything**.
+A site running in Umbraco's `Production` runtime mode precompiles its views when you
+publish, and does **not** compile `.cshtml` files that appear afterwards. So install
+locally first, **commit `Views/uBookItBookingPage.cshtml` to source control**, and
+deploy it with the rest of your views. A booking page that renders locally and 500s on
+your production server is almost always this.
 
-### uBookIt owns these — an upgrade will replace them
+## What an upgrade does, and what it never touches
 
-| | |
-|---|---|
-| **The Booking Page template's contents** | Replaced with the shipped version |
-| The document type's **name**, **icon**, **description** | Reset to the shipped values |
-| Whether the type is **allowed at root** | Reset to the shipped value |
+uBookIt's schema is imported **once**, when you install it. An ordinary upgrade does
+**not** re-import it, so your site's copy is left alone.
 
-**Do not edit the Booking Page template.** Your changes will be replaced, silently, the
-next time you upgrade. This is why that template contains nothing but a single line
-handing rendering to uBookIt — there is deliberately nothing in it worth keeping.
-
-Installing uBookIt writes that template into your project as a real file:
+Installing writes the template into your project as a real file:
 
 ```
 Views/uBookItBookingPage.cshtml
 ```
 
-It will appear in your source tree, and it will look like an ordinary template you can
-edit. It is not. Treat it the way you would a generated file: leave it alone, and put
-your changes in a view override instead (below).
+It is an ordinary template and **it is yours**. You may edit it.
 
-The case that surprises people: **an upgrade replaces the template even when the
-template itself has not changed between the two versions.** The package re-imports its
-whole manifest whenever any part of it changes, so a release that only adds a document
-type property still rewrites the template.
+### The one case where uBookIt replaces things
 
-Renaming the Booking Page document type, or changing its icon or description, is
-reverted the same way. If you want a different name in your content tree, rename the
-*page*, not the type.
-
-### You own these — an upgrade never touches them
+A uBookIt release that ships a *new migration step* — which we do only for a schema
+change that existing sites need — re-imports the whole manifest. When that happens it
+**overwrites** and never removes:
 
 | | |
 |---|---|
-| **Your view overrides** | uBookIt installs nothing on that path |
-| **Properties you add** to the Booking Page type | Nothing is ever removed |
-| **Your pages** and their content | uBookIt installs a document *type*, never a document |
-| Which of your page types allow a Booking Page as a child | Yours entirely |
+| **The Booking Page template's contents** | Replaced with the shipped version |
+| The document type's **name**, **icon**, **description**, **allowed at root** | Reset to the shipped values |
+| **Properties you added** to the type | Untouched — nothing is ever removed |
+| **Your pages** and their content | Untouched — uBookIt installs a document *type*, never a document |
 
-### Changing how the booking flow looks
+Umbraco announces it in the log when it happens:
 
-Override uBookIt's views. Place your own file at the same path under
-`Views/Shared/UBookIt/` and yours wins — this is ordinary ASP.NET Core view
-resolution.
+```
+Package migration executed. Summary: Conflicting templates found,
+they will be overwritten: uBookItBookingPage
+```
 
-That path is the **supported** way to customise, and it is safe by construction rather
-than by care: uBookIt installs nothing there, so there is nothing for an upgrade to
-overwrite. Editing the shipped template is the unsupported way, and it is the one that
-loses your work.
+Release notes will say when a release contains a migration step. If you have made
+substantial changes to the template, keep them in source control — as you would
+anyway — so you can reapply them.
+
+### Deleting the Booking Page document type is not reversible
+
+If you delete the document type, **uBookIt will not put it back.** The import runs once
+and is recorded as done; deleting the type does not change that record, so no later
+release restores it. You are left with a template pointing at a type that no longer
+exists.
+
+Recovering means clearing uBookIt's migration record in the database
+(`umbracoKeyValue`, key `Umbraco.Core.Upgrader.State+uBookIt`) so the install runs
+again. If you do not want the Booking Page, delete the *page* and leave the type alone
+— an unused document type costs nothing.
+
+**If you would rather uBookIt never wrote schema again**, Umbraco has a switch for
+that. It is global, not per-package, so it stops *every* package migration:
+
+```json
+{ "Umbraco": { "CMS": { "PackageMigration": { "RunSchemaAndContentMigrations": false } } } }
+```
+
+### Changing how the booking page looks
+
+**Add your own template** and make it the document type's default. uBookIt only ever
+touches templates it declares, so a template you create is never overwritten — this is
+the supported way to change the page, and it survives everything.
+
+Your template can render the booking flow wherever you want it:
+
+```cshtml
+@inherits Umbraco.Cms.Web.Common.Views.UmbracoViewPage
+@await Component.InvokeAsync("BookingFlow")
+```
+
+### What you cannot change yet
+
+**The markup *inside* the booking flow is not customisable.** Placing your own file at
+the same path as one of uBookIt's views does **not** work: those views are compiled
+into `UBookIt.Web.dll` without source checksums, so ASP.NET Core uses the compiled
+copy and never consults your file. This is true in development and in production.
+
+We would like to fix this properly, with a theme mechanism that looks in a path the
+package deliberately does not compile into itself. It is not built yet. Until it is,
+your options are the template above, and CSS.
 
 ## A note on the Umbraco documentation
 

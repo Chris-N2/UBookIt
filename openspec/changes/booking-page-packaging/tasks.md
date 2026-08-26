@@ -9,8 +9,10 @@
 
 ## 2. Ship the schema
 
-- [x] 2.1 Add an `AutomaticPackageMigrationPlan` and an embedded `package.xml` to
-      `UBookIt.Web`, with the manifest in the plan type's namespace.
+- [x] 2.1 Add a package migration plan and an embedded `package.xml` to `UBookIt.Web`,
+      with the manifest in the importing migration's namespace. **Revised at QA:** a
+      run-once custom `PackageMigrationPlan`, not `AutomaticPackageMigrationPlan` —
+      see design D1.
 - [x] 2.2 Define the Booking Page document type. Settle design.md's two open questions
       first and record the answers: allow-at-root vs composition, and whether the type
       needs any properties at all.
@@ -19,10 +21,11 @@
 
 ## 3. Prove the coupling, because its failure is silent
 
-- [x] 3.1 Assert the embedded resource exists and its name matches the plan type's
-      namespace. Mutation-check it: rename the namespace (or drop the
-      `<EmbeddedResource>` entry) and confirm the test fails. A wrong coupling produces
-      **no error at runtime** — the site simply comes up without the schema (design D5).
+- [x] 3.1 Assert the embedded resource exists and its name matches the importing
+      migration's namespace. Mutation-check it: rename the namespace (or drop the
+      `<EmbeddedResource>` entry) and confirm the test fails. **Corrected at QA:** a
+      wrong coupling does NOT fail silently — it throws during boot and 500s every
+      request. The test stays because it names the cause in a second (design D5).
 - [x] 3.2 Assert the shipped template carries no markup of its own, so D2's constraint
       cannot erode into "just a wrapper div". Mutation-check by adding one.
 - [x] 3.3 Assert the manifest declares no content (`<Documents>`), so "installs no
@@ -47,12 +50,14 @@
 ## 5. Document what an upgrade owns
 
 - [x] 5.1 Write the ownership documentation the spec requires: what the package
-      replaces on upgrade (template contents; the type's name, icon, description,
-      allow-at-root) and what it never touches (view overrides, editor-added
-      properties, the content tree).
-- [x] 5.2 State the counter-intuitive case explicitly, because an editor cannot
-      discover it safely: a release that does **not** change the template still
-      replaces it, since the whole manifest re-imports on any change.
+      replaces when an import runs (template contents; the type's name, icon,
+      description, allow-at-root) and what it never touches (editor-added properties,
+      the content tree, templates the site created). **Corrected at QA:** view
+      overrides are NOT in the never-touched list, because they do not work at all.
+- [x] 5.2 State the counter-intuitive cases explicitly, because a site author cannot
+      discover them safely: a release carrying a migration step re-imports the **whole**
+      manifest, so it replaces the template even though that release did not change it;
+      and a deleted document type is **never** restored.
 - [x] 5.3 Say plainly that the Umbraco documentation's "existing schema will not be
       overwritten" does not hold for schema, so a reader who checks the upstream docs
       is not left thinking ours is wrong.
@@ -103,3 +108,49 @@
 - [x] 8.5 Confirm the TestSite is stopped, the tree is clean, and no spike artefact
       survived.
 - [ ] 8.6 QA review in a **fresh context or subagent** — never the context that applied.
+
+## 9. QA round 1 — findings and dispositions
+
+- [x] 9.1 **MAJOR-1 view overrides do not work — DEFERRED by Chris's decision.**
+      Reproduced independently and the cause established: the package's views are
+      compiled into `UBookIt.Web.dll` with **no `RazorSourceChecksum`** entries, so
+      `CollectibleRuntimeViewCompiler.cs:209-218` marks them non-recompilable and uses
+      the compiled copy *as-is* — a site's same-path file is never consulted. Confirmed
+      as precedence not discovery (runtime compilation is live; editing the site's own
+      template took effect with no rebuild). Worse in production, where the standard
+      compiler is used. **Requirement 3 rewritten** from "customisation is by override"
+      to "what the package owns is documented, and the package must not claim a route it
+      does not have". Theming is the next change; design D3 records what it needs.
+- [x] 9.2 **MAJOR-2 a deleted document type is never restored.** Corrected from
+      inference to measurement in design.md Risks, and documented for site authors
+      including the recovery step. Note D1's run-once plan makes this *worse*.
+- [x] 9.3 **MAJOR-3 the "silent failure" premise was false** in four places including two
+      shipped source comments — removing the resource throws `BootFailedException` and
+      500s. Corrected in `design.md` D5, `UBookIt.Web.csproj`, `PackagingTests`, and the
+      test now states why it still earns its place. D1's inverted `IgnoreCurrentState`
+      rationale corrected in the artifact, not just the commit message.
+- [x] 9.4 **MAJOR-4** `The_component_the_template_delegates_to_exists` ties the
+      manifest's component name to a real `ViewComponent` by reflection. Mutation-checked
+      with QA's exact case: `"BookinFlow"` now fails, naming the available components.
+- [x] 9.5 **MAJOR-5** the template guard now anchors both lines with regex rather than
+      counting lines and banning `<`. Mutation-checked with QA's exact case — text, an
+      entity and branding on line 2 now fails.
+- [x] 9.6 **MAJOR-6** `The_manifest_writes_no_files_into_the_site` covers
+      `<PartialViews>`, `<Stylesheets>`, `<Scripts>` and `<Files>`; the content check
+      also covers `<Media>`. Mutation-checked by adding a `<PartialViews>` entry.
+- [x] 9.7 **MINOR-1** the docs' override section is gone with Requirement 3; replaced by
+      the template-swap route, which works.
+- [x] 9.8 **MINOR-2** docs now tell consumers to commit `Views/uBookItBookingPage.cshtml`
+      before deploying, because a Production-mode site precompiles views at publish. The
+      `.gitignore` entry says explicitly that ignoring it is specific to THIS repo.
+- [x] 9.9 **MINOR-3** proposal now states the public API surface grows by two types, and
+      that the plan's state ids and plan type cannot change after release.
+- [x] 9.10 **NIT-1** stale `umbracoKeyValue` rows cleared by Chris (2026-08-25 evening).
+- [x] 9.11 Two items from the first clean install: the `invalid Master 'null'` log line
+      is an upstream nit fixed in v18 and deliberately not silenced (adding a `Layout`
+      would impose ours on every consumer); the overwrite log line and
+      `RunSchemaAndContentMigrations` are now both documented.
+- [ ] 9.12 Verify live that the documented template-swap route actually works — the new
+      Requirement 3 scenario says "the documented customisation route works", and that
+      must not be another unmeasured claim.
+- [ ] 9.13 Re-review by the same QA subagent, with its round-1 context.

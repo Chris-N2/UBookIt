@@ -1,4 +1,7 @@
+using System.Reflection;
+using System.Text.RegularExpressions;
 using System.Xml.Linq;
+using Microsoft.AspNetCore.Mvc;
 using UBookIt.Tests.Support;
 using UBookIt.Web.Packaging;
 
@@ -7,11 +10,18 @@ namespace UBookIt.Tests;
 /// <summary>
 /// What the package installs into a site, and the constraints on it.
 /// <para>
-/// Every failure these guard against is <b>silent</b>. A manifest the plan cannot
-/// resolve produces no error — the site starts and simply has no schema. A template
-/// that grows markup produces no error either; the loss only appears on a consumer's
-/// site, at the next release, at startup. Neither is discoverable by running the
-/// package, so both are asserted here.
+/// These guard two different kinds of failure, and it is worth knowing which is
+/// which. A manifest the plan cannot resolve fails <b>loudly</b> — the resource
+/// lookup throws while the plan is built during boot, so the site does not start and
+/// every request 500s. That is guarded here anyway, because a red test names the
+/// cause immediately and a failed boot costs a deploy to diagnose.
+/// </para>
+/// <para>
+/// The constraints on what the manifest may <i>contain</i> are the silent ones. A
+/// template that grows markup, or a manifest that starts writing files into a site,
+/// raises nothing at all: the damage appears on a consumer's site, at some later
+/// release, and looks like their own mistake. Those cannot be found by running the
+/// package, so they are asserted here.
 /// </para>
 /// </summary>
 public class PackagingTests
@@ -23,14 +33,16 @@ public class PackagingTests
     [Fact]
     public void The_manifest_is_embedded_under_the_name_the_plan_resolves()
     {
-        // The coupling that fails silently.
+        // The migration resolves its manifest as an embedded resource named for its
+        // own namespace. Move the class, move the file, rename the namespace, or drop
+        // the <EmbeddedResource> entry, and the lookup throws during boot: the site
+        // will not start and every request 500s.
         //
-        // AutomaticPackageMigrationPlan resolves its manifest as an embedded resource
-        // named for the plan type's namespace. Move the class, move the file, rename
-        // the namespace, or drop the <EmbeddedResource> entry, and the plan finds
-        // nothing — no exception, no log line, no schema. This is the whole reason
-        // this test exists.
-        var planType = typeof(BookingPagePackageMigrationPlan);
+        // Measured, having first claimed the opposite: the failure is loud, named and
+        // unmissable. This test earns its place by naming the cause in a second
+        // rather than after a deploy — not by catching something that would otherwise
+        // pass unnoticed.
+        var planType = typeof(ImportBookingPageSchema);
         var expected = $"{planType.Namespace}.package.xml";
 
         var resources = planType.Assembly.GetManifestResourceNames();
@@ -69,18 +81,66 @@ public class PackagingTests
             .Where(line => line.Length > 0)
             .ToList();
 
-        // The base-class directive Umbraco templates require, and the delegation.
+        // Each line must BE what it is, not merely contain it.
+        //
+        // The earlier version checked the line count, that line 1 started with
+        // "@inherits", that line 2 contained "Component.InvokeAsync", and that there
+        // was no "<" anywhere. All four passed on:
+        //
+        //     @inherits Umbraco.Cms.Web.Common.Views.UmbracoViewPage
+        //     Book with us today &mdash; powered by uBookIt @await Component.InvokeAsync("BookingFlow")
+        //
+        // — text, an entity and branding, shipped in a template that a later release
+        // silently replaces. Anchored matching is what closes that.
         Assert.Equal(2, lines.Count);
-        Assert.StartsWith("@inherits ", lines[0], StringComparison.Ordinal);
-        Assert.Contains("Component.InvokeAsync", lines[1], StringComparison.Ordinal);
 
-        // No element markup at all — the check that actually bites, since a wrapper
-        // would pass a line count on its own.
-        Assert.DoesNotContain("<", design, StringComparison.Ordinal);
+        Assert.Matches(@"^@inherits\s+[\w.]+$", lines[0]);
+        Assert.Matches(@"^@await\s+Component\.InvokeAsync\(""\w+""\)$", lines[1]);
 
         // No layout imposed on the consumer: unset means the site's own _ViewStart
         // applies and the page wears the site's chrome.
         Assert.DoesNotContain("Layout", design, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public void The_component_the_template_delegates_to_exists()
+    {
+        // The manifest names a view component in a string. Nothing connected that
+        // string to a real type: renaming it to "BookinFlow" left the entire suite
+        // green while every shipped booking page on every consumer site would throw
+        // at render.
+        //
+        // This is spec Requirement 1's headline scenario — "a published page of the
+        // shipped type renders the flow" — which otherwise has no regression guard at
+        // all, only a one-off live check that leaves nothing behind.
+        var invoked = Regex
+            .Match(
+                Manifest().Descendants("Design").Single().Value,
+                @"Component\.InvokeAsync\(""(?<name>\w+)""\)")
+            .Groups["name"].Value;
+
+        Assert.NotEmpty(invoked);
+
+        // ASP.NET Core's convention: the component's name is its type name with any
+        // "ViewComponent" suffix removed, unless [ViewComponent(Name = …)] overrides
+        // it. Derived rather than hardcoded, so renaming the class is caught too.
+        var componentNames = typeof(BookingPagePackageMigrationPlan).Assembly
+            .GetTypes()
+            .Where(type => type is { IsAbstract: false, IsPublic: true }
+                && typeof(ViewComponent).IsAssignableFrom(type))
+            .Select(type => type.GetCustomAttribute<ViewComponentAttribute>()?.Name
+                ?? (type.Name.EndsWith("ViewComponent", StringComparison.Ordinal)
+                    ? type.Name[..^"ViewComponent".Length]
+                    : type.Name))
+            .ToList();
+
+        Assert.NotEmpty(componentNames);
+
+        Assert.True(
+            componentNames.Contains(invoked, StringComparer.Ordinal),
+            $"The shipped template invokes view component '{invoked}', which does not "
+            + $"exist in UBookIt.Web. Available: {string.Join(", ", componentNames)}. "
+            + "Every published booking page would throw at render.");
     }
 
     [Fact]
@@ -91,6 +151,29 @@ public class PackagingTests
         // absence is a decision and this is where the decision is enforced.
         Assert.Empty(Manifest().Descendants("Documents"));
         Assert.Empty(Manifest().Descendants("DocumentSet"));
+        Assert.Empty(Manifest().Descendants("Media"));
+        Assert.Empty(Manifest().Descendants("MediaItems"));
+    }
+
+    [Fact]
+    public void The_manifest_writes_no_files_into_the_site()
+    {
+        // `PackageDataInstallation` imports these sections by writing FILES into the
+        // consumer's site. The package installs exactly one file — the Booking Page
+        // template — and everything else it ships is compiled into the assembly.
+        //
+        // Checked because the alternative is discovering it on someone else's site.
+        // A manifest that gained a <PartialViews> or <Stylesheets> entry would start
+        // writing into paths the site owns, on every install, with nothing here
+        // objecting. The one section deliberately used, <Templates>, is asserted
+        // elsewhere to contain exactly one delegating template.
+        foreach (var section in new[] { "PartialViews", "Stylesheets", "Scripts", "Files" })
+        {
+            Assert.True(
+                Manifest().Descendants(section).All(element => !element.HasElements),
+                $"package.xml declares <{section}>, which writes files into the "
+                + "consumer's site. Only the Booking Page template may be installed.");
+        }
     }
 
     [Fact]

@@ -15,10 +15,14 @@
   </ItemGroup>
 
   <!--
-    The package manifest BookingPagePackageMigrationPlan installs from. It is
-    resolved by resource name, which is derived from this path — so the folder and
-    the plan's namespace must agree. A mismatch is silent: the plan finds nothing
-    and the site starts without uBookIt's schema. PackagingTests asserts it.
+    The package manifest ImportBookingPageSchema installs from. It is resolved by
+    resource name, derived from this path — so the folder and the migration's
+    namespace must agree.
+
+    A mismatch is NOT silent: the resource lookup throws, the plan is constructed
+    during boot, and the site fails to start with BootFailedException and 500s every
+    request. PackagingTests asserts the coupling anyway, because a failing test names
+    the cause in a second and a failed boot costs a deploy to diagnose.
   -->
   <ItemGroup>
     <EmbeddedResource Include="Packaging\package.xml" />

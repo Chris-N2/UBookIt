@@ -494,8 +494,12 @@ src/UBookIt.Backoffice/wwwroot/App_Plugins/
 ref/
 
 # Templates uBookIt's package migration writes into the TestSite on install.
-# Generated from src/UBookIt.Web/Packaging/package.xml, which is the authoritative
-# copy — committing them would put a second, silently-diverging copy in the repo,
-# and the import rewrites them on every manifest change anyway.
+#
+# Ignored HERE ONLY, and not advice to consumers — docs/booking-page.md tells them to
+# commit their copy, because a Production-mode site precompiles views at publish and
+# will not compile a .cshtml that appears afterwards.
+#
+# This repo is the exception: package.xml is the authoritative copy, so committing the
+# installed one too would put a second, silently-diverging copy beside it.
 src/UBookIt.TestSite/Views/uBookItBookingPage.cshtml
 

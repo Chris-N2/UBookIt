@@ -13,7 +13,7 @@ does to it.
 ## The measurement this design rests on
 
 Spiked 2026-08-25 against the pinned **Umbraco 17.6.2** (not the v18 source in `ref/`),
-by installing schema through an `AutomaticPackageMigrationPlan`, editing it over the
+by installing schema through a package migration plan, editing it over the
 management API as an editor would, shipping a "v2", and restarting:
 
 | Editor's change | After upgrade |
@@ -49,38 +49,103 @@ Two details matter more than the table:
 
 ## Decisions
 
-### D1 — `AutomaticPackageMigrationPlan`, not a custom `PackageMigrationPlan`
+### D1 — A run-once custom `PackageMigrationPlan`, not `AutomaticPackageMigrationPlan`
 
-The automatic plan tracks state as a hash of the embedded manifest and re-runs when it
-changes. A custom `PackageMigrationPlan` offers finer control and defaults
-`IgnoreCurrentState` to `true`, re-executing every migration — so the "more control"
-route is the more dangerous one here, which is the opposite of the usual trade.
+**This decision was made the wrong way round first, and the reasoning was inverted.
+Both are recorded rather than tidied away, because the mistake is the instructive
+part.**
 
-Take the simple route. It has one behaviour, it is the documented path, and its
-behaviour is now measured.
+The original text claimed a custom plan "defaults `IgnoreCurrentState` to `true`,
+re-executing every migration — so the 'more control' route is the more dangerous one".
+That is backwards. `MigrationPlan.cs:40` defaults it to **`false`**;
+`AutomaticPackageMigrationPlan.cs:50` **overrides it to `true`**. The custom route is
+the safer one. I took that claim from a documentation summary rather than from source I
+had already read — the same failure as D5 below, in the same change.
+
+| | Automatic | Custom (chosen) |
+|---|---|---|
+| Final state | hash of `package.xml` | explicit state ids |
+| Re-runs when the manifest changes | **every time** | **never** |
+| Consequence for a site | template and doctype fields overwritten on any release touching schema | site's copy left alone |
+
+**Measured**, not read: with the custom plan installed, editing the shipped template
+and then changing `package.xml` and restarting left the edit intact **on disk and in
+the database**, and the manifest's changed description never reached the site.
+
+The cost is real and is the right one: shipping new schema now needs an explicit new
+step, and adding one re-imports the whole manifest. Overwriting becomes a decision
+someone makes rather than a side effect of editing a file.
+
+**A trap for anyone revisiting this: the plan type cannot be changed after release.**
+Booting a custom plan against a site holding an automatic plan's hash state fails hard
+— `BootFailedException: The migration plan "uBookIt" does not support migrating from
+state "b2808c89-…"`, 500 on every request, recoverable only by deleting the
+`umbracoKeyValue` row. Measured, because it happened here. Nothing had shipped, so it
+cost nothing; after release it would have bricked every existing install.
 
 ### D2 — The shipped template is a one-line delegate, and that is a constraint
 
 The template delegates to the booking ViewComponent and carries nothing else.
 
-This is **forced**, not chosen. Any content in that template is destroyed by the next
-release that changes the manifest. A one-line delegate makes the overwrite a non-event,
-and the shape is already idiomatic here — `BookingFlow/Default.cshtml` is exactly such a
+Under D1's run-once plan the template is not destroyed by ordinary releases, so this is
+no longer forced by *every* release — but it is still the right shape. A release
+carrying a migration step re-imports the whole manifest, and the template is the only
+thing in there a site would plausibly have edited. Keeping it a delegate keeps the cost
+of that decision near zero.
+
+It also keeps the decision honest: if the shipped template held something valuable, the
+pressure would be to avoid adding migration steps at all, which would mean never
+shipping schema changes existing sites need.
+
+The shape is already idiomatic here — `BookingFlow/Default.cshtml` is exactly such a
 delegate.
 
 The rule to carry forward, because it will be tempting to add "just a wrapper div"
 later: **anything worth keeping in the shipped template is worth not shipping there.**
 
-### D3 — Customisation is by view override; this is the Forms "themes" pattern, mostly already built
+### D3 — There is no view-override mechanism, and the package must not claim one
 
-Umbraco Forms solves this with themes, because Forms renders the fields itself. uBookIt
-renders through ViewComponents and Razor views under `Views/Shared/UBookIt/`, and MVC
-view resolution already lets a site win by placing its own file at the same path. That
-*is* the theme mechanism, and it is what the parked branding work was for.
+**This decision asserted the opposite and was wrong. QA disproved it by measurement,
+and the original claim is left visible because the error is the useful part.**
 
-So this change ships no theming machinery. It ships a template thin enough that the
-existing override path is the only customisation surface — which is also the only one an
-upgrade cannot touch, since the package installs nothing there.
+It said: "uBookIt renders through ViewComponents and Razor views under
+`Views/Shared/UBookIt/`, and MVC view resolution already lets a site win by placing its
+own file at the same path. That *is* the theme mechanism."
+
+It is not. A site file at the same path as one of the package's views is **never
+consulted** — verified live, in both directions. The mechanism, in
+`CollectibleRuntimeViewCompiler.cs:209-218`: if
+`!ChecksumValidator.IsRecompilationSupported(precompiledView.Item)` the compiler
+returns `SupportsCompilation = false` and uses the precompiled view *as-is*, with
+`ExpirationTokens = Array.Empty` ("Never expire because we can't recompile").
+`UBookIt.Web.dll` carries `RazorCompiledItem` entries but **zero
+`RazorSourceChecksum`** entries, so that branch always wins.
+
+Confirmed as precedence rather than discovery: runtime compilation is live (editing the
+site's own template with the site running took effect with no rebuild) and the override
+still lost. And it is **worse in production** — that code path belongs to
+`Umbraco.Cms.DevelopmentMode.Backoffice`; without it the standard non-runtime compiler
+is used and precompiled views win outright. So overrides work in neither mode.
+
+**Why this is not simply a gap we failed to fill.** The Clean starter kit ships front-end
+files the same way — its manifest carries 14 templates, its partial views and 466KB of
+stylesheets — and `Clean.Core` contains **zero** `.cshtml`, so nothing is precompiled and
+the precedence problem cannot arise. Clean's published answer to customisation is to
+**uninstall the view-shipping package** (`dotnet remove package Clean`). That is an honest
+admission that no override mechanism exists, from a mature and widely used package.
+
+uBookIt cannot copy that: its assembly holds the ViewComponents and the delivery API, and
+⑪'s 598 rendering tests render the *compiled* views.
+
+**What this change does instead**: says so, plainly, in `docs/booking-page.md`, and offers
+the route that does work — a site adds its own template and makes it the document type's
+default. The package never touches a template it did not declare.
+
+**What the theming change will need** (its own change, scoped after this): keep compiled
+views as the working default and add a convention path the package deliberately does
+**not** precompile, so nothing competes. That needs an `IViewLocationExpander` **and** a
+change to how the shared partials are loaded — they use absolute paths
+(`~/Views/Shared/UBookIt/_X.cshtml`) that no expander can redirect.
 
 ### D4 — Why the POST-path rework is not here, and what the next change should test first
 
@@ -129,16 +194,33 @@ So the deferred change's likely shape, to be **measured before it is designed**:
 The spike for that change should start at (3), since (1) and (2) are now known to be
 possible and (3) is the part nobody has measured.
 
-### D5 — The manifest/namespace coupling is silent when wrong, so it is asserted
+### D5 — The manifest/namespace coupling is asserted, but it does NOT fail silently
 
-`AutomaticPackageMigrationPlan` resolves its manifest as an embedded resource named for
-the plan type's namespace. Get it wrong — wrong folder, missing `<EmbeddedResource>`,
-renamed namespace — and there is no error: the plan finds nothing and the site comes up
-without the schema.
+**Corrected. The original text claimed the opposite and was wrong in four places,
+including two shipped source comments.**
 
-That is the failure mode this project keeps meeting: a thing that reports success by
-doing nothing. It gets an explicit test that the resource exists and its name matches
-the plan's namespace, and the test must fail if either moves.
+It said: "there is no error: the plan finds nothing and the site comes up without the
+schema… the failure mode this project keeps meeting: a thing that reports success by
+doing nothing."
+
+Measured: removing the `<EmbeddedResource>` entry and booting produces
+`BootFailedException → IOException: Missing embedded files for planType: …` and **HTTP
+500 on every request**. `PackageMigrationResource.GetEmbeddedPackageDataManifestHash`
+throws, and it is reached while the plan is constructed during boot. Loud, named,
+unmissable.
+
+I asserted a failure mode I had not tried, in a change whose entire premise is
+measuring rather than assuming, and then wrote it into the source. The correction is
+kept visible so the next reader sees the shape of the mistake and not just its fix.
+
+The test stays, for a different and smaller reason: a red test names the cause in a
+second, where a failed boot costs a deploy to diagnose. It is a convenience, not a
+safety net, and it now says so.
+
+**What genuinely does fail silently is what the manifest may contain** — a template
+that grows markup, or a manifest that starts writing files into a site. Those raise
+nothing at all and surface on someone else's site later. `PackagingTests` guards those,
+and that is where the real value is.
 
 ## Risks / Trade-offs
 
@@ -149,9 +231,27 @@ the plan's namespace, and the test must fail if either moves.
 - **The doctype's name, icon and description are reverted on upgrade.** Minor, but an
   editor who renames the type will see it renamed back, and only documentation prevents
   that being alarming.
-- **An editor deleting a shipped property or the whole document type is untested.** It
-  is likely re-created, since the import creates what it does not find — but that is
-  inference, not measurement, and it is recorded as unmeasured rather than asserted.
+- **An editor who deletes the document type never gets it back. Measured by QA, and the
+  earlier inference here was wrong in the dangerous direction.** This previously read
+  "likely re-created, since the import creates what it does not find". The import never
+  runs: pending is decided by comparing the stored state to the plan's final state, and
+  deleting the type does not change the stored state. QA demonstrated it on a virgin
+  database — type installed, node removed, restart, still absent, key-value row
+  unchanged.
+
+  **D1's run-once plan makes this worse, not better.** Under the automatic plan any
+  manifest change would eventually have restored it; now nothing short of a new
+  migration step will, and recovery otherwise means deleting a `umbracoKeyValue` row by
+  hand. The site is left with a template pointing at a type that does not exist.
+
+  Not fixed here, and the reason is that the honest fix is not obvious: re-creating
+  deleted schema on every boot would override a deliberate act by an editor. Recorded
+  as an obligation, and `docs/booking-page.md` must not imply that deletion is
+  recoverable.
+
+- **An editor deleting a shipped *property* is still untested.** Probably re-added on
+  the next import, since properties are additive — but that is inference, and it is
+  recorded as unmeasured rather than asserted.
 - **`UbookitBookingTest.cshtml` becomes redundant as documentation** while remaining
   useful as a harness for `?flow` and `?resourceId`, which no shipped page exposes.
   Decide its fate explicitly; deleting it by reflex would remove the only way to reach
