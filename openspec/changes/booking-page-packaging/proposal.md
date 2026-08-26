@@ -50,9 +50,10 @@ file**. That is also how the Clean starter kit ships 14 templates, its partials 
 **There is no view-override mechanism, and this change does not pretend otherwise.**
 The first version of this proposal claimed customisation belonged in overridable views.
 QA disproved it: the package's views are compiled into `UBookIt.Web.dll` without source
-checksums, so a same-path file in a site is never consulted — in development or
-production. Restyling the flow's internals is not possible yet, the documentation says
-so plainly, and theming is scheduled as its own change.
+checksums, so a same-path file in a site is never consulted. **Measured on a development
+site**; a production site has not been tested, and which compiled view would win there is
+not established. Either way the flow's internals are not customisable today, the
+documentation says so plainly, and theming is scheduled as its own change.
 
 ## Non-goals
 

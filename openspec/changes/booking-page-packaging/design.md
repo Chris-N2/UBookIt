@@ -99,10 +99,23 @@ restart, documented. The overwrite it replaces was **routine, silent and
 unrecoverable**: it destroyed work on every release touching schema, with no way to get
 it back. A rare recoverable failure beats a routine unrecoverable one.
 
-What follows for the documentation is not optional: `docs/booking-page.md` previously
-*recommended* that setting as a way to freeze schema. It now warns against having it set
-at install time and gives the recovery. Shipping the recommendation unqualified would
-have been this change actively steering sites into its own worst failure.
+**"Detectable" was not true when that sentence was first written, and QA said so.**
+Umbraco logs its own skip at INFO, which is not detection: whoever sets that flag is
+configuring a platform, not installing uBookIt, and will not connect an INFO line to a
+booking page that never appears. Either the adjective went, or detection had to exist.
+
+Detection now exists. `ImportBookingPageSchema` keeps the
+`IOptions<PackageMigrationSettings>` it already received and logs a **warning** naming
+the package, the permanence ("runs once, so it will not retry"), and the recovery. The
+skip happens inside `ImportPackage…Do()` — `ImportPackageBuilderExpression.cs:97` —
+which is *after* the migration body starts, so the warning is reached; that is
+structural rather than hoped for, though the line has not been observed in a live boot.
+
+Documentation alone was the original disposition and it was too weak, for a reason
+worth keeping: **the reader who trips this failure is not the reader of the package's
+documentation.** `docs/booking-page.md` also stopped *recommending* the setting, which
+it previously did — shipping that unqualified would have been this change steering
+sites into its own worst failure.
 
 **A trap for anyone revisiting this: the plan type cannot be changed after release.**
 Booting a custom plan against a site holding an automatic plan's hash state fails hard
@@ -154,13 +167,18 @@ site's own template with the site running took effect with no rebuild) and the o
 still lost.
 
 **Measured on a development site only, and this is stated rather than glossed.** The
-code path above belongs to `Umbraco.Cms.DevelopmentMode.Backoffice`; a production site
-uses the standard non-runtime compiler, where precompiled views are all there is, so
-overrides should fail there too — but that is reasoning, not measurement. It was not
-measured because a published site needs a connection string that lives in a
-user-secrets file, and reading it to settle a point already settled in the direction
-that matters was not worth it: the mechanism only gets *more* absolute without runtime
-compilation.
+code path above belongs to `Umbraco.Cms.DevelopmentMode.Backoffice`. A production site
+uses the standard non-runtime compiler, and **which compiled view wins there has not
+been established** — in a fully precompiled app the site's own override is itself a
+compiled Razor item at the same path, so there are two candidates and precedence falls
+to application-part ordering, not to "the package's is the only one".
+
+That is a materially weaker claim than the one first written here ("precompiled views
+are all there is"), which was wrong: it made the expectation look better evidenced than
+it is. It was not measured because a published site needs a connection string from a
+user-secrets file, and the direction that matters was already settled — but a
+limitation we under-promise is the safe way to be wrong, and **theming will have to
+measure this properly**, since it turns on exactly this precedence.
 
 Recorded explicitly because this change has already shipped one confident, wrong claim
 about exactly this, and the correction must not quietly ship a second.

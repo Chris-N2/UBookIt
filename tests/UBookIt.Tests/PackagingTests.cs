@@ -56,30 +56,62 @@ public class PackagingTests
 
         var document = XDocument.Load(stream!);
         Assert.Equal("umbPackage", document.Root?.Name.LocalName);
+
+        // And it is the file Umbraco will actually read.
+        //
+        // Every other guard in this class reads package.xml off disk. Umbraco does not
+        // reach for it first: at each entry point — the hash,
+        // TryGetEmbeddedPackageDataManifest, and the import — it calls
+        // GetEmbeddedPackageZipStream and only falls back to the XML when no
+        // package.zip resource exists.
+        //
+        // So an embedded package.zip silently becomes the real manifest and every
+        // check here starts fencing a file that no longer installs anything.
+        // Demonstrated: a zip declaring <Stylesheets> and a branded template left all
+        // seven of these tests green while the Booking Page type was not installed at
+        // all and a rogue template wrote a file into the site.
+        //
+        // This is not a hypothetical route. A maintainer wanting to ship media or
+        // stylesheets would follow Umbraco's documented path, which IS package.zip.
+        // Fence the mechanism rather than the instance, exactly as the allowlist does.
+        Assert.DoesNotContain(
+            resources,
+            name => name.EndsWith(".package.zip", StringComparison.OrdinalIgnoreCase));
     }
 
     [Fact]
     public void The_shipped_template_carries_no_markup_of_its_own()
     {
-        // Design D2, and a constraint rather than a preference: the import replaces a
-        // template's contents wholesale on any manifest change, so anything in here
-        // is destroyed on a consumer's site by a release that need not even mention
-        // templates. A delegate makes that harmless.
+        // Design D2. The import replaces a template's contents wholesale, and it
+        // re-imports the WHOLE manifest — so a release carrying a migration step
+        // rewrites this template even though that release never mentioned templates.
+        // The plan is run-once, so an ordinary release does not, but the exposure is
+        // real whenever we choose to ship a step. A delegate makes it cost nothing.
         //
         // The rule for whoever wants to add "just a wrapper div" later: anything
         // worth keeping in the shipped template is worth not shipping there. Put it
-        // in a view the site can override instead.
+        // in the site's OWN template, which the package never touches — not in a view
+        // override, which does not work (design D3).
         // Exactly one template, and this is load-bearing rather than tidiness: taking
         // the FIRST template let a SECOND one carry `<div class="branding"><h1>…`
-        // through this check untouched. The constraint is on what the package ships,
-        // not on whichever template happens to sort first.
-        var templates = Manifest().Descendants("Template")
-            .Where(element => element.Element("Design") is not null)
-            .ToList();
+        // through this check untouched.
+        //
+        // Scoped to children of <Templates>, NOT to "any <Template> that has a
+        // <Design>". The doctype's <AllowedTemplates> also contains <Template>
+        // elements, so the earlier filter had to exclude them somehow and chose the
+        // wrong discriminator: a second REAL template declaring only Name, Alias and
+        // Key then installed, and Umbraco scaffolded a second `.cshtml` into the
+        // site — a file on a path the site owns, which the package undertakes not to
+        // write.
+        var templates = Manifest().Root!.Element("Templates")?.Elements("Template").ToList()
+            ?? [];
 
         Assert.Single(templates);
 
-        var design = templates[0].Element("Design")!.Value;
+        var designElement = templates[0].Element("Design");
+        Assert.NotNull(designElement);
+
+        var design = designElement!.Value;
 
         var lines = design!
             .Split('\n')

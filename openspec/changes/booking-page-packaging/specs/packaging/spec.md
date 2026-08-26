@@ -68,9 +68,10 @@ send a site author to a path where their work has no effect and no error explain
 What the documentation offers SHALL be something a site can actually do.
 
 **The documentation SHALL NOT assert more than has been measured.** The override failure
-is measured on a development site and expected to hold at least as strongly without
-runtime compilation, where precompiled views are all there is — but expectation and
-measurement SHALL be distinguishable to a reader. This clause exists because the
+is measured on a development site. It has not been measured without runtime
+compilation, where the site's own override is itself compiled and precedence falls to
+application-part ordering — expectation and measurement SHALL be distinguishable to a
+reader. This clause exists because the
 requirement it replaces asserted a mechanism nobody had run, and a correction that
 repeats the habit is not a correction.
 
@@ -88,9 +89,15 @@ repeats the habit is not a correction.
 
 ### Requirement: The package installs nothing on paths the site owns
 The package SHALL install exactly what it needs to put a booking page on a site — a
-document type and one template — and SHALL NOT write files, schema or configuration a
-site did not ask for. In particular it SHALL NOT install partial views, stylesheets,
-scripts, arbitrary files, data types, dictionary items or languages.
+document type and one template — and SHALL NOT write, replace **or remove** files,
+schema or configuration a site did not ask for. In particular it SHALL NOT install
+partial views, stylesheets, scripts, arbitrary files, data types, dictionary items or
+languages.
+
+("Or remove" is carried from the clause this replaces. Nothing in the import path can
+remove anything, so it is theoretical today — but it was in the dropped guarantee, and
+dropping half a clause on the grounds that it is currently unreachable is how the whole
+clause went missing in the first place.)
 
 **This guarantee was carried by the requirement that described customisation-by-override,
 and was dropped when that requirement was rewritten after the override mechanism proved
@@ -104,6 +111,14 @@ list of forbidden ones. A denylist fences only what someone thought of: the firs
 named four file-writing sections and let `DataTypes`, `DictionaryItems` and `Languages`
 straight through, each of which installs schema or configuration into a consumer's site.
 
+**The check SHALL be made against the manifest that actually installs.** Umbraco looks
+for an embedded `package.zip` **before** the XML manifest and falls back to the XML only
+when no zip exists, so a zip added later silently becomes the real manifest and every
+check above starts fencing a file that installs nothing. Demonstrated: a zip declaring
+stylesheets and a branded template left every check green while the shipped document
+type was not installed at all and a rogue template wrote a file into the site. Fencing
+the wrong artefact is indistinguishable from not fencing at all.
+
 #### Scenario: A manifest section the package has not justified fails
 - **WHEN** the package manifest declares any section beyond those the package needs
 - **THEN** the check fails, naming the section, whether or not it writes files
@@ -111,6 +126,10 @@ straight through, each of which installs schema or configuration into a consumer
 #### Scenario: The fence cannot pass by fencing nothing
 - **WHEN** the manifest declares no sections at all
 - **THEN** the check fails rather than being trivially satisfied
+
+#### Scenario: A second manifest cannot displace the one that is checked
+- **WHEN** the package embeds a manifest that would take precedence over the one the checks read
+- **THEN** the check fails, because a fence around an artefact that no longer installs is no fence
 
 ### Requirement: Installation adds schema and never creates content
 The package SHALL install a document *type* and SHALL NOT create documents. Which pages

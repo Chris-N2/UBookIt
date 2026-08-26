@@ -212,4 +212,54 @@
       guard**. A change to the shipped doctype's `AllowedTemplates` could break the
       documented route with a green suite. Needs a host-level test to close properly —
       the same question ⑪ answered for rendering, asked now of installation.
-- [ ] 10.11 Re-review (round 3) by the same QA subagent.
+- [x] 10.11 Re-review: **REJECT**, 1 MAJOR + 5 minors. Round 4 below.
+
+## 11. QA round 3 — findings and dispositions
+
+- [x] 11.1 **MAJOR — every guard fenced `package.xml`, which is not necessarily the file
+      that installs.** Umbraco checks for an embedded `package.zip` **first** and falls
+      back to the XML only when none exists. QA demonstrated it end to end: a zip
+      declaring `<Stylesheets>` and a branded template left **all seven tests green**
+      while the Booking Page type was not installed at all and a rogue template wrote a
+      file into the site. This was a hole in the allowlist *I* added in round 2 — a
+      fence around the wrong artefact is indistinguishable from no fence. Now asserted
+      in the test that already enumerates resource names; mutation-checked with a real
+      embedded zip.
+- [x] 11.2 **MINOR-1 — a `<Template>` with no `<Design>` slipped the "exactly one"
+      guard.** My filter picked the wrong discriminator: it excluded the doctype's
+      `<AllowedTemplates>` entries by requiring a `Design`, which also excused a second
+      real template declaring only Name/Alias/Key — which installs, and Umbraco
+      scaffolds a second `.cshtml` into the site. Now scoped to children of
+      `<Templates>`. Mutation-checked.
+- [x] 11.3 **MINOR-2 — rewrite damage, exactly the class I asked QA to hunt.**
+      `PackagingTests.cs` still taught the *automatic* plan ("replaces… on any manifest
+      change") and still pointed at view overrides as the alternative — a model
+      disproved by `34047b9` and a route disproved by MAJOR-1, sitting directly above
+      code freshly written the same round. Rewritten.
+- [x] 11.4 **MINOR-3** — the round-2 softening never reached `proposal.md`, which still
+      asserted "development or production" flatly, breaching the SHALL the same commit
+      introduced. Swept.
+- [x] 11.5 **MINOR-4 — the reason I gave for expecting production to match was
+      mechanically wrong.** "Precompiled views are all there is" is false: in a fully
+      precompiled app the site's own override is *also* a compiled item at that path, so
+      there are two candidates and precedence falls to application-part ordering. The
+      claim now says which compiled view wins has **not been established**, and notes
+      that theming will have to measure it.
+- [x] 11.6 **MINOR-5 — Chris revisited his earlier scope decision on new evidence and
+      chose to add the warning.** Two things had changed: the cost is ~3 lines because
+      the options were already injected, and D1's argument rested on "detectable", which
+      was not true. `ImportBookingPageSchema` now warns, naming the package, the
+      permanence and the recovery. Reachability established from source
+      (`ImportPackageBuilderExpression.cs:97` skips *inside* `Do()`, after the migration
+      body starts); the line has not been observed in a live boot.
+- [x] 11.7 **Nit — the dropped guarantee's "or remove" half** was not carried into the
+      restatement. Restored, with a note that dropping half a clause because it is
+      currently unreachable is how the whole clause went missing.
+- [x] 11.8 The spec now requires the check to be made against **the manifest that
+      actually installs**, with its own scenario, so the MAJOR cannot recur as a
+      different second manifest.
+- [ ] 11.9 Still carried forward, unchanged: no regression guard for Requirement 1's
+      headline scenario or Requirement 3's documented route (10.10), and the deleted-
+      *property* case remains unmeasured. **QA's caveat, accepted: 10.10 must reach
+      `ubookit-deferred-obligations` at sync or it vanishes when this change archives.**
+- [ ] 11.10 Re-review (round 4).
