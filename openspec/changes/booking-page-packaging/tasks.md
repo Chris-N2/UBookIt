@@ -102,12 +102,15 @@
       `docs/`. Recorded as an obligation rather than discharged here — a database
       requirement does not belong on a page about the Booking Page, and the repo
       still has no README at all. Re-run at sync.
-- [ ] 8.4b Re-run the outward grep at sync time, after the sync edits. It has
+- [x] 8.4b Outward grep re-run after the sync edits. **Nothing falsified.**
+      `default-frontend:10` and `:548` ("so a site author can place it in a template")
+      are more true, not less; the `availability` hits are domain override-exceptions,
+      an unrelated sense of the word. Original note: it has
       found something on most changes. Grep the vocabulary of the *mechanisms* as well
       as of the change — "template", "document type", "site author", "install".
 - [x] 8.5 Confirm the TestSite is stopped, the tree is clean, and no spike artefact
       survived.
-- [ ] 8.6 QA review in a **fresh context or subagent** — never the context that applied.
+- [x] 8.6 QA review in a fresh subagent: four rounds, REJECT x3 then **APPROVE**.
 
 ## 9. QA round 1 — findings and dispositions
 
@@ -207,7 +210,7 @@
       every future maintainer.
 - [x] 10.9 Nits: the precompilation causal chain corrected (it is a csproj setting, not
       runtime mode itself); the empty `Views/Shared` directory removed.
-- [ ] 10.10 Carry forward, NOT fixed: Requirement 1's headline scenario and Requirement
+- [x] 10.10 Carried forward, NOT fixed (discharged to deferred-obligations at sync — see 11.9): Requirement 1's headline scenario and Requirement
       3's "the documented route works" are both verified live but have **no regression
       guard**. A change to the shipped doctype's `AllowedTemplates` could break the
       documented route with a green suite. Needs a host-level test to close properly —
@@ -262,10 +265,12 @@
 - [x] 11.8 The spec now requires the check to be made against **the manifest that
       actually installs**, with its own scenario, so the MAJOR cannot recur as a
       different second manifest.
-- [ ] 11.9 Still carried forward, unchanged: no regression guard for Requirement 1's
-      headline scenario or Requirement 3's documented route (10.10), and the deleted-
-      *property* case remains unmeasured. **QA's caveat, accepted: 10.10 must reach
-      `ubookit-deferred-obligations` at sync or it vanishes when this change archives.**
+- [x] 11.9 **Carried to `ubookit-deferred-obligations` at sync, on QA's condition** —
+      the installation path has no regression guard (both live-verified scenarios), and
+      the deleted-*property* case is unmeasured. Both are now recorded outside this
+      change, so archiving cannot lose them. The closure path is named there: a
+      host-level installation test, which unlike ⑪'s Razor-only rig needs a database,
+      because the thing under test is a migration.
 - [x] 11.10 Re-review: **APPROVE**, 1 MINOR + 2 NITs. Round 4 below.
 
 ## 12. QA round 4 — APPROVED
