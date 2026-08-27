@@ -1,0 +1,231 @@
+/*
+    uBookIt — default front-end stylesheet.
+
+    TWO RULES GOVERN THIS FILE. Both are spec requirements, not house style, and
+    both are enforced by tests that will fail rather than warn.
+
+    1. NO COLOUR DECISION. This file declares no literal colour that renders a
+       hue — no hex, no rgb(), no hsl(), no named colour. Colour and typography
+       inherit from the host page, so the flow takes on the surrounding site's
+       appearance with no configuration at all. Emphasis that would conventionally
+       be carried by colour is carried by `currentColor`, border weight and font
+       weight instead. `transparent`, `currentColor`, `inherit` and `color-mix()`
+       over those are permitted, because none of them picks a hue.
+
+       The reason is not modesty. A colour chosen here sits on a background this
+       package has never seen, so its contrast is not computable and any claim
+       about it would be unfounded. Choosing none is what lets the accessibility
+       statement say the shipped default cannot fail contrast.
+
+    2. NO TOKEN DEFAULT IS DECLARED ON AN ELEMENT. Every token appears only as
+       `var(--ubookit-x, <default>)` at its point of use. Custom properties
+       inherit, so a default declared on a package wrapper sits closer to the
+       control than a site's `:root` and therefore BEATS it — the site's override
+       would silently do nothing. That failure is invisible and points the wrong
+       way, so the rule is absolute: if you find yourself writing
+       `--ubookit-something:` on a selector in this file, that is the bug.
+
+    Native controls are deliberately not restyled. Platform-rendered inputs,
+    selects and buttons are accessible by construction, respect the user's own
+    preferences and behave correctly in forced-colors mode. The only thing applied
+    to them here is a minimum target size, which is a floor rather than an
+    appearance.
+
+    A consuming site customises appearance by setting tokens (anywhere — `:root`
+    is expected) and by writing rules against the documented class vocabulary. It
+    should link its own stylesheet AFTER the partial that links this one.
+*/
+
+/* ---------------------------------------------------------------- roots ---- */
+
+.ubookit-booking,
+.ubookit-catalogue,
+.ubookit-confirmation {
+    box-sizing: border-box;
+
+    /* Follow the host's light/dark setting rather than imposing one. */
+    color-scheme: inherit;
+
+    /* All three inherit by default: the flow adopts the host page's type. */
+    font-family: var(--ubookit-font-family, inherit);
+    font-size: var(--ubookit-font-size, inherit);
+
+    /* The one typographic value with a real default, because 1.5 is the floor
+       readable body text needs and inheriting a tighter host value would make
+       our own multi-line hints and notices worse than the host's prose. */
+    line-height: var(--ubookit-line-height, 1.5);
+
+    /* The single lever that brands the radios. `accent-color` lets the browser
+       compute the indicator's own contrast, which is why it is the one place a
+       site's colour is accepted without us having to reason about it. */
+    accent-color: var(--ubookit-accent, auto);
+}
+
+.ubookit-booking *,
+.ubookit-catalogue *,
+.ubookit-confirmation * {
+    box-sizing: inherit;
+}
+
+/* Vertical rhythm between the major regions of a flow. */
+.ubookit-date-form,
+.ubookit-times,
+.ubookit-details,
+.ubookit-errors,
+.ubookit-booked-resources {
+    margin-block: var(--ubookit-section-gap, 1.5rem);
+}
+
+/* --------------------------------------------------------------- fields ---- */
+
+/*
+    A field is a label, its control, and that control's messages. Five of the
+    eight in the package are ordinary; two are the wrappers that stand in when a
+    control has been replaced by settled text, and they are fields here for
+    exactly that reason — the rhythm must not break on the rows carrying the most
+    conditional behaviour.
+*/
+.ubookit-field {
+    display: flex;
+    flex-direction: column;
+    gap: var(--ubookit-field-gap, 0.35rem);
+    margin-block-end: var(--ubookit-section-gap, 1.5rem);
+    max-width: var(--ubookit-measure, 34rem);
+}
+
+.ubookit-field > label {
+    /* The label is the field's heading; weight is the one emphasis available
+       without choosing a colour. */
+    font-weight: 600;
+}
+
+/* ---------------------------------------------------------- start times ---- */
+
+/*
+    The start times are a wrapping run of short labels ("09:00"), so they are laid
+    out as inline blocks rather than as a stacked list — a day with thirty starts
+    is otherwise a very long page.
+
+    Deliberately NOT `display: grid` or `flex` on the fieldset itself: a `legend`
+    inside a flex or grid `fieldset` is treated inconsistently across browsers and
+    the legend here names the group, so losing it is an accessibility regression
+    rather than a cosmetic one. Inline blocks need no container, so this needs no
+    markup change and cannot disturb the legend.
+*/
+.ubookit-times-option {
+    display: inline-block;
+    margin-inline-end: var(--ubookit-space, 1rem);
+    margin-block-end: var(--ubookit-field-gap, 0.35rem);
+
+    /* 2.5.8 target size. The row is the target, not the radio: the label is
+       associated by `for`, so clicking either activates the control. A hard
+       constant rather than a token — a token would invite a site to set it below
+       the floor, and a floor a site can lower is not a floor. */
+    min-height: 24px;
+}
+
+.ubookit-times-option > label {
+    /* Extends the clickable area to the whole row without restyling the radio. */
+    padding-inline: 0.25rem;
+}
+
+/* ------------------------------------------------------------ catalogue ---- */
+
+/*
+    The catalogue is left as a stacked list rather than a wrapping run. Its labels
+    are service and resource names of unpredictable length, where a wrapping grid
+    produces ragged rows that are harder to scan than a column — the opposite of
+    the start times, whose labels are uniformly short.
+*/
+.ubookit-catalogue-choice {
+    margin-block-end: var(--ubookit-field-gap, 0.35rem);
+    min-height: 24px;
+}
+
+/* ------------------------------------------------------------- messages ---- */
+
+/*
+    Four kinds of message, distinguished without colour. Each keeps its own class
+    so a site can style them apart; the package only sets what it can defend.
+*/
+
+.ubookit-field-error {
+    display: block;
+    font-weight: 600;
+
+    /* Derives from the host's text colour unless the site names an error colour.
+       The message is already in text, so this is reinforcement and never the only
+       carrier of meaning — 1.4.1 holds whatever the site sets it to. */
+    color: var(--ubookit-color-error, currentColor);
+}
+
+.ubookit-hint {
+    /* Recessive without being low-contrast: mixing toward transparent keeps the
+       relationship to the host's own text colour rather than picking a grey that
+       might vanish on its background. */
+    color: var(--ubookit-color-muted, color-mix(in srgb, currentColor 75%, transparent));
+    max-width: var(--ubookit-measure, 34rem);
+}
+
+.ubookit-notice,
+.ubookit-no-times,
+.ubookit-no-choices,
+.ubookit-fixed-length {
+    max-width: var(--ubookit-measure, 34rem);
+}
+
+/* An explanation the visitor has to act on, marked by a rule rather than a hue. */
+.ubookit-notice,
+.ubookit-no-times {
+    border-inline-start: var(--ubookit-border-width, 3px) solid
+        var(--ubookit-color-border, color-mix(in srgb, currentColor 35%, transparent));
+    padding-inline-start: var(--ubookit-space, 1rem);
+}
+
+/* -------------------------------------------------------- error summary ---- */
+
+.ubookit-errors {
+    border: var(--ubookit-border-width, 3px) solid var(--ubookit-color-error, currentColor);
+    border-radius: var(--ubookit-radius, 0);
+    padding: var(--ubookit-space, 1rem);
+    background: var(--ubookit-color-surface, transparent);
+    max-width: var(--ubookit-measure, 34rem);
+}
+
+.ubookit-errors > h3 {
+    margin-block-start: 0;
+}
+
+.ubookit-errors ul {
+    margin-block-end: 0;
+}
+
+/* --------------------------------------------------------- confirmation ---- */
+
+.ubookit-confirmation {
+    border: var(--ubookit-border-width, 3px) solid
+        var(--ubookit-color-border, color-mix(in srgb, currentColor 35%, transparent));
+    border-radius: var(--ubookit-radius, 0);
+    padding: var(--ubookit-space, 1rem);
+    background: var(--ubookit-color-surface, transparent);
+    max-width: var(--ubookit-measure, 34rem);
+}
+
+/* ----------------------------------------------------- target size only ---- */
+
+/*
+    The whole of what this file does to native controls. No appearance property:
+    no background, no border, no colour, no font, no padding that would reshape
+    them. 24px is WCAG 2.2 AA 2.5.8, and it is a constant for the same reason the
+    option rows' is.
+*/
+.ubookit-booking button,
+.ubookit-booking select,
+.ubookit-booking input:not([type="radio"]):not([type="checkbox"]),
+.ubookit-catalogue button {
+    min-height: 24px;
+}
+
+.ubookit-submit {
+    min-width: 24px;
+}

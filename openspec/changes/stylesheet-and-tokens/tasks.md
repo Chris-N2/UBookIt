@@ -35,26 +35,35 @@ it in its own step means §5's suite delta has exactly one cause.
 
 ## 3. The stylesheet
 
-- [ ] 3.1 Create `src/UBookIt.Web/wwwroot/ubookit.css`. Confirm no csproj change is needed (measured — the `Sdk.Razor` project already emits static web assets)
-- [ ] 3.2 Write the structural rules that need no token: `box-sizing`, `color-scheme: inherit`, field stacking, text-block measure, a `line-height` floor of 1.5
-- [ ] 3.3 Lay out the time grid — the radios in `_Times` currently stack vertically, which is poor for a day with many starts. Wrapping flex or grid, visible radios and labels kept exactly as rendered
-- [ ] 3.4 Apply the minimum target size floor (2.5.8) — and only that; no other property touching a date input, select or button
-- [ ] 3.5 Express error and notice emphasis without a colour decision: `currentColor` border and font weight
-- [ ] 3.6 Verify by inspection that the file declares no literal colour value anywhere
+- [x] 3.1 Create `src/UBookIt.Web/wwwroot/ubookit.css`. Confirm no csproj change is needed (measured — the `Sdk.Razor` project already emits static web assets)
+- [x] 3.2 Write the structural rules that need no token: `box-sizing`, `color-scheme: inherit`, field stacking, text-block measure, a `line-height` floor of 1.5
+- [x] 3.3 Lay out the time grid — the radios in `_Times` currently stack vertically, which is poor for a day with many starts. Wrapping flex or grid, visible radios and labels kept exactly as rendered
+      → **Inline-block, deliberately not flex/grid on the `fieldset`.** A `legend` inside a flex or grid `fieldset` is handled inconsistently across browsers, and that legend names the group — losing it is an accessibility regression, not a cosmetic one. Inline blocks wrap without a container, so this needed no markup change. The catalogue was left as a stacked column on purpose: its labels are names of unpredictable length, where wrapping gives ragged rows that scan worse than a column.
+- [x] 3.4 Apply the minimum target size floor (2.5.8) — and only that; no other property touching a date input, select or button
+      → Applied to the **option row** rather than the radio, since the label is associated by `for` and the row is the target. A hard `24px` constant, **not** a token: a floor a site can lower is not a floor.
+- [x] 3.5 Express error and notice emphasis without a colour decision: `currentColor` border and font weight
+- [x] 3.6 Verify by inspection that the file declares no literal colour value anywhere
+      → Only `currentColor`, `inherit`, `transparent`, `auto` and `color-mix()` over those. The permitted-set boundary is stated at the top of the file and is what 6.2 tests.
+- [x] 3.7 **NEW, found while writing the stylesheet** — the email hint had **no class hook**. My earlier audit scanned `class=` attributes only, so an element carrying just an id (`<span id="ubookit-email-hint">`) was invisible to it. Added `ubookit-hint`, which is what it is. Re-checked every other id-bearing element: all ten already carry a class or are native controls needing none
 
 ## 4. Tokens
 
-- [ ] 4.1 Define the layout tokens as use-site fallbacks: `--ubookit-space`, `-field-gap`, `-section-gap`, `-measure`, `-radius`, `-border-width`
-- [ ] 4.2 Define the type tokens: `--ubookit-font-family` and `-font-size` falling back to `inherit`, `-line-height` to `1.5`
-- [ ] 4.3 Define the colour tokens, all falling back to `currentColor`/`transparent`/`auto`: `--ubookit-accent` (used *only* as `accent-color`), `-color-error`, `-color-muted`, `-color-border`, `-color-surface`
-- [ ] 4.4 Audit every token declaration: **no token default may be declared on any element the package renders** (design D2). This is the change's silent-failure point
-- [ ] 4.5 Cross-check the token list against the stylesheet in both directions — nothing documented that is unread, nothing read that is undocumented
+- [x] 4.1 Define the layout tokens as use-site fallbacks: `--ubookit-space`, `-field-gap`, `-section-gap`, `-measure`, `-radius`, `-border-width`
+- [x] 4.2 Define the type tokens: `--ubookit-font-family` and `-font-size` falling back to `inherit`, `-line-height` to `1.5`
+- [x] 4.3 Define the colour tokens, all falling back to `currentColor`/`transparent`/`auto`: `--ubookit-accent` (used *only* as `accent-color`), `-color-error`, `-color-muted`, `-color-border`, `-color-surface`
+- [x] 4.4 Audit every token declaration: **no token default may be declared on any element the package renders** (design D2). This is the change's silent-failure point
+      → Audited by inspection; **the test in 6.1 is what actually holds it**, since an audit does not survive the next edit.
+- [x] 4.5 Cross-check the token list against the stylesheet in both directions — nothing documented that is unread, nothing read that is undocumented
+      → All 14 read by at least one declaration. Becomes 6.6 as a test.
 
 ## 5. Emission
 
-- [ ] 5.1 Create `Views/Shared/UBookIt/_Styles.cshtml` emitting the single `link` to `_content/UBookIt.Web/ubookit.css`
-- [ ] 5.2 Confirm no other view emits a `link` or `style` element for package styling — one emission route, because it is the future theme's off-switch (design D4)
-- [ ] 5.3 Verify the partial resolves when called from a **site** layout, not only from within the package (the mechanism is measured; this confirms this particular partial)
+- [x] 5.1 Create `Views/Shared/UBookIt/_Styles.cshtml` emitting the single `link` to `_content/UBookIt.Web/ubookit.css`
+      → **Razor comments do not nest.** The first version wrapped a usage example in an inner `@* … *@`, which closed the outer comment early and turned the rest of the file into live markup — four build errors, including `<head>` parsed as a malformed tag helper. Noted in the file itself so the next editor does not repeat it.
+- [x] 5.2 Confirm no other view emits a `link` or `style` element for package styling — one emission route, because it is the future theme's off-switch (design D4)
+      → Now a test (6.7), not a one-off check.
+- [ ] 5.3 Verify the partial resolves when called from a **site** layout, not only from within the package (the mechanism is measured; this confirms this particular partial) — deferred to 7.3, which needs the running TestSite
+- [x] 5.4 **NEW, forced by adding the first non-rendering view.** `_Styles.cshtml` joined the rendering suite's scanned inventory and broke ten rules that assume a model, literals and a document body. Excluded **by name, with a reason and with what would lift it**, exactly as `ViewInventory`'s own guidance demands — and *not* left untested: it is covered by the emission rule instead. Two vacuity guards added so the exclusion cannot decay: the scan now counts **both** sets (so a view cannot be added and excluded in one change silently), and the exclusion set is asserted to be exactly that one file. The same treatment was needed in `ServiceFrontendTests.The_shared_partials_are_all_reached_from_a_flow`, whose premise — a partial nothing references is dead code — does not reach a partial whose consumer is the site's layout; that exemption carries its own vacuity guard too
 
 ## 6. Tests
 

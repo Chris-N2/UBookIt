@@ -1,0 +1,30 @@
+@*
+    The only route by which uBookIt emits its own styling.
+
+    A consuming site opts in with one line in the head of its layout, rendering
+    this partial by its path: ~/Views/Shared/UBookIt/_Styles.cshtml
+
+    Three reasons it is a partial rather than a link element the site writes itself.
+
+    Head placement. The flows render from ViewComponents, and a ViewComponent
+    cannot contribute to the document head — a Razor section does not cross that
+    boundary, the same boundary that makes ModelState unavailable to the flow and
+    forced the TempData workaround. So a stylesheet emitted from inside a flow
+    could only ever be a link in the body, which buys a flash of unstyled content
+    on the very surface that has no JavaScript to hide it.
+
+    Cascade order. The package's defaults must come before the site's overrides,
+    and that ordering is a property of where this partial sits rather than
+    something a token can express. Sites are documented to link their own
+    stylesheet after this one.
+
+    A theme's off-switch. A future theme replaces what this partial emits and turns
+    the package's CSS off without the consuming site changing anything. That is why
+    the requirement is that this be the ONLY emission route: a second link element
+    somewhere else would survive the theme and fight it.
+
+    Note for anyone editing this file: Razor comments do NOT nest. An inner comment
+    closes this one early and everything below becomes live markup, which is how the
+    first version of this file failed to compile.
+*@
+<link rel="stylesheet" href="~/_content/UBookIt.Web/ubookit.css" />

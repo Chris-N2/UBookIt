@@ -32,7 +32,7 @@
                aria-invalid="@(emailError is not null ? "true" : null)"
                aria-describedby="@(emailError is not null ? "ubookit-email-hint ubookit-email-error" : "ubookit-email-hint")"
                required />
-        <span id="ubookit-email-hint">We'll send your booking confirmation here.</span>
+        <span id="ubookit-email-hint" class="ubookit-hint">We'll send your booking confirmation here.</span>
         @if (emailError is not null)
         {
             <span id="ubookit-email-error" class="ubookit-field-error">@emailError</span>
