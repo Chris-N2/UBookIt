@@ -69,28 +69,66 @@ public class FieldHookTests
     {
         // Non-vacuity, and the specific vacuity that would matter: a selector change
         // that stopped finding labels would let the rule pass over every field in the
-        // package. Counted per document rather than in total, so one document going
-        // empty cannot be masked by another.
+        // package.
+        //
+        // Counted PER DOCUMENT, not summed. The first version of this guard accumulated
+        // into one total and asserted on that, while its comment claimed per-document
+        // — so one document going empty could be masked by another, and the comment
+        // said it could not. QA caught the discrepancy. A false reassurance in the
+        // vacuity guard of a rule written to close an earlier finding is about the
+        // worst place to put one, so the code now does what the comment promised
+        // rather than the comment being softened to match the code.
+        // Scoped to the documents that render fields at all — and that scoping is a
+        // correction, not a convenience. The first attempt required every document to
+        // examine a label, which is simply false: the catalogue, the confirmations and
+        // the unavailable pages render no form, and the catalogue's only labels are
+        // choice options. The test failed and was right to; the assumption was wrong.
+        //
+        // What remains is the failure mode actually worth catching, and it is not
+        // tautological: if `IsInsideAChoiceGroup` ever over-matched — excluding the
+        // booker fields, say — a document would carry `.ubookit-field` elements while
+        // the rule examined none of them, and `Every_labelled_control_sits_in_a_field`
+        // would pass by asking nothing.
         Assert.NotEmpty(ViewFixtures.Documents);
 
-        var examined = 0;
+        var barren = new List<string>();
+        var examining = 0;
 
         foreach (var rendered in ViewFixtures.Documents)
         {
             var document = await ParseAsync(rendered);
 
-            examined += document.QuerySelectorAll("label[for]")
+            if (!document.QuerySelectorAll(".ubookit-field").Any())
+            {
+                continue;
+            }
+
+            var examined = document.QuerySelectorAll("label[for]")
                 .Count(label => !IsInsideAChoiceGroup(label));
+
+            if (examined == 0)
+            {
+                barren.Add($"{rendered.Page.ViewPath} [{rendered.Page.State}]");
+            }
+            else
+            {
+                examining++;
+            }
         }
 
-        // The flows render seven `for=`-based labels between them across the fixture
-        // states; the exact number is not the point, but zero would make the rule a
-        // no-op and a handful would mean the fixtures stopped reaching the forms.
         Assert.True(
-            examined >= 7,
-            $"Only {examined} non-choice labels were examined across all documents, so "
-            + "the field rule is close to vacuous. Either the fixtures stopped reaching "
-            + "the forms or the selector stopped matching.");
+            barren.Count == 0,
+            "These documents render .ubookit-field elements but the rule examined no "
+            + "label in them: " + string.Join(", ", barren)
+            + ". The choice-group exclusion is over-matching, so the field rule passes "
+            + "by asking nothing.");
+
+        // And that the scoping did not quietly reduce the rule to nothing: the three
+        // flow pages render fields in every state their fixtures cover.
+        Assert.True(
+            examining >= 3,
+            $"Only {examining} document(s) exercised the field rule, so it is close to "
+            + "vacuous. The flow pages should all reach it.");
     }
 
     [Theory]

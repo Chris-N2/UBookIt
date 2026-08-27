@@ -192,6 +192,9 @@ Set any of these anywhere in your CSS — `:root` is the expected place. Every o
 its default expressed at the point of use, so nothing of ours competes with yours and
 you need no `!important` and no uBookIt selector.
 
+Defaults are given exactly as the stylesheet declares them, so this table can be
+compared against the file rather than trusted — a test asserts the two agree.
+
 | Token | Default | Controls |
 |---|---|---|
 | `--ubookit-space` | `1rem` | Panel padding, gap between start times |
@@ -206,8 +209,12 @@ you need no `!important` and no uBookIt selector.
 | `--ubookit-accent` | `auto` | Radio and checkbox accent |
 | `--ubookit-color-error` | `currentColor` | Error text, error summary border |
 | `--ubookit-color-muted` | `inherit` | Hint text — see the note below the table |
-| `--ubookit-color-border` | 35% of `currentColor` | Panel borders, notice rules |
+| `--ubookit-color-border` | `color-mix(in srgb, currentColor 35%, transparent)` | Panel borders, notice rules |
 | `--ubookit-color-surface` | `transparent` | Panel backgrounds |
+
+`color-mix(in srgb, currentColor 35%, transparent)` reads as "35% of whatever your text
+colour is, the rest see-through" — a faint rule that follows your palette instead of
+fighting it.
 
 **Setting a colour token transfers responsibility for its contrast to you** — see the
 accessibility section below. That is the whole reason the shipped defaults set no text

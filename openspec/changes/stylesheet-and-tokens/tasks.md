@@ -236,4 +236,54 @@ fact that the asset list is a pin rather than a rule.
 
 **After round 1: 1572 tests** (from 1453), 0 warnings, `validate --strict` clean.
 
-- [ ] 10.2 Re-review by the same QA subagent, which keeps its findings context
+- [x] 10.2 Re-review by the same QA subagent, which keeps its findings context
+
+### Round 2 — APPROVE WITH NITS (2026-08-27). No blockers. All findings still fixed.
+
+QA reproduced the build and suite, verified **29/29** spec scenarios, and confirmed the
+round-1 CRITICAL properly resolved — including the two things it was asked to doubt
+hardest: that `inherit`/`currentColor` on `color` genuinely leaves the host's pair
+untouched, and that inspecting the **token fallback** is the right scope, since the
+fallback is exactly what ships and the moment a site sets the token the contrast is
+theirs. It tried five evasions of the new predicate; all were rejected.
+
+**[MINOR] The replacement guard was STILL mechanism-shaped — third time for the same
+fault.** Fixing round 1's CRITICAL, I fenced `color:` — the declaration the defect
+happened to use — rather than the guarantee. Two routes reproduced a byte-identical
+result and failed nothing: **`opacity: 0.75`** on the same element (naming no colour, so
+even the value-vocabulary enumeration could not see it), and a **`background:`**
+shorthand altering the *other* half of the contrast pair, which the `(?<!-)` lookbehind
+excluded and the shorthand form never matched.
+
+Replaced with a **guarantee-shaped** rule: every declaration of any colour-affecting
+property (`color`, `background`, `background-color`, `background-image`, `opacity`,
+`filter`, `backdrop-filter`, `mix-blend-mode`, `text-shadow`,
+`-webkit-text-fill-color`) must default to something that leaves the host's contrast
+exactly as it was. Mutation-checked against **nine** routes, not one — including
+`opacity` verified against the real shipped file. The stylesheet header now records that
+this clause was corrected twice and why, so the next reader sees the shape of the
+mistake rather than only its conclusion.
+
+**[MINOR] A vacuity guard's comment asserted a property the code did not have.** It
+claimed per-document counting; it summed into one total, so one document going empty
+could be masked by another. **Fixed by making the code do what the comment promised**
+rather than softening the comment — and the first attempt at that failed the suite,
+correctly: "every document examines a label" is simply false, because the catalogue,
+the confirmations and the unavailable pages render no form and the catalogue's only
+labels are choice options. Now scoped to documents that render `.ubookit-field`, which
+is the failure actually worth catching: if the choice-group exclusion ever over-matched,
+a document would carry fields while the rule examined none of them.
+
+**Nits, all three taken.** The stale `color-scheme` reference in the approved-vocabulary
+comment is corrected. The docs table now quotes each default **exactly as the stylesheet
+declares it** — including the `color-mix`, with the friendly gloss moved to prose — and
+the test ties the **defaults** as well as the names, since the default column is what
+the accessibility boundary is stated against. Extracting those defaults needs
+paren-counting rather than regex, because a regex stopping at the first `)` truncates a
+nested `color-mix`. The `label[for]` assumption in `FieldHookTests` is recorded.
+
+**After round 2: 1572 tests, 0 warnings, `validate --strict` clean.**
+
+**QA's standing notes, carried rather than closed:** task 9.8 (the `default-frontend`
+Purpose correction) is owed **at sync**, and remains the only surviving statement of the
+un-narrowed claim. The stale `brand/tokens.css` memory has been corrected.

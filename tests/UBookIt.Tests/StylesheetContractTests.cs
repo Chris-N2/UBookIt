@@ -177,16 +177,48 @@ public class StylesheetContractTests
     }
 
     /// <summary>
-    /// Every value assigned to a text-colour property, with token fallbacks unwrapped
-    /// to what they actually resolve to when a site sets nothing.
+    /// Every property that can change the colour a visitor actually sees — both halves
+    /// of the contrast pair, and the compositing operations that alter either without
+    /// naming a colour at all.
+    /// <para>
+    /// This list is the rule. The first version of this guard fenced <c>color:</c>
+    /// alone, which is the declaration the shipped defect happened to use — and QA
+    /// pointed out that <c>opacity: 0.75</c> on the same element produces a
+    /// byte-identical result while failing no test, as would a <c>background:</c>
+    /// shorthand altering the other half of the pair. That is the *third* time in this
+    /// change that a rule has been written against the mechanism someone imagined
+    /// rather than the guarantee being made.
+    /// </para>
     /// </summary>
-    private static IReadOnlyList<string> TextColourValuesIn(string css)
+    private static readonly string[] ColourAffectingProperties =
+    [
+        "color",
+        "background",
+        "background-color",
+        "background-image",
+        "opacity",
+        "filter",
+        "backdrop-filter",
+        "mix-blend-mode",
+        "text-shadow",
+        "-webkit-text-fill-color",
+    ];
+
+    /// <summary>
+    /// Every declaration in the stylesheet whose property can affect rendered colour,
+    /// as (property, value) pairs.
+    /// </summary>
+    private static IReadOnlyList<(string Property, string Value)> ColourAffectingDeclarationsIn(string css)
     {
+        var pattern = @"(?<![\w-])(?<property>"
+            + string.Join("|", ColourAffectingProperties.Select(Regex.Escape))
+            + @")\s*:(?<value>[^;}]+)";
+
         return
         [
             .. Regex
-                .Matches(WithoutComments(css), @"(?<!-)\bcolor\s*:(?<value>[^;}]+)")
-                .Select(m => m.Groups["value"].Value.Trim()),
+                .Matches(WithoutComments(css), pattern)
+                .Select(m => (m.Groups["property"].Value.Trim(), m.Groups["value"].Value.Trim())),
         ];
     }
 
@@ -212,49 +244,77 @@ public class StylesheetContractTests
         // they are whatever the host already chose, which on a conformant host already
         // passes. `color-mix()` stays permitted for BORDERS, which carry no
         // information here and are decoration under 1.4.11.
-        var offenders = TextColourValuesIn(Stylesheet())
-            .Where(value => !IsContrastNeutral(value))
+        var offenders = ColourAffectingDeclarationsIn(Stylesheet())
+            .Where(declaration => !IsContrastNeutral(declaration.Value))
+            .Select(declaration => $"{declaration.Property}: {declaration.Value}")
             .ToList();
 
         Assert.True(
             offenders.Count == 0,
-            "A text colour is derived rather than inherited: "
+            "A declaration alters the colour a visitor sees: "
             + string.Join(" | ", offenders)
-            + ". A `color:` value may resolve only to currentColor or inherit. Anything "
-            + "computed from them — color-mix in particular — changes the contrast the "
-            + "host already established, and this package cannot see the background it "
-            + "would land on. Recede with font weight, or expose a token and let the "
-            + "site own the contrast of its own choice.");
+            + ". Every colour-affecting property must resolve, by default, to something "
+            + "that leaves the host's own contrast exactly as it was — currentColor, "
+            + "inherit, transparent, none, or a token whose fallback is one of those. "
+            + "This covers BOTH halves of the pair and the compositing operations that "
+            + "change either without naming a colour: `opacity: 0.75` reproduces the "
+            + "defect this rule exists for while naming no colour at all. Recede with "
+            + "font weight, or expose a token and let the site own the contrast of its "
+            + "own choice.");
     }
 
     [Fact]
     public void The_derived_text_colour_detector_fires_on_the_defect_it_was_written_for()
     {
-        // Mutation check, using the exact declaration that shipped and was rejected.
-        const string Shipped =
-            ".ubookit-hint { color: var(--ubookit-color-muted, color-mix(in srgb, currentColor 75%, transparent)); }";
+        // Every one of these renders text at reduced contrast. The first is the
+        // declaration that actually shipped; the rest are the routes QA found to the
+        // same outcome once the guard fenced only `color:`. A rule that catches only
+        // the first is fencing the mechanism, not the guarantee.
+        var defects = new[]
+        {
+            ".ubookit-hint { color: var(--ubookit-color-muted, color-mix(in srgb, currentColor 75%, transparent)); }",
+            ".ubookit-hint { opacity: 0.75; }",
+            ".ubookit-errors { background: color-mix(in srgb, currentColor 10%, transparent); }",
+            ".ubookit-errors { background-color: color-mix(in srgb, currentColor 10%, transparent); }",
+            ".ubookit-hint { filter: opacity(0.75); }",
+            ".ubookit-hint { -webkit-text-fill-color: color-mix(in srgb, currentColor 75%, transparent); }",
+            ".ubookit-hint { mix-blend-mode: multiply; }",
+            ".ubookit-hint { text-shadow: 0 0 2px currentColor; }",
+            ".ubookit-booking { background-image: linear-gradient(currentColor, transparent); }",
+        };
 
-        Assert.Single(TextColourValuesIn(Shipped));
+        foreach (var defect in defects)
+        {
+            var found = ColourAffectingDeclarationsIn(defect);
 
-        // The rule's predicate rejects it — not merely that the scan sees it.
-        Assert.DoesNotContain(TextColourValuesIn(Shipped), IsContrastNeutral);
+            Assert.NotEmpty(found);
 
-        // Permitted forms stay permitted, including a token fallback.
+            // The PREDICATE rejects it, not merely that the scan sees it — a predicate
+            // that degenerated to "always true" would otherwise pass this test.
+            Assert.DoesNotContain(found, declaration => IsContrastNeutral(declaration.Value));
+        }
+
+        // Permitted forms stay permitted, including token fallbacks and the neutral
+        // values the shipped file actually uses.
         foreach (var good in new[]
                  {
                      ".a { color: currentColor; }",
                      ".b { color: inherit; }",
                      ".c { color: var(--ubookit-color-error, currentColor); }",
                      ".d { color: var(--ubookit-color-muted, inherit); }",
+                     ".e { background: var(--ubookit-color-surface, transparent); }",
                  })
         {
-            Assert.All(TextColourValuesIn(good), value => Assert.True(IsContrastNeutral(value), value));
+            Assert.All(
+                ColourAffectingDeclarationsIn(good),
+                declaration => Assert.True(IsContrastNeutral(declaration.Value), declaration.Value));
         }
 
-        // Non-vacuity: the scan must find the shipped file's text colours, and must not
-        // be fooled by `accent-color` or `border-color` into thinking it covered them.
-        Assert.NotEmpty(TextColourValuesIn(Stylesheet()));
-        Assert.Empty(TextColourValuesIn(".x { accent-color: auto; border-color: currentColor; }"));
+        // Non-vacuity: the scan must find the shipped file's own declarations, and must
+        // not be fooled by properties that merely CONTAIN a listed name into thinking
+        // it has covered them.
+        Assert.NotEmpty(ColourAffectingDeclarationsIn(Stylesheet()));
+        Assert.Empty(ColourAffectingDeclarationsIn(".x { accent-color: auto; border-color: currentColor; }"));
     }
 
     /// <summary>
@@ -266,10 +326,14 @@ public class StylesheetContractTests
     /// </para>
     /// </summary>
     private static bool IsContrastNeutral(string value)
-        => Regex.IsMatch(
+    {
+        const string Neutral = @"currentColor|inherit|transparent|none|1";
+
+        return Regex.IsMatch(
             value,
-            @"^(currentColor|inherit|var\(\s*--ubookit-[A-Za-z0-9-]+\s*,\s*(currentColor|inherit)\s*\))$",
+            $@"^({Neutral}|var\(\s*--ubookit-[A-Za-z0-9-]+\s*,\s*({Neutral})\s*\))$",
             RegexOptions.IgnoreCase);
+    }
 
     [Fact]
     public void The_stylesheet_selects_on_no_id()
@@ -319,7 +383,7 @@ public class StylesheetContractTests
                 "currentColor",
                 "flex",
                 "in",           // the interpolation-space keyword of color-mix
-                "inherit",      // font-family, font-size, box-sizing, color-scheme
+                "inherit",      // font-family, font-size, box-sizing, muted text
                 "inline-block", // the wrapping run of start times
                 "px",           // the 24px target-size floor
                 "rem",
@@ -456,14 +520,85 @@ public class StylesheetContractTests
         // colour token moves that contrast to the site. So the table drifting from the
         // stylesheet does not merely mislead about layout — it silently misstates who
         // is responsible for a WCAG criterion.
+        var docs = RepoFiles.Read("docs/booking-page.md");
+
         var documented = Regex
-            .Matches(RepoFiles.Read("docs/booking-page.md"), @"`(?<token>--ubookit-[A-Za-z0-9-]+)`")
+            .Matches(docs, @"`(?<token>--ubookit-[A-Za-z0-9-]+)`")
             .Select(m => m.Groups["token"].Value)
             .Distinct(StringComparer.Ordinal)
             .Order(StringComparer.Ordinal)
             .ToList();
 
         Assert.Equal(PublishedTokens.Order(StringComparer.Ordinal), documented);
+
+        // The DEFAULTS too, not only the names. Tying names alone leaves the column a
+        // site author actually reads free to drift — and it is the column the
+        // accessibility statement's boundary depends on, since "setting a colour token
+        // moves that contrast to you" only makes sense against a stated default.
+        //
+        // The table therefore quotes each default exactly as the stylesheet declares
+        // it, including the color-mix, with the friendly gloss in prose underneath
+        // rather than in the cell.
+        var css = WithoutComments(Stylesheet());
+
+        foreach (var token in PublishedTokens)
+        {
+            var declared = FallbackOf(css, token);
+
+            Assert.NotNull(declared);
+
+            var row = Regex.Match(docs, @"\|\s*`" + Regex.Escape(token) + @"`\s*\|\s*`(?<default>[^`]+)`\s*\|");
+
+            Assert.True(row.Success, $"{token} has no table row quoting its default as code.");
+
+            Assert.Equal(Normalise(declared!), Normalise(row.Groups["default"].Value));
+        }
+
+        static string Normalise(string value) => Regex.Replace(value, @"\s+", " ").Trim();
+    }
+
+    /// <summary>
+    /// The fallback a token is read with, extracted by counting parentheses rather than
+    /// by regex.
+    /// <para>
+    /// A regex stopping at the first <c>)</c> truncates
+    /// <c>var(--x, color-mix(in srgb, currentColor 35%, transparent))</c> to a value
+    /// missing its closer — which is what the first version of this check did, and it
+    /// failed loudly rather than silently only by luck of the comparison.
+    /// </para>
+    /// </summary>
+    private static string? FallbackOf(string css, string token)
+    {
+        var start = css.IndexOf($"var({token}, ", StringComparison.Ordinal);
+
+        if (start < 0)
+        {
+            return null;
+        }
+
+        var cursor = start + $"var({token}, ".Length;
+        var depth = 0;
+
+        for (var i = cursor; i < css.Length; i++)
+        {
+            switch (css[i])
+            {
+                case '(':
+                    depth++;
+                    break;
+
+                // The close that brings us below the `var(` we opened is the end of the
+                // fallback, however many nested functions sit inside it.
+                case ')' when depth == 0:
+                    return css[cursor..i];
+
+                case ')':
+                    depth--;
+                    break;
+            }
+        }
+
+        return null;
     }
 
     [Fact]

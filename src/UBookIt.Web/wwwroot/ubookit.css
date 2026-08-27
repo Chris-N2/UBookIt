@@ -14,9 +14,13 @@
        (a) No literal colour. `transparent`, `currentColor` and `inherit` are
            permitted, because none of them picks a hue.
 
-       (b) **NO DERIVED colour on TEXT.** A `color:` declaration may resolve only
-           to `currentColor` or `inherit`. `color-mix()` is permitted for
-           DECORATION — borders and rules — and forbidden for text.
+       (b) **NOTHING HERE ALTERS THE CONTRAST THE HOST ESTABLISHED.** Every
+           declaration of a colour-affecting property — `color`, `background`,
+           `background-color`, `background-image`, `opacity`, `filter`,
+           `backdrop-filter`, `mix-blend-mode`, `text-shadow`,
+           `-webkit-text-fill-color` — must default to `currentColor`, `inherit`,
+           `transparent`, `none` or `1`. `color-mix()` is permitted only for
+           BORDER colours, which are decoration here.
 
        Half (b) exists because the first version of this file got it wrong in a way
        that looked obviously safe. `.ubookit-hint` used
@@ -25,6 +29,13 @@
        text at 75% alpha *reduces contrast*: a host with AA-conformant body text at
        `#767676` (4.54:1) got a hint at 2.86:1. The shipped default failed 1.4.3 on
        most real sites with nothing overridden.
+
+       Note the SHAPE of (b), because it was corrected twice. It first said "no
+       literal colour", which the defect satisfied. It then said "no derived colour
+       on text", which `opacity: 0.75` on the same element satisfies while producing
+       a byte-identical result. Both were rules about the mechanism someone imagined
+       a violation would use. (b) is now a rule about the guarantee: whatever the
+       property, the default must leave the host's own contrast exactly as it was.
 
        Emphasis on text is therefore carried by font weight, and recession by
        nothing at all unless a site opts in via `--ubookit-color-muted` and takes
