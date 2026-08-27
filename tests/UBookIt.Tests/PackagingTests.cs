@@ -275,8 +275,14 @@ public class PackagingTests
             + "replaced by an upgrade; anywhere else it is compiled into the assembly "
             + "and served by nothing.");
 
-        // Non-vacuity: a scan finding no assets at all would permit everything. The
-        // package ships exactly one, and it is the stylesheet.
+        // Scope, stated because the test name is broader than the scan: only
+        // `UBookIt.Web` is examined, because it is the only project that ships
+        // front-end assets. `UBookIt.Backoffice` has its own `wwwroot` for the
+        // backoffice client, which is a different delivery story and not governed here.
+        //
+        // Non-vacuity: a scan finding no assets at all would permit everything. This is
+        // a PIN, not a rule — it will need editing the day the deferred JS layer ships,
+        // and that is intended: a second asset should be a decision, not a discovery.
         var assets = RepoFiles
             .Paths("src/UBookIt.Web/wwwroot", "*")
             .Select(path => Path.GetFileName(path))

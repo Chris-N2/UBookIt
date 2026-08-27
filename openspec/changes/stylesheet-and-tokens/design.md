@@ -73,6 +73,24 @@ font weight, plus colours *derived* from `currentColor`.
 
 **Rejected:** a complete neutral palette the site re-tokens to rebrand.
 
+> **CORRECTED AT QA ROUND 1 — the argument below was half wrong, and the half that was
+> wrong was the decisive one.** "We ship no colour pair that can fail, because we ship no
+> colour pair" was **false as implemented**. `.ubookit-hint` derived its colour as
+> `color-mix(in srgb, currentColor 75%, transparent)`, which names no hue and therefore
+> read as consistent with posture A — but compositing text toward transparency *reduces*
+> contrast, so a host with body text at exactly AA-conformant `#767676` rendered the hint
+> at 2.86:1.
+>
+> **"Declares no literal colour" and "cannot fail contrast" are not the same claim**, and
+> the whole guard set was built on the first while the accessibility statement rested on
+> the second. Posture A survives, but only with an added clause: **derived colour is for
+> decoration, never for text.** A `color:` value may resolve only to `currentColor` or
+> `inherit`. That is now a spec requirement with its own test and mutation check.
+>
+> Worth keeping as the generalisable lesson: the guard looked for the *mechanism* someone
+> imagined a violation would use (a hex literal) rather than for the *property* being
+> guaranteed (contrast not reduced). Same shape as [[rule-checks-mechanism-not-guarantee]].
+
 The requirement is "make it possible for somebody to make it look like their site".
 Inheriting *is* looking like their site, achieved with zero configuration; a
 re-tokenable palette only wins for someone who wants a look unlike their own site,

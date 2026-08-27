@@ -69,7 +69,22 @@ public class StylesheetContractTests
     /// balance the nested parentheses that <c>color-mix()</c> fallbacks introduce.
     /// </summary>
     private static IReadOnlyList<string> TokenDeclarationsIn(string css)
-        => [.. Regex.Matches(css, @"--ubookit-[A-Za-z-]+\s*:").Select(m => m.Value.Trim())];
+        => [.. Regex.Matches(css, @"--ubookit-[A-Za-z0-9-]+\s*:").Select(m => m.Value.Trim())];
+
+    [Fact]
+    public void The_token_pattern_matches_a_name_containing_a_digit()
+    {
+        // The character class was `[A-Za-z-]+` and could not reach the colon in
+        // `--ubookit-space2:` — backtracking stops at the digit — so such a token was
+        // invisible to BOTH halves of the D2 guard: the declaration rule above and the
+        // read/documented cross-check below. No token has a digit today, which is
+        // exactly why this needs asserting rather than observing: the hole opens the
+        // day someone adds one, in the guard this change calls its single
+        // silent-failure point.
+        Assert.NotEmpty(TokenDeclarationsIn(".a { --ubookit-space2: 1rem; }"));
+        Assert.NotEmpty(TokenDeclarationsIn(".a { --ubookit-space-2: 1rem; }"));
+        Assert.Empty(TokenDeclarationsIn(".a { gap: var(--ubookit-space2, 1rem); }"));
+    }
 
     [Fact]
     public void No_token_default_is_declared_on_an_element()
@@ -161,6 +176,101 @@ public class StylesheetContractTests
         Assert.Empty(ColourSyntaxOffencesIn("a { color: color-mix(in srgb, currentColor 50%, transparent); }"));
     }
 
+    /// <summary>
+    /// Every value assigned to a text-colour property, with token fallbacks unwrapped
+    /// to what they actually resolve to when a site sets nothing.
+    /// </summary>
+    private static IReadOnlyList<string> TextColourValuesIn(string css)
+    {
+        return
+        [
+            .. Regex
+                .Matches(WithoutComments(css), @"(?<!-)\bcolor\s*:(?<value>[^;}]+)")
+                .Select(m => m.Groups["value"].Value.Trim()),
+        ];
+    }
+
+    [Fact]
+    public void No_text_colour_is_derived_only_inherited()
+    {
+        // THE GUARD THE ORIGINAL SET COULD NOT PROVIDE, and the reason it could not.
+        //
+        // Every other colour rule here asks "is this a literal colour?". A derived
+        // colour is not literal, so it passed all of them — and the mutation check on
+        // the syntax rule explicitly asserts that
+        // `color-mix(in srgb, currentColor 50%, transparent)` is clean. The guards
+        // were not merely silent about the defect; one of them certified it.
+        //
+        // The defect: `.ubookit-hint` composited text at 75% alpha, which REDUCES
+        // contrast. A host with AA-conformant body text at #767676 (4.54:1) rendered
+        // the hint at 2.86:1. The host's own text had to be about 9:1 before the
+        // derived hint reached AA. So the shipped default failed 1.4.3 on most real
+        // sites, in the package whose stated differentiator is accessibility.
+        //
+        // The rule that replaces "no literal colour" for text: a `color:` declaration
+        // may resolve only to `currentColor` or `inherit`. Both are contrast-neutral —
+        // they are whatever the host already chose, which on a conformant host already
+        // passes. `color-mix()` stays permitted for BORDERS, which carry no
+        // information here and are decoration under 1.4.11.
+        var offenders = TextColourValuesIn(Stylesheet())
+            .Where(value => !IsContrastNeutral(value))
+            .ToList();
+
+        Assert.True(
+            offenders.Count == 0,
+            "A text colour is derived rather than inherited: "
+            + string.Join(" | ", offenders)
+            + ". A `color:` value may resolve only to currentColor or inherit. Anything "
+            + "computed from them — color-mix in particular — changes the contrast the "
+            + "host already established, and this package cannot see the background it "
+            + "would land on. Recede with font weight, or expose a token and let the "
+            + "site own the contrast of its own choice.");
+    }
+
+    [Fact]
+    public void The_derived_text_colour_detector_fires_on_the_defect_it_was_written_for()
+    {
+        // Mutation check, using the exact declaration that shipped and was rejected.
+        const string Shipped =
+            ".ubookit-hint { color: var(--ubookit-color-muted, color-mix(in srgb, currentColor 75%, transparent)); }";
+
+        Assert.Single(TextColourValuesIn(Shipped));
+
+        // The rule's predicate rejects it — not merely that the scan sees it.
+        Assert.DoesNotContain(TextColourValuesIn(Shipped), IsContrastNeutral);
+
+        // Permitted forms stay permitted, including a token fallback.
+        foreach (var good in new[]
+                 {
+                     ".a { color: currentColor; }",
+                     ".b { color: inherit; }",
+                     ".c { color: var(--ubookit-color-error, currentColor); }",
+                     ".d { color: var(--ubookit-color-muted, inherit); }",
+                 })
+        {
+            Assert.All(TextColourValuesIn(good), value => Assert.True(IsContrastNeutral(value), value));
+        }
+
+        // Non-vacuity: the scan must find the shipped file's text colours, and must not
+        // be fooled by `accent-color` or `border-color` into thinking it covered them.
+        Assert.NotEmpty(TextColourValuesIn(Stylesheet()));
+        Assert.Empty(TextColourValuesIn(".x { accent-color: auto; border-color: currentColor; }"));
+    }
+
+    /// <summary>
+    /// Whether a text-colour value leaves the host's established contrast alone.
+    /// <para>
+    /// Only <c>currentColor</c> and <c>inherit</c> do — they are whatever the host
+    /// already chose, which on a conformant host already passes. A token is neutral
+    /// exactly when its own fallback is, since the fallback is what ships.
+    /// </para>
+    /// </summary>
+    private static bool IsContrastNeutral(string value)
+        => Regex.IsMatch(
+            value,
+            @"^(currentColor|inherit|var\(\s*--ubookit-[A-Za-z0-9-]+\s*,\s*(currentColor|inherit)\s*\))$",
+            RegexOptions.IgnoreCase);
+
     [Fact]
     public void The_stylesheet_selects_on_no_id()
     {
@@ -235,6 +345,39 @@ public class StylesheetContractTests
 
     // ------------------------------------------------------ native controls ----
 
+    /// <summary>
+    /// Selectors that reach a native control — by element name, and by the classes the
+    /// package puts directly ON one. `.ubookit-submit` is on the `button` elements
+    /// themselves, so a rule matching only element names never saw it and `padding` or
+    /// `border-radius` added there passed both this rule and the colour rules.
+    /// </summary>
+    private static bool ReachesANativeControl(string selector)
+        => Regex.IsMatch(selector, @"\b(button|select|input|textarea)\b")
+        || selector.Contains("ubookit-submit", StringComparison.Ordinal);
+
+    [Fact]
+    public void The_native_control_rule_examines_something()
+    {
+        // The vacuity guard. This rule can only fail by finding an offending property,
+        // so a selector pattern that matched nothing would report a clean bill of
+        // health forever — and it is the one rule in this change that shipped without
+        // either a vacuity guard or a mutation check.
+        var blocks = Regex.Matches(WithoutComments(Stylesheet()), @"(?<selector>[^{}]+)\{(?<body>[^{}]*)\}")
+            .Select(m => m.Groups["selector"].Value)
+            .Where(ReachesANativeControl)
+            .ToList();
+
+        Assert.NotEmpty(blocks);
+
+        // And that it reaches the submit-button class, which it previously did not.
+        Assert.Contains(blocks, selector => selector.Contains("ubookit-submit", StringComparison.Ordinal));
+
+        // Mutation check on the predicate itself.
+        Assert.True(ReachesANativeControl(".ubookit-booking button"));
+        Assert.True(ReachesANativeControl(".ubookit-submit"));
+        Assert.False(ReachesANativeControl(".ubookit-field > label"));
+    }
+
     [Fact]
     public void Native_controls_carry_nothing_but_a_target_size()
     {
@@ -252,7 +395,7 @@ public class StylesheetContractTests
         {
             var selector = block.Groups["selector"].Value;
 
-            if (!Regex.IsMatch(selector, @"\b(button|select|input)\b"))
+            if (!ReachesANativeControl(selector))
             {
                 continue;
             }
@@ -269,6 +412,61 @@ public class StylesheetContractTests
     }
 
     [Fact]
+    public void The_choice_rows_keep_both_halves_of_the_target_spacing()
+    {
+        // 2.5.8 conformance for the start times and the catalogue rests on the SPACING
+        // exception — undersized targets whose centres are 24px apart — not on target
+        // size, because the real targets are the radio (~13px) and its inline label,
+        // and neither reaches 24px. The spacing comes from `min-height` AND the margins
+        // together.
+        //
+        // So the margins are load-bearing for conformance rather than cosmetic, and the
+        // original comment in the stylesheet said the opposite ("the row is the
+        // target"). A future edit tidying away "spacing" margins would have silently
+        // dropped 2.5.8 with every test green. Asserted here so it cannot.
+        var css = WithoutComments(Stylesheet());
+
+        foreach (var selector in new[] { ".ubookit-times-option", ".ubookit-catalogue-choice" })
+        {
+            var block = Regex.Match(css, Regex.Escape(selector) + @"\s*(,[^{]*)?\{(?<body>[^}]*)\}");
+
+            Assert.True(block.Success, $"{selector} has no rule at all.");
+
+            var body = block.Groups["body"].Value;
+
+            Assert.Contains("min-height", body, StringComparison.Ordinal);
+            Assert.True(
+                Regex.IsMatch(body, @"\bmargin(-block-end|-inline-end|-block|-inline|)\s*:"),
+                $"{selector} declares min-height but no margin. Both are needed: 2.5.8 is "
+                + "met here by centre-to-centre spacing, not by the size of the target, so "
+                + "removing the margin removes the conformance.");
+        }
+    }
+
+    [Fact]
+    public void The_documentation_publishes_exactly_the_tokens_that_exist()
+    {
+        // design.md recorded this as a mitigation — "tie the statement to the token
+        // list, so that adding a colour token forces the statement to be revisited" —
+        // and then it was not built. A risk logged as mitigated and left unmitigated is
+        // worse than one logged as open, because the next reader stops looking.
+        //
+        // The token table is where a site author learns what it may set, and the
+        // accessibility statement's whole boundary is drawn in terms of it: setting a
+        // colour token moves that contrast to the site. So the table drifting from the
+        // stylesheet does not merely mislead about layout — it silently misstates who
+        // is responsible for a WCAG criterion.
+        var documented = Regex
+            .Matches(RepoFiles.Read("docs/booking-page.md"), @"`(?<token>--ubookit-[A-Za-z0-9-]+)`")
+            .Select(m => m.Groups["token"].Value)
+            .Distinct(StringComparer.Ordinal)
+            .Order(StringComparer.Ordinal)
+            .ToList();
+
+        Assert.Equal(PublishedTokens.Order(StringComparer.Ordinal), documented);
+    }
+
+    [Fact]
     public void Every_published_token_is_read_and_nothing_undocumented_is()
     {
         // Both directions. A documented token nothing reads is a promise the
@@ -278,7 +476,7 @@ public class StylesheetContractTests
         var css = WithoutComments(Stylesheet());
 
         var read = Regex
-            .Matches(css, @"var\(\s*(?<token>--ubookit-[A-Za-z-]+)")
+            .Matches(css, @"var\(\s*(?<token>--ubookit-[A-Za-z0-9-]+)")
             .Select(m => m.Groups["token"].Value)
             .Distinct(StringComparer.Ordinal)
             .Order(StringComparer.Ordinal)

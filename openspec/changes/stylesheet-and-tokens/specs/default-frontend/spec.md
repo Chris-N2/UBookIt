@@ -12,11 +12,27 @@ placeholder alone. Each flow SHALL be fully operable by keyboard. Each page SHAL
 remain usable, with a logical reading and focus order, when no author stylesheet is
 applied.
 
-Criteria determined by **CSS rather than markup** — 1.4.3 and 1.4.11 (contrast),
-2.4.11 and 2.4.13 (focus appearance), and 2.5.8 (target size) — SHALL be met by the
-shipped stylesheet at its default token values, and SHALL become the consuming site's
+Criteria determined by **CSS rather than markup** — 1.4.3 (text contrast), 2.4.11 and
+2.4.13 (focus appearance), and 2.5.8 (target size) — SHALL be met by the shipped
+stylesheet at its default token values, and SHALL become the consuming site's
 responsibility for any token that site overrides. The package SHALL NOT claim those
 criteria for a rendering it did not style.
+
+**The shipped stylesheet SHALL set no text colour of its own.** Every `color`
+declaration SHALL resolve, at its default, to `currentColor` or `inherit` — that is, to
+whatever the host page already chose. A *derived* colour SHALL NOT be used for text
+even though it names no hue: compositing text toward transparency reduces its contrast,
+so a derivation from a conformant host colour can be non-conformant. This is the clause
+that makes 1.4.3 true of the default rather than merely argued, and it was learned by
+shipping the opposite: a hint derived at 75% of the host's text colour rendered at
+2.9:1 on a host whose own body text was exactly AA-conformant.
+
+**1.4.11 (non-text contrast) is NOT claimed for the package's decorative borders, and
+that exemption SHALL be stated rather than implied.** The rule beside a notice and the
+border around the confirmation panel default below 3:1. Both are decoration: neither
+carries information, every message they mark is stated in full in adjacent text, and
+neither is a boundary a visitor must perceive to operate a control. Where a border
+*does* bound a control or convey meaning, it SHALL meet 1.4.11.
 
 This narrowing states a bar that was never held rather than lowering one that was.
 The package shipped no stylesheet at all until this change, so those five criteria
@@ -71,7 +87,15 @@ catalogue when it is rendered as a chooser — it SHALL be a grouped set with a
 
 #### Scenario: The CSS-determined criteria are met by the shipped defaults
 - **WHEN** a flow is rendered with the shipped stylesheet applied and no token overridden
-- **THEN** contrast, focus appearance and target size are met, and no colour pair the package chose can fail because the package chooses none
+- **THEN** text contrast, focus appearance and target size are met, and text contrast cannot fail because every text colour resolves to what the host already chose
+
+#### Scenario: A derived text colour fails
+- **WHEN** the stylesheet sets a `color` whose default resolves to anything other than `currentColor` or `inherit` — including a derivation of them that names no hue
+- **THEN** the check fails, naming the value — because a derivation can reduce the contrast a conformant host had established
+
+#### Scenario: A decorative border is exempt from 1.4.11 and says so
+- **WHEN** the package's default border colours are below 3:1
+- **THEN** the borders they draw carry no information and bound no control, and the exemption is stated in the published accessibility statement rather than left implied
 
 #### Scenario: The published statement names its own boundary
 - **WHEN** the accessibility statement is published
@@ -86,9 +110,17 @@ catalogue when it is rendered as a chooser — it SHALL be a grouped set with a
 ### Requirement: A default stylesheet ships, and makes no colour decision
 The package SHALL ship a stylesheet as a static web asset served at
 `_content/UBookIt.Web/ubookit.css`. It SHALL style layout, spacing and arrangement,
-and SHALL NOT declare a literal colour value for any property. Colour and typography
-SHALL inherit from the host page, so that the flow takes on the surrounding site's
-appearance with no configuration at all.
+and SHALL NOT declare a literal colour value for any property. **Colour SHALL inherit
+from the host page**, so that the flow takes on the surrounding site's appearance with
+no configuration at all.
+
+Typography SHALL inherit **except for two named floors**, which are stated as
+exceptions rather than left to be discovered in the file: a `line-height` of 1.5, and
+`font-weight` where it distinguishes a field's label or an error from body text. The
+line-height floor overrides a host value below it *and above it*, so a site wanting
+pure inheritance sets `--ubookit-line-height: inherit`. Both floors are legibility
+minima that cost the host nothing to concede; neither is an appearance choice, and
+nothing else in the file overrides inherited type.
 
 Emphasis that would conventionally be carried by colour — an error, a notice — SHALL
 be carried by properties that cannot clash with an unknown host: `currentColor`,

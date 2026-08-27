@@ -144,4 +144,96 @@ it in its own step means §5's suite delta has exactly one cause.
 
 ## 10. QA rounds
 
-- [ ] 10.1 Record each QA round's findings and their disposition here, as previous changes have
+- [x] 10.1 Record each QA round's findings and their disposition here, as previous changes have
+
+### Round 1 — REJECT (2026-08-27). 1 CRITICAL, 2 MAJOR, 6 MINOR, 3 nits. All addressed.
+
+QA independently reproduced the build and suite, and verified 24/27 spec scenarios. It
+confirmed as sound: the MODIFIED requirement's guarantee diff (all nine SHALLs, all five
+scenarios), the honesty of the AA narrowing, the D2 mechanic and detector, both
+exclusions and their vacuity guards, the enumeration tests' non-vacuity, and that no
+modified existing test weakened an assertion.
+
+**CRITICAL — the shipped default DID decide a colour, and failed 1.4.3 on most hosts.**
+`.ubookit-hint` used `color-mix(in srgb, currentColor 75%, transparent)`. Compositing
+text toward transparency **reduces** contrast: a host with body text at `#767676` —
+exactly AA-conformant at 4.54:1 — got a hint at **2.86:1**. The host's own text had to be
+≈9:1 before the derived hint reached AA.
+
+The two halves of D1's argument come apart precisely here: *"declares no literal colour"*
+is **true** of the file; *"therefore contrast is unfailable by construction"* is **false**.
+Every guard looked for *literal* colours, so the defect passed all of them — and task
+6.2's mutation check **explicitly asserts that this exact construct is clean**. The guards
+did not merely miss it; one certified it.
+
+It mattered concretely: `.ubookit-hint` carries the "this booking needs N people, you
+choose one" disclosure that ⑩-1 made a requirement so a control cannot imply a choice it
+does not honour. Before this change that text inherited the host's colour and could not
+fail. **The change introduced an AA failure that did not previously exist**, in the area
+CLAUDE.md names as the differentiator.
+
+Fixed by **deleting the derivation, not by adjusting it**: the default is now `inherit`,
+so the package decides nothing and the claim is true rather than argued. The token
+remains for a site that wants recession and can pick a value that passes on its own
+background. A new rule replaces "no literal colour" for text — **a `color:` value may
+resolve only to `currentColor` or `inherit`; `color-mix()` stays permitted for
+decoration** — with a mutation check using the exact declaration that shipped. Four claim
+sites corrected: the delta, `design.md` D1, `CLAUDE.md:5`, `docs/booking-page.md`.
+
+**MAJOR — 1.4.11 claimed for 35%-alpha borders with no stated exemption.** The notice
+rule and confirmation panel border sit well under 3:1. The exemption is legitimate —
+neither carries information, every message they mark is fully in adjacent text, neither
+bounds a control — but it was **implied rather than stated**, which is the difference
+between an exemption and an overclaim. Now stated explicitly in the delta, in
+`docs/booking-page.md`, and in the stylesheet header.
+
+**MAJOR — the `default-frontend` Purpose (9.8).** Already recorded; QA flagged it because
+it is now the **only** place the un-narrowed claim survives and it is enforced by a
+checkbox. Still owed **at sync**.
+
+**MINOR — the D2 detector could be fooled by a digit in a token name.**
+`--ubookit-[A-Za-z-]+` cannot backtrack to the colon in `--ubookit-space2:`, so such a
+token was invisible to *both* halves of the guard the change calls its single
+silent-failure point. Widened to `[A-Za-z0-9-]+` and asserted, precisely because no token
+has a digit today — the hole opens the day one does.
+
+**MINOR — the native-control rule had no vacuity guard and could not see
+`.ubookit-submit`.** It matched element names only, so `padding` or `border-radius` on the
+submit class passed it *and* the colour rules. It was the one test in the change with
+neither a vacuity guard nor a mutation check. Both added; the predicate now covers classes
+the package puts directly on a control.
+
+**MINOR — the field-hook rule caught removals but not additions.** A pinned source count
+of 8 stays 8 when a new field is written without the class, while the spec's claim is the
+broader "each label-and-control group carries the field class". Closed with a structural
+rule over the **rendered document** (`FieldHookTests`): every non-choice `label[for]` must
+have a `.ubookit-field` ancestor, plus the converse — a field must never wrap a choice
+group, which would stack 35 start times into a column. Mutation-checked; it fires across
+every state naming view, state and label.
+
+**MINOR — a mitigation recorded in `design.md` was never built.** "Tie the statement to
+the token list, so adding a colour token forces the statement to be revisited." **Built
+rather than downgraded**: a test now asserts `docs/booking-page.md` publishes exactly the
+14 tokens. A risk logged as mitigated and left open is worse than one logged as open,
+because the next reader stops looking.
+
+**MINOR — "Colour and typography SHALL inherit" overstated the code.** `line-height: 1.5`
+overrides a host value *above* it as well as below, and `font-weight: 600` is set in two
+places. The delta now names both as explicit legibility floors, and says how to opt out.
+
+**MINOR — the 2.5.8 rationale was wrong.** The comment said "the row is the target"; the
+row is a `div`, and the real targets are the radio (~13px) and its inline label (~19px).
+Conformance actually rests on the **spacing exception** (centres ≥24px apart), which means
+**the margins are load-bearing, not cosmetic** — and the wrong comment would have let a
+future tidy-up remove them with the suite green. Reasoning corrected and now guarded: a
+test asserts both `min-height` and a margin are present on both choice-row rules.
+
+**Nits, all three taken.** `color-scheme: inherit` was dead CSS reading as a decision —
+removed, with a comment explaining that declaring nothing is what achieves inheritance.
+The `ViewInventoryTests` comment overclaimed that it would catch a file rename — corrected
+to say which tests actually do. `PackagingTests`' scan scope is now stated, along with the
+fact that the asset list is a pin rather than a rule.
+
+**After round 1: 1572 tests** (from 1453), 0 warnings, `validate --strict` clean.
+
+- [ ] 10.2 Re-review by the same QA subagent, which keeps its findings context

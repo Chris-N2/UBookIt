@@ -4,18 +4,43 @@
     TWO RULES GOVERN THIS FILE. Both are spec requirements, not house style, and
     both are enforced by tests that will fail rather than warn.
 
-    1. NO COLOUR DECISION. This file declares no literal colour that renders a
-       hue — no hex, no rgb(), no hsl(), no named colour. Colour and typography
-       inherit from the host page, so the flow takes on the surrounding site's
-       appearance with no configuration at all. Emphasis that would conventionally
-       be carried by colour is carried by `currentColor`, border weight and font
-       weight instead. `transparent`, `currentColor`, `inherit` and `color-mix()`
-       over those are permitted, because none of them picks a hue.
+    1. NO COLOUR DECISION — AND "DERIVED" STILL COUNTS AS A DECISION.
+       This file declares no literal colour that renders a hue: no hex, no rgb(),
+       no hsl(), no named colour. Colour inherits from the host page, so the flow
+       takes on the surrounding site's appearance with no configuration at all.
 
-       The reason is not modesty. A colour chosen here sits on a background this
-       package has never seen, so its contrast is not computable and any claim
-       about it would be unfounded. Choosing none is what lets the accessibility
-       statement say the shipped default cannot fail contrast.
+       The rule has two halves, and the second was learned the hard way:
+
+       (a) No literal colour. `transparent`, `currentColor` and `inherit` are
+           permitted, because none of them picks a hue.
+
+       (b) **NO DERIVED colour on TEXT.** A `color:` declaration may resolve only
+           to `currentColor` or `inherit`. `color-mix()` is permitted for
+           DECORATION — borders and rules — and forbidden for text.
+
+       Half (b) exists because the first version of this file got it wrong in a way
+       that looked obviously safe. `.ubookit-hint` used
+       `color-mix(in srgb, currentColor 75%, transparent)`, reasoning that deriving
+       from the host's own colour could not clash. It cannot clash, but compositing
+       text at 75% alpha *reduces contrast*: a host with AA-conformant body text at
+       `#767676` (4.54:1) got a hint at 2.86:1. The shipped default failed 1.4.3 on
+       most real sites with nothing overridden.
+
+       Emphasis on text is therefore carried by font weight, and recession by
+       nothing at all unless a site opts in via `--ubookit-color-muted` and takes
+       responsibility for what it chooses.
+
+       The reason for all of this is not modesty. A colour chosen here sits on a
+       background this package has never seen, so its contrast is not computable and
+       any claim about it would be unfounded. Deciding none is what lets the
+       accessibility statement say the shipped default cannot fail contrast — and
+       that claim is only true while half (b) holds.
+
+       Borders keep their derived colour deliberately: `.ubookit-notice`'s rule and
+       `.ubookit-confirmation`'s panel border carry no information — every message
+       they mark is fully stated in text beside them — so they are decoration under
+       1.4.11 rather than a UI component contrast requirement. That exemption is
+       stated in the docs rather than left implied.
 
     2. NO TOKEN DEFAULT IS DECLARED ON AN ELEMENT. Every token appears only as
        `var(--ubookit-x, <default>)` at its point of use. Custom properties
@@ -43,10 +68,14 @@
 .ubookit-confirmation {
     box-sizing: border-box;
 
-    /* Follow the host's light/dark setting rather than imposing one. */
-    color-scheme: inherit;
+    /* `color-scheme` is deliberately NOT set here. It is an inherited property, so
+       the host's value already reaches us and `color-scheme: inherit` was dead CSS
+       dressed up as a decision — it read as "we opt into the host's light/dark
+       setting" when in fact declaring nothing achieves precisely that, and setting
+       anything is the only way to break it. Measured: with a host at
+       `color-scheme: dark`, the native controls inside the flow go dark either way. */
 
-    /* All three inherit by default: the flow adopts the host page's type. */
+    /* Both inherit by default: the flow adopts the host page's type. */
     font-family: var(--ubookit-font-family, inherit);
     font-size: var(--ubookit-font-size, inherit);
 
@@ -117,10 +146,20 @@
     margin-inline-end: var(--ubookit-space, 1rem);
     margin-block-end: var(--ubookit-field-gap, 0.35rem);
 
-    /* 2.5.8 target size. The row is the target, not the radio: the label is
-       associated by `for`, so clicking either activates the control. A hard
-       constant rather than a token — a token would invite a site to set it below
-       the floor, and a floor a site can lower is not a floor. */
+    /* 2.5.8, and the mechanism is the SPACING exception rather than target size —
+       a correction, because the original comment here said "the row is the target"
+       and that is wrong. The row is a `div`; the actual targets are the radio
+       (~13px) and its `label`, which is inline and so has a content-height hit box
+       (~19px at 16px/1.5). Neither reaches 24px.
+
+       What satisfies 2.5.8 is the exception for undersized targets whose CENTRES
+       are at least 24px apart. That spacing comes from `min-height` and the margins
+       together — so **the margins below are load-bearing for conformance, not
+       cosmetic**, which is exactly what the wrong comment would have let someone
+       remove. Guarded by a test asserting both are present.
+
+       Hard constants rather than tokens: a token would invite a site to set the
+       floor below itself, and a floor a site can lower is not a floor. */
     min-height: 24px;
 }
 
@@ -160,10 +199,24 @@
 }
 
 .ubookit-hint {
-    /* Recessive without being low-contrast: mixing toward transparent keeps the
-       relationship to the host's own text colour rather than picking a grey that
-       might vanish on its background. */
-    color: var(--ubookit-color-muted, color-mix(in srgb, currentColor 75%, transparent));
+    /* NO recession by default, and this is a correction rather than an omission.
+       This rule previously defaulted to `color-mix(in srgb, currentColor 75%,
+       transparent)`, which reads as safe — it derives from the host's own colour —
+       and is not: compositing text at 75% alpha *reduces* its contrast. A host with
+       body text at `#767676`, which is exactly AA-conformant at 4.54:1, got a hint
+       at 2.86:1. The host's text had to be about 9:1 or better before the derived
+       hint reached AA, so on most real sites the shipped default FAILED 1.4.3 with
+       no token overridden.
+
+       It survived every guard in this package because the guards look for *literal*
+       colours, and one of their mutation checks explicitly asserts that this exact
+       construct passes. Found by QA, not by the suite.
+
+       The token stays, so a site that wants recession can have it and owns the
+       contrast of what it chooses. What the package ships decides nothing — which is
+       what makes "the shipped default cannot fail contrast" true rather than merely
+       argued. See the rule below: derived colour is for decoration, never for text. */
+    color: var(--ubookit-color-muted, inherit);
     max-width: var(--ubookit-measure, 34rem);
 }
 

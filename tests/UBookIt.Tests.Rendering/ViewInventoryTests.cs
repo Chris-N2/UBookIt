@@ -62,8 +62,10 @@ public class ViewInventoryTests
 
         var emitter = RepoFiles.Read(ViewInventory.SourcePathOf(ViewInventory.NotRendered[0]));
 
-        // Names the shipped asset, so a rename of the file cannot leave the emitter
-        // pointing at a 404 with the whole suite green.
+        // Names the shipped asset. This asserts the href is the one the package
+        // intends — it does NOT tie the href to the file's real name, so it is not
+        // what would catch a rename; `StylesheetContractTests` and `PackagingTests`
+        // both read the file by path and fail if it moves.
         Assert.Contains("_content/UBookIt.Web/ubookit.css", emitter, StringComparison.Ordinal);
         Assert.Single(Regex.Matches(emitter, @"<link\b", RegexOptions.IgnoreCase));
     }

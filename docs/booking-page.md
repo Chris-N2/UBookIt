@@ -205,14 +205,19 @@ you need no `!important` and no uBookIt selector.
 | `--ubookit-line-height` | `1.5` | Line height |
 | `--ubookit-accent` | `auto` | Radio and checkbox accent |
 | `--ubookit-color-error` | `currentColor` | Error text, error summary border |
-| `--ubookit-color-muted` | 75% of `currentColor` | Hint text |
+| `--ubookit-color-muted` | `inherit` | Hint text — see the note below the table |
 | `--ubookit-color-border` | 35% of `currentColor` | Panel borders, notice rules |
 | `--ubookit-color-surface` | `transparent` | Panel backgrounds |
 
-Two notes on the colour tokens. Setting one **transfers responsibility for its
-contrast to you** — see the accessibility section below. And `--ubookit-color-muted`
-defaults to a translucent colour, which composites against whatever is behind it; on a
-busy background image you may want to set it to something solid.
+**Setting a colour token transfers responsibility for its contrast to you** — see the
+accessibility section below. That is the whole reason the shipped defaults set no text
+colour at all: `--ubookit-color-error` and `--ubookit-color-muted` resolve to your own
+text colour unless you say otherwise, so nothing we ship can be less readable than what
+your site already chose.
+
+The two border tokens are the exception, and deliberately so: they default to a
+translucent derivation of your text colour, because the things they draw are
+decoration. See the note on 1.4.11 below.
 
 The minimum target size is deliberately **not** a token. It is a WCAG floor, and a
 floor you can lower is not a floor.
@@ -255,12 +260,29 @@ Every flow is fully operable by keyboard. And each page keeps a logical reading 
 focus order **with no stylesheet applied at all** — which is why no stylesheet can make
 the flow inoperable, only harder to read.
 
-**Met by our defaults, and yours the moment you override the token.** Text and non-text
-contrast (1.4.3, 1.4.11), focus appearance (2.4.11, 2.4.13) and target size (2.5.8) are
-determined by CSS. Our defaults meet them by deriving every colour from your text
-colour and by leaving focus styling to the browser. If you set `--ubookit-color-error`,
-`--ubookit-color-muted`, `--ubookit-color-border`, `--ubookit-color-surface` or
+**Met by our defaults, and yours the moment you override the token.** Text contrast
+(1.4.3), focus appearance (2.4.11, 2.4.13) and target size (2.5.8) are determined by
+CSS. Our defaults meet them by **setting no text colour of their own** — every text
+colour resolves to `currentColor` or `inherit`, so it is whatever your site already
+chose — and by leaving focus styling to the browser. If you set
+`--ubookit-color-error`, `--ubookit-color-muted`, `--ubookit-color-surface` or
 `--ubookit-accent`, the contrast of that choice is yours to check.
+
+> **Why muted text is not muted by default.** An earlier version derived hint text as
+> 75% of your text colour, on the reasoning that deriving from your own colour could
+> not clash. It cannot clash, but compositing text at 75% opacity *reduces* its
+> contrast — a site with body text at `#767676`, which is exactly AA-conformant, would
+> have had hints at 2.9:1. So the default now changes nothing, and
+> `--ubookit-color-muted` is there for when you want recession and can pick a value
+> that passes on your background.
+
+**Non-text contrast (1.4.11): the borders are decoration, deliberately.** The rule
+beside a notice and the border around the confirmation panel default to a translucent
+derivation of your text colour, which is well under 3:1. That is exempt rather than
+non-conformant: neither border carries any information — every message they mark is
+stated in full in the text beside them — and 1.4.11 applies to meaning-bearing
+graphics and to UI component boundaries you must perceive to operate the control. If
+you would rather they were prominent, set `--ubookit-color-border`.
 
 **Determined by your page, and never ours to claim.** Reflow (1.4.10), text spacing
 (1.4.12), bypass blocks (2.4.1), page titled (2.4.2), language of page (3.1.1), and the

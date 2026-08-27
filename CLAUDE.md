@@ -44,11 +44,20 @@ booking system for Umbraco; this aims to be it.
    - **Ours, always.** Labelling, grouping, programmatic relationships,
      keyboard operability, reading and focus order — and each flow stays
      usable with **no author stylesheet applied at all**.
-   - **Ours by default, theirs on override.** Contrast (1.4.3, 1.4.11),
-     focus appearance (2.4.11, 2.4.13) and target size (2.5.8) are decided
-     by CSS. The shipped stylesheet meets them by deciding no colour of its
-     own and leaving focus to the browser; a site that overrides a colour
-     token owns that contrast.
+   - **Ours by default, theirs on override.** Text contrast (1.4.3), focus
+     appearance (2.4.11, 2.4.13) and target size (2.5.8) are decided by CSS.
+     The shipped stylesheet meets them by setting **no text colour of its
+     own** — every `color` resolves to `currentColor` or `inherit` — and by
+     leaving focus to the browser; a site that overrides a colour token owns
+     that contrast. Non-text contrast (1.4.11) is **not** claimed for the
+     package's decorative borders, and that exemption is stated in the docs
+     rather than implied.
+
+     **"Names no literal colour" is not the same claim as "cannot fail
+     contrast", and conflating them shipped a defect.** A hint derived as
+     75% of the host's text colour named no hue and still rendered at 2.9:1
+     on a host whose own text was exactly conformant. So: **a derived colour
+     is for decoration, never for text.**
    - **Never ours.** Reflow, text spacing, bypass blocks, page title, page
      language, and the document's heading outline the flow's `<h2>` sits in.
 
