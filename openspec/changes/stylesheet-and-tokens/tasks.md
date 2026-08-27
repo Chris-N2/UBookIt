@@ -111,21 +111,36 @@ it in its own step means §5's suite delta has exactly one cause.
 
 ## 8. Documentation
 
-- [ ] 8.1 Resolve open question 3 (new page, or a section of `docs/booking-page.md`) and write the styling contract: the one layout line, the token list, the class vocabulary and its naming rule
-- [ ] 8.2 State that the package owns the asset and the site owns its appearance, and that the route is tokens and classes rather than a copy of the file
-- [ ] 8.3 Write the ACR-style accessibility statement: per criterion, met by the shipped default / passes to the site on a token override / determined by the host page
-- [ ] 8.4 Reconcile `docs/booking-page.md` — "the flow's internals are not customisable" stays true of markup and must now distinguish appearance from markup
-- [ ] 8.5 Sweep `docs/` for any sentence this change falsifies **before** sweeping the specs, per the standing rule that docs go first
+- [x] 8.1 Resolve open question 3 (new page, or a section of `docs/booking-page.md`) and write the styling contract: the one layout line, the token line, the class vocabulary and its naming rule
+      → **Chris's decision: keep it in `docs/booking-page.md` for now**, moving to a README once the package is public. New `## Styling the booking flow` section: the one-line opt-in, what the stylesheet does and deliberately does not do (with the reason for each, since all three read as omissions), the 14-token table with defaults, and the class vocabulary grouped by role plus the naming rule so a name can be predicted rather than looked up.
+      → Documented the `<head>` gap 7.3 found, cross-referenced to the existing `_ViewStart.cshtml` paragraph — it is the same condition seen from the other side. Chris confirmed this is known territory: Umbraco 17 logs `invalid Master 'null'` for the shipped template and the log goes away in v18.
+- [x] 8.2 State that the package owns the asset and the site owns its appearance, and that the route is tokens and classes rather than a copy of the file
+- [x] 8.3 Write the ACR-style accessibility statement: per criterion, met by the shipped default / passes to the site on a token override / determined by the host page
+      → Three named parts, with the criterion numbers. Includes the two consequences a site author needs and would not guess: setting a colour token transfers that contrast to them, and `--ubookit-color-muted` is **translucent** by default, so it composites against a background image.
+- [x] 8.4 Reconcile `docs/booking-page.md` — "the flow's internals are not customisable" stays true of markup and must now distinguish appearance from markup
+      → Retitled to "What you still cannot change" and its closing sentence corrected: it previously offered "the template above, and CSS" as the options **when no CSS existed**. Also renamed the neighbouring heading from "Changing how the booking page looks" to "Changing the page around the flow", which otherwise competed with the new styling section.
+- [x] 8.5 Sweep `docs/` for any sentence this change falsifies **before** sweeping the specs, per the standing rule that docs go first
+      → One falsified sentence, the "and CSS" promise above. Nothing else in `docs/` touches appearance; there is still only the one page.
 
 ## 9. Close out
 
-- [ ] 9.1 Run the outward sibling-falsification grep across `openspec/specs/` for sentences this change makes untrue, and record each as carried-forward-unchanged or corrected — silence is not a decision
-- [ ] 9.2 Re-check the `## MODIFIED` requirement against the carried-forward list: all nine SHALLs and all five scenarios accounted for, with the no-author-stylesheet clause present and intact
-- [ ] 9.3 Full clean build (zero warnings) and full suite green, diffed against §1
-- [ ] 9.4 `openspec validate stylesheet-and-tokens --strict`
-- [ ] 9.5 Record for the repo owner: CLAUDE.md invariant 5 needs rewording (open question 2) — flag it, do not edit it
-- [ ] 9.6 Note in the change what remains unmeasured: a NuGet-installed consumer serving the asset by request, and whether an RCL theme view wins a location expander's first candidate (the next change's spike)
+- [x] 9.1 Run the outward sibling-falsification grep across `openspec/specs/` for sentences this change makes untrue, and record each as carried-forward-unchanged or corrected — silence is not a decision
+      → Three hits, and **the sweep changed the change**:
+      **(a) `default-frontend/spec.md:5` Purpose — FALSIFIED, and no delta can fix it.** It says "every flow meets WCAG 2.2 AA". Carried to sync as a manual edit, exactly as ⑩-1 handled the `delivery-api` Purpose (its task 10.5). **See 9.8 — this must not be lost at archive.**
+      **(b) `default-frontend/spec.md:258` — carried forward unchanged, deliberately.** "This requirement SHALL NOT be read as replacing the WCAG 2.2 AA bar" still holds; it now points at a bar carrying a caveat, which weakens nothing it asserts. Recorded rather than left silent.
+      **(c) `packaging/spec.md:102-132` — my own delta was the problem, not the spec.** That requirement already forbids installing stylesheets, and enforces it with an **allowlist** of manifest sections while arguing explicitly against denylists ("a denylist fences only what someone thought of"). My ADDED requirement named four forbidden sections — reintroducing precisely that mistake, and duplicating a guarantee already held more strongly. **Rewritten** to drop the section list and keep only what is new: the *positive* obligation that a front-end asset be a static web asset, and why the mechanism decides who can never be fixed again.
+- [x] 9.2 Re-check the `## MODIFIED` requirement against the carried-forward list: all nine SHALLs and all five scenarios accounted for, with the no-author-stylesheet clause present and intact
+      → **All nine SHALLs verified by distinctive phrase**, not from memory. All five original scenarios carried verbatim, three added. **S1 is the only clause altered.** The S7 anchor is present and intact.
+      → Worth recording: the first check for S7 returned zero and nearly read as "the anchor was dropped" — the clause is **line-wrapped**, so a single-line grep cannot see it. Absence-checking a wrapped sentence needs a multiline match. This is the same class of trap as the guarantee-diff itself.
+- [x] 9.3 Full clean build (zero warnings) and full suite green, diffed against §1
+      → **0 warnings, 0 errors. 1453 passed** (793 / 602 / 58) against §1's 1433. +20 tests, no regressions. The TestSite had to be stopped first — a running site locks the DLLs and the build fails on file copies, which is not a code fault but reads like one.
+- [x] 9.4 `openspec validate stylesheet-and-tokens --strict`
+- [x] 9.5 Record for the repo owner: CLAUDE.md invariant 5 needs rewording (open question 2) — flag it, do not edit it
+      → **Superseded: Chris asked for it to be reworded on this branch** (2026-08-27) so the diff is visible at merge, his reasoning being "we cannot be held responsible for code we did not write". Invariant 5 now states the three-way split with criterion numbers, and carries an explicit instruction not to trade away the no-author-stylesheet clause when simplifying the wording — that clause is what makes the split honest rather than an escape.
+- [x] 9.6 Note in the change what remains unmeasured: a NuGet-installed consumer serving the asset by request, and whether an RCL theme view wins a location expander's first candidate (the next change's spike)
+      → Both recorded in `design.md` Risks, plus a third from 7.7: **forced-colors mode is unverified**, not claimed.
 - [ ] 9.7 Hand to `qa-review` in a **fresh context or subagent** — the context that implemented this must not review it
+- [ ] 9.8 **AT SYNC, NOT AT ARCHIVE:** apply the `default-frontend` Purpose correction from 9.1(a) by hand. A delta cannot express it, so it will vanish if left to the archive step
 
 ## 10. QA rounds
 

@@ -107,7 +107,7 @@ uBookIt, then put it back.
 (The setting is global rather than per-package, so it is a blunt instrument for
 freezing schema in any case.)
 
-### Changing how the booking page looks
+### Changing the page around the flow
 
 **Add your own template** and make it the document type's default. uBookIt only ever
 touches templates it declares, so a template you create is never overwritten — this is
@@ -131,7 +131,143 @@ To use it: create the template, allow it on the **Booking Page** document type, 
 select it on your page. uBookIt only touches templates it declares, so yours is never
 overwritten — including by a release carrying a migration step.
 
-### What you cannot change yet
+## Styling the booking flow
+
+uBookIt ships a stylesheet, and it is **off until you ask for it**. It does layout and
+spacing only and makes no colour decision at all — so the flow takes on your site's
+colours and type by inheriting them, with no configuration.
+
+### Turning it on
+
+One line, in the `<head>` of your layout:
+
+```cshtml
+@await Html.PartialAsync("~/Views/Shared/UBookIt/_Styles.cshtml")
+```
+
+Put your own stylesheet **after** it, so your rules and tokens win.
+
+Use the partial rather than writing the `<link>` yourself. It keeps the URL in one
+place, and when a theme mechanism arrives it is the single thing a theme replaces to
+turn uBookIt's CSS off — a hand-written `<link>` would survive the theme and fight it.
+
+> **You need a layout for this.** The line goes in `<head>`, and the booking flow
+> renders from a view component, which cannot reach `<head>` at all. As noted above,
+> uBookIt sets no layout — your `_ViewStart.cshtml` does. If your site has none, the
+> Booking Page renders with no `<head>`, so there is nowhere to put the line and the
+> flow renders unstyled. That is the same condition described earlier, seen from the
+> other side.
+
+If you add nothing, the flow renders exactly as it did before: semantic HTML, no
+styling, fully operable.
+
+### What the stylesheet does, and deliberately does not do
+
+| | |
+|---|---|
+| **Does** | Field layout and spacing, the start times as a wrapping run rather than a long column, text measure, a `line-height` floor, a minimum target size |
+| **Does not** | Choose a single colour. Restyle your date input, selects or buttons. Set a focus style. Impose a font |
+
+Three of those are worth the explanation, because they look like omissions and are not.
+
+**No colour.** A colour we pick sits on a background we have never seen, so its
+contrast cannot be computed and any claim about it would be unfounded. Instead,
+emphasis is carried by `currentColor`, border weight and font weight — all of which
+follow your text colour automatically, in light mode and dark. The one exception is
+`accent-color` on the radio controls, where the browser computes the indicator's own
+contrast for us.
+
+**Native controls keep their platform appearance.** A browser's own date input, select
+and button are accessible by construction, respect the visitor's preferences, and
+behave correctly in Windows High Contrast. Restyling them is the most common way a
+booking form loses its accessibility, so we apply a minimum target size and nothing
+else.
+
+**No focus style.** Modern browsers draw a focus ring that adapts to whatever is behind
+it. Replacing it with our own would be worse on some sites and better on none.
+
+### Design tokens
+
+Set any of these anywhere in your CSS — `:root` is the expected place. Every one has
+its default expressed at the point of use, so nothing of ours competes with yours and
+you need no `!important` and no uBookIt selector.
+
+| Token | Default | Controls |
+|---|---|---|
+| `--ubookit-space` | `1rem` | Panel padding, gap between start times |
+| `--ubookit-field-gap` | `0.35rem` | Label-to-control gap within a field |
+| `--ubookit-section-gap` | `1.5rem` | Gap between fields and between regions |
+| `--ubookit-measure` | `34rem` | Maximum width of fields and text blocks |
+| `--ubookit-radius` | `0` | Corner radius of the panels |
+| `--ubookit-border-width` | `3px` | Border and rule weight |
+| `--ubookit-font-family` | `inherit` | Type family |
+| `--ubookit-font-size` | `inherit` | Type size |
+| `--ubookit-line-height` | `1.5` | Line height |
+| `--ubookit-accent` | `auto` | Radio and checkbox accent |
+| `--ubookit-color-error` | `currentColor` | Error text, error summary border |
+| `--ubookit-color-muted` | 75% of `currentColor` | Hint text |
+| `--ubookit-color-border` | 35% of `currentColor` | Panel borders, notice rules |
+| `--ubookit-color-surface` | `transparent` | Panel backgrounds |
+
+Two notes on the colour tokens. Setting one **transfers responsibility for its
+contrast to you** — see the accessibility section below. And `--ubookit-color-muted`
+defaults to a translucent colour, which composites against whatever is behind it; on a
+busy background image you may want to set it to something solid.
+
+The minimum target size is deliberately **not** a token. It is a WCAG floor, and a
+floor you can lower is not a floor.
+
+### The class vocabulary
+
+These names are a compatibility promise: they will not be renamed without a release
+note saying so.
+
+| | |
+|---|---|
+| **Flows** | `ubookit-booking`, plus `ubookit-booking--service` on the service flow · `ubookit-catalogue` · `ubookit-confirmation` |
+| **Forms** | `ubookit-date-form` · `ubookit-catalogue-form` |
+| **Groups** | `ubookit-times` · `ubookit-details` · `ubookit-catalogue-choices` · `ubookit-booked-resources` |
+| **Items** | `ubookit-times-option` · `ubookit-catalogue-choice` |
+| **Fields** | `ubookit-field` on every label-and-control group · `ubookit-submit` on every submit button |
+| **Messages** | `ubookit-field-error` · `ubookit-errors` (the summary) · `ubookit-hint` · `ubookit-notice` · `ubookit-no-times` · `ubookit-no-choices` · `ubookit-fixed-length` |
+
+The naming rule, so you can predict a name rather than look it up: `ubookit-<block>`
+is a block, `ubookit-<block>-<part>` is a part of one, and `ubookit-<block>--<variant>`
+is a variant. A variant always appears alongside its block, so a rule written against
+`.ubookit-booking` also applies to the service flow.
+
+**Do not style the ids.** The ids in the flow are its accessibility wiring — the
+targets of `aria-describedby` and of the error summary's links. They are not
+appearance, and treating them as styling hooks puts screen-reader behaviour at the
+mercy of a restyle.
+
+### Accessibility: what we hold, and what becomes yours
+
+uBookIt's flows are built to WCAG 2.2 AA, and the honest form of that claim has three
+parts — because a booking flow is a component inside **your** page, and conformance is
+a property of a page.
+
+**Met by uBookIt, in the markup, whatever you do to the CSS.** Every control has a
+programmatically associated label. The start times and the catalogue are grouped sets
+with legends that name what is being chosen. Hints and errors are associated with their
+controls. Required fields are indicated in text, never by colour or placeholder alone.
+Every flow is fully operable by keyboard. And each page keeps a logical reading and
+focus order **with no stylesheet applied at all** — which is why no stylesheet can make
+the flow inoperable, only harder to read.
+
+**Met by our defaults, and yours the moment you override the token.** Text and non-text
+contrast (1.4.3, 1.4.11), focus appearance (2.4.11, 2.4.13) and target size (2.5.8) are
+determined by CSS. Our defaults meet them by deriving every colour from your text
+colour and by leaving focus styling to the browser. If you set `--ubookit-color-error`,
+`--ubookit-color-muted`, `--ubookit-color-border`, `--ubookit-color-surface` or
+`--ubookit-accent`, the contrast of that choice is yours to check.
+
+**Determined by your page, and never ours to claim.** Reflow (1.4.10), text spacing
+(1.4.12), bypass blocks (2.4.1), page titled (2.4.2), language of page (3.1.1), and the
+document's heading outline — the flow starts at `<h2>` on the assumption your page
+supplies the `<h1>`.
+
+### What you still cannot change
 
 **The markup *inside* the booking flow is not customisable.** Placing your own file at
 the same path as one of uBookIt's views does **not** work: those views are compiled
@@ -145,7 +281,8 @@ do not build anything on an override taking effect.
 
 We would like to fix this properly, with a theme mechanism that looks in a path the
 package deliberately does not compile into itself. It is not built yet. Until it is,
-your options are the template above, and CSS.
+your options are your own template for the page around the flow, and the tokens and
+classes above for its appearance.
 
 ## A note on the Umbraco documentation
 

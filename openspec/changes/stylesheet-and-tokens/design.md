@@ -270,20 +270,67 @@ it renders today — the only behavioural difference for an existing install is 
 rename, which nothing yet depends on because no stylesheet exists to depend on it.
 Rollback is deleting the asset and the partial.
 
+## What implementation changed, and what it found
+
+Recorded here rather than only in `tasks.md`, because these are decisions a reviewer
+needs and two of them corrected the artifacts.
+
+- **A second rename.** `ubookit-time` was the item inside `ubookit-times` and was not
+  prefixed by it, so it read as a second block differing from its own container's name
+  by one letter — D7's ambiguity in miniature. `ubookit-catalogue-choice` was checked
+  and is *not* a third case: both it and its container are prefixed by their block, so
+  the missing prefix was the defect and the plural similarity is cosmetic.
+- **Field wrappers number five in `_DateAndLength`, not three.** The two
+  `tabindex="-1"` wrappers are field positions, and excluding them would make the
+  layout rule skip the rows with the most conditional behaviour.
+- **The email hint had no class hook.** The audit behind D7 scanned `class=`
+  attributes, so an element carrying only an id was invisible to it. A reminder that an
+  inventory is only as complete as the attribute it was built from.
+- **`_Styles.cshtml` is the package's first non-rendering view**, and it broke ten
+  rendering rules that assume a model and a document body. Excluded from
+  `ViewInventory.All` **by name, with a reason and with what would lift it** — the form
+  that class's own guidance demands — and covered by the emission rule instead, which
+  is a stronger check on that file than any markup rule. Both that exclusion and the
+  sibling exemption in `ServiceFrontendTests` carry vacuity guards, so neither can
+  decay into skipping a folder.
+- **The packaging delta was rewritten after the outward sweep**, which found it
+  duplicating `packaging`'s existing manifest fence *and* doing it as a denylist — the
+  shape that requirement rejects by name. It now carries only the positive obligation.
+- **Named colours are guarded by enumerating the permitted value vocabulary**, not by
+  blacklisting the 148 CSS colour names, which would have been knowingly partial.
+
 ## Open Questions
 
-1. **Do the `tabindex="-1"` wrappers get a visible focus indicator for free?** (D6.)
-   Observe on the TestSite once the stylesheet exists, then decide. Do not pre-empt it
-   with an override.
-2. **CLAUDE.md invariant 5 states the wider claim this change narrows.** Amending a
-   project invariant is the repo owner's call and is deliberately not done here. The
-   wording that survives: the shipped default meets every AA criterion determined by
-   markup; criteria determined by CSS are met by the shipped default tokens and become
-   the site's once overridden.
-3. **Where the styling documentation lives** — a new page, or a section of
-   `docs/booking-page.md`. That page currently says the flow's internals are not
-   customisable, which stays true of markup and now needs to separate appearance from
-   markup.
+All three are now **closed**, and are kept with their answers rather than deleted so a
+reviewer can see what was decided rather than assumed.
+
+1. ~~**Do the `tabindex="-1"` wrappers get a visible focus indicator for free?**~~
+   **ANSWERED: yes. No override added.** After real keyboard input, fragment
+   navigation to the wrapper gave `:focus-visible` true and `outline-style: auto` —
+   Chrome's adaptive ring, legible on any background precisely because we did not
+   replace it. D6's "observe first, decide after" was the right call: an override
+   written up front would have been strictly worse and permanent.
+   **It shows the ring is painted, and nothing more.** The ⑤(d) human keyboard-only and
+   screen-reader pass is **not** discharged by it.
+2. ~~**CLAUDE.md invariant 5 states the wider claim this change narrows.**~~ **DONE on
+   this branch, at Chris's instruction (2026-08-27)**, so the diff is visible at merge.
+   His reasoning: *"we cannot be held responsible for code we did not write."* The
+   invariant now states the three-way split with criterion numbers, and carries a
+   standing instruction not to trade away the no-author-stylesheet clause when
+   simplifying — that clause is what makes the split honest rather than an escape.
+3. ~~**Where the styling documentation lives.**~~ **`docs/booking-page.md` for now**
+   (Chris, 2026-08-27), moving to a README once the package is public. The neighbouring
+   heading was renamed to "Changing the page around the flow" so it no longer competes
+   with the new styling section, and the old closing line offering "the template above,
+   and CSS" was corrected — it promised CSS when none existed.
+
+### One new obligation, opened by this change
+
+**Forced-colors mode is unverified.** It needs browser or OS emulation this session
+could not reach, so it is recorded as unverified rather than claimed. The reasoning
+that makes it likely safe — the package sets no background and no text colour, and
+forced-colors overrides author border colours anyway — is reasoning, not measurement.
+Dark mode *was* measured and behaves exactly as D1 predicts.
 
 ## Deferred obligations — none are discharged here, and one only looks adjacent
 
