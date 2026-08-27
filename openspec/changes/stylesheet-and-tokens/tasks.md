@@ -1,20 +1,37 @@
 ## 1. Baseline before anything changes
 
-- [ ] 1.1 Run the full solution build and record the warning count — the baseline is **ZERO**, so read the build against zero, not against "no new warnings"
-- [ ] 1.2 Run the full test suite and record the pass count and the per-project breakdown, so §5's re-run can be diffed rather than eyeballed
-- [ ] 1.3 Capture the current rendered HTML of every view under test (the rendering suite's fixtures already produce it) as the before-image for the class edits
+- [x] 1.1 Run the full solution build and record the warning count — the baseline is **ZERO**, so read the build against zero, not against "no new warnings"
+      → **0 warnings, 0 errors.**
+- [x] 1.2 Run the full test suite and record the pass count and the per-project breakdown, so §5's re-run can be diffed rather than eyeballed
+      → **1433 passed, 0 failed, 0 skipped**: `UBookIt.Tests` 777, `UBookIt.Tests.Rendering` 598, `UBookIt.Tests.Integration` 58. Integration ran rather than skipping, so SQL Server was reachable.
+- [x] 1.3 Capture the current rendered HTML of every view under test (the rendering suite's fixtures already produce it) as the before-image for the class edits
+      → **Captured the source-level `id=` and `class=` sets instead** (29 id occurrences, 31 class occurrences, interpolated forms included), because the rendering suite does not dump HTML to disk and adding a dumper would be more change than the check is worth. This is faithful for the purpose 2.5 needs it for — the edits add class attributes only, so an `id=` source diff cannot miss an id change. Recorded as a deliberate substitution rather than as the task written.
 
 ## 2. Class vocabulary (views only, no CSS yet)
 
 Do this first and alone: it is the only part that changes rendered markup, so keeping
 it in its own step means §5's suite delta has exactly one cause.
 
-- [ ] 2.1 Rename `ubookit-service-booking` → `ubookit-booking--service` in `BookingFlow/Service.cshtml`, keeping `ubookit-booking` alongside it
-- [ ] 2.2 Add `ubookit-field` to the three bare wrapper `div`s in `_DateAndLength.cshtml` (lines ~37, ~66, ~122) — including the two `tabindex="-1"` wrappers, which are field positions even when they hold settled text rather than a control
-- [ ] 2.3 Add `ubookit-field` to the three bare wrapper `div`s in `_YourDetails.cshtml`
-- [ ] 2.4 Add `ubookit-submit` to all three buttons: `Catalogue.cshtml` ("Continue"), `_DateAndLength.cshtml` ("Show times"), `_YourDetails.cshtml` ("Book")
-- [ ] 2.5 Confirm no id was renamed, added or removed anywhere in §2 — diff the id set against 1.3
-- [ ] 2.6 Re-run the rendering suite and account for every difference from 1.2; an unexplained delta stops this task rather than being waved through as additive
+- [x] 2.1 Rename `ubookit-service-booking` → `ubookit-booking--service` in `BookingFlow/Service.cshtml`, keeping `ubookit-booking` alongside it
+- [x] 2.2 Add `ubookit-field` to the wrapper `div`s in `_DateAndLength.cshtml` — **five, not three**: the three bare ones plus the two `tabindex="-1"` wrappers, which are field positions even when they hold settled text rather than a control
+- [x] 2.3 Add `ubookit-field` to the three bare wrapper `div`s in `_YourDetails.cshtml`
+- [x] 2.4 Add `ubookit-submit` to all three buttons: `Catalogue.cshtml` ("Continue"), `_DateAndLength.cshtml` ("Show times"), `_YourDetails.cshtml` ("Book")
+- [x] 2.4a **NEW, found while applying** — rename `ubookit-time` → `ubookit-times-option`. It is the item inside `ubookit-times` but was not prefixed by it, so it read as a second block differing from its own container by one letter: the same ambiguity as 2.1. Free — the only reference anywhere was to the *id* `ubookit-time-0`, not the class. `ubookit-catalogue-choice` was checked and is **not** a third case (see design D7). Proposal and design D7 updated from "one rename" to "two"
+- [x] 2.5 Confirm no id was renamed, added or removed anywhere in §2 — diff the id set against 1.3
+      → **id diff empty.** Class diff exactly as intended: 2 renames, 8 `ubookit-field` (5 + 3), 3 `ubookit-submit`.
+- [x] 2.6 Re-run the rendering suite and account for every difference from 1.2; an unexplained delta stops this task rather than being waved through as additive
+      → **One failure, and it was the suite working as designed.**
+      `BranchReachabilityTests.The_literals_that_cannot_distinguish_a_branch_are_enumerated`
+      pins the set of literals a view emits from more than one place — rule 3's known
+      blind spot, made visible rather than silent — and its own comment says a new
+      shared literal "has to be justified, which is the moment to ask whether the
+      branches need distinguishing". `ubookit-field` is emitted from mutually exclusive
+      branches in `_DateAndLength`, so it is genuinely new to that set.
+      **Justified rather than suppressed**, and the question it demands has a definite
+      answer: the branches must NOT be distinguished, because the point of the class is
+      that a field is a field whether it holds a control or the settled text that
+      replaced one. Two entries added with that reasoning recorded at the site.
+      Back to **1433 passed, 0 failed, 0 warnings** — level with §1.
 
 ## 3. The stylesheet
 

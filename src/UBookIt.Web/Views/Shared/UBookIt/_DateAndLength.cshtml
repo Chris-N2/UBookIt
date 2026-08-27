@@ -34,7 +34,7 @@
            linkable and the back button lands on a page that agrees with itself. *@
         <input type="hidden" name="@BookingKeys.SubjectQuery" value="@token" />
     }
-    <div>
+    <div class="ubookit-field">
         <label for="ubookit-date">Choose a date</label>
         <input type="date"
                id="ubookit-date"
@@ -53,7 +53,7 @@
            server-side length rejection is still possible on a hand-made POST, and
            the error summary links to that id. Without a target the summary link
            would go nowhere, which is worse than the control it replaced. *@
-        <div id="@BookingFieldIds.Duration" tabindex="-1">
+        <div id="@BookingFieldIds.Duration" class="ubookit-field" tabindex="-1">
             <p class="ubookit-fixed-length">Length: @BookingDurations.Label(Model.DurationMinutes)</p>
             @if (durationError is not null)
             {
@@ -63,7 +63,7 @@
     }
     else
     {
-        <div>
+        <div class="ubookit-field">
             <label for="@BookingFieldIds.Duration">How long do you need?</label>
             <select id="@BookingFieldIds.Duration" name="@BookingKeys.DurationQuery"
                     aria-invalid="@(durationError is not null ? "true" : null)"
@@ -99,7 +99,7 @@
            the error summary links to that id, and a link with no target is worse
            than the control it replaced. Found by the rendering suite, which noticed
            the summary pointing at nothing. *@
-        <div id="@BookingFieldIds.Resource" tabindex="-1">
+        <div id="@BookingFieldIds.Resource" class="ubookit-field" tabindex="-1">
             @if (whoError is not null)
             {
                 <span id="ubookit-who-error" class="ubookit-field-error">@whoError</span>
@@ -119,7 +119,7 @@
            the times and the contact details, which a no-JS flow would otherwise
            need. Nothing at all is rendered for a service offering no choice: no
            control, no hidden field, no way for a pin to be submitted. *@
-        <div>
+        <div class="ubookit-field">
             <label for="@BookingFieldIds.Resource">Who would you like?</label>
             <select id="@BookingFieldIds.Resource" name="@BookingKeys.ResourceQuery"
                     aria-invalid="@(whoError is not null ? "true" : null)"
@@ -165,5 +165,5 @@
             }
         </div>
     }
-    <button type="submit">Show times</button>
+    <button type="submit" class="ubookit-submit">Show times</button>
 </form>

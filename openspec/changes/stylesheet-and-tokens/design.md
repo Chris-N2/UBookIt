@@ -166,22 +166,41 @@ elements following keyboard interaction, so this may already hold. **Observe fir
 decide after** — recorded as an open question rather than guessed at, because guessing
 here means shipping a focus override we did not need.
 
-### D7 — Keep flat class names, add a variant separator; one rename, two additions
+### D7 — Keep flat class names, add a variant separator; two renames, two additions
 
-The nineteen existing classes are already about 80% consistent — container-plural /
-item-singular holds in both places it appears. There is exactly one structural
-ambiguity: `ubookit-booking` alongside `ubookit-service-booking` cannot say whether the
-second is a sibling block or a variant of the first. It is a variant. So the minimum
-rule that removes the ambiguity is adopted — flat hyphenation for parts, `--` for
-variants — rather than a wholesale move to BEM, which would rewrite names that are
-already fine.
+The nineteen existing classes are already about 80% consistent. Two structural
+ambiguities, and **the second was found while applying rather than while proposing**:
 
-Work: rename `ubookit-service-booking` → `ubookit-booking--service`; add
-`ubookit-field` to the six bare wrapper `div`s in `_DateAndLength` and `_YourDetails`;
-add `ubookit-submit` to all three buttons. One submit name rather than three, because
-the containing form already distinguishes them
+1. `ubookit-booking` alongside `ubookit-service-booking` cannot say whether the second
+   is a sibling block or a variant of the first. It is a variant.
+2. `ubookit-time` is the item inside the `ubookit-times` fieldset, but is not prefixed
+   by it — so it reads as a second block whose name differs from its own container's by
+   a single letter. Same ambiguity as the first, in miniature.
+
+So the minimum rule that removes both is adopted — every part is prefixed by its
+block, `--` marks a variant — rather than a wholesale move to BEM, which would rewrite
+names that are already fine.
+
+Work: rename `ubookit-service-booking` → `ubookit-booking--service` and `ubookit-time`
+→ `ubookit-times-option`; add `ubookit-field` to the field wrappers in
+`_DateAndLength` and `_YourDetails`; add `ubookit-submit` to all three buttons. One
+submit name rather than three, because the containing form already distinguishes them
 (`.ubookit-date-form .ubookit-submit` versus `.ubookit-details .ubookit-submit`) — a
 hook that costs no vocabulary.
+
+**`ubookit-catalogue-choice` was checked and is not a third case.** It looks like the
+same defect — an item whose name differs from its container `ubookit-catalogue-choices`
+by one letter — but both are prefixed by the block they belong to, so nothing is
+ambiguous about where either sits. The plural similarity is cosmetic; the missing block
+prefix was the actual defect. Recorded because "fix one of a pair and leave the other"
+is a failure this project has met before, and the reasoning for *not* touching this one
+should be visible rather than look like an oversight.
+
+**The field wrappers number five in `_DateAndLength`, not three.** The two
+`tabindex="-1"` wrappers — the settled-length div and the absent-choice div — occupy
+field positions and take the same class, because they are what a field looks like when
+its control has been replaced by settled text. Excluding them would make the layout
+rule skip exactly the rows that already carry the most conditional behaviour.
 
 **Granularity is kept deliberately.** Under D1 the classes are an API for other
 people's CSS rather than a vehicle for ours, so collapsing `no-times`, `no-choices`,

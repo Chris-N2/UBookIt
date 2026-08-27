@@ -12,7 +12,7 @@
 <fieldset class="ubookit-details">
     <legend>Your details</legend>
 
-    <div>
+    <div class="ubookit-field">
         <label for="@BookingFieldIds.Name">Name (required)</label>
         <input type="text" id="@BookingFieldIds.Name" name="Name" value="@Model.Name"
                autocomplete="name"
@@ -25,7 +25,7 @@
         }
     </div>
 
-    <div>
+    <div class="ubookit-field">
         <label for="@BookingFieldIds.Email">Email (required)</label>
         <input type="email" id="@BookingFieldIds.Email" name="Email" value="@Model.Email"
                autocomplete="email"
@@ -39,11 +39,11 @@
         }
     </div>
 
-    <div>
+    <div class="ubookit-field">
         <label for="ubookit-phone">Phone (optional)</label>
         <input type="tel" id="ubookit-phone" name="Phone" value="@Model.Phone"
                autocomplete="tel" />
     </div>
 
-    <button type="submit">Book</button>
+    <button type="submit" class="ubookit-submit">Book</button>
 </fieldset>

@@ -22,7 +22,7 @@
         @foreach (var (option, index) in Model.Times.Select((option, index) => (option, index)))
         {
             var id = $"ubookit-time-{index}";
-            <div class="ubookit-time">
+            <div class="ubookit-times-option">
                 <input type="radio"
                        id="@id"
                        name="SelectedTime"
