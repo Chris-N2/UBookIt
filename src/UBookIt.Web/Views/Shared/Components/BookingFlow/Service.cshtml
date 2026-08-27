@@ -7,7 +7,7 @@
     it shares with the resource flow is rendered from the shared partials, so
     there is one copy to get right and one bar to meet (design D1).
 *@
-<section class="ubookit-booking ubookit-service-booking" aria-label="Book @Model.ServiceName">
+<section class="ubookit-booking ubookit-booking--service" aria-label="Book @Model.ServiceName">
     <h2>Book @Model.ServiceName</h2>
 
     @await Html.PartialAsync("~/Views/Shared/UBookIt/_ErrorSummary.cshtml", Model)

@@ -1834,12 +1834,50 @@ public class ServiceFrontendTests
             RepoFiles.Read("src/UBookIt.Web/Views/Shared/Components/BookingFlow/Service.cshtml"),
         };
 
+        // The one partial in this folder whose consumer is NOT a flow, named rather
+        // than filtered by a pattern. `_Styles.cshtml` is rendered by the consuming
+        // SITE's layout, into the document head — a flow cannot reach the head at all,
+        // which is the whole reason it is a partial the site calls rather than markup a
+        // ViewComponent emits.
+        //
+        // The rule this exempts it from is a real one: a flow partial nothing
+        // references is dead code wearing a live seam. That reasoning does not reach a
+        // partial with a different consumer, so exempting it does not weaken the rule
+        // for anything the rule is about.
+        //
+        // It is covered instead by the emission rule in the rendering suite, which
+        // asserts exactly one view emits package styling, that it is this one, and that
+        // it names the shipped asset — a stronger check than "some flow mentions it".
+        const string EmittedBySiteLayout = "_Styles";
+
         foreach (var path in RepoFiles.Paths("src/UBookIt.Web/Views/Shared/UBookIt", "*.cshtml"))
         {
             var name = Path.GetFileNameWithoutExtension(path);
 
+            if (name == EmittedBySiteLayout)
+            {
+                continue;
+            }
+
             Assert.Contains(flows, flow => flow.Contains($"UBookIt/{name}.cshtml", StringComparison.Ordinal));
         }
+    }
+
+    [Fact]
+    public void The_flow_partials_the_seam_rule_covers_are_not_reduced_to_nothing()
+    {
+        // The vacuity guard for the exemption above. Naming one file to skip is one
+        // edit away from skipping the folder, and the loop would then pass by checking
+        // nothing while reporting the seam intact — the exact shape this suite has been
+        // bitten by before.
+        var covered = RepoFiles
+            .Paths("src/UBookIt.Web/Views/Shared/UBookIt", "*.cshtml")
+            .Select(Path.GetFileNameWithoutExtension)
+            .Where(name => name != "_Styles")
+            .Order(StringComparer.Ordinal)
+            .ToList();
+
+        Assert.Equal(["_DateAndLength", "_ErrorSummary", "_Times", "_YourDetails"], covered);
     }
 
     [Fact]

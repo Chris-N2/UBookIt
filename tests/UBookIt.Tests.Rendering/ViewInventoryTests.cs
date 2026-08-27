@@ -23,7 +23,51 @@ public class ViewInventoryTests
         // Counted, so a scan that quietly stopped finding things fails here rather
         // than making the rules vacuous. If a view is added this fails, and someone
         // decides deliberately that it belongs in the suite — which is the point.
+        //
+        // Both sets are counted. Counting only the governed set would let a view be
+        // added AND excluded in one change without anything failing, which is the
+        // decay this guard exists to prevent.
+        Assert.Equal(15, ViewInventory.Shipped.Count);
         Assert.Equal(14, ViewInventory.All.Count);
+    }
+
+    [Fact]
+    public void The_only_view_outside_the_rendering_rules_is_the_style_emitter()
+    {
+        // The exclusion, asserted rather than trusted. A second exclusion — or a
+        // different one — fails here, so "excluded by name with a reason" cannot decay
+        // into "excluded because someone filtered it once".
+        var excluded = ViewInventory.Shipped
+            .Where(view => !ViewInventory.All.Contains(view, StringComparer.Ordinal))
+            .Order(StringComparer.Ordinal)
+            .ToList();
+
+        Assert.Equal(["~/Views/Shared/UBookIt/_Styles.cshtml"], excluded);
+    }
+
+    [Fact]
+    public void Exactly_one_view_emits_the_package_stylesheet()
+    {
+        // The rule that covers the excluded view, and the spec's "there is one
+        // emission route" — which exists because a future theme suppresses package
+        // CSS by replacing that one partial, and a second link element somewhere
+        // else would survive the theme and fight it.
+        var emitting = ViewInventory.Shipped
+            .Where(view => RepoFiles.Read(ViewInventory.SourcePathOf(view)) is var source
+                && (Regex.IsMatch(source, @"<link\b", RegexOptions.IgnoreCase)
+                    || Regex.IsMatch(source, @"<style\b", RegexOptions.IgnoreCase)))
+            .ToList();
+
+        Assert.Equal(["~/Views/Shared/UBookIt/_Styles.cshtml"], emitting);
+
+        var emitter = RepoFiles.Read(ViewInventory.SourcePathOf(ViewInventory.NotRendered[0]));
+
+        // Names the shipped asset. This asserts the href is the one the package
+        // intends — it does NOT tie the href to the file's real name, so it is not
+        // what would catch a rename; `StylesheetContractTests` and `PackagingTests`
+        // both read the file by path and fail if it moves.
+        Assert.Contains("_content/UBookIt.Web/ubookit.css", emitter, StringComparison.Ordinal);
+        Assert.Single(Regex.Matches(emitter, @"<link\b", RegexOptions.IgnoreCase));
     }
 
     [Fact]

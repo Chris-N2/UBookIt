@@ -145,6 +145,19 @@ public class BranchReachabilityTests
                 // rendered when there is no control. Each is covered instead by
                 // fixtures reaching both sides.
                 "_DateAndLength.cshtml:ubookit-duration-error",
+
+                // `ubookit-field` marks every field position in the view, and two of
+                // those positions are the wrappers that stand in for a control replaced
+                // by settled text. So it is emitted from mutually exclusive branches BY
+                // DESIGN — that is what "every field position" means — and asking
+                // whether those branches need distinguishing has a definite answer here:
+                // no. The whole purpose of the class is that a field is a field whether
+                // it holds a control or the text that replaced one, because the layout
+                // rule must not skip the rows carrying the most conditional behaviour.
+                // It also carries no behaviour, so a branch losing it is a layout
+                // regression rather than an accessibility one, and it renders in every
+                // state rather than in a reachable few.
+                "_DateAndLength.cshtml:ubookit-field",
                 "_DateAndLength.cshtml:ubookit-field-error",
                 "_DateAndLength.cshtml:ubookit-hint",
                 "_DateAndLength.cshtml:ubookit-notice",
@@ -156,7 +169,11 @@ public class BranchReachabilityTests
                 // rather than in class.
                 "_Times.cshtml:ubookit-no-times",
 
-                // One error span per booker field.
+                // One field wrapper per booker field, and one error span per booker
+                // field. Both are one-per-field rather than branch-dependent: all three
+                // wrappers are unconditional, so neither can die while a sibling keeps
+                // the literal alive on a path the fixtures do not reach.
+                "_YourDetails.cshtml:ubookit-field",
                 "_YourDetails.cshtml:ubookit-field-error",
             ],
             shared);

@@ -36,11 +36,15 @@ and building it later means retrofitting it.
 - **One documented layout partial**, `UBookIt/Styles`, emits the asset. It gives us
   `<head>` placement and cascade order, and is the hook by which a future theme
   suppresses our CSS.
-- **The class vocabulary becomes a stated contract**: one rename
-  (`ubookit-service-booking` → `ubookit-booking--service`), two additions
-  (`ubookit-field` on six bare wrapper divs, `ubookit-submit` on all three buttons),
-  and a naming rule for variants. Ids are untouched — they are the accessibility
-  contract, not the styling contract.
+- **The class vocabulary becomes a stated contract**: two renames
+  (`ubookit-service-booking` → `ubookit-booking--service`, and `ubookit-time` →
+  `ubookit-times-option`), two additions (`ubookit-field` on the field wrappers,
+  `ubookit-submit` on all three buttons), and a naming rule for parts and variants.
+  Ids are untouched — they are the accessibility contract, not the styling contract.
+  The second rename was found while applying rather than while proposing: `ubookit-time`
+  is the item inside `ubookit-times` but is not prefixed by it, so it read as a second
+  block whose name differed from its own container's by one letter — the same ambiguity
+  as the first rename, in miniature.
 - **BREAKING (guarantee narrowing, deliberate): the WCAG 2.2 AA requirement is
   narrowed** to criteria determined by markup. Criteria determined by CSS are met by
   the shipped defaults and become the site's once it overrides a token. The published

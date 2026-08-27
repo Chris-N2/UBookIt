@@ -68,7 +68,49 @@ public static class ViewInventory
     /// "in scope", which is how the previous deferral stayed invisible in the spec.
     /// </para>
     /// </summary>
-    public static IReadOnlyList<string> All { get; } = Scan();
+    /// <summary>
+    /// Every <c>.cshtml</c> the package ships, including any this suite's rendering
+    /// rules do not govern. Kept separate from <see cref="All"/> so the scan's decay
+    /// guard still counts everything: a view added later fails the count whichever
+    /// set it belongs in.
+    /// </summary>
+    public static IReadOnlyList<string> Shipped { get; } = Scan();
+
+    /// <summary>
+    /// The one shipped view deliberately outside the rendering rules — named, with a
+    /// reason and with what would lift it, exactly as this class's own guidance
+    /// demands and never by an undefined phrase.
+    /// <para>
+    /// <c>_Styles.cshtml</c> emits a single <c>link</c> element into the document
+    /// head. It has no model, renders no control, carries no id or class, and
+    /// contributes nothing to the document body — so every rule in this suite is
+    /// about a property it cannot have. Forcing it in would mean special-casing it
+    /// inside each rule, which weakens the rules for the one view they were never
+    /// about.
+    /// </para>
+    /// <para>
+    /// It is <b>not untested</b>: it is covered by the emission rule instead, which
+    /// asserts that exactly one view emits package styling, that it is this one, and
+    /// that it names the shipped asset. That is a stronger check on this file than
+    /// any markup rule would be.
+    /// </para>
+    /// <para>
+    /// <b>What would lift it:</b> the moment this partial emits anything a visitor
+    /// can perceive in the body — an inline <c>style</c> block, a <c>noscript</c>
+    /// fallback, any element with an id or class — it belongs back in
+    /// <see cref="All"/> and the rules apply to it.
+    /// </para>
+    /// </summary>
+    public static IReadOnlyList<string> NotRendered { get; } =
+        ["~/Views/Shared/UBookIt/_Styles.cshtml"];
+
+    /// <summary>
+    /// Declared after <see cref="NotRendered"/> deliberately: static initialisers run
+    /// in textual order, so referencing the exclusion list from above it would read a
+    /// null and every rule would then run over a set built from nothing.
+    /// </summary>
+    public static IReadOnlyList<string> All { get; } =
+        [.. Shipped.Where(view => !NotRendered.Contains(view, StringComparer.Ordinal))];
 
     /// <summary>The repository path of a view, from its absolute view path.</summary>
     public static string SourcePathOf(string viewPath)

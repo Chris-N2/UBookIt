@@ -73,6 +73,24 @@ font weight, plus colours *derived* from `currentColor`.
 
 **Rejected:** a complete neutral palette the site re-tokens to rebrand.
 
+> **CORRECTED AT QA ROUND 1 — the argument below was half wrong, and the half that was
+> wrong was the decisive one.** "We ship no colour pair that can fail, because we ship no
+> colour pair" was **false as implemented**. `.ubookit-hint` derived its colour as
+> `color-mix(in srgb, currentColor 75%, transparent)`, which names no hue and therefore
+> read as consistent with posture A — but compositing text toward transparency *reduces*
+> contrast, so a host with body text at exactly AA-conformant `#767676` rendered the hint
+> at 2.86:1.
+>
+> **"Declares no literal colour" and "cannot fail contrast" are not the same claim**, and
+> the whole guard set was built on the first while the accessibility statement rested on
+> the second. Posture A survives, but only with an added clause: **derived colour is for
+> decoration, never for text.** A `color:` value may resolve only to `currentColor` or
+> `inherit`. That is now a spec requirement with its own test and mutation check.
+>
+> Worth keeping as the generalisable lesson: the guard looked for the *mechanism* someone
+> imagined a violation would use (a hex literal) rather than for the *property* being
+> guaranteed (contrast not reduced). Same shape as [[rule-checks-mechanism-not-guarantee]].
+
 The requirement is "make it possible for somebody to make it look like their site".
 Inheriting *is* looking like their site, achieved with zero configuration; a
 re-tokenable palette only wins for someone who wants a look unlike their own site,
@@ -166,22 +184,41 @@ elements following keyboard interaction, so this may already hold. **Observe fir
 decide after** — recorded as an open question rather than guessed at, because guessing
 here means shipping a focus override we did not need.
 
-### D7 — Keep flat class names, add a variant separator; one rename, two additions
+### D7 — Keep flat class names, add a variant separator; two renames, two additions
 
-The nineteen existing classes are already about 80% consistent — container-plural /
-item-singular holds in both places it appears. There is exactly one structural
-ambiguity: `ubookit-booking` alongside `ubookit-service-booking` cannot say whether the
-second is a sibling block or a variant of the first. It is a variant. So the minimum
-rule that removes the ambiguity is adopted — flat hyphenation for parts, `--` for
-variants — rather than a wholesale move to BEM, which would rewrite names that are
-already fine.
+The nineteen existing classes are already about 80% consistent. Two structural
+ambiguities, and **the second was found while applying rather than while proposing**:
 
-Work: rename `ubookit-service-booking` → `ubookit-booking--service`; add
-`ubookit-field` to the six bare wrapper `div`s in `_DateAndLength` and `_YourDetails`;
-add `ubookit-submit` to all three buttons. One submit name rather than three, because
-the containing form already distinguishes them
+1. `ubookit-booking` alongside `ubookit-service-booking` cannot say whether the second
+   is a sibling block or a variant of the first. It is a variant.
+2. `ubookit-time` is the item inside the `ubookit-times` fieldset, but is not prefixed
+   by it — so it reads as a second block whose name differs from its own container's by
+   a single letter. Same ambiguity as the first, in miniature.
+
+So the minimum rule that removes both is adopted — every part is prefixed by its
+block, `--` marks a variant — rather than a wholesale move to BEM, which would rewrite
+names that are already fine.
+
+Work: rename `ubookit-service-booking` → `ubookit-booking--service` and `ubookit-time`
+→ `ubookit-times-option`; add `ubookit-field` to the field wrappers in
+`_DateAndLength` and `_YourDetails`; add `ubookit-submit` to all three buttons. One
+submit name rather than three, because the containing form already distinguishes them
 (`.ubookit-date-form .ubookit-submit` versus `.ubookit-details .ubookit-submit`) — a
 hook that costs no vocabulary.
+
+**`ubookit-catalogue-choice` was checked and is not a third case.** It looks like the
+same defect — an item whose name differs from its container `ubookit-catalogue-choices`
+by one letter — but both are prefixed by the block they belong to, so nothing is
+ambiguous about where either sits. The plural similarity is cosmetic; the missing block
+prefix was the actual defect. Recorded because "fix one of a pair and leave the other"
+is a failure this project has met before, and the reasoning for *not* touching this one
+should be visible rather than look like an oversight.
+
+**The field wrappers number five in `_DateAndLength`, not three.** The two
+`tabindex="-1"` wrappers — the settled-length div and the absent-choice div — occupy
+field positions and take the same class, because they are what a field looks like when
+its control has been replaced by settled text. Excluding them would make the layout
+rule skip exactly the rows that already carry the most conditional behaviour.
 
 **Granularity is kept deliberately.** Under D1 the classes are an API for other
 people's CSS rather than a vehicle for ours, so collapsing `no-times`, `no-choices`,
@@ -251,20 +288,67 @@ it renders today — the only behavioural difference for an existing install is 
 rename, which nothing yet depends on because no stylesheet exists to depend on it.
 Rollback is deleting the asset and the partial.
 
+## What implementation changed, and what it found
+
+Recorded here rather than only in `tasks.md`, because these are decisions a reviewer
+needs and two of them corrected the artifacts.
+
+- **A second rename.** `ubookit-time` was the item inside `ubookit-times` and was not
+  prefixed by it, so it read as a second block differing from its own container's name
+  by one letter — D7's ambiguity in miniature. `ubookit-catalogue-choice` was checked
+  and is *not* a third case: both it and its container are prefixed by their block, so
+  the missing prefix was the defect and the plural similarity is cosmetic.
+- **Field wrappers number five in `_DateAndLength`, not three.** The two
+  `tabindex="-1"` wrappers are field positions, and excluding them would make the
+  layout rule skip the rows with the most conditional behaviour.
+- **The email hint had no class hook.** The audit behind D7 scanned `class=`
+  attributes, so an element carrying only an id was invisible to it. A reminder that an
+  inventory is only as complete as the attribute it was built from.
+- **`_Styles.cshtml` is the package's first non-rendering view**, and it broke ten
+  rendering rules that assume a model and a document body. Excluded from
+  `ViewInventory.All` **by name, with a reason and with what would lift it** — the form
+  that class's own guidance demands — and covered by the emission rule instead, which
+  is a stronger check on that file than any markup rule. Both that exclusion and the
+  sibling exemption in `ServiceFrontendTests` carry vacuity guards, so neither can
+  decay into skipping a folder.
+- **The packaging delta was rewritten after the outward sweep**, which found it
+  duplicating `packaging`'s existing manifest fence *and* doing it as a denylist — the
+  shape that requirement rejects by name. It now carries only the positive obligation.
+- **Named colours are guarded by enumerating the permitted value vocabulary**, not by
+  blacklisting the 148 CSS colour names, which would have been knowingly partial.
+
 ## Open Questions
 
-1. **Do the `tabindex="-1"` wrappers get a visible focus indicator for free?** (D6.)
-   Observe on the TestSite once the stylesheet exists, then decide. Do not pre-empt it
-   with an override.
-2. **CLAUDE.md invariant 5 states the wider claim this change narrows.** Amending a
-   project invariant is the repo owner's call and is deliberately not done here. The
-   wording that survives: the shipped default meets every AA criterion determined by
-   markup; criteria determined by CSS are met by the shipped default tokens and become
-   the site's once overridden.
-3. **Where the styling documentation lives** — a new page, or a section of
-   `docs/booking-page.md`. That page currently says the flow's internals are not
-   customisable, which stays true of markup and now needs to separate appearance from
-   markup.
+All three are now **closed**, and are kept with their answers rather than deleted so a
+reviewer can see what was decided rather than assumed.
+
+1. ~~**Do the `tabindex="-1"` wrappers get a visible focus indicator for free?**~~
+   **ANSWERED: yes. No override added.** After real keyboard input, fragment
+   navigation to the wrapper gave `:focus-visible` true and `outline-style: auto` —
+   Chrome's adaptive ring, legible on any background precisely because we did not
+   replace it. D6's "observe first, decide after" was the right call: an override
+   written up front would have been strictly worse and permanent.
+   **It shows the ring is painted, and nothing more.** The ⑤(d) human keyboard-only and
+   screen-reader pass is **not** discharged by it.
+2. ~~**CLAUDE.md invariant 5 states the wider claim this change narrows.**~~ **DONE on
+   this branch, at Chris's instruction (2026-08-27)**, so the diff is visible at merge.
+   His reasoning: *"we cannot be held responsible for code we did not write."* The
+   invariant now states the three-way split with criterion numbers, and carries a
+   standing instruction not to trade away the no-author-stylesheet clause when
+   simplifying — that clause is what makes the split honest rather than an escape.
+3. ~~**Where the styling documentation lives.**~~ **`docs/booking-page.md` for now**
+   (Chris, 2026-08-27), moving to a README once the package is public. The neighbouring
+   heading was renamed to "Changing the page around the flow" so it no longer competes
+   with the new styling section, and the old closing line offering "the template above,
+   and CSS" was corrected — it promised CSS when none existed.
+
+### One new obligation, opened by this change
+
+**Forced-colors mode is unverified.** It needs browser or OS emulation this session
+could not reach, so it is recorded as unverified rather than claimed. The reasoning
+that makes it likely safe — the package sets no background and no text colour, and
+forced-colors overrides author border colours anyway — is reasoning, not measurement.
+Dark mode *was* measured and behaves exactly as D1 predicts.
 
 ## Deferred obligations — none are discharged here, and one only looks adjacent
 

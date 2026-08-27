@@ -233,6 +233,66 @@ public class PackagingTests
     }
 
     [Fact]
+    public void Every_front_end_asset_arrives_by_a_decided_route()
+    {
+        // The allowlist above says what the manifest may NOT carry. This says where a
+        // front-end asset must instead live, which is the other half and is a positive
+        // rule rather than a fence: an asset can only reach a site as a static web
+        // asset (wwwroot, served from the package's own path) or not at all.
+        //
+        // Why it is worth asserting. The mechanism decides who can never be fixed
+        // again. A manifest import writes a real file into the site, and the migration
+        // plan is run-once by design, so that file is then never touched. Some of this
+        // package's CSS carries accessibility weight — focus visibility, the derivation
+        // of muted and border colours from the host's text colour, target size — so a
+        // site-owned stylesheet is one where a later accessibility fix reaches no
+        // existing install, ever, and nothing reports that it did not.
+        //
+        // A stylesheet dropped anywhere else under UBookIt.Web ships inside the
+        // assembly and is served by nothing, which fails silently in the opposite
+        // direction: present, referenced, and 404.
+        // Enumerated directly rather than through RepoFiles.Paths, whose own vacuity
+        // guard asserts a non-empty result. That guard is right for "find the things
+        // and check them" and wrong for "prove there are none" — here an empty result
+        // is the passing case, and borrowing the helper made the test fail on success.
+        var web = Path.Combine(RepoFiles.Root, "src", "UBookIt.Web");
+
+        var strays = new[] { "*.css", "*.js" }
+            .SelectMany(pattern => Directory.EnumerateFiles(web, pattern, SearchOption.AllDirectories))
+            .Where(path => !path.Contains($"{Path.DirectorySeparatorChar}obj{Path.DirectorySeparatorChar}", StringComparison.Ordinal))
+            .Where(path => !path.Contains($"{Path.DirectorySeparatorChar}bin{Path.DirectorySeparatorChar}", StringComparison.Ordinal))
+            .Where(path => !path.Contains(
+                $"{Path.DirectorySeparatorChar}wwwroot{Path.DirectorySeparatorChar}",
+                StringComparison.Ordinal))
+            .Select(path => Path.GetRelativePath(RepoFiles.Root, path))
+            .Order(StringComparer.Ordinal)
+            .ToList();
+
+        Assert.True(
+            strays.Count == 0,
+            $"Front-end asset(s) outside wwwroot: {string.Join(", ", strays)}. A static "
+            + "web asset under wwwroot is served at _content/UBookIt.Web/... and is "
+            + "replaced by an upgrade; anywhere else it is compiled into the assembly "
+            + "and served by nothing.");
+
+        // Scope, stated because the test name is broader than the scan: only
+        // `UBookIt.Web` is examined, because it is the only project that ships
+        // front-end assets. `UBookIt.Backoffice` has its own `wwwroot` for the
+        // backoffice client, which is a different delivery story and not governed here.
+        //
+        // Non-vacuity: a scan finding no assets at all would permit everything. This is
+        // a PIN, not a rule — it will need editing the day the deferred JS layer ships,
+        // and that is intended: a second asset should be a decision, not a discovery.
+        var assets = RepoFiles
+            .Paths("src/UBookIt.Web/wwwroot", "*")
+            .Select(path => Path.GetFileName(path))
+            .Order(StringComparer.Ordinal)
+            .ToList();
+
+        Assert.Equal(["ubookit.css"], assets);
+    }
+
+    [Fact]
     public void The_shipped_document_type_is_creatable_on_a_fresh_install()
     {
         // Settled at apply: allowed at root, because with this false the type is
