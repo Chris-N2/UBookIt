@@ -67,14 +67,23 @@ it in its own step means §5's suite delta has exactly one cause.
 
 ## 6. Tests
 
-- [ ] 6.1 Guard the D2 mechanic: assert no documented token has a default declared on a package-rendered element. **Mutation-check it** by moving one default onto `.ubookit-booking` and confirming the test fails — a guard for a silent failure that cannot itself fail is worse than none
-- [ ] 6.2 Assert the stylesheet declares no literal colour value, and mutation-check by adding one
-- [ ] 6.3 Assert no appearance property targets a date input, select or button beyond the target-size floor
-- [ ] 6.4 Assert the class vocabulary follows the block / part / `--`variant rule, and that every field wrapper and every submit control carries its hook
-- [ ] 6.5 Assert the id set is unchanged by this change, and that no stylesheet declaration selects on an id
-- [ ] 6.6 Assert the token list and the stylesheet agree in both directions (4.5 as a test, not a one-off audit)
-- [ ] 6.7 Assert exactly one emission route exists
-- [ ] 6.8 Vary the fixtures rather than testing one shape — per the standing lesson that a covering test has twice been written so it could not fail
+- [x] 6.1 Guard the D2 mechanic: assert no documented token has a default declared on a package-rendered element. **Mutation-check it** by moving one default onto `.ubookit-booking` and confirming the test fails — a guard for a silent failure that cannot itself fail is worse than none
+      → **Mutation-checked twice over.** Synthetically, including the nested-parenthesis `color-mix` fallback that a naive "strip `var(...)`" approach gets wrong; and by a **real edit to the shipped file** (`--ubookit-field-gap` moved onto `.ubookit-field`), which failed naming the token. Reverted.
+      The detector is one pattern — `--ubookit-…\s*:` — because a custom property name is followed by `:` only where it is *declared*; inside `var(--x, default)` it is followed by `,` or `)`. No paren balancing needed.
+- [x] 6.2 Assert the stylesheet declares no literal colour value, and mutation-check by adding one
+      → Hex (3/4/6/8 digits) and every functional notation, each mutation-checked. Comments are **stripped first**: they explain the rules in prose and so mention the very things the rules forbid — scanning the raw file would fail on its own documentation, a false positive that teaches contributors to weaken the rule.
+- [x] 6.3 Assert no appearance property targets a date input, select or button beyond the target-size floor
+- [x] 6.4 Assert the class vocabulary follows the block / part / `--`variant rule, and that every field wrapper and every submit control carries its hook
+      → Five rules. **Mutation-checked by reverting 2.4a**: restoring `ubookit-time` failed both the enumeration and the prefix rule, the latter naming the exact fault. Dropping one `ubookit-field` failed the pinned count. Both reverted; tree verified identical to HEAD.
+      → **A loophole was found and closed while writing it.** The prefix rule needs a declared block list, and a part with no block passes the moment someone declares its prefix a "block" whether or not anything renders it — I did exactly that with `ubookit-date` before noticing. A declared block must now itself be a rendered class, so the list records what the vocabulary *is* rather than being a place to make failures disappear.
+- [x] 6.5 Assert the id set is unchanged by this change, and that no stylesheet declaration selects on an id
+      → Stylesheet asserted to contain no `#` at all, which given 6.2 forbids hex means no id selector. The "unchanged" half was done as the 2.5 diff; pinning ids in a test belongs to the accessibility rules that already own them rather than here.
+- [x] 6.6 Assert the token list and the stylesheet agree in both directions (4.5 as a test, not a one-off audit)
+      → The published list lives in the test rather than being derived from the file, so the two are checked against each other instead of against themselves.
+- [x] 6.7 Assert exactly one emission route exists
+- [x] 6.8 Vary the fixtures rather than testing one shape — per the standing lesson that a covering test has twice been written so it could not fail
+      → Every enumeration rule carries a non-vacuity assertion, and the value-vocabulary scan is additionally proved to detect `color: red` — the named-colour case the syntax rule deliberately does not cover.
+      → **Why enumeration rather than a colour-name blacklist:** listing the 148 CSS named colours would be a knowingly partial guard. Enumerating the *permitted* value vocabulary instead makes it complete — any new identifier fails and has to be justified, whether it names a colour or not. It caught my own omission of `in` (from `color-mix(in srgb, …)`) on first run.
 
 ## 7. Verify live
 
