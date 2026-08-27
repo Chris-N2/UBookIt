@@ -140,7 +140,16 @@ it in its own step means §5's suite delta has exactly one cause.
 - [x] 9.6 Note in the change what remains unmeasured: a NuGet-installed consumer serving the asset by request, and whether an RCL theme view wins a location expander's first candidate (the next change's spike)
       → Both recorded in `design.md` Risks, plus a third from 7.7: **forced-colors mode is unverified**, not claimed.
 - [ ] 9.7 Hand to `qa-review` in a **fresh context or subagent** — the context that implemented this must not review it
-- [ ] 9.8 **AT SYNC, NOT AT ARCHIVE:** apply the `default-frontend` Purpose correction from 9.1(a) by hand. A delta cannot express it, so it will vanish if left to the archive step
+- [x] 9.8 **AT SYNC, NOT AT ARCHIVE:** apply the `default-frontend` Purpose correction from 9.1(a) by hand. A delta cannot express it, so it will vanish if left to the archive step
+      → **DONE at sync 2026-08-27.** `openspec/specs/default-frontend/spec.md:5` no longer says "every flow meets WCAG 2.2 AA". It now states the boundary in the same three parts as the requirement, and additionally mentions the shipped stylesheet and the token/class contract, which the Purpose had no way to know about before. Verified afterwards: **no spec anywhere still carries an unqualified AA claim.**
+
+## 11. Sync
+
+- [x] 11.1 Apply both deltas to `openspec/specs/` — `default-frontend` (1 MODIFIED, 3 ADDED) and `packaging` (1 ADDED)
+- [x] 11.2 **The deltas were STALE and were corrected before syncing.** Two QA rounds moved the implementation past what the deltas said, and syncing them unread would have written a **weaker** requirement into the main spec than the code and tests actually hold — the quiet version of the failure this project keeps guarding against. Five corrections: the contrast clause still said `color` only rather than every colour-affecting property; "those five criteria" was stale after 1.4.11 was separated out; the derived-colour scenario was still text-only, and gained a sibling for the routes that name no colour at all; the emphasis paragraph still permitted derived colour generally rather than for decoration only; and the "no colour is decided" scenario predated the text/decoration split
+- [x] 11.3 `openspec validate --specs --strict` — **10 passed, 0 failed**
+- [x] 11.4 Outward check on the synced result: no spec retains an unqualified AA claim; `default-frontend`'s "SHALL NOT be read as replacing the WCAG 2.2 AA bar" cross-reference is intact and still true, carried forward deliberately per 9.1(b); and `packaging`'s new requirement reads coherently beside the existing manifest fence rather than restating it
+- [x] 11.5 `packaging`'s Purpose deliberately **not** edited. It already covers "what the package owns thereafter, and what the site owns", which is exactly what the new requirement is about, so a rewrite would be churn rather than a correction
 
 ## 10. QA rounds
 

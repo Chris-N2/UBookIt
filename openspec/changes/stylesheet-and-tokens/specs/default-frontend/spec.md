@@ -18,14 +18,25 @@ stylesheet at its default token values, and SHALL become the consuming site's
 responsibility for any token that site overrides. The package SHALL NOT claim those
 criteria for a rendering it did not style.
 
-**The shipped stylesheet SHALL set no text colour of its own.** Every `color`
-declaration SHALL resolve, at its default, to `currentColor` or `inherit` — that is, to
-whatever the host page already chose. A *derived* colour SHALL NOT be used for text
-even though it names no hue: compositing text toward transparency reduces its contrast,
-so a derivation from a conformant host colour can be non-conformant. This is the clause
-that makes 1.4.3 true of the default rather than merely argued, and it was learned by
-shipping the opposite: a hint derived at 75% of the host's text colour rendered at
-2.9:1 on a host whose own body text was exactly AA-conformant.
+**The shipped stylesheet SHALL NOT alter the contrast the host page established.**
+Every declaration of a property able to change a rendered colour — including `color`,
+`background`, `background-color`, `background-image`, `opacity`, `filter`,
+`backdrop-filter`, `mix-blend-mode`, `text-shadow` and `-webkit-text-fill-color` —
+SHALL resolve, at its default, to a value that leaves the host's own pair exactly as it
+was: `currentColor`, `inherit`, `transparent`, `none`, or a token whose fallback is one
+of those. `color-mix()` MAY be used for **border** colours, which are decoration here,
+and SHALL NOT be used for text.
+
+This clause is what makes 1.4.3 true of the shipped default rather than merely argued,
+and **its scope is deliberately the guarantee rather than any particular declaration**,
+because two narrower versions were shipped and both were defeated. The first forbade a
+*literal* colour; a hint derived as `color-mix(in srgb, currentColor 75%, transparent)`
+satisfied it and rendered at 2.9:1 on a host whose body text was exactly AA-conformant,
+because compositing text toward transparency reduces contrast. The second forbade a
+derived **text** colour; `opacity: 0.75` on the same element satisfies that and produces
+a byte-identical result, as does a `background` shorthand altering the other half of the
+pair. A rule naming the mechanism a violation is expected to use will be met by the next
+mechanism; a rule naming the property being guaranteed will not.
 
 **1.4.11 (non-text contrast) is NOT claimed for the package's decorative borders, and
 that exemption SHALL be stated rather than implied.** The rule beside a notice and the
@@ -35,8 +46,8 @@ neither is a boundary a visitor must perceive to operate a control. Where a bord
 *does* bound a control or convey meaning, it SHALL meet 1.4.11.
 
 This narrowing states a bar that was never held rather than lowering one that was.
-The package shipped no stylesheet at all until this change, so those five criteria
-were already determined entirely by the consuming site, whatever the requirement
+The package shipped no stylesheet at all until this change, so every CSS-determined
+criterion was already decided entirely by the consuming site, whatever the requirement
 said. Nothing a visitor experiences becomes less accessible; what changes is that the
 claim now names its own boundary.
 
@@ -89,9 +100,13 @@ catalogue when it is rendered as a chooser — it SHALL be a grouped set with a
 - **WHEN** a flow is rendered with the shipped stylesheet applied and no token overridden
 - **THEN** text contrast, focus appearance and target size are met, and text contrast cannot fail because every text colour resolves to what the host already chose
 
-#### Scenario: A derived text colour fails
-- **WHEN** the stylesheet sets a `color` whose default resolves to anything other than `currentColor` or `inherit` — including a derivation of them that names no hue
-- **THEN** the check fails, naming the value — because a derivation can reduce the contrast a conformant host had established
+#### Scenario: A declaration that alters the host's contrast fails
+- **WHEN** the stylesheet declares any colour-affecting property whose default resolves to anything other than `currentColor`, `inherit`, `transparent`, `none` or a token falling back to one of those — whether it names a colour, derives one, or composites without naming one at all
+- **THEN** the check fails, naming the property and value
+
+#### Scenario: The check covers routes that name no colour
+- **WHEN** the stylesheet reduces rendered contrast by `opacity`, by a `background` shorthand, or by any other compositing property rather than by a `color` declaration
+- **THEN** the check still fails — the rule is scoped to the guarantee, not to the declaration a previous defect happened to use
 
 #### Scenario: A decorative border is exempt from 1.4.11 and says so
 - **WHEN** the package's default border colours are below 3:1
@@ -123,11 +138,12 @@ minima that cost the host nothing to concede; neither is an appearance choice, a
 nothing else in the file overrides inherited type.
 
 Emphasis that would conventionally be carried by colour — an error, a notice — SHALL
-be carried by properties that cannot clash with an unknown host: `currentColor`,
-border weight, font weight, and colours derived from `currentColor`. This is not
-austerity for its own sake: a colour the package picks sits on a background the
-package has never seen, so its contrast is not computable and any claim about it
-would be unfounded.
+be carried by properties that cannot clash with an unknown host: `currentColor`, border
+weight and font weight. A colour **derived** from `currentColor` MAY carry decoration,
+and SHALL NOT carry text. This is not austerity for its own sake: a colour the package
+picks sits on a background the package has never seen, so its contrast is not computable
+and any claim about it would be unfounded — and a derivation is a choice too, since
+compositing toward transparency reduces contrast rather than preserving it.
 
 Native form controls — `input[type=date]`, `select`, `button` — SHALL NOT be restyled.
 Platform-rendered controls are accessible by construction, respect the user's own
@@ -149,7 +165,7 @@ A site that adds nothing SHALL render exactly as it did before this change.
 
 #### Scenario: No colour is decided by the package
 - **WHEN** the shipped stylesheet is inspected
-- **THEN** it declares no literal colour value, and every colour it does express derives from `currentColor` or from a token the site may set
+- **THEN** it declares no literal colour value; every text colour resolves to what the host already chose; and the only derived colours are border colours the site may override
 
 #### Scenario: Native controls keep their platform appearance
 - **WHEN** the shipped stylesheet is inspected
