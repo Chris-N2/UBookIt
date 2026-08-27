@@ -41,6 +41,13 @@
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
     <title>uBookIt booking test</title>
+
+    @* The one-line opt-in a consuming site writes, exercised here so the harness
+       covers the styling route as well as the markup. This IS representative of
+       what a real site does, unlike the rest of this file.
+
+       Site token overrides would go in a stylesheet linked AFTER this line. *@
+    @await Html.PartialAsync("~/Views/Shared/UBookIt/_Styles.cshtml")
 </head>
 <body>
     <main>

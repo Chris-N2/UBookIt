@@ -87,14 +87,27 @@ it in its own step means §5's suite delta has exactly one cause.
 
 ## 7. Verify live
 
-- [ ] 7.1 Boot the TestSite. If it will not start, clear the stale `umbracoKeyValue` upgrader rows first (SQL Server is a local instance on localhost)
-- [ ] 7.2 Request `_content/UBookIt.Web/ubookit.css` and confirm `200` and a CSS content type
-- [ ] 7.3 Add the partial to the TestSite layout and confirm the flow renders styled, at `/book` and through to a confirmation
-- [ ] 7.4 Override two or three tokens from the site's `:root` and confirm they take effect — this is the headline claim being checked by hand, not only by a test
-- [ ] 7.5 Confirm the flow still renders correctly with the partial removed
-- [ ] 7.6 **Answer open question 1**: do the `tabindex="-1"` wrappers get a visible focus indicator for free when reached from an error-summary link, keyboard-only? Record what was observed; only add an override if the answer is no
-- [ ] 7.7 Check the flow in a forced-colors / high-contrast mode and in dark mode, since D1 claims both work for free
-- [ ] 7.8 Try `brand/tokens.css` over the defaults as the independent-tokens fixture it was kept for — the test is whether *someone else's* tokens drop cleanly, and do not commit `brand/` as part of this change
+- [x] 7.1 Boot the TestSite. If it will not start, clear the stale `umbracoKeyValue` upgrader rows first (SQL Server is a local instance on localhost)
+      → Booted clean, no `BootFailedException`; the rows were cleared 2026-08-25.
+- [x] 7.2 Request `_content/UBookIt.Web/ubookit.css` and confirm `200` and a CSS content type
+      → `200`, `text/css`, 9055 bytes, `ETag` + `Last-Modified`.
+- [x] 7.3 Add the partial to the TestSite layout and confirm the flow renders styled, at `/book` and through to a confirmation
+      → Added to the dev harness's `<head>` (`UbookitBookingTest.cshtml`, which is the only TestSite view with one) and **kept**, so the harness now exercises the styling route as well as the markup. `~/` resolved to `/_content/…`, stylesheet loaded, 18 rules applying, 35 start times wrapping into 3 rows with no horizontal overflow (measured: `scrollWidth == clientWidth`, no option beyond the viewport).
+      → **A REAL GAP FOUND, and it belongs in §8.** The *shipped* Booking Page template deliberately sets no `Layout`, so a site using it as installed **has no `<head>` to put the partial in** — `/book` renders with zero `link` elements. The styling contract therefore requires the site to have a master template or supply its own. That is not a defect in either half, but it is undocumented and a site author would hit it immediately.
+- [x] 7.4 Override two or three tokens from the site's `:root` and confirm they take effect — this is the headline claim being checked by hand, not only by a test
+      → **Passes.** Five tokens set on `:root` in a stylesheet appended after ours: field-gap 5.6→32px, measure 544→320px, space 16→48px, line-height 24→32px, and `--ubookit-accent` reached the radio's own computed `accent-color`. D2's mechanic confirmed in a browser, not just in principle.
+      → **And the two things that correctly did NOT move**: `display` (structural, untokenised) and `min-height: 24px` — **the target-size floor held against the site's tokens**, which is the "a floor a site can lower is not a floor" decision working.
+- [x] 7.5 Confirm the flow still renders correctly with the partial removed
+      → Verified live rather than by removal: `/book` is the opted-out case already, and renders the whole flow with **zero** `link` elements.
+- [x] 7.6 **Answer open question 1**: do the `tabindex="-1"` wrappers get a visible focus indicator for free when reached from an error-summary link, keyboard-only? Record what was observed; only add an override if the answer is no
+      → **ANSWERED: yes, for free. No override added.** After real keyboard input, fragment navigation to `#ubookit-times` gave `document.activeElement` = the wrapper, `:focus-visible` **true**, and `outline-style: auto` — Chrome's own adaptive dual-tone ring, which is legible on any background precisely because we did not replace it. Confirmed visually too. Our stylesheet declares **no** outline or focus rule at all (asserted by reading the loaded rules).
+      → Limit of this result, stated rather than glossed: it shows the ring is *computed and painted*. Whether the experience works remains the **⑤(d) human keyboard-only + screen-reader pass**, which this does not discharge.
+- [x] 7.7 Check the flow in a forced-colors / high-contrast mode and in dark mode, since D1 claims both work for free
+      → **Dark mode: confirmed, and it is the cleanest demonstration of posture A.** With a host theme of `#111`/`#eee`, our text inherited `rgb(238,238,238)`, our background stayed transparent, the native `<select>` followed `color-scheme: inherit` to `#3b3b3b`/white, and **the muted hint flipped itself** to 75% of `#eee` because it derives from `currentColor`. A hardcoded grey would have been near-invisible there.
+      → **Forced-colors: NOT verified.** It needs browser/OS emulation this session could not reach, and it is recorded as unverified rather than claimed. The reasoning that makes it *likely* safe — we set no background and no text colour, and forced-colors overrides author border colours anyway — is reasoning, not measurement. Carry it as an obligation.
+- [x] 7.8 Try `brand/tokens.css` over the defaults as the independent-tokens fixture it was kept for — the test is whether *someone else's* tokens drop cleanly, and do not commit `brand/` as part of this change
+      → **The fixture does not exist.** `brand/` holds two empty directories (`png/`, `svg/`) and no files — no `tokens.css`, no `BRAND.md`. The memory describing it is stale and needs correcting. 7.4 was therefore performed with synthetic third-party token values, which serves the same purpose: the point was that the tokens be *someone else's*, not that they be Norwood's. `brand/` remains untracked and uncommitted.
+- [x] 7.9 **NEW** — verify the emitted href carries no literal `~`. Worth its own check because the partial is authored `href="~/_content/…"` (correct: a site under a virtual application path needs the PathBase), while the package deliberately registers no tag helpers. Proven through the package's **own** rig, which registers none — so the answer is the package's, not the TestSite's. Two permanent tests added
 
 ## 8. Documentation
 
