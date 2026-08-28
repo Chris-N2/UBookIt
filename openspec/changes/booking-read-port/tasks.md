@@ -35,4 +35,4 @@
 - [x] 4.3 `openspec validate --all --strict`.
 - [x] 4.4 **Re-read the delta spec against the code before syncing.** Deltas go stale after every QA round; on the last two changes the deltas were corrected at sync, and syncing them unread would have written a weaker requirement into the main spec while looking like a clean sync.
 - [x] 4.5 Swept, and it **found a real contradiction** rather than coming back clean: `bookings` requires that no Core service depend on a management store, which the first draft's `BookingQueryService` violated. Resolved by moving the guard into `BookingQuery.Create` (see 1.3) so no sibling spec needed changing. Nothing else in `bookings`, `persistence` or `resource-management` is falsified — no sibling claims bookings cannot be listed.
-- [ ] 4.6 Hand the change to `qa-review` in a **fresh context or subagent** — the context that implemented it never reviews it.
+- [x] 4.6 Hand the change to `qa-review` in a **fresh context or subagent** — the context that implemented it never reviews it.
