@@ -1,0 +1,45 @@
+<Project Sdk="Microsoft.NET.Sdk.Razor">
+
+  <!--
+    A theme, as a theme really is: an ordinary Razor class library whose views are
+    precompiled into its own assembly and discovered as an application part. It
+    mirrors UBookIt.Web's csproj shape (Sdk.Razor + AddRazorSupportForMvc) so the
+    precedence measurement is a fair comparison rather than a comparison between
+    two differently-built artefacts.
+
+    IT LIVES UNDER tests/ AND MUST NEVER LIVE UNDER src/UBookIt.Web/Views.
+    ViewInventory scans that directory on disk to discover the shipped view set, so
+    a fixture placed there would silently join it and every rendering rule would
+    start asserting over a test fixture while reporting green.
+
+    Four themes in one assembly, because the theme name is part of the view path
+    and a theme is therefore identified by path rather than by assembly:
+
+      complete    all ten required views, at the right paths, with the right models
+      partial     two of them, so per-view fallback can be observed
+      wrongmodel  one view at a required path declaring a model it never receives
+      basemodel   one view declaring a base type the model it receives satisfies
+  -->
+  <PropertyGroup>
+    <TargetFramework>net10.0</TargetFramework>
+    <AddRazorSupportForMvc>true</AddRazorSupportForMvc>
+    <Nullable>enable</Nullable>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <IsPackable>false</IsPackable>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <FrameworkReference Include="Microsoft.AspNetCore.App" />
+  </ItemGroup>
+
+  <!--
+    A theme references the package for its view models, and for the shared partials
+    it may call as building blocks. It is referenced BY the test projects and by the
+    TestSite — never by UBookIt.Web, which would make it part of the package and
+    prove nothing about a separate assembly winning.
+  -->
+  <ItemGroup>
+    <ProjectReference Include="..\..\src\UBookIt.Web\UBookIt.Web.csproj" />
+  </ItemGroup>
+
+</Project>

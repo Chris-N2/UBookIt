@@ -10,5 +10,6 @@
     <Project Path="tests/UBookIt.Tests.Integration/UBookIt.Tests.Integration.csproj" />
     <Project Path="tests/UBookIt.Tests/UBookIt.Tests.csproj" />
     <Project Path="tests/UBookIt.Tests.Rendering/UBookIt.Tests.Rendering.csproj" />
+    <Project Path="tests/UBookIt.Tests.ThemeFixture/UBookIt.Tests.ThemeFixture.csproj" />
   </Folder>
 </Solution>

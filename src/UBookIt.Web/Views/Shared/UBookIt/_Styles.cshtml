@@ -1,3 +1,6 @@
+@using Microsoft.Extensions.Options
+@using UBookIt.Web.Theming
+@inject IOptions<UBookItThemeOptions> UBookItTheme
 @*
     The only route by which uBookIt emits its own styling.
 
@@ -18,13 +21,31 @@
     something a token can express. Sites are documented to link their own
     stylesheet after this one.
 
-    A theme's off-switch. A future theme replaces what this partial emits and turns
-    the package's CSS off without the consuming site changing anything. That is why
-    the requirement is that this be the ONLY emission route: a second link element
-    somewhere else would survive the theme and fight it.
+    A theme's off-switch — now built, and it is the condition below. A theme owns
+    the markup, so the package's classes largely do not exist in the rendered
+    document: the stylesheet would style nothing while still being able to collide
+    with the theme's own. A theme that reuses the package's shared partials as
+    building blocks registers with usePackageStylesheet: true and gets back exactly
+    what an unthemed site gets. That is why the requirement is that this be the ONLY
+    emission route: a second link element somewhere else would survive the theme and
+    fight it.
 
-    Note for anyone editing this file: Razor comments do NOT nest. An inner comment
-    closes this one early and everything below becomes live markup, which is how the
-    first version of this file failed to compile.
+    IOptions rather than the theme object itself, because this partial renders in
+    hosts that never registered a theme — including the package's own rendering rig.
+    IOptions<T> always resolves, and no theme is simply the default value.
+
+    Two notes for anyone editing this file.
+
+    Razor comments do NOT nest. An inner comment closes this one early and everything
+    below becomes live markup, which is how the first version of this file failed to
+    compile.
+
+    The link element below sits at column 0 inside the block ON PURPOSE. Razor emits
+    literal markup including its leading whitespace, so indenting it to match the
+    braces changes the bytes an unthemed site renders — which was verified against the
+    running TestSite, and which is the one thing this change promised not to do.
 *@
+@if (!UBookItTheme.Value.IsActive || UBookItTheme.Value.UsePackageStylesheet)
+{
 <link rel="stylesheet" href="~/_content/UBookIt.Web/ubookit.css" />
+}

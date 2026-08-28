@@ -40,6 +40,17 @@
   </ItemGroup>
 
   <!--
+    The theme fixture: a second Razor class library, precompiled, at a different
+    path. It is what makes the precedence measurement a measurement rather than an
+    inference — and it is measured HERE precisely because runtime compilation is
+    absent from this project's closure, which is the configuration a production
+    site actually runs and the one the spike could not reach.
+  -->
+  <ItemGroup>
+    <ProjectReference Include="..\UBookIt.Tests.ThemeFixture\UBookIt.Tests.ThemeFixture.csproj" />
+  </ItemGroup>
+
+  <!--
     Shared by link rather than copied. RepoFiles locates the repository root from
     its own compile-time path (CallerFilePath), which is the path of the ORIGINAL
     file, so a linked copy resolves to the same root. Asserted by a test rather

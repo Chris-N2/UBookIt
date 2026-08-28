@@ -89,6 +89,14 @@ public static class ViewInventory
     /// about.
     /// </para>
     /// <para>
+    /// <b>Re-decided when theming shipped, against the lifting condition below rather
+    /// than by inertia.</b> The partial now emits either that one <c>link</c> or
+    /// nothing at all, depending on whether a theme is active and whether it asked for
+    /// the package's stylesheet. Emitting less is still nothing a visitor can perceive
+    /// in the body, so the grounds are unchanged and it stays here. Its themed
+    /// behaviour is covered by the emission rule, which now asserts both states.
+    /// </para>
+    /// <para>
     /// It is <b>not untested</b>: it is covered by the emission rule instead, which
     /// asserts that exactly one view emits package styling, that it is this one, and
     /// that it names the shipped asset. That is a stronger check on this file than

@@ -58,6 +58,19 @@ booking system for Umbraco; this aims to be it.
      75% of the host's text colour named no hue and still rendered at 2.9:1
      on a host whose own text was exactly conformant. So: **a derived colour
      is for decoration, never for text.**
+   - **Theirs entirely, when a theme replaces the markup.** A theme (an RCL
+     supplying views at `Views/Shared/UBookIt/Themes/<theme>/…`) renders instead
+     of the package's views. The first bullet's guarantees are guarantees about
+     **the views the package ships**; where a theme supplies the view, the
+     markup is the theme author's and so are they. The package **claims nothing
+     in either direction** — it neither asserts a theme is accessible nor
+     requires anything of one, and it does not let a statement written about its
+     own views be silently inherited by markup it has never seen. Same reasoning
+     as the CSS narrowing: we do not take responsibility for code we did not
+     write. **The narrowing reaches themed views and nothing else** — for an
+     unthemed site, and for every view a theme does not supply, the first bullet
+     holds exactly as written, no-author-stylesheet clause included.
+
    - **Never ours.** Reflow, text spacing, bypass blocks, page title, page
      language, and the document's heading outline the flow's `<h2>` sits in.
 
