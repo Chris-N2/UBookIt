@@ -66,31 +66,51 @@ booking whose date nobody remembers cannot be found through this port. That is t
 support query walks into, and it is why search is named as a follow-up rather than left
 implied.
 
-### D2. The guardrail lives in a service, not the store, because that is where this
-### repository puts it
+### D2. The guardrail lives in the query type, so an unusable query cannot exist
 
-Existing convention, and it is consistent: stores do not validate. `ListAsync` on both
-management stores returns a bare `XPage`; only mutations return `DomainResult`. The
-availability range guard sits in `AvailabilityService`, not in `IBookingStore`.
+Stores here do not validate: `ListAsync` on both management stores returns a bare `XPage`,
+only mutations return `DomainResult`, and the availability range guard sits in
+`AvailabilityService` rather than in `IBookingStore`.
 
-So this change adds **two** things, not one:
+The first draft of this design followed that literally and put a `BookingQueryService` in
+front of the store. **The outward sweep caught it**: `bookings` says, in as many words,
+*"No Core service SHALL depend on a management store: the read ports are the only pathway
+anonymous delivery traffic reaches storage through."* That service was a Core service
+depending on a management store — the first exception to a standing `SHALL`, arrived at by
+accident rather than by decision.
+
+The guard therefore moved into `BookingQuery` itself:
 
 ```
-  IBookingQueryService  ──validates window, returns DomainResult<BookingPage>
-          │
+  BookingQuery.Create(from, to, settings, …)  ──> DomainResult<BookingQuery>
+          │                                         (an invalid one is never produced)
           ▼
-  IBookingManagementStore ──dumb; takes a validated query, returns BookingPage
-          │
+  IBookingManagementStore.ListAsync(BookingQuery) ──> BookingPage
+          │                                            (nothing to validate)
           ▼
   SqlBookingManagementStore ──the join
 ```
 
-*Rejected: putting the guard in the store* — it would be the only validating store, and
-the next person would reasonably copy the wrong one.
-*Rejected: leaving the guard to the eventual API controller* — then the port is unsafe for
-every other caller, and a guardrail that callers may skip is not a guardrail. This is the
-same reasoning that put theme-registration ordering inside the package rather than in the
-site's `Program.cs`.
+This is **stronger than the service version**, not merely a way around the rule. A guard in
+front of the store is something a caller can route around; a guard in the constructor
+leaves no invalid value to pass. It also lets creation settle the defaults once — statuses,
+an empty resource set, page bounds — so that every implementation of the port sees the same
+values rather than defaulting for itself.
+
+`BookingQuery` is a **class, not a record**, for one reason: `with` would clone around the
+factory and produce exactly the state the factory exists to prevent.
+
+*Rejected: putting the guard in the store* — it would be the only validating store, and the
+next person would reasonably copy the wrong one.
+*Rejected: leaving the guard to the eventual API controller* — the port is then unsafe for
+every other caller, and a guardrail callers may skip is not a guardrail. Same reasoning that
+put theme-registration ordering inside the package rather than in the site's `Program.cs`.
+*Rejected: amending the `bookings` rule to permit a management-facing Core service* —
+defensible, since the rule's stated reason is about anonymous delivery traffic and this
+service was not on that path. But it would have widened a sibling capability's guarantee to
+accommodate an implementation detail, when a better implementation was available.
+*Rejected: moving the service into `UBookIt.Backoffice`* — keeps the rule intact, but leaves
+a Core-only consumer holding an unguarded port.
 
 ### D3. A summary carries what a list row renders, including resource names
 

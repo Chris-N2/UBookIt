@@ -27,13 +27,12 @@ first half of "see" and deliberately touches none of the rest.
 - **A management read port.** `IBookingManagementStore` in Core, with a single windowed,
   paged, filtered query returning summaries rich enough to render a list row without a
   second round trip per booking.
-- **A thin query service in front of it.** `IBookingQueryService` validates the window and
-  returns `DomainResult<BookingPage>`; the store takes an already-valid query and returns
-  the page. This is the repository's existing split, not a new one — `ListAsync` on both
-  management stores returns a bare page, mutations return `DomainResult`, and the
-  availability range guard lives in `AvailabilityService` rather than in a store. Putting
-  the guard anywhere else would either make this the only validating store or leave the
-  port unsafe for every caller that is not the API.
+- **A query type that cannot hold an unusable window.** `BookingQuery.Create` returns
+  `DomainResult<BookingQuery>`, so a window that runs backwards or exceeds the site's
+  guardrail never becomes a value at all and the store has nothing to validate. Stronger
+  than checking in front of the store, which a caller can route around — and it keeps Core
+  free of a service depending on a management store, which `bookings` forbids so the read
+  ports stay the only pathway anonymous delivery traffic reaches storage through.
 - **Its SQL implementation.** `SqlBookingManagementStore` in Persistence, joining
   `BookingRow` → `ClaimRow` → `ResourceRow` so a row carries its resources' **names**,
   not just their ids. `ClaimRow` holds only `ResourceId`, so without the join every list
@@ -91,14 +90,14 @@ cancelled.
 
 ## Impact
 
-- **`UBookIt.Core`**: `IBookingManagementStore`, `IBookingQueryService` and its
-  implementation, and the query, summary and page types they use. No change to
-  `IBookingStore`, `IBookingService` or `Booking`.
+- **`UBookIt.Core`**: `IBookingManagementStore` and the query, summary and page types it
+  uses, the query carrying its own validation. No change to `IBookingStore`,
+  `IBookingService` or `Booking`, and **no new Core service** — see design D2.
 - **`UBookIt.Persistence`**: `SqlBookingManagementStore` and its DI registration. Reads
   only; no entity, schema or migration change.
-- **Public API surface** (additive): the port, the query service and their types. A store
-  is a Core port, so a site could implement it against another database, exactly as with
-  the existing management stores.
+- **Public API surface** (additive): the port and its query, summary and page types. A
+  store is a Core port, so a site could implement it against another database, exactly as
+  with the existing management stores.
 - **`UBookIt.Tests` / `UBookIt.Tests.Integration`**: coverage for windowing, the range
   guardrail, paging, status defaults and filters, and the resource-name join.
 - **No dependencies, no schema change, no migration.** Nothing installs into a site.

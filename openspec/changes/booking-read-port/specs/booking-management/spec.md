@@ -58,28 +58,57 @@ email or reference is a different query with different indexing, and is not prov
 - **WHEN** a list query's window spans more days than the site's configured maximum
 - **THEN** the query fails with the same stable failure code an over-wide availability query produces, and no results are returned
 
+A window that does not run forwards SHALL be refused with a stable failure code of its
+own, distinct from the over-wide one, so a caller can tell "you asked for nothing" from
+"you asked for too much".
+
 #### Scenario: The window cannot be omitted
 - **WHEN** a caller attempts to list bookings without a window
 - **THEN** it is not possible to express the request
 
-### Requirement: Validation is the service's job, not the store's
-The window guard SHALL be enforced by a query **service**, and the store SHALL receive an
-already-valid query and return its page directly.
+#### Scenario: A backwards or empty window is refused
+- **WHEN** a list query's window ends at or before it starts
+- **THEN** the query fails with a stable failure code distinguishable from the over-wide one, and no results are returned
 
-This SHALL follow the split the package already uses rather than introduce a second
-convention: management store reads return a page, mutations return a result carrying
-failures, and the equivalent range guard for availability is enforced by a service.
+### Requirement: An unusable query cannot be constructed
+The window guard SHALL be enforced when a query is **created**, and a query that fails it
+SHALL NOT come into existence. The store SHALL therefore receive only queries it can serve,
+and SHALL return its page directly rather than a result that may carry failures — on the
+same terms as the other management stores' list reads.
 
-The guard SHALL NOT be left to the eventual API layer. A port whose safety depends on
-every caller remembering to check first is not safe, and the API is only one caller.
+**This is stronger than checking before the call, and that is the reason for it.** A guard
+in front of the store is something a caller can route around; a guard in the constructor
+leaves no invalid value to pass. The eventual API layer is only one caller, and a port
+whose safety depends on every caller remembering to check first is not safe.
 
-#### Scenario: An invalid query never reaches the store
-- **WHEN** a list query fails the window guard
-- **THEN** the failure is returned by the service and the store is not asked for results
+**No Core service SHALL depend on the management store to achieve this.** The `bookings`
+capability requires that the read ports remain the only pathway anonymous delivery traffic
+reaches storage through, and a validating service in Core would have been the first
+exception to it. Putting the guard in the query type satisfies both obligations at once.
+
+The query type SHALL NOT offer a copy-and-modify facility that bypasses creation, since
+that would reproduce exactly the state creation exists to prevent.
+
+Creation SHALL also normalise what it accepts — resolving the default statuses, treating an
+absent resource set as empty, and bounding the page — so that every implementation of the
+port sees the same already-settled values. A default each store decided for itself would be
+several guarantees wearing one name.
+
+#### Scenario: An invalid window yields no query
+- **WHEN** a caller attempts to create a query whose window is unusable
+- **THEN** creation fails with the relevant failure code and no query is produced
+
+#### Scenario: The store cannot be handed an invalid query
+- **WHEN** the query type's construction surface is inspected
+- **THEN** there is no route to an instance that skips the window guard, including by copying an existing instance with altered values
 
 #### Scenario: The store does not re-validate
 - **WHEN** the store is given a query
-- **THEN** it returns the matching page rather than a result that may carry failures, on the same terms as the other management stores' list reads
+- **THEN** it returns the matching page rather than a result that may carry failures
+
+#### Scenario: Defaults are settled once, at creation
+- **WHEN** a query is created without statuses or resources
+- **THEN** it already carries the default statuses and an empty resource set, rather than leaving each store to decide
 
 ### Requirement: Results are paged in a stable order
 A list query SHALL be paged, and SHALL report the **total** number of bookings matching
@@ -88,6 +117,16 @@ the window and filters, so a caller can render a pager.
 Results SHALL be ordered by start time and then by booking identity, both ascending. The
 identity tiebreak is required, not decorative: two bookings may share a start time, and
 paging over an order that is not total silently repeats or drops rows between pages.
+
+**The ordering is a total order rather than a specified sequence of ids.** How a store
+orders two identities is its own concern — SQL Server, for instance, compares
+`uniqueidentifier` by its last six bytes rather than in the order a caller's language
+would sort the same values. What this requirement guarantees is that the order is total
+and stable across pages, not that it matches any particular caller-side sort.
+
+A page size SHALL be bounded, so that a caller asking for an unreasonable page receives a
+capped one rather than the whole window. The bound SHALL match the one the other
+management list reads already apply, so that page sizes do not differ per capability.
 
 **A test for this SHALL include bookings that share a start time**, because a fixture of
 distinct start times passes against an ordering that has no tiebreak at all.
