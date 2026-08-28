@@ -355,7 +355,25 @@ public class BookingManagementStoreTests(SqlServerFixture fixture)
 
         var sql = store.OrderedPage(Query(from, to)).ToQueryString();
 
-        var orderBy = sql[sql.LastIndexOf("ORDER BY", StringComparison.Ordinal)..];
+        // Pin to the clause that orders the PAGE — the one immediately before OFFSET/FETCH
+        // — rather than to whichever ORDER BY happens to come last.
+        //
+        // Taking the last one would be wrong in a way that reads as right. In the fully
+        // projected query EF emits a second, outer ORDER BY to group the resource
+        // collection, and it re-adds [Id] there as the parent identifier REGARDLESS of
+        // whether this store asks for the tiebreak. A guard reading that clause would pass
+        // in both directions. It reads correctly today only because this seam is
+        // un-projected and carries exactly one ORDER BY — an accident of shape, not a
+        // property anything guarantees.
+        var offset = sql.IndexOf("OFFSET", StringComparison.Ordinal);
+
+        Assert.True(
+            offset >= 0,
+            $"The paged query no longer emits OFFSET/FETCH, so there is no paging clause to "
+            + $"check and this guard is not testing what it claims. SQL was: {sql}");
+
+        var paging = sql[..offset];
+        var orderBy = paging[paging.LastIndexOf("ORDER BY", StringComparison.Ordinal)..];
 
         Assert.Contains("[StartUtc]", orderBy, StringComparison.Ordinal);
         Assert.Contains("[Id]", orderBy, StringComparison.Ordinal);
