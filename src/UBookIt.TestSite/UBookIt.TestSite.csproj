@@ -20,6 +20,17 @@
   <ItemGroup>
     <ProjectReference Include="..\UBookIt.Backoffice\UBookIt.Backoffice.csproj" />
     <ProjectReference Include="..\UBookIt.Web\UBookIt.Web.csproj" />
+
+    <!--
+      The theme, so the mechanism is exercised live rather than only in the rendering
+      rig. It is the same fixture the rendering suite measures precedence with, which
+      is deliberate: the two configurations differ only in whether runtime compilation
+      is present, so a disagreement between them is the finding, not a difference in
+      what was themed.
+
+      A real site would reference a theme package. Nothing here ships.
+    -->
+    <ProjectReference Include="..\..\tests\UBookIt.Tests.ThemeFixture\UBookIt.Tests.ThemeFixture.csproj" />
   </ItemGroup>
 
 

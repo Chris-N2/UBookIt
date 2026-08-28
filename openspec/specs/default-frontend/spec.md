@@ -2,7 +2,7 @@
 
 ## Purpose
 
-Defines the shipped, dependency-free default front-end: server-rendered, no-JavaScript booking flows exposed as Umbraco ViewComponents. It renders a single-resource flow, a service flow, and a catalogue of the bookable things a site offers — services and directly-bookable resources together — dispatched by a `BookingFlow` view component from whichever entry point a site author chooses, while the original `Booking` component continues to render the single-resource flow when invoked directly with a resource id. It renders availability by calling the Core resource, service and availability ports in-process (never the anonymous delivery API over HTTP), places bookings through the Core booking services behind an anti-forgery-protected same-origin POST, and confirms via Post-Redirect-Get. It ships a stylesheet as a static web asset, emitted by one documented partial and overridable through a published design-token and class contract. Accessibility is a first-class requirement, and the claim names its own boundary: every flow meets every WCAG 2.2 AA criterion determined by markup, uses semantic HTML, and preserves input while reporting failures accessibly; the criteria determined by CSS are met by the shipped stylesheet's defaults and become the consuming site's on override; and those determined by the host page were never the package's to claim, since a component cannot conform on its page's behalf. This is the default rendering that any alternative UI (a separate-repo DevExpress front-end, a SPA, a mobile client) may replace by consuming the delivery API instead.
+Defines the shipped, dependency-free default front-end: server-rendered, no-JavaScript booking flows exposed as Umbraco ViewComponents. It renders a single-resource flow, a service flow, and a catalogue of the bookable things a site offers — services and directly-bookable resources together — dispatched by a `BookingFlow` view component from whichever entry point a site author chooses, while the original `Booking` component continues to render the single-resource flow when invoked directly with a resource id. It renders availability by calling the Core resource, service and availability ports in-process (never the anonymous delivery API over HTTP), places bookings through the Core booking services behind an anti-forgery-protected same-origin POST, and confirms via Post-Redirect-Get. It ships a stylesheet as a static web asset, emitted by one documented partial and overridable through a published design-token and class contract. Accessibility is a first-class requirement, and the claim names its own boundary: **the views the package itself renders** meet every WCAG 2.2 AA criterion determined by markup, use semantic HTML, and preserve input while reporting failures accessibly; the criteria determined by CSS are met by the shipped stylesheet's defaults and become the consuming site's on override; where a registered **theme** supplies the view, its markup is the theme author's and the package claims nothing about it in either direction; and those determined by the host page were never the package's to claim, since a component cannot conform on its page's behalf. This is the default rendering that any alternative UI (a separate-repo DevExpress front-end, a SPA, a mobile client) may replace — either by consuming the delivery API, or by supplying a theme, which the `theming` capability defines.
 
 ## Requirements
 
@@ -106,6 +106,21 @@ placeholder alone. Each flow SHALL be fully operable by keyboard. Each page SHAL
 remain usable, with a logical reading and focus order, when no author stylesheet is
 applied.
 
+**Every markup clause in this requirement is a claim about the views the package
+ships.** Where a registered theme supplies the view that renders, that view's markup is
+the theme author's: the package neither claims conformance for it nor requires any of
+the theme. This is the same narrowing already made for the CSS-determined criteria
+below, applied to the one category that was previously held unconditionally, on the
+same reasoning — the package does not take responsibility for code it did not write.
+
+**That narrowing reaches themed views and nothing else.** For a site with no theme
+registered, and for every view a registered theme does not supply, every clause of this
+requirement holds exactly as written, unchanged by the existence of theming. In
+particular the no-author-stylesheet clause above is untouched and remains load-bearing:
+it is what makes both narrowings defensible rather than escapes. The `theming`
+capability states the boundary, its reasoning and the obligation on the published
+accessibility statement in full.
+
 Criteria determined by **CSS rather than markup** — 1.4.3 (text contrast), 2.4.11 and
 2.4.13 (focus appearance), and 2.5.8 (target size) — SHALL be met by the shipped
 stylesheet at its default token values, and SHALL become the consuming site's
@@ -165,29 +180,30 @@ a differentiator for this package rather than a checkbox, and per-flow restateme
 drift: the flow written second gets the attention, and the guarantee quietly becomes
 "whichever flow was reviewed most recently". The same hazard applies to the
 markup/CSS split — it is one split, stated once, not a caveat repeated per surface.
+It applies equally to the shipped/themed split added here.
 
 Where a choice is offered as a set of related controls — the start times, and the
 catalogue when it is rendered as a chooser — it SHALL be a grouped set with a
 `legend` naming what is being chosen, on the same terms as the start times.
 
 #### Scenario: Every control is labelled
-- **WHEN** a booking form is rendered, in either flow
+- **WHEN** a booking form is rendered by the package's own views, in either flow
 - **THEN** each input and select has a programmatically associated `label`
 
 #### Scenario: Start times are a labelled radio group
-- **WHEN** available start times are rendered, in either flow
+- **WHEN** available start times are rendered by the package's own views, in either flow
 - **THEN** they are radio inputs inside a `fieldset` whose `legend` names the group
 
 #### Scenario: Usable without an author stylesheet
-- **WHEN** any flow is rendered with no author CSS applied
+- **WHEN** any flow is rendered by the package's own views with no author CSS applied
 - **THEN** the content order is logical and every control remains operable and labelled
 
 #### Scenario: The catalogue meets the same bar
-- **WHEN** the catalogue is rendered as a set of choices
+- **WHEN** the catalogue is rendered by the package's own view as a set of choices
 - **THEN** it is a grouped set of labelled controls with a `legend` naming what is being chosen, operable by keyboard
 
 #### Scenario: The service flow meets the bar the resource flow meets
-- **WHEN** the service flow is rendered
+- **WHEN** the service flow is rendered by the package's own views
 - **THEN** it satisfies every clause of this requirement, with no clause holding only for the resource flow
 
 #### Scenario: The CSS-determined criteria are met by the shipped defaults
@@ -211,9 +227,12 @@ catalogue when it is rendered as a chooser — it SHALL be a grouped set with a
 - **THEN** it names, criterion by criterion, which are met by the shipped default, which pass to the site on a token override, and which are determined by the host page
 
 #### Scenario: The narrowing does not reach the markup clauses
-- **WHEN** any clause of this requirement other than the CSS-determined criteria is evaluated
-- **THEN** it holds exactly as it did before this change, for all three flows
+- **WHEN** any clause of this requirement other than the CSS-determined criteria is evaluated against a rendering the package itself produced
+- **THEN** it holds exactly as it did before the stylesheet change, for all three flows
 
+#### Scenario: A themed view is outside this requirement, and only a themed view
+- **WHEN** a registered theme supplies the view that renders
+- **THEN** this requirement's markup clauses are not claimed for that view, and they continue to hold unchanged for every view the package itself renders
 ### Requirement: Accessible failure handling with input preservation
 When a submission fails validation or placement, the form SHALL be redrawn with an
 error summary that lists each problem in text and is associated with the offending
@@ -975,10 +994,12 @@ minimum target size, which is a floor rather than an appearance.
 The stylesheet SHALL be emitted by **one documented partial**, so that a consuming
 site opts in with a single line in its layout and the package controls `<head>`
 placement and cascade order. That partial SHALL be the only route by which the
-package emits its own styling, so that a future theme can replace what it emits
-without the site changing anything.
+package emits its own styling, so that a theme can replace what it emits
+without the site changing anything. **What that partial emits when a theme is active is
+governed by the `theming` capability**, which is the mechanism this clause was written
+in anticipation of; the single-route obligation is unchanged and applies equally then.
 
-A site that adds nothing SHALL render exactly as it did before this change.
+A site that adds nothing SHALL render exactly as it did before the stylesheet change.
 
 #### Scenario: The asset is served
 - **WHEN** a site with the package installed requests `_content/UBookIt.Web/ubookit.css`
@@ -993,17 +1014,16 @@ A site that adds nothing SHALL render exactly as it did before this change.
 - **THEN** it applies no appearance property to a date input, a select or a button, other than a minimum target size
 
 #### Scenario: Opting in is one line
-- **WHEN** a site adds the documented partial to its layout
+- **WHEN** a site with no theme active adds the documented partial to its layout
 - **THEN** the stylesheet is linked in `<head>`, before any stylesheet the site links afterwards
 
 #### Scenario: Opting out changes nothing
 - **WHEN** a site does not add the partial
-- **THEN** every flow renders exactly the markup it rendered before this change, with no styling and no broken reference
+- **THEN** every flow renders exactly the markup it rendered before the stylesheet change, with no styling and no broken reference
 
 #### Scenario: There is one emission route
-- **WHEN** the package's views and stylesheet are inspected
+- **WHEN** the package's views and stylesheet are inspected, with or without a theme active
 - **THEN** no view emits a `link` or `style` element for package styling other than through that one partial
-
 ### Requirement: A site can override any token from anywhere in the cascade
 The package SHALL publish a named set of design tokens as its appearance-override
 contract, covering layout and spacing, typography, and the derived colours described
@@ -1040,8 +1060,8 @@ no `!important`.
 - **THEN** every documented token is read by at least one declaration, and no token is documented that nothing reads
 
 ### Requirement: The styling contract is a stable class vocabulary
-The classes the views render SHALL be a published, stable contract, because they are
-the surface a consuming site writes CSS against. They SHALL follow one naming rule:
+The classes the package's own views render SHALL be a published, stable contract, because
+they are the surface a consuming site writes CSS against. They SHALL follow one naming rule:
 `ubookit-<block>` for a block, `ubookit-<block>-<part>` for a part of one, and
 `ubookit-<block>--<variant>` for a variant of one. A variant SHALL be expressed with
 the variant separator rather than as a differently-named block, so that a reader can
@@ -1052,25 +1072,35 @@ field — a label, its control, and that control's messages — SHALL carry one,
 is the unit both the package's own layout and a site's overrides operate on; and every
 submit control SHALL carry one.
 
-**Ids SHALL NOT be used as styling hooks and SHALL NOT be renamed by this change.**
-The ids the views render are the accessibility contract — `aria-describedby` and
-`aria-labelledby` targets, and the targets the error summary's in-page links resolve
-to. They are governed by the requirements about resolving references and accessible
-failure handling, and they are not appearance. Conflating the two would put a
+**This vocabulary is a contract over the markup the package renders.** A theme renders its
+own markup and is under no obligation to reproduce it; a theme that calls the package's
+shared partials as building blocks gets their classes with them. The contract is not
+weakened by theming — it continues to describe, exactly and completely, whatever the package
+itself renders.
+
+**Ids SHALL NOT be used as styling hooks and SHALL NOT be renamed by the change that
+introduced this requirement.** The ids the views render are the accessibility contract —
+`aria-describedby` and `aria-labelledby` targets, and the targets the error summary's in-page
+links resolve to. They are governed by the requirements about resolving references and
+accessible failure handling, and they are not appearance. Conflating the two would put a
 guarantee about screen-reader behaviour at the mercy of a restyle.
 
 #### Scenario: The vocabulary follows the rule
-- **WHEN** the classes rendered by the views are inspected
+- **WHEN** the classes rendered by the package's own views are inspected
 - **THEN** each is a block, a part of a named block, or a variant expressed with the variant separator
 
 #### Scenario: A variant is not a sibling block
-- **WHEN** a flow that is a variant of the booking block is rendered
+- **WHEN** a flow that is a variant of the booking block is rendered by the package's own views
 - **THEN** it carries the block's class and the variant's class, and not a separately-named block
 
 #### Scenario: Every field and every submit control has a hook
-- **WHEN** any flow is rendered
+- **WHEN** any flow is rendered by the package's own views
 - **THEN** each label-and-control group carries the field class and each submit control carries the submit class
 
 #### Scenario: No id is repurposed or renamed
-- **WHEN** the ids rendered by the views are compared against those rendered before this change
+- **WHEN** the ids rendered by the package's own views are compared against those rendered before the stylesheet change
 - **THEN** they are unchanged, and no stylesheet declaration selects on any of them
+
+#### Scenario: A theme is not held to the vocabulary
+- **WHEN** a theme renders markup of its own
+- **THEN** no rule requires it to carry the package's classes, and the vocabulary continues to hold for every view the package itself renders

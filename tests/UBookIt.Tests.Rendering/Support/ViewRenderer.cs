@@ -54,6 +54,16 @@ public sealed class ViewRenderer
     private readonly ITempDataProvider _tempData;
 
     public ViewRenderer()
+        : this(null)
+    {
+    }
+
+    /// <param name="theme">
+    /// The theme configuration to build the rig with, or <c>null</c> for an unthemed
+    /// site — which is what every rule about the shipped views uses, and what the
+    /// parameterless constructor gives.
+    /// </param>
+    public ViewRenderer(ThemedRendering? theme)
     {
         var services = new ServiceCollection();
 
@@ -71,9 +81,21 @@ public sealed class ViewRenderer
 
             // The compiled views live here. Adding the assembly as an application
             // part is what makes them discoverable; nothing is read from disk.
+            //
+            // A theme adds a SECOND compiled assembly, exactly as a theme package
+            // would — two precompiled application parts, at different paths, which is
+            // the arrangement whose precedence this suite measures.
             .ConfigureApplicationPartManager(parts =>
+            {
                 parts.ApplicationParts.Add(
-                    new CompiledRazorAssemblyPart(typeof(BookingKeys).Assembly)));
+                    new CompiledRazorAssemblyPart(typeof(BookingKeys).Assembly));
+
+                if (theme is not null)
+                {
+                    parts.ApplicationParts.Add(
+                        new CompiledRazorAssemblyPart(theme.ThemeAssembly));
+                }
+            });
 
         // What `Html.BeginUmbracoForm` needs, and nothing more.
         //
@@ -86,6 +108,8 @@ public sealed class ViewRenderer
         // artefact needs, which is the one thing it exists not to do (design D2).
         services.AddSingleton(new SurfaceControllerTypeCollection(SurfaceControllerTypes));
         services.AddSingleton<IUmbracoContextAccessor, RenderingUmbracoContextAccessor>();
+
+        theme?.ApplyTo(services);
 
         _services = services.BuildServiceProvider();
         _viewEngine = _services.GetRequiredService<IRazorViewEngine>();
@@ -109,10 +133,51 @@ public sealed class ViewRenderer
     /// <param name="viewPath">
     /// Absolute view path, e.g. <c>~/Views/Shared/UBookIt/_Times.cshtml</c>.
     /// </param>
-    public async Task<string> RenderAsync(string viewPath, object? model)
-    {
-        var view = FindView(viewPath);
+    public Task<string> RenderAsync(string viewPath, object? model)
+        => RenderAsync(FindView(viewPath), model);
 
+    /// <summary>
+    /// Resolves a view the way a <b>view component</b> resolves one: by qualified
+    /// name, through the whole view-location chain, rather than by absolute path.
+    /// <para>
+    /// This is the call that consults <c>ViewLocationFormats</c> and therefore the
+    /// expander chain. <c>GetView</c> — what <see cref="RenderAsync(string, object?)"/>
+    /// uses — does not, because it only handles <c>~/</c>, <c>/</c> and a
+    /// <c>.cshtml</c> suffix, which is why view-component resolution tries it first,
+    /// gets NotFound for a bare name, and falls through to here.
+    /// </para>
+    /// </summary>
+    /// <param name="qualifiedViewName">
+    /// The name a view component asks for, e.g. <c>Components/Booking/Default</c>.
+    /// </param>
+    public ViewEngineResult ResolveByName(string qualifiedViewName)
+    {
+        var httpContext = new DefaultHttpContext { RequestServices = _services };
+        var actionContext = new ActionContext(httpContext, new RouteData(), new ActionDescriptor());
+
+        return _viewEngine.FindView(actionContext, qualifiedViewName, isMainPage: false);
+    }
+
+    /// <summary>
+    /// Renders whatever <see cref="ResolveByName"/> resolves — so what is rendered is
+    /// decided by the chain rather than by the test naming a file.
+    /// </summary>
+    public Task<string> RenderByNameAsync(string qualifiedViewName, object? model)
+    {
+        var result = ResolveByName(qualifiedViewName);
+
+        if (!result.Success)
+        {
+            throw new InvalidOperationException(
+                $"Could not resolve view '{qualifiedViewName}'. Searched: "
+                + string.Join(", ", result.SearchedLocations ?? []));
+        }
+
+        return RenderAsync(result.View, model);
+    }
+
+    private async Task<string> RenderAsync(IView view, object? model)
+    {
         var httpContext = new DefaultHttpContext { RequestServices = _services };
         var actionContext = new ActionContext(httpContext, new RouteData(), new ActionDescriptor());
 

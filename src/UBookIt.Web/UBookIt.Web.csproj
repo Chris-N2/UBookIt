@@ -30,6 +30,14 @@
 
   <ItemGroup>
     <InternalsVisibleTo Include="UBookIt.Tests" />
+
+    <!--
+      The resolution guard lives in the rendering suite, because that is the only
+      project whose dependency closure has no runtime compilation in it. It calls
+      the package's own registration step so that what it measures is the package's
+      behaviour rather than a chain the test assembled to suit itself.
+    -->
+    <InternalsVisibleTo Include="UBookIt.Tests.Rendering" />
   </ItemGroup>
 
   <ItemGroup>

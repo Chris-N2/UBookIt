@@ -45,10 +45,74 @@ public class StyleEmissionTests
         // A second link, or any stray markup, would survive a theme's suppression of
         // the package's CSS and fight it — which is the reason the spec requires one
         // emission route rather than merely a tidy one.
-        var html = (await _renderer.RenderAsync(StylesPartial, null)).Trim();
+        //
+        // Asserted UNTRIMMED, and that is the point of this version. Razor emits literal
+        // markup including its leading whitespace, so indenting the link element inside
+        // the theme condition in `_Styles.cshtml` adds four spaces to every unthemed page
+        // — which was measured against a running site and is the one thing this change
+        // promised not to do. A trimmed assertion passed either way, so the file's comment
+        // saying "column 0 on purpose" was the only thing protecting it.
+        var html = await _renderer.RenderAsync(StylesPartial, null);
 
         Assert.Single(Regex.Matches(html, "<link", RegexOptions.IgnoreCase));
-        Assert.StartsWith("<link", html, StringComparison.OrdinalIgnoreCase);
-        Assert.EndsWith("/>", html, StringComparison.Ordinal);
+        Assert.StartsWith("<link", html.TrimStart('\r', '\n'), StringComparison.OrdinalIgnoreCase);
+        Assert.DoesNotContain("    <link", html, StringComparison.Ordinal);
+        Assert.EndsWith("/>", html.TrimEnd('\r', '\n'), StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public async Task With_a_theme_active_it_emits_nothing()
+    {
+        // A theme owns the markup, so the package's classes largely do not exist in
+        // the rendered document: the stylesheet would style nothing while still being
+        // able to collide with the theme's own. This partial was built as exactly
+        // this off-switch, and its own comments said so before the switch existed.
+        var renderer = new ViewRenderer(ThemedRendering.StylesheetOnly(usePackageStylesheet: false));
+
+        var html = (await renderer.RenderAsync(StylesPartial, null)).Trim();
+
+        Assert.Equal(string.Empty, html);
+    }
+
+    [Fact]
+    public async Task A_theme_may_opt_back_in_and_gets_exactly_what_an_unthemed_site_gets()
+    {
+        // A theme reusing the package's shared partials as building blocks wants their
+        // styling. Byte-for-byte the same as the unthemed emission, rather than
+        // "something similar" — a second, nearly-identical emission path is how one
+        // route quietly becomes two.
+        // Compared untrimmed, so "exactly what an unthemed site emits" is the whole
+        // emission and not its trimmed shadow.
+        var unthemed = await new ViewRenderer().RenderAsync(StylesPartial, null);
+
+        var themed = await new ViewRenderer(ThemedRendering.StylesheetOnly(usePackageStylesheet: true))
+            .RenderAsync(StylesPartial, null);
+
+        Assert.Equal(unthemed, themed);
+        Assert.Contains("_content/UBookIt.Web/ubookit.css", themed, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public async Task No_other_view_emits_package_styling_with_a_theme_active()
+    {
+        // The single-emission-route obligation, STRENGTHENED by theming rather than
+        // qualified by it. `ViewInventoryTests` asserts over the shipped source that
+        // exactly one view carries a link or style element; this asserts the same
+        // thing about what is actually rendered with a theme active, where a second
+        // emission route would survive the theme and fight it.
+        //
+        // Rendered rather than scanned, because the condition added by this change is
+        // a runtime condition: a view could emit a link only when a theme is active
+        // and the source scan would read identically.
+        var renderer = new ViewRenderer(ThemedRendering.StylesheetOnly(usePackageStylesheet: false));
+
+        foreach (var rendered in ViewFixtures.All)
+        {
+            var html = await renderer.RenderAsync(rendered.ViewPath, rendered.Model);
+
+            Assert.False(
+                Regex.IsMatch(html, "<link\\b|<style\\b", RegexOptions.IgnoreCase),
+                $"{rendered} emitted package styling with a theme active.");
+        }
     }
 }

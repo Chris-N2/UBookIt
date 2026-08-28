@@ -148,8 +148,10 @@ One line, in the `<head>` of your layout:
 Put your own stylesheet **after** it, so your rules and tokens win.
 
 Use the partial rather than writing the `<link>` yourself. It keeps the URL in one
-place, and when a theme mechanism arrives it is the single thing a theme replaces to
-turn uBookIt's CSS off — a hand-written `<link>` would survive the theme and fight it.
+place, and it is the single thing a [theme](theming.md) turns off — a hand-written
+`<link>` would survive the theme and fight it. When a theme is active this partial
+emits nothing, unless the theme asked for uBookIt's stylesheet; your layout keeps the
+same one line either way, and does not change when a theme is added or removed.
 
 > **You need a layout for this.** The line goes in `<head>`, and the booking flow
 > renders from a view component, which cannot reach `<head>` at all. As noted above,
@@ -255,9 +257,16 @@ mercy of a restyle.
 
 ### Accessibility: what we hold, and what becomes yours
 
-uBookIt's flows are built to WCAG 2.2 AA, and the honest form of that claim has three
+uBookIt's flows are built to WCAG 2.2 AA, and the honest form of that claim has four
 parts — because a booking flow is a component inside **your** page, and conformance is
 a property of a page.
+
+**These claims describe the views uBookIt ships.** If your site registers a
+[theme](theming.md), the theme supplies the markup for every view it covers, and the
+markup claims below are the theme author's rather than uBookIt's. uBookIt makes no
+claim about a theme in either direction: it does not assert that a theme is accessible,
+and it does not require anything of one. For a site with no theme, and for every view a
+theme does not supply, everything below holds exactly as written.
 
 **Met by uBookIt, in the markup, whatever you do to the CSS.** Every control has a
 programmatically associated label. The start times and the catalogue are grouped sets
@@ -296,22 +305,36 @@ you would rather they were prominent, set `--ubookit-color-border`.
 document's heading outline — the flow starts at `<h2>` on the assumption your page
 supplies the `<h1>`.
 
-### What you still cannot change
+### Changing the markup inside the flow
 
-**The markup *inside* the booking flow is not customisable.** Placing your own file at
-the same path as one of uBookIt's views does **not** work: those views are compiled
-into `UBookIt.Web.dll` without source checksums, so ASP.NET Core uses the compiled copy
-and never consults your file.
+**The markup inside the booking flow is customisable — by a theme.** A theme is a
+Razor class library that supplies its own views for the booking flows; uBookIt resolves
+them ahead of its own. That is how you replace a control rather than restyle one: your
+own time picker, your own catalogue, your own anything. Writing one is
+[documented separately](theming.md).
 
-Verified on a development site. We have not established what happens on a fully
-precompiled production site, where your override would also be compiled and the outcome
-depends on assembly load order — so treat the flow's markup as fixed either way, and
-do not build anything on an override taking effect.
+**Putting your own file at the path of one of uBookIt's views does *not* work, and it
+never will.** This is the trap most people meet first, and a theme existing elsewhere
+does not make it less likely. uBookIt's views are compiled into `UBookIt.Web.dll`
+without source checksums, so ASP.NET Core uses the compiled copy and never consults
+your file — no error, no warning, your file simply has no effect.
 
-We would like to fix this properly, with a theme mechanism that looks in a path the
-package deliberately does not compile into itself. It is not built yet. Until it is,
-your options are your own template for the page around the flow, and the tokens and
-classes above for its appearance.
+The two look alike and only one of them does anything. The difference is that a theme
+supplies views from a **separate assembly at a different path**, so nothing collides;
+a site file competes with a compiled view at the *same* path, and loses.
+
+> **An earlier version of this page predicted the wrong fix.** It said a theme
+> mechanism would have to look in "a path the package deliberately does not compile
+> into itself". That was reasoning from the site-file collision, and it was wrong: the
+> theme path *is* precompiled — into the theme's own assembly — and wins anyway. Two
+> precompiled assemblies at different paths do not compete for anything.
+
+#### What has been measured, and what has not
+
+| | Measured | Not measured |
+|---|---|---|
+| **A site file at a package view's path is ignored** | On a development site, with runtime compilation live | On a fully precompiled production site, where your override is itself compiled and precedence would fall to assembly load order. Treat it as fixed either way; do not build anything on an override taking effect |
+| **A theme's view wins** | Both: under real Umbraco page rendering on a development site, *and* in a test host with `Microsoft.AspNetCore.Mvc.Razor.RuntimeCompilation` absent from the dependency closure — which is the configuration a precompiled production site runs | Nothing further is claimed. In particular, no claim is made about a theme's own accessibility, in either direction |
 
 ## A note on the Umbraco documentation
 
