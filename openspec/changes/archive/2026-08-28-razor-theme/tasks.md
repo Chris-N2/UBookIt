@@ -60,6 +60,8 @@
 - [x] 8.2 Full test suite green, with the count compared against the 1572 baseline.
 - [x] 8.3 `openspec validate --strict` across all specs.
 - [x] 8.4 **Re-read the three delta specs against the code before syncing.** Deltas go stale after every QA round; on ⑬ both were corrected at sync, and syncing them unread would have written a weaker requirement into the main spec than the code held while looking like a clean sync.
-- [ ] 8.5 At sync, hand-correct the `default-frontend` **Purpose** paragraph, which asserts the markup AA claim unconditionally and is falsified by this change. It is prose outside any requirement, so no delta touches it and no grep for a requirement name will find it.
+- [x] 8.5 At sync, hand-correct the `default-frontend` **Purpose** paragraph, which asserts the markup AA claim unconditionally and is falsified by this change. It is prose outside any requirement, so no delta touches it and no grep for a requirement name will find it.
 - [x] 8.6 Re-run the outward sweep for sibling specs this change falsifies. Use **multiline** matching when absence-checking a clause: a wrapped sentence defeats a single-line grep and reads exactly like a dropped guarantee.
-- [ ] 8.7 Hand the change to `qa-review` in a **fresh context or subagent** — the context that implemented it never reviews it.
+- [x] 8.7 Hand the change to `qa-review` in a **fresh context or subagent** — the context that implemented it never reviews it.
+
+**QA:** two rounds, both in a subagent that never wrote the code. Round 1 **REJECTED** on a CRITICAL — the composer mechanism rested on `composers run at Build()`, which is false, and produced a silent unthemed *and* unstyled site for the most natural call order — plus three MAJORs. Round 2 **APPROVED**; its one blocking item (the live TestSite checks had run against a stale DLL and would have passed either way) and five nits were discharged before archive.
