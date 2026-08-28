@@ -176,3 +176,216 @@ public interface IBookingStore
     /// <summary>Persists a status change to an existing booking.</summary>
     Task UpdateAsync(Booking booking, CancellationToken cancellationToken = default);
 }
+
+/// <summary>One resource a booking claims, with the name a list row displays.</summary>
+/// <remarks>
+/// The name is carried deliberately. A claim records only a resource id, so a caller
+/// given ids alone must read each resource separately — one lookup per claim, per row.
+/// Removing the name from here does not simplify anything; it moves the cost to every
+/// caller.
+/// </remarks>
+public sealed record BookedResource(Guid ResourceId, string DisplayName);
+
+/// <summary>
+/// A booking as a management list row: everything such a row displays, and nothing more.
+/// </summary>
+/// <remarks>
+/// <para>
+/// It is a summary and it is allowed to stay one. When a detail view is needed,
+/// <see cref="IBookingStore.GetBookingAsync"/> already returns the whole
+/// <see cref="Booking"/>. Growing this type to serve both is how a list query acquires
+/// columns nobody renders.
+/// </para>
+/// <para>
+/// It carries the booker's name and email because that is what a list row shows. Nothing
+/// logs them, and fixtures use invented people — the standing rule, restated because this
+/// is the first Core type built to carry contact details in bulk.
+/// </para>
+/// </remarks>
+public sealed record BookingSummary(
+    Guid BookingId,
+    BookingInterval Interval,
+    BookingStatus Status,
+    DateTimeOffset CreatedUtc,
+    string BookerName,
+    string BookerEmail,
+    IReadOnlyList<BookedResource> Resources);
+
+/// <summary>A page of booking summaries plus the unpaged total, for a management list.</summary>
+public sealed record BookingPage(IReadOnlyList<BookingSummary> Items, int Total);
+
+/// <summary>
+/// What a management list asks for: a window, filters and a page — and it cannot be
+/// constructed in a state the store would have to refuse.
+/// </summary>
+/// <remarks>
+/// <para>
+/// <b>The window guard lives here, in the type, rather than in a service in front of the
+/// store.</b> Bookings accumulate without limit, so an unwindowed or over-wide list is
+/// the cost hole <see cref="SiteBookingSettings.MaxQueryRangeDays"/> already exists to
+/// close for availability. Putting the check in a service would make it something a
+/// caller could route around; putting it in the constructor makes an invalid query
+/// unrepresentable, which is a stronger guarantee and needs no cooperation at all.
+/// </para>
+/// <para>
+/// It also keeps <c>UBookIt.Core</c> free of a service depending on a management store,
+/// which the <c>bookings</c> capability forbids so that the read ports stay the only
+/// pathway anonymous delivery traffic reaches storage through.
+/// </para>
+/// <para>
+/// <b>A class rather than a record, deliberately.</b> A record's <c>with</c> expression
+/// would clone around the factory and hand the store exactly the state this type exists
+/// to make impossible.
+/// </para>
+/// </remarks>
+public sealed class BookingQuery
+{
+    /// <summary>The largest page this query will ask for, matching the other management list reads.</summary>
+    public const int MaxTake = 500;
+
+    private BookingQuery(
+        DateTimeOffset fromUtc,
+        DateTimeOffset toUtc,
+        IReadOnlyCollection<BookingStatus> statuses,
+        IReadOnlyCollection<Guid> resourceIds,
+        int skip,
+        int take)
+    {
+        FromUtc = fromUtc;
+        ToUtc = toUtc;
+        Statuses = statuses;
+        ResourceIds = resourceIds;
+        Skip = skip;
+        Take = take;
+    }
+
+    /// <summary>Window start, inclusive.</summary>
+    public DateTimeOffset FromUtc { get; }
+
+    /// <summary>Window end, exclusive.</summary>
+    public DateTimeOffset ToUtc { get; }
+
+    /// <summary>
+    /// The statuses to return, already resolved and never empty. Defaulting happens once,
+    /// here, so every <see cref="IBookingManagementStore"/> implementation cannot default
+    /// differently and turn one guarantee into several.
+    /// </summary>
+    public IReadOnlyCollection<BookingStatus> Statuses { get; }
+
+    /// <summary>
+    /// Return only bookings claiming <b>any</b> of these resources. Empty means no
+    /// resource filter — never "match nothing".
+    /// </summary>
+    public IReadOnlyCollection<Guid> ResourceIds { get; }
+
+    public int Skip { get; }
+
+    public int Take { get; }
+
+    /// <summary>
+    /// Builds a query, or explains why the window is unusable.
+    /// </summary>
+    /// <param name="statuses">
+    /// <c>null</c> or empty means the <b>blocking</b> statuses — the set
+    /// <see cref="Booking.IsBlocking"/> already defines — because the default answer to
+    /// "what is booked" should not silently include bookings that are not. Supplied, it
+    /// is used exactly as given, including asking only for cancelled bookings.
+    /// </param>
+    /// <param name="resourceIds">
+    /// A set rather than a single id, and the reason is compatibility rather than
+    /// ambition: widening a published <c>Guid?</c> into a collection later would be a
+    /// breaking change, while a set behaves identically when given one id.
+    /// </param>
+    /// <returns>
+    /// Fails with <see cref="FailureCodes.DateRangeInvalid"/> when the window does not run
+    /// forwards, and <see cref="FailureCodes.DateRangeTooLarge"/> when it spans more than
+    /// the site's configured maximum — the same code an over-wide availability query
+    /// produces for the same reason.
+    /// </returns>
+    public static DomainResult<BookingQuery> Create(
+        DateTimeOffset fromUtc,
+        DateTimeOffset toUtc,
+        SiteBookingSettings settings,
+        IReadOnlyCollection<BookingStatus>? statuses = null,
+        IReadOnlyCollection<Guid>? resourceIds = null,
+        int skip = 0,
+        int take = 50)
+    {
+        ArgumentNullException.ThrowIfNull(settings);
+
+        if (toUtc <= fromUtc)
+        {
+            return DomainResult<BookingQuery>.Failure(
+                FailureCodes.DateRangeInvalid,
+                "The queried window must end after it starts.",
+                nameof(toUtc));
+        }
+
+        // The window is half-open, so its span is the difference rather than the
+        // inclusive day count availability computes over two DateOnly values. A window of
+        // exactly the maximum is allowed; one tick more is not.
+        var spanDays = (toUtc - fromUtc).TotalDays;
+
+        if (spanDays > settings.MaxQueryRangeDays)
+        {
+            // The window is named rather than its span rounded. Rounding produced a
+            // message that contradicted itself at the boundary the tests exercise — a
+            // window one tick over 31 days reported "spans 31 days, which exceeds the
+            // maximum of 31" — and the endpoints are what a caller has to change anyway.
+            return DomainResult<BookingQuery>.Failure(
+                FailureCodes.DateRangeTooLarge,
+                $"The queried window [{fromUtc:O}, {toUtc:O}) exceeds the maximum span of "
+                + $"{settings.MaxQueryRangeDays} days.",
+                nameof(toUtc));
+        }
+
+        return DomainResult<BookingQuery>.Success(
+            new BookingQuery(
+                fromUtc,
+                toUtc,
+                statuses is { Count: > 0 } supplied
+                    ? [.. supplied]
+                    : [BookingStatus.Requested, BookingStatus.Confirmed],
+                resourceIds is { Count: > 0 } ids ? [.. ids] : [],
+                Math.Max(0, skip),
+                Math.Clamp(take, 0, MaxTake)));
+    }
+}
+
+/// <summary>
+/// Lists bookings for the backoffice. Implemented by UBookIt.Persistence.
+/// <para>
+/// Separate from <see cref="IBookingStore"/> for the same reason
+/// <see cref="IResourceManagementStore"/> is separate from <see cref="IResourceStore"/>:
+/// the front end reads claims to compute availability, and an operator reads bookings to
+/// see what a site has taken. Different question, different caller, different port.
+/// </para>
+/// <para>
+/// <b>There is deliberately no filter by service.</b> That is a limit of the stored data
+/// rather than a choice about this port: a booking does not record the service that
+/// produced it. A service is used to choose the resources a booking claims and is not
+/// retained, so answering "which bookings were for this service" would need an additive
+/// column and a decision about bookings already placed without one.
+/// </para>
+/// <para>
+/// <b>It does not validate.</b> Management store reads return their page directly; only
+/// mutations carry failures. It does not need to validate either: a <see cref="BookingQuery"/>
+/// cannot be constructed with an unusable window, so there is no invalid state for a store
+/// to defend against. A store that validated would be the only one here, and the next
+/// person would reasonably copy it.
+/// </para>
+/// </summary>
+public interface IBookingManagementStore
+{
+    /// <summary>
+    /// The bookings whose interval <b>overlaps</b> the query's window — half-open, on the
+    /// same terms as <see cref="IBookingStore.GetClaimsAsync(Guid, DateTimeOffset, DateTimeOffset, CancellationToken)"/>
+    /// — matching its status and resource filters, ordered by start time then id, paged.
+    /// <para>
+    /// A booking claiming several resources SHALL appear <b>once</b>, carrying all of
+    /// them, and count once toward <see cref="BookingPage.Total"/>. Filtering and
+    /// projecting across the claim join must not multiply the booking it selects.
+    /// </para>
+    /// </summary>
+    Task<BookingPage> ListAsync(BookingQuery query, CancellationToken cancellationToken = default);
+}
