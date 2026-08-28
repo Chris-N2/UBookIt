@@ -13,14 +13,20 @@ internal static class Seed
         int granularityMinutes = 15,
         int minDurationMinutes = 30,
         int maxDurationMinutes = 480,
-        Guid? id = null)
+        Guid? id = null,
+        string? displayName = null)
     {
         id ??= Guid.NewGuid();
         var row = new ResourceRow
         {
             Id = id.Value,
             Type = type,
-            DisplayName = $"Room {id:N}",
+
+            // The default name is derived from the id, which is fine for suites that only
+            // need distinct names. A test asserting that a NAME was joined from the
+            // resource row must pass its own: a name derivable from the id cannot tell a
+            // real join from a store fabricating the name out of the id it already has.
+            DisplayName = displayName ?? $"Room {id:N}",
             GranularityMinutes = granularityMinutes,
             MinDurationMinutes = minDurationMinutes,
             MaxDurationMinutes = maxDurationMinutes,

@@ -1,3 +1,4 @@
+using Microsoft.EntityFrameworkCore;
 using UBookIt.Core;
 using UBookIt.Core.Bookings;
 using UBookIt.Core.Stores;
@@ -24,13 +25,50 @@ public class BookingManagementStoreTests(SqlServerFixture fixture)
     private static CancellationToken Ct => TestContext.Current.CancellationToken;
 
     /// <summary>
-    /// A window no other test's fixtures reach into. Each caller takes its own day, so
-    /// two tests running against the same shared database cannot see each other's rows.
+    /// How far apart two tests' windows sit. Tests deliberately seed bookings
+    /// <b>outside</b> their own window — that is how "outside is excluded" is asserted at
+    /// all — so the gap between windows must be wider than the furthest any fixture
+    /// reaches. The furthest today is <c>to.AddDays(3)</c>; ten days leaves room.
     /// </summary>
-    private static (DateTimeOffset From, DateTimeOffset To) WindowOn(int dayOffset)
+    private const int WindowStrideDays = 10;
+
+    /// <summary>
+    /// A one-day window no other test in this class reaches into, including with the
+    /// out-of-window bookings tests seed on purpose.
+    /// <para>
+    /// <b>The stride is load-bearing and was originally wrong.</b> With windows one day
+    /// apart, <c>Matches_by_overlap_not_containment</c>'s "outside" booking at
+    /// <c>to.AddDays(3)</c> landed exactly inside <c>WindowOn(4)</c> — the window whose
+    /// unfiltered exact-set assertion then counted it. The suite passed only because
+    /// xUnit happened to order the cases favourably; renaming a method flipped it.
+    /// </para>
+    /// </summary>
+    private static (DateTimeOffset From, DateTimeOffset To) WindowOn(int index)
     {
-        var from = new DateTimeOffset(2031, 1, 1, 0, 0, 0, TimeSpan.Zero).AddDays(dayOffset);
+        var from = new DateTimeOffset(2031, 1, 1, 0, 0, 0, TimeSpan.Zero)
+            .AddDays(index * WindowStrideDays);
+
         return (from, from.AddDays(1));
+    }
+
+    /// <summary>
+    /// Asserts a window is empty before a test seeds into it.
+    /// <para>
+    /// The isolation above is a claim about arithmetic, and the arithmetic was wrong
+    /// once. Any test making an exact-set assertion over an <b>unfiltered</b> query calls
+    /// this first, so a future collision fails here — naming the window — rather than as
+    /// an off-by-one in an unrelated expected set.
+    /// </para>
+    /// </summary>
+    private async Task AssertWindowIsUnusedAsync(DateTimeOffset from, DateTimeOffset to)
+    {
+        var existing = await ListAsync(Query(from, to, Statuses: Enum.GetValues<BookingStatus>()));
+
+        Assert.True(
+            existing.Total == 0,
+            $"The window [{from:O}, {to:O}) already holds {existing.Total} booking(s) before "
+            + "this test seeded anything. Another test's fixtures reach into it — widen "
+            + $"{nameof(WindowStrideDays)} or move that test's out-of-window bookings.");
     }
 
     private async Task<Guid> PlaceAsync(Guid resourceId, DateTimeOffset startUtc, TimeSpan duration,
@@ -208,6 +246,11 @@ public class BookingManagementStoreTests(SqlServerFixture fixture)
         fixture.EnsureAvailable();
 
         var (from, to) = WindowOn(4);
+
+        // This test's last assertion is an exact set over an UNFILTERED query, so it is
+        // the one that breaks if any other test's fixtures reach in here.
+        await AssertWindowIsUnusedAsync(from, to);
+
         var first = await Seed.EveryDayRoomAsync(fixture, Ct);
         var second = await Seed.EveryDayRoomAsync(fixture, Ct);
         var third = await Seed.EveryDayRoomAsync(fixture, Ct);
@@ -294,6 +337,35 @@ public class BookingManagementStoreTests(SqlServerFixture fixture)
     }
 
     [Fact]
+    public void The_generated_sql_orders_by_start_then_id()
+    {
+        fixture.EnsureAvailable();
+
+        // The tiebreak's guard, and it has to be this rather than a behavioural one.
+        //
+        // `Id` is the clustered key, so SQL Server's incidental order for these rows
+        // already equals `ORDER BY Id` — which means removing `.ThenBy(booking => b.Id)`
+        // changes no result anywhere and every behavioural test stays green. Reading the
+        // generated SQL is the one formulation that fails deterministically, needs no
+        // fixture, and does not touch the database.
+        var (from, to) = WindowOn(8);
+
+        using var context = fixture.CreateContext();
+        var store = new SqlBookingManagementStore(context);
+
+        var sql = store.OrderedPage(Query(from, to)).ToQueryString();
+
+        var orderBy = sql[sql.LastIndexOf("ORDER BY", StringComparison.Ordinal)..];
+
+        Assert.Contains("[StartUtc]", orderBy, StringComparison.Ordinal);
+        Assert.Contains("[Id]", orderBy, StringComparison.Ordinal);
+        Assert.True(
+            orderBy.IndexOf("[StartUtc]", StringComparison.Ordinal)
+                < orderBy.IndexOf("[Id]", StringComparison.Ordinal),
+            $"Start time must be the primary sort key. ORDER BY was: {orderBy}");
+    }
+
+    [Fact]
     public async Task Total_is_the_unpaged_count()
     {
         fixture.EnsureAvailable();
@@ -319,24 +391,27 @@ public class BookingManagementStoreTests(SqlServerFixture fixture)
         fixture.EnsureAvailable();
 
         var (from, to) = WindowOn(7);
-        var first = await Seed.EveryDayRoomAsync(fixture, Ct);
-        var second = await Seed.EveryDayRoomAsync(fixture, Ct);
+
+        // Names that are NOT derivable from the ids, so a store fabricating a name out of
+        // the id it already holds fails here. The default seed name is `Room {id:N}`,
+        // which cannot tell a real join from that.
+        var first = await Seed.EveryDayRoomAsync(fixture, Ct, displayName: "The Gilded Parlour");
+        var second = await Seed.EveryDayRoomAsync(fixture, Ct, displayName: "Bricklayers Arms");
 
         await PlaceTwoResourceAsync(first, second, from.AddHours(9), TimeSpan.FromHours(1));
-
-        // Names read back from the resources themselves, so a join pairing a booking
-        // with the wrong resource is visible — a single-resource fixture could not tell.
-        await using var context = fixture.CreateContext();
-        var expected = await new SqlResourceStore(context).GetAsync(first, Ct);
 
         var page = await ListAsync(Query(from, to, ResourceIds: [first]));
         var only = Assert.Single(page.Items);
 
+        // Each id paired with ITS OWN name, so a join pairing a booking with the wrong
+        // resource is visible too — two distinct names is what makes that observable.
+        Assert.Equal(2, only.Resources.Count);
         Assert.Contains(
             only.Resources,
-            resource => resource.ResourceId == first && resource.DisplayName == expected!.DisplayName);
-        Assert.Equal(2, only.Resources.Count);
-        Assert.All(only.Resources, resource => Assert.False(string.IsNullOrWhiteSpace(resource.DisplayName)));
+            resource => resource.ResourceId == first && resource.DisplayName == "The Gilded Parlour");
+        Assert.Contains(
+            only.Resources,
+            resource => resource.ResourceId == second && resource.DisplayName == "Bricklayers Arms");
 
         Assert.Equal("Integration Tester", only.BookerName);
         Assert.Equal("integration@example.com", only.BookerEmail);

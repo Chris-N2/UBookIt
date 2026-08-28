@@ -328,10 +328,14 @@ public sealed class BookingQuery
 
         if (spanDays > settings.MaxQueryRangeDays)
         {
+            // The window is named rather than its span rounded. Rounding produced a
+            // message that contradicted itself at the boundary the tests exercise — a
+            // window one tick over 31 days reported "spans 31 days, which exceeds the
+            // maximum of 31" — and the endpoints are what a caller has to change anyway.
             return DomainResult<BookingQuery>.Failure(
                 FailureCodes.DateRangeTooLarge,
-                $"The queried window spans {spanDays:0.##} days, which exceeds the maximum "
-                + $"of {settings.MaxQueryRangeDays}.",
+                $"The queried window [{fromUtc:O}, {toUtc:O}) exceeds the maximum span of "
+                + $"{settings.MaxQueryRangeDays} days.",
                 nameof(toUtc));
         }
 
@@ -355,6 +359,13 @@ public sealed class BookingQuery
 /// <see cref="IResourceManagementStore"/> is separate from <see cref="IResourceStore"/>:
 /// the front end reads claims to compute availability, and an operator reads bookings to
 /// see what a site has taken. Different question, different caller, different port.
+/// </para>
+/// <para>
+/// <b>There is deliberately no filter by service.</b> That is a limit of the stored data
+/// rather than a choice about this port: a booking does not record the service that
+/// produced it. A service is used to choose the resources a booking claims and is not
+/// retained, so answering "which bookings were for this service" would need an additive
+/// column and a decision about bookings already placed without one.
 /// </para>
 /// <para>
 /// <b>It does not validate.</b> Management store reads return their page directly; only

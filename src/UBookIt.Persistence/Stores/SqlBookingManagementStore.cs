@@ -38,15 +38,7 @@ internal sealed class SqlBookingManagementStore(UBookItDbContext db) : IBookingM
         // as the total is a pager that never offers a second page.
         var total = await matching.CountAsync(cancellationToken).ConfigureAwait(false);
 
-        var rows = await matching
-
-            // Ordered by start, then id. The id tiebreak is required rather than tidy:
-            // two bookings routinely share a start time, and Skip/Take over an order
-            // that is not total silently repeats or drops rows between pages.
-            .OrderBy(booking => booking.StartUtc)
-            .ThenBy(booking => booking.Id)
-            .Skip(query.Skip)
-            .Take(query.Take)
+        var rows = await OrderedPage(matching, query)
             .Select(booking => new
             {
                 booking.Id,
@@ -85,6 +77,33 @@ internal sealed class SqlBookingManagementStore(UBookItDbContext db) : IBookingM
 
         return new BookingPage(items, total);
     }
+
+    /// <summary>
+    /// The matching bookings, ordered and paged.
+    /// <para>
+    /// Ordered by start, then id. <b>The id tiebreak is required rather than tidy:</b>
+    /// two bookings routinely share a start time, and <c>Skip</c>/<c>Take</c> over an
+    /// order that is not total silently repeats or drops rows between pages.
+    /// </para>
+    /// <para>
+    /// Separated from <see cref="ListAsync"/> so a test can read the SQL this produces.
+    /// The tiebreak has no observable effect on results today — <c>Id</c> is the
+    /// clustered key, so SQL Server's incidental order already matches it — which means
+    /// the only way to catch its removal is to look at the generated <c>ORDER BY</c>.
+    /// Without this seam the guard would have been a comment.
+    /// </para>
+    /// </summary>
+    internal IQueryable<Entities.BookingRow> OrderedPage(
+        IQueryable<Entities.BookingRow> matching, BookingQuery query)
+        => matching
+            .OrderBy(booking => booking.StartUtc)
+            .ThenBy(booking => booking.Id)
+            .Skip(query.Skip)
+            .Take(query.Take);
+
+    /// <summary>Convenience for tests: the ordered, paged query for a whole request.</summary>
+    internal IQueryable<Entities.BookingRow> OrderedPage(BookingQuery query)
+        => OrderedPage(Matching(query), query);
 
     /// <summary>
     /// The bookings the query selects, before ordering and paging — shared by the count
