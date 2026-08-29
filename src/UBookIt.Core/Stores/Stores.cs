@@ -322,9 +322,16 @@ public sealed class BookingQuery
         }
 
         // The window is half-open, so its span is the difference rather than the
-        // inclusive day count availability computes over two DateOnly values. A window of
-        // exactly the maximum is allowed; one tick more is not.
-        var spanDays = (toUtc - fromUtc).TotalDays;
+        // inclusive day count availability computes over two DateOnly values.
+        //
+        // Whole days, floored, and that is deliberate rather than sloppy. A site-local
+        // day is 23 hours on a spring-forward date and 25 on a fall-back one, so a
+        // calendar month resolved to instants can be a few minutes over a whole number of
+        // days. Comparing raw elapsed time would refuse "show me October" on any European
+        // site running the default guardrail — a predictable, annual, entirely reasonable
+        // request. The guard exists to stop unbounded queries, and an hour either way is
+        // not what it is protecting against.
+        var spanDays = Math.Floor((toUtc - fromUtc).TotalDays);
 
         if (spanDays > settings.MaxQueryRangeDays)
         {

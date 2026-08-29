@@ -1,0 +1,66 @@
+namespace UBookIt.Backoffice.Models;
+
+/// <summary>One resource a booking claims, as the list row shows it.</summary>
+public class BookedResourceModel
+{
+    public Guid ResourceId { get; set; }
+
+    public string DisplayName { get; set; } = string.Empty;
+}
+
+/// <summary>
+/// A booking as a management list row.
+/// </summary>
+/// <remarks>
+/// <para>
+/// A purpose-built model, not a domain type: the HTTP contract is versioned and public
+/// while <c>BookingSummary</c> is free to change with the port.
+/// </para>
+/// <para>
+/// It carries <b>exactly</b> what the read port supplies and nothing more. A field added
+/// here that the port cannot fill is a field the screen would have to fetch some other
+/// way, which is how a second read path into bookings begins.
+/// </para>
+/// <para>
+/// <c>TimeZoneId</c> travels with the interval so a client can render local time without
+/// having to know, or ask for, the site's zone.
+/// </para>
+/// </remarks>
+public class BookingModel
+{
+    public Guid BookingId { get; set; }
+
+    public DateTimeOffset StartUtc { get; set; }
+
+    public DateTimeOffset EndUtc { get; set; }
+
+    /// <summary>The zone the booking was made in — its own, not the site's current setting.</summary>
+    public string TimeZoneId { get; set; } = string.Empty;
+
+    /// <summary>
+    /// The booking's status by name.
+    /// <para>
+    /// A string rather than the domain enum, matching how <c>ServiceModels</c> carries a
+    /// duration kind. Domain types do not appear in the HTTP contract — an enum is a
+    /// domain type whose members are a versioning commitment, and putting it on the wire
+    /// couples the published contract to the order and spelling of a Core declaration.
+    /// </para>
+    /// </summary>
+    public string Status { get; set; } = string.Empty;
+
+    public DateTimeOffset CreatedUtc { get; set; }
+
+    public string BookerName { get; set; } = string.Empty;
+
+    public string BookerEmail { get; set; } = string.Empty;
+
+    public IReadOnlyList<BookedResourceModel> Resources { get; set; } = [];
+}
+
+/// <summary>A page of bookings plus the unpaged total, matching the other list endpoints.</summary>
+public class PagedBookingsModel
+{
+    public int Total { get; set; }
+
+    public IReadOnlyList<BookingModel> Items { get; set; } = [];
+}

@@ -15,20 +15,20 @@
 
 ## 3. The endpoint
 
-- [ ] 3.1 Add `BookingsController` with `GET bookings`, taking `from`/`to` dates, optional statuses, optional resource ids, `skip`/`take` — mirroring `ResourcesController`'s shape and using the shared base.
-- [ ] 3.2 Convert the window server-side: start of `from`, and start of the day **after** `to`, through `SiteBookingSettings.TimeZoneId`. Naming a Monday and a Sunday covers all of Sunday.
-- [ ] 3.3 Bound the **dates** before converting, so an over-wide window is reported in terms of what the caller sent. A DST boundary makes a date span a variable number of hours, so validating only the converted instants can refuse a window the caller would consider legal.
-- [ ] 3.4 Purpose-built DTOs; no domain or store type in the contract. Map `BookingSummary` one-for-one — no field added at the HTTP layer.
-- [ ] 3.5 Map failures through the existing `ApiResults` so `date-range-too-large` and `date-range-invalid` surface as they do elsewhere. Check whether either needs adding to the status mapping rather than falling through to 400 by accident.
-- [ ] 3.6 Return the unpaged total alongside the page, matching the existing list endpoints.
+- [x] 3.1 Add `BookingsController` with `GET bookings`, taking `from`/`to` dates, optional statuses, optional resource ids, `skip`/`take` — mirroring `ResourcesController`'s shape and using the shared base.
+- [x] 3.2 Convert the window server-side: start of `from`, and start of the day **after** `to`, through `SiteBookingSettings.TimeZoneId`. Naming a Monday and a Sunday covers all of Sunday.
+- [x] 3.3 Bound the **dates** before converting, so an over-wide window is reported in terms of what the caller sent. **This went further than the task anticipated.** Bounding dates was not enough: `BookingQuery.Create` compared raw elapsed time, so a 31-date window containing a fall-back resolved to 31 days and an hour and was refused by the port — meaning `show me October` failed on any European site running the default guardrail, every year. The port now counts **whole** days, which is a relaxation of a shipped guarantee and carries a MODIFIED delta on `booking-management` plus an updated `BookingQueryTests` case. The endpoint bounds dates only; a window it accepts is one the port accepts.
+- [x] 3.4 Purpose-built DTOs; no domain or store type in the contract. Map `BookingSummary` one-for-one — no field added at the HTTP layer. **Caught myself violating this:** the first draft put the `BookingStatus` enum on the wire, in and out. `ServiceModels` sets the precedent by carrying its duration kind as a `string`, and an enum is a domain type whose members are a versioning commitment. Status is now a name in both directions, parsed on the way in.
+- [x] 3.5 Checked. Both date codes correctly fall through to 400 — they are caller errors. **Two findings:** `time-zone-invalid` also falls through to 400 although it is a *site misconfiguration* rather than the caller's fault; left as-is because the message names the site's zone plainly and changing shared mapping would affect other endpoints, but flagged for review. And a new stable code was needed: `booking-status-invalid`, because status names arrive as strings (see 3.4) and an unrecognised one must be refused rather than silently dropped, which would return a page filtered by something other than what was asked for.
+- [x] 3.6 Return the unpaged total alongside the page, matching the existing list endpoints.
 
 ## 4. Guards that would catch the real mistakes
 
-- [ ] 4.1 **The last named date is included in full** — a booking late on the `to` date is returned. The off-by-one here is invisible until someone misses a booking.
-- [ ] 4.2 **A DST boundary.** A window spanning a spring-forward and a fall-back date returns the bookings an operator would expect, and the site-local day is what defines the edge rather than a fixed 24 hours.
-- [ ] 4.3 **Omitted filters match the port's defaults**, asserted against the port rather than against a restated expectation — so the endpoint cannot drift into defaulting for itself.
-- [ ] 4.4 **No domain type in the contract**, asserted over the controller's signatures and DTOs the way the existing containment test asserts over `IBookingStore`.
-- [ ] 4.5 Mutation-check the window conversion: shift it by a day, or drop the end-of-day handling, from a clean build, and confirm a test fails. **Restore with an edit, never a timestamp-preserving copy.**
+- [x] 4.1 **The last named date is included in full** — a booking late on the `to` date is returned. The off-by-one here is invisible until someone misses a booking.
+- [x] 4.2 **A DST boundary.** A window spanning a spring-forward and a fall-back date returns the bookings an operator would expect, and the site-local day is what defines the edge rather than a fixed 24 hours.
+- [x] 4.3 **Omitted filters match the port's defaults**, asserted against the port rather than against a restated expectation — so the endpoint cannot drift into defaulting for itself.
+- [x] 4.4 **No domain type in the contract**, asserted over the controller's signatures and DTOs the way the existing containment test asserts over `IBookingStore`.
+- [x] 4.5 Mutation-checked, twice, restoring by edit. **(a) Dropping the end-of-day handling** (`toDate` instead of `toDate.AddDays(1)`) fails 6 tests. **(b) Treating the local date as UTC** (`DateTimeKind.Utc`, i.e. ignoring the site zone) fails 4 — including all three DST cases, which is the point: a fixed-offset fixture would not have caught it.
 
 ## 5. Client, docs and close
 

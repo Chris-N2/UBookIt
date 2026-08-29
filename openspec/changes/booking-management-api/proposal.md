@@ -71,7 +71,12 @@ happens decides what the screen has to know.
 ### Modified Capabilities
 - `booking-management`: gains the HTTP surface — the endpoint, its parameters, the DTO
   contract, where the timezone conversion happens, and that the response carries no more
-  than the port returns.
+  than the port returns. **Its windowing requirement is also MODIFIED**, discovered at
+  apply time: the guardrail compared raw elapsed time, so a window of exactly the maximum
+  number of local dates was refused whenever it contained a daylight-saving fall-back —
+  `show me October` failed on every European site running the default of 31, annually.
+  Days are now counted whole, so a partial day over does not count. A relaxation, stated
+  as one.
 - `resource-management`: two requirements. **"Management endpoints require backoffice
   authorization"** is strengthened from "an Umbraco backoffice authorization policy" to
   one granting access to *the package's own section*. **"HTTP callers cannot reach raw

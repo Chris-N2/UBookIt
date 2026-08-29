@@ -1,3 +1,61 @@
+## MODIFIED Requirements
+
+### Requirement: The list is windowed, and the window is bounded
+A list query SHALL require a date window and SHALL match a booking whose interval
+**overlaps** that window, treating it as half-open, on the same terms as the claim reads
+that serve availability. A booking beginning before the window and continuing into it is
+within it.
+
+The window SHALL be rejected when it spans more days than the site's configured maximum
+query range, with the same stable failure code the availability queries use for the same
+condition. Bookings accumulate without limit, so an unwindowed list is the cost hole that
+setting already exists to close.
+
+**Days SHALL be counted whole; a partial day over the maximum SHALL NOT be rejected.**
+This is a deliberate relaxation of a stricter earlier reading, and the reason is that a
+day is not always 24 hours. A window expressed in a site's local dates resolves to
+slightly more than a whole number of days whenever it contains a daylight-saving
+fall-back, so comparing raw elapsed time refused a calendar month — "show me October" on
+any site in a European time zone running the default guardrail, predictably and every
+year. The guard exists to stop an unbounded day-by-day walk, and an hour either way is
+not what it protects against.
+
+**The window SHALL NOT be optional.** An optional window makes the unbounded call the
+easiest one to write, and the guarantee this requirement makes is one no caller can
+decline.
+
+A window that does not run forwards SHALL be refused with a stable failure code of its
+own, distinct from the over-wide one, so a caller can tell "you asked for nothing" from
+"you asked for too much".
+
+**The cost SHALL be stated rather than left to be discovered:** a booking whose date is
+not known cannot be found through this port. Locating a booking from a booker's name,
+email or reference is a different query with different indexing, and is not provided here.
+
+#### Scenario: A booking overlapping the window is listed
+- **WHEN** a booking starts before the window and ends inside it
+- **THEN** it appears in the results
+
+#### Scenario: A booking outside the window is not listed
+- **WHEN** a booking's interval does not overlap the window at all
+- **THEN** it does not appear in the results
+
+#### Scenario: An over-wide window is refused
+- **WHEN** a list query's window spans a whole day more than the site's configured maximum
+- **THEN** the query fails with the same stable failure code an over-wide availability query produces, and no results are returned
+
+#### Scenario: A partial day over the maximum is accepted
+- **WHEN** a list query's window spans the maximum number of days plus part of another, as a local calendar month containing a daylight-saving change does
+- **THEN** the query is accepted, because the guard counts whole days
+
+#### Scenario: The window cannot be omitted
+- **WHEN** a caller attempts to list bookings without a window
+- **THEN** it is not possible to express the request
+
+#### Scenario: A backwards or empty window is refused
+- **WHEN** a list query's window ends at or before it starts
+- **THEN** the query fails with a stable failure code distinguishable from the over-wide one, and no results are returned
+
 ## ADDED Requirements
 
 ### Requirement: Bookings are readable over an authorized management endpoint
