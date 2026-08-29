@@ -69,6 +69,30 @@ public class ServiceAttributionTests
     }
 
     [Fact]
+    public async Task Asking_for_a_service_booking_without_a_service_throws()
+    {
+        // Not "places an unattributed booking". A caller reaching this overload has asked
+        // for a service booking; giving them an ordinary one that succeeds and looks right
+        // is the quiet failure this whole change exists to prevent. The general overload
+        // is what "no service" means, and it is one call away.
+        var service = new BookingService(
+            new InMemoryResourceStore(),
+            new InMemoryBookingStore(),
+            new FixedTimeProvider(TestData.Now),
+            TestData.Settings);
+
+        await Assert.ThrowsAsync<ArgumentNullException>(() => service.PlaceForServiceAsync(
+            null!,
+            new MultiClaimBookingRequest
+            {
+                ResourceIds = [Guid.NewGuid()],
+                Start = TestData.Utc(TestData.BaseDate, "09:00"),
+                Duration = TimeSpan.FromMinutes(60),
+                Booker = TestData.Booker(),
+            }));
+    }
+
+    [Fact]
     public void A_booking_created_without_a_service_reports_none()
     {
         var booking = Booking.Rehydrate(

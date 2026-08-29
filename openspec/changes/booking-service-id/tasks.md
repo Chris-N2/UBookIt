@@ -183,4 +183,27 @@ construction changes.
   the management-list test; an FK declared in `UBookItDbContext` alone fails 20 integration
   tests, because the fixture migrates and a model/schema mismatch breaks the context loudly.
   Recorded because I had said otherwise in writing.
-- [ ] 8.8 Clean-build gates, then QA round 2.
+- [x] 8.8 Clean-build gates, then QA round 2.
+
+## 9. QA round 2 — APPROVE, four NITs
+
+No must-fix. Two taken, two recorded as accepted with the reason.
+
+- [x] 9.1 **`PlaceForServiceAsync` did not guard a null attribution**, while
+  `CheckPlacementRules` guards its reference parameter. A null-oblivious caller would have
+  placed an *unattributed* booking that succeeded and looked ordinary — the quiet failure
+  this change exists to prevent, arriving through the very method that exists to prevent it.
+  Now throws. Mutation-checked: removing the guard fails the covering test.
+- [x] 9.2 **`ToColumns` was called once per column**, which is harmless — it is pure over
+  the same value, so the columns could not disagree — but it read as two independent
+  derivations of a pair that must agree, directly undercutting the comment saying otherwise.
+  Destructured once.
+- [x] 9.3 **NIT accepted, not fixed: the failed-placement attribution assertion is close to
+  unfalsifiable.** QA is right that no code path can attach an attribution to a pre-existing
+  direct booking, and that the real guard for that scenario is the claim count above it.
+  Kept as documentation of what the scenario means, and recorded here so nobody later reads
+  it as load-bearing. It is not what would catch a regression.
+- [x] 9.4 **NIT accepted, not fixed: the two-entry-point pair does not compare the paths
+  through a `conflict` or the atomic contract.** Both share one private pipeline and the
+  concurrency suites cover that ground; adding a third comparison would assert the same
+  delegation a third time. Recorded as a completeness note rather than closed.

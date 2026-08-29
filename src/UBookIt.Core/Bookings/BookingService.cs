@@ -181,7 +181,16 @@ public sealed class BookingService(
         ServiceAttribution service,
         MultiClaimBookingRequest request,
         CancellationToken cancellationToken = default)
-        => PlaceAsync(request, service, cancellationToken);
+    {
+        // Throwing rather than placing. A caller reaching this overload with a null
+        // attribution has asked for a service booking and would get an unattributed one —
+        // a booking that succeeded, looks ordinary, and is silently wrong in the exact way
+        // this whole change exists to prevent. There is no sensible fallback: the general
+        // overload is what "no service" means, and it is one call away.
+        ArgumentNullException.ThrowIfNull(service);
+
+        return PlaceAsync(request, service, cancellationToken);
+    }
 
     /// <summary>
     /// The one multi-claim pipeline. Both public entry points delegate here and differ only
