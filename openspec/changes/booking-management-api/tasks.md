@@ -32,7 +32,7 @@
 
 ## 5. Client, docs and close
 
-- [ ] 5.1 Regenerate the TypeScript client and commit it, as every prior API change has.
+- [x] 5.1 Regenerated against the running site's swagger and committed. **Only `sdk.gen.ts` and `types.gen.ts` change** — the `wwwroot/App_Plugins` bundles are gitignored (`.gitignore:485`), so the built output is not a committed artifact after all. `listBookings` is generated at `/umbraco/ubookitbackoffice/api/v1/bookings`, and the wire types confirm the DTO fix landed: `status: string` and `statuses?: Array<string>`, not an enum. `tsc` typechecks and the 69 client tests pass.
 - [ ] 5.2 Document the authorization change for site administrators: which section now grants access, and that a user with Content but not uBookIt loses access while a user with uBookIt but not Content gains it. This is a behaviour change to a shipped surface.
 - [ ] 5.3 Full solution build at **zero** warnings.
 - [ ] 5.4 Full test suite green, compared against the 1631 baseline.

@@ -9,6 +9,23 @@ export type AvailabilityExceptionModel = {
     windows: Array<TimeWindowModel>;
 };
 
+export type BookedResourceModel = {
+    resourceId: string;
+    displayName: string;
+};
+
+export type BookingModel = {
+    bookingId: string;
+    startUtc: string;
+    endUtc: string;
+    timeZoneId: string;
+    status: string;
+    createdUtc: string;
+    bookerName: string;
+    bookerEmail: string;
+    resources: Array<BookedResourceModel>;
+};
+
 export type CapabilityUsageModel = {
     key: string;
     count: number;
@@ -43,6 +60,11 @@ export type OpeningHoursModel = {
     day: DayOfWeek;
     start: string;
     end: string;
+};
+
+export type PagedBookingsModel = {
+    total: number;
+    items: Array<BookingModel>;
 };
 
 export type PagedResourcesModel = {
@@ -177,6 +199,40 @@ export type TimeWindowModel = {
     start: string;
     end: string;
 };
+
+export type ListBookingsData = {
+    body?: never;
+    path?: never;
+    query?: {
+        from?: string;
+        to?: string;
+        statuses?: Array<string>;
+        resourceIds?: Array<string>;
+        skip?: number;
+        take?: number;
+    };
+    url: '/umbraco/ubookitbackoffice/api/v1/bookings';
+};
+
+export type ListBookingsErrors = {
+    /**
+     * Bad Request
+     */
+    400: unknown;
+    /**
+     * The resource is protected and requires an authentication token
+     */
+    401: unknown;
+};
+
+export type ListBookingsResponses = {
+    /**
+     * OK
+     */
+    200: PagedBookingsModel;
+};
+
+export type ListBookingsResponse = ListBookingsResponses[keyof ListBookingsResponses];
 
 export type ListResourcesData = {
     body?: never;
