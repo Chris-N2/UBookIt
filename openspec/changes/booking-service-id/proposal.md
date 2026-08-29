@@ -72,7 +72,13 @@ the final row shape rather than gaining a column immediately after being reviewe
   requirement that **no field is added at the HTTP layer the port cannot supply**.
 - `service-booking`: service placement SHALL record the service on the booking it
   produces. This is the requirement that makes the column populated rather than merely
-  present.
+  present. **Its "Direct-resource booking is unaffected" requirement is also MODIFIED**,
+  found by the falsified-sentence sweep at apply time: it guaranteed a service booking was
+  "indistinguishable in shape from a directly placed one", which this change makes false
+  by design. The clause is **narrowed, not dropped** — every behavioural guarantee it was
+  written for (one interval, the same claim rows, identical blocking, the same
+  cancellation) is restated, and the single admitted difference is the recorded fact of
+  where the booking came from.
 
 ## Impact
 

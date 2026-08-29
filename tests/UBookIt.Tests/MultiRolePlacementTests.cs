@@ -490,6 +490,54 @@ public class MultiRolePlacementTests
             placed.Value.Claims.Select(c => c.ResourceId).OrderBy(id => id));
     }
 
+    [Fact]
+    public async Task Spec_scenario_service_placement_records_the_service()
+    {
+        // The guard against the quiet failure: a column that exists and is never written
+        // reads as "every booking was placed directly". Nothing else in the suite would
+        // notice — every placement assertion is about claims and outcomes, all of which
+        // stay correct while the attribution is silently absent.
+        //
+        // Asserted on what the STORE holds, not only on what PlaceAsync returned. The
+        // return value could carry the attribution while the value that gets persisted
+        // does not, and the persisted one is the only one anybody ever reads again.
+        var service = Svc(ResourceTypes.Room, Therapist);
+        var harness = TwoOfEach(service);
+
+        var placed = await harness.Services.PlaceAsync(Request(service, "09:00", 60));
+
+        Assert.True(placed.Succeeded);
+
+        var stored = await harness.Store.GetBookingAsync(placed.Value.Id);
+
+        Assert.NotNull(stored);
+        Assert.Equal(new ServiceAttribution(service.Id, "Massage"), stored!.Service);
+    }
+
+    [Fact]
+    public async Task A_directly_placed_booking_records_no_service()
+    {
+        // The other side of the same guarantee, and the reason the attribution is nullable
+        // in the domain rather than nullable as a storage concession: a direct booking has
+        // no service, permanently. If this ever fails, something has invented one.
+        var service = Svc(ResourceTypes.Room, Therapist);
+        var harness = TwoOfEach(service);
+
+        var placed = await harness.Bookings.PlaceAsync(new BookingRequest
+        {
+            ResourceId = Id(1),
+            Start = TestData.Utc(Date, "09:00"),
+            Duration = Mins(60),
+            Booker = TestData.Booker(),
+        });
+
+        Assert.True(placed.Succeeded);
+
+        var stored = await harness.Store.GetBookingAsync(placed.Value.Id);
+
+        Assert.Null(stored?.Service);
+    }
+
     /// <summary>
     /// Counts placement attempts so a test can assert how many combinations the
     /// loop tried, not merely what it returned.
@@ -510,6 +558,19 @@ public class MultiRolePlacementTests
         {
             Attempts++;
             return inner.PlaceAsync(request, cancellationToken);
+        }
+
+        // Counted too, and not as a formality: service placement calls THIS overload, so
+        // an implementation that only counted the two above would count zero attempts
+        // while every assertion about the loop's behaviour still passed — the test
+        // measuring nothing, and saying so nowhere.
+        public Task<DomainResult<Booking>> PlaceForServiceAsync(
+            ServiceAttribution service,
+            MultiClaimBookingRequest request,
+            CancellationToken cancellationToken = default)
+        {
+            Attempts++;
+            return inner.PlaceForServiceAsync(service, request, cancellationToken);
         }
 
         public DomainResult CheckPlacementRules(Resource resource, DateTimeOffset start, TimeSpan duration)
@@ -533,6 +594,17 @@ public class MultiRolePlacementTests
 
         public Task<DomainResult<Booking>> PlaceAsync(
             MultiClaimBookingRequest request, CancellationToken cancellationToken = default)
+            => Task.FromResult(DomainResult<Booking>.Failure(
+                FailureCodes.Conflict, "Another booking took it first."));
+
+        // The race has to be lost on the overload service placement actually calls.
+        // Leaving this one delegating to the real service would quietly stop the test
+        // racing at all, and it would still pass — it asserts on the reported outcome,
+        // which a successful placement also produces a plausible-looking version of.
+        public Task<DomainResult<Booking>> PlaceForServiceAsync(
+            ServiceAttribution service,
+            MultiClaimBookingRequest request,
+            CancellationToken cancellationToken = default)
             => Task.FromResult(DomainResult<Booking>.Failure(
                 FailureCodes.Conflict, "Another booking took it first."));
 

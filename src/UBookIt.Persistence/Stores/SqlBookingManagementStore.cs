@@ -50,6 +50,13 @@ internal sealed class SqlBookingManagementStore(UBookItDbContext db) : IBookingM
                 booking.BookerName,
                 booking.BookerEmail,
 
+                // Read from the booking row, NOT joined to the service table. The stored
+                // name is the snapshot taken at placement; a join would answer with the
+                // name the service has now, and would answer with nothing once the service
+                // is deleted — losing an attribution the booking definitely had.
+                booking.ServiceId,
+                booking.ServiceName,
+
                 // Correlated, so it cannot multiply the booking row above. Joined to
                 // resources here because a claim carries only an id, and resolving names
                 // at the call site is one read per claim per row — the cost this port
@@ -72,7 +79,10 @@ internal sealed class SqlBookingManagementStore(UBookItDbContext db) : IBookingM
                 row.CreatedUtc,
                 row.BookerName,
                 row.BookerEmail,
-                [.. row.Resources.Select(r => new BookedResource(r.Id, r.DisplayName))]))
+                [.. row.Resources.Select(r => new BookedResource(r.Id, r.DisplayName))],
+                row.ServiceId is { } serviceId
+                    ? new ServiceAttribution(serviceId, row.ServiceName ?? string.Empty)
+                    : null))
             .ToList();
 
         return new BookingPage(items, total);

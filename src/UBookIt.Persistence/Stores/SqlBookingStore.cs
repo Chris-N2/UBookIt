@@ -161,6 +161,8 @@ internal sealed class SqlBookingStore(UBookItDbContext db) : IBookingStore
         BookerName = booking.Booker.Name,
         BookerEmail = booking.Booker.Email,
         BookerPhone = booking.Booker.Phone,
+        ServiceId = booking.Service?.ServiceId,
+        ServiceName = booking.Service?.DisplayName,
         Claims = booking.Claims.Select(c => new ClaimRow { BookingId = booking.Id, ResourceId = c.ResourceId }).ToList(),
     };
 
@@ -171,5 +173,21 @@ internal sealed class SqlBookingStore(UBookItDbContext db) : IBookingStore
             Booker.Create(row.MemberKey, row.BookerName, row.BookerEmail, row.BookerPhone).Value,
             row.Claims.Select(c => new ResourceClaim(c.ResourceId)),
             (BookingStatus)row.Status,
-            row.CreatedUtc).Value;
+            row.CreatedUtc,
+            ToAttribution(row)).Value;
+
+    /// <summary>
+    /// The stored attribution, or none.
+    /// </summary>
+    /// <remarks>
+    /// Keyed on the id: a row with an id and no name is a storage state nothing writes, and
+    /// treating it as "no service" would silently discard an attribution the booking has.
+    /// The name falls back to empty rather than the row being dropped, so a defect shows up
+    /// as a blank name on a row that still knows which service it was — recoverable — rather
+    /// than as a booking that claims it was placed directly.
+    /// </remarks>
+    private static ServiceAttribution? ToAttribution(BookingRow row)
+        => row.ServiceId is { } serviceId
+            ? new ServiceAttribution(serviceId, row.ServiceName ?? string.Empty)
+            : null;
 }

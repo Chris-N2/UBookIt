@@ -47,7 +47,10 @@ public class BookingsEndpointTests
     }
 
     private static BookingSummary Summary(
-        DateTimeOffset startUtc, BookingStatus status, params (Guid Id, string Name)[] resources)
+        DateTimeOffset startUtc,
+        BookingStatus status,
+        ServiceAttribution? service = null,
+        params (Guid Id, string Name)[] resources)
         => new(
             Guid.NewGuid(),
             BookingInterval.Create(startUtc, startUtc.AddHours(1), "Europe/London").Value,
@@ -55,7 +58,8 @@ public class BookingsEndpointTests
             new DateTimeOffset(2026, 5, 1, 0, 0, 0, TimeSpan.Zero),
             "Ada Lovelace",
             "ada@example.com",
-            [.. resources.Select(r => new BookedResource(r.Id, r.Name))]);
+            [.. resources.Select(r => new BookedResource(r.Id, r.Name))],
+            service);
 
     private static (BookingsController Controller, RecordingStore Store) Endpoint(
         BookingPage? page = null, string zone = "UTC")
@@ -76,9 +80,12 @@ public class BookingsEndpointTests
         var roomId = Guid.NewGuid();
         var therapistId = Guid.NewGuid();
 
+        var serviceId = Guid.NewGuid();
+
         var page = new BookingPage(
             [
                 Summary(new DateTimeOffset(2026, 6, 2, 9, 0, 0, TimeSpan.Zero), BookingStatus.Confirmed,
+                    new ServiceAttribution(serviceId, "Initial Consultation"),
                     (roomId, "Meeting Room A"), (therapistId, "MRC Therapist")),
             ],
             Total: 75);
@@ -103,6 +110,34 @@ public class BookingsEndpointTests
         Assert.Equal(2, item.Resources.Count);
         Assert.Contains(item.Resources, r => r.ResourceId == roomId && r.DisplayName == "Meeting Room A");
         Assert.Contains(item.Resources, r => r.ResourceId == therapistId && r.DisplayName == "MRC Therapist");
+
+        // The service, as one object rather than two fields that must agree about being
+        // null together.
+        Assert.NotNull(item.Service);
+        Assert.Equal(serviceId, item.Service.ServiceId);
+        Assert.Equal("Initial Consultation", item.Service.DisplayName);
+    }
+
+    [Fact]
+    public async Task A_directly_placed_booking_carries_a_null_service()
+    {
+        // Not an object with empty values. A client cannot tell "placed directly" from
+        // "placed for a service we failed to record" if the absence is spelled as a
+        // populated object carrying blanks — and the first is a fact while the second is
+        // a defect, so they must not look alike.
+        var page = new BookingPage(
+            [
+                Summary(new DateTimeOffset(2026, 6, 2, 9, 0, 0, TimeSpan.Zero), BookingStatus.Confirmed,
+                    service: null,
+                    (Guid.NewGuid(), "Meeting Room A")),
+            ],
+            Total: 1);
+
+        var (controller, _) = Endpoint(page);
+
+        var model = Payload<PagedBookingsModel>(await controller.ListBookings(From, To));
+
+        Assert.Null(Assert.Single(model.Items).Service);
     }
 
     [Fact]

@@ -201,6 +201,13 @@ public sealed record BookedResource(Guid ResourceId, string DisplayName);
 /// logs them, and fixtures use invented people — the standing rule, restated because this
 /// is the first Core type built to carry contact details in bulk.
 /// </para>
+/// <para>
+/// The service is the attribution <b>stored on the booking</b>, name included, not a join
+/// to the service table. That is what lets a row stay answerable for a service since
+/// renamed or deleted — a read-time join would report the current name, or nothing at all.
+/// A <c>null</c> here means the booking was placed directly, which is a fact rather than a
+/// gap. See <see cref="ServiceAttribution"/>.
+/// </para>
 /// </remarks>
 public sealed record BookingSummary(
     Guid BookingId,
@@ -209,7 +216,8 @@ public sealed record BookingSummary(
     DateTimeOffset CreatedUtc,
     string BookerName,
     string BookerEmail,
-    IReadOnlyList<BookedResource> Resources);
+    IReadOnlyList<BookedResource> Resources,
+    ServiceAttribution? Service);
 
 /// <summary>A page of booking summaries plus the unpaged total, for a management list.</summary>
 public sealed record BookingPage(IReadOnlyList<BookingSummary> Items, int Total);

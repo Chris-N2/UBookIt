@@ -40,6 +40,21 @@ Bookings are readable through the management API but do not yet have a screen. V
 cancelling them from the backoffice is the next piece of work; nothing about the section or
 its permissions changes when it arrives.
 
+## The service shown against a booking
+
+A booking records the service it was placed for. Two things about that are worth knowing
+before they look like bugs.
+
+**The service name is the one recorded when the booking was placed.** Renaming a service
+does not retitle bookings already placed for it, and deleting a service does not remove the
+name from bookings that named it — they keep saying what was sold at the time. This is
+deliberate: the alternative is that last year's bookings silently change what they say when
+somebody edits a service today.
+
+**A booking with no service was booked directly**, against a resource offered on its own.
+It is not a booking whose service failed to be recorded. Both kinds are normal, and which
+one a resource allows is the *booked directly* setting on the resource itself.
+
 ## What the section does not do
 
 - **It does not place bookings.** Recording a booking on someone's behalf — a phone
