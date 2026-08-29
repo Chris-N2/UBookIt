@@ -244,4 +244,33 @@ editing two of its requirements feels like having read it.
 - [x] 10.5 **A BOM I introduced was stripped.** Re-syncing one requirement through a script
   rewrote `booking-management/spec.md` with a UTF-8 BOM that no other spec carries, showing
   up as a phantom change to line 1. Caught by reading the diff rather than the summary.
-- [ ] 10.6 Clean-build gates, then QA round 3 on the new delta.
+- [x] 10.6 Clean-build gates, then QA round 3 on the new delta.
+
+## 11. QA round 3 — REJECT, one MAJOR and two MINORs
+
+- [x] 11.1 **A stray `</para>` left the public read port's XML doc malformed.** Mine: I split
+  one paragraph into two and left the original's closing tag. `CS1570` — the only one in the
+  repo — and **invisible to every gate**, because no project sets `GenerateDocumentationFile`.
+  So the summary of the very type whose published prose this round exists to correct was
+  itself invalid XML, fed broken to IDE quick-info and any doc generator. Fixed, and verified
+  by building all four shipped projects with documentation generation on.
+  <br>**The gate gap is real and is recorded, not fixed here.** Turning documentation
+  generation on repo-wide surfaces five pre-existing `CS1573` warnings on
+  `BookingQuery.Create` (partial `<param>` tags, from the previous change) and would need a
+  decision about `CS1591` across the whole public surface. That is a change of its own for a
+  package whose public API is a compatibility promise; doing it inside this one would be
+  scope creep on top of a defect fix.
+- [x] 11.2 **MINOR — the prose guard forbade one literal string, not the claim.** The
+  requirement forbids *stating* that a booking does not record its service — a meaning. A
+  reworded restatement passed, and so would the same words rewrapped, because the sentence is
+  broken across ~90-character lines and the test read raw text. It now unwraps the port's own
+  comment first, is scoped to that comment rather than the whole thousand-line file, and
+  checks several phrasings. Mutation-checked three ways: the original claim reinserted
+  **across a line break**, a **reworded** version of it, and the true statement removed — all
+  three caught, and the first two are exactly what the first draft would have missed.
+- [x] 11.3 **MINOR — `Contains("scope decision")` pinned a form of words.** It failed on a
+  correct rewording and passed on the phrase appearing anywhere in the file. Replaced with
+  assertions on the substance: that no filter by service is offered, and that a booking
+  records the service it was placed for.
+- [ ] 11.4 Clean-build gates, then QA round 4 to confirm — three rounds have each found
+  something real, so the confirming round is cheap next to merging a defect.

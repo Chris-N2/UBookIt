@@ -402,7 +402,6 @@ public sealed class BookingQuery
 /// of a limit that outlives the limit is worse than no statement at all: a reader inspecting
 /// this port was being told the package forgets something it records.
 /// </para>
-/// </para>
 /// <para>
 /// <b>It does not validate.</b> Management store reads return their page directly; only
 /// mutations carry failures. It does not need to validate either: a <see cref="BookingQuery"/>

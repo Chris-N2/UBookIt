@@ -111,12 +111,58 @@ public class ServiceAttributionTests
         // status name. This asserts PROSE, which is what the requirement is about: the spec
         // scenario says the package must *state* something. A prose guarantee is the one
         // case where reading the prose is the direct test rather than a proxy for one.
-        var source = Support.RepoFiles.Read("src/UBookIt.Core/Stores/Stores.cs");
+        // Scoped to the port's own comment, and with the source unwrapped first: the claim
+        // is a sentence, and a sentence in this file is broken across ~90-character lines,
+        // so a search over raw text only finds phrasings that happen not to wrap. The first
+        // draft of this test had both faults — file-scoped and line-sensitive — and passed
+        // for the wrong reason.
+        var comment = Unwrapped(Support.RepoFiles.Read("src/UBookIt.Core/Stores/Stores.cs"),
+            from: "public interface IBookingManagementStore",
+            back: "/// <summary>");
 
-        Assert.DoesNotContain("a booking does not record the service", source, StringComparison.OrdinalIgnoreCase);
+        // Several phrasings of the one false claim, because the obligation is on the
+        // MEANING and a single literal only forbids one way of saying it. Still not
+        // exhaustive — no string test is — so this is a floor rather than a proof.
+        foreach (var claim in new[]
+                 {
+                     "does not record the service",
+                     "is not retained",
+                     "no record of which service",
+                     "the service is discarded",
+                     "forgets the service",
+                 })
+        {
+            Assert.DoesNotContain(claim, comment, StringComparison.OrdinalIgnoreCase);
+        }
 
-        // And the reason it still gives is the true one.
-        Assert.Contains("scope decision", source, StringComparison.Ordinal);
+        // And the true statement is present: the filter is absent by choice, not because
+        // the data is. Asserted on the substance rather than on a form of words — an
+        // earlier draft pinned the exact phrase "scope decision", which fails on a correct
+        // rewording and passes on the phrase appearing anywhere in a thousand-line file.
+        Assert.Contains("no filter by service", comment, StringComparison.OrdinalIgnoreCase);
+        Assert.Contains("records the service it was placed for", comment, StringComparison.OrdinalIgnoreCase);
+    }
+
+    /// <summary>
+    /// The doc comment immediately above <paramref name="from"/>, as one line.
+    /// </summary>
+    /// <remarks>
+    /// Comment markers and line breaks removed so a wrapped sentence reads as a sentence.
+    /// A guard on prose that cannot see across a line break is a guard on line breaks.
+    /// </remarks>
+    private static string Unwrapped(string source, string from, string back)
+    {
+        var anchor = source.IndexOf(from, StringComparison.Ordinal);
+        Assert.True(anchor >= 0, $"'{from}' is no longer in the file; this guard is looking at nothing.");
+
+        var start = source.LastIndexOf(back, anchor, StringComparison.Ordinal);
+        Assert.True(start >= 0, $"No doc comment found above '{from}'.");
+
+        var block = source[start..anchor];
+
+        return string.Join(' ', block
+            .Split('\n')
+            .Select(line => line.Trim().TrimStart('/').Trim()));
     }
 
     [Fact]
