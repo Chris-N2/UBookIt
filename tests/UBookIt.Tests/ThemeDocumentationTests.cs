@@ -119,14 +119,12 @@ public class ThemeDocumentationTests
         // requirement placed on one.
         var docs = BookingPage();
 
-        AssertSentence("These claims describe the views uBookIt ships", docs);
-        AssertSentence("no claim about a theme in either direction", docs);
+        DocumentationAssert.Says(docs, "These claims describe the views uBookIt ships");
+        DocumentationAssert.Says(docs, "no claim about a theme in either direction");
 
         // The narrowing reaches themed views and nothing else — the clause that keeps
         // this a narrowing rather than an escape hatch.
-        AssertSentence(
-            "for every view a theme does not supply, everything below holds exactly as written",
-            docs);
+        DocumentationAssert.Says(docs, "for every view a theme does not supply, everything below holds exactly as written");
     }
 
     [Fact]
@@ -138,28 +136,7 @@ public class ThemeDocumentationTests
         // single-line search and reads exactly like a dropped guarantee.
         var docs = BookingPage();
 
-        AssertSentence("with no stylesheet applied at all", docs);
-        AssertSentence("which is why no stylesheet can make the flow inoperable", docs);
-    }
-
-    /// <summary>
-    /// Asserts a sentence is present <b>however it is wrapped</b>.
-    /// <para>
-    /// An ordinary substring search is a single-line search once a sentence wraps, and
-    /// a wrapped sentence that is present reads exactly like a guarantee that was
-    /// dropped. Every run of whitespace in the expected text matches any run of
-    /// whitespace in the document.
-    /// </para>
-    /// </summary>
-    private static void AssertSentence(string sentence, string document)
-    {
-        var pattern = string.Join(
-            @"\s+",
-            sentence.Split(' ', StringSplitOptions.RemoveEmptyEntries)
-                .Select(System.Text.RegularExpressions.Regex.Escape));
-
-        Assert.True(
-            System.Text.RegularExpressions.Regex.IsMatch(document, pattern),
-            $"The documentation no longer says: \"{sentence}\"");
+        DocumentationAssert.Says(docs, "with no stylesheet applied at all");
+        DocumentationAssert.Says(docs, "which is why no stylesheet can make the flow inoperable");
     }
 }

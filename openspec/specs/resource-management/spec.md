@@ -7,11 +7,33 @@ Defines the backoffice management surface for bookable resources: authorized ver
 ## Requirements
 
 ### Requirement: Management endpoints require backoffice authorization
-Every uBookIt management endpoint SHALL require an authenticated backoffice user via an Umbraco backoffice authorization policy applied to the shared controller base. Unauthenticated requests SHALL receive 401; the endpoints SHALL NOT be reachable anonymously under any configuration shipped by the package.
+Every uBookIt management endpoint SHALL require an authenticated backoffice user via an
+Umbraco backoffice authorization policy applied to the shared controller base.
+Unauthenticated requests SHALL receive 401; the endpoints SHALL NOT be reachable
+anonymously under any configuration shipped by the package.
+
+**The policy SHALL grant access on the basis of the package's own backoffice section**, not
+of an unrelated one. Authorizing uBookIt's endpoints against another section is wrong in
+both directions at once: a user granted uBookIt but not that section is refused an API for
+a section they can see, and a user granted that section but not uBookIt can call every
+uBookIt endpoint for a section they cannot. Neither is a configuration a site chose.
+
+This matters more than tidiness because these endpoints return **personal data** — a
+booking carries the booker's name and email — and an endpoint that inherits its
+authorization from whichever policy was nearest to hand is how such data becomes reachable
+by people the site never granted it to.
 
 #### Scenario: Anonymous request is rejected
 - **WHEN** any management endpoint is called without backoffice authentication
 - **THEN** the response is 401 and no handler logic executes
+
+#### Scenario: Access follows the package's own section
+- **WHEN** an authenticated backoffice user without access to the package's section calls a management endpoint
+- **THEN** the request is refused, whatever other sections they hold
+
+#### Scenario: Access to the package's section is sufficient
+- **WHEN** an authenticated backoffice user with access to the package's section calls a management endpoint
+- **THEN** the request is authorized, without requiring access to any other section
 
 ### Requirement: Resource CRUD endpoints
 The Management API SHALL expose versioned endpoints in the `ubookitbackoffice` swagger group: paged list (`GET`, with skip/take and total count), get by id, create, full update, and delete. Request and response bodies SHALL be purpose-built DTO models — domain types SHALL NOT appear in the HTTP contract. The full availability model (opening hours, exceptions, constraints) and the resource's capability set SHALL be readable and writable through these endpoints. An omitted capability collection SHALL be treated as empty, and a full update SHALL replace the capability set rather than merging into it, consistent with the full-update semantics of the rest of the model.
@@ -59,11 +81,25 @@ Deleting a resource that has any booking claims SHALL fail with a 409 problem-de
 - **THEN** the response indicates success and a subsequent get returns 404
 
 ### Requirement: HTTP callers cannot reach raw booking storage
-Management controllers SHALL depend only on the resource management port and validated Core services. `IBookingStore` and `Booking.Rehydrate` SHALL NOT be referenced by any controller or API-layer type. (Discharges the containment obligation recorded at the persistence archive.)
+Management controllers SHALL depend only on the management **ports** and validated Core
+services. `IBookingStore` and `Booking.Rehydrate` SHALL NOT be referenced by any controller
+or API-layer type. (Discharges the containment obligation recorded at the persistence
+archive.)
+
+The plural is deliberate and is the only thing that changed here: the package now has more
+than one management port, and a controller reading bookings for the backoffice depends on
+the booking management port exactly as the resource controllers depend on the resource one.
+**The guarantee is unchanged** — a management port and a validated Core service are the
+only routes to storage an API-layer type may take, and raw booking storage is reachable
+through neither.
 
 #### Scenario: API layer has no raw store references
 - **WHEN** the management API layer's dependencies are inspected
 - **THEN** no controller or API model references `IBookingStore` or `Booking.Rehydrate`
+
+#### Scenario: A management port is the only storage route
+- **WHEN** a management controller reads or writes stored data
+- **THEN** it does so through a management port or a validated Core service, and never through a raw store
 
 ### Requirement: Resource type usage endpoint
 The Management API SHALL expose a versioned endpoint in the `ubookitbackoffice` swagger group returning the distinct resource type keys currently in use, each with the number of resources having that type. It SHALL require backoffice authorization like every other management endpoint, SHALL be a read-only projection over existing resource storage requiring no schema change, and SHALL return an empty collection rather than an error when no resources exist. Results SHALL be ordered deterministically so that repeated calls present the same order.

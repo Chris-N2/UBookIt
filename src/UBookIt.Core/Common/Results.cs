@@ -23,6 +23,13 @@ public static class FailureCodes
     // Status machine
     public const string InvalidStatusTransition = "invalid-status-transition";
 
+    /// <summary>
+    /// A caller named a booking status that does not exist. Distinct from
+    /// <see cref="InvalidStatusTransition"/>, which is about a status that exists being
+    /// unreachable from the current one.
+    /// </summary>
+    public const string BookingStatusInvalid = "booking-status-invalid";
+
     // Lookups and queries
     public const string ResourceNotFound = "resource-not-found";
     public const string ResourceInUse = "resource-in-use";

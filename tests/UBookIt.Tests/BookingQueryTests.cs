@@ -33,12 +33,37 @@ public class BookingQueryTests
     }
 
     [Fact]
-    public void A_window_one_tick_past_the_maximum_is_refused()
+    public void A_window_a_whole_day_past_the_maximum_is_refused()
     {
-        var result = BookingQuery.Create(From, From.AddDays(31).AddTicks(1), Settings(maxDays: 31));
+        var result = BookingQuery.Create(From, From.AddDays(32), Settings(maxDays: 31));
 
         Assert.False(result.Succeeded);
         Assert.Equal(FailureCodes.DateRangeTooLarge, Assert.Single(result.Failures).Code);
+    }
+
+    [Fact]
+    public void A_partial_day_over_the_maximum_is_allowed()
+    {
+        // Changed deliberately, and it relaxes what this guard previously refused.
+        //
+        // The earlier rule compared raw elapsed time, so a window one tick over the
+        // maximum failed. That looked tidy and was wrong once a caller expressed a window
+        // in local DATES: a site-local day is 25 hours across a fall-back transition, so a
+        // calendar month resolves to slightly more than a whole number of days. With the
+        // default guardrail of 31, "show me October" was refused on every European site,
+        // every year.
+        //
+        // The guard exists to stop unbounded queries — a day-by-day walk over an
+        // arbitrary span — and an hour either way is not what it protects against. It now
+        // counts whole days, so a partial day over does not count.
+        foreach (var over in new[] { TimeSpan.FromTicks(1), TimeSpan.FromHours(1), TimeSpan.FromHours(23) })
+        {
+            var result = BookingQuery.Create(From, From.AddDays(31) + over, Settings(maxDays: 31));
+
+            Assert.True(
+                result.Succeeded,
+                $"A window of 31 days plus {over} should be within a 31-day guardrail.");
+        }
     }
 
     [Fact]
