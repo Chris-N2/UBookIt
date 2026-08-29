@@ -33,10 +33,10 @@
 ## 5. Client, docs and close
 
 - [x] 5.1 Regenerated against the running site's swagger and committed. **Only `sdk.gen.ts` and `types.gen.ts` change** — the `wwwroot/App_Plugins` bundles are gitignored (`.gitignore:485`), so the built output is not a committed artifact after all. `listBookings` is generated at `/umbraco/ubookitbackoffice/api/v1/bookings`, and the wire types confirm the DTO fix landed: `status: string` and `statuses?: Array<string>`, not an enum. `tsc` typechecks and the 69 client tests pass.
-- [ ] 5.2 Document the authorization change for site administrators: which section now grants access, and that a user with Content but not uBookIt loses access while a user with uBookIt but not Content gains it. This is a behaviour change to a shipped surface.
-- [ ] 5.3 Full solution build at **zero** warnings.
-- [ ] 5.4 Full test suite green, compared against the 1631 baseline.
-- [ ] 5.5 `openspec validate --all --strict`.
-- [ ] 5.6 **Re-read both delta specs against the code before syncing**, and diff the `resource-management` guarantees rather than the prose — two requirements are replaced wholesale and one of them is the authorization guarantee.
-- [ ] 5.7 Sweep the sibling specs this change could falsify. `packaging` and `default-frontend` both make statements about what the package installs and requires; an authorization change is exactly the kind of thing that falsifies a sentence written elsewhere.
+- [x] 5.2 Document **what the package ships with**: the uBookIt section is what grants access to its management API, and a site grants it to a user group like any other section. **Not** an upgrade note — the package has never been released, so there is no prior behaviour for anyone to migrate from, and warning about one would be a fiction.
+- [x] 5.3 Full solution build at **zero** warnings.
+- [x] 5.4 Full test suite green, compared against the 1631 baseline.
+- [x] 5.5 `openspec validate --all --strict`.
+- [x] 5.6 Re-read; every delta clause traced to the code implementing it, and all eight `resource-management` guarantees and scenarios diffed clause-by-clause as carried. Three artifact corrections fell out of this pass, all recorded: the "behaviour change to a shipped surface" framing was false (nothing is released, so there is no migration and the docs must not invent one), design D1 still described the converted-span check that the whole-days fix replaced, and D3 still read as though task 1 were pending.
+- [x] 5.7 Swept, clean. Two near-misses checked rather than assumed: `delivery-api` requires its endpoints be reachable anonymously and **NOT** behind a backoffice policy — unaffected, since delivery uses a different base in a different assembly carrying `[AllowAnonymous]`; and `availability` bounds an **inclusive date span** by the same `MaxQueryRangeDays`, which the whole-days change to `BookingQuery` brings into agreement with rather than divergence from. Nothing outside this change names the Content section.
 - [ ] 5.8 Hand to `qa-review` in a **fresh context or subagent**.

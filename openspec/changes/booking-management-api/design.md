@@ -47,12 +47,20 @@ anyone means.
 
 The DST consequence is stated rather than discovered: on a spring-forward day a site-local
 day is 23 hours and on a fall-back day 25, so a seven-date window is not always 168 hours.
-That is correct — it is the week the operator sees — and it means the guardrail's
-`MaxQueryRangeDays` is evaluated on the converted instants, so a 31-date window across a
-fall-back boundary is 31 days and one hour. **The guard therefore rejects a window a
-caller would consider legal.** Resolved by converting first and validating second, and by
-the endpoint bounding *dates* itself before conversion, so the failure a caller sees is
-about the dates they asked for.
+That is correct — it is the week the operator sees.
+
+**It also broke the guardrail, and the fix went into the port rather than the endpoint.**
+`BookingQuery.Create` compared raw elapsed time, so a window of exactly the maximum number
+of dates resolved to slightly more than that many days whenever it contained a fall-back —
+with the default of 31, *"show me October"* was refused on every European site, annually.
+The first attempt here bounded dates at the endpoint *and* re-checked the converted span,
+which produced the same refusal with a better message; that is a nicer way to say no to
+something that should have been a yes.
+
+So the port now counts **whole** days, a partial day over does not count, and the endpoint
+bounds dates only. A window the endpoint accepts is one the port accepts. This relaxes a
+guarantee shipped and QA-approved in the previous change, so it carries a `MODIFIED` delta
+rather than a quiet edit.
 
 ### D2. Authorization moves to the package's own section, and this is a fix rather than an addition
 
@@ -78,8 +86,11 @@ and services on the wrong policy while bookings uses the right one would mean tw
 authorization stories in one section, and the mismatch would be even harder to notice
 next time.
 
-**This is a behaviour change to a shipped surface**, and the proposal says so rather than
-filing it as a fix nobody needs to read.
+**Nothing is shipped, so this is a correction rather than a migration.** The package has
+never been released: there are no installs, no configured user groups, and nobody relying
+on the old policy. Framing it as a breaking change would have been an over-claim in the
+opposite direction from the usual one — warning about a disruption that cannot occur — and
+it would have put an upgrade note in the documentation for an upgrade nobody can perform.
 
 ### D3. What task 1 measures, because the design above is conditional on it
 
@@ -103,6 +114,17 @@ what a site administrator must configure, which is Chris's decision and not an
 implementation detail. This is the same discipline as the theming change's D8: name the
 unmeasured claim, measure it before building on it, and treat a negative result as a
 design question rather than something to work around.
+
+**Measured, and both answers were yes.** The user-group editor lists `uBookIt Section`
+alongside the built-ins, and `umbracoUserGroup2App` on the running site stores it as
+`UBookIt.Section` — the manifest alias verbatim, where Umbraco's own sections store short
+lowercase names (`content`, `media`, `users`). The two shapes genuinely differ, so the
+constant is the manifest's `alias` and not its `name`, and a test ties the two together.
+
+Worth noting that the inference from `SectionMapper`'s fallback reached the same answer.
+It was still right to measure: an inference that happens to be correct is
+indistinguishable, before the fact, from one that is not — and this project has twice
+shipped a defect that began as a plausible reading of a framework.
 
 ### D4. The generated TypeScript client ships with this change
 
@@ -135,8 +157,9 @@ change satisfies it: the controller goes through the management port and
 ## Risks / Trade-offs
 
 - **The section may not be grantable** → D3; measured first, stop-and-report.
-- **Existing endpoints change who may call them** → stated in the proposal as a behaviour
-  change, not buried as a fix.
+- **Existing endpoints change who may call them** → immaterial: nothing is released, so
+  there is no install to disturb. Recorded because the change is real, not because anyone
+  is exposed to it.
 - **DST makes a date window a variable number of hours** → D1; the guardrail is evaluated
   on dates before conversion so the error a caller sees matches the dates they sent.
 - **The regenerated client inflates the diff** → accepted, per D4.

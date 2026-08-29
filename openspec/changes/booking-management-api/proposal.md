@@ -90,11 +90,14 @@ happens decides what the screen has to know.
 
 - **`UBookIt.Backoffice`**: a `BookingsController`, booking DTOs and a mapper, the
   authorization requirement, handler and policy registration, and the regenerated client.
-- **Behaviour change, called out deliberately:** every existing uBookIt management
-  endpoint changes who may call it. A backoffice user with Content access but no uBookIt
-  section access **loses** access; a user with uBookIt access but no Content **gains** it.
-  This is a tightening in the direction the section model already implies, but it is a
-  change to a shipped surface and sites with unusual group configurations will notice.
+- **Who may call every uBookIt management endpoint changes** — a user with Content but no
+  uBookIt section **loses** access, one with uBookIt but no Content **gains** it. **This is
+  not a migration and nobody will notice it**, because the package has never been
+  released: there are no installs, no configured user groups, and no consumer of the
+  previous behaviour. It is simply the wrong policy being corrected before anything can
+  depend on it, which is the same reasoning as fixing the booking/service schema gap while
+  the only data is our own. The documentation therefore states what the package ships
+  with, and does not carry an upgrade note for an upgrade that cannot happen.
 - **Public API surface** (additive): the endpoint, its DTOs, and the policy name.
 - **No Core change, no persistence change, no schema change, no migration.**
 
