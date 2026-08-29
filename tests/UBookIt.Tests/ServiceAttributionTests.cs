@@ -116,9 +116,22 @@ public class ServiceAttributionTests
         // so a search over raw text only finds phrasings that happen not to wrap. The first
         // draft of this test had both faults — file-scoped and line-sensitive — and passed
         // for the wrong reason.
-        var comment = Unwrapped(Support.RepoFiles.Read("src/UBookIt.Core/Stores/Stores.cs"),
+        var source = Support.RepoFiles.Read("src/UBookIt.Core/Stores/Stores.cs");
+
+        // The forbidden claims are searched across the WHOLE file, unwrapped. Scoping them
+        // to the interface's summary — which an earlier draft did — narrowed the guard
+        // without saying so: the same false sentence on `ListAsync`'s own doc comment five
+        // lines below, or in a `<remarks>` above the summary, passed silently. A negative
+        // assertion has no false-positive cost here, so it has no reason to be scoped.
+        var whole = Unwrapped(source);
+
+        // The positive assertions ARE scoped, and that scoping is the point: file-wide they
+        // would pass on the phrase appearing anywhere in a thousand-line file, which is the
+        // fault that retired the previous `Contains("scope decision")`.
+        var comment = Unwrapped(Between(
+            source,
             from: "public interface IBookingManagementStore",
-            back: "/// <summary>");
+            back: "/// <summary>"));
 
         // Several phrasings of the one false claim, because the obligation is on the
         // MEANING and a single literal only forbids one way of saying it. Still not
@@ -126,13 +139,18 @@ public class ServiceAttributionTests
         foreach (var claim in new[]
                  {
                      "does not record the service",
+                     "do not record the service",
                      "is not retained",
+                     "are not retained",
+                     "do not retain",
+                     "does not retain",
                      "no record of which service",
                      "the service is discarded",
+                     "the originating service",
                      "forgets the service",
                  })
         {
-            Assert.DoesNotContain(claim, comment, StringComparison.OrdinalIgnoreCase);
+            Assert.DoesNotContain(claim, whole, StringComparison.OrdinalIgnoreCase);
         }
 
         // And the true statement is present: the filter is absent by choice, not because
@@ -144,13 +162,23 @@ public class ServiceAttributionTests
     }
 
     /// <summary>
-    /// The doc comment immediately above <paramref name="from"/>, as one line.
+    /// Source with comment markers and line breaks removed, so a wrapped sentence reads as
+    /// a sentence. A guard on prose that cannot see across a line break is a guard on line
+    /// breaks.
+    /// </summary>
+    private static string Unwrapped(string source)
+        => string.Join(' ', source
+            .Split('\n')
+            .Select(line => line.Trim().TrimStart('/').Trim()));
+
+    /// <summary>
+    /// The doc comment immediately above <paramref name="from"/>.
     /// </summary>
     /// <remarks>
-    /// Comment markers and line breaks removed so a wrapped sentence reads as a sentence.
-    /// A guard on prose that cannot see across a line break is a guard on line breaks.
+    /// Fails loudly when either anchor is gone. A prose guard that quietly starts reading an
+    /// empty string is worse than no guard, because it keeps passing.
     /// </remarks>
-    private static string Unwrapped(string source, string from, string back)
+    private static string Between(string source, string from, string back)
     {
         var anchor = source.IndexOf(from, StringComparison.Ordinal);
         Assert.True(anchor >= 0, $"'{from}' is no longer in the file; this guard is looking at nothing.");
@@ -158,11 +186,7 @@ public class ServiceAttributionTests
         var start = source.LastIndexOf(back, anchor, StringComparison.Ordinal);
         Assert.True(start >= 0, $"No doc comment found above '{from}'.");
 
-        var block = source[start..anchor];
-
-        return string.Join(' ', block
-            .Split('\n')
-            .Select(line => line.Trim().TrimStart('/').Trim()));
+        return source[start..anchor];
     }
 
     [Fact]

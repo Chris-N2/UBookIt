@@ -255,9 +255,12 @@ editing two of its requirements feels like having read it.
   itself invalid XML, fed broken to IDE quick-info and any doc generator. Fixed, and verified
   by building all four shipped projects with documentation generation on.
   <br>**The gate gap is real and is recorded, not fixed here.** Turning documentation
-  generation on repo-wide surfaces five pre-existing `CS1573` warnings on
-  `BookingQuery.Create` (partial `<param>` tags, from the previous change) and would need a
-  decision about `CS1591` across the whole public surface. That is a change of its own for a
+  generation on repo-wide surfaces **eight** pre-existing `CS1573` warnings (partial
+  `<param>` tags) — five on `BookingQuery.Create` and three on
+  `BookingsController.ListBookings`, both from the previous change — and would need a
+  decision about `CS1591` across the whole public surface. *This entry said five until QA
+  round 4 counted them; the number matters because the next change will size the work from
+  it.* That is a change of its own for a
   package whose public API is a compatibility promise; doing it inside this one would be
   scope creep on top of a defect fix.
 - [x] 11.2 **MINOR — the prose guard forbade one literal string, not the claim.** The
@@ -272,5 +275,28 @@ editing two of its requirements feels like having read it.
   correct rewording and passed on the phrase appearing anywhere in the file. Replaced with
   assertions on the substance: that no filter by service is offered, and that a booking
   records the service it was placed for.
-- [ ] 11.4 Clean-build gates, then QA round 4 to confirm — three rounds have each found
+- [x] 11.4 Clean-build gates, then QA round 4 to confirm — three rounds have each found
   something real, so the confirming round is cheap next to merging a defect.
+
+## 12. QA round 4 — APPROVE, and one narrowing I had recorded as a gain
+
+- [x] 12.1 **Scoping the prose guard to the summary traded one blind spot for another, and
+  §11.2 described it as pure improvement.** QA published the verbatim false claim on
+  `ListAsync`'s own doc comment — five lines below the anchor, inside the same port — and the
+  suite stayed green; a `<remarks>` block placed *above* the summary passed too. The
+  file-scoped version this replaced would have caught the first of those.
+  <br>The error in reasoning is worth keeping: **only the positive assertions needed
+  scoping.** `Contains` file-wide passes on the phrase appearing anywhere in a thousand-line
+  file, which is exactly what retired `Contains("scope decision")`. `DoesNotContain` has no
+  false-positive cost and so had no reason to be narrowed — I scoped both because I was
+  fixing "the test reads the wrong region" as one idea rather than two. The forbidden
+  phrases now run over the whole unwrapped file; the positive assertions stay on the port's
+  comment. Both placements QA found are now caught, mutation-verified.
+- [x] 12.2 The phrase list gained singular/plural and tense variants, after QA slipped
+  "Bookings do not retain the originating service" past it. Still a floor and still says so:
+  no string test forbids a meaning, and pretending otherwise in the record is the thing
+  12.1 was about.
+- [x] 12.3 **NIT — `ServiceBookingService.cs` lost a UTF-8 BOM in this change.** Noticed and
+  left: none of its siblings in `UBookIt.Core` carry one, so the file now matches the local
+  convention rather than diverging from it. Recorded because §10.5 was an *added* BOM and
+  the two should not be confused.
