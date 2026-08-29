@@ -69,7 +69,12 @@ the final row shape rather than gaining a column immediately after being reviewe
   service's display name. The additive-migration guarantee is restated, not relaxed.
 - `booking-management`: the read port's `BookingSummary` carries the service, and the
   management endpoint's DTO carries it as a nullable id and name — under the existing
-  requirement that **no field is added at the HTTP layer the port cannot supply**.
+  requirement that **no field is added at the HTTP layer the port cannot supply**. **Its
+  filter requirement is also MODIFIED**, found by the sweep at sync time: it explained the
+  absent service filter by asserting that a booking does not record the service that
+  produced it, which this change makes false, and its scenario required the package to
+  *publish* that explanation. The conclusion is unchanged — no service filter here — and
+  only the reason moves, from a limit of the data to a scope decision.
 - `service-booking`: service placement SHALL record the service on the booking it
   produces. This is the requirement that makes the column populated rather than merely
   present. **Its "Direct-resource booking is unaffected" requirement is also MODIFIED**,

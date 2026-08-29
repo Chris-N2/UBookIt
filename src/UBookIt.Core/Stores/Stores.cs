@@ -390,11 +390,18 @@ public sealed class BookingQuery
 /// see what a site has taken. Different question, different caller, different port.
 /// </para>
 /// <para>
-/// <b>There is deliberately no filter by service.</b> That is a limit of the stored data
-/// rather than a choice about this port: a booking does not record the service that
-/// produced it. A service is used to choose the resources a booking claims and is not
-/// retained, so answering "which bookings were for this service" would need an additive
-/// column and a decision about bookings already placed without one.
+/// <b>There is deliberately no filter by service — and it is now a scope decision rather
+/// than a limit of the data.</b> A booking records the service it was placed for, so the
+/// question is answerable; the filter is not offered because it belongs with the screen
+/// that would drive it, designed together rather than guessed at in advance.
+/// </para>
+/// <para>
+/// This paragraph previously asserted the opposite — that the service was discarded after
+/// choosing resources, and that answering the question would need an additive column. That
+/// column now exists. The correction is noted rather than made silently, because a statement
+/// of a limit that outlives the limit is worse than no statement at all: a reader inspecting
+/// this port was being told the package forgets something it records.
+/// </para>
 /// </para>
 /// <para>
 /// <b>It does not validate.</b> Management store reads return their page directly; only

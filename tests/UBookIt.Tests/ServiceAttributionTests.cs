@@ -93,6 +93,33 @@ public class ServiceAttributionTests
     }
 
     [Fact]
+    public void The_package_no_longer_claims_a_booking_forgets_its_service()
+    {
+        // A statement of a limit outlived the limit. `IBookingManagementStore` explained the
+        // missing service filter by saying a booking does not record the service that
+        // produced it — true when written, and false the moment this change landed. It was
+        // published on the read port itself, so anyone inspecting the package would have
+        // been told bookings forget their service by the package that records it.
+        //
+        // Neither my own falsified-sentence sweep nor two QA rounds caught it; the sync-time
+        // sweep did. Asserted here so the next contradiction is a failing test rather than a
+        // third pair of eyes.
+        //
+        // This IS a source grep, which the previous change deleted one of — and the
+        // distinction is the point. That one asserted BEHAVIOUR through source text ("the
+        // file must not contain the word Confirmed") and broke when a comment mentioned a
+        // status name. This asserts PROSE, which is what the requirement is about: the spec
+        // scenario says the package must *state* something. A prose guarantee is the one
+        // case where reading the prose is the direct test rather than a proxy for one.
+        var source = Support.RepoFiles.Read("src/UBookIt.Core/Stores/Stores.cs");
+
+        Assert.DoesNotContain("a booking does not record the service", source, StringComparison.OrdinalIgnoreCase);
+
+        // And the reason it still gives is the true one.
+        Assert.Contains("scope decision", source, StringComparison.Ordinal);
+    }
+
+    [Fact]
     public void A_booking_created_without_a_service_reports_none()
     {
         var booking = Booking.Rehydrate(

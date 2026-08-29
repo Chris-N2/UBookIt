@@ -1,5 +1,74 @@
 ## MODIFIED Requirements
 
+### Requirement: Status and resource filter the list, and the status default excludes what is not booked
+A list query SHALL be filterable by **status** and by **resource**. With the window, those
+are the only filters this capability offers; every other dimension is either impossible
+from the stored data or deferred until something renders it.
+
+The resource filter SHALL accept a **set** of resource ids and SHALL match a booking that
+claims **any** of them. A set rather than a single id is a compatibility decision: the
+published query type would have to change incompatibly to widen one into the other later,
+and a set costs nothing now while behaving identically when given one id. An empty or
+absent set SHALL mean no resource filter rather than matching nothing.
+
+A booking claiming more than one resource SHALL be returned **once**, whether or not a
+resource filter is applied. Filtering and projecting across a join must not multiply the
+booking it selects.
+
+When statuses are supplied they SHALL be used exactly as given, including asking only for
+cancelled or declined bookings, which is how a reader answers what was called off.
+
+When no status is supplied the query SHALL return only the statuses that **block** time —
+the same set the domain already uses to decide whether a booking claims its interval. The
+default answer to "what is booked" SHALL NOT silently include bookings that are not.
+
+**This default SHALL be documented rather than discovered.** Nothing is hidden
+irrecoverably: an excluded booking is one filter away, and a reader who cannot find a
+cancelled booking must be able to learn why from the package rather than by experiment.
+
+Filtering by the **service** that produced a booking SHALL NOT be offered by this
+capability, and the reason SHALL be stated rather than implied. **The reason is now a
+scope decision, and this requirement previously stated a different one that has become
+false.** It said a booking does not record the service it came from — that the service is
+used to choose resources and is not retained — and a booking now records exactly that. The
+conclusion is unchanged and the justification is not: the data exists, and a filter over it
+belongs with the screen that would offer it, so that the filter and the control that drives
+it are designed together rather than the filter being added on the guess that one will want
+it.
+
+**A statement of a limit SHALL NOT outlive the limit.** This one was published on the read
+port itself, so a reader inspecting the package would have been told bookings do not record
+their service by the same package that records it. The requirement is restated here rather
+than deleted because "we do not offer this" is still true and still worth explaining.
+
+#### Scenario: The default omits cancelled and declined bookings
+- **WHEN** bookings are listed with no status filter
+- **THEN** only bookings whose status blocks time are returned
+
+#### Scenario: Cancelled bookings are reachable
+- **WHEN** a caller asks for cancelled bookings
+- **THEN** they are returned
+
+#### Scenario: Filtering by one resource
+- **WHEN** a caller lists bookings naming a single resource
+- **THEN** only bookings claiming that resource are returned
+
+#### Scenario: Filtering by several resources matches any of them
+- **WHEN** a caller lists bookings naming more than one resource
+- **THEN** a booking claiming any one of them is returned
+
+#### Scenario: A booking claiming several resources is returned once
+- **WHEN** a booking claims two resources and both are within the filter
+- **THEN** it appears once in the results and once in the total, carrying both resources
+
+#### Scenario: No resource filter means no filtering
+- **WHEN** a caller supplies no resources, or an empty set
+- **THEN** bookings are returned regardless of what they claim
+
+#### Scenario: The absence of a service filter is explained
+- **WHEN** a reader asks why bookings cannot be filtered by service
+- **THEN** the package states that the filter is not offered yet, rather than leaving the omission unexplained, and SHALL NOT state that a booking does not record its service
+
 ### Requirement: Bookings can be enumerated for management
 The package SHALL provide a read port that **lists** bookings, distinct from the
 availability reads that serve the front end. It SHALL be a Core port with a persistence

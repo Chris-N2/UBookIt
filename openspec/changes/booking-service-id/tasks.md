@@ -207,3 +207,41 @@ No must-fix. Two taken, two recorded as accepted with the reason.
   through a `conflict` or the atomic contract.** Both share one private pipeline and the
   concurrency suites cover that ground; adding a third comparison would assert the same
   delegation a third time. Recorded as a completeness note rather than closed.
+
+## 10. The sync-time sweep found what three earlier passes did not
+
+**A statement of a limit outlived the limit, and it was published on the read port itself.**
+`booking-management`'s filter requirement explained the absent service filter by asserting
+that a booking does not record the service that produced it — that the service chooses
+resources and is then discarded. True when written. False the moment this change landed, in
+the same capability the change was already modifying two other requirements in. Its scenario
+went further and required the *package* to publish that explanation, and
+`IBookingManagementStore` duly did: a reader inspecting the port was told bookings forget
+something the package records.
+
+**My own sweep (task 6.6) missed it, and so did both QA rounds.** 6.6 swept
+`service-booking`, `delivery-api` and `bookings` — and stopped short of the capability whose
+deltas were already open in front of me. The lesson is narrow and worth keeping: *the
+capability you are already modifying is the one you are least likely to sweep*, because
+editing two of its requirements feels like having read it.
+
+- [x] 10.1 The requirement is **MODIFIED, not silently corrected in the main spec** — a
+  falsified sentence found at sync time still needs a delta, or the change's own record does
+  not contain the thing it changed. The conclusion is unchanged (no service filter here) and
+  only the reason moves: from a limit of the data to a scope decision, because a filter
+  belongs with the screen that would drive it. Every other SHALL and all six scenarios
+  carried forward verbatim.
+- [x] 10.2 The scenario now forbids the false claim as well as requiring the true one — it
+  is not enough to state a reason if the old one can sit beside it.
+- [x] 10.3 `IBookingManagementStore`'s comment corrected, with the correction visible rather
+  than quietly rewritten.
+- [x] 10.4 **A test now pins the prose**, so the next contradiction is a failing test rather
+  than a third pair of eyes. It is a source grep, which the previous change deleted one of —
+  and the distinction is the point: that one asserted *behaviour* through source text and
+  broke when a comment mentioned a status name; this asserts *prose*, which is exactly what
+  the requirement is about. Mutation-checked. It also caught my own first draft of the
+  correction, which restated the false sentence verbatim while explaining that it was false.
+- [x] 10.5 **A BOM I introduced was stripped.** Re-syncing one requirement through a script
+  rewrote `booking-management/spec.md` with a UTF-8 BOM that no other spec carries, showing
+  up as a phantom change to line 1. Caught by reading the diff rather than the summary.
+- [ ] 10.6 Clean-build gates, then QA round 3 on the new delta.
