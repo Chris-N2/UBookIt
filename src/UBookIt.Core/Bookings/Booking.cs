@@ -98,7 +98,11 @@ public sealed class Booking
         IEnumerable<ResourceClaim> claims,
         BookingStatus status,
         DateTimeOffset createdUtc,
-        ServiceAttribution? service = null)
+        // Required, not defaulted: this is internal with one call site, so making the
+        // caller state "no service" costs nothing and removes the silent-omission case
+        // inside Core entirely. `Rehydrate` keeps a default because it is the persistence
+        // boundary with many legitimate callers that have no service to give.
+        ServiceAttribution? service)
     {
         var claimList = claims.ToList();
 

@@ -183,6 +183,16 @@ public class MultiRolePlacementTests
         var claims = await AllClaims(harness);
         Assert.Equal(2, claims.Count);
         Assert.All(claims, claim => Assert.Contains(claim.ResourceId, new[] { Id(3), Id(4) }));
+
+        // And nothing was attributed. The bookings that DO exist here were placed
+        // directly, by the loop above — so if a failed service placement ever recorded an
+        // attribution, it could only land on one of them, and this would catch it. Stated
+        // rather than assumed: "no booking, therefore no attribution" is an inference, and
+        // the failure it would miss is a service booking counted that never happened.
+        var stored = await Task.WhenAll(
+            claims.Select(claim => harness.Store.GetBookingAsync(claim.BookingId)));
+
+        Assert.All(stored, booking => Assert.Null(booking?.Service));
     }
 
     [Fact]
@@ -536,6 +546,119 @@ public class MultiRolePlacementTests
         var stored = await harness.Store.GetBookingAsync(placed.Value.Id);
 
         Assert.Null(stored?.Service);
+    }
+
+    [Fact]
+    public async Task The_two_multi_claim_entry_points_differ_only_in_the_recorded_service()
+    {
+        // The claim design D1 rests on: the service entry point is the SAME placement, and
+        // the only thing it changes is the value recorded. Both delegate to one private
+        // pipeline, so this is safe by construction today — but "safe by construction" is a
+        // property of the current implementation, and the requirement is a property of the
+        // contract. If someone later gives the service path its own pipeline (to skip a
+        // rule, or to add one), everything else stays green and the two silently diverge.
+        //
+        // Run against two identical harnesses rather than one, so the second placement is
+        // not competing with the first for the same resources.
+        var service = Svc(ResourceTypes.Room, Therapist);
+
+        var viaGeneral = TwoOfEach(service);
+        var viaService = TwoOfEach(service);
+
+        var request = new MultiClaimBookingRequest
+        {
+            ResourceIds = [Id(1), Id(3)],
+            Start = TestData.Utc(Date, "09:00"),
+            Duration = Mins(60),
+            Booker = TestData.Booker(),
+        };
+
+        var attribution = new ServiceAttribution(service.Id, "Massage");
+
+        var general = await viaGeneral.Bookings.PlaceAsync(request);
+        var attributed = await viaService.Bookings.PlaceForServiceAsync(attribution, request);
+
+        Assert.True(general.Succeeded);
+        Assert.True(attributed.Succeeded);
+
+        // Same interval, same status, same claims — the whole booking except its provenance.
+        Assert.Equal(general.Value.Interval, attributed.Value.Interval);
+        Assert.Equal(general.Value.Status, attributed.Value.Status);
+        Assert.Equal(
+            general.Value.Claims.Select(c => c.ResourceId).Order(),
+            attributed.Value.Claims.Select(c => c.ResourceId).Order());
+
+        // And the one difference, in both directions.
+        Assert.Null(general.Value.Service);
+        Assert.Equal(attribution, attributed.Value.Service);
+    }
+
+    [Fact]
+    public async Task The_two_entry_points_refuse_an_invalid_request_identically()
+    {
+        // The other half of "identical placement": a rule that the service path skipped
+        // would show up as a success where the general path fails, and a success is not
+        // something an equivalence test on two successes can see.
+        var service = Svc(ResourceTypes.Room, Therapist);
+
+        var viaGeneral = TwoOfEach(service);
+        var viaService = TwoOfEach(service);
+
+        // Outside open hours (fixtures run 09:00–17:00), so every resource refuses it.
+        var request = new MultiClaimBookingRequest
+        {
+            ResourceIds = [Id(1), Id(3)],
+            Start = TestData.Utc(Date, "05:00"),
+            Duration = Mins(60),
+            Booker = TestData.Booker(),
+        };
+
+        var general = await viaGeneral.Bookings.PlaceAsync(request);
+        var attributed = await viaService.Bookings.PlaceForServiceAsync(
+            new ServiceAttribution(service.Id, "Massage"), request);
+
+        Assert.False(general.Succeeded);
+        Assert.False(attributed.Succeeded);
+        Assert.Equal(
+            general.Failures.Select(f => f.Code),
+            attributed.Failures.Select(f => f.Code));
+    }
+
+    [Fact]
+    public async Task Cancelling_a_service_booking_is_the_same_operation_and_keeps_its_service()
+    {
+        // The narrowed "indistinguishable in shape" clause names cancellation explicitly,
+        // and nothing anywhere cancelled a service-attributed booking. Two things could
+        // have been wrong and neither would have shown up: cancellation could refuse a
+        // booking it did not recognise as ordinary, or it could drop the attribution while
+        // rewriting the row — which would turn a cancelled service booking into a cancelled
+        // direct one, quietly, in exactly the reporting that motivated this change.
+        var service = Svc(ResourceTypes.Room, Therapist);
+        var harness = TwoOfEach(service);
+
+        var placed = await harness.Services.PlaceAsync(Request(service, "09:00", 60));
+        Assert.True(placed.Succeeded);
+
+        // The same CancelAsync a direct booking uses — there is no service-specific one.
+        var cancelled = await harness.Bookings.CancelAsync(placed.Value.Id);
+
+        Assert.True(cancelled.Succeeded);
+        Assert.Equal(BookingStatus.Cancelled, cancelled.Value.Status);
+
+        var stored = await harness.Store.GetBookingAsync(placed.Value.Id);
+
+        Assert.Equal(BookingStatus.Cancelled, stored?.Status);
+        Assert.Equal(new ServiceAttribution(service.Id, "Massage"), stored?.Service);
+
+        // NOTE ON WHAT THIS DOES AND DOES NOT PROVE. The in-memory store hands back the
+        // same instance, so the attribution assertion above cannot fail for a persistence
+        // reason — it covers the domain (cancellation does not clear the attribution) and
+        // nothing else. The persistence half, where a status update could rewrite the row
+        // and lose the columns, is asserted against real SQL Server in
+        // BookingServiceAttributionTests.Cancelling_keeps_the_service_the_booking_was_placed_for.
+        //
+        // Stated rather than left implicit, because an assertion that cannot fail reads
+        // exactly like one that can.
     }
 
     /// <summary>

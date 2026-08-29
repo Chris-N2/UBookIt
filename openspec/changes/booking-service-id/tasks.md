@@ -63,6 +63,10 @@
   booking still reports the old name.
 - [x] 5.6 **Placement behaviour is unchanged** — the same request through the new entry point
   and the old one yields identical outcomes apart from the recorded service.
+  <br>**This was ticked before the test existed.** See 8.2: nothing invoked
+  `PlaceForServiceAsync` and `PlaceAsync(MultiClaimBookingRequest)` for one request and
+  compared them; the guarantee was safe by construction and unasserted, which is how a later
+  change comes to believe it is protected.
 - [x] 5.7 Mutation-check every guard above, restoring by **edit** rather than by a
   timestamp-preserving copy. Pay particular attention to 5.1 and 5.4: both assert that
   something *is* stored or *survives*, and an assertion of presence is the kind that most
@@ -124,3 +128,59 @@
 - [x] 7.6 **The dev database's booking rows are gone**: 78 bookings and 87 claims deleted,
   the 29 resources and 25 services left alone. Every one of those bookings carried a NULL
   service meaning "not recorded", which is the one thing NULL must not mean.
+
+## 8. QA round 1 — REJECT, two MAJORs, both "the claim is right, the artifact is missing"
+
+Nothing was behaviourally wrong. Both MAJORs were scenarios and a ticked task with no test
+behind them — a guarantee that holds by construction today and would break silently the day
+construction changes.
+
+- [x] 8.1 **Cancelling a service booking was tested nowhere.** The narrowed
+  "indistinguishable in shape" clause names cancellation explicitly, and no test in any
+  project cancelled an attributed booking. Two failures were possible and neither would have
+  surfaced: cancellation refusing a booking it did not recognise as ordinary, or a status
+  update rewriting the row and dropping the columns — turning a cancelled service booking
+  into a cancelled walk-in, in exactly the reporting this change exists for.
+  <br>**And the obvious place to assert it was the wrong one.** The unit-level test re-reads
+  the same instance from the in-memory store, so its attribution assertion cannot fail for a
+  persistence reason. It covers the domain half and now *says so*; the persistence half is
+  asserted against real SQL Server. Mutation-checked there: adding `row.ServiceId = null` to
+  `UpdateAsync` fails the integration test and nothing else.
+- [x] 8.2 **Task 5.6 was ticked with no artifact.** Two tests now do what it claimed. The
+  success case compares a request placed through both entry points — same interval, status
+  and claims; service present on one and absent on the other. The refusal case matters more
+  and was the one worth thinking about: a service path that *skipped* a rule shows up as a
+  success where the general path fails, which an equivalence test over two successes cannot
+  see. Mutation-checked: skipping the per-resource rules when a service is present fails the
+  refusal test (and, as it happens, much of the suite — but the refusal test is the one that
+  fails *for the right reason*).
+- [x] 8.3 **MINOR — a failed service placement recording nothing** had no assertion pairing
+  the failure with the attribution. Added to the existing all-candidates-busy test: the
+  bookings that do exist there were placed directly, so a stray attribution could only land
+  on one of them, and it would be caught. "No booking, therefore no attribution" is an
+  inference, and the failure it would miss is a service booking counted that never happened.
+- [x] 8.4 **MINOR — D1's rationale overclaimed, and QA was right to call it.** The design
+  said the recorded value "cannot be set to something the placement did not actually do" and
+  called the wrong value "unconstructible". Both false: `PlaceForServiceAsync` is public and
+  `ServiceAttribution` has a public constructor, so a forged attribution is no less reachable
+  than through the request field this design rejected. What D1 buys is narrower and real —
+  the **general** contract cannot name a service, so the ordinary path cannot acquire one by
+  accident or by a caller filling in a field because it was there. That narrower claim is
+  what the spec's SHALL already says, so this was a prose defect rather than a conformance
+  failure. Corrected, with the overclaim recorded rather than quietly deleted: it is exactly
+  the kind of sentence a later change leans on while removing what actually protected it.
+- [x] 8.5 **NIT — `Booking.Create`'s parameter is now required.** It is internal with one
+  call site, so the default bought nothing and left a silent-omission case inside Core.
+  `Rehydrate` keeps its default: it is the persistence boundary with many callers that have
+  no service to give, and its one production caller is mutation-covered.
+- [x] 8.6 **NIT — the NULL-semantics rule lived in two stores.** The rule that decides what
+  `NULL` *means* was written twice, and two copies of it can drift into the same row saying
+  one thing as an aggregate and another as a list row. One `BookingAttributionMapper` now,
+  writing both columns from a single source so they cannot disagree.
+- [x] 8.7 **QA corrected me on a guard I had called weak.** I flagged
+  `A_booking_outlives_the_service_it_names` as probably only catching a foreign key that
+  reached the database via a migration. It catches both: an FK in the migration fails it and
+  the management-list test; an FK declared in `UBookItDbContext` alone fails 20 integration
+  tests, because the fixture migrates and a model/schema mismatch breaks the context loudly.
+  Recorded because I had said otherwise in writing.
+- [ ] 8.8 Clean-build gates, then QA round 2.

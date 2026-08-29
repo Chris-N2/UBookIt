@@ -80,9 +80,7 @@ internal sealed class SqlBookingManagementStore(UBookItDbContext db) : IBookingM
                 row.BookerName,
                 row.BookerEmail,
                 [.. row.Resources.Select(r => new BookedResource(r.Id, r.DisplayName))],
-                row.ServiceId is { } serviceId
-                    ? new ServiceAttribution(serviceId, row.ServiceName ?? string.Empty)
-                    : null))
+                BookingAttributionMapper.ToAttribution(row.ServiceId, row.ServiceName)))
             .ToList();
 
         return new BookingPage(items, total);

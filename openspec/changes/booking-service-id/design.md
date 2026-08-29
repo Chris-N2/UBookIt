@@ -27,7 +27,8 @@ simplify anything; it moves the cost to every caller."*
 **Goals:**
 
 - A booking records the service it was placed for, or records honestly that there was none.
-- The recorded value cannot be set to something the placement did not actually do.
+- The **general** placement contract cannot name a service at all, so an attribution can
+  only be produced by a call site that reads as one.
 - A management list row can show the service without a second query per row.
 - A booking survives the service being renamed, retired, or deleted.
 
@@ -111,9 +112,19 @@ satisfied because the port supplies both parts.
 ## Risks / Trade-offs
 
 - **A third placement entry point on `IBookingService` is more surface to keep coherent.**
-  → It is the smallest surface that makes the wrong value unconstructible, and the
-  interface's existing shape already means "which method you call is what the booking is",
-  so this extends a pattern rather than introducing one.
+  → The interface's existing shape already means "which method you call is what the booking
+  is", so this extends a pattern rather than introducing one.
+- **This does not make a forged attribution impossible, and saying so would be false.**
+  `PlaceForServiceAsync` is public and `ServiceAttribution` has a public constructor, so a
+  determined caller can still pass one that describes nothing real — no less reachable than
+  the request field this design rejected. What D1 actually buys is narrower and still worth
+  having: the **general** contract cannot name a service, so the ordinary multi-claim path
+  cannot acquire an attribution by accident or by a caller filling in a field because it was
+  there; and a call that does name one says so in the method name rather than in a property.
+  The spec claims exactly this and no more — "SHALL NOT be settable by a caller of the
+  general multi-claim placement contract". An earlier draft of this document claimed the
+  wrong value was "unconstructible", which is the kind of overclaim a later change leans on
+  while removing the thing that was actually protecting it.
 - **The name snapshot can drift from the service's current name, and someone will report
   it as a bug.** → Documented in the spec and in the backoffice doc as intended
   behaviour: the row shows what was booked at the time. The id is carried alongside for

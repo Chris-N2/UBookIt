@@ -159,6 +159,45 @@ public class BookingServiceAttributionTests(SqlServerFixture fixture)
     }
 
     [Fact]
+    public async Task Cancelling_keeps_the_service_the_booking_was_placed_for()
+    {
+        // The narrowed "indistinguishable in shape" clause names cancellation, and this is
+        // where it can actually be tested: the unit-level equivalent re-reads the same
+        // object from an in-memory store, so it would agree with itself no matter what the
+        // persistence layer did. Here the row goes back to SQL Server and comes back out.
+        //
+        // The failure this catches is a status update that rewrites the whole row: the
+        // booking would come back cancelled and *directly placed*, turning a cancelled
+        // service booking into a walk-in in exactly the reporting this change exists for.
+        fixture.EnsureAvailable();
+
+        var resourceId = await Seed.EveryDayRoomAsync(fixture, Ct);
+        var service = await SeedServiceAsync("Follow-up");
+
+        var bookingId = await PlaceAsync(Seed.ConfirmedBooking(
+            resourceId, Start(7), TimeSpan.FromHours(1),
+            service: new ServiceAttribution(service.Id, service.Name)));
+
+        await using (var cancelling = fixture.CreateContext())
+        {
+            var store = new SqlBookingStore(cancelling);
+            var booking = await store.GetBookingAsync(bookingId, Ct);
+
+            Assert.NotNull(booking);
+            Assert.True(booking!.Cancel().Succeeded);
+
+            await store.UpdateAsync(booking, Ct);
+        }
+
+        await using var context = fixture.CreateContext();
+        var reloaded = await new SqlBookingStore(context).GetBookingAsync(bookingId, Ct);
+
+        Assert.Equal(BookingStatus.Cancelled, reloaded?.Status);
+        Assert.Equal(service.Id, reloaded?.Service?.ServiceId);
+        Assert.Equal("Follow-up", reloaded?.Service?.DisplayName);
+    }
+
+    [Fact]
     public async Task The_management_list_carries_the_service_without_joining_to_it()
     {
         fixture.EnsureAvailable();
