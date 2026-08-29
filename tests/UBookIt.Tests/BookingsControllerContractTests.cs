@@ -1,4 +1,6 @@
 using System.Reflection;
+using Microsoft.AspNetCore.Mvc.ModelBinding;
+using Microsoft.Extensions.DependencyInjection;
 using UBookIt.Backoffice.Controllers;
 using UBookIt.Backoffice.Models;
 using UBookIt.Core.Bookings;
@@ -81,6 +83,57 @@ public class BookingsControllerContractTests
                 .SelectMany(method => method.GetParameters())
                 .Select(parameter => parameter.ParameterType),
             type => type == typeof(IBookingStore));
+    }
+
+    [Fact]
+    public void The_window_cannot_be_omitted_by_a_caller()
+    {
+        // "The window SHALL NOT be optional" is a guarantee about MODEL BINDING, and until
+        // now nothing asserted it: removing both `[BindRequired]` attributes passed all 860
+        // tests, and the endpoint then answered a windowless call with 200 and an empty page
+        // over a window starting at 0001-01-01 — succeeding, and wrong.
+        //
+        // The generated TypeScript client does pin the required shape, but it is a committed
+        // artifact: it only disagrees with the C# after someone regenerates it, so it sits a
+        // build behind the defect rather than catching it.
+        //
+        // This asks MVC's own metadata layer the question its binder asks, rather than
+        // looking for an attribute — a guard on the attribute would pass on any other
+        // mechanism that made the parameter required, and fail on this one if the framework
+        // ever expressed it differently.
+        //
+        // MVC's own provider, built the way MVC builds it — the detail providers that decide
+        // `IsBindingRequired` are internal, and assembling a hand-rolled subset would be a
+        // second opinion about the very thing under test.
+        var services = new ServiceCollection();
+        services.AddLogging();
+        services.AddMvcCore();
+
+        var provider = (ModelMetadataProvider)services.BuildServiceProvider()
+            .GetRequiredService<IModelMetadataProvider>();
+
+        var action = typeof(BookingsController)
+            .GetMethod(nameof(BookingsController.ListBookings))!;
+
+        foreach (var name in new[] { "from", "to" })
+        {
+            var parameter = action.GetParameters().Single(p => p.Name == name);
+
+            Assert.True(
+                provider.GetMetadataForParameter(parameter).IsBindingRequired,
+                $"'{name}' is not binding-required, so a caller can omit the window.");
+        }
+
+        // And the filters stay optional, so this cannot be satisfied by making everything
+        // required — which would refuse the ordinary "show me this week" call.
+        foreach (var name in new[] { "statuses", "resourceIds", "skip", "take" })
+        {
+            var parameter = action.GetParameters().Single(p => p.Name == name);
+
+            Assert.False(
+                provider.GetMetadataForParameter(parameter).IsBindingRequired,
+                $"'{name}' became binding-required; the port treats it as optional.");
+        }
     }
 
     // The "status default is not restated" assertion that used to live here has moved to

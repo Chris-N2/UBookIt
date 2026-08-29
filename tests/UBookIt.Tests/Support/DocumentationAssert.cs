@@ -19,6 +19,12 @@ namespace UBookIt.Tests.Support;
 /// whitespace-only match reports it as missing — a documentation guard that cries wolf gets
 /// weakened rather than fixed, so it has to match the markup people write.
 /// </para>
+/// <para>
+/// It does <b>not</b> cross a blank line, and each word is anchored on a word boundary.
+/// Without those, the guard is satisfiable by the same words scattered across separate
+/// paragraphs, or as fragments inside longer words — a sentence the document no longer
+/// says, passing a test that claims it does.
+/// </para>
 /// </remarks>
 public static class DocumentationAssert
 {
@@ -28,11 +34,15 @@ public static class DocumentationAssert
     /// </summary>
     public static void Says(string document, string sentence)
     {
-        var pattern = string.Join(
-            @"[\s>*_]+",
+        // Horizontal whitespace, markdown decoration, or a single line break — but never a
+        // blank line, which is where one paragraph stops and another begins.
+        const string Separator = @"(?:[^\S\r\n]|[>*_]|\r?\n(?!\s*\r?\n))+";
+
+        var pattern = @"\b" + string.Join(
+            Separator,
             sentence
                 .Split(' ', StringSplitOptions.RemoveEmptyEntries)
-                .Select(word => Regex.Escape(word.Trim('*', '_'))));
+                .Select(word => Regex.Escape(word.Trim('*', '_')))) + @"\b";
 
         Assert.True(
             Regex.IsMatch(document, pattern),

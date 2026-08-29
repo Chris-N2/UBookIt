@@ -1,11 +1,20 @@
 using System.Security.Claims;
 using System.Security.Principal;
 using Microsoft.AspNetCore.Authorization;
+using Microsoft.Extensions.Configuration;
+using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Logging;
+using OpenIddict.Validation.AspNetCore;
 using UBookIt.Backoffice;
+using UBookIt.Backoffice.Composers;
 using UBookIt.Backoffice.Controllers;
 using UBookIt.Backoffice.Security;
 using UBookIt.Core.Common;
+using Umbraco.Cms.Core.Cache;
+using Umbraco.Cms.Core.Composing;
 using Umbraco.Cms.Core.Configuration.Models;
+using Umbraco.Cms.Core.DependencyInjection;
+using Umbraco.Cms.Core.Logging;
 using Umbraco.Cms.Core.Models.Membership;
 using Umbraco.Cms.Core.Models.Membership.Permissions;
 using Umbraco.Cms.Core.Security.Authorization;
@@ -141,6 +150,116 @@ public class UBookItSectionAccessTests
             controller => Assert.True(
                 typeof(UBookItBackofficeApiControllerBase).IsAssignableFrom(controller),
                 $"{controller.Name} does not derive from the authorized base controller."));
+    }
+
+    [Fact]
+    public async Task The_policy_the_endpoints_name_is_the_one_the_handler_answers()
+    {
+        // The chain this asserts — base controller's policy NAME -> the composer's
+        // registration under that name -> the requirement -> the handler -> who gets in —
+        // had no guard at all, and every link in it was silently breakable. Restoring the
+        // original defect (`SectionAccessContent` on the base) passed the entire suite,
+        // which is precisely the failure the class comment above warns about: the earlier
+        // tests assert the handler's answer, and nothing connected the handler to the
+        // attribute the endpoints actually carry.
+        //
+        // So this goes through Umbraco's nothing and ASP.NET's everything: the real
+        // AuthorizationService resolving the real registered policy by the name read off
+        // the real attribute. A wrong name does not fail an assertion — the policy does not
+        // exist, and the framework throws.
+        Assert.True(await IsAuthorizedByTheRegisteredPolicyAsync(
+            UserWithSections(Constants.SectionAlias)));
+
+        Assert.False(await IsAuthorizedByTheRegisteredPolicyAsync(
+            UserWithSections("content", "media", "settings")));
+    }
+
+    [Fact]
+    public async Task The_registered_policy_carries_the_backoffice_authentication_scheme()
+    {
+        // Omitting it rejects an authenticated user with nothing useful to say about why —
+        // the request never resolves to a backoffice principal, so the handler sees no user
+        // and refuses. It is invisible to the test above, which hands the policy a principal
+        // directly rather than authenticating one, and it was invisible to the whole suite:
+        // deleting the line passed 860/860. The live check in task 4.6 caught it once; a
+        // one-off confirmation is not a regression guard.
+        var provider = await PolicyProvider().GetPolicyAsync(PolicyOnTheSharedBase);
+
+        Assert.NotNull(provider);
+        Assert.Contains(
+            OpenIddictValidationAspNetCoreDefaults.AuthenticationScheme,
+            provider.AuthenticationSchemes);
+    }
+
+    /// <summary>
+    /// The policy name the endpoints actually carry, read from the attribute rather than
+    /// from the constant — so naming the wrong policy is what fails, not a mismatch between
+    /// two things a single edit changes together.
+    /// </summary>
+    private static string PolicyOnTheSharedBase
+        => typeof(UBookItBackofficeApiControllerBase)
+               .GetCustomAttributes(typeof(AuthorizeAttribute), inherit: true)
+               .Cast<AuthorizeAttribute>()
+               .Select(attribute => attribute.Policy)
+               .Single(policy => !string.IsNullOrWhiteSpace(policy))
+           ?? throw new InvalidOperationException(
+               "The shared base controller names no authorization policy.");
+
+    private static IAuthorizationPolicyProvider PolicyProvider(IUser? user = null)
+        => Composed(user).GetRequiredService<IAuthorizationPolicyProvider>();
+
+    private static async Task<bool> IsAuthorizedByTheRegisteredPolicyAsync(IUser user)
+    {
+        var services = Composed(user);
+
+        var result = await services.GetRequiredService<IAuthorizationService>().AuthorizeAsync(
+            new ClaimsPrincipal(new ClaimsIdentity(authenticationType: "Test")),
+            resource: null,
+            PolicyOnTheSharedBase);
+
+        return result.Succeeded;
+    }
+
+    /// <summary>Everything the composer registers, and the one thing the handler reads.</summary>
+    private static ServiceProvider Composed(IUser? user)
+    {
+        var services = new ServiceCollection();
+
+        services.AddLogging();
+        services.AddSingleton<IAuthorizationHelper>(new StubAuthorizationHelper(user));
+
+        new UBookItAuthorizationComposer().Compose(new ServicesOnlyUmbracoBuilder(services));
+
+        return services.BuildServiceProvider();
+    }
+
+    /// <summary>
+    /// An <see cref="IUmbracoBuilder"/> that offers a service collection and nothing else.
+    /// A composer that started reading configuration or the type loader would fail loudly
+    /// here rather than being handed an invented answer.
+    /// </summary>
+    private sealed class ServicesOnlyUmbracoBuilder(IServiceCollection services) : IUmbracoBuilder
+    {
+        public IServiceCollection Services { get; } = services;
+
+        public IConfiguration Config => throw new NotSupportedException(Explanation);
+
+        public TypeLoader TypeLoader => throw new NotSupportedException(Explanation);
+
+        public ILoggerFactory BuilderLoggerFactory => throw new NotSupportedException(Explanation);
+
+        public IProfiler Profiler => throw new NotSupportedException(Explanation);
+
+        public AppCaches AppCaches => throw new NotSupportedException(Explanation);
+
+        public TBuilder WithCollectionBuilder<TBuilder>() where TBuilder : ICollectionBuilder
+            => throw new NotSupportedException(Explanation);
+
+        public void Build() => throw new NotSupportedException(Explanation);
+
+        private const string Explanation =
+            "The authorization composer registers services and reads nothing else. If that "
+            + "changed, give this stub a real answer rather than an invented one.";
     }
 
     /// <summary>

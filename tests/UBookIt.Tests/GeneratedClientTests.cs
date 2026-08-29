@@ -13,6 +13,13 @@ namespace UBookIt.Tests;
 /// an optional parameter in the generated types is precisely how the unbounded call becomes
 /// the easiest one to write.
 /// </para>
+/// <para>
+/// <b>This is the client half of that guard, and only the half.</b> The file is a committed
+/// artifact, so it does not disagree with the C# until somebody regenerates it — a
+/// `[BindRequired]` removed today would pass here until the next regeneration.
+/// `BookingsControllerContractTests.The_window_cannot_be_omitted_by_a_caller` asks MVC's own
+/// binding metadata the same question, and that is the half that catches it immediately.
+/// </para>
 /// </summary>
 public class GeneratedClientTests
 {

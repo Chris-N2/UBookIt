@@ -82,4 +82,52 @@
   "the window SHALL NOT be optional". `GeneratedClientTests` pins it, and pins the filters as
   still optional so a blanket-required regeneration cannot satisfy it. Mutation-checked
   against the previous, optional generation.
-- [ ] 6.8 Clean-build gates, then QA round 2.
+- [x] 6.8 Clean-build gates, then QA round 2.
+
+## 7. QA round 2 — REJECT, two MAJORs
+
+Both were the same fault, and it is the one this project keeps making: **the guard watched a
+downstream artifact instead of the guarantee.** Round 1's fixes were verified genuine by
+mutation, but two of the links they created were themselves unguarded.
+
+- [x] 7.1 **`[BindRequired]` was unguarded.** Deleting both attributes passed all 860 tests,
+  and the endpoint then answered a windowless call with **200 and an empty page** over a
+  window starting at `0001-01-01` — the succeeds-and-is-wrong pair the status requirement
+  names as the worst a response can have. `GeneratedClientTests` (7.1's predecessor, task
+  6.7) could not see it: `types.gen.ts` is a **committed** artifact, so it disagrees with the
+  C# only after someone regenerates, leaving the guard a build behind the defect.
+  `The_window_cannot_be_omitted_by_a_caller` now asks **MVC's own metadata provider** whether
+  the parameters are binding-required — the question the binder itself asks, rather than a
+  search for an attribute — and asserts the four filters are *not*, so a blanket-required
+  signature cannot satisfy it. Mutation-checked: dropping `[BindRequired]` from `from` fails
+  it. `GeneratedClientTests` stays as the client half, and now says in its own comment that
+  it is only the half.
+- [x] 7.2 **The authorization fix had no regression guard.** Restoring the exact defect this
+  change exists to correct — `SectionAccessContent` on the shared base — passed **860/860**.
+  Nothing tied the base's policy *name* to the composer's registration, or that registration
+  to the requirement the handler answers. This is the failure task 2.4 wrote itself a warning
+  about, and it shipped anyway: the round-1 tests assert the handler's answer, and nothing
+  connected the handler to the attribute the endpoints actually carry.
+  `The_policy_the_endpoints_name_is_the_one_the_handler_answers` now runs the **real**
+  composer into a service collection and asks the **real** `IAuthorizationService` to
+  authorize against the policy name **read off the attribute**, for a uBookIt user and a
+  Content-only one. A wrong name does not fail an assertion — the policy does not exist and
+  the framework throws, which is the loudest possible failure.
+  `The_registered_policy_carries_the_backoffice_authentication_scheme` covers the OpenIddict
+  scheme separately, because the test above hands the policy a principal directly and so
+  cannot see a missing scheme. Mutation-checked, four ways: restoring the Content policy
+  fails 2, dropping the scheme fails 1, dropping the requirement fails 2.
+- [x] 7.3 **NIT — the documentation separator could cross a paragraph.** `\s` already
+  spanned blank lines before the fix, so this was inherited rather than introduced, but the
+  widened character class made a `*`-bulleted list crossable too. The separator now permits a
+  single line break and never a blank one, and each end is anchored on a word boundary.
+  Mutation-checked by splitting an asserted sentence across a paragraph break with every word
+  intact and in order: it is now reported missing.
+- [x] 7.4 **NIT — `GeneratedClientTests`' regex is pinned to the generator's emitted shape.**
+  Left as written: a generator upgrade that renames the type fails *loudly*, with a message
+  naming what to look at, rather than passing silently. Recorded rather than changed.
+- [x] 7.5 **NIT — the TestSite README and the dead SQLite connection string were unlisted
+  scope.** Correct: they were Chris's separate request, made while this change was open, and
+  committed on their own (`cd6c3fb`). Recorded here so the change's own task list accounts
+  for everything in its branch.
+- [ ] 7.6 Clean-build gates, then QA round 3.
