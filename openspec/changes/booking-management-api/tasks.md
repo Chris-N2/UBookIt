@@ -40,4 +40,46 @@
 - [x] 5.5 `openspec validate --all --strict`.
 - [x] 5.6 Re-read; every delta clause traced to the code implementing it, and all eight `resource-management` guarantees and scenarios diffed clause-by-clause as carried. Three artifact corrections fell out of this pass, all recorded: the "behaviour change to a shipped surface" framing was false (nothing is released, so there is no migration and the docs must not invent one), design D1 still described the converted-span check that the whole-days fix replaced, and D3 still read as though task 1 were pending.
 - [x] 5.7 Swept, clean. Two near-misses checked rather than assumed: `delivery-api` requires its endpoints be reachable anonymously and **NOT** behind a backoffice policy — unaffected, since delivery uses a different base in a different assembly carrying `[AllowAnonymous]`; and `availability` bounds an **inclusive date span** by the same `MaxQueryRangeDays`, which the whole-days change to `BookingQuery` brings into agreement with rather than divergence from. Nothing outside this change names the Content section.
-- [ ] 5.8 Hand to `qa-review` in a **fresh context or subagent**.
+- [x] 5.8 Hand to `qa-review` in a **fresh context or subagent**.
+
+## 6. QA round 1 — REJECT, five must-fix
+
+- [x] 6.1 **A day that begins twice.** `StartOfDayUtc` handled the spring-forward gap and not
+  the fall-back ambiguity, so on a site in an ambiguous zone the day began at the *second*
+  midnight and an hour of bookings fell outside a window that names their date. It now takes
+  the **earlier** offset — the first midnight — which is the one an operator means. Fixtures
+  added for `America/Havana` (ambiguity) and `America/Santiago` (gap). Mutation-checked:
+  disabling the ambiguity branch fails `A_day_that_begins_twice_begins_at_the_first_one`.
+  **Worth recording that the 400-day contiguity sweep did *not* fail** — with the bug both
+  ends of each day shift together, so days still abut. A relative-consistency assertion is
+  blind to an error that moves the whole boundary; only the absolute assertion sees it.
+- [x] 6.2 **`Enum.TryParse` is not a name check.** It accepted `"1"` (the ordinal),
+  `" Confirmed "` (whitespace) and — the one that matters — `"Confirmed,Cancelled"`, which
+  it *combines* into a third value. A caller joining a repeated query parameter with commas
+  is ordinary, and the response would have succeeded while filtering by something nobody
+  asked for. Statuses are now matched against `Enum.GetValues<BookingStatus>()` by name,
+  case-insensitively and nothing else. Mutation-checked: restoring `TryParse` fails four
+  tests including the comma-joined case. The delta gained a scenario for each form.
+- [x] 6.3 **The port's paging defaults were restated at the HTTP layer** — the very thing the
+  requirement it implements forbids, one line below the status default that obeys it.
+  `BookingQuery` now publishes `DefaultSkip`/`DefaultTake` and the controller passes those.
+- [x] 6.4 **No test called the endpoint.** Every guard reached the mapper or the port
+  directly, so the whole controller — binding, parsing, failure mapping, paging — was
+  unasserted. `BookingsEndpointTests` now drives `ListBookings` against a recording store:
+  the page and its unpaged total, cancelled bookings over HTTP, each refused status form,
+  omitted-vs-supplied paging read off the port's own constants, omitted filters, the
+  site-local window, and the over-wide refusal.
+- [x] 6.5 **`booking-status-invalid` was undocumented and the proposal's Impact was false.**
+  The delta gained the refusal scenarios (6.2); the Impact bullets now enumerate the actual
+  public surface and state plainly that **Core does change** — the whole-days relaxation and
+  the new failure code — where the earlier draft denied it.
+- [x] 6.6 **One documentation helper, not two.** `AssertSentence` had been copied, the copy
+  fixed after a false failure, and the original left standing with the defect beside it.
+  Extracted to `Support/DocumentationAssert`; mutation-checked through a theme sentence that
+  wraps mid-clause, which is exactly the case the defective twin missed.
+- [x] 6.7 Client regenerated after `[BindRequired]`: `ListBookingsData.query` is now required
+  and carries `from: string` / `to: string` rather than optionals — the generated shape of
+  "the window SHALL NOT be optional". `GeneratedClientTests` pins it, and pins the filters as
+  still optional so a blanket-required regeneration cannot satisfy it. Mutation-checked
+  against the previous, optional generation.
+- [ ] 6.8 Clean-build gates, then QA round 2.

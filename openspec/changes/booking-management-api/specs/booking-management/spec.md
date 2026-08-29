@@ -134,6 +134,28 @@ reach first.
 - **WHEN** a caller supplies no status and no resource filter
 - **THEN** the result is the same as the read port returns for that window with no filters — blocking statuses only, and no restriction by resource
 
+**A status the caller names SHALL be one the package publishes, or the request SHALL be
+refused** with a stable failure code of its own. Statuses cross the boundary as **names**,
+because the endpoint's contract is names, and a name the package does not recognise SHALL
+NOT be ignored: dropping it silently returns a page filtered by something other than what
+was asked for, which succeeds and is wrong — the worst pair of properties a response can
+have.
+
+The refusal SHALL cover every way a value can fail to be one of the published names,
+**including forms that a permissive parse would accept**: a numeric value naming a status
+by its underlying ordinal rather than by name, a value with surrounding whitespace, and
+several names joined into one parameter. That last is the one worth naming: a caller
+joining a repeated query parameter with commas is ordinary, and a parse that accepts it can
+combine the values into a *different* status that is itself valid.
+
 #### Scenario: Cancelled bookings are reachable over HTTP
 - **WHEN** a caller asks for cancelled bookings
 - **THEN** they are returned
+
+#### Scenario: An unrecognised status name is refused
+- **WHEN** a caller names a status the package does not publish
+- **THEN** the request fails with a stable failure code identifying the offending value, and no results are returned
+
+#### Scenario: A status cannot be named by ordinal or by a joined list
+- **WHEN** a caller supplies a numeric value, a value with surrounding whitespace, or several status names joined into one parameter
+- **THEN** each is refused as an unrecognised name, rather than resolving to a status the caller did not ask for

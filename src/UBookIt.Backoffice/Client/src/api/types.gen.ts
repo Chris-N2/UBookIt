@@ -203,9 +203,9 @@ export type TimeWindowModel = {
 export type ListBookingsData = {
     body?: never;
     path?: never;
-    query?: {
-        from?: string;
-        to?: string;
+    query: {
+        from: string;
+        to: string;
         statuses?: Array<string>;
         resourceIds?: Array<string>;
         skip?: number;

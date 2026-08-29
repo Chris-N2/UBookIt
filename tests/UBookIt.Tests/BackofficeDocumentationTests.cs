@@ -29,8 +29,8 @@ public class BackofficeDocumentationTests
         // reads as "you also need Content", which is the opposite of true.
         var docs = Docs();
 
-        AssertSentence("Access to another section does not grant uBookIt", docs);
-        AssertSentence("a user granted only uBookIt can use it without being given Content", docs);
+        DocumentationAssert.Says(docs, "Access to another section does not grant uBookIt");
+        DocumentationAssert.Says(docs, "a user granted only uBookIt can use it without being given Content");
     }
 
     [Fact]
@@ -38,7 +38,7 @@ public class BackofficeDocumentationTests
     {
         // The section is the control over booker names and email addresses. A site owner
         // cannot weigh a grant they have not been told the consequence of.
-        AssertSentence("name and email address of every person who has booked", Docs());
+        DocumentationAssert.Says(Docs(), "name and email address of every person who has booked");
     }
 
     [Fact]
@@ -48,36 +48,12 @@ public class BackofficeDocumentationTests
 
         // The endpoint exists; the screen does not. Saying so plainly is the difference
         // between documentation and a roadmap.
-        AssertSentence("do not yet have a screen", docs);
+        DocumentationAssert.Says(docs, "do not yet have a screen");
 
         // And the three verbs the section genuinely lacks are named, because "management
         // section" invites the assumption that it manages everything.
-        AssertSentence("It does not place bookings", docs);
-        AssertSentence("It does not approve or decline", docs);
-        AssertSentence("It does not amend a booking's time", docs);
-    }
-
-    /// <summary>
-    /// Asserts a sentence is present however it is wrapped — a wrapped sentence defeats a
-    /// single-line search and reads exactly like a dropped statement.
-    /// </summary>
-    /// <remarks>
-    /// The separator allows markdown emphasis and blockquote markers between words, not
-    /// only whitespace. Found the hard way: the personal-data warning is a blockquote, so
-    /// its wrapped line begins <c>&gt; </c>, and a whitespace-only join reported a
-    /// sentence that was plainly there as missing. A documentation guard that cries wolf
-    /// gets weakened rather than fixed, so it needs to match the markup people actually
-    /// write.
-    /// </remarks>
-    private static void AssertSentence(string sentence, string document)
-    {
-        var pattern = string.Join(
-            @"[\s>*_]+",
-            sentence.Split(' ', StringSplitOptions.RemoveEmptyEntries)
-                .Select(word => System.Text.RegularExpressions.Regex.Escape(word.Trim('*', '_'))));
-
-        Assert.True(
-            System.Text.RegularExpressions.Regex.IsMatch(document, pattern),
-            $"The documentation no longer says: \"{sentence}\"");
+        DocumentationAssert.Says(docs, "It does not place bookings");
+        DocumentationAssert.Says(docs, "It does not approve or decline");
+        DocumentationAssert.Says(docs, "It does not amend a booking's time");
     }
 }

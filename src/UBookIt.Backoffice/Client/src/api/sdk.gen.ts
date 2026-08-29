@@ -19,8 +19,8 @@ export type Options<TData extends TDataShape = TDataShape, ThrowOnError extends 
 };
 
 export class UBookItBackofficeService {
-    public static listBookings<ThrowOnError extends boolean = false>(options?: Options<ListBookingsData, ThrowOnError>) {
-        return (options?.client ?? client).get<ListBookingsResponses, ListBookingsErrors, ThrowOnError>({
+    public static listBookings<ThrowOnError extends boolean = false>(options: Options<ListBookingsData, ThrowOnError>) {
+        return (options.client ?? client).get<ListBookingsResponses, ListBookingsErrors, ThrowOnError>({
             security: [
                 {
                     scheme: 'bearer',

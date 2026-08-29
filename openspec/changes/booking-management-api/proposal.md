@@ -98,8 +98,16 @@ happens decides what the screen has to know.
   depend on it, which is the same reasoning as fixing the booking/service schema gap while
   the only data is our own. The documentation therefore states what the package ships
   with, and does not carry an upgrade note for an upgrade that cannot happen.
-- **Public API surface** (additive): the endpoint, its DTOs, and the policy name.
-- **No Core change, no persistence change, no schema change, no migration.**
+- **Public API surface** (additive): the endpoint and its DTOs (`BookingModel`,
+  `BookedResourceModel`, `PagedBookingsModel`); `Constants.SectionAlias` and
+  `Constants.SectionAccessPolicy`; `UBookItSectionRequirement`, `UBookItSectionHandler` and
+  `UBookItAuthorizationComposer`; and on Core, `FailureCodes.BookingStatusInvalid` plus
+  `BookingQuery.DefaultSkip` / `DefaultTake`.
+- **Core does change**, in two ways the earlier draft of this section wrongly denied. The
+  window guard in `BookingQuery.Create` is relaxed to count whole days (see Modified
+  Capabilities), and `FailureCodes` gains `booking-status-invalid`. Both are additive and
+  neither touches persistence.
+- **No persistence change, no schema change, no migration.**
 
 ## Risks
 

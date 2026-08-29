@@ -52,9 +52,13 @@ internal static class BookingWindow
 
         if (!TryFindZone(settings.TimeZoneId, out var zone))
         {
+            // No field: the fault is the site's TimeZoneId setting, not anything the
+            // caller sent. Attributing it to `to` tells them to change a parameter that
+            // is fine, and sends them looking in the one place the answer is not.
             return Failure(
                 FailureCodes.TimeZoneInvalid,
-                $"The site's configured time zone '{settings.TimeZoneId}' could not be resolved.");
+                $"The site's configured time zone '{settings.TimeZoneId}' could not be resolved.",
+                field: null);
         }
 
         // Dates are the only bound applied here, deliberately.
@@ -70,11 +74,11 @@ internal static class BookingWindow
     }
 
     /// <summary>
-    /// Midnight on a date in the site's zone, as an instant.
+    /// The instant a date <b>begins</b> in the site's zone.
     /// <para>
-    /// Midnight does not exist on every date in every zone — some zones spring forward at
-    /// midnight, so the local time is skipped. <c>ConvertTimeToUtc</c> throws on those
-    /// rather than choosing, so the first instant that does exist on that date is used.
+    /// Midnight is neither guaranteed to exist nor guaranteed to be unique, and a
+    /// daylight-saving transition at local midnight produces one of each. Both are
+    /// handled, because handling one and not the other is how this method was wrong.
     /// </para>
     /// </summary>
     private static DateTimeOffset StartOfDayUtc(DateOnly date, TimeZoneInfo zone)
@@ -83,13 +87,28 @@ internal static class BookingWindow
 
         if (zone.IsInvalidTime(local))
         {
-            // Walk forward to the first valid minute. A DST gap is at most a couple of
-            // hours, so this terminates quickly and lands on the instant the day begins.
+            // A spring-forward at midnight SKIPS the local time entirely, and
+            // ConvertTimeToUtc throws rather than choosing. Walk to the first minute that
+            // does exist — a gap is at most a couple of hours, so this terminates quickly.
             do
             {
                 local = local.AddMinutes(1);
             }
             while (zone.IsInvalidTime(local));
+        }
+        else if (zone.IsAmbiguousTime(local))
+        {
+            // A fall-back at midnight makes the local time happen TWICE, and
+            // ConvertTimeToUtc resolves an ambiguous time to standard time — the SECOND
+            // occurrence. The day begins the first time it begins, so take the earliest
+            // instant, which is the largest UTC offset.
+            //
+            // Getting this wrong moved the whole day boundary by the DST delta: bookings
+            // in the first hour of the date landed on the previous day, the 25-hour day
+            // was attributed to the wrong date, and both ends of every window shifted.
+            // Real today in America/Havana, and historically in Brazil.
+            return new DateTimeOffset(
+                local - zone.GetAmbiguousTimeOffsets(local).Max(), TimeSpan.Zero);
         }
 
         return new DateTimeOffset(TimeZoneInfo.ConvertTimeToUtc(local, zone), TimeSpan.Zero);
@@ -109,6 +128,7 @@ internal static class BookingWindow
         }
     }
 
-    private static DomainResult<(DateTimeOffset, DateTimeOffset)> Failure(string code, string message)
-        => DomainResult<(DateTimeOffset, DateTimeOffset)>.Failure(code, message, "to");
+    private static DomainResult<(DateTimeOffset, DateTimeOffset)> Failure(
+        string code, string message, string? field = "to")
+        => DomainResult<(DateTimeOffset, DateTimeOffset)>.Failure(code, message, field);
 }

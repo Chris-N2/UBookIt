@@ -107,6 +107,92 @@ public class BookingWindowTests
             "This fixture no longer spans the fall-back boundary, so it is not testing the case.");
     }
 
+    /// <summary>
+    /// Havana falls back <b>at local midnight</b> on 2025-11-02, so 00:00 happens twice.
+    /// </summary>
+    private const string Havana = "America/Havana";
+
+    /// <summary>
+    /// Santiago springs forward <b>at local midnight</b> on 2026-09-06, so 00:00 does not
+    /// exist at all.
+    /// </summary>
+    private const string Santiago = "America/Santiago";
+
+    [Fact]
+    public void A_day_that_begins_twice_begins_at_the_first_one()
+    {
+        // The defect this test exists for, and the mirror of the gap case below.
+        //
+        // ConvertTimeToUtc resolves an ambiguous local time to STANDARD time — the second
+        // occurrence — so the day was starting an hour late. Bookings in the first hour of
+        // 2 November were missing from 2 November and appeared on 1 November instead, and
+        // the 25-hour day was attributed to the wrong date. Both ends of every window
+        // containing such a date were wrong.
+        var window = BookingWindow.Resolve(
+            new DateOnly(2025, 11, 2), new DateOnly(2025, 11, 2), Settings(Havana));
+
+        Assert.True(window.Succeeded);
+        Assert.Equal(new DateTimeOffset(2025, 11, 2, 4, 0, 0, TimeSpan.Zero), window.Value.FromUtc);
+
+        // And the 25 hours belong to 2 November, not to 1 November.
+        Assert.Equal(TimeSpan.FromHours(25), window.Value.ToUtc - window.Value.FromUtc);
+
+        var previous = BookingWindow.Resolve(
+            new DateOnly(2025, 11, 1), new DateOnly(2025, 11, 1), Settings(Havana));
+
+        Assert.Equal(TimeSpan.FromHours(24), previous.Value.ToUtc - previous.Value.FromUtc);
+        Assert.Equal(window.Value.FromUtc, previous.Value.ToUtc);
+    }
+
+    [Fact]
+    public void A_day_whose_midnight_does_not_exist_begins_at_its_first_real_instant()
+    {
+        // The gap branch had no test at all — deleting it would have failed nothing,
+        // because every fixture used UTC or Europe/London, neither of which skips
+        // midnight. Santiago does.
+        var window = BookingWindow.Resolve(
+            new DateOnly(2026, 9, 6), new DateOnly(2026, 9, 6), Settings(Santiago));
+
+        Assert.True(window.Succeeded);
+
+        // The day is short, and it begins the moment it begins rather than at a local
+        // midnight that never occurred.
+        Assert.Equal(TimeSpan.FromHours(23), window.Value.ToUtc - window.Value.FromUtc);
+
+        // Contiguous with the day before: no gap, no overlap, so no booking can fall
+        // between two adjacent windows or appear in both.
+        var previous = BookingWindow.Resolve(
+            new DateOnly(2026, 9, 5), new DateOnly(2026, 9, 5), Settings(Santiago));
+
+        Assert.Equal(window.Value.FromUtc, previous.Value.ToUtc);
+    }
+
+    [Theory]
+    [InlineData(Havana)]
+    [InlineData(Santiago)]
+    [InlineData(London)]
+    public void Consecutive_days_never_overlap_or_leave_a_gap(string zone)
+    {
+        // The property both transitions threaten, asserted over a whole year rather than
+        // at the two dates someone remembered. A booking must belong to exactly one day.
+        var settings = Settings(zone);
+        var date = new DateOnly(2025, 6, 1);
+
+        for (var day = 0; day < 400; day++)
+        {
+            var current = BookingWindow.Resolve(date, date, settings);
+            var next = BookingWindow.Resolve(date.AddDays(1), date.AddDays(1), settings);
+
+            Assert.True(current.Succeeded && next.Succeeded);
+            Assert.Equal(current.Value.ToUtc, next.Value.FromUtc);
+            Assert.True(
+                current.Value.ToUtc > current.Value.FromUtc,
+                $"{zone} {date:O} did not move forwards.");
+
+            date = date.AddDays(1);
+        }
+    }
+
     [Fact]
     public void One_date_past_the_maximum_is_refused_in_terms_of_the_dates_sent()
     {

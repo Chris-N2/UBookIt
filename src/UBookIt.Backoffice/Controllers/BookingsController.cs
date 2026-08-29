@@ -1,6 +1,7 @@
 using Asp.Versioning;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.AspNetCore.Mvc.ModelBinding;
 using UBookIt.Backoffice.Mapping;
 using UBookIt.Backoffice.Models;
 using UBookIt.Core;
@@ -53,12 +54,12 @@ public class BookingsController(
     [ProducesResponseType<PagedBookingsModel>(StatusCodes.Status200OK)]
     [ProducesResponseType(StatusCodes.Status400BadRequest)]
     public async Task<IActionResult> ListBookings(
-        DateOnly from,
-        DateOnly to,
+        [BindRequired] DateOnly from,
+        [BindRequired] DateOnly to,
         [FromQuery] string[]? statuses = null,
         [FromQuery] Guid[]? resourceIds = null,
-        int skip = 0,
-        int take = 50,
+        int? skip = null,
+        int? take = null,
         CancellationToken cancellationToken = default)
     {
         var parsedStatuses = ParseStatuses(statuses);
@@ -75,14 +76,19 @@ public class BookingsController(
             return window.Failures.ToProblemResult();
         }
 
+        // skip/take are passed through only when supplied, so the port's defaults stay the
+        // port's. Declaring `= 0` and `= 50` here and always sending them would restate a
+        // default the port already settles — two defaults, with the one a caller meets
+        // decided by which layer they reach first, which is exactly what this capability
+        // forbids. It also silently pins the endpoint if the port's default ever changes.
         var query = BookingQuery.Create(
             window.Value.FromUtc,
             window.Value.ToUtc,
             settings,
             parsedStatuses.Value,
             resourceIds,
-            skip,
-            take);
+            skip ?? BookingQuery.DefaultSkip,
+            take ?? BookingQuery.DefaultTake);
 
         // Should not fail: BookingWindow has already refused every window Create would.
         // Mapped rather than assumed away, because "cannot happen" is how a 500 gets
@@ -119,13 +125,30 @@ public class BookingsController(
 
         foreach (var status in statuses)
         {
-            // Case-insensitive, but names only: `Enum.TryParse` accepts the underlying
-            // number by default, so "7" would bind to a status that does not exist and
-            // then match nothing. Rejecting digits keeps the contract to the names the
-            // response also uses.
-            if (!Enum.TryParse<BookingStatus>(status, ignoreCase: true, out var value)
-                || !Enum.IsDefined(value)
-                || char.IsAsciiDigit(status.TrimStart('-', '+').FirstOrDefault()))
+            // Matched against the NAMES, not parsed. `Enum.TryParse` is the obvious tool
+            // here and it is the wrong one, in three separate ways that a name match
+            // closes at once:
+            //
+            //   "Confirmed,Cancelled" — it accepts comma-separated lists and combines
+            //     them BITWISE, even on a non-flags enum. Confirmed(1) | Cancelled(3) is
+            //     3, which is defined, so a caller asking for confirmed AND cancelled
+            //     bookings silently received cancelled ONLY, with a 200. A generated
+            //     client or a hand-written fetch comma-joining a repeated query parameter
+            //     is an entirely ordinary thing to do.
+            //   "1" — it accepts the underlying number, binding to a status by ordinal
+            //     rather than by the name the response uses.
+            //   " 1" — it trims whitespace before parsing, so a digit guard that does not
+            //     trim identically is simply bypassed.
+            //
+            // Every one of those returns a page filtered by something other than what was
+            // asked for, which is exactly what refusing an unrecognised name is meant to
+            // prevent.
+            var value = Enum.GetValues<BookingStatus>()
+                .Cast<BookingStatus?>()
+                .FirstOrDefault(candidate =>
+                    string.Equals(candidate!.Value.ToString(), status, StringComparison.OrdinalIgnoreCase));
+
+            if (value is null)
             {
                 return DomainResult<IReadOnlyCollection<BookingStatus>>.Failure(
                     FailureCodes.BookingStatusInvalid,
@@ -134,7 +157,7 @@ public class BookingsController(
                     nameof(statuses));
             }
 
-            parsed.Add(value);
+            parsed.Add(value.Value);
         }
 
         return DomainResult<IReadOnlyCollection<BookingStatus>>.Success(parsed);

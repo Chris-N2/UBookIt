@@ -83,32 +83,15 @@ public class BookingsControllerContractTests
             type => type == typeof(IBookingStore));
     }
 
-    [Fact]
-    public void The_status_default_is_not_restated_at_the_http_layer()
-    {
-        // The endpoint must not carry its own copy of "blocking statuses". A default in
-        // two places is two defaults, and which one a caller meets depends on the layer
-        // they reach first.
-        //
-        // Asserted by behaviour rather than by reading source: an omitted status list must
-        // produce whatever the port produces for an omitted status list.
-        var settings = new Core.SiteBookingSettings { TimeZoneId = "UTC" };
-        var from = new DateTimeOffset(2026, 6, 1, 0, 0, 0, TimeSpan.Zero);
-
-        var portDefault = BookingQuery.Create(from, from.AddDays(1), settings).Value.Statuses;
-        var viaEmpty = BookingQuery.Create(from, from.AddDays(1), settings, statuses: []).Value.Statuses;
-
-        Assert.Equal(portDefault.Order(), viaEmpty.Order());
-
-        // And the controller passes an EMPTY list rather than a set of its own when the
-        // caller supplies none — which is what makes the two agree.
-        Assert.DoesNotContain(
-            nameof(BookingStatus.Confirmed),
-            SourceOf("src/UBookIt.Backoffice/Controllers/BookingsController.cs"),
-            StringComparison.Ordinal);
-    }
-
-    private static string SourceOf(string path) => Support.RepoFiles.Read(path);
+    // The "status default is not restated" assertion that used to live here has moved to
+    // BookingsEndpointTests, which asserts it through the controller.
+    //
+    // It was a source grep — "the file must not contain the word Confirmed" — and that is
+    // a proxy for the guarantee rather than the guarantee. It broke the moment a COMMENT
+    // mentioned a status name, which is a test dictating prose rather than behaviour; and
+    // it never covered paging, where the same defect was actually present and shipped past
+    // it. Both defaults are now asserted against the port's own constants, through a real
+    // call, which is what the requirement is about.
 
     /// <summary>Element and generic argument types, so a collection is not a hiding place.</summary>
     private static IEnumerable<Type> Unwrap(Type type)
