@@ -191,19 +191,52 @@ public class UBookItSectionAccessTests
             provider.AuthenticationSchemes);
     }
 
+    [Fact]
+    public void The_authorization_composer_is_one_Umbraco_will_run()
+    {
+        // The last link of the chain, and the only one the test above cannot see: it calls
+        // `Compose` directly, so dropping `: IComposer` from the class still compiles and
+        // still passes. Umbraco would then never register the policy and every management
+        // endpoint would fail on a policy that does not exist.
+        //
+        // It fails closed, which is why this is a one-line assertion rather than a live
+        // check — but the previous change's round-1 CRITICAL was this exact family of fault
+        // (a composer that did not run when I was sure it did), and it cost a shipped
+        // defect. Discovery is a guarantee, so it gets a guard.
+        Assert.True(
+            typeof(IComposer).IsAssignableFrom(typeof(UBookItAuthorizationComposer)),
+            "The authorization composer is not an IComposer, so Umbraco will never run it "
+            + "and the policy the endpoints name will not exist.");
+    }
+
     /// <summary>
     /// The policy name the endpoints actually carry, read from the attribute rather than
     /// from the constant — so naming the wrong policy is what fails, not a mismatch between
     /// two things a single edit changes together.
     /// </summary>
     private static string PolicyOnTheSharedBase
-        => typeof(UBookItBackofficeApiControllerBase)
-               .GetCustomAttributes(typeof(AuthorizeAttribute), inherit: true)
-               .Cast<AuthorizeAttribute>()
-               .Select(attribute => attribute.Policy)
-               .Single(policy => !string.IsNullOrWhiteSpace(policy))
-           ?? throw new InvalidOperationException(
-               "The shared base controller names no authorization policy.");
+    {
+        get
+        {
+            // Both degenerate cases get a sentence that says what is wrong. An earlier draft
+            // ended in a `?? throw` that could never run, so the base-names-no-policy case
+            // surfaced as LINQ's "sequence contains no matching element" while a carefully
+            // written explanation sat unreachable beside it.
+            var policies = typeof(UBookItBackofficeApiControllerBase)
+                .GetCustomAttributes(typeof(AuthorizeAttribute), inherit: true)
+                .Cast<AuthorizeAttribute>()
+                .Select(attribute => attribute.Policy)
+                .Where(policy => !string.IsNullOrWhiteSpace(policy))
+                .ToList();
+
+            Assert.True(
+                policies.Count == 1,
+                $"The shared base controller names {policies.Count} authorization policies; "
+                + "the endpoints authorize on exactly one.");
+
+            return policies[0]!;
+        }
+    }
 
     private static IAuthorizationPolicyProvider PolicyProvider(IUser? user = null)
         => Composed(user).GetRequiredService<IAuthorizationPolicyProvider>();

@@ -118,11 +118,14 @@ mutation, but two of the links they created were themselves unguarded.
   cannot see a missing scheme. Mutation-checked, four ways: restoring the Content policy
   fails 2, dropping the scheme fails 1, dropping the requirement fails 2.
 - [x] 7.3 **NIT — the documentation separator could cross a paragraph.** `\s` already
-  spanned blank lines before the fix, so this was inherited rather than introduced, but the
-  widened character class made a `*`-bulleted list crossable too. The separator now permits a
-  single line break and never a blank one, and each end is anchored on a word boundary.
-  Mutation-checked by splitting an asserted sentence across a paragraph break with every word
-  intact and in order: it is now reported missing.
+  spanned blank lines before the fix, so this was inherited rather than introduced. The
+  separator now permits a single line break and never a blank one. Mutation-checked by
+  splitting an asserted sentence across a paragraph break with every word intact and in
+  order: it is now reported missing.
+  <br>**This entry over-claimed and QA round 3 caught it** — see 8.2 and 8.3. It said the
+  `*`-bulleted-list crossing was fixed as well, and it was not: `*` was still in the
+  separator, so two words on adjacent bullets still read as one sentence. It also said "each
+  end is anchored on a word boundary", which was true and was the defect.
 - [x] 7.4 **NIT — `GeneratedClientTests`' regex is pinned to the generator's emitted shape.**
   Left as written: a generator upgrade that renames the type fails *loudly*, with a message
   naming what to look at, rather than passing silently. Recorded rather than changed.
@@ -130,4 +133,41 @@ mutation, but two of the links they created were themselves unguarded.
   scope.** Correct: they were Chris's separate request, made while this change was open, and
   committed on their own (`cd6c3fb`). Recorded here so the change's own task list accounts
   for everything in its branch.
-- [ ] 7.6 Clean-build gates, then QA round 3.
+- [x] 7.6 Clean-build gates, then QA round 3.
+
+## 8. QA round 3 — APPROVE, three MINORs, all closed
+
+No must-fix. All three were taken anyway: one closes the last link of the chain rounds 1–3
+were spent securing, and one was a **task record claiming a guarantee the code did not
+carry**, which is the kind of residue that outlives the change and misleads the next reader.
+
+- [x] 8.1 **The composer's own discovery was the last unguarded link.** Every new round-2
+  test calls `Compose` directly, so removing `: IComposer` compiled and passed 863/863 —
+  Umbraco would then never register the policy and every management endpoint would fail on a
+  policy that does not exist. It fails closed, hence MINOR, but this is the exact family of
+  fault as ⑭'s round-1 CRITICAL (a composer I was certain ran, and did not), and that one
+  shipped. One assertion closes it; mutation-checked.
+- [x] 8.2 **The `\b` anchors cried wolf.** They report a sentence missing when its first or
+  last character is not a word character — so `Says(docs, "The data is personal.")` failed on
+  a document containing exactly that. No current assertion tripped it, because all twelve
+  happen to start and end on a letter, but writing a full stop is the obvious thing for the
+  next person to do, and a guard that fails on correct input is one that gets weakened rather
+  than fixed. Replaced with `(?<!\w)` / `(?!\w)`, which anchor against *word characters*
+  rather than asserting a boundary.
+- [x] 8.3 **Adjacent bullets still read as one sentence.** `*` was in the separator and a
+  single line break was permitted, so `* makes no` / `* claim about a theme` satisfied an
+  assertion the document does not make. The separator now refuses a line break into a new
+  list item (`-`, `*`, `+`, or `1.`) as well as into a new paragraph.
+- [x] 8.4 **The helper now has its own tests.** It decides whether twelve assertions in two
+  suites pass, and it has now produced a defect in each direction — a copy left unfixed
+  beside its corrected twin, then a correction that reported present text as missing. Nothing
+  was checking it. `DocumentationAssertTests` covers both directions: found when the document
+  says it (plain, punctuated, parenthesised, wrapped, blockquoted, emphasised), reported
+  missing when it does not (absent, across a paragraph, across each bullet style, and as a
+  fragment inside a longer word). All three fixes mutation-checked through it — restoring
+  `\b` fails 2, restoring the `*` crossing fails 1, dropping `: IComposer` fails 1.
+- [x] 8.5 **NIT — an unreachable `?? throw`.** `Single(policy => !IsNullOrWhiteSpace)` can
+  never return null, so a carefully written explanation sat dead beside LINQ's own message.
+  Replaced with an assertion that names the count, so both the no-policy and the ambiguous
+  two-policy case say what is wrong.
+- [x] 8.6 Clean-build gates; sync and archive.
