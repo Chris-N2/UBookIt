@@ -1,17 +1,17 @@
 ## 1. Measure the authorization mechanism before building on it
 
-- [ ] 1.1 **Does the user-group editor offer `UBookIt.Section` as a grantable section?** Run the TestSite, open a user group in the backoffice, and look. Sections are declared in the client manifest and there is **no server-side section registry** in Umbraco 17 — no `ISectionService`, no section collection — so this cannot be answered from C#. **Needs a backoffice login.**
-- [ ] 1.2 If it is grantable, grant it and read back what lands in `IUser.AllowedSections` — the **exact string**, not the assumption. Built-in sections store a short alias (`content`) while the manifest name is `Umb.Section.Content`; uBookIt's manifest declares `alias: "UBookIt.Section"`, which is shaped like a name. The handler compares against whatever this actually is.
-- [ ] 1.3 **If the section is not grantable, STOP and report.** The fallbacks — a server-side section registration, or the documented `RequireRole` against a user-group alias — change what a site administrator has to configure, which is a decision rather than an implementation detail. Do not pick one silently.
-- [ ] 1.4 Record what was measured, so §5's documentation states it rather than asserting it.
+- [x] 1.1 **Measured: YES.** The user-group collection lists `uBookIt Section` among Administrators' sections, alongside the built-ins. The section is grantable and already granted.
+- [x] 1.2 **Measured: `UBookIt.Section`**, read from `umbracoUserGroup2App` on the running site. A custom section stores its **manifest alias verbatim**, where the built-ins store short lowercase names (`content`, `media`, `users`). The two shapes genuinely differ, which is exactly why this was checked rather than inferred — reasoning from `SectionMapper`'s alias fallback gave the same answer, but that was a hint, not evidence.
+- [x] 1.3 Not triggered: the section is grantable, so no fallback was needed and no configuration decision falls to Chris.
+- [x] 1.4 Recorded here, on `Constants.SectionAlias`, and on `UBookItSectionHandler`. A test ties the constant to the client manifest so the two cannot drift.
 
 ## 2. The authorization policy
 
-- [ ] 2.1 Add the requirement and handler: `IAuthorizationHelper.TryGetUmbracoUser`, then `AllowedSections` contains the alias measured in 1.2. Mirrors Umbraco's own `AllowedApplicationHandler`, which is `internal` — the ingredients are public, the handler is not.
-- [ ] 2.2 Register the policy from a composer, **adding the OpenIddict validation scheme**. A backoffice API policy without that scheme rejects an authenticated user and says nothing useful about why.
-- [ ] 2.3 Apply it on `UBookItBackofficeApiControllerBase`, replacing `SectionAccessContent` — so all three controllers move together rather than leaving two authorization stories in one section.
-- [ ] 2.4 **Guard the guarantee, not the attribute.** Assert that a user holding the package's section is authorized and a user without it is refused — not that some `[Authorize]` attribute is present. An attribute-presence test passes on exactly the wrong policy, which is the configuration this change exists to correct.
-- [ ] 2.5 Assert the anonymous case still yields 401, which is the guarantee this requirement already carried and must not lose.
+- [x] 2.1 Add the requirement and handler: `IAuthorizationHelper.TryGetUmbracoUser`, then `AllowedSections` contains the alias measured in 1.2. Mirrors Umbraco's own `AllowedApplicationHandler`, which is `internal` — the ingredients are public, the handler is not.
+- [x] 2.2 Register the policy from a composer, **adding the OpenIddict validation scheme**. A backoffice API policy without that scheme rejects an authenticated user and says nothing useful about why.
+- [x] 2.3 Apply it on `UBookItBackofficeApiControllerBase`, replacing `SectionAccessContent` — so all three controllers move together rather than leaving two authorization stories in one section.
+- [x] 2.4 **Guard the guarantee, not the attribute.** Assert that a user holding the package's section is authorized and a user without it is refused — not that some `[Authorize]` attribute is present. An attribute-presence test passes on exactly the wrong policy, which is the configuration this change exists to correct.
+- [x] 2.5 Assert the anonymous case still yields 401, which is the guarantee this requirement already carried and must not lose.
 
 ## 3. The endpoint
 
