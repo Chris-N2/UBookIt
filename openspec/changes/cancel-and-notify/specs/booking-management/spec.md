@@ -1,0 +1,85 @@
+## ADDED Requirements
+
+### Requirement: An operator can cancel a booking
+The package SHALL expose a versioned backoffice endpoint that cancels a booking, in the same
+swagger group and under the same section authorization as every other uBookIt management
+endpoint.
+
+**It SHALL apply the domain's status machine rather than its own rule.** Cancellation
+succeeds from `Requested` and `Confirmed` and from nothing else; a second attempt on an
+already-cancelled booking SHALL be refused with the domain's stable code rather than treated
+as a no-op success. A caller that is told "cancelled" when nothing changed cannot tell a
+completed action from a rejected one.
+
+**A cancelled booking SHALL remain.** It keeps its row, its interval, its booker and the
+service it was placed for; it stops holding its time; and it is still returned by the
+management list when asked for. The endpoint SHALL therefore not be a deletion, in verb or in
+effect.
+
+The response SHALL carry the booking as it now stands, so a caller can show the result of
+what it asked for without reading it back.
+
+An unknown booking SHALL be reported as not found, distinctly from a booking that exists and
+cannot be cancelled — they call for different actions from the operator.
+
+#### Scenario: A confirmed booking is cancelled
+- **WHEN** an authorized operator cancels a confirmed booking
+- **THEN** it becomes cancelled, stops holding its time, and the response carries it in its new state
+
+#### Scenario: Cancelling twice is refused, not silently accepted
+- **WHEN** an operator cancels a booking that is already cancelled
+- **THEN** the request fails with the domain's invalid-transition code, and the booking is unchanged
+
+#### Scenario: An unknown booking is distinguishable from an uncancellable one
+- **WHEN** cancellation is requested for an id no booking has
+- **THEN** the failure says the booking was not found, distinctly from the failure a booking that cannot be cancelled produces
+
+#### Scenario: Cancelling is not deleting
+- **WHEN** a booking has been cancelled
+- **THEN** it is still returned by the management list for its window when cancelled bookings are asked for, carrying the same interval, booker and service it always had
+
+#### Scenario: The endpoint is not anonymous
+- **WHEN** the endpoint is called without backoffice authentication
+- **THEN** the response is 401 and no booking changes
+
+### Requirement: The bookings view can cancel a booking
+The bookings view SHALL offer cancellation for a booking that can be cancelled, and SHALL NOT
+offer it for one that cannot — a control that is always refused teaches an operator to ignore
+failures.
+
+**The screen's judgement SHALL NOT be the rule.** The endpoint SHALL refuse an invalid
+transition independently, so a screen showing a stale list cannot talk the domain into one.
+
+Cancellation SHALL require confirmation through an accessible in-page modal provided by the
+backoffice, never a native browser dialog, on the same terms as deleting a resource.
+Dismissing or cancelling the confirmation SHALL leave the booking untouched, and a
+confirmation that fails to appear SHALL NOT be treated as a refusal — those are different
+outcomes and only one of them is something the operator chose.
+
+After a cancellation the list SHALL show the booking's new state without the operator
+reloading the page.
+
+**The view SHALL state that cancelling notifies nobody by itself**, where the operator can see
+it at the moment they are deciding. A customer who is not told is the predictable consequence
+of the button, and an operator who assumes the package sends something will not find out until
+somebody arrives for a booking that no longer exists.
+
+#### Scenario: An operator cancels from the list
+- **WHEN** an operator confirms cancellation of a booking in the list
+- **THEN** the booking is cancelled and the list shows its new state without a page reload
+
+#### Scenario: Dismissing the confirmation changes nothing
+- **WHEN** an operator activates cancel and then dismisses or cancels the confirmation
+- **THEN** no request is issued and the booking is unchanged
+
+#### Scenario: A booking that cannot be cancelled offers no control
+- **WHEN** the list shows a cancelled or declined booking
+- **THEN** no cancel control is offered for it
+
+#### Scenario: A refused cancellation is reported
+- **WHEN** the endpoint refuses a cancellation the screen believed was possible
+- **THEN** the failure is shown to the operator rather than the row appearing to change
+
+#### Scenario: The operator is told the customer is not
+- **WHEN** an operator is deciding whether to cancel
+- **THEN** the view states that the package notifies nobody by itself
