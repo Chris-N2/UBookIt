@@ -213,6 +213,46 @@ describe("when the zone is shown", () => {
   });
 });
 
+describe("what the cancel confirmation says", () => {
+  it("tells the operator that the person who booked will not be told", async () => {
+    // The sentence the whole notify half of this change exists to make true, said at the
+    // moment of deciding rather than in documentation nobody is reading just then. An
+    // operator who assumes uBookIt emails the customer finds out when somebody arrives for
+    // a booking that no longer exists.
+    //
+    // Pinned here because it is the one view scenario that needs no DOM — it is a string.
+    // The equivalent sentence in docs/backoffice.md is pinned on the .NET side; this is the
+    // one an operator actually reads, and it was the unpinned half.
+    const { default: terms } = await import("../localization/en-us.js");
+    const bookings = (terms as Record<string, Record<string, string>>).ubookitBookings;
+
+    expect(bookings.confirmCancelContent).toContain("does not tell the person who booked");
+
+    // And that the consequence is named rather than left to be worked out.
+    expect(bookings.confirmCancelContent).toContain("contact them");
+  });
+
+  it("has a string for every key the cancel flow can emit", async () => {
+    // A missing key renders as the raw key or as nothing — and for a confirmation dialog,
+    // "nothing" is a destructive action with no explanation attached to it.
+    const { default: terms } = await import("../localization/en-us.js");
+    const bookings = (terms as Record<string, Record<string, string>>).ubookitBookings;
+
+    for (const key of [
+      "cancel",
+      "confirmCancelHeadline",
+      "confirmCancelContent",
+      "confirmCancel",
+      "confirmFailed",
+      "cancelFailed",
+      "actions",
+    ]) {
+      expect(typeof bookings[key]).toBe("string");
+      expect(bookings[key].length).toBeGreaterThan(0);
+    }
+  });
+});
+
 describe("which bookings offer cancellation", () => {
   it("offers it for the statuses the domain can cancel from", () => {
     expect(canCancel("Requested")).toBe(true);

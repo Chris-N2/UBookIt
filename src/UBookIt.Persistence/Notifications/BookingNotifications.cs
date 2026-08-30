@@ -77,6 +77,11 @@ public sealed class UmbracoBookingObserver(
     public Task BookingCancelledAsync(Booking booking, CancellationToken cancellationToken = default)
         => PublishAsync(new BookingCancelledNotification(booking), booking, "cancelled");
 
+    /// <remarks>
+    /// The caller's <c>CancellationToken</c> is deliberately not forwarded. It belongs to the
+    /// request that placed or cancelled the booking, and that work is already committed — a
+    /// visitor closing their browser must not stop a site being told what happened.
+    /// </remarks>
     private async Task PublishAsync(INotification notification, Booking booking, string what)
     {
         try

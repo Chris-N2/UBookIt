@@ -184,7 +184,12 @@ export class UBookItBookingsListElement extends UmbLitElement {
 
     return html`
       <div class="header">
-        <h2>${this.#term("label")}</h2>
+        <!--
+          tabindex="-1" so cancellation can put focus here afterwards: it is not in the tab
+          order, and only code can move focus to it. Without it the browser refuses, and
+          focus lands on <body> instead.
+        -->
+        <h2 tabindex="-1">${this.#term("label")}</h2>
       </div>
 
       ${this.#renderControls()}
@@ -434,6 +439,16 @@ export class UBookItBookingsListElement extends UmbLitElement {
     // leaves the view entirely — and the total changes with it. Editing the row
     // would show a booking the current filter no longer selects.
     await this.#load();
+
+    // And put focus somewhere, because the button that had it has just been removed
+    // from the DOM along with its row. Left alone, focus falls to <body> and a keyboard
+    // operator cancelling several bookings restarts their traversal every time.
+    //
+    // The heading, rather than another row: which row is "next" depends on a filter that
+    // just changed under them, and guessing wrong moves them somewhere they did not ask
+    // to be. The heading is where the list begins.
+    await this.updateComplete;
+    this.shadowRoot?.querySelector<HTMLElement>("h2")?.focus();
   }
 
   static override styles = css`
@@ -475,6 +490,20 @@ export class UBookItBookingsListElement extends UmbLitElement {
     .zone {
       font-size: var(--uui-type-small-size);
       color: var(--uui-color-text-alt);
+    }
+    /*
+      Copied the markup from the resource and service lists and not this rule, so the
+      column heading meant to be screen-reader-only was rendered to everyone. Shadow DOM
+      does not inherit page classes and this element adopts no shared stylesheet, so the
+      class had no meaning here at all.
+    */
+    .visually-hidden {
+      position: absolute;
+      width: 1px;
+      height: 1px;
+      overflow: hidden;
+      clip: rect(0 0 0 0);
+      white-space: nowrap;
     }
     .error {
       color: var(--uui-color-danger, #d42054);

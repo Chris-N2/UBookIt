@@ -29,7 +29,7 @@
   <br>**Changed during apply, and the requirement with it.** This path cannot honestly return
   a list-shaped booking: a row carries each resource NAME, joined by the management port,
   while cancellation goes through the domain, which knows resource IDs. There is no by-id
-  read on the management port to fill them from, so the endpoint returns the booking''s
+  read on the management port to fill them from, so the endpoint returns the booking's
   identity and new status, and the screen reloads — which it must anyway, since cancelling
   changes what the query matches.
 - [x] 3.3 Map failures as the section already does: `booking-not-found` → 404,
@@ -86,7 +86,7 @@
 - [x] 7.2 Full suite green against the 1711 baseline; client suite against 104.
 - [x] 7.3 `openspec validate --all --strict`.
 - [x] 7.4 **Diff the guarantees of the MODIFIED requirement clause by clause.** *Availability
-  and placement service ports* is long, carries eight scenarios, and is being widened at its
+  and placement service ports* is long, carries six scenarios, and is being widened at its
   most-quoted sentence — precisely the shape that loses something silently.
 - [x] 7.5 Sweep sibling specs for sentences this falsifies. **Start with the capabilities this
   change touches**, then: anything saying Core depends on two ports or has no dependencies,
@@ -107,7 +107,49 @@
   Cancel a real booking, confirm the row leaves the default view, confirm a second attempt is
   refused, and confirm the cancellation notification reaches the same handler. The mechanism
   is identical to placement's and proven above; what is unverified is the screen.
-- [ ] 7.7 Hand to `qa-review` in a **fresh context or subagent**.
+- [x] 7.7 Hand to `qa-review` in a **fresh context or subagent**.
+
+## 8. QA round 1 — REJECT: two MAJORs, both coverage rather than behaviour
+
+Nothing behavioural was wrong. Both must-fix items were guarantees this change **itself
+added** and then left unenforced.
+
+- [x] 8.1 **MAJOR — the scenario I added about Core's independence had no test, and task 1.5
+  had already told me so.** It says, in its own words, "**assert it rather than assume it**".
+  I asserted it in a spec scenario and assumed it in code. Nothing in the repo inspected
+  Core's references.
+  <br>This is the constraint the entire design rests on: the port lives in Core *because*
+  Core carries no framework, and the adapter is exiled to Persistence at an admitted cost for
+  the same reason. Remove the constraint and every one of those decisions becomes arbitrary,
+  with a green suite — and **the pressure is already in the code**, because Core's catch
+  around an observer is silent precisely for want of a logger. Three tests now: the csproj
+  declares no package reference, it declares no project reference either (a transitive route
+  to the same place), and the built assembly binds to nothing outside the framework.
+  Mutation-checked with a package that central package management will actually resolve —
+  the first attempt used an unversioned one and failed at restore, which is a different
+  signal from the test firing.
+- [x] 8.2 **MAJOR — the one view scenario that needed no DOM was the one left unpinned.**
+  "The operator is told the customer is not" is a string, and this suite already has the
+  pattern for pinning strings. The equivalent sentence in `docs/backoffice.md` was guarded on
+  the .NET side; the sentence an operator actually reads, at the moment of deciding, was not.
+  Now pinned by meaning ("does not tell the person who booked", "contact them") plus a
+  presence check over every key the cancel flow can emit. Mutation-checked by softening the
+  sentence to say uBookIt *will* notify.
+- [x] 8.3 **`.visually-hidden` was used and never defined.** Markup copied from the resource
+  and service lists; the CSS rule not. Shadow DOM inherits no page classes and this element
+  adopts no shared stylesheet, so the class meant nothing and the "Actions" heading rendered
+  to everyone. Exactly the class of defect the missing DOM environment cannot see.
+- [x] 8.4 **Focus was dropped after cancelling.** The button holding it is removed with its
+  row — on the default filter the booking leaves the view entirely — so focus fell to the
+  document and a keyboard operator cancelling several bookings restarted their traversal each
+  time. Focus now moves to the heading, which is where the list begins; not to another row,
+  because which row is "next" depends on a filter that just changed under them.
+- [x] 8.5 **NITs recorded rather than fixed:** the adapter accepts a `CancellationToken` and
+  drops it (correct — a cancelled request must not abort notification of a committed booking
+  — and now said so in the code); and adding an optional constructor parameter to
+  `BookingService` is binary-breaking, which is irrelevant while nothing is published and
+  will not be after step 1 of `docs/mvp.md`. The "eight scenarios" count in 7.4 was six.
+- [ ] 8.6 Clean-build gates, then QA round 2.
 - [ ] 7.8 **At sync: `booking-management`'s Purpose is falsified again.** It says *cancel* "is
   the half still outstanding", which this change completes — and that sentence is one **I
   wrote at the last sync**, one change ago.
