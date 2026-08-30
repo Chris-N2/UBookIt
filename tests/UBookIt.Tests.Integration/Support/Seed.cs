@@ -57,12 +57,17 @@ internal static class Seed
 
     /// <summary>A confirmed single-claim booking aggregate built via the public rehydration surface.</summary>
     public static Booking ConfirmedBooking(
-        Guid resourceId, DateTimeOffset startUtc, TimeSpan duration, BookingStatus status = BookingStatus.Confirmed)
+        Guid resourceId,
+        DateTimeOffset startUtc,
+        TimeSpan duration,
+        BookingStatus status = BookingStatus.Confirmed,
+        ServiceAttribution? service = null)
         => Booking.Rehydrate(
             Guid.NewGuid(),
             BookingInterval.Create(startUtc, startUtc + duration, "UTC").Value,
             Booker.Create(null, "Integration Tester", "integration@example.com", "01234 567890").Value,
             [new ResourceClaim(resourceId)],
             status,
-            new DateTimeOffset(2026, 9, 1, 0, 0, 0, TimeSpan.Zero)).Value;
+            new DateTimeOffset(2026, 9, 1, 0, 0, 0, TimeSpan.Zero),
+            service).Value;
 }

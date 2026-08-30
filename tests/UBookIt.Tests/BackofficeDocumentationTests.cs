@@ -56,4 +56,17 @@ public class BackofficeDocumentationTests
         DocumentationAssert.Says(docs, "It does not approve or decline");
         DocumentationAssert.Says(docs, "It does not amend a booking's time");
     }
+
+    [Fact]
+    public void The_two_surprising_things_about_the_recorded_service_are_stated()
+    {
+        // Both of these look like defects to someone who has not been told, and both are
+        // decisions. Documenting them is what stops the first report of "the name is
+        // wrong" turning into a change that retitles historical bookings.
+        var docs = Docs();
+
+        DocumentationAssert.Says(docs, "the one recorded when the booking was placed");
+        DocumentationAssert.Says(docs, "A booking with no service was booked directly");
+        DocumentationAssert.Says(docs, "not a booking whose service failed to be recorded");
+    }
 }

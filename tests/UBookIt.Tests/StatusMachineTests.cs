@@ -14,7 +14,7 @@ public class StatusMachineTests
             TestData.LondonZoneId).Value;
 
         return Booking.Create(
-            Guid.NewGuid(), interval, TestData.Booker(), [new ResourceClaim(Guid.NewGuid())], status, TestData.Now);
+            Guid.NewGuid(), interval, TestData.Booker(), [new ResourceClaim(Guid.NewGuid())], status, TestData.Now, service: null);
     }
 
     [Theory]

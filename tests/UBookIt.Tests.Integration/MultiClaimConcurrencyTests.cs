@@ -215,6 +215,15 @@ public class MultiClaimConcurrencyTests(SqlServerFixture fixture)
                 // holds. It changes what a service OFFERS, never what a booking
                 // claims.
                 "20260819103548_AddVisitorSelectableRole",
+
+                // Bookings gain a nullable `ServiceId` and a nullable `ServiceName`.
+                // Checked, and this one needed checking properly because it is the first
+                // entry that touches the BOOKING table at all: two additive nullable
+                // columns on `uBookItBooking`, no foreign key, no index, and
+                // `uBookItResourceClaim` is not referenced. One booking still holds one
+                // claim row per resource, which is the guarantee above — what changes is
+                // what the booking says about itself, never what it claims.
+                "20260829161913_AddBookingServiceAttribution",
             ],
             applied.OrderBy(name => name, StringComparer.Ordinal));
 

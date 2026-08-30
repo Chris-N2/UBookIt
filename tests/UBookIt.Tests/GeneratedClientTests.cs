@@ -53,4 +53,31 @@ public class GeneratedClientTests
         Assert.Matches(@"\bskip\?:", members);
         Assert.Matches(@"\btake\?:", members);
     }
+
+    [Fact]
+    public void The_generated_booking_carries_an_optional_service_as_one_object()
+    {
+        // Two things at once, because the defect would be either.
+        //
+        // Optional: a booking placed directly has no service, so a client that assumed one
+        // would break on ordinary data. Required here would be the wrong contract.
+        //
+        // One object: "a booking has a service, or it does not" has to be expressed in the
+        // shape. Two parallel nullable scalars can be observed half-populated, and a client
+        // meeting that state has no correct way to read it.
+        var types = RepoFiles.Read("src/UBookIt.Backoffice/Client/src/api/types.gen.ts");
+
+        Assert.Matches(@"\bservice\?:\s*BookedServiceModel\s*\|\s*null", types);
+
+        // And the object itself carries both halves, so a null-vs-populated check on the
+        // client is enough to know whether there is a name to show.
+        var model = Regex.Match(
+            types,
+            @"export type BookedServiceModel = \{(?<members>.*?)\};",
+            RegexOptions.Singleline);
+
+        Assert.True(model.Success, "BookedServiceModel is no longer generated.");
+        Assert.Matches(@"\bserviceId:\s*string", model.Groups["members"].Value);
+        Assert.Matches(@"\bdisplayName:\s*string", model.Groups["members"].Value);
+    }
 }

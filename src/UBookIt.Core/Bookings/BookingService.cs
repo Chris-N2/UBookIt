@@ -22,6 +22,15 @@ public sealed record BookingRequest
 /// shape a multi-role service resolves to. All claims share the booking's single
 /// interval, which is what the store's atomic contract is defined over.
 /// </summary>
+/// <remarks>
+/// <b>This carries no service, deliberately.</b> Attributing a booking to a service is done
+/// by calling <see cref="IBookingService.PlaceForServiceAsync"/>, for the same reason there
+/// is no "this is a direct booking" flag on <see cref="BookingRequest"/>: a request field
+/// would restate the call site in a form a caller can get wrong. A caller could then name a
+/// service whose roles these resources do not satisfy, and the result is not a wrong answer
+/// to a query — it is a wrong <i>fact</i>, stored permanently and indistinguishable later
+/// from a real attribution.
+/// </remarks>
 public sealed record MultiClaimBookingRequest
 {
     /// <summary>
@@ -59,6 +68,31 @@ public interface IBookingService
     /// </summary>
     Task<DomainResult<Booking>> PlaceAsync(
         MultiClaimBookingRequest request, CancellationToken cancellationToken = default);
+
+    /// <summary>
+    /// The same placement, recording the service it was placed for.
+    /// </summary>
+    /// <remarks>
+    /// <para>
+    /// <b>A distinct entry point rather than a field on the request</b>, so that naming a
+    /// service is inseparable from actually placing through one. Which method you call is
+    /// what the booking <i>is</i> — the discipline direct placement already follows.
+    /// </para>
+    /// <para>
+    /// It takes the attribution whole, including the display name, because the snapshot has
+    /// to be taken by the caller that has the service in hand at placement time. Reading
+    /// the name here would be a second load of something the caller already holds, and
+    /// reading it later would answer with the name the service has <i>now</i>.
+    /// </para>
+    /// <para>
+    /// Placement behaviour is identical to the overload above in every respect. The only
+    /// difference is the value recorded on a booking that succeeds.
+    /// </para>
+    /// </remarks>
+    Task<DomainResult<Booking>> PlaceForServiceAsync(
+        ServiceAttribution service,
+        MultiClaimBookingRequest request,
+        CancellationToken cancellationToken = default);
 
     /// <summary>
     /// Runs the placement rules that are properties of the request and one
@@ -139,8 +173,34 @@ public sealed class BookingService(
             cancellationToken).ConfigureAwait(false);
     }
 
-    public async Task<DomainResult<Booking>> PlaceAsync(
+    public Task<DomainResult<Booking>> PlaceAsync(
         MultiClaimBookingRequest request, CancellationToken cancellationToken = default)
+        => PlaceAsync(request, service: null, cancellationToken);
+
+    public Task<DomainResult<Booking>> PlaceForServiceAsync(
+        ServiceAttribution service,
+        MultiClaimBookingRequest request,
+        CancellationToken cancellationToken = default)
+    {
+        // Throwing rather than placing. A caller reaching this overload with a null
+        // attribution has asked for a service booking and would get an unattributed one —
+        // a booking that succeeded, looks ordinary, and is silently wrong in the exact way
+        // this whole change exists to prevent. There is no sensible fallback: the general
+        // overload is what "no service" means, and it is one call away.
+        ArgumentNullException.ThrowIfNull(service);
+
+        return PlaceAsync(request, service, cancellationToken);
+    }
+
+    /// <summary>
+    /// The one multi-claim pipeline. Both public entry points delegate here and differ only
+    /// in what they pass for <paramref name="service"/> — duplicating the pipeline is how
+    /// the two would drift into placing different bookings for the same request.
+    /// </summary>
+    private async Task<DomainResult<Booking>> PlaceAsync(
+        MultiClaimBookingRequest request,
+        ServiceAttribution? service,
+        CancellationToken cancellationToken)
     {
         var zoneResult = AvailabilityService.ResolveZone(settings);
         if (!zoneResult.Succeeded)
@@ -206,7 +266,8 @@ public sealed class BookingService(
             request.Booker,
             [.. resources.Select(r => new ResourceClaim(r.Id))],
             BookingStatus.Confirmed,
-            window.NowUtc);
+            window.NowUtc,
+            service);
 
         return await bookingStore.PlaceAsync(booking, cancellationToken).ConfigureAwait(false);
     }

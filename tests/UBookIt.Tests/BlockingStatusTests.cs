@@ -20,7 +20,8 @@ public class BlockingStatusTests
             TestData.Booker(),
             [new ResourceClaim(resourceId)],
             status,
-            TestData.Now);
+            TestData.Now,
+            service: null);
 
     [Fact]
     public async Task Requested_booking_reduces_free_time()

@@ -658,7 +658,17 @@ on the evidence of one instant.
 - **THEN** the message describes that instant, and does not state that the service can never be fulfilled
 
 ### Requirement: Direct-resource booking is unaffected
-Introducing booking via a service SHALL NOT change how a resource is booked directly. The existing per-resource availability queries, the existing placement pipeline, and the existing placement endpoint SHALL behave identically whether or not any service exists, and whether or not a resource happens to be in some service's candidate pool. A booking placed through a service SHALL be an ordinary booking, indistinguishable in shape from a directly placed one, and SHALL block the resolved resource for other bookings on the same terms.
+Introducing booking via a service SHALL NOT change how a resource is booked directly. The existing per-resource availability queries, the existing placement pipeline, and the existing placement endpoint SHALL behave identically whether or not any service exists, and whether or not a resource happens to be in some service's candidate pool. A booking placed through a service SHALL block the resolved resource for other bookings on exactly the same terms as a directly placed one.
+
+**A service booking is an ordinary booking in every respect except that it records which
+service placed it.** The earlier wording — "indistinguishable in shape from a directly
+placed one" — is narrowed here rather than dropped, because recording the service is
+precisely a difference in shape and the sentence would otherwise be false. What it was
+written to guarantee is unchanged and restated: a service booking is not a second kind of
+entity, holds no privileged position, uses one interval and the same claim rows, blocks and
+is blocked identically, and is cancelled by the same operation. The one difference is a
+recorded fact about where the booking came from, which changes nothing about how it
+behaves.
 
 What a resource **permits** is a separate question from what services do to it. Direct
 booking is now offered only for a resource whose editor has said it may be booked on
@@ -688,6 +698,44 @@ composite availability, and is still claimed by a service booking.
 #### Scenario: Withholding direct booking does not remove a candidate
 - **WHEN** a resource that withholds direct booking is in a service's candidate pool
 - **THEN** it is resolved, contributes availability, and can be claimed by a service booking exactly as a permitting resource would
+
+#### Scenario: The recorded service is the only difference
+- **WHEN** a service booking and a direct booking are compared
+- **THEN** they differ only in the recorded service, and are identical in how they claim resources, block other bookings, and are cancelled
+
+### Requirement: Service placement records the service on the booking it produces
+When a service booking resolves an assignment and places it, the resulting booking SHALL
+record **that service** — its id, and its display name as it stands at placement time.
+
+This is the requirement that makes the attribution *populated* rather than merely
+available. A column that exists and is never written reads as "every booking was placed
+directly", which is wrong and silent — the same class of failure as an attribution naming
+the wrong service, arrived at from the other side.
+
+The recorded name SHALL be a snapshot taken at placement, not a reference resolved later.
+What the row states is what was sold at the time; a service renamed afterwards SHALL NOT
+retitle bookings already placed for it.
+
+Recording the service SHALL NOT change any placement outcome. The assignment that is
+chosen, the conflicts that are detected, the failures that are reported and the atomic
+all-or-nothing contract SHALL all behave exactly as before — this requirement records an
+outcome that placement already produces.
+
+#### Scenario: The placed booking names the service
+- **WHEN** a service is booked and placement succeeds
+- **THEN** the resulting booking reports that service's id and its display name
+
+#### Scenario: The name is a snapshot, not a reference
+- **WHEN** a service is renamed after a booking was placed for it
+- **THEN** the existing booking still reports the name the service had when it was placed
+
+#### Scenario: Placement behaviour is unchanged
+- **WHEN** the same service booking request is placed as before this requirement existed
+- **THEN** the same assignment, the same success or failure, and the same failure codes result — the only difference is the service recorded on a successful booking
+
+#### Scenario: A failed placement records nothing
+- **WHEN** a service booking fails to place
+- **THEN** no booking is created, and no service attribution is stored
 
 ### Requirement: Eligibility remains derivable from public reads
 Every input to the eligibility rule SHALL be readable through the anonymous delivery

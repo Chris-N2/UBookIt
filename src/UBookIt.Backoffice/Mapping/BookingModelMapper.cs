@@ -29,5 +29,12 @@ internal static class BookingModelMapper
             ResourceId = resource.ResourceId,
             DisplayName = resource.DisplayName,
         })],
+        Service = summary.Service is { } service
+            ? new BookedServiceModel
+            {
+                ServiceId = service.ServiceId,
+                DisplayName = service.DisplayName,
+            }
+            : null,
     };
 }

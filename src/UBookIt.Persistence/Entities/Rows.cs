@@ -104,6 +104,27 @@ internal sealed class BookingRow
 
     public string? BookerPhone { get; set; }
 
+    /// <summary>
+    /// The service this booking was placed for, or NULL for one placed directly.
+    /// </summary>
+    /// <remarks>
+    /// <b>No foreign key, deliberately.</b> A booking is a historical fact and must survive
+    /// its service being renamed, retired or deleted. A nullable FK with
+    /// <c>ON DELETE SET NULL</c> would convert "placed for a service that no longer exists"
+    /// into "placed directly", and that is the one meaning NULL has to keep.
+    /// </remarks>
+    public Guid? ServiceId { get; set; }
+
+    /// <summary>
+    /// The service's name as it stood at placement — a snapshot, not a reference.
+    /// </summary>
+    /// <remarks>
+    /// Stored rather than joined so a row stays answerable after the service is renamed or
+    /// deleted. A join would report the name the service has now, or none at all.
+    /// NULL exactly when <see cref="ServiceId"/> is NULL.
+    /// </remarks>
+    public string? ServiceName { get; set; }
+
     public List<ClaimRow> Claims { get; set; } = [];
 }
 

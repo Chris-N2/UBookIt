@@ -1,4 +1,4 @@
-﻿using UBookIt.Core.Availability;
+using UBookIt.Core.Availability;
 using UBookIt.Core.Bookings;
 using UBookIt.Core.Common;
 using UBookIt.Core.Stores;
@@ -205,10 +205,35 @@ public sealed class ServiceBookingService(
     public async Task<DomainResult<IReadOnlyList<RoleCandidates>>> ResolveCandidatesAsync(
         Guid serviceId, CancellationToken cancellationToken = default)
     {
+        var resolved = await ResolveServiceAndCandidatesAsync(serviceId, cancellationToken).ConfigureAwait(false);
+
+        return resolved.Succeeded
+            ? DomainResult<IReadOnlyList<RoleCandidates>>.Success(resolved.Value.Pools)
+            : DomainResult<IReadOnlyList<RoleCandidates>>.Failure(resolved.Failures);
+    }
+
+    /// <summary>
+    /// The pools, <b>and the service they came from</b>.
+    /// </summary>
+    /// <remarks>
+    /// Placement needs the service's display name to record on the booking, and it needs
+    /// the name as it stands at placement. The service is already loaded here to read its
+    /// roles and duration, so returning it costs nothing — where loading it again in
+    /// <c>PlaceAsync</c> would be a second read of something this method just had, and one
+    /// that could disagree with the pools if the service changed in between.
+    /// <para>
+    /// The public projection above keeps its existing shape: no caller of
+    /// <c>ResolveCandidatesAsync</c> wants the service, and widening a published signature
+    /// to serve one internal caller is how a contract accumulates members nobody uses.
+    /// </para>
+    /// </remarks>
+    private async Task<DomainResult<(Service Service, IReadOnlyList<RoleCandidates> Pools)>>
+        ResolveServiceAndCandidatesAsync(Guid serviceId, CancellationToken cancellationToken)
+    {
         var service = await serviceStore.GetAsync(serviceId, cancellationToken).ConfigureAwait(false);
         if (service is null)
         {
-            return DomainResult<IReadOnlyList<RoleCandidates>>.Failure(
+            return DomainResult<(Service, IReadOnlyList<RoleCandidates>)>.Failure(
                 FailureCodes.ServiceNotFound, $"No service exists with id {serviceId}.");
         }
 
@@ -225,7 +250,7 @@ public sealed class ServiceBookingService(
             pools.Add(new RoleCandidates(role, resolution.Candidates));
         }
 
-        return DomainResult<IReadOnlyList<RoleCandidates>>.Success(pools);
+        return DomainResult<(Service, IReadOnlyList<RoleCandidates>)>.Success((service, pools));
     }
 
     public async Task<DomainResult<IReadOnlyList<ServiceBookableStart>>> GetBookableStartsAsync(
@@ -723,13 +748,20 @@ public sealed class ServiceBookingService(
     public async Task<DomainResult<Booking>> PlaceAsync(
         ServiceBookingRequest request, CancellationToken cancellationToken = default)
     {
-        var candidateResult = await ResolveCandidatesAsync(request.ServiceId, cancellationToken).ConfigureAwait(false);
+        var candidateResult = await ResolveServiceAndCandidatesAsync(request.ServiceId, cancellationToken)
+            .ConfigureAwait(false);
         if (!candidateResult.Succeeded)
         {
             return DomainResult<Booking>.Failure(candidateResult.Failures);
         }
 
-        var pools = candidateResult.Value;
+        var pools = candidateResult.Value.Pools;
+
+        // The snapshot, taken here rather than read back later: this is the service as it
+        // stood when the booking was placed, which is what the booking records. See
+        // ServiceAttribution.
+        var attribution = new ServiceAttribution(
+            candidateResult.Value.Service.Id, candidateResult.Value.Service.Name);
 
         // Before the empty-pool guard: a preference naming a resource outside
         // every pool is equally wrong whether some pool is empty or merely lacks
@@ -839,7 +871,8 @@ public sealed class ServiceBookingService(
             // assignments in sequence is safe (bookings spec, atomic placement
             // contract).
             var placed = await bookingService
-                .PlaceAsync(
+                .PlaceForServiceAsync(
+                    attribution,
                     new MultiClaimBookingRequest
                     {
                         ResourceIds = [.. assignment.Select(c => c.ResourceId)],

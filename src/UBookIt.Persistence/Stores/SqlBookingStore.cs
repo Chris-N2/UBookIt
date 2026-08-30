@@ -149,20 +149,33 @@ internal sealed class SqlBookingStore(UBookItDbContext db) : IBookingStore
     private Task AcquireResourceLockAsync(Guid resourceId, CancellationToken cancellationToken)
         => AppLock.AcquireAsync(db, AppLock.ForResourcePlacement(resourceId), cancellationToken);
 
-    private static BookingRow ToRow(Booking booking) => new()
+    private static BookingRow ToRow(Booking booking)
     {
-        Id = booking.Id,
-        StartUtc = booking.Interval.StartUtc,
-        EndUtc = booking.Interval.EndUtc,
-        TimeZoneId = booking.Interval.TimeZoneId,
-        Status = (int)booking.Status,
-        CreatedUtc = booking.CreatedUtc,
-        MemberKey = booking.Booker.MemberKey,
-        BookerName = booking.Booker.Name,
-        BookerEmail = booking.Booker.Email,
-        BookerPhone = booking.Booker.Phone,
-        Claims = booking.Claims.Select(c => new ClaimRow { BookingId = booking.Id, ResourceId = c.ResourceId }).ToList(),
-    };
+        // Destructured once, so "written from one source" is what the code does rather
+        // than what its comment says. Calling the mapper per column was harmless — it is
+        // pure over the same value — but it read as two independent derivations of a pair
+        // that must agree.
+        var (serviceId, serviceName) = BookingAttributionMapper.ToColumns(booking.Service);
+
+        return new BookingRow
+        {
+            Id = booking.Id,
+            StartUtc = booking.Interval.StartUtc,
+            EndUtc = booking.Interval.EndUtc,
+            TimeZoneId = booking.Interval.TimeZoneId,
+            Status = (int)booking.Status,
+            CreatedUtc = booking.CreatedUtc,
+            MemberKey = booking.Booker.MemberKey,
+            BookerName = booking.Booker.Name,
+            BookerEmail = booking.Booker.Email,
+            BookerPhone = booking.Booker.Phone,
+            ServiceId = serviceId,
+            ServiceName = serviceName,
+            Claims = booking.Claims
+                .Select(c => new ClaimRow { BookingId = booking.Id, ResourceId = c.ResourceId })
+                .ToList(),
+        };
+    }
 
     private static Booking ToDomain(BookingRow row)
         => Booking.Rehydrate(
@@ -171,5 +184,6 @@ internal sealed class SqlBookingStore(UBookItDbContext db) : IBookingStore
             Booker.Create(row.MemberKey, row.BookerName, row.BookerEmail, row.BookerPhone).Value,
             row.Claims.Select(c => new ResourceClaim(c.ResourceId)),
             (BookingStatus)row.Status,
-            row.CreatedUtc).Value;
+            row.CreatedUtc,
+            BookingAttributionMapper.ToAttribution(row)).Value;
 }

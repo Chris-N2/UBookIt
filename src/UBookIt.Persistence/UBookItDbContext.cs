@@ -89,6 +89,15 @@ public sealed class UBookItDbContext(DbContextOptions<UBookItDbContext> options)
             booking.Property(b => b.BookerName).HasMaxLength(256);
             booking.Property(b => b.BookerEmail).HasMaxLength(320);
             booking.Property(b => b.BookerPhone).HasMaxLength(64);
+            // Matches the service's own name column, because it stores the same value —
+            // a snapshot of it. A shorter bound here would silently truncate a name the
+            // service itself accepts; an unbounded one would be the only unbounded string
+            // in the schema.
+            //
+            // No foreign key to the service, deliberately: a booking outlives its service,
+            // and ON DELETE SET NULL would turn "placed for a service that no longer
+            // exists" into "placed directly".
+            booking.Property(b => b.ServiceName).HasMaxLength(512);
             // The availability date-range lookup must hit this index (QA gate).
             booking.HasIndex(b => new { b.StartUtc, b.EndUtc }).IncludeProperties(b => b.Status);
             booking.HasMany(b => b.Claims).WithOne().HasForeignKey(c => c.BookingId).OnDelete(DeleteBehavior.Cascade);

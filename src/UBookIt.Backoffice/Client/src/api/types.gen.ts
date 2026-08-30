@@ -14,6 +14,11 @@ export type BookedResourceModel = {
     displayName: string;
 };
 
+export type BookedServiceModel = {
+    serviceId: string;
+    displayName: string;
+};
+
 export type BookingModel = {
     bookingId: string;
     startUtc: string;
@@ -24,6 +29,7 @@ export type BookingModel = {
     bookerName: string;
     bookerEmail: string;
     resources: Array<BookedResourceModel>;
+    service?: BookedServiceModel | null;
 };
 
 export type CapabilityUsageModel = {

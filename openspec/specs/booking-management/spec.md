@@ -29,20 +29,31 @@ so that an alternative implementation is possible and has a stated contract to s
 
 The port SHALL return, for each booking, everything a management list row displays
 **without a further read per booking**: the booking's identity, its interval and the time
-zone it was made in, its status, when it was created, the booker's name and email, and
-each claimed resource's id **and name**.
+zone it was made in, its status, when it was created, the booker's name and email, each
+claimed resource's id **and name**, and **the service it was placed for — id and name —
+or nothing, for a booking placed directly**.
 
 Resource names are part of the guarantee rather than a convenience. A claim records only a
 resource id, so a caller given ids alone must perform a lookup per claim, which is the
-cost this port exists to avoid.
+cost this port exists to avoid. **The service name is carried for the same reason and one
+more**: it is the name recorded at placement time, so it remains answerable for a service
+that has since been renamed or deleted, which a read-time join could not do.
 
 #### Scenario: A booking is listed with everything a row shows
 - **WHEN** bookings are listed
-- **THEN** each result carries its interval, time zone, status, creation time, booker name and email, and every claimed resource as an id and a name
+- **THEN** each result carries its interval, time zone, status, creation time, booker name and email, every claimed resource as an id and a name, and its service attribution as an id and a name where it has one
 
 #### Scenario: Resource names come back with the list
 - **WHEN** a listed booking claims a resource
 - **THEN** that resource's name is present in the result, without the caller reading the resource separately
+
+#### Scenario: The service comes back with the list
+- **WHEN** a listed booking was placed through a service
+- **THEN** that service's id and its name as recorded at placement are present in the result, without the caller reading the service separately
+
+#### Scenario: A directly placed booking reports no service
+- **WHEN** a listed booking was placed directly
+- **THEN** it carries no service attribution, distinguishable from a service whose name is empty
 
 #### Scenario: The front-end reads are unaffected
 - **WHEN** this port is added
@@ -203,10 +214,20 @@ default answer to "what is booked" SHALL NOT silently include bookings that are 
 irrecoverably: an excluded booking is one filter away, and a reader who cannot find a
 cancelled booking must be able to learn why from the package rather than by experiment.
 
-Filtering by the **service** that produced a booking SHALL NOT be offered, and the reason
-SHALL be stated rather than implied: a booking does not record the service it came from.
-A service is used to choose the resources a booking claims and is not retained, so this is
-a limit of the data rather than a choice about the query.
+Filtering by the **service** that produced a booking SHALL NOT be offered by this
+capability, and the reason SHALL be stated rather than implied. **The reason is now a
+scope decision, and this requirement previously stated a different one that has become
+false.** It said a booking does not record the service it came from — that the service is
+used to choose resources and is not retained — and a booking now records exactly that. The
+conclusion is unchanged and the justification is not: the data exists, and a filter over it
+belongs with the screen that would offer it, so that the filter and the control that drives
+it are designed together rather than the filter being added on the guess that one will want
+it.
+
+**A statement of a limit SHALL NOT outlive the limit.** This one was published on the read
+port itself, so a reader inspecting the package would have been told bookings do not record
+their service by the same package that records it. The requirement is restated here rather
+than deleted because "we do not offer this" is still true and still worth explaining.
 
 #### Scenario: The default omits cancelled and declined bookings
 - **WHEN** bookings are listed with no status filter
@@ -234,7 +255,7 @@ a limit of the data rather than a choice about the query.
 
 #### Scenario: The absence of a service filter is explained
 - **WHEN** a reader asks why bookings cannot be filtered by service
-- **THEN** the package states that a booking does not record the service that produced it, rather than leaving the omission unexplained
+- **THEN** the package states that the filter is not offered yet, rather than leaving the omission unexplained, and SHALL NOT state that a booking does not record its service
 
 ### Requirement: Bookings are readable over an authorized management endpoint
 The package SHALL expose a versioned backoffice endpoint, in the same swagger group as its
@@ -250,8 +271,14 @@ in the HTTP contract**, on the same terms as the resource and service endpoints.
 
 The response SHALL carry, per booking, exactly what the read port supplies: the booking's
 identity, its interval and the time zone it was made in, its status, when it was created,
-the booker's name and email, and each claimed resource's id and name. It SHALL report the
-unpaged total alongside the page, so a caller can render a pager.
+the booker's name and email, each claimed resource's id and name, and **the service it was
+placed for, or null**. It SHALL report the unpaged total alongside the page, so a caller
+can render a pager.
+
+**The service SHALL cross the boundary as a single nullable object carrying both id and
+name**, rather than as two parallel nullable fields. "A booking has a service, or it does
+not" is then expressed in the shape, rather than as a rule that two fields must be null
+together — which a client can observe violated and has no way to interpret.
 
 **No field SHALL be added at the HTTP layer that the read port cannot supply.** A field the
 port does not carry is one the screen must obtain another way, which is how a second read
@@ -259,7 +286,11 @@ path into bookings begins.
 
 #### Scenario: A page of bookings is returned with its total
 - **WHEN** an authorized caller requests bookings for a window
-- **THEN** the matching page is returned with the unpaged total, each booking carrying its interval, time zone, status, creation time, booker name and email, and its resources with their names
+- **THEN** the matching page is returned with the unpaged total, each booking carrying its interval, time zone, status, creation time, booker name and email, its resources with their names, and its service where it has one
+
+#### Scenario: A directly placed booking carries a null service
+- **WHEN** a returned booking was placed directly
+- **THEN** its service member is null, rather than an object with empty or placeholder values
 
 #### Scenario: The endpoint is not anonymous
 - **WHEN** the endpoint is called without backoffice authentication
