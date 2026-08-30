@@ -122,8 +122,62 @@ public sealed class BookingService(
     IResourceStore resourceStore,
     IBookingStore bookingStore,
     TimeProvider timeProvider,
-    SiteBookingSettings settings) : IBookingService
+    SiteBookingSettings settings,
+    IBookingObserver? observer = null) : IBookingService
 {
+    /// <summary>
+    /// Where placement and cancellation are reported. Never null.
+    /// </summary>
+    /// <remarks>
+    /// <para>
+    /// <b>Defaulted, unlike <c>Booking.Create</c>'s attribution — and the difference is worth
+    /// stating, because the last change made the opposite call.</b> Omitting a booking's
+    /// service silently recorded a wrong <i>fact</i>: a service booking that claimed it was
+    /// placed directly. Omitting an observer records nothing and claims nothing; it produces
+    /// silence, which is exactly right for the several dozen tests that construct this
+    /// service to exercise placement rules and have no interest in who is told.
+    /// </para>
+    /// <para>
+    /// Production never omits it: the only construction is by the container, which supplies
+    /// every registered dependency. The residual risk is a host that forgets to register one
+    /// and gets silence — so a test asserts the composer registers it, rather than trusting
+    /// that nobody will.
+    /// </para>
+    /// </remarks>
+    private readonly IBookingObserver _observer = observer ?? new NullBookingObserver();
+
+    /// <summary>
+    /// Tells the observer, and lets nothing it does reach the caller.
+    /// </summary>
+    /// <remarks>
+    /// <para>
+    /// <b>The booking is already stored by the time this runs.</b> An exception escaping here
+    /// would report failure for a booking that exists — and a visitor told their booking
+    /// failed books again, so somebody else's handler throwing would produce a double
+    /// booking. That is worse than any notification is worth, which is why this is absolute
+    /// rather than best-effort.
+    /// </para>
+    /// <para>
+    /// <b>The catch is silent, and that is a consequence rather than a choice.</b> Core has
+    /// no logging dependency because it has no dependencies at all, and acquiring one to
+    /// report a third party's fault would trade the property this design is built on for a
+    /// log line. The shipped Umbraco adapter logs — it has an <c>ILogger</c> and is where the
+    /// diagnostics belong. An observer written by somebody else is theirs to instrument.
+    /// </para>
+    /// </remarks>
+    private static async Task TellAsync(Func<Task> tell)
+    {
+        try
+        {
+            await tell().ConfigureAwait(false);
+        }
+        catch
+        {
+            // Deliberately swallowed. See the remarks above: the booking is committed, and
+            // the caller's answer must not depend on what an observer does.
+        }
+    }
+
     public async Task<DomainResult<Booking>> PlaceAsync(
         BookingRequest request, CancellationToken cancellationToken = default)
     {
@@ -269,7 +323,17 @@ public sealed class BookingService(
             window.NowUtc,
             service);
 
-        return await bookingStore.PlaceAsync(booking, cancellationToken).ConfigureAwait(false);
+        var placed = await bookingStore.PlaceAsync(booking, cancellationToken).ConfigureAwait(false);
+
+        // After the store agreed, and only then. Announcing before the commit would report a
+        // booking that may not exist; announcing on failure would report one that does not.
+        if (placed.Succeeded)
+        {
+            await TellAsync(() => _observer.BookingPlacedAsync(placed.Value, cancellationToken))
+                .ConfigureAwait(false);
+        }
+
+        return placed;
     }
 
     public async Task<DomainResult<Booking>> CancelAsync(
@@ -289,6 +353,14 @@ public sealed class BookingService(
         }
 
         await bookingStore.UpdateAsync(booking, cancellationToken).ConfigureAwait(false);
+
+        // Reached only where the status machine allowed the transition AND the update was
+        // written — which is what makes this unambiguous. Cancellation succeeds from
+        // Requested or Confirmed and nowhere else, so being told at all means the booking has
+        // just become cancelled, and a second attempt fails above and tells nobody.
+        await TellAsync(() => _observer.BookingCancelledAsync(booking, cancellationToken))
+            .ConfigureAwait(false);
+
         return DomainResult<Booking>.Success(booking);
     }
 
