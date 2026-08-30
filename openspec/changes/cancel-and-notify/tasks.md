@@ -168,6 +168,39 @@ added** and then left unenforced.
   `BookingService` is binary-breaking, which is irrelevant while nothing is published and
   will not be after step 1 of `docs/mvp.md`. The "eight scenarios" count in 7.4 was six.
 - [x] 8.6 Clean-build gates, then QA round 2.
+
+## 9. QA round 2 — APPROVE; four of five MINORs taken
+
+No must-fix. One of them was a real defect reachable by an ordinary action.
+
+- [x] 9.1 **Cancelling the last row of a page stranded the operator.** Every other action that
+  changes the result set resets paging; cancellation did not. Cancel the only booking on page
+  two and `skip` points past the end: the table renders empty under *"showing 21–20 of 20"*,
+  with the empty message suppressed **because the total is not zero**. My own comment
+  half-anticipated it — "the total changes with it" — and did nothing about it.
+  <br>It steps **back** a page rather than resetting to the first: a window or status change
+  is a different question and resets, while a cancellation is the same question with one
+  fewer answer, and someone working through page four should not be thrown to page one on
+  every cancellation. Mutation-checked in both directions — not stepping, and resetting.
+- [x] 9.2 **The focus fix from round 1 had no scenario.** An unspec'd accessibility behaviour
+  is exactly the shape that vanishes in a later wholesale rewrite, which this project has a
+  rule about. Both it and 9.1 now have requirements and scenarios.
+- [x] 9.3 **The confirmation dialog said "Cancel booking" twice.** The modal's own dismiss
+  button reads "Cancel", so the confirm button reading "Cancel booking" put the same word on
+  both — one meaning *do the irreversible thing*, one meaning *back out* — in a dialog whose
+  entire purpose is to separate them. This change reasons carefully about
+  `confirmDestructive`'s three outcomes so a broken dialog cannot read as a refusal, and then
+  undercut it in the wording. Now "Yes, cancel it".
+- [x] 9.4 **A comment of mine overclaimed again.** `CoreIndependenceTests` said the
+  assembly-level check would catch a `Directory.Build.props` injection. It would not:
+  `GetReferencedAssemblies` reports only what the IL binds to, so an injected-but-unused
+  reference is invisible and a `FrameworkReference` never appears. The two tests are
+  complements and neither is a superset; the comment now says so. Same fault family as the
+  previous change's "announced" versus "valid".
+- [x] 9.5 **NIT recorded, not fixed:** three of the view's scenarios remain uncovered because
+  no DOM environment is installed. That is now **three changes deep**, so it moves from
+  implicit to the deferred-obligations list rather than being re-noted each time.
+- [x] 9.6 Clean-build gates, then sync and archive.
 - [ ] 7.8 **At sync: `booking-management`'s Purpose is falsified again.** It says *cancel* "is
   the half still outstanding", which this change completes — and that sentence is one **I
   wrote at the last sync**, one change ago.

@@ -60,9 +60,16 @@ public class CoreIndependenceTests
     public void Nothing_but_the_framework_reaches_Core_at_runtime()
     {
         // The csproj states the intent; this checks what the built assembly actually binds
-        // to, which is what would break a non-Umbraco host. Central package management means
-        // a reference can arrive without a version attribute, and a Directory.Build.props
-        // could inject one project-wide without touching this csproj at all.
+        // to, which is what would break a non-Umbraco host.
+        //
+        // WHAT IT DOES NOT CATCH, because an earlier version of this comment claimed it did:
+        // `GetReferencedAssemblies` reports only what the compiled IL binds to. A reference
+        // injected project-wide and never used is invisible here, and a `FrameworkReference`
+        // or an analyzer never appears at all. Those are the csproj test's job — this one's
+        // job is the reference that is declared somewhere else and actually used, which the
+        // csproj test cannot see.
+        //
+        // The two are complements, and neither is a superset of the other.
         var referenced = typeof(IBookingObserver).Assembly
             .GetReferencedAssemblies()
             .Select(assembly => assembly.Name ?? string.Empty)

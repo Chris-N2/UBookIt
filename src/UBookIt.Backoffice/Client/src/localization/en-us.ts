@@ -360,7 +360,12 @@ export default {
     confirmCancelContent:
       "Cancel the booking for %0%? The time is released immediately. uBookIt does not tell "
       + "the person who booked — if they should know, you will need to contact them.",
-    confirmCancel: "Cancel booking",
+    // NOT "Cancel booking". The modal's own dismiss button says "Cancel", so a confirm
+    // button reading "Cancel booking" puts the same word on both — one meaning "do the
+    // irreversible thing" and one meaning "back out" — in a dialog whose whole purpose is
+    // to make that distinction. This change is careful that a broken dialog cannot read as
+    // a refusal; identical wording would undo that at the point of decision.
+    confirmCancel: "Yes, cancel it",
     confirmFailed: "The confirmation could not be shown, so nothing was cancelled.",
     cancelFailed: "The booking could not be cancelled.",
   },

@@ -75,6 +75,26 @@ outcomes and only one of them is something the operator chose.
 After a cancellation the list SHALL show the booking's new state without the operator
 reloading the page.
 
+**A cancellation SHALL NOT leave the operator on a page that no longer exists.** Removing the
+last row of a page leaves the list positioned past the end of its own results, which renders
+as an empty table under a count that cannot be true. The view SHALL step back rather than
+returning to the first page: a filter change is a different question and resets, while a
+cancellation is the same question with one fewer answer, and an operator working through a
+later page should not be thrown to the start each time.
+
+**Focus SHALL NOT be lost when the cancelled row is removed.** The control the operator was
+using goes with its row, so focus SHALL be placed somewhere deliberate rather than falling to
+the document — a keyboard operator cancelling several bookings would otherwise restart their
+traversal every time.
+
+#### Scenario: Cancelling the last row of a page does not strand the operator
+- **WHEN** an operator cancels the only booking shown on a later page
+- **THEN** the list shows the preceding page rather than an empty table, and never reports a range beyond its own total
+
+#### Scenario: Focus survives the cancelled row
+- **WHEN** a keyboard operator confirms a cancellation and the row is removed
+- **THEN** focus is placed deliberately within the view rather than lost to the document
+
 **The view SHALL state that cancelling notifies nobody by itself**, where the operator can see
 it at the moment they are deciding. A customer who is not told is the predictable consequence
 of the button, and an operator who assumes the package sends something will not find out until

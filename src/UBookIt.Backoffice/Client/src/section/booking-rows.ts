@@ -134,6 +134,31 @@ export function shouldLoad(window: Window): boolean {
 }
 
 /**
+ * Where paging should land when the page just emptied under the operator.
+ *
+ * Cancelling removes a row from the current result set — on the default filter
+ * the booking leaves the view entirely — and cancelling the only row on page two
+ * leaves `skip` pointing past the end. The table then renders empty with
+ * "showing 21–20 of 20", and the empty message is suppressed because the total
+ * is not zero: a nonsense state reachable by an ordinary action.
+ *
+ * **Steps back a page rather than resetting to the first.** A window or filter
+ * change resets, because the operator asked a different question; cancelling is
+ * the same question with one fewer answer, and an operator working through page
+ * three does not want to be thrown to page one on every cancellation.
+ *
+ * Returns the same `skip` when nothing needs to move, so a caller can compare and
+ * avoid a second request in the ordinary case.
+ */
+export function skipAfterEmptyPage(skip: number, itemCount: number, pageSize: number): number {
+  if (itemCount > 0 || skip <= 0) {
+    return skip;
+  }
+
+  return Math.max(0, skip - pageSize);
+}
+
+/**
  * Whether the view offers to cancel this booking.
  *
  * Only where the domain would allow it — the status machine permits cancellation

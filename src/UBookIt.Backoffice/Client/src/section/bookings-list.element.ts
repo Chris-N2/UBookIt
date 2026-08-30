@@ -13,6 +13,7 @@ import {
   shouldLoad,
   showsEmptyMessage,
   skipAfter,
+  skipAfterEmptyPage,
   zoneFallbackOccurred,
   zoneLabelNeeded,
 } from "./booking-rows.js";
@@ -439,6 +440,17 @@ export class UBookItBookingsListElement extends UmbLitElement {
     // leaves the view entirely — and the total changes with it. Editing the row
     // would show a booking the current filter no longer selects.
     await this.#load();
+
+    // Cancelling the last row on a page leaves `skip` past the end: the table renders
+    // empty with "showing 21–20 of 20", and the empty message is suppressed because the
+    // total is not zero. Step back a page and ask again — once, since the retry only
+    // happens when the page came back empty.
+    const stepped = skipAfterEmptyPage(this._skip, this._items.length, PAGE_SIZE);
+
+    if (stepped !== this._skip) {
+      this._skip = stepped;
+      await this.#load();
+    }
 
     // And put focus somewhere, because the button that had it has just been removed
     // from the DOM along with its row. Left alone, focus falls to <body> and a keyboard

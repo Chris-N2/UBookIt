@@ -8,6 +8,7 @@ import {
   shouldLoad,
   showsEmptyMessage,
   skipAfter,
+  skipAfterEmptyPage,
   statusesParam,
   toDateValue,
   zoneFallbackOccurred,
@@ -210,6 +211,32 @@ describe("when the zone is shown", () => {
     // it "says so" when it falls back; this is what keeps that promise.
     expect(zoneFallbackOccurred([booking({ timeZoneId: "Mars/Olympus_Mons" })])).toBe(true);
     expect(zoneFallbackOccurred([booking(), booking()])).toBe(false);
+  });
+});
+
+describe("where paging lands when a page empties under the operator", () => {
+  it("steps back a page when the current one is now empty", () => {
+    // Cancelling the only row on page two leaves skip pointing past the end, and the
+    // table then renders empty under "showing 21–20 of 20" — with the empty message
+    // suppressed, because the total is not zero. A nonsense state from an ordinary action.
+    expect(skipAfterEmptyPage(20, 0, 20)).toBe(0);
+    expect(skipAfterEmptyPage(60, 0, 20)).toBe(40);
+  });
+
+  it("stays put while the page still has rows", () => {
+    // The common case, and the one that must not cost a second request.
+    expect(skipAfterEmptyPage(20, 5, 20)).toBe(20);
+  });
+
+  it("does not step below the first page", () => {
+    expect(skipAfterEmptyPage(0, 0, 20)).toBe(0);
+  });
+
+  it("steps back rather than resetting to the first page", () => {
+    // A window or status change resets, because the operator asked a different question.
+    // Cancelling is the same question with one fewer answer, and throwing someone working
+    // through page four back to page one on every cancellation is its own annoyance.
+    expect(skipAfterEmptyPage(60, 0, 20)).not.toBe(0);
   });
 });
 
