@@ -55,7 +55,13 @@ public class BackofficeDocumentationTests
         // And the status default is disclosed, because the endpoint hides cancelled
         // bookings by default and an operator who cannot find one must be able to learn
         // why from the package rather than by experiment.
-        DocumentationAssert.Says(docs, "cancelled booking is one toggle away rather than missing");
+        // "tick", not "toggle": the status filter became four native checkboxes when the
+        // hint had to be associated with the controls, and this sentence went on describing
+        // a switch that is no longer on the screen — while the paragraph four lines below it
+        // already said "ticking". An operator reading a page that contradicts itself hunts
+        // for a control that does not exist.
+        DocumentationAssert.Says(docs, "cancelled booking is one tick away rather than missing");
+        Assert.DoesNotContain("one toggle away", docs, StringComparison.OrdinalIgnoreCase);
 
         // And that ticking REPLACES rather than adds. The screen's own hint said
         // "include others" until operating it showed that ticking Cancelled makes the

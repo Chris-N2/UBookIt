@@ -42,7 +42,7 @@ piece of work; nothing about the section or its permissions changes when it arri
 
 The view opens on the current week and you change the window with the two date controls.
 It shows the statuses that hold their time — confirmed and requested — so a **cancelled
-booking is one toggle away rather than missing**.
+booking is one tick away rather than missing**.
 
 Ticking statuses shows **only** those, rather than adding them to what is already listed:
 tick Cancelled on its own and you get the cancelled bookings, not the confirmed ones with

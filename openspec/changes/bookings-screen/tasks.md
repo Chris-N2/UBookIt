@@ -289,7 +289,26 @@ other two are false sentences in artifacts that get archived.
   in the section-wide UI review rather than here.
 - [x] 11.7 Clean-build gates, then QA round 4.
 
-## 12. Carried forward, for the section-wide UI review
+## 12. QA round 4 — APPROVE, one MINOR, and it is the third round of the same thing
+
+- [x] 12.1 **The checkbox change falsified a sentence that ships to users, and a test pinned
+  the stale word.** `docs/backoffice.md` still said a cancelled booking is "one **toggle**
+  away" — while the paragraph four lines below already said "ticking", so the page
+  contradicted itself and sent an operator hunting for a switch that is not there.
+  `BackofficeDocumentationTests` asserted the stale string, so the wording was locked in and
+  the fix had to touch both. Also corrected the same word in an `en-us.ts` comment.
+  <br>**This is the third consecutive round where a fix of mine falsified a sentence** —
+  round 2 the design document, round 3 the proposal, round 4 the shipped documentation. Each
+  time I updated the thing I was thinking about and not the thing that described it. The
+  pattern is not carelessness about any one sentence; it is that I sweep *after* deciding I am
+  finished, when the sweep needs to run against every artifact each time the behaviour moves.
+  The one guard that caught it here was a test asserting the old wording — which is an
+  argument for pinning prose wherever it makes a promise.
+- [x] 12.2 NIT accepted as history: task 5.3 above still describes operating "the toggle",
+  which is what the task said when it was written. §11.1 records the change; rewriting the
+  earlier entry would make the record tidier and less true.
+
+## 13. Carried forward, for the section-wide UI review
 
 Chris has a UI review planned once the functionality is in. These belong to it rather than
 here, and are recorded so they are not lost when this change archives:

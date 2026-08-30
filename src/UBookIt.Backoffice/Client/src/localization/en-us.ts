@@ -302,7 +302,7 @@ export default {
     //
     // The hint is load-bearing. The endpoint returns only what blocks time when
     // no status is asked for, so an operator hunting a cancelled booking would
-    // otherwise conclude it is gone rather than one toggle away — and the port
+    // otherwise conclude it is gone rather than one tick away — and the port
     // requires that this be learnable from the package rather than by
     // experiment.
     statusFilter: "Status",
