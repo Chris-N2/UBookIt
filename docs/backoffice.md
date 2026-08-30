@@ -2,7 +2,7 @@
 
 Installing uBookIt adds a **uBookIt** section to the Umbraco backoffice, alongside
 Content, Media and the rest. It is where a site's bookable resources and services are
-configured.
+configured, and where the bookings it has taken are read.
 
 ## Who can use it
 

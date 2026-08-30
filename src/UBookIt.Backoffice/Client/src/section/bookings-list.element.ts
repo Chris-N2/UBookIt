@@ -239,39 +239,47 @@ export class UBookItBookingsListElement extends UmbLitElement {
         </div>
 
         <!--
-          The hint is described BY THE FIELDSET, not by each control:
-          aria-describedby on a uui-toggle host is dropped, because
-          uui-boolean-input forwards aria-label and aria-labelledby to its
-          internal input and nothing else. The editor hit that wall and left a
-          note; the service editor puts the reference on the fieldset too.
+          NATIVE CHECKBOXES, not uui-toggle, and the reason is the hint.
 
-          WHAT THIS IS AND IS NOT. It makes the description valid — the
-          reference resolves within this shadow root, which was measured. It
-          does NOT reliably make it announced: a fieldset maps to role=group,
-          aria-describedby is not inherited by descendants, and screen readers
-          announce a group's NAME on entry rather than its description. Group
-          descriptions are read reliably for composite widgets with one focus
-          stop, which four independently tabbable toggles are not.
+          The hint is the load-bearing part of this control: it is how an
+          operator learns that a cancelled booking is one tick away rather than
+          gone, and that ticking replaces rather than adds. It has to be
+          ASSOCIATED with the controls, and a uui component's internal input is
+          not reachable from the host attribute — uui-boolean-input forwards
+          aria-label and aria-labelledby and nothing else, so aria-describedby
+          on the host is dropped.
 
-          So the hint is carried by DOM ORDER rather than by that reference: it
-          is a visible paragraph inside the fieldset, after the legend and
-          before the toggles, where a reader going through the view meets it.
-          The reference is worth keeping and is not worth relying on, and this
-          note exists because an earlier version of it claimed more than had
-          been measured — which is exactly the fault that produced this round's
-          predecessor.
+          This is not a new judgement. The resource editor made exactly this
+          call, for a hint it treated as less load-bearing than this one, and
+          wrote down why. Two earlier attempts here put the reference on the
+          fieldset instead and CLAIMED it was announced; it was only valid — a
+          fieldset is role=group, aria-describedby is not inherited by
+          descendants, and a screen reader announces a group's name on entry
+          rather than its description. Relying on DOM order would have left a
+          user in focus mode, tabbing between the four controls, never meeting
+          the paragraph at all.
+
+          Checkboxes are also the more honest semantics: four independent
+          filters, not four switches.
         -->
-        <fieldset class="statuses" aria-describedby="ubookit-bookings-status-hint">
+        <fieldset class="statuses">
           <legend>${this.#term("statusFilter")}</legend>
           <p class="hint" id="ubookit-bookings-status-hint">${this.#term("statusHint")}</p>
           ${STATUSES.map(
             (status) => html`
-              <uui-toggle
-                label=${this.#term(`status${status}`)}
-                ?checked=${this._statuses.includes(status)}
-                @change=${(event: Event) =>
-                  this.#toggleStatus(status, (event.target as HTMLInputElement).checked)}
-              ></uui-toggle>
+              <div class="checkbox-field">
+                <input
+                  id="ubookit-bookings-status-${status.toLowerCase()}"
+                  type="checkbox"
+                  aria-describedby="ubookit-bookings-status-hint"
+                  .checked=${this._statuses.includes(status)}
+                  @change=${(event: Event) =>
+                    this.#toggleStatus(status, (event.target as HTMLInputElement).checked)}
+                />
+                <label for="ubookit-bookings-status-${status.toLowerCase()}">
+                  ${this.#term(`status${status}`)}
+                </label>
+              </div>
             `,
           )}
         </fieldset>
@@ -378,6 +386,11 @@ export class UBookItBookingsListElement extends UmbLitElement {
       gap: var(--uui-size-space-3);
       border: 1px solid var(--uui-color-border);
       padding: var(--uui-size-space-3);
+    }
+    .checkbox-field {
+      align-items: center;
+      display: flex;
+      gap: var(--uui-size-space-2);
     }
     .hint {
       margin: 0;

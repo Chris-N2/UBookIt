@@ -79,7 +79,11 @@ is currently correct.
 
 - **`UBookIt.Backoffice/Client`**: a `bookings-view` element and a `bookings-list` element,
   a manifest entry, and `en-US` strings. No new npm dependency — `uui-input type="date"`,
-  `uui-table`, `uui-combobox` and `uui-button` are all already present and already used.
+  `uui-table`, `uui-button`, `uui-label` and `uui-loader-bar` are all already present and
+  already used, and the status filter is native checkboxes, following the resource editor's
+  documented reason for preferring them where a hint must be associated with the control.
+  *(An earlier draft of this sentence listed `uui-combobox`, which this client does not use
+  anywhere and has twice recorded a decision against.)*
 - **No server change.** No endpoint, no DTO, no Core, no persistence, no migration. If this
   change needs one, that is a finding.
 - **No public C# API change.** The TypeScript client is regenerated only if the endpoint
@@ -93,8 +97,9 @@ the zone whenever it differs from the site's — but **the screen does not know 
 zone**: the endpoint returns each booking's zone and nothing page-level, and adding a field
 the read port cannot supply is exactly what that capability forbids.
 
-So the screen labels the zone when **the page holds more than one distinct zone**, which
-catches the case that actually misleads: two rows read against each other. It does **not**
+So the screen labels the zone when **the page holds more than one distinct zone** — which
+catches the case that actually misleads, two rows read against each other — and also when a
+zone could not be resolved and the time is being shown in another one. It does **not**
 catch every row sharing one zone that is not the site's — possible only if the site's zone
 changed after those bookings were placed. That narrowing is stated in the spec rather than
 papered over, and the fix, if it is ever worth making, is a decision about the endpoint

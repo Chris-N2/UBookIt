@@ -238,7 +238,52 @@ root. All eight controls are keyboard-reachable in visual order with a visible f
   `showsEmptyMessage` fixes here. QA is right that fixing this one here made the two lists
   diverge — the argument in 8.8 for leaving paging alone cuts the other way for this, and both
   now need the same follow-up.
-- [ ] 10.8 Clean-build gates, then QA round 3.
+- [x] 10.8 Clean-build gates, then QA round 3.
+
+## 11. QA round 3 — APPROVE with NITs; three taken
+
+No must-fix. All three taken, because the first is the third pass over one claim and the
+other two are false sentences in artifacts that get archived.
+
+- [x] 11.1 **Stopped re-wording the hint claim and delivered it instead.** Rounds 1 and 2 both
+  moved `aria-describedby` and both described the result too generously; round 3 pointed at a
+  fix the repo had already made three files away. `resource-editor` uses a **native checkbox**
+  rather than `uui-toggle` for precisely this — *"The explanation has to be ASSOCIATED with
+  the control, not merely sitting next to it"* — for a hint it judged **less** load-bearing
+  than this one. My comment had also cited the wrong precedent: the service editor's
+  fieldset-level reference carries group **errors** that are separately announced, not a hint.
+  <br>The status filter is now four native checkboxes, each carrying the reference. It is what
+  I twice said was true, and relying on DOM order would have failed anyone in focus mode
+  tabbing between the controls — the residue round 3 named and the second attempt did not.
+  Checkboxes are also the better semantics: four independent filters, not four switches.
+- [x] 11.2 **The accessibility requirement now says what this view does and why it differs.**
+  It promises failures are *announced* rather than *associated with their fields* — deliberate
+  and narrower, because this view has one whole-request failure and no per-field ones, and
+  promising an association with nothing to associate is a requirement written for a different
+  screen. It also now states that an explanation which changes what a control does must be
+  attached to the control, and that a native control is preferred where a library one cannot
+  carry the association — so the library-components preference cannot be read as licence to
+  drop a guarantee the section's editors already keep.
+- [x] 11.3 **Two false sentences in the artifacts.** The proposal claimed `uui-combobox` was
+  "already present and already used" — this client uses it nowhere and has twice recorded a
+  decision against it. The conclusion (no new dependency) survives; the statement did not.
+  And the zone sentence in the proposal still omitted the fallback arm that D3 had already
+  been corrected for, so the two read inconsistently in the archive. Both fixed.
+- [x] 11.4 **NIT — `docs/backoffice.md` opened by saying the section is where resources and
+  services are configured.** True and now incomplete: it is also where bookings are read.
+- [x] 11.5 **NIT recorded, not fixed — the zone column renders the raw IANA identifier** while
+  the spec requires displayed strings come from localization. It is endpoint data rather than
+  package prose, on the same footing as a booker's name or a resource's; noted because the
+  distinction is worth having written down before somebody reads the requirement literally.
+- [ ] 11.6 **Live-verify the checkbox change.** Not yet done — the browser extension
+  disconnected before it could run, and this is the one item that must not be assumed. Clean
+  build, 1711 tests and 104 client tests are green, but "the filter still works and the
+  controls still announce" is a browser question.
+  <br>The risk profile does differ from the two failed attempts: this is a native
+  `<input aria-describedby>` with a `<label for>` in the same root, which is the baseline
+  case rather than a claim about a component's internal behaviour. That is a reason to expect
+  it to hold, not a reason to record it as held.
+- [ ] 11.7 Clean-build gates, then QA round 4.
 
 **Outside this change, worth raising with Chris:** the `qa-review` skill's DevExpress scan
 greps the working tree, which on this machine hits gitignored `obj/*.nuget.g.props` recording

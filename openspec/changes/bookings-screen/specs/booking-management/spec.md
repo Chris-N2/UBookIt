@@ -152,10 +152,24 @@ That is reachable only by changing a site's zone after it has taken bookings.
 
 ### Requirement: The bookings view meets the section's accessibility bar
 The view's markup SHALL meet the same bar the section's editors do: every control labelled,
-failures programmatically associated and announced, full keyboard operability with visible
+failures **announced** rather than only rendered, full keyboard operability with visible
 focus, semantic table markup with header cells associated to their columns, and components
 from the backoffice UI library preferred over hand-rolled controls. Focus order SHALL match
 visual order.
+
+**Where an explanation changes what a control does, it SHALL be associated with that
+control** — not merely placed beside it, and not attached to a grouping element, which is
+announced on entry as a name rather than a description and is not inherited by the controls
+inside it. A native control SHALL be preferred over a library one where the library one
+cannot carry the association: the preference for library components is about not
+hand-rolling behaviour, and it does not extend to dropping a guarantee the section's editors
+already keep by the same means.
+
+*The requirement says failures are announced rather than "associated with their fields",
+which is what the resource editor's version says. That is deliberate and narrower: this view
+has no per-field failures to associate — its one failure is a whole-request one — and
+promising an association it has nothing to associate would be a requirement written for a
+different screen.*
 
 This restates the bar rather than extending the existing requirement, which is written about
 the resource editor and its scenarios: replacing it wholesale to reach a list view would put
@@ -168,6 +182,10 @@ six editing scenarios at risk of being lost to say something about a table.
 #### Scenario: A failed load is announced
 - **WHEN** loading the list fails
 - **THEN** the failure is exposed to assistive technology rather than only rendered, and the view does not present an empty list as though nothing matched
+
+#### Scenario: An explanation is associated with the control it explains
+- **WHEN** an operator reaches the status filter, by keyboard and without reading the surrounding page
+- **THEN** the explanation of what the filter does is associated with the controls themselves, rather than only positioned near them
 
 #### Scenario: The table is semantic
 - **WHEN** the rendered list is inspected
