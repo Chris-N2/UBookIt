@@ -57,6 +57,13 @@ public class BackofficeDocumentationTests
         // why from the package rather than by experiment.
         DocumentationAssert.Says(docs, "cancelled booking is one toggle away rather than missing");
 
+        // And that ticking REPLACES rather than adds. The screen's own hint said
+        // "include others" until operating it showed that ticking Cancelled makes the
+        // confirmed bookings disappear — correct behaviour, wrongly described. An
+        // operator who reads "include" and watches today's bookings vanish will conclude
+        // the filter is broken.
+        DocumentationAssert.Says(docs, "Ticking statuses shows only those");
+
         // And the three verbs the section genuinely lacks are named, because "management
         // section" invites the assumption that it manages everything.
         DocumentationAssert.Says(docs, "It does not place bookings");

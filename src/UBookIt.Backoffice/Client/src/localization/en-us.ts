@@ -306,7 +306,17 @@ export default {
     // requires that this be learnable from the package rather than by
     // experiment.
     statusFilter: "Status",
-    statusHint: "Showing bookings that hold their time. Tick a status to include others.",
+
+    // "instead", not "as well". Ticking Cancelled shows ONLY cancelled
+    // bookings — the endpoint uses supplied statuses exactly as given rather
+    // than adding them to the default. The first wording said "tick a status to
+    // include others", which reads as adding to what is already shown, and an
+    // operator ticking Cancelled to see a cancelled booking alongside today's
+    // confirmed ones would instead watch the confirmed ones disappear.
+    //
+    // Found by operating the screen, not by a test: the behaviour was correct
+    // and the sentence describing it was not.
+    statusHint: "Showing bookings that hold their time. Tick statuses to show only those instead.",
     statusRequested: "Requested",
     statusConfirmed: "Confirmed",
     statusCancelled: "Cancelled",

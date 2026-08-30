@@ -155,6 +155,36 @@ had already measured it and written the answer down.**
 - [x] 8.9 **I walked into a documented trap.** The first draft of the label fix put backticks
   inside a comment in a Lit template literal, which ends the template — `resource-editor`
   carries a warning about exactly that, three lines from code I had just read.
-- [ ] 8.10 Clean-build gates, then QA round 2. The live checks (6.2, 6.4) remain outstanding
-  and QA notes 6.4 would have caught 8.1 — which is the argument for doing it before merge
-  rather than after.
+- [x] 8.10 Clean-build gates, then QA round 2.
+
+## 9. The live check (6.2, 6.4) — and it found two more
+
+Run in the real backoffice against real data. **QA's prediction held: 6.4 is the gate that
+would have caught the CRITICAL**, and it went on to find two defects nothing else could.
+
+Verified working: the section view registers and opens; the window defaults to Monday–Sunday
+of the current week; a week with no bookings shows the empty message; changing the window
+loads the rows; times render in the booking's own zone (09:00Z showing as 10:00 BST); no zone
+label on a single-zone page; "Booked directly" against the direct booking and "Massage"
+against the service one; "Showing 1–2 of 2" with both paging buttons correctly disabled; the
+status filter reaches the cancelled booking; a failed load is announced. **The CRITICAL fix
+was confirmed at the source that matters** — both native date inputs carry a real
+`aria-label`, and the fieldset's `aria-describedby` resolves to the hint in the same shadow
+root. All eight controls are keyboard-reachable in visual order with a visible focus ring.
+
+- [x] 9.1 **A stale error could sit above correct results.** Changing From and then To starts
+  two requests; the first went out with the second date momentarily blank, and its failure
+  arrived *after* the good response — leaving an error contradicting the data beside it. That
+  is a worse version of the state `showsEmptyMessage` exists to prevent.
+  <br>**No test could have reached it**: every test starts one load and awaits it. The view
+  now stamps each load and lets only the newest write state, verified by reproducing the
+  exact sequence in the browser.
+- [x] 9.2 **The status hint described the behaviour backwards.** It said "Tick a status to
+  include others", which reads as adding to what is shown — and ticking Cancelled shows
+  *only* cancelled, because the endpoint uses supplied statuses exactly as given. An operator
+  ticking Cancelled to see a cancelled booking alongside today's would watch today's
+  disappear and conclude the filter was broken. The behaviour is right and the sentence was
+  wrong; both the hint and the documentation now say "only those instead", with a test.
+  <br>This is the load-bearing hint QA and I had both already looked at twice, in a file
+  whose comment calls it load-bearing. Reading it is not operating it.
+- [ ] 9.3 Clean-build gates, then QA round 2.

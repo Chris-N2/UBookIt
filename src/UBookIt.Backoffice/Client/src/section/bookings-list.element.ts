@@ -59,6 +59,20 @@ export class UBookItBookingsListElement extends UmbLitElement {
   @state()
   private _window = currentWeek(new Date());
 
+  /**
+   * Which load is allowed to write state.
+   *
+   * Requests can finish out of order, and an operator changing From and then To
+   * starts two. **Found in the browser, not by a test:** the first request went
+   * out with the second date still empty, its failure arrived after the good
+   * response, and the view ended up showing an error above correct results —
+   * the error and the data contradicting each other on screen.
+   *
+   * That is a worse version of the state `showsEmptyMessage` exists to prevent,
+   * and no test could have reached it: every test calls one load and awaits it.
+   */
+  #latestLoad = 0;
+
   #term(key: string) {
     return this.localize.term(`ubookitBookings_${key}`);
   }
@@ -69,6 +83,12 @@ export class UBookItBookingsListElement extends UmbLitElement {
   }
 
   async #load() {
+    const load = ++this.#latestLoad;
+
+    // Only the most recently started load may write anything. A superseded one
+    // has already been answered by a newer question.
+    const current = () => load === this.#latestLoad;
+
     this._loading = true;
     this._error = undefined;
 
@@ -83,6 +103,10 @@ export class UBookItBookingsListElement extends UmbLitElement {
       const { data, error } = await UBookItBackofficeService.listBookings({
         query: listQuery(this._window, this._statuses, this._skip, PAGE_SIZE),
       });
+
+      if (!current()) {
+        return;
+      }
 
       if (error || !data) {
         // The endpoint reports an over-wide window in terms of the dates that
@@ -101,6 +125,10 @@ export class UBookItBookingsListElement extends UmbLitElement {
         this._total = data.total;
       }
     } catch (thrown) {
+      if (!current()) {
+        return;
+      }
+
       this._error = toApiErrors(thrown, this.#term("listLoadFailed"))
         .map((failure) => failure.message)
         .filter(Boolean)
@@ -110,7 +138,11 @@ export class UBookItBookingsListElement extends UmbLitElement {
       this._total = 0;
     }
 
-    this._loading = false;
+    // Only the newest load clears the spinner, so a superseded one cannot
+    // report "finished" while its replacement is still in flight.
+    if (current()) {
+      this._loading = false;
+    }
   }
 
   /** A window change makes the current page number meaningless, so paging resets. */
