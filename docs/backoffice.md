@@ -35,10 +35,14 @@ in logs and in the database, and it is not the display name.
 |---|---|
 | **Resources** | The bookable things themselves: opening hours, exceptions, duration limits, capabilities, and whether each may be booked directly |
 | **Services** | What a visitor books by name, and the resource roles each service resolves to |
+| **Bookings** | What the site has taken: a window you choose, filtered by status, showing when, who, which resources, which service, and status |
 
-Bookings are readable through the management API but do not yet have a screen. Viewing and
-cancelling them from the backoffice is the next piece of work; nothing about the section or
-its permissions changes when it arrives.
+The Bookings view is **read-only**. Cancelling a booking from the backoffice is the next
+piece of work; nothing about the section or its permissions changes when it arrives.
+
+The view opens on the current week and you change the window with the two date controls.
+It shows the statuses that hold their time — confirmed and requested — until you tick
+another, so a **cancelled booking is one toggle away rather than missing**.
 
 ## The service shown against a booking
 

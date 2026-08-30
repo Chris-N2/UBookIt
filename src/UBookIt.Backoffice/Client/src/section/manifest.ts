@@ -46,6 +46,27 @@ export const manifests: Array<UmbExtensionManifest> = [
     ],
   },
   {
+    type: "sectionView",
+    alias: "UBookIt.SectionView.Bookings",
+    name: "uBookIt Bookings Section View",
+    js: () => import("./bookings-view.element.js"),
+    // Below both configuration views, so the section still opens on Resources.
+    // Seeing bookings is the common task, but configuring what can be booked is
+    // the one an empty site has to do first.
+    weight: 80,
+    meta: {
+      label: "#ubookitBookings_label",
+      pathname: "bookings",
+      icon: "icon-book-alt",
+    },
+    conditions: [
+      {
+        alias: "Umb.Condition.SectionAlias",
+        match: "UBookIt.Section",
+      },
+    ],
+  },
+  {
     type: "localization",
     alias: "UBookIt.Localization.EnUS",
     name: "uBookIt English (United States)",

@@ -56,6 +56,18 @@ its own change.
   that cancelled bookings are reachable through a control, that the screen sends dates rather
   than instants, and its own accessibility bar.
 
+**`booking-management`'s Purpose statement is falsified and must be corrected at sync.** Its
+last line reads *"This capability currently covers only the reading half of see."* — true
+while there was an endpoint and no screen, and false once this lands: the capability then
+covers *see* entirely, and only *cancel* remains. It is prose outside any requirement, so it
+carries no delta; it is recorded here and in the task list so that syncing this change
+includes fixing it rather than leaving the capability's own summary contradicting its
+contents.
+
+Found by sweeping the capability being modified **first** — which is exactly where the
+previous change's sweep failed, for the same reason: having edited its requirements feels
+like having read it.
+
 **Deliberately NOT modified:** `resource-management`'s *Editor accessibility baseline*. It
 would be the obvious place to widen, and widening it means replacing it wholesale — carrying
 six scenarios about resource editing forward to say something about a bookings list. The

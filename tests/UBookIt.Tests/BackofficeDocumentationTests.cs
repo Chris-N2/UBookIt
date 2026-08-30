@@ -46,9 +46,16 @@ public class BackofficeDocumentationTests
     {
         var docs = Docs();
 
-        // The endpoint exists; the screen does not. Saying so plainly is the difference
-        // between documentation and a roadmap.
-        DocumentationAssert.Says(docs, "do not yet have a screen");
+        // The screen now exists, so the sentence that said it did not is gone — that
+        // statement was true when written and this change is what made it false. What
+        // replaces it is the narrower claim that still holds: the view is read-only.
+        DocumentationAssert.Says(docs, "The Bookings view is read-only");
+        Assert.DoesNotContain("do not yet have a screen", docs, StringComparison.OrdinalIgnoreCase);
+
+        // And the status default is disclosed, because the endpoint hides cancelled
+        // bookings by default and an operator who cannot find one must be able to learn
+        // why from the package rather than by experiment.
+        DocumentationAssert.Says(docs, "cancelled booking is one toggle away rather than missing");
 
         // And the three verbs the section genuinely lacks are named, because "management
         // section" invites the assumption that it manages everything.

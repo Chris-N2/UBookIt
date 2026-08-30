@@ -287,4 +287,50 @@ export default {
     confirmDelete: "Delete",
     confirmFailed: "The confirmation dialog could not be shown, so nothing was deleted.",
   },
+  ubookitBookings: {
+    label: "Bookings",
+
+    // ------------------------------------------------------------- the window
+    //
+    // The dates are shown rather than hidden behind a preset, because the site
+    // refuses an over-wide window and names the dates it refused. A failure
+    // that names something not on screen cannot be acted on.
+    from: "From",
+    to: "To",
+
+    // ------------------------------------------------------------ the filter
+    //
+    // The hint is load-bearing. The endpoint returns only what blocks time when
+    // no status is asked for, so an operator hunting a cancelled booking would
+    // otherwise conclude it is gone rather than one toggle away — and the port
+    // requires that this be learnable from the package rather than by
+    // experiment.
+    statusFilter: "Status",
+    statusHint: "Showing bookings that hold their time. Tick a status to include others.",
+    statusRequested: "Requested",
+    statusConfirmed: "Confirmed",
+    statusCancelled: "Cancelled",
+    statusDeclined: "Declined",
+
+    // ------------------------------------------------------------- the table
+    when: "When",
+    booker: "Booker",
+    resources: "Resources",
+    service: "Service",
+    status: "Status",
+
+    // Words, not a blank cell. A booking with no service was placed directly
+    // against a resource offered on its own — a recorded fact, where an empty
+    // cell reads as data that failed to load.
+    bookedDirectly: "Booked directly",
+
+    empty: "No bookings in this window.",
+    previousPage: "Previous page",
+    nextPage: "Next page",
+    showing: "Showing %0%–%1% of %2%",
+    tableLabel: "Bookings",
+    pagingLabel: "Booking list pages",
+    loadingList: "Loading bookings",
+    listLoadFailed: "The bookings could not be loaded.",
+  },
 };
