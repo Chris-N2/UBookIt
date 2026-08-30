@@ -67,10 +67,10 @@
 ## 6. Accessibility
 
 - [x] 6.1 Every control labelled; the table's header cells associated with their columns.
-- [ ] 6.2 Keyboard operability end to end with visible focus, focus order matching visual
+- [x] 6.2 Keyboard operability end to end with visible focus, focus order matching visual
   order.
 - [x] 6.3 A failed load announced to assistive technology, not merely rendered.
-- [ ] 6.4 Verify in the running backoffice, not only in tests — the previous UI change found
+- [x] 6.4 Verify in the running backoffice, not only in tests — the previous UI change found
   two defects only the browser could show.
 
 ## 7. Close
@@ -187,4 +187,4 @@ root. All eight controls are keyboard-reachable in visual order with a visible f
   wrong; both the hint and the documentation now say "only those instead", with a test.
   <br>This is the load-bearing hint QA and I had both already looked at twice, in a file
   whose comment calls it load-bearing. Reading it is not operating it.
-- [ ] 9.3 Clean-build gates, then QA round 2.
+- [x] 9.3 Clean-build gates, then QA round 2.
