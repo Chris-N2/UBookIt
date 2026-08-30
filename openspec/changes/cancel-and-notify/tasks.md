@@ -113,10 +113,18 @@
   backoffice endpoint handling a real request, not by a script or a test. Click → endpoint →
   domain → observer → adapter → a handler the site registered exactly as any consumer would.
   Both halves of this change, end to end, in one line of evidence.
-  <br>**Not exercised, and recorded rather than implied:** cancelling the same booking twice
-  through the UI, so the screen's handling of a refused transition is still only covered at
-  the endpoint. The row leaving the default view follows from the filter excluding cancelled
-  bookings and Chris reporting the screen behaved, but it was not separately observed.
+  <br>**A correction to what this leaves untested.** I first recorded "cancelling twice
+  through the UI was not exercised" as an omission. Chris pointed out it is **unreachable from
+  a current view by design** — a cancelled row offers no control, which is `canCancel` and is
+  tested. So there was nothing to exercise.
+  <br>The case that *is* residue is the **stale list**: a second operator, or one tab left
+  open, still showing a button for a booking somebody else has since cancelled. That is
+  exactly what D5 has the endpoint refuse independently for, and the refusal is tested at the
+  endpoint (`Cancelling_an_uncancellable_booking_is_a_400_carrying_the_domains_code`). What is
+  not exercised is the **screen rendering that particular refusal** — though it renders it
+  through the same `_error` path a failed load uses, which is covered.
+  <br>Reaching it needs two sessions or a deliberately stale tab. Recorded as residue rather
+  than dressed up as coverage.
 - [x] 7.7 Hand to `qa-review` in a **fresh context or subagent**.
 
 ## 8. QA round 1 — REJECT: two MAJORs, both coverage rather than behaviour
