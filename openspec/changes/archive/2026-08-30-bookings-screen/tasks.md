@@ -88,7 +88,10 @@
   `booking-management` itself** — the capability being modified is the one the last change
   proved easiest to skip, because editing its requirements feels like having read it. Then
   `resource-management`'s section and accessibility requirements, and `packaging`.
-- [ ] 7.8 **At sync: correct `booking-management`'s Purpose.** Its closing line —
+- [x] 7.8 **At sync: correct `booking-management`'s Purpose.** *Done at sync:* it now reads
+  "This capability now covers *see* in full — the read port, the authorized endpoint over it,
+  and the backoffice view an operator reads it in — and *cancel* is the half still
+  outstanding." The rest of the paragraph is untouched. Its closing line —
   *"This capability currently covers only the reading half of see"* — is true today and false
   once this lands. It is prose outside any requirement, so no delta carries it and only the
   sync can fix it. Left undone here would leave a capability's own summary contradicting its
