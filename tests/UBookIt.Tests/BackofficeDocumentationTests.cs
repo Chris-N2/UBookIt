@@ -46,15 +46,53 @@ public class BackofficeDocumentationTests
     {
         var docs = Docs();
 
-        // The endpoint exists; the screen does not. Saying so plainly is the difference
-        // between documentation and a roadmap.
-        DocumentationAssert.Says(docs, "do not yet have a screen");
+        // The screen now exists, so the sentence that said it did not is gone — that
+        // statement was true when written and this change is what made it false. What
+        // replaces it is the narrower claim that still holds: the view is read-only.
+        DocumentationAssert.Says(docs, "The Bookings view is read-only");
+        Assert.DoesNotContain("do not yet have a screen", docs, StringComparison.OrdinalIgnoreCase);
+
+        // And the status default is disclosed, because the endpoint hides cancelled
+        // bookings by default and an operator who cannot find one must be able to learn
+        // why from the package rather than by experiment.
+        // "tick", not "toggle": the status filter became four native checkboxes when the
+        // hint had to be associated with the controls, and this sentence went on describing
+        // a switch that is no longer on the screen — while the paragraph four lines below it
+        // already said "ticking". An operator reading a page that contradicts itself hunts
+        // for a control that does not exist.
+        DocumentationAssert.Says(docs, "cancelled booking is one tick away rather than missing");
+        Assert.DoesNotContain("one toggle away", docs, StringComparison.OrdinalIgnoreCase);
+
+        // And that ticking REPLACES rather than adds. The screen's own hint said
+        // "include others" until operating it showed that ticking Cancelled makes the
+        // confirmed bookings disappear — correct behaviour, wrongly described. An
+        // operator who reads "include" and watches today's bookings vanish will conclude
+        // the filter is broken.
+        DocumentationAssert.Says(docs, "Ticking statuses shows only those");
 
         // And the three verbs the section genuinely lacks are named, because "management
         // section" invites the assumption that it manages everything.
         DocumentationAssert.Says(docs, "It does not place bookings");
         DocumentationAssert.Says(docs, "It does not approve or decline");
         DocumentationAssert.Says(docs, "It does not amend a booking's time");
+    }
+
+    [Fact]
+    public void The_screen_and_the_documentation_agree_about_what_ticking_a_status_does()
+    {
+        // Defect 9.2 lived in two places — the hint an operator reads on the screen, and
+        // the documentation — and the assertion above guards only one of them. Reverting
+        // the hint alone would ship green, with the docs correctly describing behaviour
+        // that the screen once again misdescribes: the same defect with its halves
+        // swapped.
+        //
+        // The screen's string is the one that matters more of the two. Nobody reads the
+        // documentation while standing in front of the filter.
+        var strings = Support.RepoFiles.Read(
+            "src/UBookIt.Backoffice/Client/src/localization/en-us.ts");
+
+        Assert.Contains("show only those instead", strings, StringComparison.Ordinal);
+        Assert.DoesNotContain("Tick a status to include others", strings, StringComparison.Ordinal);
     }
 
     [Fact]
