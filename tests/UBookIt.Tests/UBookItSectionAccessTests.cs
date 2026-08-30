@@ -10,6 +10,7 @@ using UBookIt.Backoffice.Composers;
 using UBookIt.Backoffice.Controllers;
 using UBookIt.Backoffice.Security;
 using UBookIt.Core.Common;
+using UBookIt.Tests.Support;
 using Umbraco.Cms.Core.Cache;
 using Umbraco.Cms.Core.Composing;
 using Umbraco.Cms.Core.Configuration.Models;
@@ -266,34 +267,6 @@ public class UBookItSectionAccessTests
         return services.BuildServiceProvider();
     }
 
-    /// <summary>
-    /// An <see cref="IUmbracoBuilder"/> that offers a service collection and nothing else.
-    /// A composer that started reading configuration or the type loader would fail loudly
-    /// here rather than being handed an invented answer.
-    /// </summary>
-    private sealed class ServicesOnlyUmbracoBuilder(IServiceCollection services) : IUmbracoBuilder
-    {
-        public IServiceCollection Services { get; } = services;
-
-        public IConfiguration Config => throw new NotSupportedException(Explanation);
-
-        public TypeLoader TypeLoader => throw new NotSupportedException(Explanation);
-
-        public ILoggerFactory BuilderLoggerFactory => throw new NotSupportedException(Explanation);
-
-        public IProfiler Profiler => throw new NotSupportedException(Explanation);
-
-        public AppCaches AppCaches => throw new NotSupportedException(Explanation);
-
-        public TBuilder WithCollectionBuilder<TBuilder>() where TBuilder : ICollectionBuilder
-            => throw new NotSupportedException(Explanation);
-
-        public void Build() => throw new NotSupportedException(Explanation);
-
-        private const string Explanation =
-            "The authorization composer registers services and reads nothing else. If that "
-            + "changed, give this stub a real answer rather than an invented one.";
-    }
 
     /// <summary>
     /// Answers only the question the handler asks. Everything else throws, so a handler

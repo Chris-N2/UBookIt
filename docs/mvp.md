@@ -24,14 +24,15 @@ A gap anywhere in this list means there is no product, however complete the rest
 | 4 | **Publish a booking page** without writing code | ✅ |
 | 5 | **A visitor books**, with or without JavaScript | ✅ |
 | 6 | **The owner sees bookings** in the backoffice | ✅ |
-| 7 | **The owner cancels** a booking | ❌ next change |
-| 8 | **The site can react** when a booking is placed or cancelled | ❌ next change |
+| 7 | **The owner cancels** a booking | ✅ |
+| 8 | **The site can react** when a booking is placed or cancelled | ✅ |
 | 9 | **It is licensed and documented** enough for someone to adopt | ❌ not built |
 
-Steps 2–6 are done and merged. Steps 7 and 8 are one change. Step 1 and step 9 are the
-packaging change, and step 1 is only proven by installing the built package into a clean
-Umbraco site — building a `.nupkg` proves nothing, because the current one builds and cannot
-be consumed.
+Steps 2–8 are done. **Only packaging is left** — step 1 and step 9, one change — and step 1
+is proven by installing the built package into a clean Umbraco site, not by building a
+`.nupkg`. The current one builds happily and cannot be consumed: it declares dependencies on
+`UBookIt.Core` and `UBookIt.Persistence` packages that do not exist, and omits `UBookIt.Web`
+entirely, so the Razor booking page ships to nobody.
 
 ### Why 8 is in v1 rather than after it
 
@@ -68,12 +69,13 @@ somebody discovers.
   and capacity is a model change rather than a setting.
 - **Recurring bookings, payment, cancellation windows, and any language beyond `en-US`.**
 
-## What "done" looks like for the two remaining changes
+## What "done" looks like for the remaining change
 
-**Cancel and notify** — an operator can cancel a booking they can see; the booking's status
-becomes `Cancelled` and it stops holding its time; the site receives an event for both
-placement and cancellation carrying enough to act on; and the backoffice documentation says
-plainly that the package notifies nobody by itself.
+~~**Cancel and notify**~~ — done. An operator can cancel a booking they can see; the status
+becomes `Cancelled` and it stops holding its time; the site receives a notification for both
+placement and cancellation carrying the booking; and both the backoffice documentation and the
+confirmation dialog say plainly that the package notifies nobody by itself. See
+[reacting to bookings](notifications.md).
 
 **Packaging** — the package installs into a clean Umbraco 17 site from a local feed and the
 booking flow works there, proven by doing it rather than by inspecting a `.nupkg`; every

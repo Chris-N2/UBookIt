@@ -240,10 +240,28 @@ public sealed class InMemoryBookingStore : IBookingStore
         }
     }
 
+    /// <summary>
+    /// How many updates this store has been asked to persist.
+    /// </summary>
+    /// <remarks>
+    /// Counted because this store <b>cannot otherwise show that an update happened</b>: it
+    /// keeps the same instance the caller mutated, so re-reading a cancelled booking reports
+    /// <c>Cancelled</c> whether or not anything was ever persisted. Removing the
+    /// <c>UpdateAsync</c> call from cancellation left the whole observation suite green until
+    /// this existed.
+    /// <para>
+    /// That instance-sharing is convenient and has now caused three separate false negatives,
+    /// so where a test needs to know that a write <i>occurred</i> rather than that a value
+    /// <i>looks right</i>, it asks this.
+    /// </para>
+    /// </remarks>
+    public int UpdateCount { get; private set; }
+
     public Task UpdateAsync(Booking booking, CancellationToken cancellationToken = default)
     {
         lock (_gate)
         {
+            UpdateCount++;
             _bookings[booking.Id] = booking;
             return Task.CompletedTask;
         }

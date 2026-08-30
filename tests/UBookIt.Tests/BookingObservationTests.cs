@@ -1,6 +1,9 @@
+using Microsoft.Extensions.DependencyInjection;
 using UBookIt.Core.Bookings;
 using UBookIt.Core.Common;
 using UBookIt.Core.Resources;
+using UBookIt.Persistence.Composing;
+using UBookIt.Persistence.Notifications;
 using UBookIt.Tests.Support;
 
 namespace UBookIt.Tests;
@@ -70,6 +73,17 @@ public class BookingObservationTests
     {
         public List<BookingStatus?> StatusWhenTold { get; } = [];
 
+        /// <summary>
+        /// How many writes the store had taken when each report arrived.
+        /// </summary>
+        /// <remarks>
+        /// The status alone cannot show that cancellation was <i>persisted</i>: this store
+        /// keeps the instance the domain mutated, so it reads <c>Cancelled</c> whether or not
+        /// <c>UpdateAsync</c> was ever called. Deleting that call left every test here green
+        /// until this was recorded too.
+        /// </remarks>
+        public List<int> UpdatesWhenTold { get; } = [];
+
         public Task BookingPlacedAsync(Booking booking, CancellationToken cancellationToken = default)
             => RecordAsync(booking.Id, cancellationToken);
 
@@ -80,6 +94,7 @@ public class BookingObservationTests
         {
             var stored = await store.GetBookingAsync(bookingId, cancellationToken);
             StatusWhenTold.Add(stored?.Status);
+            UpdatesWhenTold.Add(store.UpdateCount);
         }
     }
 
@@ -267,6 +282,35 @@ public class BookingObservationTests
         Assert.Equal(
             [BookingStatus.Confirmed, BookingStatus.Cancelled],
             observer!.StatusWhenTold);
+
+        // Placement's entry reports zero updates (it was an insert); cancellation's reports
+        // one, which is the part the status alone cannot show. Without this, deleting the
+        // UpdateAsync call from cancellation leaves every test here green — the store keeps
+        // the instance the domain mutated, so it reads Cancelled either way.
+        Assert.Equal([0, 1], observer.UpdatesWhenTold);
+    }
+
+    [Fact]
+    public void The_package_registers_a_real_observer()
+    {
+        // The residual risk of defaulting the constructor parameter, and the reason that
+        // default is defensible: a host that never registered an observer would get silence,
+        // and silence looks exactly like a site with no subscribers. So the registration is
+        // asserted rather than trusted.
+        //
+        // Asserted against the composer's own registration list — not by resolving, which
+        // would need a container Umbraco has already configured.
+        var registrations = new ServiceCollection();
+        new UBookItPersistenceComposer().Compose(new ServicesOnlyUmbracoBuilder(registrations));
+
+        var observer = Assert.Single(
+            registrations, d => d.ServiceType == typeof(IBookingObserver));
+
+        Assert.Equal(typeof(UmbracoBookingObserver), observer.ImplementationType);
+
+        // And not the no-op, which would be a registration that satisfies a presence check
+        // while telling nobody anything.
+        Assert.NotEqual(typeof(NullBookingObserver), observer.ImplementationType);
     }
 
     [Fact]

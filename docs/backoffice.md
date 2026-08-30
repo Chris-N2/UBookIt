@@ -37,8 +37,13 @@ in logs and in the database, and it is not the display name.
 | **Services** | What a visitor books by name, and the resource roles each service resolves to |
 | **Bookings** | What the site has taken: a window you choose, filtered by status, showing when, who, which resources, which service, and status |
 
-The Bookings view is **read-only**. Cancelling a booking from the backoffice is the next
-piece of work; nothing about the section or its permissions changes when it arrives.
+From the Bookings view **you can see bookings and cancel them**. Those are the two things v1
+does: it does not approve, decline, amend or take a booking on someone's behalf.
+
+**Cancelling tells nobody.** The time is released immediately and the booking keeps its
+record, but uBookIt sends no email or message to the person who booked — so if they should
+know, that is yours to do. Your site can react automatically: see
+[reacting to bookings](notifications.md).
 
 The view opens on the current week and you change the window with the two date controls.
 It shows the statuses that hold their time — confirmed and requested — so a **cancelled

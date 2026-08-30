@@ -3,7 +3,9 @@ import { UmbLitElement } from "@umbraco-cms/backoffice/lit-element";
 import { UBookItBackofficeService } from "../api/index.js";
 import type { BookingModel } from "../api/index.js";
 import { toApiErrors } from "./api-errors.js";
+import { confirmDestructive } from "./confirm.js";
 import {
+  canCancel,
   currentWeek,
   formatInterval,
   listQuery,
@@ -30,12 +32,13 @@ const STATUSES = ["Requested", "Confirmed", "Cancelled", "Declined"] as const;
 
 /**
  * Collection view over the bookings endpoint: a window, a status filter, a
- * semantic table and prev/next paging.
+ * semantic table, prev/next paging, and cancellation.
  *
- * Read-only by design. Cancelling is the only other v1 verb and is its own
- * change; there is deliberately no editor to route to and no seam prepared for
- * one, because a routing seam for a workspace that does not exist is a guess
- * about what that change will need.
+ * Cancelling is the second and last of v1's management verbs, and it is a row
+ * action rather than a workspace — there is still nothing to open a booking
+ * into, because the list already shows everything the read port carries.
+ * Approving, declining and amending are each domain changes and none of them is
+ * here.
  */
 @customElement("ubookit-bookings-list")
 export class UBookItBookingsListElement extends UmbLitElement {
@@ -311,6 +314,9 @@ export class UBookItBookingsListElement extends UmbLitElement {
           <uui-table-head-cell>${this.#term("resources")}</uui-table-head-cell>
           <uui-table-head-cell>${this.#term("service")}</uui-table-head-cell>
           <uui-table-head-cell>${this.#term("status")}</uui-table-head-cell>
+          <uui-table-head-cell>
+            <span class="visually-hidden">${this.#term("actions")}</span>
+          </uui-table-head-cell>
         </uui-table-head>
         ${this._items.map((booking) => this.#renderRow(booking, showZone))}
       </uui-table>
@@ -361,8 +367,73 @@ export class UBookItBookingsListElement extends UmbLitElement {
         </uui-table-cell>
         <uui-table-cell>${serviceLabel(booking, this.#term("bookedDirectly"))}</uui-table-cell>
         <uui-table-cell>${this.#term(`status${booking.status}`)}</uui-table-cell>
+        <uui-table-cell>
+          <!--
+            Offered only where the domain would allow it. A control that is always
+            refused teaches an operator to ignore failures — and the endpoint refuses
+            independently anyway, so this is a convenience rather than the rule.
+          -->
+          ${canCancel(booking.status)
+            ? html`<uui-button
+                look="secondary"
+                color="danger"
+                label="${this.#term("cancel")} ${booking.bookerName}"
+                @click=${() => this.#cancel(booking)}
+              ></uui-button>`
+            : nothing}
+        </uui-table-cell>
       </uui-table-row>
     `;
+  }
+
+  async #cancel(booking: BookingModel) {
+    const outcome = await confirmDestructive(this, {
+      headline: this.#term("confirmCancelHeadline"),
+      content: this.localize.term("ubookitBookings_confirmCancelContent", booking.bookerName),
+      confirmLabel: this.#term("confirmCancel"),
+    });
+
+    // Three outcomes, not two. A confirmation that failed to appear is not the
+    // operator declining — treating it as one turns a broken dialog into a silent
+    // no-op, where they press Cancel, confirm nothing, and see no request, message
+    // or trace.
+    if (outcome === "failed") {
+      this._error = this.#term("confirmFailed");
+      return;
+    }
+
+    if (outcome === "cancelled") {
+      return;
+    }
+
+    try {
+      const { error } = await UBookItBackofficeService.cancelBooking({
+        path: { id: booking.bookingId },
+      });
+
+      if (error) {
+        // Shown rather than swallowed. The domain refuses a booking somebody else
+        // already cancelled, and an operator whose row simply stopped offering the
+        // button would have no idea why.
+        this._error = toApiErrors(error, this.#term("cancelFailed"))
+          .map((failure) => failure.message)
+          .filter(Boolean)
+          .join(" ") || this.#term("cancelFailed");
+        return;
+      }
+    } catch (thrown) {
+      this._error = toApiErrors(thrown, this.#term("cancelFailed"))
+        .map((failure) => failure.message)
+        .filter(Boolean)
+        .join(" ") || this.#term("cancelFailed");
+      return;
+    }
+
+    // Reload rather than patch the row in place. Cancelling changes what the query
+    // matches — the default filter excludes cancelled bookings, so the row usually
+    // leaves the view entirely — and the total changes with it. Editing the row
+    // would show a booking the current filter no longer selects.
+    await this.#load();
   }
 
   static override styles = css`

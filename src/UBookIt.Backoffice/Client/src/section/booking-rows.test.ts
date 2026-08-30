@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
 import {
+  canCancel,
   currentWeek,
   formatInterval,
   listQuery,
@@ -209,6 +210,28 @@ describe("when the zone is shown", () => {
     // it "says so" when it falls back; this is what keeps that promise.
     expect(zoneFallbackOccurred([booking({ timeZoneId: "Mars/Olympus_Mons" })])).toBe(true);
     expect(zoneFallbackOccurred([booking(), booking()])).toBe(false);
+  });
+});
+
+describe("which bookings offer cancellation", () => {
+  it("offers it for the statuses the domain can cancel from", () => {
+    expect(canCancel("Requested")).toBe(true);
+    expect(canCancel("Confirmed")).toBe(true);
+  });
+
+  it("does not offer it where the domain would refuse", () => {
+    // A control that is always refused teaches an operator to ignore failures,
+    // which is a worse habit than a missing button is an inconvenience.
+    expect(canCancel("Cancelled")).toBe(false);
+    expect(canCancel("Declined")).toBe(false);
+  });
+
+  it("does not offer it for a status it does not recognise", () => {
+    // Closed rather than open: a status added to the domain later should arrive
+    // here as "no button" and a deliberate decision, not as a button that
+    // happens to work because the check was a denylist.
+    expect(canCancel("Rescheduled")).toBe(false);
+    expect(canCancel("")).toBe(false);
   });
 });
 

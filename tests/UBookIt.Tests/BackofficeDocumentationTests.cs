@@ -46,11 +46,16 @@ public class BackofficeDocumentationTests
     {
         var docs = Docs();
 
-        // The screen now exists, so the sentence that said it did not is gone — that
-        // statement was true when written and this change is what made it false. What
-        // replaces it is the narrower claim that still holds: the view is read-only.
-        DocumentationAssert.Says(docs, "The Bookings view is read-only");
+        // Twice now this assertion has had to move with the behaviour, which is the point of
+        // it. First it said bookings "do not yet have a screen"; the screen arrived. Then it
+        // said the view was "read-only"; cancelling arrived. Each sentence was true when
+        // written and each was made false by the very change that had to update it.
+        //
+        // What it says now is the pair of verbs v1 actually has, which is stable in a way
+        // "read-only" was not: see and cancel.
+        DocumentationAssert.Says(docs, "you can see bookings and cancel them");
         Assert.DoesNotContain("do not yet have a screen", docs, StringComparison.OrdinalIgnoreCase);
+        Assert.DoesNotContain("view is read-only", docs, StringComparison.OrdinalIgnoreCase);
 
         // And the status default is disclosed, because the endpoint hides cancelled
         // bookings by default and an operator who cannot find one must be able to learn

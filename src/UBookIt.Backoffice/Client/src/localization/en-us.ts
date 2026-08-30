@@ -342,5 +342,26 @@ export default {
     pagingLabel: "Booking list pages",
     loadingList: "Loading bookings",
     listLoadFailed: "The bookings could not be loaded.",
+
+    // ---------------------------------------------------------------- cancel
+    //
+    // The confirmation says who the booking is for, because that is what an
+    // operator recognises in a list of times — and because cancelling the wrong
+    // one cannot be undone from here.
+    //
+    // It also says the package tells nobody. That sentence is the whole reason
+    // the notification hook shipped in the same change: an operator who assumes
+    // uBookIt emails the customer will not discover otherwise until somebody
+    // arrives for a booking that no longer exists. It belongs at the moment of
+    // deciding, not in documentation nobody is reading just then.
+    actions: "Actions",
+    cancel: "Cancel booking for",
+    confirmCancelHeadline: "Cancel booking",
+    confirmCancelContent:
+      "Cancel the booking for %0%? The time is released immediately. uBookIt does not tell "
+      + "the person who booked — if they should know, you will need to contact them.",
+    confirmCancel: "Cancel booking",
+    confirmFailed: "The confirmation could not be shown, so nothing was cancelled.",
+    cancelFailed: "The booking could not be cancelled.",
   },
 };

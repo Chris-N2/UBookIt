@@ -134,6 +134,26 @@ export function shouldLoad(window: Window): boolean {
 }
 
 /**
+ * Whether the view offers to cancel this booking.
+ *
+ * Only where the domain would allow it — the status machine permits cancellation
+ * from `Requested` and `Confirmed` and from nothing else. Offering a control that
+ * is always refused teaches an operator to ignore failures, which is a worse
+ * habit than a missing button is an inconvenience.
+ *
+ * **This is a convenience, not the rule.** The endpoint refuses an invalid
+ * transition independently, so a screen showing a stale list cannot talk the
+ * domain into one. If this function and the domain ever disagree, the domain
+ * wins and the operator is told.
+ *
+ * Compared by NAME, because that is what crosses the wire — the same reason the
+ * status filter sends published names rather than labels.
+ */
+export function canCancel(status: string): boolean {
+  return status === "Requested" || status === "Confirmed";
+}
+
+/**
  * Where paging should be after a query changes.
  *
  * Always the first page when the *query* changed — a page number counts into
