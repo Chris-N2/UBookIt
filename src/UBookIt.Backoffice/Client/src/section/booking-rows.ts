@@ -69,12 +69,17 @@ export function currentWeek(today: Date): Window {
 /**
  * The `statuses` query value for a set of selected names — or `undefined`.
  *
- * **`undefined` and `[]` are different requests, and only one of them is the
- * endpoint's default.** Omitting the parameter yields the statuses that block
- * time; sending an empty array is a caller stating a filter, and sending all
- * four names is a third request again. The port settles this default and the
- * view must not restate it, so "the operator has chosen nothing" has to mean
- * "do not send the parameter".
+ * Omitting the parameter yields the statuses that block time, which is what
+ * "the operator has chosen nothing" means.
+ *
+ * **An earlier version of this comment claimed an empty array would return
+ * nothing. It does not** — the endpoint treats an empty set exactly as an
+ * absent one, so that request is harmless. The reason to omit is that the port
+ * settles this default and a view that restates it creates a second one.
+ *
+ * The request that genuinely differs is naming **all four** statuses to mean
+ * "the default": that includes cancelled and declined, which the default
+ * excludes, so it answers a question the operator did not ask.
  */
 export function statusesParam(selected: readonly string[]): string[] | undefined {
   return selected.length === 0 ? undefined : [...selected];
@@ -111,6 +116,38 @@ export function listQuery(
 }
 
 /**
+ * Where paging should be after a query changes.
+ *
+ * Always the first page when the *query* changed — a page number counts into
+ * one result set and means nothing in another. An operator on page 3 who
+ * narrows the window would otherwise get page 3 of a different question:
+ * plausibly empty, under a "Showing 41–60 of 12" label that cannot be true.
+ *
+ * Out here rather than inline in two event handlers because it is the same
+ * class of failure as the rest of this module — nothing on screen says the page
+ * number is stale, and a reader looking at an empty page has no way to tell it
+ * from a window with no bookings in it.
+ */
+export function skipAfter(change: "query" | "page", currentSkip: number): number {
+  return change === "query" ? 0 : currentSkip;
+}
+
+/**
+ * Whether to tell the reader that nothing matched.
+ *
+ * Only when the view actually knows. After a failed request it does not: the
+ * alert says what happened, and adding "No bookings in this window" beside it
+ * answers a question nothing asked, with the answer most likely to be wrong.
+ *
+ * The two states render almost identically and mean opposite things — "nothing
+ * is booked" versus "we could not find out" — which is exactly why this is a
+ * named decision rather than a condition buried in a template.
+ */
+export function showsEmptyMessage(total: number, failed: boolean): boolean {
+  return total === 0 && !failed;
+}
+
+/**
  * Whether the zone must be shown beside each time.
  *
  * Only when this page holds more than one — that is the case where a reader can
@@ -126,7 +163,20 @@ export function listQuery(
  * zone after it has taken bookings, and stated in the spec rather than implied.
  */
 export function zoneLabelNeeded(bookings: readonly BookingLike[]): boolean {
-  return new Set(bookings.map((booking) => booking.timeZoneId)).size > 1;
+  // Resolved zones, not raw ids. Deduping on the id let a page where every
+  // booking carried an id the runtime rejects render UTC times with no label at
+  // all — one zone by the id's reckoning, and silently not the zone the times
+  // were actually formatted in. `formatInterval` promises it "says so" when it
+  // falls back; this is the half that keeps that promise.
+  return new Set(bookings.map((booking) => resolveZone(booking.timeZoneId))).size > 1;
+}
+
+/**
+ * Whether any booking on the page is being shown in a zone that is not the one
+ * it records — i.e. the fallback fired and the reader must be told.
+ */
+export function zoneFallbackOccurred(bookings: readonly BookingLike[]): boolean {
+  return bookings.some((booking) => resolveZone(booking.timeZoneId) !== booking.timeZoneId);
 }
 
 /**
@@ -147,17 +197,30 @@ export function formatInterval(
   formatter: (options: Intl.DateTimeFormatOptions) => Intl.DateTimeFormat = (options) =>
     new Intl.DateTimeFormat(locale, options),
 ): { text: string; zone: string } {
-  const zone = supportedZone(booking.timeZoneId);
+  const zone = resolveZone(booking.timeZoneId);
 
-  const date = formatter({ timeZone: zone, dateStyle: "medium" }).format(new Date(booking.startUtc));
-  const start = formatter({ timeZone: zone, timeStyle: "short" }).format(new Date(booking.startUtc));
-  const end = formatter({ timeZone: zone, timeStyle: "short" }).format(new Date(booking.endUtc));
+  const day = formatter({ timeZone: zone, dateStyle: "medium" });
+  const clock = formatter({ timeZone: zone, timeStyle: "short" });
 
-  return { text: `${date}, ${start}–${end}`, zone };
+  const startDay = day.format(new Date(booking.startUtc));
+  const endDay = day.format(new Date(booking.endUtc));
+  const start = clock.format(new Date(booking.startUtc));
+  const end = clock.format(new Date(booking.endUtc));
+
+  // A booking that runs past midnight ends on a different day, and naming only
+  // the start date reports an end that appears to precede its own start —
+  // "2 Sept, 23:00–02:00". Overnight bookings are ordinary for a booking
+  // system, so the second date is shown exactly when it differs.
+  const text =
+    startDay === endDay
+      ? `${startDay}, ${start}–${end}`
+      : `${startDay}, ${start} – ${endDay}, ${end}`;
+
+  return { text, zone };
 }
 
 /** The booking's zone if the runtime knows it, UTC if it does not. */
-function supportedZone(timeZoneId: string): string {
+function resolveZone(timeZoneId: string): string {
   try {
     new Intl.DateTimeFormat("en", { timeZone: timeZoneId });
     return timeZoneId;

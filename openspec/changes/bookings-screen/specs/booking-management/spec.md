@@ -50,9 +50,19 @@ rather than as a generic failure.
 - **WHEN** an operator opens the Bookings view without choosing anything
 - **THEN** the bookings of the current week are listed, and the window's two dates are shown
 
+**A change to the query SHALL return the view to the first page.** A page number counts into
+one result set and means nothing in another: an operator on page three who narrows the window
+would otherwise be shown page three of a different question — plausibly empty, beneath a
+"showing 41–60 of 12" that cannot be true — with nothing on screen indicating the page number
+is stale.
+
 #### Scenario: The operator changes the window
 - **WHEN** an operator changes either date
 - **THEN** the list reloads for the new window
+
+#### Scenario: Changing the query returns to the first page
+- **WHEN** an operator on a later page changes the window or the status filter
+- **THEN** the first page of the new result set is shown, rather than a page counted into the previous one
 
 #### Scenario: An over-wide window is reported, not swallowed
 - **WHEN** an operator asks for a window wider than the site permits
@@ -68,9 +78,16 @@ or declined booking is invisible by default. The view SHALL offer a status contr
 reach them.
 
 **Selecting no status SHALL mean what the endpoint means by omitting it** — the statuses that
-block time — and SHALL NOT mean "no statuses", which would return nothing. A default restated
-in the view is a second default, and the one an operator meets would depend on which layer
-answered first.
+block time — and the view SHALL express that by **omitting the parameter** rather than by
+naming a set of its own.
+
+The reason is that a default restated in the view is a second default, and the one an
+operator meets would then depend on which layer answered first. It is **not** that an empty
+set would return nothing: the endpoint treats an empty set exactly as it treats an absent
+one, so that particular request is harmless. What is not harmless is the view naming **all
+four** statuses to mean "the default", which is a genuinely different request — it includes
+cancelled and declined bookings, which the default excludes — and would silently answer a
+question the operator did not ask.
 
 Status values SHALL cross the wire as the names the package publishes. A localized label SHALL
 NOT be sent as a value.
@@ -97,6 +114,13 @@ zone**, so two rows can never be read against each other as though they shared a
 every row shares a zone — every ordinary site — the label SHALL be omitted rather than
 repeated on every row.
 
+**It SHALL also be shown when a booking's recorded zone could not be resolved and its time is
+therefore being displayed in some other zone.** A time shown in a zone the booking does not
+name is exactly the misattribution this requirement exists to prevent, and it is worse
+unlabelled than a mixed page is: the reader has no cue at all that the clock is not the
+booking's own. Distinctness is judged on the zone a row is **displayed in** rather than the
+identifier it carries, so two unresolvable identifiers showing the same clock count as one.
+
 **The limit of this SHALL be stated rather than implied:** the view compares the bookings on
 the page with each other, not with the site's configured zone, because the endpoint does not
 report the site's zone and adding a field the read port cannot supply is forbidden. A page
@@ -110,6 +134,10 @@ That is reachable only by changing a site's zone after it has taken bookings.
 #### Scenario: A mixed-zone page is disambiguated
 - **WHEN** the page contains bookings placed in different zones
 - **THEN** each row shows the zone its time is expressed in
+
+#### Scenario: A time shown in a substituted zone says so
+- **WHEN** a booking's recorded zone cannot be resolved and its time is shown in another
+- **THEN** the zone it is displayed in is shown, even where every row on the page is affected alike
 
 ### Requirement: The bookings view meets the section's accessibility bar
 The view's markup SHALL meet the same bar the section's editors do: every control labelled,

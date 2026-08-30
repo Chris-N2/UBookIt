@@ -8,6 +8,9 @@ import {
   formatInterval,
   listQuery,
   serviceLabel,
+  showsEmptyMessage,
+  skipAfter,
+  zoneFallbackOccurred,
   zoneLabelNeeded,
 } from "./booking-rows.js";
 
@@ -113,7 +116,7 @@ export class UBookItBookingsListElement extends UmbLitElement {
   /** A window change makes the current page number meaningless, so paging resets. */
   #setWindow(end: "from" | "to", value: string) {
     this._window = { ...this._window, [end]: value };
-    this._skip = 0;
+    this._skip = skipAfter("query", this._skip);
     void this.#load();
   }
 
@@ -122,7 +125,7 @@ export class UBookItBookingsListElement extends UmbLitElement {
       ? [...this._statuses, status]
       : this._statuses.filter((candidate) => candidate !== status);
 
-    this._skip = 0;
+    this._skip = skipAfter("query", this._skip);
     void this.#load();
   }
 
@@ -151,38 +154,62 @@ export class UBookItBookingsListElement extends UmbLitElement {
   #renderControls() {
     return html`
       <div class="controls">
-        <uui-label for="ubookit-bookings-from">${this.#term("from")}</uui-label>
-        <uui-input
-          id="ubookit-bookings-from"
-          type="date"
-          .value=${this._window.from}
-          @change=${(event: Event) =>
-            this.#setWindow("from", (event.target as HTMLInputElement).value)}
-        ></uui-input>
+        <!--
+          The label attribute on the input, not only uui-label. uui-label is not
+          a native label: its "for" is a click handler that focuses the target,
+          and it sets no aria-labelledby. A uui-input names its internal input
+          from its own label property or aria-label and from nothing else, so
+          without this the control is announced as an unlabelled edit field and
+          only a pointer user gets the association. Every other uui-input in
+          this client pairs the two for the same reason.
 
-        <uui-label for="ubookit-bookings-to">${this.#term("to")}</uui-label>
-        <uui-input
-          id="ubookit-bookings-to"
-          type="date"
-          .value=${this._window.to}
-          @change=${(event: Event) =>
-            this.#setWindow("to", (event.target as HTMLInputElement).value)}
-        ></uui-input>
+          (No backticks in here: this is inside a Lit template literal, and one
+          would end the template. The editor leaves the same warning, and this
+          comment was written with them the first time.)
+        -->
+        <div class="field">
+          <uui-label for="ubookit-bookings-from">${this.#term("from")}</uui-label>
+          <uui-input
+            id="ubookit-bookings-from"
+            type="date"
+            label=${this.#term("from")}
+            .value=${this._window.from}
+            @change=${(event: Event) =>
+              this.#setWindow("from", (event.target as HTMLInputElement).value)}
+          ></uui-input>
+        </div>
 
-        <fieldset class="statuses">
+        <div class="field">
+          <uui-label for="ubookit-bookings-to">${this.#term("to")}</uui-label>
+          <uui-input
+            id="ubookit-bookings-to"
+            type="date"
+            label=${this.#term("to")}
+            .value=${this._window.to}
+            @change=${(event: Event) =>
+              this.#setWindow("to", (event.target as HTMLInputElement).value)}
+          ></uui-input>
+        </div>
+
+        <!--
+          The hint is described BY THE FIELDSET, not by each control. It is
+          load-bearing — it is how an operator learns a cancelled booking is one
+          toggle away rather than gone — and aria-describedby on a uui-toggle
+          host is dropped: uui-boolean-input forwards aria-label and
+          aria-labelledby to its internal input and nothing else. The editor
+          hit this exact wall and left a note about it; the service editor puts
+          the reference on the fieldset for the same reason.
+
+          The fieldset is one control group with one explanation, so describing
+          the group is also the more accurate reading of it.
+        -->
+        <fieldset class="statuses" aria-describedby="ubookit-bookings-status-hint">
           <legend>${this.#term("statusFilter")}</legend>
-          <!--
-            Nothing checked means "the endpoint's default" — the statuses that
-            block time — rather than "no statuses". The hint says so, because an
-            operator looking for a cancelled booking needs to know it is one
-            checkbox away rather than absent.
-          -->
           <p class="hint" id="ubookit-bookings-status-hint">${this.#term("statusHint")}</p>
           ${STATUSES.map(
             (status) => html`
               <uui-toggle
                 label=${this.#term(`status${status}`)}
-                aria-describedby="ubookit-bookings-status-hint"
                 ?checked=${this._statuses.includes(status)}
                 @change=${(event: Event) =>
                   this.#toggleStatus(status, (event.target as HTMLInputElement).checked)}
@@ -200,10 +227,15 @@ export class UBookItBookingsListElement extends UmbLitElement {
       // failed request the view does not know whether it is true. The alert
       // above already says what happened; saying "none" as well would answer a
       // question nothing asked, with the one answer most likely to be wrong.
-      return this._error ? nothing : html`<p>${this.#term("empty")}</p>`;
+      return showsEmptyMessage(this._total, this._error !== undefined)
+        ? html`<p>${this.#term("empty")}</p>`
+        : nothing;
     }
 
-    const showZone = zoneLabelNeeded(this._items);
+    // Either because the page mixes zones, or because a zone the runtime could
+    // not resolve has been shown in UTC — in which case the reader is told
+    // rather than left reading a time attributed to a zone nobody chose.
+    const showZone = zoneLabelNeeded(this._items) || zoneFallbackOccurred(this._items);
 
     return html`
       <uui-table aria-label=${this.#term("tableLabel")}>

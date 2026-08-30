@@ -93,4 +93,68 @@
   once this lands. It is prose outside any requirement, so no delta carries it and only the
   sync can fix it. Left undone here would leave a capability's own summary contradicting its
   requirements.
-- [ ] 7.9 Hand to `qa-review` in a **fresh context or subagent**.
+- [x] 7.9 Hand to `qa-review` in a **fresh context or subagent**.
+
+## 8. QA round 1 — REJECT: one CRITICAL, five MAJORs
+
+The CRITICAL and the first MAJOR are the same fault, and it is the one I flagged as least
+certain: **I asserted an accessibility association without measuring it, in a codebase that
+had already measured it and written the answer down.**
+
+- [x] 8.1 **CRITICAL — the two date controls had no accessible name.** `uui-label` is not a
+  native label: its `for` is a click handler that focuses the target, and it sets no
+  `aria-labelledby`. `uui-input` names its internal input from its own `label` property or
+  `aria-label` **and nothing else**. So both controls were announced as unlabelled edit
+  fields, and only a pointer user got the association. Every other `uui-input` in this client
+  pairs `uui-label for=` with `label=` — I diverged from an established pattern without
+  noticing it was a pattern. Fixed.
+- [x] 8.2 **MAJOR — the status hint was associated with nothing.** `aria-describedby` on a
+  `uui-toggle` host is dropped: `uui-boolean-input` forwards `aria-label` and
+  `aria-labelledby` to its internal input and no more. The hint is the load-bearing part of
+  that control — it is how an operator learns a cancelled booking is one toggle away rather
+  than gone — and it was announced with nothing. **The editor had already hit this exact wall
+  and left a comment about it.** Moved to the `fieldset`, following the service editor.
+- [x] 8.3 **MAJOR — the "dates, not instants" guard survived its own named mutation.** QA
+  replaced the passthrough with a `new Date(...T00:00:00Z)` round-trip and all 21 tests
+  passed — the defect the test's own comment claims to catch. The shape assertions catch
+  `toISOString` and epochs; they cannot catch a value-shifting round-trip, because on a UTC
+  runner that round-trip is the identity. Now also asserts that a value which is **not a date
+  at all** passes through unchanged, which no conversion survives on any runner. Task 5.7
+  singled this guard out for particular attention and I checked it against mutations it was
+  already immune to.
+- [x] 8.4 **MAJOR ×2 — two decisions were left outside the seam the design argues for.** The
+  paging reset on a query change, and the "don't say *no bookings* after a failure"
+  distinction, were both inline in the element and both unasserted — the same class of
+  invisible failure the pure module exists for, sitting one line outside it. Extracted as
+  `skipAfter` and `showsEmptyMessage`, both mutation-checked. The paging reset also gained a
+  spec scenario, since it was a real guarantee stated nowhere.
+- [x] 8.5 **MAJOR — an ADDED requirement asserted something the server contradicts.** It said
+  selecting no status must not mean "no statuses", *"which would return nothing"*. It does
+  not: `BookingsController` and `BookingQuery` both treat an empty set exactly as an absent
+  one. The **conclusion** (omit the parameter) is right and the **reason** was false, in the
+  requirement and three comments — and a requirement is permanent once synced. Corrected to
+  the true reason: a view that states a default creates a second one, and the genuinely
+  different request is naming all four statuses.
+- [x] 8.6 **MINOR — the UTC fallback did not say so on a single-zone page.** `zoneLabelNeeded`
+  deduped on the raw identifier, so a page where every booking carried an unresolvable zone
+  counted as one zone and showed UTC times with no label — the exact misattribution
+  `formatInterval`'s comment promised it would not make. Dedupe is now on the resolved zone,
+  and `zoneFallbackOccurred` reports the case dedupe cannot see. Spec updated to describe
+  both, since the code was doing more than the requirement said.
+  <br>Worth recording: the first mutation for this was **not caught**, because the element's
+  behaviour is identical either way once the fallback flag exists. The test now asserts the
+  function's own contract, where the difference is real.
+- [x] 8.7 **MINOR — an interval crossing midnight read backwards.** A 22:00–01:00 booking
+  showed as one date with an end apparently before its start. Both dates are now named when
+  they differ, and only then.
+- [x] 8.8 **Flagged, not fixed: paging destroys focus and the live region.** The `<nav>` is
+  inside the branch `_loading` swaps out, so Next drops focus to `<body>` and the
+  `aria-live` span is recreated rather than updated. It is a verbatim copy of the shipped
+  `resource-list` pattern, so it is a **section-wide** defect and fixing it here would leave
+  two lists behaving differently. Recorded for its own change; task 6.2 will see it.
+- [x] 8.9 **I walked into a documented trap.** The first draft of the label fix put backticks
+  inside a comment in a Lit template literal, which ends the template — `resource-editor`
+  carries a warning about exactly that, three lines from code I had just read.
+- [ ] 8.10 Clean-build gates, then QA round 2. The live checks (6.2, 6.4) remain outstanding
+  and QA notes 6.4 would have caught 8.1 — which is the argument for doing it before merge
+  rather than after.

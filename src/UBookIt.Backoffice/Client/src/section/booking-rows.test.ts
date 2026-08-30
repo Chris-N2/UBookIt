@@ -4,8 +4,11 @@ import {
   formatInterval,
   listQuery,
   serviceLabel,
+  showsEmptyMessage,
+  skipAfter,
   statusesParam,
   toDateValue,
+  zoneFallbackOccurred,
   zoneLabelNeeded,
 } from "./booking-rows.js";
 
@@ -74,9 +77,12 @@ describe("the opening window", () => {
 
 describe("the status parameter", () => {
   it("is omitted entirely when nothing is selected", () => {
-    // NOT an empty array. Omitting yields the endpoint's default — the statuses
-    // that block time — while sending `[]` is the view stating a filter of its
-    // own, and would restate a default the port already settles.
+    // Omitting yields the endpoint's default: the statuses that block time.
+    //
+    // Not because `[]` would return nothing — QA checked the server and it
+    // treats an empty set exactly as an absent one — but because the port
+    // settles this default and a view that states one of its own creates a
+    // second. The genuinely different request is the one below.
     expect(statusesParam([])).toBeUndefined();
   });
 
@@ -118,6 +124,23 @@ describe("the query the list sends", () => {
     expect(JSON.stringify(query)).not.toContain("Z");
   });
 
+  it("passes the window through untouched, whatever it holds", () => {
+    // The shape assertions above are NOT enough, and QA proved it: a mutant
+    // that round-trips each date through `new Date(...T00:00:00Z)` and back
+    // passes every one of them, because on a UTC runner that round-trip is the
+    // identity — while on a runner west of UTC it silently shifts both ends
+    // back a day.
+    //
+    // A value that is not a date at all cannot survive any conversion, so this
+    // is the assertion that holds on every runner: the mutant yields
+    // "NaN-NaN-NaN". The window is data the view carries, not data it
+    // interprets, and this says exactly that.
+    const query = listQuery({ from: "not-a-date", to: "also-not-a-date" }, [], 0, 20);
+
+    expect(query.from).toBe("not-a-date");
+    expect(query.to).toBe("also-not-a-date");
+  });
+
   it("omits statuses entirely when none is selected", () => {
     // The property must be ABSENT, not present-and-empty: the endpoint's
     // default applies only when the parameter is not sent.
@@ -151,6 +174,75 @@ describe("when the zone is shown", () => {
   it("is not shown for an empty page", () => {
     expect(zoneLabelNeeded([])).toBe(false);
   });
+
+  it("compares RESOLVED zones, so two unresolvable ids are one zone", () => {
+    // Both render in UTC, so on screen they ARE one zone, and this function's
+    // question is "can two rows be misread against each other" — which they
+    // cannot when they show the same clock.
+    //
+    // This is the only case where resolved and raw dedupe disagree, and it is
+    // asserted here precisely because the element's behaviour does NOT
+    // distinguish them: `zoneFallbackOccurred` labels this page either way. A
+    // mutation back to raw ids is invisible at the element and visible here,
+    // which is what the function's own contract is for.
+    expect(
+      zoneLabelNeeded([
+        booking({ timeZoneId: "Mars/Olympus_Mons" }),
+        booking({ timeZoneId: "Jupiter/Io" }),
+      ]),
+    ).toBe(false);
+  });
+
+  it("still separates an unresolvable zone from a real one", () => {
+    expect(
+      zoneLabelNeeded([
+        booking({ timeZoneId: "Mars/Olympus_Mons" }),
+        booking({ timeZoneId: "Europe/London" }),
+      ]),
+    ).toBe(true);
+  });
+
+  it("reports the fallback so a single-zone unresolvable page still says UTC", () => {
+    // The case zoneLabelNeeded alone still cannot see: every row unresolvable,
+    // so every row is UTC and they genuinely all agree. formatInterval promises
+    // it "says so" when it falls back; this is what keeps that promise.
+    expect(zoneFallbackOccurred([booking({ timeZoneId: "Mars/Olympus_Mons" })])).toBe(true);
+    expect(zoneFallbackOccurred([booking(), booking()])).toBe(false);
+  });
+});
+
+describe("where paging lands after a change", () => {
+  it("returns to the first page when the query changes", () => {
+    // Page 3 counts into one result set and means nothing in another. Without
+    // this an operator who narrows the window gets page 3 of a different
+    // question — plausibly empty, under a "Showing 41–60 of 12" label that
+    // cannot be true, and nothing on screen says the page number is stale.
+    expect(skipAfter("query", 40)).toBe(0);
+  });
+
+  it("stays put when only the page changes", () => {
+    // The other direction matters: a reset here would pin the list to page one
+    // and make Next do nothing, which is the kind of defect that looks like the
+    // button being broken.
+    expect(skipAfter("page", 40)).toBe(40);
+  });
+});
+
+describe("whether the empty message is shown", () => {
+  it("is shown when the query genuinely matched nothing", () => {
+    expect(showsEmptyMessage(0, false)).toBe(true);
+  });
+
+  it("is NOT shown after a failed load", () => {
+    // "No bookings in this window" is a claim about the site, and after a
+    // failure the view does not know whether it is true. Saying it beside the
+    // error contradicts the error, and is the answer most likely to be wrong.
+    expect(showsEmptyMessage(0, true)).toBe(false);
+  });
+
+  it("is not shown when there are results", () => {
+    expect(showsEmptyMessage(3, false)).toBe(false);
+  });
 });
 
 describe("the time a booking shows", () => {
@@ -169,6 +261,24 @@ describe("the time a booking shows", () => {
 
   it("carries both ends of the interval", () => {
     expect(formatInterval(booking(), "en-GB").text).toContain("10:00");
+  });
+
+  it("names both days when a booking runs past midnight", () => {
+    // Naming only the start date reports an end that appears to precede its own
+    // start — "2 Sept, 23:00–02:00" — and an overnight booking is ordinary for
+    // a booking system rather than an edge case.
+    const overnight = formatInterval(
+      booking({ startUtc: "2026-09-02T21:00:00+00:00", endUtc: "2026-09-03T00:30:00+00:00" }),
+      "en-GB",
+    );
+
+    expect(overnight.text).toContain("2 Sept");
+    expect(overnight.text).toContain("3 Sept");
+  });
+
+  it("names one day when a booking does not cross midnight", () => {
+    // The other direction: repeating the date on every ordinary row is noise.
+    expect(formatInterval(booking(), "en-GB").text.match(/Sept/g)).toHaveLength(1);
   });
 
   it("falls back to UTC, and says so, for a zone the runtime does not know", () => {
