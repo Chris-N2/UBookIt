@@ -79,4 +79,4 @@ one a resource allows is the *booked directly* setting on the resource itself.
   operation is a cancellation and a new booking.
 
 These are stated because a management section invites the assumption that it manages
-everything. It currently configures what can be booked, and reads what has been.
+everything. It configures what can be booked, reads what has been, and calls one off.

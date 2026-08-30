@@ -151,7 +151,11 @@ Core defines this contract and SHALL honour it in its in-memory test double, inc
 - **THEN** both complete — one succeeding and one failing with `conflict` — and neither blocks indefinitely
 
 ### Requirement: Availability and placement service ports
-`UBookIt.Core` SHALL expose an availability query service (free-time and slot projection for a resource and date range, per `availability`) and a booking service (placement running the validation pipeline, and cancellation applying the status machine). Both SHALL depend only on the two store ports (`IResourceStore`, `IBookingStore`) so implementations can be swapped without changing Core.
+`UBookIt.Core` SHALL expose an availability query service (free-time and slot projection for a resource and date range, per `availability`) and a booking service (placement running the validation pipeline, and cancellation applying the status machine).
+
+**Both SHALL depend only on ports `UBookIt.Core` itself defines**, so implementations can be swapped without changing Core and `UBookIt.Core` continues to carry **no package reference of any kind**. The availability service SHALL depend only on the two store ports (`IResourceStore`, `IBookingStore`). The booking service SHALL depend on those two and, additionally, on the **observation port** through which it reports what it has done — see *Placement and cancellation are observable*.
+
+*The enumeration is widened rather than dropped, and what it protected is unchanged: the constraint was never about the number two. It was that Core owns its own dependencies, that a host can substitute any of them, and that nothing drags a framework into the domain — all of which a Core-defined observation port satisfies, and which an Umbraco type in this assembly would not.*
 
 Core services concerned with services (per `service-booking`) MAY additionally depend on the service read port (`IServiceStore`). No Core service SHALL depend on a management store: the read ports are the only pathway anonymous delivery traffic reaches storage through.
 
@@ -166,6 +170,10 @@ Only one such member SHALL be added. An additional overload taking the resource 
 #### Scenario: Services are testable with in-memory stores
 - **WHEN** the availability and booking services are constructed with in-memory store implementations
 - **THEN** all placement, cancellation, free-time, and slot-projection behaviour in these specs is exercisable without a database
+
+#### Scenario: Core carries no framework dependency
+- **WHEN** `UBookIt.Core`'s package references are inspected
+- **THEN** there are none, and every port it depends on is a type it declares itself
 
 #### Scenario: Type listing returns every resource of the type
 - **WHEN** the read port is asked for resources of a type key whose population exceeds any default page size
@@ -186,6 +194,57 @@ Only one such member SHALL be added. An additional overload taking the resource 
 #### Scenario: Claims for other resources are ignored
 - **WHEN** the pure projection is passed a claim belonging to a different resource that would, if applied, remove all of this resource's free time
 - **THEN** the result is unchanged from passing no claims at all
+
+### Requirement: Placement and cancellation are observable
+`UBookIt.Core` SHALL report, through a port it declares itself, that a booking has been
+**placed** and that a booking has been **cancelled**. A host SHALL be able to observe both
+without the package sending anything on its behalf.
+
+**Each SHALL be reported only after storage has agreed, and only on success.** An event means
+*this happened*; raising one before the store has committed would announce a booking that may
+not exist, and raising one on failure would announce one that does not.
+
+**Nothing an observer does SHALL affect the operation it is observing.** An observer that
+throws SHALL NOT change what the caller is told, SHALL NOT undo the booking, and SHALL NOT
+prevent the operation from reporting success. The booking is already stored by the time an
+observer runs, so an exception escaping would tell a visitor their booking failed when it did
+not — and a visitor told that books again. The failure this prevents is a double booking
+caused by somebody else's handler, which is worse than any notification is valuable.
+
+**The cost of that SHALL be stated rather than implied:** an observer that throws is a
+notification nobody receives, and the package neither retries nor queues it.
+
+A report SHALL carry the booking and nothing derived from it, so there is one source of truth
+and no computed value to keep in step.
+
+**The cancellation report SHALL NOT need to describe what changed.** The status machine
+permits cancellation only from `Requested` or `Confirmed`, so a report is by construction "this
+booking has just become cancelled"; cancelling an already-cancelled booking fails and reports
+nothing.
+
+#### Scenario: A placed booking is reported
+- **WHEN** a booking is placed successfully
+- **THEN** the placement is reported once, after the booking is stored, carrying that booking
+
+#### Scenario: A cancelled booking is reported
+- **WHEN** a booking is cancelled successfully
+- **THEN** the cancellation is reported once, after the status is stored, carrying that booking
+
+#### Scenario: A failed placement reports nothing
+- **WHEN** placement fails for any reason
+- **THEN** nothing is reported
+
+#### Scenario: Cancelling an already-cancelled booking reports nothing
+- **WHEN** cancellation is attempted on a booking that is already cancelled
+- **THEN** it fails with `invalid-status-transition` and nothing is reported
+
+#### Scenario: A throwing observer does not break the booking
+- **WHEN** an observer throws while being told a booking was placed
+- **THEN** the placement still reports success to its caller, and the booking remains stored and unchanged
+
+#### Scenario: Observation is substitutable
+- **WHEN** the booking service is constructed with an observer that only records what it was told
+- **THEN** placement and cancellation behaviour is unchanged and every report is exercisable without a database
 
 ### Requirement: Booking rehydration
 `UBookIt.Core` SHALL expose a public, additive rehydration factory (`Booking.Rehydrate`) that materializes a `Booking` from stored state: id, interval, booker, claims, status, created timestamp, and **the optional service attribution**. Rehydration SHALL enforce structural invariants (at least one claim; no duplicate resource per booking) and SHALL accept any `BookingStatus` without applying transition rules — the stored status is historical fact, not a transition. Rehydration SHALL NOT be usable to bypass placement validation: it is documented as a persistence-boundary API, and placement remains the only pathway that creates new bookings. (Discharges the deferred obligation recorded at core-domain archive, per design decision D9: downstream changes add Core surface via their own specs.)
