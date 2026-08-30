@@ -201,7 +201,19 @@ No must-fix. One of them was a real defect reachable by an ordinary action.
   no DOM environment is installed. That is now **three changes deep**, so it moves from
   implicit to the deferred-obligations list rather than being re-noted each time.
 - [x] 9.6 Clean-build gates, then sync and archive.
-- [ ] 7.8 **At sync: `booking-management`'s Purpose is falsified again.** It says *cancel* "is
+- [x] 7.8 **Done at sync**, and the score-keeping is gone rather than advanced. The Purpose now
+  ends: *"This capability is about those two verbs and the path each takes — the ports, the
+  authorized endpoints over them, and the backoffice views an operator works in — and the
+  requirements below, not this paragraph, say what exists."* Two further sentences in the
+  same paragraph were falsified by cancel shipping and corrected without widening scope.
+  <br>The sweep also found a **scenario** asserting "no booking is placed, cancelled or
+  altered by any operation in this capability", which cancel makes false. The sync corrected
+  it by hand; that was reverted and done as a MODIFIED delta instead. **A Purpose is prose
+  and only a sync can fix it; a scenario is part of a requirement, and requirement changes go
+  through deltas so they are diffed and reviewed.** Editing one at sync is the shortcut this
+  workflow exists to refuse. All five scenarios carried, and the guarantee that scenario
+  protected is now a read-only SHALL on the port — stronger than an aside in a THEN.
+  <br>*Original note:* it says *cancel* "is
   the half still outstanding", which this change completes — and that sentence is one **I
   wrote at the last sync**, one change ago.
   <br>The lesson is not "remember to update it". A Purpose that enumerates what is left is
