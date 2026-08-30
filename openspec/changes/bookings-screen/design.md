@@ -73,8 +73,14 @@ A localized label must never become the wire value.
 
 Covered in the proposal's Risks with its narrowing stated. The rule the screen implements:
 format each booking's interval in its own `timeZoneId`, and render the zone beside the time
-**only when the current page contains more than one distinct zone**. On a single-zone page —
-every ordinary site — the column stays quiet.
+when the current page contains more than one distinct zone, **or when a zone could not be
+resolved and the time is therefore being shown in another one**. On an ordinary single-zone
+page the column stays quiet.
+
+*(The second half was added at QA round 1 and this paragraph said "only when the page contains
+more than one" until round 2 caught it — a design document falsified by its own change's fix.
+Zones are compared as **resolved**, so two unresolvable identifiers showing the same clock
+count as one.)*
 
 **Why not compare with the site's zone:** the screen does not have it, and obtaining it means
 either a field the read port cannot supply (forbidden by that capability) or a second request

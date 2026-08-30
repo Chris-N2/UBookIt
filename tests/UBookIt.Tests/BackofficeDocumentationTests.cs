@@ -72,6 +72,24 @@ public class BackofficeDocumentationTests
     }
 
     [Fact]
+    public void The_screen_and_the_documentation_agree_about_what_ticking_a_status_does()
+    {
+        // Defect 9.2 lived in two places — the hint an operator reads on the screen, and
+        // the documentation — and the assertion above guards only one of them. Reverting
+        // the hint alone would ship green, with the docs correctly describing behaviour
+        // that the screen once again misdescribes: the same defect with its halves
+        // swapped.
+        //
+        // The screen's string is the one that matters more of the two. Nobody reads the
+        // documentation while standing in front of the filter.
+        var strings = Support.RepoFiles.Read(
+            "src/UBookIt.Backoffice/Client/src/localization/en-us.ts");
+
+        Assert.Contains("show only those instead", strings, StringComparison.Ordinal);
+        Assert.DoesNotContain("Tick a status to include others", strings, StringComparison.Ordinal);
+    }
+
+    [Fact]
     public void The_two_surprising_things_about_the_recorded_service_are_stated()
     {
         // Both of these look like defects to someone who has not been told, and both are

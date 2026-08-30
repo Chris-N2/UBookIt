@@ -116,6 +116,24 @@ export function listQuery(
 }
 
 /**
+ * Whether a window is complete enough to ask about.
+ *
+ * A date input reports an empty value while it is being edited — clear one
+ * segment and the whole control reads `""`. Asking with that produces a 400
+ * from model binding, so an operator halfway through changing a date gets an
+ * alert interrupting them, the table removed, and a framework-worded message
+ * about a parameter they have never heard of.
+ *
+ * The view can see this before it asks, so it does. **This is the cause behind
+ * the stale-error race** — the race guard stops a failure outliving a later
+ * success, and this stops the failure happening at all. Fixing only the former
+ * leaves the interruption in place for anyone who pauses mid-edit.
+ */
+export function shouldLoad(window: Window): boolean {
+  return window.from !== "" && window.to !== "";
+}
+
+/**
  * Where paging should be after a query changes.
  *
  * Always the first page when the *query* changed — a page number counts into

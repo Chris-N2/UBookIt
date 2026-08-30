@@ -4,6 +4,7 @@ import {
   formatInterval,
   listQuery,
   serviceLabel,
+  shouldLoad,
   showsEmptyMessage,
   skipAfter,
   statusesParam,
@@ -225,6 +226,31 @@ describe("where paging lands after a change", () => {
     // and make Next do nothing, which is the kind of defect that looks like the
     // button being broken.
     expect(skipAfter("page", 40)).toBe(40);
+  });
+});
+
+describe("whether to ask at all", () => {
+  it("does not ask while a date is half-edited", () => {
+    // A date input reads as empty while a segment is being changed, and asking
+    // with it earns a 400 the operator did not cause and cannot act on — an
+    // alert interrupting them mid-edit, worded by the framework.
+    expect(shouldLoad({ from: "", to: "2026-09-06" })).toBe(false);
+    expect(shouldLoad({ from: "2026-08-31", to: "" })).toBe(false);
+    expect(shouldLoad({ from: "", to: "" })).toBe(false);
+  });
+
+  it("asks as soon as both ends are present", () => {
+    // The other direction matters as much: a guard that never let the view ask
+    // would leave a permanently empty screen, and would look like the endpoint
+    // being down.
+    expect(shouldLoad({ from: "2026-08-31", to: "2026-09-06" })).toBe(true);
+  });
+
+  it("does not judge whether the dates are sensible", () => {
+    // Only whether they are there. Whether a window is backwards or too wide is
+    // the endpoint's answer to give — it has the site's guardrail and its zone,
+    // and a second opinion here would be a rule the view invented.
+    expect(shouldLoad({ from: "2026-09-06", to: "2026-08-31" })).toBe(true);
   });
 });
 

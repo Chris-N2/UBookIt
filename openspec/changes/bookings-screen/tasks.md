@@ -188,3 +188,59 @@ root. All eight controls are keyboard-reachable in visual order with a visible f
   <br>This is the load-bearing hint QA and I had both already looked at twice, in a file
   whose comment calls it load-bearing. Reading it is not operating it.
 - [x] 9.3 Clean-build gates, then QA round 2.
+
+## 10. QA round 2 — REJECT: one MAJOR, and my own fix falsified my own design
+
+- [x] 10.1 **MAJOR — the newest-load-wins rule was a real guarantee with no scenario and no
+  test.** This is round 1's finding repeating one commit later: 8.4 rejected the paging reset
+  and the error/empty distinction for being *"real guarantees stated nowhere"*, and I then
+  fixed a third one the same way and gave it neither. Deleting any of the three `current()`
+  checks leaves the suite green, `tsc` clean and validate 13/13 — and the live check that
+  found it is finished, so nothing would find it again. The delta now carries the scenario.
+  <br>On the test: QA agrees no *current* suite could reach it — a DOM environment is not
+  installed and every client suite is pure-module — and did not insist on adding one here. The
+  code comment saying "no test could have reached it" was true of the suite, not of the code,
+  and is now written that way.
+- [x] 10.2 **The design document was falsified by this change's own round-1 fix.** D3 still
+  said the zone shows *"only when the current page contains more than one distinct zone"*,
+  which stopped being true when the fallback case was added. Task 8.6 said "spec updated to
+  describe both" — the spec was; the design was not. A design document gets archived and
+  consulted, and it said "only".
+- [x] 10.3 **My accessibility claim overreached again, one layer up.** I recorded that moving
+  `aria-describedby` to the fieldset made the hint announced. It makes it **valid**: the
+  reference resolves, which is what I measured. A fieldset is `role=group`,
+  `aria-describedby` is not inherited by descendants, and screen readers announce a group's
+  *name* on entry rather than its description — reliably read only for composite widgets with
+  one focus stop, which four independently tabbable toggles are not.
+  <br>The markup stays, because the hint is a visible paragraph in DOM order between the
+  legend and the toggles, which is where a reader meets it. **The claim is what changes.**
+  This is the same fault as round 1's CRITICAL — asserting an association without measuring
+  what I claimed — and catching it in the *record* rather than the code is only luck.
+- [x] 10.4 **Fixed the cause behind the race, not only the symptom.** `#latestLoad` stops a
+  stale failure outliving a good response; it does not stop the failure. A date input reads as
+  empty mid-edit, so clearing a segment fired a request that 400s on model binding — an alert
+  interrupting the operator, the table removed, and a framework-worded message about a
+  parameter they have never heard of. `shouldLoad` now declines to ask until both ends are
+  present, and deliberately judges nothing else: whether a window is backwards or too wide is
+  the endpoint's answer, and a second opinion here would be a rule the view invented.
+- [x] 10.5 **Guarded the half of defect 9.2 that nothing was watching.** The fix guarded the
+  documentation and left the screen's own string — so reverting the hint alone would ship
+  green, with the docs correctly describing behaviour the screen misdescribes. That is the
+  original defect with its halves swapped, and the screen's string is the one that matters:
+  nobody reads the documentation while standing in front of the filter.
+- [x] 10.6 **NIT taken: `skipAfter`'s `"page"` arm had no caller**, so the extraction bought a
+  name and a scenario but not detection. Both paging handlers now go through it. Recorded
+  honestly: this does **not** make deleting the reset detectable — nothing drives the element
+  — and pretending otherwise would be the overclaim 10.3 is about.
+- [x] 10.7 **NITs recorded, not fixed** — all section-wide, all belonging to the follow-up
+  change 8.8 already names: no retry affordance after a failure; paging focus and live-region
+  loss; and `resource-list` claiming "no resources" after a failed load, which is the defect
+  `showsEmptyMessage` fixes here. QA is right that fixing this one here made the two lists
+  diverge — the argument in 8.8 for leaving paging alone cuts the other way for this, and both
+  now need the same follow-up.
+- [ ] 10.8 Clean-build gates, then QA round 3.
+
+**Outside this change, worth raising with Chris:** the `qa-review` skill's DevExpress scan
+greps the working tree, which on this machine hits gitignored `obj/*.nuget.g.props` recording
+local DevExpress NuGet fallback folders. A reviewer following it verbatim after a build would
+fail a hard gate on nothing. `git grep` over tracked files is the scan that means something.

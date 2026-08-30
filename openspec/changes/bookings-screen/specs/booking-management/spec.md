@@ -64,6 +64,17 @@ is stale.
 - **WHEN** an operator on a later page changes the window or the status filter
 - **THEN** the first page of the new result set is shown, rather than a page counted into the previous one
 
+**Only the most recently requested result SHALL be shown.** Changing one end of the window
+and then the other starts two requests, and they can finish in either order. A superseded
+request SHALL NOT write anything — not its results, not its failure, and not the end of its
+loading state — because a stale failure landing after a fresh success puts an error on screen
+directly above the data that contradicts it, which is worse than either alone: the reader
+cannot tell which to believe.
+
+#### Scenario: A superseded request does not overwrite a newer one
+- **WHEN** two requests are in flight and the older one finishes last
+- **THEN** the newer one's result stands, and the older one neither replaces it, nor reports a failure over it, nor ends its loading state
+
 #### Scenario: An over-wide window is reported, not swallowed
 - **WHEN** an operator asks for a window wider than the site permits
 - **THEN** the view reports the refusal in terms of the dates asked for, and does not present an empty list as though nothing matched

@@ -8,6 +8,7 @@ import {
   formatInterval,
   listQuery,
   serviceLabel,
+  shouldLoad,
   showsEmptyMessage,
   skipAfter,
   zoneFallbackOccurred,
@@ -68,8 +69,14 @@ export class UBookItBookingsListElement extends UmbLitElement {
    * response, and the view ended up showing an error above correct results —
    * the error and the data contradicting each other on screen.
    *
-   * That is a worse version of the state `showsEmptyMessage` exists to prevent,
-   * and no test could have reached it: every test calls one load and awaits it.
+   * That is a worse version of the state `showsEmptyMessage` exists to prevent.
+   *
+   * **No test in the current suite reaches this** — every client suite here is
+   * pure-module, and reproducing it needs an element instance and therefore a
+   * DOM environment, which is not installed. That is a fact about the suite
+   * rather than about the code: a spy returning two deferred promises would
+   * reproduce it exactly. The guarantee is stated in the spec instead, so it is
+   * at least written down somewhere that outlives this comment.
    */
   #latestLoad = 0;
 
@@ -83,6 +90,14 @@ export class UBookItBookingsListElement extends UmbLitElement {
   }
 
   async #load() {
+    // A half-edited date reads as empty, and asking with it earns a 400 the
+    // operator did not cause and cannot act on. Waiting costs nothing: the next
+    // keystroke that completes the date fires another change.
+    if (!shouldLoad(this._window)) {
+      this._loading = false;
+      return;
+    }
+
     const load = ++this.#latestLoad;
 
     // Only the most recently started load may write anything. A superseded one
@@ -224,16 +239,27 @@ export class UBookItBookingsListElement extends UmbLitElement {
         </div>
 
         <!--
-          The hint is described BY THE FIELDSET, not by each control. It is
-          load-bearing — it is how an operator learns a cancelled booking is one
-          toggle away rather than gone — and aria-describedby on a uui-toggle
-          host is dropped: uui-boolean-input forwards aria-label and
-          aria-labelledby to its internal input and nothing else. The editor
-          hit this exact wall and left a note about it; the service editor puts
-          the reference on the fieldset for the same reason.
+          The hint is described BY THE FIELDSET, not by each control:
+          aria-describedby on a uui-toggle host is dropped, because
+          uui-boolean-input forwards aria-label and aria-labelledby to its
+          internal input and nothing else. The editor hit that wall and left a
+          note; the service editor puts the reference on the fieldset too.
 
-          The fieldset is one control group with one explanation, so describing
-          the group is also the more accurate reading of it.
+          WHAT THIS IS AND IS NOT. It makes the description valid — the
+          reference resolves within this shadow root, which was measured. It
+          does NOT reliably make it announced: a fieldset maps to role=group,
+          aria-describedby is not inherited by descendants, and screen readers
+          announce a group's NAME on entry rather than its description. Group
+          descriptions are read reliably for composite widgets with one focus
+          stop, which four independently tabbable toggles are not.
+
+          So the hint is carried by DOM ORDER rather than by that reference: it
+          is a visible paragraph inside the fieldset, after the legend and
+          before the toggles, where a reader going through the view meets it.
+          The reference is worth keeping and is not worth relying on, and this
+          note exists because an earlier version of it claimed more than had
+          been measured — which is exactly the fault that produced this round's
+          predecessor.
         -->
         <fieldset class="statuses" aria-describedby="ubookit-bookings-status-hint">
           <legend>${this.#term("statusFilter")}</legend>
@@ -287,7 +313,7 @@ export class UBookItBookingsListElement extends UmbLitElement {
           label=${this.#term("previousPage")}
           ?disabled=${this._skip === 0}
           @click=${() => {
-            this._skip = Math.max(0, this._skip - PAGE_SIZE);
+            this._skip = skipAfter("page", Math.max(0, this._skip - PAGE_SIZE));
             void this.#load();
           }}
         ></uui-button>
@@ -299,7 +325,7 @@ export class UBookItBookingsListElement extends UmbLitElement {
           label=${this.#term("nextPage")}
           ?disabled=${pageEnd >= this._total}
           @click=${() => {
-            this._skip += PAGE_SIZE;
+            this._skip = skipAfter("page", this._skip + PAGE_SIZE);
             void this.#load();
           }}
         ></uui-button>
