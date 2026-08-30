@@ -275,15 +275,40 @@ other two are false sentences in artifacts that get archived.
   the spec requires displayed strings come from localization. It is endpoint data rather than
   package prose, on the same footing as a booker's name or a resource's; noted because the
   distinction is worth having written down before somebody reads the requirement literally.
-- [ ] 11.6 **Live-verify the checkbox change.** Not yet done — the browser extension
-  disconnected before it could run, and this is the one item that must not be assumed. Clean
-  build, 1711 tests and 104 client tests are green, but "the filter still works and the
-  controls still announce" is a browser question.
-  <br>The risk profile does differ from the two failed attempts: this is a native
-  `<input aria-describedby>` with a `<label for>` in the same root, which is the baseline
-  case rather than a claim about a component's internal behaviour. That is a reason to expect
-  it to hold, not a reason to record it as held.
-- [ ] 11.7 Clean-build gates, then QA round 4.
+- [x] 11.6 **Live-verified.** Chris confirmed the date filter and the status checkboxes still
+  work and that the hint's id appears in `aria-describedby`; measured in the page, all four
+  checkboxes carry a reference that **resolves** to the hint element in the same root, each is
+  labelled, and no `uui-toggle` remains. Resolution is the part an attribute inspection cannot
+  show — an id that points at nothing looks identical in the markup.
+  <br>**What is still not proven, and is worth saying plainly a third time:** no screen reader
+  has been run. What differs from the two failed attempts is the *mechanism*, not the strength
+  of the evidence — a native `<input aria-describedby>` resolving within its own root is the
+  canonical case the attribute exists for, where the fieldset version rested on group
+  descriptions being inherited and announced on entry, which they are not. That is a reason to
+  expect this to hold; an actual AT pass is the only thing that would settle it, and it belongs
+  in the section-wide UI review rather than here.
+- [x] 11.7 Clean-build gates, then QA round 4.
+
+## 12. Carried forward, for the section-wide UI review
+
+Chris has a UI review planned once the functionality is in. These belong to it rather than
+here, and are recorded so they are not lost when this change archives:
+
+- **An actual screen-reader pass** over the whole section (11.6). Three rounds of this change
+  turned on what an assistive technology would announce, and every answer so far has been
+  reasoned rather than heard.
+- **Paging loses focus and rebuilds its live region** (8.8) — the `<nav>` sits inside the
+  branch the loading state swaps out, so Next drops focus to the document and the
+  "showing X–Y of Z" span is recreated rather than updated. Verbatim in `resource-list` too.
+- **No route back after a failed load** (10.7): the paging controls disappear while `skip`
+  keeps its value, so the only way back to page one is changing a filter. Section-wide.
+- **`resource-list` says "no resources" after a failed load** (10.7) — the defect
+  `showsEmptyMessage` fixes here, still present next door. The two lists now differ, which is
+  the cost of fixing one in isolation and an argument for doing the rest together.
+- **A DOM test environment**, installed once, would let all three element-level guarantees be
+  asserted rather than reasoned about — including the newest-load-wins rule this change could
+  only write into the spec.
+- **Cosmetic polish** Chris has already noted.
 
 **Outside this change, worth raising with Chris:** the `qa-review` skill's DevExpress scan
 greps the working tree, which on this machine hits gitignored `obj/*.nuget.g.props` recording
