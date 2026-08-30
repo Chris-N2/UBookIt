@@ -1,3 +1,4 @@
+using System.Runtime.CompilerServices;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
 using UBookIt.Backoffice.Controllers;
@@ -5,6 +6,7 @@ using UBookIt.Backoffice.Models;
 using UBookIt.Core;
 using UBookIt.Core.Bookings;
 using UBookIt.Core.Common;
+using UBookIt.Core.Resources;
 using UBookIt.Core.Stores;
 
 namespace UBookIt.Tests;
@@ -62,16 +64,160 @@ public class BookingsEndpointTests
             service);
 
     private static (BookingsController Controller, RecordingStore Store) Endpoint(
-        BookingPage? page = null, string zone = "UTC")
+        BookingPage? page = null, string zone = "UTC", IBookingService? bookingService = null)
     {
         var store = new RecordingStore(page ?? new BookingPage([], 0));
-        return (new BookingsController(store, Settings(zone)), store);
+
+        return (
+            new BookingsController(store, bookingService ?? new UnusedBookingService(), Settings(zone)),
+            store);
+    }
+
+    /// <summary>
+    /// Stands in for the booking service on the read tests, and refuses to be used.
+    /// </summary>
+    /// <remarks>
+    /// Every member throws rather than returning a plausible empty answer. A listing test
+    /// that started depending on placement or cancellation would say so here, instead of
+    /// quietly passing against a stub that invented one.
+    /// </remarks>
+    private sealed class UnusedBookingService : IBookingService
+    {
+        private static InvalidOperationException Unexpected([CallerMemberName] string member = "")
+            => new($"The listing endpoint reached {member} on the booking service; it should not.");
+
+        public Task<DomainResult<Booking>> PlaceAsync(
+            BookingRequest request, CancellationToken cancellationToken = default) => throw Unexpected();
+
+        public Task<DomainResult<Booking>> PlaceAsync(
+            MultiClaimBookingRequest request, CancellationToken cancellationToken = default) => throw Unexpected();
+
+        public Task<DomainResult<Booking>> PlaceForServiceAsync(
+            ServiceAttribution service,
+            MultiClaimBookingRequest request,
+            CancellationToken cancellationToken = default) => throw Unexpected();
+
+        public DomainResult CheckPlacementRules(Resource resource, DateTimeOffset start, TimeSpan duration)
+            => throw Unexpected();
+
+        public Task<DomainResult<Booking>> CancelAsync(
+            Guid bookingId, CancellationToken cancellationToken = default) => throw Unexpected();
     }
 
     private static T Payload<T>(IActionResult result)
     {
         var ok = Assert.IsType<OkObjectResult>(result);
         return Assert.IsType<T>(ok.Value);
+    }
+
+    /// <summary>Answers cancellation with whatever the test needs, and records the id asked for.</summary>
+    private sealed class CancellingBookingService(DomainResult<Booking> answer) : IBookingService
+    {
+        public Guid? CancelledId { get; private set; }
+
+        public Task<DomainResult<Booking>> CancelAsync(
+            Guid bookingId, CancellationToken cancellationToken = default)
+        {
+            CancelledId = bookingId;
+            return Task.FromResult(answer);
+        }
+
+        public Task<DomainResult<Booking>> PlaceAsync(
+            BookingRequest request, CancellationToken cancellationToken = default) => throw new NotSupportedException();
+
+        public Task<DomainResult<Booking>> PlaceAsync(
+            MultiClaimBookingRequest request, CancellationToken cancellationToken = default)
+            => throw new NotSupportedException();
+
+        public Task<DomainResult<Booking>> PlaceForServiceAsync(
+            ServiceAttribution service,
+            MultiClaimBookingRequest request,
+            CancellationToken cancellationToken = default) => throw new NotSupportedException();
+
+        public DomainResult CheckPlacementRules(Resource resource, DateTimeOffset start, TimeSpan duration)
+            => throw new NotSupportedException();
+    }
+
+    private static Booking Cancelled()
+    {
+        var booking = Booking.Rehydrate(
+            Guid.NewGuid(),
+            BookingInterval.Create(
+                new DateTimeOffset(2026, 6, 2, 9, 0, 0, TimeSpan.Zero),
+                new DateTimeOffset(2026, 6, 2, 10, 0, 0, TimeSpan.Zero),
+                "Europe/London").Value,
+            Booker.Create(null, "Ada Lovelace", "ada@example.com", null).Value,
+            [new ResourceClaim(Guid.NewGuid())],
+            BookingStatus.Cancelled,
+            new DateTimeOffset(2026, 5, 1, 0, 0, 0, TimeSpan.Zero)).Value;
+
+        return booking;
+    }
+
+    [Fact]
+    public async Task Cancelling_returns_the_bookings_new_status()
+    {
+        var booking = Cancelled();
+        var service = new CancellingBookingService(DomainResult<Booking>.Success(booking));
+        var (controller, _) = Endpoint(bookingService: service);
+
+        var model = Payload<CancelledBookingModel>(await controller.CancelBooking(booking.Id));
+
+        Assert.Equal(booking.Id, service.CancelledId);
+        Assert.Equal(booking.Id, model.BookingId);
+
+        // A NAME on the wire, as everywhere else in this contract — never the enum's ordinal.
+        Assert.Equal("Cancelled", model.Status);
+    }
+
+    [Fact]
+    public void The_cancellation_response_does_not_imitate_a_list_row()
+    {
+        // A list row carries each resource's NAME, which the management port joins for. This
+        // path has the domain's booking, which knows ids only — so a response shaped like a
+        // row would have to leave those names blank and look quietly less true than the thing
+        // it resembles. It carries what it knows instead.
+        var properties = typeof(CancelledBookingModel).GetProperties().Select(p => p.Name).Order();
+
+        Assert.Equal(["BookingId", "Status"], properties);
+    }
+
+    [Fact]
+    public async Task Cancelling_an_uncancellable_booking_is_a_400_carrying_the_domains_code()
+    {
+        // Refused, not quietly reported as done. A caller told "cancelled" when nothing
+        // changed cannot tell a completed action from a rejected one.
+        var service = new CancellingBookingService(DomainResult<Booking>.Failure(
+            FailureCodes.InvalidStatusTransition, "A booking cannot move from Cancelled to Cancelled."));
+        var (controller, _) = Endpoint(bookingService: service);
+
+        var result = Assert.IsType<ObjectResult>(await controller.CancelBooking(Guid.NewGuid()));
+
+        Assert.Equal(StatusCodes.Status400BadRequest, result.StatusCode);
+        Assert.Contains(FailureCodes.InvalidStatusTransition, Codes(result));
+    }
+
+    [Fact]
+    public async Task Cancelling_an_unknown_booking_is_a_404()
+    {
+        // Distinct from the 400 above, and that distinction is the point: a stale list and a
+        // booking somebody already dealt with call for different actions from the operator.
+        var service = new CancellingBookingService(DomainResult<Booking>.Failure(
+            FailureCodes.BookingNotFound, "No booking exists with that id."));
+        var (controller, _) = Endpoint(bookingService: service);
+
+        var result = Assert.IsType<ObjectResult>(await controller.CancelBooking(Guid.NewGuid()));
+
+        Assert.Equal(StatusCodes.Status404NotFound, result.StatusCode);
+        Assert.Contains(FailureCodes.BookingNotFound, Codes(result));
+    }
+
+    private static IEnumerable<string?> Codes(ObjectResult result)
+    {
+        var problem = Assert.IsType<ProblemDetails>(result.Value);
+        var errors = Assert.IsType<ApiErrorModel[]>(problem.Extensions["errors"]);
+
+        return errors.Select(e => e.Code);
     }
 
     [Fact]

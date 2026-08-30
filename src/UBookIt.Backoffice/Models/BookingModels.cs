@@ -85,6 +85,33 @@ public class BookingModel
     public BookedServiceModel? Service { get; set; }
 }
 
+/// <summary>
+/// What a cancellation returns: the booking's identity and its new status.
+/// </summary>
+/// <remarks>
+/// <para>
+/// <b>Deliberately not a whole <see cref="BookingModel"/>.</b> That model carries each claimed
+/// resource's <i>name</i>, which the management port supplies by joining — and cancellation
+/// goes through the Core booking service, which knows a booking's resource <i>ids</i> and
+/// nothing more. Returning a <c>BookingModel</c> here would mean either reading the booking
+/// back through a port that has no by-id read, or filling those names with blanks: a response
+/// shaped like the list's and quietly less true than it.
+/// </para>
+/// <para>
+/// This is what the operation actually knows, and it is enough for what a caller does next.
+/// The row's consequences — whether it still belongs in the current filter, what the total is
+/// now — are a property of the query rather than of the booking, so a caller reloads the list
+/// to see them.
+/// </para>
+/// </remarks>
+public class CancelledBookingModel
+{
+    public Guid BookingId { get; set; }
+
+    /// <summary>The booking's status by name — <c>Cancelled</c>, on success.</summary>
+    public string Status { get; set; } = string.Empty;
+}
+
 /// <summary>A page of bookings plus the unpaged total, matching the other list endpoints.</summary>
 public class PagedBookingsModel
 {

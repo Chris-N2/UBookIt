@@ -16,15 +16,31 @@ service it was placed for; it stops holding its time; and it is still returned b
 management list when asked for. The endpoint SHALL therefore not be a deletion, in verb or in
 effect.
 
-The response SHALL carry the booking as it now stands, so a caller can show the result of
-what it asked for without reading it back.
+The response SHALL carry the booking's identity and its new status, so a caller knows what
+happened without reading it back.
+
+**It SHALL NOT carry the shape the list carries.** A list row includes each claimed
+resource's *name*, which the management port supplies by joining; cancellation goes through
+the domain, which knows a booking's resource *ids* and nothing more. A response shaped like a
+list row but with those names blank would be quietly less true than the thing it resembles,
+and there is no by-id read on the management port to fill them from. What a caller needs
+next — whether the booking still belongs in the filter it is looking at, and what the total is
+now — are properties of the query rather than of the booking, so they come from asking again.
+
+*This requirement said "the booking as it now stands" until implementation showed that could
+not be honoured on this path. The sentence was written before the shape was known; it is
+corrected rather than satisfied with blanks.*
 
 An unknown booking SHALL be reported as not found, distinctly from a booking that exists and
 cannot be cancelled — they call for different actions from the operator.
 
 #### Scenario: A confirmed booking is cancelled
 - **WHEN** an authorized operator cancels a confirmed booking
-- **THEN** it becomes cancelled, stops holding its time, and the response carries it in its new state
+- **THEN** it becomes cancelled, stops holding its time, and the response names it and reports its new status
+
+#### Scenario: The response does not imitate a list row
+- **WHEN** a cancellation's response model is inspected
+- **THEN** it carries no resource collection, rather than one whose names this path cannot fill
 
 #### Scenario: Cancelling twice is refused, not silently accepted
 - **WHEN** an operator cancels a booking that is already cancelled

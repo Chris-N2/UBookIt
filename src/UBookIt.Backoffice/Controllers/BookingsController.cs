@@ -21,14 +21,16 @@ namespace UBookIt.Backoffice.Controllers;
 /// requirement. Authorization comes from the shared base controller.
 /// </para>
 /// <para>
-/// Read-only. Cancelling a booking from the backoffice is its own change; the domain port
-/// for it already exists and is deliberately not reached from here yet.
+/// Reads through the management port and cancels through the Core booking service. Cancelling
+/// is the second and last of v1's management verbs; approving, declining and amending are
+/// each domain changes rather than endpoints, and none of them is here.
 /// </para>
 /// </remarks>
 [ApiVersion("1.0")]
 [ApiExplorerSettings(GroupName = "UBookIt.Backoffice")]
 public class BookingsController(
     IBookingManagementStore bookingStore,
+    IBookingService bookingService,
     SiteBookingSettings settings) : UBookItBackofficeApiControllerBase
 {
     /// <summary>
@@ -104,6 +106,52 @@ public class BookingsController(
         {
             Total = page.Total,
             Items = [.. page.Items.Select(BookingModelMapper.ToModel)],
+        });
+    }
+
+    /// <summary>
+    /// Cancels a booking.
+    /// </summary>
+    /// <remarks>
+    /// <para>
+    /// <b>POST rather than DELETE, because a cancelled booking is not gone.</b> It keeps its
+    /// row, its interval, its booker and the service it was placed for; it stops holding its
+    /// time; and the management list still returns it when cancelled bookings are asked for.
+    /// <c>DELETE</c> would say the opposite of all of that.
+    /// </para>
+    /// <para>
+    /// <b>The status machine is the rule, not the screen.</b> This applies no judgement of its
+    /// own about whether a booking can be cancelled — it asks the domain, which permits the
+    /// transition only from <c>Requested</c> or <c>Confirmed</c>. A screen showing a stale
+    /// list therefore cannot talk this into an invalid transition, and a second attempt is
+    /// refused rather than quietly reported as success: a caller told "cancelled" when nothing
+    /// changed cannot tell a completed action from a rejected one.
+    /// </para>
+    /// <para>
+    /// Returns the booking's identity and its new status rather than a whole
+    /// <see cref="BookingModel"/> — this path cannot honestly fill one, because a
+    /// <c>Booking</c> knows its resources by id and the list model carries their names. See
+    /// <see cref="CancelledBookingModel"/>.
+    /// </para>
+    /// </remarks>
+    /// <param name="id">The booking to cancel.</param>
+    [HttpPost("bookings/{id:guid}/cancel")]
+    [ProducesResponseType<CancelledBookingModel>(StatusCodes.Status200OK)]
+    [ProducesResponseType(StatusCodes.Status400BadRequest)]
+    [ProducesResponseType(StatusCodes.Status404NotFound)]
+    public async Task<IActionResult> CancelBooking(Guid id, CancellationToken cancellationToken = default)
+    {
+        var cancelled = await bookingService.CancelAsync(id, cancellationToken);
+
+        if (!cancelled.Succeeded)
+        {
+            return cancelled.Failures.ToProblemResult();
+        }
+
+        return Ok(new CancelledBookingModel
+        {
+            BookingId = cancelled.Value.Id,
+            Status = cancelled.Value.Status.ToString(),
         });
     }
 
