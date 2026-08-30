@@ -103,10 +103,20 @@
   `INotificationAsyncHandler` imported from the wrong namespace (it lives in
   `Umbraco.Cms.Core.Events`, not `.Notifications`). The compiler caught the code; nothing
   would have caught the documentation.
-- [ ] 7.6b **Cancel from the backoffice UI** — outstanding, needs a login I will not perform.
-  Cancel a real booking, confirm the row leaves the default view, confirm a second attempt is
-  refused, and confirm the cancellation notification reaches the same handler. The mechanism
-  is identical to placement's and proven above; what is unverified is the screen.
+- [x] 7.6b **Cancel from the backoffice UI — verified by Chris, and the whole chain with it.**
+  He cancelled a real booking through the screen. The database shows that booking moved from
+  `Confirmed` to `Cancelled`, and the site's log carries:
+  <br>`UBOOKIT-DEV-NOTIFICATION cancelled booking 35bddb1b… starting 2026-08-31T09:00`, with
+  `SourceContext: UBookIt.TestSite.LogBookingCancelled` and
+  `ActionName: UBookIt.Backoffice.Controllers.BookingsController…`.
+  <br>**The `ActionName` is what makes it conclusive**: the notification was raised by the
+  backoffice endpoint handling a real request, not by a script or a test. Click → endpoint →
+  domain → observer → adapter → a handler the site registered exactly as any consumer would.
+  Both halves of this change, end to end, in one line of evidence.
+  <br>**Not exercised, and recorded rather than implied:** cancelling the same booking twice
+  through the UI, so the screen's handling of a refused transition is still only covered at
+  the endpoint. The row leaving the default view follows from the filter excluding cancelled
+  bookings and Chris reporting the screen behaved, but it was not separately observed.
 - [x] 7.7 Hand to `qa-review` in a **fresh context or subagent**.
 
 ## 8. QA round 1 — REJECT: two MAJORs, both coverage rather than behaviour
@@ -149,7 +159,7 @@ added** and then left unenforced.
   — and now said so in the code); and adding an optional constructor parameter to
   `BookingService` is binary-breaking, which is irrelevant while nothing is published and
   will not be after step 1 of `docs/mvp.md`. The "eight scenarios" count in 7.4 was six.
-- [ ] 8.6 Clean-build gates, then QA round 2.
+- [x] 8.6 Clean-build gates, then QA round 2.
 - [ ] 7.8 **At sync: `booking-management`'s Purpose is falsified again.** It says *cancel* "is
   the half still outstanding", which this change completes — and that sentence is one **I
   wrote at the last sync**, one change ago.
