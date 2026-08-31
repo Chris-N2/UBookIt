@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
 import {
+  canCancel,
   currentWeek,
   formatInterval,
   listQuery,
@@ -7,6 +8,7 @@ import {
   shouldLoad,
   showsEmptyMessage,
   skipAfter,
+  skipAfterEmptyPage,
   statusesParam,
   toDateValue,
   zoneFallbackOccurred,
@@ -209,6 +211,94 @@ describe("when the zone is shown", () => {
     // it "says so" when it falls back; this is what keeps that promise.
     expect(zoneFallbackOccurred([booking({ timeZoneId: "Mars/Olympus_Mons" })])).toBe(true);
     expect(zoneFallbackOccurred([booking(), booking()])).toBe(false);
+  });
+});
+
+describe("where paging lands when a page empties under the operator", () => {
+  it("steps back a page when the current one is now empty", () => {
+    // Cancelling the only row on page two leaves skip pointing past the end, and the
+    // table then renders empty under "showing 21–20 of 20" — with the empty message
+    // suppressed, because the total is not zero. A nonsense state from an ordinary action.
+    expect(skipAfterEmptyPage(20, 0, 20)).toBe(0);
+    expect(skipAfterEmptyPage(60, 0, 20)).toBe(40);
+  });
+
+  it("stays put while the page still has rows", () => {
+    // The common case, and the one that must not cost a second request.
+    expect(skipAfterEmptyPage(20, 5, 20)).toBe(20);
+  });
+
+  it("does not step below the first page", () => {
+    expect(skipAfterEmptyPage(0, 0, 20)).toBe(0);
+  });
+
+  it("steps back rather than resetting to the first page", () => {
+    // A window or status change resets, because the operator asked a different question.
+    // Cancelling is the same question with one fewer answer, and throwing someone working
+    // through page four back to page one on every cancellation is its own annoyance.
+    expect(skipAfterEmptyPage(60, 0, 20)).not.toBe(0);
+  });
+});
+
+describe("what the cancel confirmation says", () => {
+  it("tells the operator that the person who booked will not be told", async () => {
+    // The sentence the whole notify half of this change exists to make true, said at the
+    // moment of deciding rather than in documentation nobody is reading just then. An
+    // operator who assumes uBookIt emails the customer finds out when somebody arrives for
+    // a booking that no longer exists.
+    //
+    // Pinned here because it is the one view scenario that needs no DOM — it is a string.
+    // The equivalent sentence in docs/backoffice.md is pinned on the .NET side; this is the
+    // one an operator actually reads, and it was the unpinned half.
+    const { default: terms } = await import("../localization/en-us.js");
+    const bookings = (terms as Record<string, Record<string, string>>).ubookitBookings;
+
+    expect(bookings.confirmCancelContent).toContain("does not tell the person who booked");
+
+    // And that the consequence is named rather than left to be worked out.
+    expect(bookings.confirmCancelContent).toContain("contact them");
+  });
+
+  it("has a string for every key the cancel flow can emit", async () => {
+    // A missing key renders as the raw key or as nothing — and for a confirmation dialog,
+    // "nothing" is a destructive action with no explanation attached to it.
+    const { default: terms } = await import("../localization/en-us.js");
+    const bookings = (terms as Record<string, Record<string, string>>).ubookitBookings;
+
+    for (const key of [
+      "cancel",
+      "confirmCancelHeadline",
+      "confirmCancelContent",
+      "confirmCancel",
+      "confirmFailed",
+      "cancelFailed",
+      "actions",
+    ]) {
+      expect(typeof bookings[key]).toBe("string");
+      expect(bookings[key].length).toBeGreaterThan(0);
+    }
+  });
+});
+
+describe("which bookings offer cancellation", () => {
+  it("offers it for the statuses the domain can cancel from", () => {
+    expect(canCancel("Requested")).toBe(true);
+    expect(canCancel("Confirmed")).toBe(true);
+  });
+
+  it("does not offer it where the domain would refuse", () => {
+    // A control that is always refused teaches an operator to ignore failures,
+    // which is a worse habit than a missing button is an inconvenience.
+    expect(canCancel("Cancelled")).toBe(false);
+    expect(canCancel("Declined")).toBe(false);
+  });
+
+  it("does not offer it for a status it does not recognise", () => {
+    // Closed rather than open: a status added to the domain later should arrive
+    // here as "no button" and a deliberate decision, not as a button that
+    // happens to work because the check was a denylist.
+    expect(canCancel("Rescheduled")).toBe(false);
+    expect(canCancel("")).toBe(false);
   });
 });
 

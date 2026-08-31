@@ -84,6 +84,19 @@ public class MultiRolePlacementTests
     }
 
     private static Harness Wire(Service service, params Resource[] resources)
+        => WireWith(null, service, resources);
+
+    /// <summary>
+    /// The same wiring, with an observer attached.
+    /// </summary>
+    /// <remarks>
+    /// A sibling rather than an optional parameter on <see cref="Wire"/>: an optional
+    /// argument cannot precede a <c>params</c> array, and moving it after would mean editing
+    /// twenty-five call sites that have no interest in observation. One implementation, two
+    /// entry points.
+    /// </remarks>
+    private static Harness WireWith(
+        IBookingObserver? observer, Service service, params Resource[] resources)
     {
         var resourceStore = new InMemoryResourceStore();
         foreach (var resource in resources)
@@ -97,7 +110,7 @@ public class MultiRolePlacementTests
         var settings = TestData.Settings;
 
         var availability = new AvailabilityService(resourceStore, bookingStore, time, settings);
-        var bookings = new BookingService(resourceStore, bookingStore, time, settings);
+        var bookings = new BookingService(resourceStore, bookingStore, time, settings, observer);
 
         return new Harness
         {
@@ -622,6 +635,48 @@ public class MultiRolePlacementTests
         Assert.Equal(
             general.Failures.Select(f => f.Code),
             attributed.Failures.Select(f => f.Code));
+    }
+
+    [Fact]
+    public async Task A_service_booking_is_reported_exactly_once()
+    {
+        // Service placement reaches the store through PlaceForServiceAsync, which is a
+        // different public entry point from the one a direct booking uses — and both delegate
+        // to one private pipeline. If the report were raised in the entry points rather than
+        // in the pipeline, this path would report twice or not at all, and every existing
+        // test would still pass because none of them observes anything.
+        //
+        // It also matters that the report carries the SERVICE booking rather than some
+        // intermediate: a subscriber sending a confirmation would name the wrong thing.
+        var service = Svc(ResourceTypes.Room, Therapist);
+
+        var reported = new List<Guid>();
+
+        var harness = WireWith(
+            new RecordingObserver(reported),
+            service,
+            Res(1, ResourceTypes.Room),
+            Res(2, ResourceTypes.Room),
+            Res(3, Therapist),
+            Res(4, Therapist));
+
+        var placed = await harness.Services.PlaceAsync(Request(service, "09:00", 60));
+
+        Assert.True(placed.Succeeded);
+        Assert.Equal([placed.Value.Id], reported);
+    }
+
+    /// <summary>Records the id of every booking it is told about.</summary>
+    private sealed class RecordingObserver(List<Guid> placed) : IBookingObserver
+    {
+        public Task BookingPlacedAsync(Booking booking, CancellationToken cancellationToken = default)
+        {
+            placed.Add(booking.Id);
+            return Task.CompletedTask;
+        }
+
+        public Task BookingCancelledAsync(Booking booking, CancellationToken cancellationToken = default)
+            => Task.CompletedTask;
     }
 
     [Fact]

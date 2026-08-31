@@ -5,6 +5,7 @@ using UBookIt.Core.Availability;
 using UBookIt.Core.Bookings;
 using UBookIt.Core.Services;
 using UBookIt.Core.Stores;
+using UBookIt.Persistence.Notifications;
 using UBookIt.Persistence.Stores;
 using Umbraco.Cms.Core.Composing;
 using Umbraco.Cms.Core.DependencyInjection;
@@ -60,6 +61,11 @@ public sealed class UBookItPersistenceComposer : IComposer
         builder.Services.AddScoped<IBookingStore, SqlBookingStore>();
         builder.Services.AddScoped<IBookingManagementStore, SqlBookingManagementStore>();
         builder.Services.AddScoped<IAvailabilityQueryService, AvailabilityService>();
+        // Replaces Core's no-op default, so a booking placed or cancelled through any path
+        // raises an Umbraco notification a site can handle. Registered here rather than as a
+        // decorator around IBookingService: the observation is a domain fact, and Core
+        // reports it whether or not Umbraco composed the application.
+        builder.Services.AddScoped<IBookingObserver, UmbracoBookingObserver>();
         builder.Services.AddScoped<IBookingService, BookingService>();
         builder.Services.AddScoped<IServiceBookingService, ServiceBookingService>();
 

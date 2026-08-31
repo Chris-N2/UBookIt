@@ -134,6 +134,51 @@ export function shouldLoad(window: Window): boolean {
 }
 
 /**
+ * Where paging should land when the page just emptied under the operator.
+ *
+ * Cancelling removes a row from the current result set — on the default filter
+ * the booking leaves the view entirely — and cancelling the only row on page two
+ * leaves `skip` pointing past the end. The table then renders empty with
+ * "showing 21–20 of 20", and the empty message is suppressed because the total
+ * is not zero: a nonsense state reachable by an ordinary action.
+ *
+ * **Steps back a page rather than resetting to the first.** A window or filter
+ * change resets, because the operator asked a different question; cancelling is
+ * the same question with one fewer answer, and an operator working through page
+ * three does not want to be thrown to page one on every cancellation.
+ *
+ * Returns the same `skip` when nothing needs to move, so a caller can compare and
+ * avoid a second request in the ordinary case.
+ */
+export function skipAfterEmptyPage(skip: number, itemCount: number, pageSize: number): number {
+  if (itemCount > 0 || skip <= 0) {
+    return skip;
+  }
+
+  return Math.max(0, skip - pageSize);
+}
+
+/**
+ * Whether the view offers to cancel this booking.
+ *
+ * Only where the domain would allow it — the status machine permits cancellation
+ * from `Requested` and `Confirmed` and from nothing else. Offering a control that
+ * is always refused teaches an operator to ignore failures, which is a worse
+ * habit than a missing button is an inconvenience.
+ *
+ * **This is a convenience, not the rule.** The endpoint refuses an invalid
+ * transition independently, so a screen showing a stale list cannot talk the
+ * domain into one. If this function and the domain ever disagree, the domain
+ * wins and the operator is told.
+ *
+ * Compared by NAME, because that is what crosses the wire — the same reason the
+ * status filter sends published names rather than labels.
+ */
+export function canCancel(status: string): boolean {
+  return status === "Requested" || status === "Confirmed";
+}
+
+/**
  * Where paging should be after a query changes.
  *
  * Always the first page when the *query* changed — a page number counts into

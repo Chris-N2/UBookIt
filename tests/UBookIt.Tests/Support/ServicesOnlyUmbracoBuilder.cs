@@ -1,0 +1,49 @@
+using Microsoft.Extensions.Configuration;
+using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Logging;
+using Umbraco.Cms.Core.Cache;
+using Umbraco.Cms.Core.Composing;
+using Umbraco.Cms.Core.DependencyInjection;
+using Umbraco.Cms.Core.Logging;
+
+namespace UBookIt.Tests.Support;
+
+/// <summary>
+/// An <see cref="IUmbracoBuilder"/> that offers a service collection and nothing else, so a
+/// composer's registrations can be asserted without booting Umbraco.
+/// </summary>
+/// <remarks>
+/// <para>
+/// Everything but <see cref="Services"/> throws. A composer that started reading
+/// configuration or the type loader says so here rather than being handed an invented answer
+/// — the same discipline the rendering suite's Umbraco context uses.
+/// </para>
+/// <para>
+/// One implementation, deliberately, and extracted the moment a second caller appeared. The
+/// documentation-assertion helper in this suite was copied instead, the copy was fixed after
+/// a false failure, and the original stood defective beside it for a change and a half.
+/// </para>
+/// </remarks>
+public sealed class ServicesOnlyUmbracoBuilder(IServiceCollection services) : IUmbracoBuilder
+{
+    public IServiceCollection Services { get; } = services;
+
+    public IConfiguration Config => throw new NotSupportedException(Explanation);
+
+    public TypeLoader TypeLoader => throw new NotSupportedException(Explanation);
+
+    public ILoggerFactory BuilderLoggerFactory => throw new NotSupportedException(Explanation);
+
+    public IProfiler Profiler => throw new NotSupportedException(Explanation);
+
+    public AppCaches AppCaches => throw new NotSupportedException(Explanation);
+
+    public TBuilder WithCollectionBuilder<TBuilder>() where TBuilder : ICollectionBuilder
+        => throw new NotSupportedException(Explanation);
+
+    public void Build() => throw new NotSupportedException(Explanation);
+
+    private const string Explanation =
+        "This builder offers a service collection and nothing else. If the composer under "
+        + "test now needs more, give it a real answer rather than an invented one.";
+}

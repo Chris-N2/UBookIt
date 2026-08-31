@@ -17,7 +17,16 @@ internal static class ApiResults
     {
         var status = failures switch
         {
-            _ when failures.Any(f => f.Code is FailureCodes.ResourceNotFound or FailureCodes.ServiceNotFound)
+            // `BookingNotFound` joins the other two rather than falling through to 400.
+            // Cancelling an id nothing has and cancelling a booking that cannot move are
+            // different problems calling for different actions — one is a stale list, the
+            // other is a booking somebody already dealt with — and a caller that meets 400
+            // for both has to read the code to tell them apart. The delivery API already
+            // maps it this way; this mapping simply had no endpoint that produced it until
+            // now.
+            _ when failures.Any(f => f.Code is FailureCodes.ResourceNotFound
+                or FailureCodes.ServiceNotFound
+                or FailureCodes.BookingNotFound)
                 => StatusCodes.Status404NotFound,
             _ when failures.Any(f => f.Code == FailureCodes.ResourceInUse) => StatusCodes.Status409Conflict,
             _ => StatusCodes.Status400BadRequest,

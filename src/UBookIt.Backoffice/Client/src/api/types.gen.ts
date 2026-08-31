@@ -32,6 +32,11 @@ export type BookingModel = {
     service?: BookedServiceModel | null;
 };
 
+export type CancelledBookingModel = {
+    bookingId: string;
+    status: string;
+};
+
 export type CapabilityUsageModel = {
     key: string;
     count: number;
@@ -239,6 +244,39 @@ export type ListBookingsResponses = {
 };
 
 export type ListBookingsResponse = ListBookingsResponses[keyof ListBookingsResponses];
+
+export type CancelBookingData = {
+    body?: never;
+    path: {
+        id: string;
+    };
+    query?: never;
+    url: '/umbraco/ubookitbackoffice/api/v1/bookings/{id}/cancel';
+};
+
+export type CancelBookingErrors = {
+    /**
+     * Bad Request
+     */
+    400: unknown;
+    /**
+     * The resource is protected and requires an authentication token
+     */
+    401: unknown;
+    /**
+     * Not Found
+     */
+    404: unknown;
+};
+
+export type CancelBookingResponses = {
+    /**
+     * OK
+     */
+    200: CancelledBookingModel;
+};
+
+export type CancelBookingResponse = CancelBookingResponses[keyof CancelBookingResponses];
 
 export type ListResourcesData = {
     body?: never;
