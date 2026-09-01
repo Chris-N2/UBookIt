@@ -4,9 +4,10 @@ Measured before designing.
 
 - **The view already calls it a reference.** `Views/Shared/Components/Booking/Confirmation.cshtml`
   renders `<dt>Reference</dt><dd>@Model.BookingId</dd>`. The label is right; the value is a Guid.
-- **Identity is supplied, not generated.** `Booking.Create` is `internal` and takes `Guid id`
-  from its caller. Core therefore stays deterministic and has no need of a random source — the
-  reference can arrive the same way the id does, and Core keeps its zero package references.
+- **Identity is supplied to the aggregate, and generated one level up.** `Booking.Create` is
+  `internal` and takes `Guid id` from its caller — but that caller is `BookingService`, inside
+  Core, calling `Guid.NewGuid()`. So the reference can arrive the same way the id does, and Core
+  is **not** the deterministic assembly the first draft of D2 claimed it was.
 - **`Booking.Rehydrate` is `public`** and is the persistence boundary. It is the breaking part.
 - **`Booker` holds `Name`, `Email`, optional `Phone`, optional `MemberKey`.** Nothing in the
   booking survives their removal today except the interval and the claims — which is why the
@@ -78,13 +79,30 @@ nothing here should be built as though it were.
 
 ### D3. Uniqueness is enforced by the database, with a bounded retry
 
-**Decision:** a unique index on the reference column. Generation collides → catch the unique
-violation → generate again, up to a small bounded number of attempts, then fail the placement
-with a domain failure.
+**Decision:** a unique index on the reference column. Generation collides → the store reports
+it → generate again, up to a small bounded number of attempts, then fail.
 
-**Why not "generate and check first":** a check-then-insert is a race, and this codebase has
-already been bitten by conflict logic that looked correct outside a transaction. The database
-is the only thing that can actually enforce uniqueness, so it should be the thing that does.
+**Two corrections made during apply, because the code does not do what this originally said:**
+
+- ~~"catch the unique violation"~~. The store **pre-checks inside the placement transaction** and
+  returns a `ReferenceTaken` failure. The index is still the guarantee; the check is what makes
+  the ordinary case reportable without parsing SQL error numbers and index names to work out
+  which constraint fired. The residue is real and worth stating: a genuine race loses to the
+  index and surfaces as a `DbUpdateException` — a 500 for that booker — rather than being
+  retried. With the pre-check in front of it and 28⁸ values behind it, nobody will meet that;
+  the alternative is a fragile string-matching layer whose own failure mode is worse.
+- ~~"fail the placement with a domain failure"~~. Exhaustion **throws**. A `DomainResult` failure
+  is for something the caller did; this is the generator being broken. Putting it in the result
+  type would also oblige the delivery API's failure mapping — a published contract — to gain a
+  code meaning "our generator is broken", which no consumer can act on.
+
+**Why the index is the guarantee and the check is not:** a check-then-insert *outside* a
+transaction is a race, and this codebase has already been bitten by conflict logic that looked
+correct until it was placed under load. The database is the only thing that can actually
+enforce uniqueness, so it is the thing that does — the pre-check above runs inside the
+placement transaction and exists to make the outcome *reportable*, never to establish it.
+Delete the index and the check does not save you; delete the check and correctness is
+untouched, only the error message gets worse.
 
 **Why a bound rather than a loop:** an unbounded retry turns a bug — an exhausted or broken
 generator — into a hang. A bound turns it into an error message.
@@ -131,8 +149,13 @@ dependency is on something written down rather than on an implementation detail.
 
 ## Risks / Trade-offs
 
-- **A breaking change to a public type.** → Deliberate, and taken now precisely because the
-  window closes at 1.0. Called out in the proposal as CLAUDE.md requires.
+- **Breaking changes to public types — four, not one.** `Booking.Rehydrate` gains a required
+  parameter; `Booking` gains `Reference`; **`BookingSummary` gains a required positional
+  parameter**, which is source-breaking for any alternative `IBookingManagementStore` — a port
+  the `booking-management` spec explicitly promises is substitutable — and
+  **`BookingConfirmationModel` and `ServiceConfirmationModel` gain `required` members**, which
+  breaks any theme constructing them. The proposal originally called out only the first.
+  Deliberate, and taken now precisely because the window closes at 1.0.
 - **Two identifiers to keep straight.** → D4. Named clearly, documented, and the Guid stays the
   one machines use so the split follows an obvious line.
 - **A generator is a new failure mode.** → Bounded retry with a real domain failure, and the

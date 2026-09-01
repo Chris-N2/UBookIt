@@ -49,6 +49,26 @@ public class BookingsEndpointTests
         }
     }
 
+    [Fact]
+    public async Task The_row_carries_the_bookings_own_reference()
+    {
+        // Spec: "An operator can match what a caller reads out". Asserted against the summary
+        // the port supplied, not against a shape — a mapper hard-wired to a constant satisfies
+        // "there is a reference on the row" and cannot match anything, and that mutation
+        // passed all 1786 tests before this existed.
+        var summary = Summary(new DateTimeOffset(2026, 6, 2, 9, 0, 0, TimeSpan.Zero), BookingStatus.Confirmed);
+        var (controller, _) = Endpoint(new BookingPage([summary], Total: 1));
+
+        var model = Payload<PagedBookingsModel>(await controller.ListBookings(From, To));
+
+        var row = Assert.Single(model.Items);
+
+        Assert.Equal(summary.Reference.Value, row.Reference);
+
+        // Canonical on the wire; the client groups it for display.
+        Assert.DoesNotContain('-', row.Reference);
+    }
+
     private static BookingSummary Summary(
         DateTimeOffset startUtc,
         BookingStatus status,

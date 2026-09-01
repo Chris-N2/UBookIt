@@ -23,9 +23,12 @@
   the properties, not the constant**: that no vowel is present, that none of `0 1 L O I U`
   is, and that the alphabet therefore cannot spell a word. A test that restates the literal
   proves only that someone typed it twice.
-- [x] 1.3 A generation port (design D2), implemented outside Core. **`UBookIt.Core` keeps zero
-  package references and stays deterministic** — `CoreIndependenceTests` guards that and must
-  stay green.
+- [x] 1.3 A generation port (design D2). ~~Implemented outside Core~~ — **the default
+  implementation lives in Core**, drawing on `RandomNumberGenerator`, a `System` type. The
+  original wording rested on the determinism argument D2 retracts: `BookingService` has called
+  `Guid.NewGuid()` inline since bookings existed, so there was never any purity to preserve.
+  `CoreIndependenceTests` guards Core's **package references** — a different property, and it
+  stays green.
 - [x] 1.4 `Booking` carries the reference. `Create` takes it the way it already takes `id`;
   `Rehydrate` gains it as a required parameter — **the breaking change**, called out in the
   proposal.
@@ -37,9 +40,24 @@
 
 - [x] 2.1 Column plus a **unique index** — the store enforces uniqueness, not a prior check
   (design D3).
-- [x] 2.2 Bounded retry on unique violation, then a real domain failure. **Test the collision
-  path by supplying a generator that returns a known duplicate** — the port exists partly so
-  this is testable rather than theoretical.
+- [x] 2.2 Bounded retry, then a fault. **Two corrections to what this task originally said**,
+  both found by QA reading the code against the design rather than against the prose:
+  - ~~"a real domain failure"~~ — exhaustion throws `InvalidOperationException`. A `DomainResult`
+    failure would be wrong: nothing the caller did caused it, nothing they can do fixes it, and
+    the delivery API's failure mapping is a published contract that should not gain a code
+    meaning "our generator is broken". Recorded here and in design D3 rather than left as a
+    comment in a test arguing with its own specification.
+  - ~~"on unique violation"~~ — the store does not catch a unique-index violation. It
+    **pre-checks inside the placement transaction** and returns `ReferenceTaken`. The index
+    remains the guarantee; the check is what makes the ordinary case reportable. The residue,
+    stated rather than hidden: a genuine race loses to the index and surfaces as a
+    `DbUpdateException` — a 500 for that booker — instead of being retried. At 28^8 with the
+    pre-check in front of it, that is not a scenario anyone will meet, and the alternative
+    (parsing SQL error numbers and index names to tell one violation from another) is a
+    fragility with a worse failure mode.
+
+  **Test the collision path by supplying a generator that returns a known duplicate** — the port
+  exists partly so this is testable rather than theoretical.
 - [x] 2.3 **Backfill existing bookings** (design D5), not deletion. Settle at apply whether the
   backfill is set-based or batched, and say which and why.
 - [x] 2.4 Migration is additive, per CLAUDE.md. No existing value is read or overwritten.
@@ -108,8 +126,10 @@
 - [x] 5.1 Clean build at **zero** warnings; full suite green against the 1755 baseline; client
   suite against 113.
 - [x] 5.2 `openspec validate --all --strict`.
-- [x] 5.3 **Guarantee diff for the two MODIFIED requirements — done at propose time, re-check
-  at apply.** Both replace requirements wholesale, which deletes anything not restated:
+- [x] 5.3 **Guarantee diff for the THREE MODIFIED requirements — done at propose time, re-check
+  at apply.** Written when there were two; `delivery-api` joined when task 0.1 was settled and
+  was missing from this record until QA noticed. Each replaces a requirement wholesale, which
+  deletes anything not restated:
   - `default-frontend` / *Post-Redirect-Get confirmation*: three guarantees (303 redirect not a
     rendered POST; the confirmation shows reference + resource + time + contact details;
     refresh does not re-book) and two scenarios. All carried forward. **The only deliberate
@@ -121,6 +141,13 @@
     All carried forward, including the trailing note explaining why one scenario was narrowed
     when cancellation joined the capability. **The only change is the reference joining the
     row payload**, plus a scenario for it.
+  - `delivery-api` / *Booking placement* — **added after this task was first written**: one
+    endpoint SHALL, four request-body guarantees (resource id, start, duration, booker contact;
+    no member key; the pipeline unchanged), five response elements (id, status, resource id,
+    ISO-8601 UTC interval, echoed booker) and three scenarios. All carried forward. **The only
+    deliberate change is `(the confirmation reference)` after the id**, which is the same false
+    equation `default-frontend` carried and is the defect itself; the response gains the
+    reference alongside.
 - [x] 5.4 Outward sweep for sentences this falsifies. Start with `bookings` and
   `default-frontend`, then `docs/`, then the README. **`docs/booking-page.md` and
   `docs/backoffice.md` both describe what a visitor and an operator see.**

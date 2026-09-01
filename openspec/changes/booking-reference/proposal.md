@@ -64,11 +64,19 @@ nobody wants to make.
 
 ## Impact
 
-- **Public API — breaking, and called out as CLAUDE.md requires.** `Booking.Rehydrate` is
-  public and is the persistence boundary; it gains a required reference parameter. `Booking`
-  gains a `Reference` property. The backoffice row model and the confirmation view model gain a
-  field. This is the window for that: `0.1.0` says the API may still move, and after 1.0 it
-  could not.
+- **Public API — breaking in four places, called out as CLAUDE.md requires.** Enumerated after
+  QA pointed out that the original wording named one and waved at the rest:
+  - `Booking.Rehydrate` — public, the persistence boundary, gains a required parameter.
+  - `Booking` gains a `Reference` property.
+  - **`BookingSummary`** gains a required positional parameter. This is the one worth pausing
+    on: it is the row type of `IBookingManagementStore`, a port the `booking-management` spec
+    promises is substitutable, so any alternative implementation stops compiling.
+  - **`BookingConfirmationModel` and `ServiceConfirmationModel`** gain `required` members, which
+    breaks a theme that constructs them.
+
+  Additive on the wire, though: the delivery and management JSON responses gain a field and
+  lose nothing. This is the window for the source-breaking half — `0.1.0` says the API may
+  still move, and after 1.0 it could not.
 - **Schema**: a new non-nullable column with a unique index, plus a data migration that
   backfills existing rows. Additive, per CLAUDE.md's migration convention.
 - **Notifications**: `BookingPlacedNotification` and `BookingCancelledNotification` carry a

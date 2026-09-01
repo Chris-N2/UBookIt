@@ -507,6 +507,16 @@ export class UBookItBookingsListElement extends UmbLitElement {
       color: var(--uui-color-text-alt);
     }
     /*
+      Tabular figures and a monospace face, because this column exists to be read out and
+      typed back. Proportional digits make an eight-symbol code harder to keep your place in,
+      and the reference is the one cell an operator scans down while somebody talks.
+    */
+    .reference {
+      font-family: var(--uui-font-monospace, monospace);
+      font-variant-numeric: tabular-nums;
+      white-space: nowrap;
+    }
+    /*
       Copied the markup from the resource and service lists and not this rule, so the
       column heading meant to be screen-reader-only was rendered to everyone. Shadow DOM
       does not inherit page classes and this element adopts no shared stylesheet, so the
