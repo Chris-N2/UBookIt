@@ -69,6 +69,23 @@ if ($LASTEXITCODE -ne 0) { throw 'pack failed' }
 $packed = Get-ChildItem $feed -Filter '*.nupkg' | Where-Object { $_.Name -notlike '*.snupkg' }
 Write-Host ("      " + (($packed | ForEach-Object { $_.Name }) -join "`n      "))
 
+# Evict the previous build of this same version from the global package cache.
+#
+# During development the version does not change between runs, and NuGet identifies a
+# package by id and version alone: a cached ubookit.backoffice/0.1.0 is reused without
+# ever looking at the feed. So a second run of this script would install the FIRST run's
+# packages and report success — the script would be verifying history rather than the
+# build that just ran, which is the exact failure this whole change exists to prevent.
+$cache = Join-Path $env:USERPROFILE '.nuget/packages'
+foreach ($package in $packed) {
+    $id = $package.BaseName -replace "\.$([regex]::Escape($version))$", ''
+    $cached = Join-Path $cache "$($id.ToLowerInvariant())/$version"
+    if (Test-Path $cached) {
+        Remove-Item $cached -Recurse -Force
+        Write-Host "      evicted from cache: $id/$version" -ForegroundColor DarkGray
+    }
+}
+
 # ---------------------------------------------------------------- 2. a site from scratch
 
 Write-Host "`n[2/5] Creating an Umbraco site at $sitePath" -ForegroundColor Cyan

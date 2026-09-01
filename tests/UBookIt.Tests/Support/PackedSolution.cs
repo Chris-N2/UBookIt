@@ -61,9 +61,29 @@ public sealed class PackedSolution : IDisposable
         // the BUILD rather than about the developer's disk. Nothing is lost: the build
         // regenerates it during the pack below, and if it cannot, that is the defect this
         // is looking for and the failure is the right outcome.
-        DeleteGeneratedClientOutput();
+        // ONE pack, over a solution containing only the packable projects, written to a
+        // temporary directory so nothing lands in the repository.
+        //
+        // Both halves of that are load-bearing, and both were measured rather than guessed:
+        //
+        //   - Packing the real solution also BUILDS UBookIt.TestSite, a full Umbraco web
+        //     application, and the deletion above invalidates UBookIt.Backoffice which
+        //     TestSite references — so that cost is paid every run. 212 seconds.
+        //   - Packing the five projects one at a time instead costs about 40 seconds each in
+        //     restore and evaluation of Umbraco's package graph. 305 seconds.
+        //   - One invocation over these five: 17 seconds, and 6 with the client already
+        //     built.
+        //
+        // The drift guarantee survives because the project list is derived from the real
+        // solution rather than written here: a new packable project appears in UBookIt.slnx,
+        // gets packed, and then has to be reachable from the aggregate.
+        var packList = Path.Combine(output, "UBookItPackable.slnx");
 
-        Run("dotnet", $"pack \"{Path.Combine(RepoFiles.Root, "UBookIt.slnx")}\" -c Release -o \"{output}\"");
+        File.WriteAllText(packList, BuildPackListSolution());
+
+        Run("dotnet", $"pack \"{packList}\" -c Release -o \"{output}\"");
+
+        File.Delete(packList);
 
         var packages = Directory
             .GetFiles(output, "*.nupkg")
@@ -84,20 +104,102 @@ public sealed class PackedSolution : IDisposable
         return new PackedSolution(output, packages);
     }
 
+    /// <summary>
+    /// Every project the solution lists that has not opted out of packing.
+    /// <para>
+    /// Read from the solution rather than listed here, so that a project added later is
+    /// included by existing — which is the whole point of the aggregate-drift guard. A
+    /// project opts out with a literal <c>&lt;IsPackable&gt;false&lt;/IsPackable&gt;</c>;
+    /// that is a text match rather than an MSBuild evaluation, which would cost a process
+    /// launch per project. If an opt-out is ever expressed some other way, this over-includes
+    /// and the pack of a non-packable project fails loudly — the safe direction.
+    /// </para>
+    /// </summary>
+    private static IEnumerable<string> PackableProjects()
+    {
+        var solution = XDocument.Parse(RepoFiles.Read("UBookIt.slnx"));
+
+        var projects = solution
+            .Descendants().Where(e => e.Name.LocalName == "Project")
+            .Select(e => e.Attribute("Path")?.Value)
+            .Where(path => !string.IsNullOrWhiteSpace(path))
+            .Select(path => Path.Combine(RepoFiles.Root, path!.Replace('/', Path.DirectorySeparatorChar)))
+            .Where(path => !File.ReadAllText(path).Contains("<IsPackable>false</IsPackable>", StringComparison.Ordinal))
+            .ToList();
+
+        // A solution that suddenly lists no packable projects would satisfy every assertion
+        // made about the packages by producing none of them.
+        if (projects.Count == 0)
+        {
+            throw new InvalidOperationException("UBookIt.slnx lists no packable projects.");
+        }
+
+        return projects;
+    }
+
+    /// <summary>
+    /// A solution file listing only the packable projects, by absolute path so it can live
+    /// in a temporary directory rather than in the repository.
+    /// </summary>
+    private static string BuildPackListSolution()
+    {
+        var projects = PackableProjects()
+            .Select(path => $"  <Project Path=\"{path.Replace('\\', '/')}\" />");
+
+        return $"<Solution>{Environment.NewLine}{string.Join(Environment.NewLine, projects)}{Environment.NewLine}</Solution>{Environment.NewLine}";
+    }
+
+    /// <summary>
+    /// Rebuilds the backoffice from nothing and packs it, so that what the package contains
+    /// is a statement about the <b>build</b> rather than about the developer's disk.
+    /// <para>
+    /// This is expensive — about 110 seconds, which is a clean Razor SDK build against
+    /// Umbraco's static web assets and not something this code can shorten. It is kept
+    /// separate from the shared fixture, and paid by exactly one test, because only one
+    /// guarantee needs it: the other guards concern dependencies, versions and metadata, and
+    /// an ordinary six-second pack answers those perfectly well.
+    /// </para>
+    /// <para>
+    /// Cheaper approaches were tried and measured, and none of them works. Deleting only the
+    /// client output leaves discovery's cached asset list in obj/, and that cache answers
+    /// from the previous build: with it warm, removing the csproj's Content injection
+    /// entirely still produced a complete package. Disabling
+    /// <c>StaticWebAssetsCacheDefineStaticWebAssetsEnabled</c> does not help either — measured
+    /// at 19 client entries either way. The intermediate has to go.
+    /// </para>
+    /// </summary>
+    internal static PackedPackage PackBackofficeFromNothing(string outputDirectory)
+    {
+        DeleteGeneratedClientOutput();
+
+        var project = Path.Combine(RepoFiles.Root, "src", "UBookIt.Backoffice", "UBookIt.Backoffice.csproj");
+
+        Run("dotnet", $"pack \"{project}\" -c Release -o \"{outputDirectory}\"");
+
+        var produced = Directory
+            .GetFiles(outputDirectory, "UBookIt.Backoffice.*.nupkg")
+            .Single(path => !path.EndsWith(".snupkg", StringComparison.OrdinalIgnoreCase));
+
+        return PackedPackage.Open(produced);
+    }
+
     private static void DeleteGeneratedClientOutput()
     {
         var backoffice = Path.Combine(RepoFiles.Root, "src", "UBookIt.Backoffice");
 
-        // A checkout has no client output AND no intermediate output. Deleting only the
-        // first produces a state no clone is ever in, and it does not behave like one:
-        // static web asset discovery caches its file list in obj/, so a wwwroot emptied
-        // behind that cache's back yields a package with no client and no error. Measured,
-        // not assumed — the first version of this helper did exactly that and produced a
-        // failure that looked like the defect but was an artefact of the helper.
+        // The Release intermediate goes too, and that is not belt-and-braces — without it
+        // this guard does not work.
         //
-        // Release only. The test assembly runs from bin/Debug and has UBookIt.Backoffice.dll
-        // loaded; the pack below is Release, so this reproduces the clean state that matters
-        // without deleting a file out from under the running process.
+        // Static web asset discovery caches its resolved asset list in obj/. With that cache
+        // warm, the package gets its client from the previous build no matter what the
+        // current one does: deleting the Content injection from the csproj entirely still
+        // produced a complete package. Measured both ways from a clean intermediate — no
+        // injection gives zero client entries, injection gives nineteen — so the cache, not
+        // the build, was answering.
+        //
+        // Release only. The test assembly is running from bin/Debug with
+        // UBookIt.Backoffice.dll loaded; the pack is Release, so nothing is pulled out from
+        // under the running process.
         foreach (var directory in new[]
                  {
                      Path.Combine(backoffice, "wwwroot", "App_Plugins"),
@@ -122,17 +224,42 @@ public sealed class PackedSolution : IDisposable
             UseShellExecute = false,
         };
 
+        // Without this the fixture takes fifteen minutes and forty seconds, every time.
+        //
+        // That number is not arbitrary: it is MSBuild's node-reuse timeout. The worker
+        // processes MSBuild keeps alive for the next build inherit the redirected stdout
+        // handle, so the pipe does not close when `dotnet pack` exits — the read completes
+        // only when the last worker finally expires. The build itself takes twenty seconds.
+        //
+        // It reads as a slow build, which is why it was worth writing down.
+        info.Environment["MSBUILDDISABLENODEREUSE"] = "1";
+
         using var process = Process.Start(info)
             ?? throw new InvalidOperationException($"Could not start '{fileName} {arguments}'.");
 
-        var stdout = process.StandardOutput.ReadToEnd();
-        var stderr = process.StandardError.ReadToEnd();
+        // Both pipes are drained concurrently, and that is not style.
+        //
+        // Reading one to the end before starting the other deadlocks as soon as the child
+        // fills the pipe it is NOT being read from: the child blocks writing, we block
+        // reading, and neither ever moves. It survived early runs only because the output
+        // was small; the first run that forced a real rebuild hung for the full timeout and
+        // looked like a slow build rather than a hang, which cost a while to see.
+        var stdoutTask = process.StandardOutput.ReadToEndAsync();
+        var stderrTask = process.StandardError.ReadToEndAsync();
 
         if (!process.WaitForExit(milliseconds: 10 * 60 * 1000))
         {
             process.Kill(entireProcessTree: true);
             throw new InvalidOperationException($"'{fileName} {arguments}' did not finish within ten minutes.");
         }
+
+        // Bounded, because the output is only ever used to explain a failure. Anything
+        // still holding the pipe open after the process has exited must not be able to hang
+        // the suite — belt and braces alongside disabling node reuse above.
+        Task.WaitAll([stdoutTask, stderrTask], TimeSpan.FromSeconds(30));
+
+        var stdout = stdoutTask.IsCompletedSuccessfully ? stdoutTask.Result : "(stdout not captured)";
+        var stderr = stderrTask.IsCompletedSuccessfully ? stderrTask.Result : "(stderr not captured)";
 
         if (process.ExitCode != 0)
         {

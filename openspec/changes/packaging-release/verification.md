@@ -85,24 +85,49 @@ The last two matter most. `UBookIt.Web` is the assembly nothing referenced and n
 packed; its delivery API answering in a site that obtained uBookIt only from a NuGet feed is
 the direct refutation of the defect this change exists to fix.
 
+## The backoffice half, 2026-09-01
+
+Chris, in the installed site: **booking page published, booking taken through the front end**,
+and the Packages → Installed screen showing the `uBookIt` migration plan and the package at
+**`0.1.0`**. That closes tasks 5.3 and 5.4 and, with them, `docs/mvp.md` step 1.
+
+**Looking at it produced two findings that nothing else could have.**
+
+**The Packages screen named the package `UBookIt.Backoffice`.** An editor installs `UBookIt`;
+they have no reason to know it is four assemblies, and being shown one assembly's name invites
+the question of where the other three went. This is the same rule the nuspec metadata already
+had to satisfy — a package named after its own assembly reads as one nobody has looked at —
+applied to the one place an editor actually looks, and it had been left out of scope on the
+grounds that only the *version* was wrong. The manifest's `name` is now `uBookIt`, its `id` is
+unchanged, and a guard asserts the displayed name is not the package id.
+
+**The uBookIt section is invisible until it is granted**, which is ordinary Umbraco behaviour
+for any custom section and is documented in `docs/backoffice.md` — but the README, which is
+what a first-time installer reads, said nothing, so the first experience after installing was
+"where is it". The README now says so at the point of install, and repeats the reason the
+backoffice docs give for granting it deliberately: booking data contains the name and email
+address of every person who has booked.
+
+Neither is a packaging defect in the strict sense. Both are the difference between a package
+that installs and a package somebody can adopt, which is step 9.
+
 ## What is NOT yet verified, and why
 
-**Tasks 5.3 and 5.4 are outstanding.** Creating a bookable resource, publishing a Booking
-Page, taking a booking through the front end, seeing it in the backoffice Bookings list, and
-reading the version off the backoffice Packages screen all require an authenticated backoffice
-session. I do not enter credentials, so this half needs Chris at the keyboard.
+**Every step of the installation path has now been walked.** What is unguarded is that it
+*stays* walked: this was done by hand, and an automated installation test remains an open
+obligation from `booking-page-packaging`. Nothing here discharges it.
 
-The front-end booking is the step that most deserves a human: it is what `UBookIt.Web`'s
-absence used to break, and it is invisible from the backoffice. The HTTP probes above are
-strong evidence the assembly is there and wired up — they are not evidence that a visitor can
-complete a booking.
+Two smaller gaps, stated rather than implied:
 
-To pick it up:
+- **`npm ci` is unexercised.** This machine has `node_modules`, so only `npm run build` has
+  actually run. It is the standard command and its failure would be loud, but it is untested.
+- **A same-version reinstall is a trap**, and the script now defends against it rather than
+  documenting it. During development the version does not change between runs, and NuGet
+  identifies a package by id and version alone — so a cached `ubookit.backoffice/0.1.0` is
+  reused without the feed being consulted, and a second run would verify the *first* run's
+  packages while reporting success. `verify-install.ps1` evicts uBookIt from the global cache
+  before installing. This was found by the manifest change above not appearing.
 
-```
-cd C:\Users\cnorw\AppData\Local\Temp\ubookit-install-check\InstallCheck
-dotnet run
-```
-
-Then `/umbraco`, `admin@example.com` / `InstallCheck1234!`, and steps 2–7 of the checklist the
-script prints when it finishes.
+To repeat the whole thing: `pwsh scripts/verify-install.ps1`, then `dotnet run` in the site it
+creates and steps 1–7 of the checklist it prints. Add `-KeepExisting` to reinstall into the
+site that is already there, keeping its database and content.

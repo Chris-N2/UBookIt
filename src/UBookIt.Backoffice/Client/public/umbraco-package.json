@@ -1,6 +1,6 @@
 {
   "id": "UBookIt.Backoffice",
-  "name": "UBookIt.Backoffice",
+  "name": "uBookIt",
   "version": "0.0.0",
   "allowTelemetry": true,
   "extensions": [

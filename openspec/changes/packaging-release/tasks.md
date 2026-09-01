@@ -66,7 +66,8 @@
   umbraco` in a temp directory → `dotnet add package UBookIt` → run → install.
 - [x] 5.2 **From scratch, never against the TestSite** (design D4). The TestSite references
   the projects, which is the configuration that has hidden this failure from the beginning.
-- [ ] 5.3 **BLOCKED on Chris — needs an authenticated backoffice session.** In the installed
+- [x] 5.3 **DONE 2026-09-01, by Chris in the installed site.** Booking page published, booking
+  taken through the front end. In the installed
   site: create and publish a booking page, take a booking through the front end, and see it in
   the backoffice Bookings view. **The front-end half is the point** — it is what
   `UBookIt.Web`'s absence would have broken, and it is invisible from the backoffice alone.
@@ -75,9 +76,27 @@
   and `/umbraco/ubookit/api/v1/resources` and `/services` both answer `200` — so
   `UBookIt.Web` is present and registered, in a site that got uBookIt only from a feed. That
   is not the same as a visitor completing a booking, and is not recorded as if it were.
-- [ ] 5.4 **BLOCKED on Chris** — confirm the backoffice Packages screen shows the real version.
-  The manifest it reads was fetched from the running site and says `"version": "0.1.0"`; what
-  is unverified is only that the screen renders it.
+- [x] 5.4 **DONE 2026-09-01** — the Packages screen shows `0.1.0`, and the Migrations list
+  shows the `uBookIt` plan. Screenshot in `verification.md`'s account.
+
+  **It also showed the package as `UBookIt.Backoffice`, and looking at it is the only way that
+  could have been found.** The manifest's `name` is now `uBookIt` (`id` unchanged), guarded by
+  a test that the displayed name is not the package id — the same rule the nuspec metadata
+  already had to satisfy, applied to the one place an editor actually looks. Re-verified in the
+  running site after a reinstall.
+
+- [x] 5.6 **Two findings that only using it could produce**, both recorded in
+  `verification.md`:
+  - the Packages screen naming an assembly rather than the product (above);
+  - **the uBookIt section is invisible until granted** — ordinary Umbraco behaviour, already in
+    `docs/backoffice.md`, but absent from the README, so a first-time installer's first
+    experience was "where is it". The README now says so at the point of install.
+- [x] 5.7 **A same-version reinstall silently verified the previous build.** NuGet identifies a
+  package by id and version alone, and the version does not change between development runs, so
+  a cached `0.1.0` was reused without the feed being consulted — the script was measuring
+  history, the exact failure this change exists to prevent. `verify-install.ps1` now evicts
+  uBookIt from the global package cache before installing. Found because the manifest rename
+  did not appear.
 - [x] 5.5 Record what was run and what was observed, **and that it was performed rather than
   automated** — `verification.md`. The automated installation guard is an existing recorded
   obligation and this does not discharge it; the record says so in its own first paragraph.

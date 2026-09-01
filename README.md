@@ -10,7 +10,12 @@ booking is placed or cancelled so it can send whatever it wants to send.
 dotnet add package UBookIt
 ```
 
-Then run the site and install it from the backoffice **Packages** section.
+Then run the site. uBookIt installs its schema on first boot.
+
+**One step you will otherwise look for:** the **uBookIt** section is not visible until you
+grant it, the same as any other Umbraco section — *Users → User Groups → (a group) → Sections*.
+Grant it deliberately rather than to everyone: booking data includes the name and email address
+of every person who has booked. See [the backoffice docs](docs/backoffice.md).
 
 > **uBookIt is at `0.1.0`, and the public API may still move.** It does what the list below
 > says and it does it properly, but the version is not decoration: treat contracts as settled

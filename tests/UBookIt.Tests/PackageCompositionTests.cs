@@ -1,3 +1,4 @@
+using System.Text.Json;
 using UBookIt.Tests.Support;
 
 namespace UBookIt.Tests;
@@ -140,14 +141,54 @@ public class PackageCompositionTests(PackedSolutionFixture fixture)
         // and said "Successfully created package". The site would have got the
         // Management API and no Bookings section.
         //
-        // The fixture deletes that directory before packing, so this is a statement about
-        // what the build produces and not about what happens to be on this disk. Asserting
-        // mere presence would have passed against the broken build for the same reason
-        // nobody noticed it for months.
+        // Presence, from an ordinary pack. Cheap, and it catches an outright regression —
+        // but it cannot tell whether the bundle was built by this build or was simply lying
+        // on the disk, which is the distinction that matters here. That is the next test.
         var backoffice = Packed["UBookIt.Backoffice"];
 
         Assert.Contains("staticwebassets/App_Plugins/UBookItBackoffice/u-book-it-backoffice.js", backoffice.Entries);
         Assert.Contains("staticwebassets/App_Plugins/UBookItBackoffice/umbraco-package.json", backoffice.Entries);
+    }
+
+    [Fact]
+    public void The_backoffice_client_is_built_by_the_build_and_not_by_the_developer()
+    {
+        // The only guard here that could have found what was actually wrong, and the reason
+        // it takes ~110 seconds instead of six: it deletes the client output AND the Release
+        // intermediate, so the bundle in the package must have been produced by this build.
+        //
+        // Two separate defects passed a presence check. First nothing built the client at
+        // all — wwwroot/App_Plugins is gitignored and no target produced it. Then, after
+        // that was "fixed" by running vite from MSBuild, static web asset discovery still
+        // never saw the result, because wwwroot is globbed at EVALUATION time, before any
+        // target runs. Both produced "Successfully created package" and a package with no
+        // Bookings section in it.
+        //
+        // A guard whose subject is a build step has to destroy that step's output before
+        // measuring, or it is measuring history. Here that means the intermediate too: with
+        // obj/Release warm, deleting the csproj's Content injection outright still yielded a
+        // complete package, because discovery's cache answered instead of the build.
+        var output = Path.Combine(Path.GetTempPath(), "ubookit-client-" + Guid.NewGuid().ToString("n"));
+        Directory.CreateDirectory(output);
+
+        try
+        {
+            using var backoffice = PackedSolution.PackBackofficeFromNothing(output);
+
+            Assert.Contains("staticwebassets/App_Plugins/UBookItBackoffice/u-book-it-backoffice.js", backoffice.Entries);
+            Assert.Contains("staticwebassets/App_Plugins/UBookItBackoffice/umbraco-package.json", backoffice.Entries);
+        }
+        finally
+        {
+            try
+            {
+                Directory.Delete(output, recursive: true);
+            }
+            catch (IOException)
+            {
+                // A leftover temp directory is not worth failing a test run over.
+            }
+        }
     }
 
     [Fact]
@@ -160,6 +201,30 @@ public class PackageCompositionTests(PackedSolutionFixture fixture)
         var manifest = backoffice.ReadText("staticwebassets/App_Plugins/UBookItBackoffice/umbraco-package.json");
 
         Assert.Contains($"\"version\": \"{backoffice.Version}\"", manifest);
+    }
+
+    [Fact]
+    public void The_name_an_editor_sees_is_the_product_they_installed()
+    {
+        // The Packages screen showed "UBookIt.Backoffice", which is an assembly name. The
+        // editor installed uBookIt; they have no reason to know the package is four
+        // assemblies, and being shown one of their names invites the question of where the
+        // other three went.
+        //
+        // This is the same rule the nuspec metadata already has to satisfy — a package
+        // named after its own assembly reads as one nobody looked at — applied to the one
+        // place an editor actually looks. Found by looking at the screen, which is the only
+        // way it could have been found.
+        var backoffice = Packed["UBookIt.Backoffice"];
+
+        var manifest = backoffice.ReadText("staticwebassets/App_Plugins/UBookItBackoffice/umbraco-package.json");
+
+        using var document = JsonDocument.Parse(manifest);
+
+        var name = document.RootElement.GetProperty("name").GetString();
+
+        Assert.False(string.IsNullOrWhiteSpace(name), "The manifest has no name for the Packages screen to show.");
+        Assert.NotEqual(backoffice.Id, name);
     }
 
     [Theory]
