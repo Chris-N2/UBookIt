@@ -18,6 +18,13 @@ and no error is raised anywhere.
 **Package versions SHALL be produced together and SHALL match.** A uBookIt package depending
 on a different version of a uBookIt package is a resolution nobody chose.
 
+**Everything the packages carry SHALL be produced by the build that packs them.** A build
+artifact that is not under version control and is not built by the build is absent from a
+clean checkout, and packing then succeeds while shipping less than it claims. This is not a
+convenience requirement about developer setup: it is the same silent absence as a missing
+assembly, and it is *harder* to notice, because the working copy where anyone would check has
+usually been made complete by hand already.
+
 #### Scenario: One install is enough
 - **WHEN** a site adds the single uBookIt package to a newly created Umbraco project
 - **THEN** restore succeeds, and the site has the backoffice section, the management API, the delivery API and the front-end rendering available
@@ -29,6 +36,10 @@ on a different version of a uBookIt package is a resolution nobody chose.
 #### Scenario: The front-end rendering is in the box
 - **WHEN** a site installs the package and publishes a booking page
 - **THEN** the flow renders, using views and a stylesheet that arrived with the package rather than being copied into the site
+
+#### Scenario: The backoffice client is in the box
+- **WHEN** the packages are built from a checkout containing only what version control carries
+- **THEN** the backoffice package contains the compiled client bundle and its manifest, rather than whatever an earlier manual build happened to leave in the working copy
 
 #### Scenario: The aggregate does not drift
 - **WHEN** a new packable assembly is added to the solution

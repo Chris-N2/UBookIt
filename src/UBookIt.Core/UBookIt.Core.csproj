@@ -6,6 +6,11 @@
     <Nullable>enable</Nullable>
   </PropertyGroup>
 
+  <PropertyGroup>
+    <Title>uBookIt — domain</Title>
+    <Description>The uBookIt booking domain: bookable resources, availability rules, services, slot generation and bookings. Depends on nothing — no Umbraco, no database, no framework — so a host can reference the model and the booking rules on their own. Part of uBookIt, a booking system for Umbraco; install the UBookIt package rather than this one.</Description>
+  </PropertyGroup>
+
   <ItemGroup>
     <InternalsVisibleTo Include="UBookIt.Tests" />
   </ItemGroup>

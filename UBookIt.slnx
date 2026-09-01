@@ -1,5 +1,6 @@
 <Solution>
   <Folder Name="/src/">
+    <Project Path="src/UBookIt/UBookIt.csproj" />
     <Project Path="src/UBookIt.Backoffice/UBookIt.Backoffice.csproj" />
     <Project Path="src/UBookIt.Core/UBookIt.Core.csproj" />
     <Project Path="src/UBookIt.Persistence/UBookIt.Persistence.csproj" />

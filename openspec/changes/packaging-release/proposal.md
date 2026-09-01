@@ -17,6 +17,18 @@ built and merged; **nobody can install it.**
   to be open source, and which installs schema into other people's databases, that is not a
   formality.
 
+A fourth, **found during apply and not by the measurement above**:
+
+- **The backoffice client was built by nothing.** `wwwroot/App_Plugins/` is gitignored and no
+  MSBuild target produced it, so packing a clean clone produced a `UBookIt.Backoffice` package
+  with **no client in it** and said "Successfully created package". A site installing that
+  gets the Management API and no Bookings section.
+
+  It was missed at propose time for an instructive reason: the measurement was taken against a
+  working copy where an earlier manual `npm run build` had already populated the directory. The
+  artifact looked complete because a previous local step had quietly completed it — which is
+  the same failure this whole change is about, one level up.
+
 Every one of those was invisible to a build reporting success, which decides how this change
 has to be verified: **by installing the built packages into a clean Umbraco site and taking a
 booking**, not by inspecting a `.nupkg`.
@@ -74,9 +86,13 @@ booking**, not by inspecting a `.nupkg`.
   publishing is the moment CLAUDE.md's compatibility promise starts**, which is why the
   version below is a real decision rather than a formality.
 
-## Decisions needed from Chris before apply
+## Decisions needed from Chris before apply — all three settled 2026-08-31
 
-Three, and the first two cannot be inferred from the repository.
+**1. MIT. 2. `0.1.0`. 3. `UBookIt` as the meta-package**, as recommended below. Chris also
+raised planning the 0.2.0 → 1.0.0 road so that 1.0 means "a fully functional product", and
+deferred it — recorded as an obligation rather than answered here.
+
+The reasoning as it was put to him:
 
 1. **Licence.** *Recommendation: MIT.* It is the most permissive common choice, it is what
    most Umbraco community packages use, and it maximises the chance a site will adopt this

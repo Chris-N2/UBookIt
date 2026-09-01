@@ -5,6 +5,11 @@
     <AddRazorSupportForMvc>true</AddRazorSupportForMvc>
   </PropertyGroup>
 
+  <PropertyGroup>
+    <Title>uBookIt — front end</Title>
+    <Description>What a visitor actually sees: the uBookIt booking flow's Razor views and view components, the booking page document type, the delivery API, and a stylesheet a site can restyle or replace. Views are overridable per site or by a theme. Part of uBookIt, a booking system for Umbraco; install the UBookIt package rather than this one.</Description>
+  </PropertyGroup>
+
   <ItemGroup>
     <FrameworkReference Include="Microsoft.AspNetCore.App" />
   </ItemGroup>

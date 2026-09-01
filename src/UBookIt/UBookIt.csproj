@@ -1,0 +1,49 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <!--
+    ==========================================================================================
+    The package a site installs. It contains no code.
+    ==========================================================================================
+
+    uBookIt is four assemblies, and they are separate on purpose: the architecture's stated
+    goal is that a headless consumer can build a booking flow against the contracts without
+    taking the backoffice with them, and merging everything into one artifact would make that
+    impossible to express.
+
+    But "install these two packages" is a trap, because forgetting the second one fails
+    SILENTLY: the backoffice section appears, the Management API answers, and the booking page
+    renders nothing at all, with no error raised anywhere. Nobody would think to look at their
+    package list. So the thing a site installs is this, and it reaches everything.
+  -->
+
+  <PropertyGroup>
+    <TargetFramework>net10.0</TargetFramework>
+
+    <Title>uBookIt</Title>
+    <Description>A booking system for Umbraco 17: bookable resources, availability rules, services, and a booking flow a visitor can complete without JavaScript. Install this package — it brings the domain, the storage, the backoffice section and the front-end rendering. Requires Umbraco 17 (LTS) and SQL Server.</Description>
+
+    <!--
+      There is nothing to ship: this package exists to name its dependencies. NU5128 is the
+      warning for exactly that shape — dependency groups with no matching lib/ folder — and
+      it is suppressed here, on the one project where it is the intent, rather than anywhere
+      broader. Warnings are errors in CI, so leaving it would fail the build.
+    -->
+    <IncludeBuildOutput>false</IncludeBuildOutput>
+    <IncludeSymbols>false</IncludeSymbols>
+    <NoWarn>$(NoWarn);NU5128</NoWarn>
+  </PropertyGroup>
+
+  <!--
+    Backoffice brings Core and Persistence with it. Web is listed because nothing else
+    references it — it is the assembly whose absence this package exists to prevent.
+
+    PackagingTests asserts this reaches every packable project rather than trusting the list,
+    because a fifth assembly added later and forgotten is the same silent failure wearing a
+    different hat.
+  -->
+  <ItemGroup>
+    <ProjectReference Include="..\UBookIt.Backoffice\UBookIt.Backoffice.csproj" />
+    <ProjectReference Include="..\UBookIt.Web\UBookIt.Web.csproj" />
+  </ItemGroup>
+
+</Project>

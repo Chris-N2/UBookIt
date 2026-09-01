@@ -18,7 +18,7 @@ A gap anywhere in this list means there is no product, however complete the rest
 
 | | | |
 |---|---|---|
-| 1 | **Install the package** into an Umbraco 17 site from a feed | ❌ not built |
+| 1 | **Install the package** into an Umbraco 17 site from a feed | ✅ |
 | 2 | **Configure a bookable resource** — opening hours, exceptions, duration limits, capabilities | ✅ |
 | 3 | **Define a service** over resource roles, where a site wants one | ✅ |
 | 4 | **Publish a booking page** without writing code | ✅ |
@@ -26,13 +26,24 @@ A gap anywhere in this list means there is no product, however complete the rest
 | 6 | **The owner sees bookings** in the backoffice | ✅ |
 | 7 | **The owner cancels** a booking | ✅ |
 | 8 | **The site can react** when a booking is placed or cancelled | ✅ |
-| 9 | **It is licensed and documented** enough for someone to adopt | ❌ not built |
+| 9 | **It is licensed and documented** enough for someone to adopt | ✅ |
 
-Steps 2–8 are done. **Only packaging is left** — step 1 and step 9, one change — and step 1
-is proven by installing the built package into a clean Umbraco site, not by building a
-`.nupkg`. The current one builds happily and cannot be consumed: it declares dependencies on
-`UBookIt.Core` and `UBookIt.Persistence` packages that do not exist, and omits `UBookIt.Web`
-entirely, so the Razor booking page ships to nobody.
+**Every step is done.** A site adds one package, `UBookIt`, and gets all four assemblies;
+the repository carries an MIT `LICENSE` and a `README.md`; and the first version is `0.1.0`,
+which is a claim that the package works rather than that its API has stopped moving.
+
+Step 1 was proven the only way it can be — by installing the built packages into an Umbraco
+site created from scratch and using it. `scripts/verify-install.ps1` walks that path and
+`openspec/changes/.../packaging-release` records what was observed. What made this necessary
+rather than pedantic: the package that existed before **built happily and could not be
+consumed at all.** It declared dependencies on `UBookIt.Core` and `UBookIt.Persistence`
+packages nobody published, omitted `UBookIt.Web` entirely so the Razor booking page shipped
+to nobody, and — found while fixing the rest — carried no backoffice bundle either, because
+`wwwroot/App_Plugins` is gitignored and nothing built it. Three silent absences in an
+artifact that reported complete success.
+
+`PackageCompositionTests` now guards each of those over the real `.nupkg` files. The
+installation itself is **not** automated; that remains a recorded obligation.
 
 ### Why 8 is in v1 rather than after it
 

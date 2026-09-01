@@ -110,14 +110,63 @@ shipped.
   may still move" and CLAUDE.md's compatibility promise starting immediately; recorded as a
   decision rather than picked.
 
-## Open Questions
+## Open Questions — answered at apply
 
-- **Does the meta-package need to carry the `umbraco-package.json`?** The manifest currently
-  ships with `UBookIt.Backoffice`, which the meta depends on, so it should arrive either way
-  — but "should" is exactly the word that got `UBookIt.Web` left out. Settle it by looking at
-  the installed site, not by reasoning.
-- **`UBookIt.Persistence.runtimeconfig.json` in the package's `lib/`.** Harmless or not,
-  something is producing it that should not be.
-- **Whether the readme belongs in every package or only the meta.** NuGet shows the readme on
-  each package's page; four copies of one readme is noise, and none at all makes the library
-  pages blank. Probably: full readme on the meta, a short pointer on the libraries.
+- **Does the meta-package need to carry the `umbraco-package.json`?** ~~It should arrive
+  either way — but "should" is exactly the word that got `UBookIt.Web` left out.~~ **No.**
+  Settled the way the question asked for, by looking at the installed site rather than
+  reasoning: `/App_Plugins/UBookItBackoffice/umbraco-package.json` returns 200 from a site
+  that installed only `UBookIt`, carrying `"version": "0.1.0"`. The manifest arrives with
+  `UBookIt.Backoffice` as a static web asset and needs no help.
+- **`UBookIt.Persistence.runtimeconfig.json` in the package's `lib/`.** **Not our
+  misconfiguration.** `Microsoft.EntityFrameworkCore.Design`'s own props sets
+  `GenerateRuntimeConfigurationFiles=true` for class libraries so `dotnet ef` has something to
+  run — deliberate, and switching it off breaks migrations tooling. The file reaches the
+  package only because `.json` is in NuGet's default packable-build-output extension list, so
+  the fix narrows that list for this project and leaves EF's behaviour alone.
+- **Whether the readme belongs in every package or only the meta.** ~~Probably: full readme on
+  the meta, a short pointer on the libraries.~~ **The same readme on all five.** Two documents
+  saying overlapping things drift silently — the exact failure mode that produced findings on
+  each of the last three changes — and the readme already names the packages and says which
+  one to install, which is the whole content the "pointer" would have had.
+
+## What the measurement missed, and apply found
+
+Recorded here rather than quietly fixed, because the Context section above was written from a
+measurement and is now known to have been incomplete.
+
+**The backoffice client was never built by anything.** `wwwroot/App_Plugins/` is gitignored
+and no MSBuild target produced it, so `dotnet pack` on a clean clone built a
+`UBookIt.Backoffice` package **containing no client at all** — and reported success. A site
+installing it would get the Management API and no Bookings section, with no error anywhere.
+
+The Context section said the bundle "is already in the right place", which was true of *my
+working copy* and false of the repository. That is the same mistake as the defect being fixed,
+one level up: a measurement of an artifact that a previous local step had quietly populated.
+The client build is now part of building the project, incrementally, and
+`PackageCompositionTests` asserts the bundle is in the package.
+
+**And then the fix for it was wrong, in the same way again.** Wiring `npm run build` into the
+build is not sufficient, because static web assets are discovered from `@(Content)` and
+`wwwroot\**` is globbed when the project is **evaluated** — before any target runs. On a clean
+checkout wwwroot does not exist at that moment, so vite ran, wrote the bundle, and discovery
+never saw it: `dotnet pack` produced a package with no client and reported success. Identical
+symptom, different cause.
+
+It was caught for one reason only. The fixture that packs for these tests deletes the client
+output first, so "the client is in the package" is a claim about what the **build** produces
+rather than about what is on the disk of whoever is running it. A test asserting mere presence
+would have passed against both broken versions — which is exactly why nobody noticed the first
+one for months. The lesson is not about npm or MSBuild: **when a guard's subject is a build
+step, the guard has to destroy that step's output before measuring, or it is measuring
+history.**
+
+Two further notes for whoever touches this next:
+
+- The first attempt at that deletion removed `wwwroot/App_Plugins` but left `obj/`, which is a
+  state no clone is ever in, and it failed for an unrelated reason (a stale asset cache). It
+  produced a failure that *looked* like the defect. The helper now clears the Release
+  intermediate output too, so the state it creates is one a checkout actually has.
+- `npm ci` on a machine with no `node_modules` is the only path not exercised here — this
+  machine has them. It is the standard command and the failure would be loud, but it is
+  untested rather than proven.
