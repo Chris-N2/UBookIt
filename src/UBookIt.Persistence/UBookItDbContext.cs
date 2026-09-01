@@ -1,4 +1,5 @@
 using Microsoft.EntityFrameworkCore;
+using UBookIt.Core.Bookings;
 using UBookIt.Persistence.Entities;
 
 namespace UBookIt.Persistence;
@@ -86,6 +87,13 @@ public sealed class UBookItDbContext(DbContextOptions<UBookItDbContext> options)
             booking.HasKey(b => b.Id);
             booking.Property(b => b.Id).ValueGeneratedNever();
             booking.Property(b => b.TimeZoneId).HasMaxLength(64);
+            // Fixed length: every reference is exactly BookingReference.Length symbols in
+            // canonical form, so a wider column would only admit values the domain refuses.
+            booking.Property(b => b.Reference).HasMaxLength(BookingReference.Length).IsFixedLength();
+            // THE uniqueness guarantee. It is here rather than in a read-then-write because a
+            // check followed by an insert is a race, and two bookings sharing a reference
+            // makes both of them unquotable — the one thing a reference exists to prevent.
+            booking.HasIndex(b => b.Reference).IsUnique();
             booking.Property(b => b.BookerName).HasMaxLength(256);
             booking.Property(b => b.BookerEmail).HasMaxLength(320);
             booking.Property(b => b.BookerPhone).HasMaxLength(64);

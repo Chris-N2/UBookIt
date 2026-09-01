@@ -217,6 +217,13 @@ public sealed class ServiceConfirmationModel
 {
     public required Guid BookingId { get; init; }
 
+    /// <summary>
+    /// The quotable reference, grouped for display — see <c>BookingConfirmationModel</c>. A
+    /// service booking needs it for exactly the same reason a direct one does: somebody is
+    /// going to have to talk about this booking later.
+    /// </summary>
+    public required string Reference { get; init; }
+
     public required string ServiceName { get; init; }
 
     /// <summary>Every resource the service resolved to, in the order the booking claims them.</summary>

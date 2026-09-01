@@ -90,6 +90,7 @@ public class BookingManagementStoreTests(SqlServerFixture fixture)
     {
         var booking = Booking.Rehydrate(
             Guid.NewGuid(),
+            new RandomBookingReferenceFactory().Next(),
             BookingInterval.Create(startUtc, startUtc + duration, "UTC").Value,
             Booker.Create(null, "Integration Tester", "integration@example.com", null).Value,
             [new ResourceClaim(firstResourceId), new ResourceClaim(secondResourceId)],

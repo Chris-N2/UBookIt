@@ -43,16 +43,38 @@ negligible and the reference still reads in one breath. Grouping into two blocks
 purely for the eye; the stored value has no separator, so the display format can change later
 without a migration.
 
-### D2. Generation is a port, because Core is deterministic
+### D2. Generation is a port — for testability, not for determinism
 
-**Decision:** a `IBookingReferenceFactory` (or equivalent seam) in `UBookIt.Core`, implemented
-outside it. `Booking` receives a reference the way it already receives its id.
+**Corrected during apply. The original justification was wrong on its facts.**
 
-**Why:** `UBookIt.Core` has **zero package references** and its tests are deterministic — that
-is a stated invariant, guarded by `CoreIndependenceTests`. Reaching for a random source inside
-the domain would put non-determinism into the one assembly that has none, and would make
-"what reference did this produce" untestable. A port keeps the domain a pure function of its
-inputs and lets a test supply a known reference, including a deliberately colliding one.
+It said a random source "would put non-determinism into the one assembly that has none".
+`BookingService` already contains `Booking.Create(Guid.NewGuid(), …)`. Core has generated
+random identity inline since bookings existed, so there was no determinism to protect, and the
+argument as written would have been rejected by anyone who looked. `CoreIndependenceTests`
+guards Core's **package references**, not its purity — a different property.
+
+**The decision survives, on the half of the reasoning that holds:** a port makes the collision
+path reachable. Uniqueness is enforced by the store (D3), so the interesting behaviour is what
+happens when a generated reference is already taken — and at 28⁸ values, waiting for a real
+collision is not a test strategy. A factory a test can point at a known-duplicate value is the
+only practical way to exercise it.
+
+**Decision:** `IBookingReferenceFactory` in `UBookIt.Core`, with a default implementation in
+Core drawing from `RandomNumberGenerator` (a `System` type, so the zero-package-reference
+invariant is untouched). `BookingService` takes it as an **optional** parameter defaulting to
+that implementation.
+
+**Why optional rather than required**, which is the opposite of the call made for
+`Booking.Create`'s service attribution: omitting the attribution silently recorded a wrong
+*fact* — a service booking claiming it was placed directly. Omitting a reference factory
+records nothing wrong; it produces a perfectly good random reference, exactly as
+`Guid.NewGuid()` does today. The failure mode that made attribution required does not exist
+here, and making it required would mean editing 29 construction sites to no safety benefit.
+
+Cryptographic randomness rather than `Random.Shared` costs nothing and forecloses a footgun: a
+reference is the natural thing to put in a "manage my booking" link later, and a predictable
+one would be guessable. That is not a claim that a reference is a secret — it is not, and
+nothing here should be built as though it were.
 
 ### D3. Uniqueness is enforced by the database, with a bounded retry
 

@@ -1,3 +1,4 @@
+using UBookIt.Tests.Support;
 using UBookIt.Core;
 using UBookIt.Core.Bookings;
 using UBookIt.Core.Common;
@@ -123,6 +124,7 @@ public class BookingQueryTests
         var blocking = Enum.GetValues<BookingStatus>()
             .Where(status => Booking.Rehydrate(
                 Guid.NewGuid(),
+                References.Any(),
                 BookingInterval.Create(From, From.AddHours(1), "UTC").Value,
                 Booker.Create(null, "A Tester", "tester@example.com", null).Value,
                 [new ResourceClaim(Guid.NewGuid())],

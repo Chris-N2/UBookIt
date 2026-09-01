@@ -614,8 +614,14 @@ public class ServicesDeliveryTests
         // into ⑤'s path.
         var properties = typeof(PlacementResponseModel).GetProperties().Select(p => p.Name).ToArray();
 
+        // `Reference` joined this list deliberately: a consumer builds its own confirmation
+        // screen and a person reads it, so returning only the opaque id would leave them
+        // showing a Guid — the very defect this pin's neighbours were written about.
+        //
+        // What the pin guards is unchanged and still holds: ONE `ResourceId`, singular, and no
+        // resource collection. That is ⑤'s contract staying out of the direct endpoint.
         Assert.Equal(
-            ["BookingId", "Status", "ResourceId", "Interval", "Booker"],
+            ["BookingId", "Reference", "Status", "ResourceId", "Interval", "Booker"],
             properties);
 
         Assert.Equal(

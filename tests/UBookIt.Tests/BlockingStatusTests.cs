@@ -16,6 +16,7 @@ public class BlockingStatusTests
     private static Booking BookingIn(BookingStatus status, Guid resourceId, string start, string end)
         => Booking.Create(
             Guid.NewGuid(),
+            References.Any(),
             BookingInterval.Create(TestData.Utc(Date, start), TestData.Utc(Date, end), TestData.LondonZoneId).Value,
             TestData.Booker(),
             [new ResourceClaim(resourceId)],

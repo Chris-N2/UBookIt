@@ -323,6 +323,7 @@ export default {
     statusDeclined: "Declined",
 
     // ------------------------------------------------------------- the table
+    reference: "Reference",
     when: "When",
     booker: "Booker",
     resources: "Resources",

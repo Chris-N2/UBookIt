@@ -18,6 +18,7 @@ export type BookingLike = {
   startUtc: string;
   endUtc: string;
   timeZoneId: string;
+  reference?: string;
   service?: { serviceId: string; displayName: string } | null;
 };
 
@@ -317,4 +318,21 @@ export function serviceLabel(
   return booking.service.displayName.trim() === ""
     ? booking.service.serviceId
     : booking.service.displayName;
+}
+
+/**
+ * Groups a booking reference for reading: `7QX4M2NP` becomes `7QX4-M2NP`.
+ *
+ * The API sends the canonical form deliberately — how a reference is presented is the
+ * consumer's decision, and canonical is what compares and stores cleanly. This screen is a
+ * consumer, so the grouping happens here rather than on the wire.
+ *
+ * The separator is cosmetic: it is never sent back and never compared against. Anything that
+ * is not the expected length is passed through untouched rather than sliced into something
+ * that looks authoritative and is not.
+ */
+export function bookingReference(booking: { reference?: string }): string {
+  const value = booking.reference ?? "";
+
+  return value.length === 8 ? `${value.slice(0, 4)}-${value.slice(4)}` : value;
 }

@@ -40,6 +40,18 @@ public static class FailureCodes
 
     // Definitional validation
     public const string ClaimsInvalid = "claims-invalid";
+
+    /// <summary>
+    /// The reference offered for a new booking is already in use.
+    /// <para>
+    /// <b>Internal to placement — this never reaches a consumer.</b>
+    /// <c>BookingService</c> answers it by generating another reference and trying again, so
+    /// it is a message between the service and its store rather than a report to a caller.
+    /// It is deliberately absent from the delivery API's failure mapping: a caller can do
+    /// nothing with it, and nothing they did caused it.
+    /// </para>
+    /// </summary>
+    public const string ReferenceTaken = "reference-taken";
     public const string DisplayNameRequired = "display-name-required";
     public const string TypeKeyInvalid = "type-key-invalid";
 

@@ -47,6 +47,7 @@ public sealed class Booking
 
     private Booking(
         Guid id,
+        BookingReference reference,
         BookingInterval interval,
         Booker booker,
         List<ResourceClaim> claims,
@@ -55,6 +56,7 @@ public sealed class Booking
         ServiceAttribution? service)
     {
         Id = id;
+        Reference = reference;
         Interval = interval;
         Booker = booker;
         _claims = claims;
@@ -64,6 +66,23 @@ public sealed class Booking
     }
 
     public Guid Id { get; }
+
+    /// <summary>
+    /// The identifier a person quotes. Assigned at placement and never changed afterwards —
+    /// not by confirming, declining or cancelling, and not by any later amendment of the
+    /// booking's time.
+    /// <para>
+    /// That immutability is the whole value of it. The customer is holding the reference they
+    /// were given; a system that reassigns it denies all knowledge of the booking the person
+    /// is asking about. It has no setter for the same reason <see cref="Id"/> has none.
+    /// </para>
+    /// <para>
+    /// It is also deliberately independent of the booker: a booking whose personal details are
+    /// later removed still occupies its interval and still has to be discussable, so nothing
+    /// about the reference is derived from the person.
+    /// </para>
+    /// </summary>
+    public BookingReference Reference { get; }
 
     public BookingInterval Interval { get; }
 
@@ -93,6 +112,7 @@ public sealed class Booking
 
     internal static Booking Create(
         Guid id,
+        BookingReference reference,
         BookingInterval interval,
         Booker booker,
         IEnumerable<ResourceClaim> claims,
@@ -116,7 +136,7 @@ public sealed class Booking
             throw new ArgumentException("A booking cannot claim the same resource twice.", nameof(claims));
         }
 
-        return new Booking(id, interval, booker, claimList, status, createdUtc.ToUniversalTime(), service);
+        return new Booking(id, reference, interval, booker, claimList, status, createdUtc.ToUniversalTime(), service);
     }
 
     /// <summary>
@@ -136,6 +156,7 @@ public sealed class Booking
     /// </summary>
     public static DomainResult<Booking> Rehydrate(
         Guid id,
+        BookingReference reference,
         BookingInterval interval,
         Booker booker,
         IEnumerable<ResourceClaim> claims,
@@ -158,7 +179,7 @@ public sealed class Booking
         }
 
         return DomainResult<Booking>.Success(
-            new Booking(id, interval, booker, claimList, status, createdUtc.ToUniversalTime(), service));
+            new Booking(id, reference, interval, booker, claimList, status, createdUtc.ToUniversalTime(), service));
     }
 
     public DomainResult Confirm() => Transition(BookingStatus.Confirmed, BookingStatus.Requested);

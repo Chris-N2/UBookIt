@@ -21,6 +21,7 @@ export type BookedServiceModel = {
 
 export type BookingModel = {
     bookingId: string;
+    reference: string;
     startUtc: string;
     endUtc: string;
     timeZoneId: string;

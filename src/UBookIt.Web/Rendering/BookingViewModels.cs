@@ -252,6 +252,17 @@ public sealed class BookingConfirmationModel
 {
     public required Guid BookingId { get; init; }
 
+    /// <summary>
+    /// What the confirmation puts under "Reference" — grouped for the eye, and the thing a
+    /// visitor can actually quote. The view printed <see cref="BookingId"/> there until now.
+    /// <para>
+    /// The grouped display form, because this is a rendering model — a theme binds to it in
+    /// order to draw something. The delivery API carries the canonical form instead, for a
+    /// consumer that needs to compare or store it.
+    /// </para>
+    /// </summary>
+    public required string Reference { get; init; }
+
     public required string ResourceName { get; init; }
 
     public required string LocalStart { get; init; }

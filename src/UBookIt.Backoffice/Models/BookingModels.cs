@@ -44,6 +44,16 @@ public class BookingModel
 {
     public Guid BookingId { get; set; }
 
+    /// <summary>
+    /// The reference a caller reads out, in canonical form.
+    /// <para>
+    /// Carried alongside <see cref="BookingId"/> rather than instead of it, because they have
+    /// different readers: the id is what the client sends back to cancel a booking, and this
+    /// is what an operator matches against what the person on the telephone is holding.
+    /// </para>
+    /// </summary>
+    public string Reference { get; set; } = string.Empty;
+
     public DateTimeOffset StartUtc { get; set; }
 
     public DateTimeOffset EndUtc { get; set; }

@@ -1,3 +1,4 @@
+using UBookIt.Tests.Support;
 using System.Runtime.CompilerServices;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
@@ -55,6 +56,7 @@ public class BookingsEndpointTests
         params (Guid Id, string Name)[] resources)
         => new(
             Guid.NewGuid(),
+            References.Any(),
             BookingInterval.Create(startUtc, startUtc.AddHours(1), "Europe/London").Value,
             status,
             new DateTimeOffset(2026, 5, 1, 0, 0, 0, TimeSpan.Zero),
@@ -142,6 +144,7 @@ public class BookingsEndpointTests
     {
         var booking = Booking.Rehydrate(
             Guid.NewGuid(),
+            References.Any(),
             BookingInterval.Create(
                 new DateTimeOffset(2026, 6, 2, 9, 0, 0, TimeSpan.Zero),
                 new DateTimeOffset(2026, 6, 2, 10, 0, 0, TimeSpan.Zero),

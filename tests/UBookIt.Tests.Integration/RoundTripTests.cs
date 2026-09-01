@@ -95,6 +95,12 @@ public class RoundTripTests(SqlServerFixture fixture)
 
         Assert.NotNull(reloaded);
         Assert.Equal(booking.Id, reloaded.Id);
+
+        // Through a real column and back, canonical and unchanged. Rehydration goes via
+        // FromCanonical, which throws on anything non-canonical — so a store that lower-cased
+        // or padded the value would fail here rather than producing a reference that no
+        // lookup could ever match.
+        Assert.Equal(booking.Reference, reloaded.Reference);
         Assert.Equal(start, reloaded.Interval.StartUtc);
         Assert.Equal(start.AddHours(1), reloaded.Interval.EndUtc);
         Assert.Equal("UTC", reloaded.Interval.TimeZoneId);

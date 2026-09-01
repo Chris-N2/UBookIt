@@ -5,6 +5,7 @@ import type { BookingModel } from "../api/index.js";
 import { toApiErrors } from "./api-errors.js";
 import { confirmDestructive } from "./confirm.js";
 import {
+  bookingReference,
   canCancel,
   currentWeek,
   formatInterval,
@@ -315,6 +316,7 @@ export class UBookItBookingsListElement extends UmbLitElement {
     return html`
       <uui-table aria-label=${this.#term("tableLabel")}>
         <uui-table-head>
+          <uui-table-head-cell>${this.#term("reference")}</uui-table-head-cell>
           <uui-table-head-cell>${this.#term("when")}</uui-table-head-cell>
           <uui-table-head-cell>${this.#term("booker")}</uui-table-head-cell>
           <uui-table-head-cell>${this.#term("resources")}</uui-table-head-cell>
@@ -361,6 +363,7 @@ export class UBookItBookingsListElement extends UmbLitElement {
 
     return html`
       <uui-table-row>
+        <uui-table-cell><span class="reference">${bookingReference(booking)}</span></uui-table-cell>
         <uui-table-cell>
           ${interval.text}${showZone ? html` <span class="zone">${interval.zone}</span>` : nothing}
         </uui-table-cell>

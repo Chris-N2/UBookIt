@@ -1,70 +1,88 @@
 ## 0. Settle before writing code
 
-- [ ] 0.1 **Does the delivery API response carry the reference?** (design open question). A
-  headless consumer building its own confirmation needs it for exactly the reasons the Razor
-  view does. Widens the change into `delivery-api` with a delta of its own — decide, do not
-  drift into it.
-- [ ] 0.2 **Any prefix?** `BK-` aids recognition in an inbox and costs three characters.
-  Display-only under D1's canonical/display split, so it can be decided late — but decide it
-  rather than defaulting by omission.
+- [x] 0.1 **Yes — the delivery API carries it.** Measured: `PlacementResponseModel` and
+  `ServicePlacementResponseModel` both return `BookingId` and nothing else identifying, so a
+  headless consumer building its own confirmation screen shows a person a Guid — **the identical
+  defect this change exists to fix, on the other surface**. Fixing one and not the other would
+  ship the bug to exactly the consumers the delivery API exists for.
+
+  Note the urgency argument does *not* apply: adding a field to a response is additive and could
+  be done after 1.0, unlike `Booking.Rehydrate`. It is included because it is the same defect,
+  not because the window is closing. Widens the change with a `delivery-api` delta.
+- [x] 0.2 **No prefix.** It costs three characters on every reference for recognition value that
+  only pays off in an inbox — and emails are not in this change. It is display-only under D1's
+  canonical/display split, so it can be added later without a migration, and a prefix invites
+  people to parse the reference. Decided rather than defaulted.
 
 ## 1. The reference itself, in Core
 
-- [ ] 1.1 A `BookingReference` value object: canonical form (uppercase, no separator),
+- [x] 1.1 A `BookingReference` value object: canonical form (uppercase, no separator),
   a parse that accepts any case with separators and whitespace stripped, equality that is
   case-insensitive, and a display form grouped `XXXX-XXXX`.
-- [ ] 1.2 The alphabet is `BCDFGHJKMNPQRSTVWXYZ23456789`, 8 symbols long (design D1). **Assert
+- [x] 1.2 The alphabet is `BCDFGHJKMNPQRSTVWXYZ23456789`, 8 symbols long (design D1). **Assert
   the properties, not the constant**: that no vowel is present, that none of `0 1 L O I U`
   is, and that the alphabet therefore cannot spell a word. A test that restates the literal
   proves only that someone typed it twice.
-- [ ] 1.3 A generation port (design D2), implemented outside Core. **`UBookIt.Core` keeps zero
+- [x] 1.3 A generation port (design D2), implemented outside Core. **`UBookIt.Core` keeps zero
   package references and stays deterministic** — `CoreIndependenceTests` guards that and must
   stay green.
-- [ ] 1.4 `Booking` carries the reference. `Create` takes it the way it already takes `id`;
+- [x] 1.4 `Booking` carries the reference. `Create` takes it the way it already takes `id`;
   `Rehydrate` gains it as a required parameter — **the breaking change**, called out in the
   proposal.
-- [ ] 1.5 **Immutability (design D6).** Confirm, decline and cancel leave it untouched. Prove
+- [x] 1.5 **Immutability (design D6).** Confirm, decline and cancel leave it untouched. Prove
   it by transitioning through every status and asserting the reference is the one assigned at
   placement, rather than by inspecting that no code assigns it.
 
 ## 2. Persistence
 
-- [ ] 2.1 Column plus a **unique index** — the store enforces uniqueness, not a prior check
+- [x] 2.1 Column plus a **unique index** — the store enforces uniqueness, not a prior check
   (design D3).
-- [ ] 2.2 Bounded retry on unique violation, then a real domain failure. **Test the collision
+- [x] 2.2 Bounded retry on unique violation, then a real domain failure. **Test the collision
   path by supplying a generator that returns a known duplicate** — the port exists partly so
   this is testable rather than theoretical.
-- [ ] 2.3 **Backfill existing bookings** (design D5), not deletion. Settle at apply whether the
+- [x] 2.3 **Backfill existing bookings** (design D5), not deletion. Settle at apply whether the
   backfill is set-based or batched, and say which and why.
-- [ ] 2.4 Migration is additive, per CLAUDE.md. No existing value is read or overwritten.
+- [x] 2.4 Migration is additive, per CLAUDE.md. No existing value is read or overwritten.
 
 ## 3. What people see
 
-- [ ] 3.1 The confirmation view shows the reference where it currently prints a Guid under a
+- [x] 3.1 The confirmation view shows the reference where it currently prints a Guid under a
   `<dt>Reference</dt>` it already has.
-- [ ] 3.2 The backoffice list row carries and displays it.
-- [ ] 3.3 **Sweep the shipped views** for anywhere else a booking is identified to a human
-  (design open question) — look rather than assume.
-- [ ] 3.4 Accessibility: the reference is content, not a control, but check it does not become
+- [x] 3.2 The backoffice list row carries and displays it.
+- [x] 3.3 **Sweep the shipped views** — and it found one. `ServiceConfirmation.cshtml` had the
+  same defect as the direct confirmation: `<dt>Reference</dt>` over `@Model.BookingId`. Fixing
+  only the direct flow would have left half the product broken in exactly the way this change
+  was written to fix. Both are now guarded, and no other shipped view identifies a booking to a
+  person.
+- [x] 3.4 Accessibility: the reference is content, not a control, but check it does not become
   an unlabelled fragment and that grouping does not break its reading order.
 
 ## 4. Guards worth having
 
-- [ ] 4.1 **A reference survives a round trip through persistence** unchanged, including case
+- [x] 4.1 **A reference survives a round trip through persistence** unchanged, including case
   and canonical form.
-- [ ] 4.2 **Uniqueness is enforced where it is claimed to be.** Mutation-check by removing the
+- [x] 4.2 **Uniqueness is enforced where it is claimed to be.** Mutation-check by removing the
   unique index and confirming something fails — a guard over a constraint must be shown to
   observe the constraint.
-- [ ] 4.3 **The alphabet properties** (1.2), stated as properties.
-- [ ] 4.4 **Immutability across every status transition** (1.5).
-- [ ] 4.5 Mutation-check each of the above from a clean build.
+- [x] 4.3 **The alphabet properties** (1.2), stated as properties.
+- [x] 4.4 **Immutability across every status transition** (1.5).
+- [x] 4.5 Mutation-check each of the above from a clean build. Four run, and **one found a
+  real hole**:
+  - alphabet reverted to A–Z0–9 → 4 failures (both property tests, plus the vowel and
+    excluded-digit parse cases);
+  - collision retry removed → the retry and exhaustion tests both fail;
+  - unique index dropped **and** the store's check disabled → both integration tests fail;
+  - **confirmation view reverted to `@Model.BookingId` → 747 rendering tests PASSED.** Nothing
+    guarded the actual defect, on the view where it was found. `ConfirmationReferenceTests` now
+    does, asserting the negative as well as the positive — "the reference appears" is satisfied
+    by a page printing both, which is not the fix. Re-run after: both flows fail.
 
 ## 5. Close
 
-- [ ] 5.1 Clean build at **zero** warnings; full suite green against the 1755 baseline; client
+- [x] 5.1 Clean build at **zero** warnings; full suite green against the 1755 baseline; client
   suite against 113.
-- [ ] 5.2 `openspec validate --all --strict`.
-- [ ] 5.3 **Guarantee diff for the two MODIFIED requirements — done at propose time, re-check
+- [x] 5.2 `openspec validate --all --strict`.
+- [x] 5.3 **Guarantee diff for the two MODIFIED requirements — done at propose time, re-check
   at apply.** Both replace requirements wholesale, which deletes anything not restated:
   - `default-frontend` / *Post-Redirect-Get confirmation*: three guarantees (303 redirect not a
     rendered POST; the confirmation shows reference + resource + time + contact details;
@@ -77,10 +95,10 @@
     All carried forward, including the trailing note explaining why one scenario was narrowed
     when cancellation joined the capability. **The only change is the reference joining the
     row payload**, plus a scenario for it.
-- [ ] 5.4 Outward sweep for sentences this falsifies. Start with `bookings` and
+- [x] 5.4 Outward sweep for sentences this falsifies. Start with `bookings` and
   `default-frontend`, then `docs/`, then the README. **`docs/booking-page.md` and
   `docs/backoffice.md` both describe what a visitor and an operator see.**
-- [ ] 5.5 **Do not write anything that promises one resource equals one occupancy unit.** A
+- [x] 5.5 **Do not write anything that promises one resource equals one occupancy unit.** A
   standing constraint from the composite-resources exploration, recorded because the failure
   mode is closing that door in prose without noticing. This change does not touch claims, so
   the risk is only in careless wording.

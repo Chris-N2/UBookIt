@@ -197,6 +197,7 @@ public sealed class BookingSurfaceController : SurfaceController
         return new BookingConfirmationModel
         {
             BookingId = booking.Id,
+            Reference = booking.Reference.Display,
             ResourceName = resourceName,
             LocalStart = start.ToString("dddd d MMMM yyyy, HH:mm", CultureInfo.InvariantCulture),
             LocalEnd = end.ToString("HH:mm", CultureInfo.InvariantCulture),

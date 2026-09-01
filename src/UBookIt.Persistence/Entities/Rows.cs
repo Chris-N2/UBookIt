@@ -96,6 +96,18 @@ internal sealed class BookingRow
 
     public DateTimeOffset CreatedUtc { get; set; }
 
+    /// <summary>
+    /// The booking's quotable reference, in canonical form — upper case, no separator.
+    /// </summary>
+    /// <remarks>
+    /// <b>Stored canonical, and uniquely indexed.</b> Uniqueness lives here rather than in a
+    /// check before writing, because a check followed by a write is a race and the database is
+    /// the only thing that can actually enforce it. Canonical form is what makes the index
+    /// meaningful: a reference stored as typed rather than as normalised would let two rows
+    /// differ only by case and be, to every person who reads them, the same reference.
+    /// </remarks>
+    public required string Reference { get; set; }
+
     public Guid? MemberKey { get; set; }
 
     public required string BookerName { get; set; }

@@ -108,6 +108,7 @@ internal static class DeliveryModelMapper
         => new()
         {
             BookingId = booking.Id,
+            Reference = booking.Reference.Value,
             Status = booking.Status.ToString(),
             // Direct placement claims exactly one resource — the endpoint takes a
             // single resource id — so the claim's resource is the booked resource.
@@ -127,6 +128,7 @@ internal static class DeliveryModelMapper
         => new()
         {
             BookingId = booking.Id,
+            Reference = booking.Reference.Value,
             Status = booking.Status.ToString(),
             // In the booking's own claim order, which is the order the service's
             // roles were resolved in — not re-sorted by id. Sorting by id would

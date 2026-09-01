@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
 import {
+  bookingReference,
   canCancel,
   currentWeek,
   formatInterval,
@@ -431,5 +432,23 @@ describe("what the service column says", () => {
     expect(
       serviceLabel(booking({ service: { serviceId: "s1", displayName: "  " } }), "Booked directly"),
     ).toBe("s1");
+  });
+});
+
+describe("bookingReference", () => {
+  it("groups a canonical reference for reading", () => {
+    expect(bookingReference({ reference: "7QX4M2NP" })).toBe("7QX4-M2NP");
+  });
+
+  it("passes through anything that is not the expected length", () => {
+    // Rather than slicing it into something that looks authoritative and is not.
+    expect(bookingReference({ reference: "7QX4" })).toBe("7QX4");
+    expect(bookingReference({ reference: "" })).toBe("");
+  });
+
+  it("survives a row that carries no reference at all", () => {
+    // The field is optional on BookingLike, so a caller with an older payload renders a
+    // blank cell rather than "undefined".
+    expect(bookingReference({})).toBe("");
   });
 });
