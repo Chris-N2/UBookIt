@@ -34,7 +34,7 @@ which is a claim that the package works rather than that its API has stopped mov
 
 Step 1 was proven the only way it can be — by installing the built packages into an Umbraco
 site created from scratch and using it. `scripts/verify-install.ps1` walks that path and
-`openspec/changes/.../packaging-release` records what was observed. What made this necessary
+the `packaging-release` change's `verification.md` records what was observed. What made this necessary
 rather than pedantic: the package that existed before **built happily and could not be
 consumed at all.** It declared dependencies on `UBookIt.Core` and `UBookIt.Persistence`
 packages nobody published, omitted `UBookIt.Web` entirely so the Razor booking page shipped

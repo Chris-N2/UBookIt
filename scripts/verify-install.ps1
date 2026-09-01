@@ -39,7 +39,7 @@ param(
     [string] $SqlServer = '.',
     [string] $Database = 'uBookItInstallCheck',
     [string] $AdminEmail = 'admin@example.com',
-    [string] $AdminPassword = 'InstallCheck1234!',
+    [string] $AdminPassword,
     [switch] $KeepExisting
 )
 
@@ -56,6 +56,28 @@ $version = ($props.Project.PropertyGroup.Version | Where-Object { $_ }) | Select
 if (-not $version) { throw 'No <Version> in Directory.Build.props.' }
 
 Write-Host "uBookIt $version" -ForegroundColor Cyan
+
+# The admin password is generated, never committed.
+#
+# It began life as a literal default in this file, which is a credential in the repository —
+# and CLAUDE.md's "no secrets in logs or test fixtures" is stated without an exemption for
+# throwaway ones. It is kept beside the site it belongs to, under the temporary directory and
+# outside the repository, so that -KeepExisting can log into the site it created last time
+# rather than a database whose password nobody has any more.
+$credentialFile = Join-Path $SiteRoot 'admin-credentials.txt'
+
+if (-not $AdminPassword) {
+    if ($KeepExisting -and (Test-Path $credentialFile)) {
+        $AdminPassword = (Get-Content $credentialFile -Raw).Trim()
+    }
+    else {
+        $bytes = [byte[]]::new(18)
+        [System.Security.Cryptography.RandomNumberGenerator]::Fill($bytes)
+        # Umbraco requires a digit and a non-alphanumeric; the suffix guarantees both
+        # regardless of what the random segment happens to contain.
+        $AdminPassword = [Convert]::ToBase64String($bytes) -replace '[^A-Za-z0-9]', '' | ForEach-Object { $_ + '1!' }
+    }
+}
 
 # ---------------------------------------------------------------- 1. pack
 
@@ -103,6 +125,8 @@ if (-not (Test-Path $sitePath)) {
         --connection-string $connectionString `
         --friendly-name 'Install Check' --email $AdminEmail --password $AdminPassword
     if ($LASTEXITCODE -ne 0) { throw 'dotnet new umbraco failed' }
+
+    Set-Content $credentialFile $AdminPassword -Encoding UTF8
 
     # uBookIt comes from the local feed and everything else from nuget.org. The
     # mapping is not decoration: if the developer's own NuGet configuration enables
@@ -167,7 +191,8 @@ Write-Host @"
 Then, in a browser — and this half is the point, because it is what a package
 inspection cannot tell you:
 
-  1. Log in at /umbraco with $AdminEmail / $AdminPassword
+  1. Log in at /umbraco with $AdminEmail
+     The password was generated for this site and is in $credentialFile
   2. Packages -> installed: uBookIt should be listed at version $version, not 0.0.0
   3. There is a Bookings section, and it opens (this is the backoffice bundle)
   4. Create a bookable resource with some opening hours

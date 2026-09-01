@@ -266,6 +266,34 @@ public class PackageCompositionTests(PackedSolutionFixture fixture)
     }
 
     [Fact]
+    public void No_package_claims_a_customisation_route_the_package_does_not_have()
+    {
+        // UBookIt.Web's description said "Views are overridable per site or by a theme".
+        // The first half is false: these views are compiled into the assembly without source
+        // checksums, so a file placed at the same path in a consuming site is never
+        // consulted. It is the trap a site author falls into first, packaging's spec has an
+        // explicit SHALL NOT about claiming it, and docs/booking-page.md documents it as a
+        // route that does NOT work — while the nuspec, which is what a prospective consumer
+        // reads on nuget.org, said it does.
+        //
+        // A word-level check rather than a claim-level one, because "does the prose assert
+        // something true" is not decidable. It is deliberately blunt: the supported route is
+        // a theme, so a package description has no business using this vocabulary at all,
+        // and anyone who needs it will read this message first.
+        foreach (var package in Packed.Packages)
+        {
+            var description = package.Value("description");
+
+            Assert.False(
+                description.Contains("overrid", StringComparison.OrdinalIgnoreCase),
+                $"{package.Id}'s description talks about overriding. The package's views cannot be "
+                + "overridden by a file in the consuming site — they are precompiled without source "
+                + "checksums — and openspec/specs/packaging/spec.md forbids claiming that route. "
+                + "The supported route is a theme; say that instead.");
+        }
+    }
+
+    [Fact]
     public void No_package_ships_a_runtime_configuration_file()
     {
         // Microsoft.EntityFrameworkCore.Design turns on runtimeconfig generation so that

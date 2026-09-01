@@ -143,4 +143,37 @@
     list the new `src/UBookIt` meta-project**; left alone deliberately, because it is labelled
     "initial proposal — don't treat as spec" and it is Chris's file. Flagged rather than
     edited.
-- [ ] 7.6 Hand to `qa-review` in a **fresh context or subagent**.
+- [x] 7.6 Hand to `qa-review` in a **fresh context or subagent**. Done 2026-09-01: **REJECT**,
+  one MAJOR, four MINOR/NIT. QA independently mutation-tested five guards, packed and read
+  every nuspec, probed the running installed site, and confirmed 1754/113/13-of-13.
+
+## 8. QA round 1 findings
+
+- [x] 8.1 **MAJOR — `UBookIt.Web`'s package description claimed a customisation route the
+  package does not have**: *"Views are overridable per site or by a theme."* The first half is
+  false. These views are precompiled into the assembly without source checksums, so a file at
+  the same path in a consuming site is never consulted — and `packaging`'s spec has an explicit
+  **SHALL NOT** about claiming exactly this, because it is the trap a site author falls into
+  first. `docs/booking-page.md` says it does not work; the nuspec, which is what a prospective
+  consumer reads on nuget.org, said it does.
+
+  I wrote that sentence, in a change whose entire subject is not shipping claims that are not
+  true. Description now says the markup is replaced by supplying a theme, and
+  `No_package_claims_a_customisation_route_the_package_does_not_have` fails on any package
+  description using override vocabulary — mutation-verified against the original sentence.
+- [x] 8.2 **MINOR — a literal admin password in `verify-install.ps1`.** CLAUDE.md's "no secrets
+  in logs or test fixtures" is stated without an exemption for throwaway ones, and this was the
+  first credential to land in the repo. Now generated per site and written beside the site
+  under the temp directory, outside the repository; `-KeepExisting` reads it back.
+- [x] 8.3 **MINOR — the destructive guard mutates the working tree**, and QA was right that it
+  should stay and wrong to be silent. Documented on `PackBackofficeFromNothing`: what it
+  deletes, that all of it is regenerated build output, that the suite leaves Release cold, and
+  that a concurrent Release build in another window races it.
+- [x] 8.4 **MINOR — `docs/mvp.md` cited `openspec/changes/.../packaging-release`**, a path that
+  goes stale at the next step of the workflow. Now names the record rather than its location.
+- [x] 8.5 **NIT — source maps in the backoffice package**, about half its 176 KB, shipped by
+  default rather than by decision. Now a decision, recorded in `vite.config.ts`: they ship,
+  because they are the difference between a consumer debugging our section and reading
+  minified output, and nothing in them is secret.
+- [x] 8.6 **NIT — `CLAUDE.md`'s architecture sketch omits `src/UBookIt`.** QA agreed with
+  leaving it: the sketch is labelled "don't treat as spec" and the file is Chris's.
