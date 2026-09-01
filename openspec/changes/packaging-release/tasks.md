@@ -177,3 +177,30 @@
   minified output, and nothing in them is secret.
 - [x] 8.6 **NIT — `CLAUDE.md`'s architecture sketch omits `src/UBookIt`.** QA agreed with
   leaving it: the sketch is labelled "don't treat as spec" and the file is Chris's.
+
+## 9. The sweep over QA's own fixes — which found the worst one yet
+
+Chris asked whether the falsification sweep should be run before archive or left to QA. Run
+before, and it earned its place immediately: fixing 8.2 broke the script, and behind that was
+a defect older than this change.
+
+- [x] 9.1 **The generated password did not work on a re-run, and worse, the run was not real.**
+  The site directory is recreated but **the SQL database outlives it** — so Umbraco booted as
+  an already-installed site, the seven uBookIt migrations did **not** run, and the admin user
+  kept its original password. Every full run after the first verified neither the schema nor
+  the install, and reported success.
+
+  This is a **fourth** instance of the change's recurring fault — a check measuring history —
+  and the only one that predates the change rather than being introduced by it. The first run
+  (2026-08-31) was genuine; nothing after it was. The script now drops the database on a fresh
+  run, and refuses with an explanatory error if it cannot.
+
+  Verified by running it: the log shows Umbraco creating its entire schema from nothing,
+  followed by uBookIt's migrations — which is precisely what had stopped happening.
+- [x] 9.2 `-KeepExisting` against a site created before the credential file existed would have
+  generated a password, applied it to nothing, and told Chris to use it. It now says plainly
+  that it reused an existing site and did not set one.
+- [x] 9.3 **Falsified sentences from the QA fixes, all corrected**: two memory files carried
+  the retired literal password and the old test count. `verification.md`, `README.md` and
+  `docs/*.md` were checked and carry neither. Nothing in the repository referenced the
+  password.

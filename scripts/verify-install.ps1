@@ -67,15 +67,24 @@ Write-Host "uBookIt $version" -ForegroundColor Cyan
 $credentialFile = Join-Path $SiteRoot 'admin-credentials.txt'
 
 if (-not $AdminPassword) {
-    if ($KeepExisting -and (Test-Path $credentialFile)) {
+    if (Test-Path $credentialFile) {
+        # The site's database outlives its directory, and the admin user lives in the
+        # database — so a previously generated password stays the right one until the
+        # database itself is dropped.
         $AdminPassword = (Get-Content $credentialFile -Raw).Trim()
+    }
+    elseif ($KeepExisting) {
+        # Reusing a site created before this file existed. Generating one here would be
+        # actively misleading: the site is already installed, so nothing would apply it, and
+        # the summary would name a password that does not work.
+        $AdminPassword = $null
     }
     else {
         $bytes = [byte[]]::new(18)
         [System.Security.Cryptography.RandomNumberGenerator]::Fill($bytes)
-        # Umbraco requires a digit and a non-alphanumeric; the suffix guarantees both
-        # regardless of what the random segment happens to contain.
-        $AdminPassword = [Convert]::ToBase64String($bytes) -replace '[^A-Za-z0-9]', '' | ForEach-Object { $_ + '1!' }
+        # Umbraco wants a digit and a non-alphanumeric; the suffix guarantees both whatever
+        # the random segment happens to contain.
+        $AdminPassword = ([Convert]::ToBase64String($bytes) -replace '[^A-Za-z0-9]', '') + '1!'
     }
 }
 
@@ -114,6 +123,20 @@ Write-Host "`n[2/5] Creating an Umbraco site at $sitePath" -ForegroundColor Cyan
 if ((Test-Path $sitePath) -and -not $KeepExisting) { Remove-Item $sitePath -Recurse -Force }
 
 if (-not (Test-Path $sitePath)) {
+    # Drop the database, and this is not tidiness.
+    #
+    # The database outlives the site directory. Reuse it and Umbraco boots as an already
+    # installed site: the seven uBookIt migrations do not run, the admin user keeps whatever
+    # password it was created with, and the run reports success having verified neither. The
+    # first run would be the only real one and every run after it would be theatre — the same
+    # "measuring history" failure as the cached package, wearing yet another hat.
+    Write-Host "      dropping database $Database" -ForegroundColor DarkGray
+    $drop = "IF DB_ID('$Database') IS NOT NULL BEGIN ALTER DATABASE [$Database] SET SINGLE_USER WITH ROLLBACK IMMEDIATE; DROP DATABASE [$Database]; END"
+    & sqlcmd -S $SqlServer -E -b -Q $drop
+    if ($LASTEXITCODE -ne 0) {
+        throw "Could not drop $Database on $SqlServer. Drop it by hand, or pass -Database with a name that does not exist — reusing it would skip the migrations this script exists to verify."
+    }
+
     New-Item -ItemType Directory -Path $sitePath -Force | Out-Null
 
     $connectionString = "Server=$SqlServer;Database=$Database;Integrated Security=true;TrustServerCertificate=true"
@@ -191,8 +214,9 @@ Write-Host @"
 Then, in a browser — and this half is the point, because it is what a package
 inspection cannot tell you:
 
-  1. Log in at /umbraco with $AdminEmail
-     The password was generated for this site and is in $credentialFile
+  1. Log in at /umbraco as $AdminEmail
+     $(if ($AdminPassword) { "Password (generated for this site): $credentialFile" }
+       else { "Password: whatever this site was created with — this run reused an existing site and did not set one." })
   2. Packages -> installed: uBookIt should be listed at version $version, not 0.0.0
   3. There is a Bookings section, and it opens (this is the backoffice bundle)
   4. Create a bookable resource with some opening hours

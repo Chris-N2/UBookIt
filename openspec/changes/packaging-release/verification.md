@@ -117,6 +117,19 @@ that installs and a package somebody can adopt, which is step 9.
 *stays* walked: this was done by hand, and an automated installation test remains an open
 obligation from `booking-page-packaging`. Nothing here discharges it.
 
+**The 2026-08-31 runs recorded above were real, and the runs between them were not.** Found on
+2026-09-01 by sweeping the QA fixes for falsified sentences: the script recreated the site
+directory but left the **SQL database** alone, and the database outlives the directory. Umbraco
+therefore booted as an already-installed site — the seven uBookIt migrations did not run, the
+admin user kept its original password, and the run reported success having verified neither.
+
+That is a fourth instance of this change's recurring fault, a check measuring history, and the
+only one older than the change itself. The script now drops the database on a fresh run and
+refuses with an explanatory error if it cannot. Re-run afterwards, and the log is unambiguous:
+Umbraco creates its entire schema from nothing, `Unattended install completed`, then
+`uBookIt applied 7 database migration(s)`. The admin password is generated per site and written
+beside it, outside the repository, so nothing here depends on a credential in source control.
+
 Two smaller gaps, stated rather than implied:
 
 - **`npm ci` is unexercised.** This machine has `node_modules`, so only `npm run build` has
