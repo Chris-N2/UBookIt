@@ -5,6 +5,19 @@
     <AddRazorSupportForMvc>true</AddRazorSupportForMvc>
   </PropertyGroup>
 
+  <PropertyGroup>
+    <Title>uBookIt — front end</Title>
+    <!--
+      "Views are overridable per site" was here, and it was false. These views are compiled
+      into this assembly without source checksums, so a file placed at the same path in a
+      consuming site is never consulted — the trap a site author falls into first, which
+      openspec/specs/packaging/spec.md has an explicit SHALL NOT about and which
+      docs/booking-page.md documents as a route that does not work. The supported route is a
+      theme. Do not reintroduce the shorter phrasing.
+    -->
+    <Description>What a visitor actually sees: the uBookIt booking flow's Razor views and view components, the booking page document type, the delivery API, and a stylesheet a site can restyle or replace. The markup itself is replaced by supplying a theme. Part of uBookIt, a booking system for Umbraco; install the UBookIt package rather than this one.</Description>
+  </PropertyGroup>
+
   <ItemGroup>
     <FrameworkReference Include="Microsoft.AspNetCore.App" />
   </ItemGroup>

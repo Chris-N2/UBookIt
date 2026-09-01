@@ -6,10 +6,14 @@
     <StaticWebAssetBasePath>/</StaticWebAssetBasePath>
   </PropertyGroup>
 
+  <!--
+    PackageId, Authors, Product and the rest come from Directory.Build.props. They were set
+    here to the assembly's own name, which is the shape the spec calls a framework default:
+    it tells a prospective consumer that nobody has looked at the package.
+  -->
   <PropertyGroup>
-    <PackageId>UBookIt.Backoffice</PackageId>
-    <Product>UBookIt.Backoffice</Product>
-    <Title>UBookIt.Backoffice</Title>
+    <Title>uBookIt — backoffice</Title>
+    <Description>The uBookIt backoffice: a Bookings section for managing bookable resources, availability, services and reservations, built with Lit and the Umbraco UI Library, plus the Management API behind it. Part of uBookIt, a booking system for Umbraco; install the UBookIt package rather than this one.</Description>
   </PropertyGroup>
 
 
@@ -33,6 +37,100 @@
   <ItemGroup>
     <Folder Include="wwwroot\" />
   </ItemGroup>
+
+  <!--
+    ==========================================================================================
+    Building the backoffice client is part of building this project.
+    ==========================================================================================
+
+    It was not, until packaging made the consequence visible. `wwwroot/App_Plugins/` is
+    gitignored, so on a clean clone it does not exist; nothing in MSBuild produced it; and
+    `dotnet pack` therefore built a backoffice package containing no client at all — and
+    reported success. Installing it gives a site the Management API and no Bookings section,
+    with no error anywhere. That is the same silent absence as an assembly left out of the
+    aggregate, so it is fixed here rather than written down as a prerequisite for whoever
+    packs next.
+
+    Inputs/Outputs make this a no-op once the bundle is current, which is the normal case —
+    the test suites build this project and must not pay for npm every time. `npm ci` runs
+    only when node_modules is genuinely absent.
+  -->
+  <PropertyGroup>
+    <UBookItClientDir>$(MSBuildThisFileDirectory)Client</UBookItClientDir>
+    <UBookItClientOutput>$(MSBuildThisFileDirectory)wwwroot\App_Plugins\UBookItBackoffice\u-book-it-backoffice.js</UBookItClientOutput>
+    <!-- An escape hatch for a host that has no Node, e.g. a machine only running the tests -->
+    <UBookItBuildClient Condition="'$(UBookItBuildClient)' == ''">true</UBookItBuildClient>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <UBookItClientInput Include="$(UBookItClientDir)\src\**\*" />
+    <UBookItClientInput Include="$(UBookItClientDir)\public\**\*" />
+    <UBookItClientInput Include="$(UBookItClientDir)\package.json;$(UBookItClientDir)\vite.config.ts;$(UBookItClientDir)\tsconfig.json" />
+  </ItemGroup>
+
+  <Target Name="UBookItBuildClient"
+          Condition="'$(UBookItBuildClient)' == 'true'"
+          Inputs="@(UBookItClientInput)"
+          Outputs="$(UBookItClientOutput)">
+    <Exec Command="npm ci" WorkingDirectory="$(UBookItClientDir)" Condition="!Exists('$(UBookItClientDir)\node_modules')" />
+    <Exec Command="npm run build" WorkingDirectory="$(UBookItClientDir)" />
+  </Target>
+
+  <!--
+    The version an editor sees in the backoffice Packages screen is whatever this manifest
+    says. It said 0.0.0, because it was a hand-maintained file with no reason to change.
+    Stamping it from the package version removes the possibility of the two disagreeing
+    rather than relying on someone editing both.
+
+    Deliberately NOT incremental: it is a file copy, and Version can change without any
+    client input changing — which is exactly the case that would otherwise ship a stale
+    number. It also runs after UBookItBuildClient because vite's emptyOutDir wipes the
+    directory first.
+
+    The Error is not defensive padding. A string replacement that stops matching does not
+    fail, it silently does nothing — and doing nothing here means shipping 0.0.0 again, the
+    very defect this target exists to fix.
+  -->
+  <Target Name="UBookItStampManifestVersion" DependsOnTargets="UBookItBuildClient">
+    <PropertyGroup>
+      <_UBookItManifestSource>$(UBookItClientDir)\public\umbraco-package.json</_UBookItManifestSource>
+      <_UBookItManifestTarget>$(MSBuildThisFileDirectory)wwwroot\App_Plugins\UBookItBackoffice\umbraco-package.json</_UBookItManifestTarget>
+      <_UBookItManifestText>$([System.IO.File]::ReadAllText('$(_UBookItManifestSource)').Replace('"version": "0.0.0"', '"version": "$(Version)"'))</_UBookItManifestText>
+    </PropertyGroup>
+
+    <Error Condition="!$(_UBookItManifestText.Contains('&quot;version&quot;: &quot;$(Version)&quot;'))"
+           Text="umbraco-package.json version was not stamped: expected to replace the literal &quot;version&quot;: &quot;0.0.0&quot; in $(_UBookItManifestSource), but it is not there. The backoffice Packages screen would show a version nobody released." />
+
+    <MakeDir Directories="$([System.IO.Path]::GetDirectoryName('$(_UBookItManifestTarget)'))" />
+    <WriteLinesToFile File="$(_UBookItManifestTarget)" Lines="$(_UBookItManifestText)" Overwrite="true" WriteOnlyWhenDifferent="true" />
+  </Target>
+
+  <!--
+    ==========================================================================================
+    The step without which building the client achieves nothing.
+    ==========================================================================================
+
+    Static web assets are discovered from `@(Content)`, and `wwwroot\**` is globbed when the
+    project is EVALUATED — before any target runs. On a clean checkout wwwroot does not exist
+    at that moment, so a client built during the build is invisible to discovery: MSBuild runs
+    vite, vite writes the bundle, and `dotnet pack` then produces a package with no client in
+    it and reports success.
+
+    That is not a hypothetical. Building the client without this target was written, tested,
+    and looked correct on a working copy where wwwroot happened to be populated already — the
+    same illusion that hid the original defect. It failed the moment a test packed from a
+    genuinely clean state, which is the only reason it is not in the shipped package now.
+
+    So the freshly built files are added to @(Content) explicitly, before discovery reads it.
+    Exclude keeps the ones evaluation already found from being added twice.
+  -->
+  <Target Name="UBookItIncludeClientAssets"
+          DependsOnTargets="UBookItStampManifestVersion"
+          BeforeTargets="ResolveProjectStaticWebAssets;AssignTargetPaths">
+    <ItemGroup>
+      <Content Include="wwwroot\**\*" Exclude="@(Content)" />
+    </ItemGroup>
+  </Target>
 
   <ItemGroup>
     <InternalsVisibleTo Include="UBookIt.Tests" />

@@ -1,0 +1,108 @@
+# uBookIt
+
+A booking system for Umbraco 17.
+
+Configure what can be booked, publish a page, and take bookings — without writing code.
+Visitors can complete a booking **with JavaScript turned off**, and your site is told when a
+booking is placed or cancelled so it can send whatever it wants to send.
+
+```
+dotnet add package UBookIt
+```
+
+Then run the site. uBookIt installs its schema on first boot.
+
+**One step you will otherwise look for:** the **uBookIt** section is not visible until you
+grant it, the same as any other Umbraco section — *Users → User Groups → (a group) → Sections*.
+Grant it deliberately rather than to everyone: booking data includes the name and email address
+of every person who has booked. See [the backoffice docs](docs/backoffice.md).
+
+> **uBookIt is at `0.1.0`, and the public API may still move.** It does what the list below
+> says and it does it properly, but the version is not decoration: treat contracts as settled
+> from `1.0.0`, not before.
+
+## Requirements
+
+| | |
+|---|---|
+| **Umbraco** | 17.x (LTS). Not 13, and not the 14–16 STS line. |
+| **.NET** | 10.0 |
+| **Database** | **SQL Server.** SQLite is not supported — including the SQLite database a `dotnet new umbraco` site gives you by default. |
+
+The SQLite exclusion is a real constraint rather than an untested configuration: uBookIt's schema and
+its availability queries are written for SQL Server, and a site on SQLite will fail at
+migration time rather than quietly misbehave.
+
+## What it does
+
+- **Bookable resources** — opening hours, date exceptions, minimum and maximum duration, and
+  capabilities describing what a resource can do.
+- **Services** composed of resource *roles*, so "a haircut" can mean "one stylist and one
+  chair" and uBookIt works out which combinations are actually free.
+- **A booking page** you create like any other page. Point it at the whole catalogue, or at
+  one service or resource. It uses your site's layout.
+- **A booking flow** that works without JavaScript, and a JSON delivery API if you would
+  rather build your own front end.
+- **A Bookings section** in the backoffice for seeing and cancelling bookings.
+- **Notifications** when a booking is placed or cancelled, so your site can email, log,
+  push to a CRM, or anything else.
+- **Restyling** through CSS custom properties, or **theming** by replacing the views
+  entirely with your own Razor class library.
+
+### Accessibility is a feature here, not a checkbox
+
+Booking interfaces are notorious accessibility failures, so uBookIt's shipped flow is built
+to meet **every WCAG 2.2 AA criterion that markup determines** — labelling, grouping,
+programmatic relationships, keyboard operability, reading and focus order — and every step
+stays usable with **no stylesheet applied at all**.
+
+That claim names its own boundary, because uBookIt is a component inside *your* page and WCAG
+conformance is a property of a page. Text contrast, focus appearance and target size are
+decided by CSS, the shipped stylesheet sets no text colour of its own, and non-text contrast
+for decorative borders is explicitly **not** claimed. The full account, including what becomes
+yours the moment you override a token or supply a theme, is in
+[the booking page docs](docs/booking-page.md#accessibility-what-we-hold-and-what-becomes-yours).
+
+## What it does not do yet
+
+On the record as decisions, not gaps somebody discovers:
+
+- **Approving or declining** a booking — placement auto-confirms.
+- **Amending** a booking's time, or **taking a booking on someone's behalf**.
+- **Finding a booking without knowing roughly when it is.** The backoffice list is windowed
+  by date; there is no search by name, email or reference.
+- **Emails.** uBookIt raises a notification; your site owns the channel and the wording.
+  Nothing is sent by the package, including to somebody whose booking you cancel.
+- **More than one booking at a time for the same resource.** A resource is claimed
+  exclusively for its interval — a room that seats twenty is one bookable thing, not twenty.
+- **Recurring bookings, payment, cancellation windows**, and any language beyond `en-US`.
+
+## Documentation
+
+- [The booking page](docs/booking-page.md) — creating it, the URL parameters, styling, the
+  deployment note about committing the installed template, and the accessibility statement
+- [The backoffice](docs/backoffice.md) — resources, availability, services and bookings
+- [Reacting to bookings](docs/notifications.md) — the notifications and how to handle them
+- [Writing a theme](docs/theming.md) — replacing the rendering with your own views
+
+## The packages
+
+You install `UBookIt`, which contains no code and exists to bring the rest in. They are
+published separately because they are separately useful, and because a headless consumer
+should be able to take the contracts without the backoffice.
+
+| Package | |
+|---|---|
+| **`UBookIt`** | What you install. Brings everything below. |
+| `UBookIt.Core` | The domain — resources, availability, slots, bookings. References nothing. |
+| `UBookIt.Persistence` | EF Core storage and the Umbraco migration plan. |
+| `UBookIt.Backoffice` | The Bookings section and its Management API. |
+| `UBookIt.Web` | The Razor views, the booking page, the delivery API and the stylesheet. |
+
+Installing the individual packages instead is supported, but installing
+`UBookIt.Backoffice` without `UBookIt.Web` **fails silently** — the backoffice works and the
+booking page renders nothing. Install `UBookIt`.
+
+## Licence
+
+[MIT](LICENSE). Copyright © Norwood Development.

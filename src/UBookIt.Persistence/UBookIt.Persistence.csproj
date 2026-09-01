@@ -6,6 +6,36 @@
     <Nullable>enable</Nullable>
   </PropertyGroup>
 
+  <PropertyGroup>
+    <Title>uBookIt — persistence</Title>
+    <Description>Entity Framework Core storage for uBookIt: entities, the DbContext, the Umbraco migration plan and the repositories behind the domain's store abstractions. Requires SQL Server — SQLite is not supported. Part of uBookIt, a booking system for Umbraco; install the UBookIt package rather than this one.</Description>
+  </PropertyGroup>
+
+  <!--
+    Microsoft.EntityFrameworkCore.Design's own props sets GenerateRuntimeConfigurationFiles
+    for class libraries, so that `dotnet ef` has something to run the assembly against. That
+    is design-time tooling working as intended and we do not want to switch it off — doing so
+    breaks `dotnet ef migrations`.
+
+    What we do not want is the resulting .runtimeconfig.json inside the package's lib/ folder,
+    which is where it lands because `.json` is one of NuGet's default packable build-output
+    extensions. A library telling a host how to configure a runtime is at best noise and at
+    worst confusing, so it is dropped from the package and left in the build output.
+
+    NuGet exposes the default list as an overridable property (it is set with a
+    `== ''` condition in NuGet.Build.Tasks.Pack.targets), so this is the supported knob rather
+    than a target reaching into NuGet's item groups. The list is the stock one minus `.json`;
+    a library's build output has no other .json in it, so nothing else is affected.
+
+    PackagingTests asserts the absence over the built package. The list being written out in
+    full is a small maintenance cost against a future SDK adding an extension we then miss —
+    accepted, because the alternative is string surgery on a property whose format is not a
+    contract.
+  -->
+  <PropertyGroup>
+    <DefaultAllowedOutputExtensionsInPackageBuildOutputFolder>.dll; .exe; .winmd; .pri; .xml</DefaultAllowedOutputExtensionsInPackageBuildOutputFolder>
+  </PropertyGroup>
+
   <ItemGroup>
     <ProjectReference Include="..\UBookIt.Core\UBookIt.Core.csproj" />
   </ItemGroup>

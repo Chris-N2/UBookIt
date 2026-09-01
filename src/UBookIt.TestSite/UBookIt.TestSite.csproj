@@ -4,6 +4,21 @@
     <ImplicitUsings>enable</ImplicitUsings>
     <Nullable>enable</Nullable>
     <CompressionEnabled>false</CompressionEnabled> <!-- Disable compression. E.g. for umbraco backoffice files. These files should be precompressed by node and not let dotnet handle it -->
+
+    <!--
+      A development harness, not something anybody installs. It lives under src/ next to the
+      four libraries, so `dotnet pack` on the solution would otherwise offer it a package.
+      The test projects already declare this; this one was the omission.
+    -->
+    <IsPackable>false</IsPackable>
+
+    <!--
+      The Web SDK — and only the Web SDK, which is why the test projects are silent — warns
+      when a solution-wide `dotnet pack` reaches a project that has opted out. The warning
+      exists to catch an accidental opt-out; this one is deliberate, and packing the solution
+      is how the packages are built. Saying so beats a warning nobody can act on.
+    -->
+    <WarnOnPackingNonPackableProject>false</WarnOnPackingNonPackableProject>
   </PropertyGroup>
 
   <ItemGroup>

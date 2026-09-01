@@ -5,4 +5,58 @@
     <!-- Warnings are errors in CI (CLAUDE.md convention); locally they stay warnings -->
     <TreatWarningsAsErrors Condition="'$(CI)' == 'true' or '$(TF_BUILD)' == 'true'">true</TreatWarningsAsErrors>
   </PropertyGroup>
+
+  <!--
+    Package metadata, set once for every package rather than per project.
+
+    Five packages whose versions can drift apart is a support problem: an inter-package
+    dependency resolving to a mismatched version works on the machine that built it and
+    fails on somebody else's. One property makes that impossible rather than unlikely.
+
+    `PackageId` is deliberately absent — it defaults to the assembly name, which is
+    already what each package should be called. The one exception sets it itself.
+  -->
+  <PropertyGroup>
+    <Version>0.1.0</Version>
+
+    <Authors>Norwood Development</Authors>
+    <Company>Norwood Development</Company>
+    <Product>uBookIt</Product>
+    <Copyright>Copyright © Norwood Development</Copyright>
+
+    <PackageLicenseExpression>MIT</PackageLicenseExpression>
+    <PackageReadmeFile>README.md</PackageReadmeFile>
+    <PackageTags>umbraco;umbraco-marketplace;booking;bookings;scheduling;reservations</PackageTags>
+
+    <!--
+      Taken from the actual git remote rather than invented. If uBookIt's public home ends up
+      somewhere else when it is published, this is the one place it changes.
+    -->
+    <PackageProjectUrl>https://dev.azure.com/NorwoodDesignDev/uBookIt</PackageProjectUrl>
+    <RepositoryUrl>https://dev.azure.com/NorwoodDesignDev/uBookIt/_git/uBookIt</RepositoryUrl>
+    <RepositoryType>git</RepositoryType>
+
+    <!--
+      Deterministic-ish niceties that cost nothing and help a consumer debug: the symbol
+      package means a stack trace through uBookIt has line numbers.
+    -->
+    <IncludeSymbols>true</IncludeSymbols>
+    <SymbolPackageFormat>snupkg</SymbolPackageFormat>
+  </PropertyGroup>
+
+  <!--
+    One README, in every package, rather than a full one on the aggregate and a stub on
+    each library.
+
+    The design left this open and guessed at "full on the meta, pointer on the libraries".
+    Rejected on apply for a reason this project keeps relearning: two documents saying
+    overlapping things drift, and the drift is silent. Four identical copies are noise;
+    two versions of the truth are a defect waiting to happen.
+
+    Guarded on IsPackable so it is not attached to test projects, and `Condition="Exists"`
+    so a partial checkout does not fail the build with a packaging error.
+  -->
+  <ItemGroup Condition="'$(IsPackable)' != 'false' AND Exists('$(MSBuildThisFileDirectory)README.md')">
+    <None Include="$(MSBuildThisFileDirectory)README.md" Pack="true" PackagePath="\" Visible="false" />
+  </ItemGroup>
 </Project>
