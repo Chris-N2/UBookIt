@@ -43,6 +43,32 @@
 - [x] 2.3 **Backfill existing bookings** (design D5), not deletion. Settle at apply whether the
   backfill is set-based or batched, and say which and why.
 - [x] 2.4 Migration is additive, per CLAUDE.md. No existing value is read or overwritten.
+- [x] 2.5 **The backfill run against a real database with real rows**, which no automated test
+  covers — every unit and integration test creates the column on an empty table.
+
+  500 bookings were inserted into the installed check site under the **pre-migration** schema,
+  then the new packages were installed over it with `-KeepExisting` and the site booted:
+  `uBookIt applied 1 database migration(s): 20260901184959_AddBookingReference`. Measured
+  afterwards, straight out of SQL Server:
+
+  | | |
+  |---|---|
+  | rows | 500 |
+  | **distinct references** | **500** |
+  | null or blank | 0 |
+  | wrong length | 0 |
+  | outside the alphabet | 0 |
+  | unique index present | yes |
+  | column nullable | no |
+
+  **This settles the one thing about the migration that was reasoned rather than measured:
+  that `NEWID()` re-evaluates per occurrence and not once per row.** Had it evaluated once, every
+  reference would have been the same symbol eight times over — `GGGGGGGG` — and 500 rows would
+  have collapsed to a handful of distinct values, or hung in the de-duplication loop. Samples:
+  `G3Y3CNTF`, `X8K9PM4Q`, `6N83HNVY`, `KG2H9JFX`. Eight independent symbols, no vowels, nothing
+  from `0 1 L O I U`.
+
+  Performed by hand, once. It is not a regression test and nothing here makes it one.
 
 ## 3. What people see
 
