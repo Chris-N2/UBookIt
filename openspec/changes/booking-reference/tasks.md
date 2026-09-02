@@ -130,10 +130,15 @@
 - [x] 5.1 Clean build at **zero** warnings; full suite green against the 1755 baseline; client
   suite against 113.
 - [x] 5.2 `openspec validate --all --strict`.
-- [x] 5.3 **Guarantee diff for the THREE MODIFIED requirements — done at propose time, re-check
-  at apply.** Written when there were two; `delivery-api` joined when task 0.1 was settled and
-  was missing from this record until QA noticed. Each replaces a requirement wholesale, which
-  deletes anything not restated:
+- [x] 5.3 **Guarantee diff for all SIX MODIFIED requirements.** This entry has been wrong at
+  every round — written for two, corrected to three, and still saying three when round 2 added
+  two more. **That drift is exactly how MAJOR 1 of round 3 happened**: the endpoint requirement
+  round 2 restated by hand was not in this list, so nobody re-diffed it, and it had silently
+  dropped four guarantees. The list is now the population, and the technique changed with it:
+  round 3's restatements are **programmatic copies of the original text with one sentence
+  patched**, not retyped from what was on screen, because retyping is what dropped them.
+
+  Each replaces a requirement wholesale, which deletes anything not restated:
   - `default-frontend` / *Post-Redirect-Get confirmation*: three guarantees (303 redirect not a
     rendered POST; the confirmation shows reference + resource + time + contact details;
     refresh does not re-book) and two scenarios. All carried forward. **The only deliberate
@@ -145,6 +150,21 @@
     All carried forward, including the trailing note explaining why one scenario was narrowed
     when cancellation joined the capability. **The only change is the reference joining the
     row payload**, plus a scenario for it.
+  - `bookings` / *Booking shape* — 7 SHALLs, 4 scenarios, all carried; the enumeration of what a
+    booking has gains the reference. `bookings` / *Booking rehydration* — 5 SHALLs, 3 scenarios,
+    all carried; the factory's parameter list gains it, stated as **required**. Both counted
+    before and after the patch.
+  - `booking-management` / *Bookings are readable over an authorized management endpoint* — the
+    one round 2 got wrong. Restated from the file this time: the versioned-endpoint-in-the-same-
+    swagger-group SHALL, the not-anonymous-under-any-configuration SHALL, purpose-built models as
+    a SHALL rather than only inside a scenario, and windowed/paged/filtered — all four were
+    dropped and are back.
+  - `delivery-api` / *Service booking placement* — 17 SHALLs, 13 scenarios, all carried. It said
+    `POST /bookings` "SHALL remain unchanged in route, request model, **response model**, and
+    semantics", which this change falsifies; corrected so the guarantee it was actually making
+    (service placement leaks nothing into the direct endpoint) survives intact.
+  - `persistence` / *Schema shape and naming* — 8 scenarios carried, one added for
+    storage-level uniqueness.
   - `delivery-api` / *Booking placement* — **added after this task was first written**: one
     endpoint SHALL, four request-body guarantees (resource id, start, duration, booker contact;
     no member key; the pipeline unchanged), five response elements (id, status, resource id,
@@ -192,8 +212,11 @@
   **The lesson, which is the useful part: when a finding enumerates instances, the count is a
   sample, not the population.** The right response to "these three are unguarded" was to sweep
   for every site that projects a reference and check each, which takes one grep. Done now:
-  `grep -rn "\.Reference" src` finds six, all six are guarded, and the constant mutation
-  fails six tests across three suites.
+  `grep -rn "\.Reference" src` is the sweep. **It found six; QA round 3 refused to trust that
+  number and enumerated ten independently mutable sites** — the same grep plus reading each
+  surface, counting the two Razor views and both directions of the persistence mapping. All ten
+  are guarded, each one killed by a constant substitution from a clean build. The count being
+  wrong twice, in a task about counting things properly, is the joke this entry has to live with.
 - [x] 7.2 **MAJOR — no `persistence` delta.** `persistence/spec.md` enumerates the schema
   exhaustively and the enumeration no longer matched: no `Reference` column, no unique index.
   The precedent was exact and in-repo — ⑰ shipped a `persistence` MODIFIED requirement for the
@@ -210,3 +233,50 @@
   the report rather than by deleting the sentence.
 - [x] 7.5 **NITs** — the three answered Open Questions marked answered; the count guard's
   spanning-row blind spot documented in the test that has it.
+
+## 8. QA round 3
+
+Code clean — QA enumerated **ten** independently mutable reference projections (refusing to
+trust round 2's "six") and found all ten guarded, each killed by a constant substitution from a
+clean build. Every finding this round is an artifact defect.
+
+- [x] 8.1 **MAJOR — the fix for a wholesale-replacement problem was itself a wholesale
+  replacement, done wrong.** Round 2 restated `booking-management`'s endpoint requirement by
+  hand and silently dropped four guarantees: the versioned-endpoint-in-the-same-swagger-group
+  SHALL, "SHALL NOT be reachable anonymously **under any configuration the package ships**"
+  (weakened to a sentence about the section's authorization, with a surviving scenario that
+  tests one unauthenticated call), purpose-built models as a SHALL rather than only inside a
+  scenario's THEN, and windowed/paged/filtered.
+
+  **Cause, precisely:** I restated it from the part of the requirement I had on screen. I read
+  from line 281 and never scrolled to 271, so four guarantees I never saw could not be carried.
+  All four restored.
+
+  **Method changed as a result.** Round 3's restatements are produced by reading the original
+  requirement out of the file programmatically and patching one sentence, then asserting the
+  SHALL and scenario counts match before and after. Retyping from a screenful is what dropped
+  them; a copy cannot.
+- [x] 8.2 **MAJOR — `delivery-api` said `POST /bookings` "SHALL remain unchanged in route,
+  request model, response model, and semantics".** This change adds `Reference` to that response
+  model, so after sync the capability would have contradicted itself: its own ADDED requirement
+  says every placement response carries the reference. Corrected so the guarantee the sentence
+  was actually making — service placement leaks nothing into the direct endpoint — survives
+  intact. Its scenario "Direct placement is unchanged" was falsified the same way and is now
+  "Direct placement still claims one resource".
+- [x] 8.3 **MAJOR — the two `bookings` requirements that enumerate what a booking *is*.**
+  *Booking shape* listed everything a booking has and did not list the reference; *Booking
+  rehydration* listed `Booking.Rehydrate`'s parameters and did not either — the change's
+  headline breaking change, absent from the sentence that enumerates that factory's inputs.
+  ⑰ edited both of these for the same reason and the precedent was not followed. Both now
+  MODIFIED, restated by copy, with the reference stated as **required** in the factory.
+- [x] 8.4 **MINOR — the proposal's Modified Capabilities named three of five**, in a change
+  whose entire review history is understated scope. Now five, each with why it is there.
+- [x] 8.5 **MINOR — task 5.3 said "THREE MODIFIED requirements" when there were six.** Not a
+  clerical error: 8.1 happened *because* the requirement round 2 restated was never added to
+  this list, so nothing prompted a re-diff. The list is now the population.
+- [x] 8.6 **NITs** — `default-frontend`'s service-confirmation requirement said "the booking
+  reference" while its sibling had been deliberately disambiguated to "the identifier a person
+  can quote, not its machine identifier"; the one sentence pair this change exists to
+  disambiguate was disambiguated in one place only. Fixed. The client's hardcoded `8` and `4`
+  are now named constants beside a note that nothing carries them across the boundary. And the
+  claim that the sweep "finds six" now records that it found ten.

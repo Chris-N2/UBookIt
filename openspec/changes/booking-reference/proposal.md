@@ -55,12 +55,21 @@ nobody wants to make.
 
 ### Modified Capabilities
 
+**Five, not three.** The first three were named at propose time; `delivery-api` joined when
+task 0.1 was settled and `persistence` when QA round 2 found the schema enumeration had stopped
+matching. Listed in full because in a change whose entire review history is understated scope,
+an understated scope list is the last thing this document should carry.
+
 - `bookings`: a booking gains a second identifier, with rules about its shape, its uniqueness
-  and its immutability.
+  and its immutability — and the two requirements that enumerate *what a booking is* gain it too.
 - `default-frontend`: what the confirmation shows a visitor under "Reference" becomes something
   they can use.
 - `booking-management`: the backoffice row carries the reference, so an operator can match what
-  a caller is reading out.
+  a caller is reading out — in the read port and at the HTTP endpoint, which enumerate the
+  payload separately.
+- `delivery-api`: both placement responses carry it, so a headless consumer's own confirmation
+  screen is not left showing a Guid.
+- `persistence`: the schema enumeration gains the column and its unique index.
 
 ## Impact
 

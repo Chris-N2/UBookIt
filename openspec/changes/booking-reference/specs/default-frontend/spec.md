@@ -23,3 +23,30 @@ labelled it accurately and filled it uselessly. This requirement previously said
 #### Scenario: The confirmation shows a reference a person can use
 - **WHEN** a visitor reads the reference on their confirmation
 - **THEN** it is the booking's quotable reference, which they could dictate over a telephone or type into a search, rather than the identifier machines use
+
+### Requirement: The confirmation reports every resource a service resolved to
+The confirmation for a placed service booking SHALL report the booking's **quotable
+reference — the identifier a person can quote, not its machine identifier** — the
+booked interval, the booker's contact details, and **every** resource the service
+resolved to, not one of them and not a count.
+
+The disambiguation matters here for the same reason it does on the direct confirmation:
+both views printed a `Guid` beneath a label reading "Reference", and a service booking
+is no less likely to be the one somebody telephones about.
+
+A visitor who booked a room and a therapist was given both, and a confirmation naming
+one of them describes a different booking from the one that exists. For a single-role
+service the report SHALL still be the resolved set, which has one member — the flow
+does not special-case it.
+
+#### Scenario: A multi-role confirmation names every resource
+- **WHEN** a service requiring a room and a therapist is booked
+- **THEN** the confirmation names both resolved resources
+
+#### Scenario: A single-role confirmation names its one resource
+- **WHEN** a single-role service is booked
+- **THEN** the confirmation names that one resolved resource
+
+#### Scenario: Refreshing the confirmation does not re-submit
+- **WHEN** a visitor refreshes the confirmation page after a successful service booking
+- **THEN** no additional booking is created

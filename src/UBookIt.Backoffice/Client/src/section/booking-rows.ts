@@ -331,8 +331,17 @@ export function serviceLabel(
  * is not the expected length is passed through untouched rather than sliced into something
  * that looks authoritative and is not.
  */
+const REFERENCE_LENGTH = 8;
+const REFERENCE_GROUP = 4;
+
 export function bookingReference(booking: { reference?: string }): string {
   const value = booking.reference ?? "";
 
-  return value.length === 8 ? `${value.slice(0, 4)}-${value.slice(4)}` : value;
+  // Named rather than inline, because these duplicate BookingReference.Length and its group
+  // size on the C# side and nothing carries a shared constant across the boundary. If the
+  // reference ever changes length, this silently stops grouping and starts passing values
+  // through unformatted — so the numbers are at least findable by searching for the name.
+  return value.length === REFERENCE_LENGTH
+    ? `${value.slice(0, REFERENCE_GROUP)}-${value.slice(REFERENCE_GROUP)}`
+    : value;
 }

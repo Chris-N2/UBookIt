@@ -57,8 +57,15 @@ nothing — and the guarantee it protected is now carried explicitly by the read
 above, which is stronger than an aside in a scenario's THEN.*
 
 ### Requirement: Bookings are readable over an authorized management endpoint
-The package SHALL expose the read port over an HTTP endpoint in the Management API, protected
-by the backoffice authorization the section already requires. **Domain types SHALL NOT appear
+The package SHALL expose a **versioned** backoffice endpoint, **in the same swagger group as
+its other management endpoints**, returning the **windowed, paged, filtered** list of bookings
+the management read port provides.
+
+The endpoint SHALL require backoffice authorization on the same terms as every other
+uBookIt management endpoint. **It SHALL NOT be reachable anonymously under any configuration
+the package ships.**
+
+**Request and response bodies SHALL be purpose-built models.** **Domain types SHALL NOT appear
 in the HTTP contract**, on the same terms as the resource and service endpoints.
 
 The response SHALL carry, per booking, exactly what the read port supplies: the booking's
