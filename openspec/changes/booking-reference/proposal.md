@@ -73,7 +73,7 @@ an understated scope list is the last thing this document should carry.
 
 ## Impact
 
-- **Public API — breaking in four places, called out as CLAUDE.md requires.** Enumerated after
+- **Public API — breaking in five types, called out as CLAUDE.md requires.** Enumerated after
   QA pointed out that the original wording named one and waved at the rest:
   - `Booking.Rehydrate` — public, the persistence boundary, gains a required parameter.
   - `Booking` gains a `Reference` property.

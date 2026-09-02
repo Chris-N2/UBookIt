@@ -10,6 +10,13 @@ two options: show a value nobody can quote, or invent a reference of its own tha
 owner's backoffice will not recognise. The package already assigns one; withholding it makes
 every headless consumer solve a problem that has been solved.
 
+**The reference SHALL cross the boundary in canonical form** — upper case, no separator — as
+it does on the management endpoint. How it is grouped for reading is the consumer's decision,
+and a consumer that stores it or searches by it needs the value exactly as the package holds
+it. Saying so matters more here than anywhere else: this is the package's most public
+contract, and its own Razor views render the grouped form, so a consumer comparing the two
+would otherwise have to guess which is canonical.
+
 This is stated once, over both endpoints, because the guarantee is about placement rather than
 about either route.
 
@@ -20,6 +27,10 @@ about either route.
 #### Scenario: A service placement returns something quotable
 - **WHEN** a booking is placed over the service placement endpoint
 - **THEN** the response carries the booking's reference as well as its identifier
+
+#### Scenario: The reference crosses the boundary unformatted
+- **WHEN** a placement response carries a reference
+- **THEN** it is the canonical stored value, leaving the consumer to group it for display
 
 ## MODIFIED Requirements
 

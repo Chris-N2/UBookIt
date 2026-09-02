@@ -149,7 +149,7 @@ dependency is on something written down rather than on an implementation detail.
 
 ## Risks / Trade-offs
 
-- **Breaking changes to public types — four, not one.** `Booking.Rehydrate` gains a required
+- **Breaking changes to public types — five, not one.** `Booking.Rehydrate` gains a required
   parameter; `Booking` gains `Reference`; **`BookingSummary` gains a required positional
   parameter**, which is source-breaking for any alternative `IBookingManagementStore` — a port
   the `booking-management` spec explicitly promises is substitutable — and

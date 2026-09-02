@@ -107,3 +107,42 @@ path into bookings begins.
 #### Scenario: The reference crosses the boundary unformatted
 - **WHEN** a booking's reference is returned by the endpoint
 - **THEN** it is the canonical stored value, leaving the client to group it for display
+
+### Requirement: Bookings have a backoffice collection view
+The package SHALL register a **Bookings** view in the uBookIt backoffice section, beside the
+resource and service views and under the same section condition, listing the bookings the
+management endpoint returns.
+
+The list SHALL be a semantic table built from the backoffice UI library, showing per booking:
+**its quotable reference**, when it runs, the booker's name and email, the resources it
+claims by name, the service it was placed for, and its status. **The reference SHALL come
+first**, because it is the column an operator scans while somebody reads it out — which is
+the case the whole identifier exists for. It SHALL show the unpaged total and page through results, in
+the same idiom the section's existing lists use.
+
+**The view SHALL NOT compute anything the endpoint does not return.** A value the endpoint
+cannot supply is a finding about the endpoint, not a calculation to add to a screen — the
+same rule the endpoint already carries about fields the read port cannot supply, pointed one
+layer further out.
+
+**Formatting a value the endpoint did return is not computing one.** The reference crosses
+the boundary canonical and is grouped for reading on the way to the screen, exactly as an
+instant crosses as UTC and is rendered in the booking's zone. The rule above is about the
+view inventing data; presentation of data it was given is the view's own business, and
+stating that here keeps a reader of this requirement alone from seeing a prohibition being
+broken.
+
+No third-party widget framework SHALL be used, and every string the view displays SHALL come
+from the package's localization with `en-US` provided.
+
+#### Scenario: The section lists bookings
+- **WHEN** a backoffice user with access to the uBookIt section opens the Bookings view
+- **THEN** bookings in the default window are listed with their reference, time, booker, resources, service and status, and the unpaged total is shown
+
+#### Scenario: Paging reaches the rest
+- **WHEN** more bookings match than fit on one page
+- **THEN** the remaining bookings are reachable, and the total reported is the number matching the query rather than the number on the page
+
+#### Scenario: A booking placed directly says so
+- **WHEN** a listed booking has no service
+- **THEN** the view states that it was booked directly, rather than leaving the cell blank as though the value were missing

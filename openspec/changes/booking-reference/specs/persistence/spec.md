@@ -59,3 +59,18 @@ for a caller that needs the service as it is now.
 #### Scenario: A directly placed booking stores no service
 - **WHEN** a booking placed directly is reloaded through the store
 - **THEN** its service columns are NULL, and it reports no service attribution rather than an empty one
+
+### Requirement: Atomic placement on SQL Server
+`IBookingStore.PlaceAsync` SHALL execute within a single database transaction that (1) acquires an exclusive per-resource application lock (`sp_getapplock`, transaction-owned, lock resource derived from the resource id) for every claimed resource in ascending resource-id order, (2) re-checks conflicts (half-open overlap against blocking-status claims) under that lock, (3) verifies the booking's reference is unused, and (4) inserts the booking and its claims. A detected conflict SHALL produce the structured `conflict` failure, and a reference already in use SHALL produce `reference-taken`; either SHALL leave the database unchanged. **The reference check is for reportability, not for correctness** — the unique index is what guarantees uniqueness, and step (3) exists so that a collision can be answered with another reference instead of a database exception. Under concurrent conflicting placements, exactly one SHALL succeed.
+
+#### Scenario: Concurrency proof against real SQL Server
+- **WHEN** at least 10 conflicting placements for the same resource and interval execute concurrently against a real SQL Server database
+- **THEN** exactly one succeeds, all others fail with code `conflict`, and exactly one booking with exactly one claim exists afterwards
+
+#### Scenario: Failed placement leaves no rows
+- **WHEN** a placement fails with `conflict`
+- **THEN** no booking or claim row from the failed attempt exists
+
+#### Scenario: A reference already in use is refused inside the same transaction
+- **WHEN** a placement carries a reference another booking already holds
+- **THEN** it fails with `reference-taken` and no booking or claim row from the attempt exists

@@ -130,7 +130,42 @@
 - [x] 5.1 Clean build at **zero** warnings; full suite green against the 1755 baseline; client
   suite against 113.
 - [x] 5.2 `openspec validate --all --strict`.
-- [x] 5.3 **Guarantee diff for all SIX MODIFIED requirements.** This entry has been wrong at
+- [x] 5.3 **Guarantee diff for every MODIFIED requirement — ELEVEN, across five capabilities.**
+  The number has been wrong at every single round: written for two, corrected to three,
+  corrected to six, and still wrong. It is not a clerical problem — **round 3's MAJOR happened
+  because a requirement restated by hand was absent from this list, so nothing prompted anyone
+  to diff it, and four guarantees went missing.** QA round 4 found the count wrong for a third
+  time.
+
+  So the list is no longer trusted to be maintained by hand.
+  `ChangeDeltaIntegrityTests.Every_modified_requirement_is_named_in_its_change_tasks` fails the
+  build if any `## MODIFIED Requirements` entry in this change's deltas is not named somewhere
+  in this file — a machine cannot check that the prose survived, but it can refuse to let a
+  wholesale replacement go unlisted where the person doing that reading will look. Its sibling
+  asserts each one names a requirement that actually exists upstream, so a typo cannot sync as
+  a new requirement beside the one it meant to replace.
+
+  The requirements, enumerated from the deltas rather than from memory:
+
+  | capability | requirement |
+  |---|---|
+  | `bookings` | Booking shape |
+  | `bookings` | Booking rehydration |
+  | `default-frontend` | Post-Redirect-Get confirmation |
+  | `default-frontend` | The confirmation reports every resource a service resolved to |
+  | `booking-management` | Bookings can be enumerated for management |
+  | `booking-management` | Bookings are readable over an authorized management endpoint |
+  | `booking-management` | Bookings have a backoffice collection view |
+  | `delivery-api` | Booking placement |
+  | `delivery-api` | Service booking placement |
+  | `persistence` | Schema shape and naming |
+  | `persistence` | Atomic placement on SQL Server |
+
+  **Regenerate this table from the deltas; do not patch it.** Patching is what produced every
+  previous wrong count — including one in the first draft of this very entry, which said ten
+  while the table below it listed eleven. The generator is four lines: walk
+  `openspec/changes/<change>/specs/*/spec.md`, track the current `## ` section, and collect
+  `### Requirement:` headings while that section is `MODIFIED Requirements`. This entry has been wrong at
   every round — written for two, corrected to three, and still saying three when round 2 added
   two more. **That drift is exactly how MAJOR 1 of round 3 happened**: the endpoint requirement
   round 2 restated by hand was not in this list, so nobody re-diffed it, and it had silently
@@ -280,3 +315,48 @@ clean build. Every finding this round is an artifact defect.
   disambiguate was disambiguated in one place only. Fixed. The client's hardcoded `8` and `4`
   are now named constants beside a note that nothing carries them across the boundary. And the
   claim that the sweep "finds six" now records that it found ten.
+
+## 9. QA round 4
+
+Round 3's three MAJORs verified fixed, all eleven MODIFIED requirements re-diffed by QA with
+**zero dropped guarantees**, and the programmatic-copy method verified by inspecting the text
+rather than believing the claim. Not over-scoped. One MAJOR remained.
+
+- [x] 9.1 **MAJOR — the falsified-sibling class, for the FOURTH consecutive round.**
+  `booking-management` / *Bookings have a backoffice collection view* enumerates the screen's
+  columns and had stopped matching: the reference is now the first column, and `docs/backoffice.md`
+  was updated to say so while the spec was not. After sync, the capability and the package's own
+  documentation would have contradicted each other about what the screen shows.
+
+  The proposal's **What Changes** names this surface explicitly — *"The operator sees it in the
+  backoffice bookings list"* — while its Capabilities bullet named only the read port and the
+  endpoint. The change described the surface it then failed to specify.
+
+  Restated by copy. Its *"The view SHALL NOT compute anything the endpoint does not return"*
+  clause also needed reconciling: the view derives `7QX4-M2NP` from the canonical wire value,
+  and the permission for that lived only in the endpoint requirement, so a reader of the view
+  requirement alone saw a prohibition being broken. Formatting a value you were given is now
+  distinguished from inventing one.
+- [x] 9.2 **MINOR — `persistence` / *Atomic placement on SQL Server*** enumerates the placement
+  transaction as three numbered steps; there are now four, and a second failure code. Restated.
+- [x] 9.3 **MINOR — the `delivery-api` ADDED requirement never said which form crosses the wire.**
+  `booking-management` guarantees canonical with a scenario; the delivery API — the more public
+  contract, and the one justified by a headless consumer's confirmation screen — said nothing,
+  while the package's own views render the grouped form. Now stated, with a scenario.
+- [x] 9.4 **NITs** — "breaking in four places" while listing five types, corrected to five; the
+  client declared `reference?: string` optional where the generated model has it required, which
+  would have rendered a silently empty cell rather than failing a type check.
+- [x] 9.5 **MINOR, and the one that mattered: task 5.3 miscounted for the THIRD round running.**
+  Said six; there were nine; it now says eleven. **This is not clerical — round 3's MAJOR was
+  caused by it.** A requirement restated by hand was absent from the list, so nothing prompted a
+  re-diff, and four guarantees went missing.
+
+  **A hand-maintained list has now failed four times, so it is no longer maintained by hand.**
+  `ChangeDeltaIntegrityTests` fails the build if any `## MODIFIED Requirements` entry in an
+  active change's deltas is not named in that change's `tasks.md`, and asserts each names a
+  requirement that actually exists upstream. Mutation-checked by deleting the very requirement
+  round 3 lost: the guard names it and fails.
+
+  A machine cannot check that the prose survived a wholesale replacement — that is a reading
+  job. It can refuse to let a replacement go **unlisted where the person doing the reading will
+  look**, which is the step that actually broke.

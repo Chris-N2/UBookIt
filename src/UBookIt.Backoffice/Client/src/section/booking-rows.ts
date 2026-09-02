@@ -18,7 +18,10 @@ export type BookingLike = {
   startUtc: string;
   endUtc: string;
   timeZoneId: string;
-  reference?: string;
+  // Required, matching the generated BookingModel — the endpoint always sends it. Declaring
+  // it optional here would let a missing value render a silently empty cell rather than
+  // failing a type check at the one place that would notice.
+  reference: string;
   service?: { serviceId: string; displayName: string } | null;
 };
 
@@ -335,6 +338,8 @@ const REFERENCE_LENGTH = 8;
 const REFERENCE_GROUP = 4;
 
 export function bookingReference(booking: { reference?: string }): string {
+  // Still tolerant of an absent value: this is called with plain object literals in tests and
+  // the cost of a blank cell is lower than the cost of a thrown render.
   const value = booking.reference ?? "";
 
   // Named rather than inline, because these duplicate BookingReference.Length and its group

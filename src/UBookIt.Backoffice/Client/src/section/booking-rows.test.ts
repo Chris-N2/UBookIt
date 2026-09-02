@@ -30,6 +30,7 @@ const booking = (overrides: Partial<Parameters<typeof serviceLabel>[0]> = {}) =>
   startUtc: "2026-09-02T08:00:00+00:00",
   endUtc: "2026-09-02T09:00:00+00:00",
   timeZoneId: "Europe/London",
+  reference: "7QX4M2NP",
   service: null,
   ...overrides,
 });
