@@ -448,8 +448,11 @@ describe("bookingReference", () => {
   });
 
   it("survives a row that carries no reference at all", () => {
-    // The field is optional on BookingLike, so a caller with an older payload renders a
-    // blank cell rather than "undefined".
+    // `BookingLike.reference` is REQUIRED — the endpoint always sends it, and declaring it
+    // optional there would let a missing value render a silently empty cell. This function's
+    // own parameter stays optional on purpose: it is called with plain object literals, and a
+    // blank cell costs less than a thrown render. (The comment here previously said the field
+    // was optional; it stopped being true when the type was tightened, and nobody swept it.)
     expect(bookingReference({})).toBe("");
   });
 });

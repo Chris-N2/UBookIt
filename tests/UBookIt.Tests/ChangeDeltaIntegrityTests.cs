@@ -24,18 +24,22 @@ public class ChangeDeltaIntegrityTests
 {
     private const string ChangesRoot = "openspec/changes";
 
-    /// <summary>The section heading this guard reads. Written once so the failure message can quote it.</summary>
-    private const string ModifiedSection = "MODIFIED Requirements";
-
     private static readonly Regex RequirementHeading =
         new(@"^###\s+Requirement:\s*(?<name>.+?)\s*$", RegexOptions.Multiline);
 
-    /// <summary>An active change's delta: which capability, what it modifies, and its section headings.</summary>
+    /// <summary>
+    /// The section kinds OpenSpec understands. A requirement under anything else is orphaned:
+    /// it will not sync as its author intended, and no guard here can see it.
+    /// </summary>
+    private static readonly string[] SectionKinds = ["ADDED", "MODIFIED", "REMOVED", "RENAMED"];
+
+    /// <summary>An active change's delta: which capability, what it modifies, and what is orphaned.</summary>
     private sealed record Delta(
         string Change,
         string Capability,
         IReadOnlyList<string> Modified,
         IReadOnlyList<string> Sections,
+        IReadOnlyList<string> Unattributed,
         bool HasTasks);
 
     [Fact]
@@ -125,23 +129,25 @@ public class ChangeDeltaIntegrityTests
 
             Assert.NotEmpty(delta.Sections);
 
-            // A delta that declares no MODIFIED section may be genuinely ADDED-only — legitimate
-            // and common. What it must not be is a MODIFIED section this guard failed to
-            // recognise, so the sections actually present are named in the failure.
-            var recognised = delta.Sections.Any(s => s.Contains("MODIFIED", StringComparison.Ordinal));
-            var addedOnly = delta.Sections.Any(s => s.Contains("ADDED", StringComparison.Ordinal));
-
+            // EVERY requirement must sit under a section this guard understands.
+            //
+            // The previous version asked whether a recognised section was *present*, which any
+            // delta carrying an ADDED section satisfied — so a reworded MODIFIED heading in a
+            // mixed file was exempt, and two of this change's five deltas were in exactly that
+            // shape. That is the fourth iteration of one fault: testing a guard against the
+            // single mutation that motivated it instead of against the shapes of input it will
+            // actually meet. Delta files come in three (ADDED-only, MODIFIED-only, both), and
+            // only one had been tried.
+            //
+            // Asking instead whether anything is left UNATTRIBUTED cannot be dodged by shape.
+            // A reworded heading orphans every requirement beneath it, whatever else the file
+            // contains, and an orphan is reported by name rather than inferred from a count.
             Assert.True(
-                recognised || addedOnly,
-                $"{delta.Change}/{delta.Capability} declares no section this guard recognises. It reads "
-                + $"\"## {ModifiedSection}\" exactly. Sections present: {string.Join(", ", delta.Sections)}. "
-                + "If one of those is a reworded MODIFIED heading, every wholesale replacement beneath it is "
-                + "invisible to both assertions above.");
-
-            if (recognised)
-            {
-                Assert.NotEmpty(delta.Modified);
-            }
+                delta.Unattributed.Count == 0,
+                $"{delta.Change}/{delta.Capability}: {delta.Unattributed.Count} requirement(s) sit under no "
+                + $"section this guard understands — {string.Join("; ", delta.Unattributed)}. Sections present: "
+                + $"{string.Join(", ", delta.Sections)}. A section heading whose wording this guard does not "
+                + "match makes every requirement beneath it invisible to the two assertions above.");
         }
     }
 
@@ -199,6 +205,7 @@ public class ChangeDeltaIntegrityTests
                     Path.GetFileName(capabilityDir),
                     ModifiedIn(text),
                     SectionsIn(text),
+                    UnattributedIn(text),
                     hasTasks));
             }
         }
@@ -212,6 +219,35 @@ public class ChangeDeltaIntegrityTests
             .Where(l => l.StartsWith("## ", StringComparison.Ordinal))
             .Select(l => l[3..].Trim())
             .ToList();
+
+    /// <summary>
+    /// Requirement headings sitting under a section whose kind OpenSpec does not recognise —
+    /// including the case of no section at all. Each is reported as
+    /// <c>"&lt;section&gt;" / &lt;requirement&gt;</c> so a failure names both.
+    /// </summary>
+    private static IReadOnlyList<string> UnattributedIn(string delta)
+    {
+        var orphans = new List<string>();
+        var section = "(no section)";
+
+        foreach (var line in Lines(delta))
+        {
+            if (line.StartsWith("## ", StringComparison.Ordinal))
+            {
+                section = line[3..].Trim();
+                continue;
+            }
+
+            var match = RequirementHeading.Match(line);
+
+            if (match.Success && !SectionKinds.Any(k => section.Contains(k, StringComparison.Ordinal)))
+            {
+                orphans.Add($"\"{section}\" / {match.Groups["name"].Value}");
+            }
+        }
+
+        return orphans;
+    }
 
     /// <summary>Requirement headings that fall under a <c>## MODIFIED Requirements</c> section.</summary>
     private static IReadOnlyList<string> ModifiedIn(string delta)

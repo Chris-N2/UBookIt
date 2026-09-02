@@ -92,6 +92,13 @@
 
   Performed by hand, once. It is not a regression test and nothing here makes it one.
 
+  **Accuracy note added at round 6:** this run measured the pre-round-5 expression,
+  `ABS(CHECKSUM(NEWID()) % 28)`. The SQL has since changed to remove a distribution bias
+  (10.3), so what this establishes is the *mechanism* — the column is added, filled and
+  constrained against real rows, and `NEWID()` re-evaluates per occurrence — not the current
+  expression's output. Round 5's 28,000-draw measurement covers the distribution. Re-running
+  the end-to-end backfill would add nothing either measurement does not already give.
+
 ## 3. What people see
 
 - [x] 3.1 The confirmation view shows the reference where it currently prints a Guid under a
@@ -112,6 +119,26 @@
 - [x] 4.2 **Uniqueness is enforced where it is claimed to be.** Mutation-check by removing the
   unique index and confirming something fails — a guard over a constraint must be shown to
   observe the constraint.
+
+  **This task was recorded as done and had not been performed as written** (found at round 6).
+  Task 4.5 ran a *compound* mutation — index dropped **and** the store's pre-check disabled —
+  which cannot attribute the failure. QA ran the single one: with the index removed consistently
+  from the model, the migration and both snapshots, **1796 of 1796 tests passed**. The shipped
+  database had no unique index and nothing noticed. Both existing tests assert `ReferenceTaken`,
+  which only the pre-check can produce, so they watched the check and never the constraint —
+  while three normative statements say the constraint is the guarantee and the check explicitly
+  is not.
+
+  `The_schema_refuses_a_duplicate_reference_even_when_nothing_checks_first` now writes the row
+  the way something that is not our code would: a raw `INSERT` performing no check, asserted to
+  fail with SQL Server's duplicate-key error specifically, so it cannot pass because the insert
+  failed for an unrelated reason. Re-run with the index-only mutation: it dies, alone.
+
+  **A trap worth carrying**, because it produces a false green that reads exactly like a real
+  one: removing the index from the **model alone** fails all 78 integration tests with EF's
+  `PendingModelChangesWarning`. That fires for any model/snapshot divergence and says nothing
+  whatever about uniqueness. A mutation check that stops there concludes the constraint is
+  guarded when nothing observes it.
 - [x] 4.3 **The alphabet properties** (1.2), stated as properties.
 - [x] 4.4 **Immutability across every status transition** (1.5).
 - [x] 4.5 Mutation-check each of the above from a clean build. Four run, and **one found a
@@ -424,3 +451,42 @@ another instance.
   QA raises is whether change-scoped scenarios should sync into a capability at all. On the
   deferred-obligations list; fixing it here would be scope creep into a defect predating the
   branch.
+
+## 11. QA round 6
+
+The feature code is clean. Both MAJORs are guards that did not observe what they claimed to.
+
+- [x] 11.1 **MAJOR — the anti-vacuity guard was vacuous on a case adjacent to the one it was
+  measured against.** `recognised || addedOnly` named a variable for a condition it did not
+  compute: `addedOnly` was true whenever an ADDED section was *present*, not when it was the
+  only one, so **every mixed delta was exempt** — and two of this change's five deltas are
+  mixed, carrying five of the twelve MODIFIED requirements between them. Round 5's own probe,
+  applied to `bookings` instead of `default-frontend`, passed all three tests while hiding
+  three wholesale replacements, including the one round 5 rejected over.
+
+  **The fault is fourth-generation and the pattern is now named: testing a guard against the
+  single mutation that motivated it, rather than against the shapes of input it will meet.**
+  Delta files come in three shapes — ADDED-only, MODIFIED-only, both — and only one had ever
+  been tried.
+
+  Rewritten to ask a question no shape can dodge: **is every requirement attributed to a
+  section OpenSpec understands?** A reworded heading orphans everything beneath it whatever
+  else the file contains, and orphans are reported by name. Mutation-checked against **all
+  three shapes**; all three fail.
+- [x] 11.2 **MAJOR — the unique index had no covering test, and 4.2's mutation was never run as
+  written.** See 4.2 above: removing the index consistently passed 1796/1796.
+- [x] 11.3 **NITs** — a client comment describing a type as optional after round 4 made it
+  required (the same unswept-prose class as most of this review history); a failure message
+  claiming exact matching that matched on `Contains`; and task 2.5's live measurement predating
+  the round-5 expression change, now noted for what it does and does not establish.
+- [x] 11.5 **Found by the suite while fixing 11.2: two integration tests shared a literal
+  reference.** The new schema test and `The_projected_row_carries_the_bookings_own_reference`
+  both used `QF7M3XKB`, and the integration tests share one database — so whichever ran second
+  was refused, and the failure depended on ordering. Distinct literals now, with the hazard
+  named in the file rather than left for the next person to rediscover. This is the
+  shared-fixture ordering trap this project has hit before; it is cheap to cause and expensive
+  to diagnose, because it appears and disappears.
+- [x] 11.4 **Environment note from QA, worth keeping**: `find src tests -type d -name bin` matches
+  `Client/node_modules/*/bin` and destroys the npm binstubs, producing a misleading "cannot find
+  module typescript/bin/tsc". It cost the reviewer four build cycles. The sweep used in this
+  change prunes `node_modules` explicitly; anyone writing a fresh one should.
