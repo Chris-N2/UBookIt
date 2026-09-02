@@ -130,7 +130,7 @@
 - [x] 5.1 Clean build at **zero** warnings; full suite green against the 1755 baseline; client
   suite against 113.
 - [x] 5.2 `openspec validate --all --strict`.
-- [x] 5.3 **Guarantee diff for every MODIFIED requirement — ELEVEN, across five capabilities.**
+- [x] 5.3 **Guarantee diff for every MODIFIED requirement — TWELVE, across five capabilities.**
   The number has been wrong at every single round: written for two, corrected to three,
   corrected to six, and still wrong. It is not a clerical problem — **round 3's MAJOR happened
   because a requirement restated by hand was absent from this list, so nothing prompted anyone
@@ -160,6 +160,7 @@
   | `delivery-api` | Service booking placement |
   | `persistence` | Schema shape and naming |
   | `persistence` | Atomic placement on SQL Server |
+  | `bookings` | Availability and placement service ports |
 
   **Regenerate this table from the deltas; do not patch it.** Patching is what produced every
   previous wrong count — including one in the first draft of this very entry, which said ten
@@ -360,3 +361,66 @@ rather than believing the claim. Not over-scoped. One MAJOR remained.
   A machine cannot check that the prose survived a wholesale replacement — that is a reading
   job. It can refuse to let a replacement go **unlisted where the person doing the reading will
   look**, which is the step that actually broke.
+
+## 10. QA round 5
+
+**The code is clean — QA found nothing wrong with the implementation.** Both MAJORs are
+artifact/guard defects, and the falsified-sibling sweep finally has a verdict rather than
+another instance.
+
+- [x] 10.1 **MAJOR — the falsified-sibling class, fifth round, and now exhausted.**
+  `bookings` / *Availability and placement service ports* enumerates what the booking service
+  depends on: two stores plus the observation port. It now takes a fourth, and **the precedent
+  is written inside the requirement itself** — an italic note explaining that the enumeration
+  was widened rather than dropped when the observation port arrived, because "the constraint
+  was never about the number two". The same move was available and was not made.
+
+  Worse than a stale sentence: `BookingReference`, `IBookingReferenceFactory` and
+  `RandomBookingReferenceFactory` are new **public Core API** and appeared in no requirement
+  anywhere. Design D2 decides the port exists; design is not what gets archived into a
+  capability. The one requirement that would have carried it is the one that went stale, so the
+  guarantee vanished on both sides at once. The requirement now enumerates the port and states
+  what it does and does not promise, with a scenario for substituting it.
+
+  **Why it took five rounds, which is the useful part:** every earlier sweep looked at *payload*
+  axes — what a row, response, column or table carries. This is the only axis that is about a
+  **constructor**. It was never on anyone's list, including mine. QA's round-5 sweep derived the
+  axes from `git diff aec2952..HEAD` rather than from the proposal, checked every requirement in
+  all ten capabilities against each axis, and reports the class **exhausted**.
+- [x] 10.2 **MAJOR — the anti-vacuity guard had no anti-vacuity guard.**
+  `ChangeDeltaIntegrityTests`, written in round 4 to end a four-round failure, shipped with four
+  silent-empty paths. QA measured it: renaming `## MODIFIED Requirements` to
+  `## Modified Requirements` made three wholesale replacements invisible — including the very
+  requirement round 4 rejected over — and **both tests passed**, as did strict validation.
+
+  This project has written the rule down twice: `RepoFiles.Paths` carries *"a scan over nothing
+  passes every assertion made about it"*, and `default-frontend` makes an anti-vacuity guard a
+  **SHALL**, noting that the fault has shipped before. It shipped again, inside the guard meant
+  to stop a different recurrence of it.
+
+  Fixed with a third test that separates the two ways of seeing nothing. *"There is no active
+  change"* is legitimate and true for most of a repository's life. *"The parser stopped
+  working"* is not — so the parser is proved against the **archive**, which is never empty and
+  never changes, and each active delta must have a `tasks.md`, non-empty sections, and a
+  section this guard recognises. Mutation-checked with QA's own probe: the reworded heading now
+  fails, naming it.
+
+  **And it caught me the same hour.** Its first run against 10.1's new requirement failed —
+  I had added the MODIFIED entry and not listed it in 5.3, which is precisely the round-3
+  failure it exists to prevent, reproduced by me while fixing round 5.
+- [x] 10.3 **NIT — a measurable distribution bias in the backfill.** `ABS(CHECKSUM(NEWID()) % 28)`
+  folds ±n onto n, so `B` was drawn at half the rate of the other 27 symbols: backfilled and
+  newly-placed references came from different distributions where the design describes one
+  alphabet. Now `(CHECKSUM(NEWID()) & 0x7FFFFFFF) % 28`, which avoids both the overflow and the
+  fold. **Measured on real SQL Server over 28,000 draws**: 28 distinct symbols, counts 898–1062
+  against an expected 1000, `B` at 996. Safe to amend because nothing is published — the
+  migration has never shipped.
+- [x] 10.4 **NIT — the "1755 baseline" claim, checked rather than assumed.** QA's notes said
+  1752 and flagged it as unverified. The merge commit `aec2952` records *"1755 tests"*, so the
+  baseline stands.
+- [x] 10.5 **Recorded, not fixed: `persistence` / "Scenario: No migration is added".** Literally
+  false — this change adds one — but it was already falsified by ⑰ and is self-scoped by "after
+  this change". It is inherited history, not something this change broke, and the real question
+  QA raises is whether change-scoped scenarios should sync into a capability at all. On the
+  deferred-obligations list; fixing it here would be scope creep into a defect predating the
+  branch.

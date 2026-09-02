@@ -31,20 +31,33 @@ namespace UBookIt.Persistence.Migrations
         /// expressions give eight independent symbols rather than one repeated.
         /// </summary>
         /// <remarks>
-        /// `CHECKSUM(...) % 28` before `ABS`, not after. `ABS(CHECKSUM(NEWID()))` is the
-        /// well-known way to write this and it is wrong: `CHECKSUM` can return
-        /// `-2147483648`, whose absolute value overflows a signed 32-bit integer and throws.
-        /// Taking the modulo first keeps the value in range.
+        /// <para>
+        /// The obvious spelling, `ABS(CHECKSUM(NEWID())) % 28`, throws: `CHECKSUM` can return
+        /// `-2147483648`, whose absolute value overflows a signed 32-bit integer.
+        /// </para>
+        /// <para>
+        /// The obvious fix, `ABS(CHECKSUM(NEWID()) % 28)`, does not throw but is <b>biased</b>.
+        /// The modulo yields -27..27; taking the absolute value folds ±n onto n, so every
+        /// symbol but the first is reachable two ways and the first only one — `B` would be
+        /// drawn at half the rate of the other 27. Harmless in isolation, but it would mean
+        /// backfilled references and newly-placed ones came from measurably different
+        /// distributions, where the design describes exactly one alphabet.
+        /// </para>
+        /// <para>
+        /// Masking the sign bit avoids both. `&amp; 0x7FFFFFFF` yields 0..2147483647 with no
+        /// overflow, and the residual modulo bias over 2^31 values is on the order of one part
+        /// in 76 million — uniform to any standard this needs to meet.
+        /// </para>
         /// </remarks>
         private const string ReferenceExpression = """
-            SUBSTRING(@alphabet, ABS(CHECKSUM(NEWID()) % 28) + 1, 1) +
-            SUBSTRING(@alphabet, ABS(CHECKSUM(NEWID()) % 28) + 1, 1) +
-            SUBSTRING(@alphabet, ABS(CHECKSUM(NEWID()) % 28) + 1, 1) +
-            SUBSTRING(@alphabet, ABS(CHECKSUM(NEWID()) % 28) + 1, 1) +
-            SUBSTRING(@alphabet, ABS(CHECKSUM(NEWID()) % 28) + 1, 1) +
-            SUBSTRING(@alphabet, ABS(CHECKSUM(NEWID()) % 28) + 1, 1) +
-            SUBSTRING(@alphabet, ABS(CHECKSUM(NEWID()) % 28) + 1, 1) +
-            SUBSTRING(@alphabet, ABS(CHECKSUM(NEWID()) % 28) + 1, 1)
+            SUBSTRING(@alphabet, (CHECKSUM(NEWID()) & 0x7FFFFFFF) % 28 + 1, 1) +
+            SUBSTRING(@alphabet, (CHECKSUM(NEWID()) & 0x7FFFFFFF) % 28 + 1, 1) +
+            SUBSTRING(@alphabet, (CHECKSUM(NEWID()) & 0x7FFFFFFF) % 28 + 1, 1) +
+            SUBSTRING(@alphabet, (CHECKSUM(NEWID()) & 0x7FFFFFFF) % 28 + 1, 1) +
+            SUBSTRING(@alphabet, (CHECKSUM(NEWID()) & 0x7FFFFFFF) % 28 + 1, 1) +
+            SUBSTRING(@alphabet, (CHECKSUM(NEWID()) & 0x7FFFFFFF) % 28 + 1, 1) +
+            SUBSTRING(@alphabet, (CHECKSUM(NEWID()) & 0x7FFFFFFF) % 28 + 1, 1) +
+            SUBSTRING(@alphabet, (CHECKSUM(NEWID()) & 0x7FFFFFFF) % 28 + 1, 1)
             """;
 
         /// <inheritdoc />

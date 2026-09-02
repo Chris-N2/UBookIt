@@ -24,75 +24,19 @@ public class ChangeDeltaIntegrityTests
 {
     private const string ChangesRoot = "openspec/changes";
 
+    /// <summary>The section heading this guard reads. Written once so the failure message can quote it.</summary>
+    private const string ModifiedSection = "MODIFIED Requirements";
+
     private static readonly Regex RequirementHeading =
         new(@"^###\s+Requirement:\s*(?<name>.+?)\s*$", RegexOptions.Multiline);
 
-    /// <summary>An active change's delta: which capability, and which requirements it modifies.</summary>
-    private sealed record Delta(string Change, string Capability, IReadOnlyList<string> Modified);
-
-    private static IReadOnlyList<Delta> ActiveDeltas()
-    {
-        var root = Path.Combine(RepoFiles.Root, ChangesRoot);
-        var deltas = new List<Delta>();
-
-        foreach (var changeDir in Directory.GetDirectories(root))
-        {
-            // Archived changes are history and are never edited — CLAUDE.md is explicit.
-            if (Path.GetFileName(changeDir) == "archive")
-            {
-                continue;
-            }
-
-            var specsDir = Path.Combine(changeDir, "specs");
-
-            if (!Directory.Exists(specsDir))
-            {
-                continue;
-            }
-
-            foreach (var capabilityDir in Directory.GetDirectories(specsDir))
-            {
-                var file = Path.Combine(capabilityDir, "spec.md");
-
-                if (!File.Exists(file))
-                {
-                    continue;
-                }
-
-                deltas.Add(new Delta(
-                    Path.GetFileName(changeDir),
-                    Path.GetFileName(capabilityDir),
-                    ModifiedIn(File.ReadAllText(file))));
-            }
-        }
-
-        return deltas;
-    }
-
-    /// <summary>Requirement headings that fall under a <c>## MODIFIED Requirements</c> section.</summary>
-    private static IReadOnlyList<string> ModifiedIn(string delta)
-    {
-        var names = new List<string>();
-        var inModified = false;
-
-        foreach (var line in delta.Split('\n'))
-        {
-            if (line.StartsWith("## ", StringComparison.Ordinal))
-            {
-                inModified = line.Contains("MODIFIED", StringComparison.Ordinal);
-                continue;
-            }
-
-            var match = RequirementHeading.Match(line.TrimEnd('\r'));
-
-            if (inModified && match.Success)
-            {
-                names.Add(match.Groups["name"].Value);
-            }
-        }
-
-        return names;
-    }
+    /// <summary>An active change's delta: which capability, what it modifies, and its section headings.</summary>
+    private sealed record Delta(
+        string Change,
+        string Capability,
+        IReadOnlyList<string> Modified,
+        IReadOnlyList<string> Sections,
+        bool HasTasks);
 
     [Fact]
     public void Every_modified_requirement_names_one_that_exists()
@@ -109,7 +53,7 @@ public class ChangeDeltaIntegrityTests
                 File.Exists(upstream),
                 $"{delta.Change} modifies capability '{delta.Capability}', which has no spec at {upstream}.");
 
-            var headings = ModifiedHeadingsOf(File.ReadAllText(upstream));
+            var headings = HeadingsOf(File.ReadAllText(upstream));
 
             foreach (var name in delta.Modified)
             {
@@ -134,14 +78,7 @@ public class ChangeDeltaIntegrityTests
         // missing. The count in that list was wrong in three consecutive rounds.
         foreach (var delta in ActiveDeltas())
         {
-            var tasksPath = Path.Combine(RepoFiles.Root, ChangesRoot, delta.Change, "tasks.md");
-
-            if (!File.Exists(tasksPath))
-            {
-                continue;
-            }
-
-            var tasks = File.ReadAllText(tasksPath);
+            var tasks = File.ReadAllText(Path.Combine(RepoFiles.Root, ChangesRoot, delta.Change, "tasks.md"));
 
             foreach (var name in delta.Modified)
             {
@@ -153,7 +90,159 @@ public class ChangeDeltaIntegrityTests
         }
     }
 
-    private static HashSet<string> ModifiedHeadingsOf(string spec)
+    [Fact]
+    public void This_guard_is_not_watching_nothing()
+    {
+        // Every path above iterates a collection. A collection that is empty satisfies all of
+        // them, and this project has now shipped that fault twice: RepoFiles.Paths carries
+        // "a scan over nothing passes every assertion made about it", and default-frontend
+        // makes an anti-vacuity guard a SHALL, noting the fault has shipped before. The first
+        // version of THIS file — written to end a four-round failure — had it too.
+        //
+        // Measured rather than argued: renaming one heading from "## MODIFIED Requirements" to
+        // "## Modified Requirements" made three wholesale replacements invisible to both tests
+        // above, and both passed. `openspec validate --strict` passed as well.
+        // The parser is proved against the ARCHIVE, which is never empty and never changes.
+        // That separates the two ways this guard could see nothing: "there is no active change"
+        // — legitimate, and true for most of a repository's life — from "the parser stopped
+        // working", which is the one that must never pass quietly. Only the second is a defect,
+        // and only the second is detectable without an active change to look at.
+        var archived = ArchivedDeltas();
+
+        Assert.True(
+            archived.Any(d => d.Modified.Count > 0),
+            "The parser found no MODIFIED requirement anywhere in openspec/changes/archive, which is "
+            + "not credible — archived changes contain many. The section or heading parsing has broken, "
+            + "and every assertion in this file would now pass by finding nothing.");
+
+        foreach (var delta in ActiveDeltas())
+        {
+            Assert.True(
+                delta.HasTasks,
+                $"{delta.Change} has delta specs but no tasks.md. This guard's whole premise is that a "
+                + "modification is declared where the reader will look; without that file there is nowhere "
+                + "to look, and both assertions above would pass by finding nothing.");
+
+            Assert.NotEmpty(delta.Sections);
+
+            // A delta that declares no MODIFIED section may be genuinely ADDED-only — legitimate
+            // and common. What it must not be is a MODIFIED section this guard failed to
+            // recognise, so the sections actually present are named in the failure.
+            var recognised = delta.Sections.Any(s => s.Contains("MODIFIED", StringComparison.Ordinal));
+            var addedOnly = delta.Sections.Any(s => s.Contains("ADDED", StringComparison.Ordinal));
+
+            Assert.True(
+                recognised || addedOnly,
+                $"{delta.Change}/{delta.Capability} declares no section this guard recognises. It reads "
+                + $"\"## {ModifiedSection}\" exactly. Sections present: {string.Join(", ", delta.Sections)}. "
+                + "If one of those is a reworded MODIFIED heading, every wholesale replacement beneath it is "
+                + "invisible to both assertions above.");
+
+            if (recognised)
+            {
+                Assert.NotEmpty(delta.Modified);
+            }
+        }
+    }
+
+    /// <summary>
+    /// Archived changes, read only to prove the parser still works. Never modified — CLAUDE.md
+    /// is explicit that the archive is history.
+    /// </summary>
+    private static IReadOnlyList<Delta> ArchivedDeltas()
+        => DeltasUnder(Path.Combine(RepoFiles.Root, ChangesRoot, "archive"));
+
+    private static IReadOnlyList<Delta> ActiveDeltas()
+        => DeltasUnder(Path.Combine(RepoFiles.Root, ChangesRoot));
+
+    private static IReadOnlyList<Delta> DeltasUnder(string root)
+    {
+        var deltas = new List<Delta>();
+
+        if (!Directory.Exists(root))
+        {
+            return deltas;
+        }
+
+        foreach (var changeDir in Directory.GetDirectories(root))
+        {
+            // The archive is walked only by ArchivedDeltas, which is handed it directly.
+            if (Path.GetFileName(changeDir) == "archive")
+            {
+                continue;
+            }
+
+            var specsDir = Path.Combine(changeDir, "specs");
+
+            // A change with no delta specs is legitimate: not every change touches a capability.
+            // Named here so a reader knows it was considered rather than overlooked.
+            if (!Directory.Exists(specsDir))
+            {
+                continue;
+            }
+
+            var hasTasks = File.Exists(Path.Combine(changeDir, "tasks.md"));
+
+            foreach (var capabilityDir in Directory.GetDirectories(specsDir))
+            {
+                var file = Path.Combine(capabilityDir, "spec.md");
+
+                if (!File.Exists(file))
+                {
+                    continue;
+                }
+
+                var text = File.ReadAllText(file);
+
+                deltas.Add(new Delta(
+                    Path.GetFileName(changeDir),
+                    Path.GetFileName(capabilityDir),
+                    ModifiedIn(text),
+                    SectionsIn(text),
+                    hasTasks));
+            }
+        }
+
+        return deltas;
+    }
+
+    /// <summary>Every <c>## </c> section heading, so an unrecognised one can be named in a failure.</summary>
+    private static IReadOnlyList<string> SectionsIn(string delta)
+        => Lines(delta)
+            .Where(l => l.StartsWith("## ", StringComparison.Ordinal))
+            .Select(l => l[3..].Trim())
+            .ToList();
+
+    /// <summary>Requirement headings that fall under a <c>## MODIFIED Requirements</c> section.</summary>
+    private static IReadOnlyList<string> ModifiedIn(string delta)
+    {
+        var names = new List<string>();
+        var inModified = false;
+
+        foreach (var line in Lines(delta))
+        {
+            if (line.StartsWith("## ", StringComparison.Ordinal))
+            {
+                inModified = line.Contains("MODIFIED", StringComparison.Ordinal);
+                continue;
+            }
+
+            var match = RequirementHeading.Match(line);
+
+            if (inModified && match.Success)
+            {
+                names.Add(match.Groups["name"].Value);
+            }
+        }
+
+        return names;
+    }
+
+    /// <summary>Lines without their line endings, so CRLF and LF read the same.</summary>
+    private static IEnumerable<string> Lines(string text)
+        => text.Split('\n').Select(l => l.TrimEnd('\r'));
+
+    private static HashSet<string> HeadingsOf(string spec)
         => RequirementHeading.Matches(spec)
             .Select(m => m.Groups["name"].Value)
             .ToHashSet(StringComparer.Ordinal);
