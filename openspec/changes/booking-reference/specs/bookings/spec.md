@@ -17,9 +17,11 @@ to be spelled out twice has failed at the one job it has.
 customer a reference which happens to read as an obscenity has a problem it cannot apologise
 its way out of, and the class is removed by construction rather than by a filter list.
 
-**The reference SHALL be unique within a site**, and that uniqueness SHALL be enforced by the
-store rather than by checking before writing — a check followed by a write is a race, and two
-bookings sharing a reference makes both unquotable.
+**The reference SHALL be unique within a site**, and that uniqueness SHALL be **guaranteed by
+the store itself** rather than rest on a check performed beforehand — a check followed by a
+write is a race, and two bookings sharing a reference makes both unquotable. A store MAY also
+check first so that a collision can be reported and answered rather than thrown; what it MUST
+NOT do is let that check be the thing uniqueness depends on.
 
 **The reference SHALL be assigned when the booking is placed and SHALL never change
 thereafter** — not when a booking is confirmed, declined or cancelled, and not if the booking's

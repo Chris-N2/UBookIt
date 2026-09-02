@@ -137,6 +137,35 @@ public class BookingManagementStoreTests(SqlServerFixture fixture)
     }
 
     [Fact]
+    public async Task The_projected_row_carries_the_bookings_own_reference()
+    {
+        // Against the REAL store and a real column. The controller-level test uses a fake
+        // port, so it cannot see what this projection does — and substituting a constant here
+        // made every booking in an operator's list report the same reference while passing
+        // all 1791 tests. Every row identical is the one failure a reference cannot survive,
+        // because matching a caller against the list is the entire job.
+        fixture.EnsureAvailable();
+
+        var resourceId = await Seed.EveryDayRoomAsync(fixture, Ct);
+        var start = new DateTimeOffset(2026, 11, 3, 9, 0, 0, TimeSpan.Zero);
+        var reference = BookingReference.FromCanonical("QF7M3XKB");
+
+        var booking = Seed.ConfirmedBooking(resourceId, start, TimeSpan.FromHours(1), reference: reference);
+
+        await using (var context = fixture.CreateContext())
+        {
+            Assert.True((await new SqlBookingStore(context).PlaceAsync(booking, Ct)).Succeeded);
+        }
+
+        var page = await ListAsync(Query(
+            start.AddHours(-1), start.AddHours(2), ResourceIds: [resourceId]));
+
+        var row = Assert.Single(page.Items);
+
+        Assert.Equal(reference, row.Reference);
+    }
+
+    [Fact]
     public async Task Matches_by_overlap_not_containment()
     {
         fixture.EnsureAvailable();

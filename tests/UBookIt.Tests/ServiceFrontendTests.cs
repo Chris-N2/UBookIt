@@ -132,6 +132,12 @@ public class ServiceFrontendTests
         Assert.Equal(2, confirmation.ResourceNames.Count);
         Assert.Contains("Treatment Room", confirmation.ResourceNames);
         Assert.Contains("Jane", confirmation.ResourceNames);
+
+        // The model carries THIS booking's reference. The rendering suite proves the view
+        // prints Model.Reference rather than the Guid; it renders a fixture and so can say
+        // nothing about whether the model was filled from the booking. Substituting a constant
+        // here — every visitor on both flows shown the same reference — passed 1791 tests.
+        Assert.Equal(placed.Value.Reference.Display, confirmation.Reference);
     }
 
     [Fact]

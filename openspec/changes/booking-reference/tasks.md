@@ -58,8 +58,12 @@
 
   **Test the collision path by supplying a generator that returns a known duplicate** — the port
   exists partly so this is testable rather than theoretical.
-- [x] 2.3 **Backfill existing bookings** (design D5), not deletion. Settle at apply whether the
-  backfill is set-based or batched, and say which and why.
+- [x] 2.3 **Backfill existing bookings** (design D5), not deletion. **Set-based**, and here is
+  the why the task asked for and the first pass did not give: one `UPDATE … WHERE Reference IS
+  NULL`, then the de-duplication loop, then the constraint. Batching would buy nothing — it runs
+  once, inside a migration a site is already waiting on at startup, and a booking table large
+  enough to need chunking has a worse problem than this statement. Measured at 500 rows against
+  a real install and 2000 in QA's own database; both immediate.
 - [x] 2.4 Migration is additive, per CLAUDE.md. No existing value is read or overwritten.
 - [x] 2.5 **The backfill run against a real database with real rows**, which no automated test
   covers — every unit and integration test creates the column on an empty table.
@@ -155,4 +159,54 @@
   standing constraint from the composite-resources exploration, recorded because the failure
   mode is closing that door in prose without noticing. This change does not touch claims, so
   the risk is only in careless wording.
-- [ ] 5.6 Hand to `qa-review` in a **fresh context or subagent**.
+- [x] 5.6 Hand to `qa-review` in a **fresh context or subagent**. Two rounds, both REJECT.
+
+## 6. QA round 1
+
+- [x] 6.1 **CRITICAL, and self-inflicted.** I ran `git add -A` while the QA subagent was
+  mid-mutation and committed its in-flight edit — a vowel into the reference alphabet — into
+  `4677b01`. Invisible to `git status` because the edit preserved byte length and defeated
+  git's stat cache. Amended; verified against `HEAD` rather than the working tree, which is the
+  check that would have caught it. Two rules recorded: never stage broadly while an agent is
+  running, and a commit touching source is not finished until the tests have run again.
+- [x] 6.2 **MAJOR — the reference *value* was unguarded on three surfaces.** Substituting a
+  constant passed 1786/1786. Guards added comparing against the reference the store or port
+  actually holds.
+- [x] 6.3 **MAJOR — the backoffice list cell was unguarded at every layer.** Deleting it left
+  seven headers over six cells and passed all 116 client tests. Source-level guard added, with
+  its limits stated: there is no DOM environment, so this is a stand-in.
+- [x] 6.4 **MINORs** — design D3 described catching a unique violation and returning a domain
+  failure when the code pre-checks and throws; the factory's own doc comment and task 1.3 still
+  carried the determinism claim D2 had already retracted; task 5.3 diffed two MODIFIED
+  requirements when there are three; the proposal named one breaking change when there are four.
+  All corrected. **Every one of these is the same fault**: prose that stopped being true and was
+  not swept.
+
+## 7. QA round 2
+
+- [x] 7.1 **MAJOR — I fixed three projections because round 1 named three. There were six.**
+  The three left unguarded were the SQL read port, and *both* confirmation model builders — the
+  confirmation being the surface this entire change exists for. A constant substituted into any
+  of them passed 1791/1791.
+
+  **The lesson, which is the useful part: when a finding enumerates instances, the count is a
+  sample, not the population.** The right response to "these three are unguarded" was to sweep
+  for every site that projects a reference and check each, which takes one grep. Done now:
+  `grep -rn "\.Reference" src` finds six, all six are guarded, and the constant mutation
+  fails six tests across three suites.
+- [x] 7.2 **MAJOR — no `persistence` delta.** `persistence/spec.md` enumerates the schema
+  exhaustively and the enumeration no longer matched: no `Reference` column, no unique index.
+  The precedent was exact and in-repo — ⑰ shipped a `persistence` MODIFIED requirement for the
+  same reason — and task 5.4's sweep never looked at `persistence`. Delta added, every
+  guarantee restated, plus a scenario for storage-level uniqueness.
+- [x] 7.3 **MINOR — `booking-management`'s endpoint enumeration** listed the response payload in
+  a second place the delta had not touched. Extended, with the canonical-form rule stated where
+  a client will read it.
+- [x] 7.4 **MINORs from round 1's own fixes** — design Risks still promised "a real domain
+  failure" eighty lines below D3's retraction of exactly that phrase; task 2.3 was ticked while
+  still asking a question it never answered; the `bookings` delta — the artifact that gets
+  archived — said uniqueness is enforced "rather than by checking before writing" while the
+  store checks before writing. All three corrected, the last by separating the guarantee from
+  the report rather than by deleting the sentence.
+- [x] 7.5 **NITs** — the three answered Open Questions marked answered; the count guard's
+  spanning-row blind spot documented in the test that has it.

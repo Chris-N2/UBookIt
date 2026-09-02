@@ -46,6 +46,12 @@ public class BookingsViewReferenceTests
 
         Assert.True(headers > 0, "No header cells found — the template has moved and this guard is measuring nothing.");
         Assert.Equal(headers, cells);
+
+        // Known limit, stated rather than discovered later: an empty-state or loading row
+        // carrying a spanning cell would rebalance this arithmetic and let a deleted column
+        // through. The guard is a stand-in until a DOM environment exists and can render the
+        // element; if a spanning row is added, this needs to count per-row rather than
+        // per-file, and the assertion above is what should force that conversation.
     }
 
     private static int Occurrences(string haystack, string needle)

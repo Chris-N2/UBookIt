@@ -55,3 +55,48 @@ cancel endpoint in this same capability reaches the domain, never this port.
 The narrowing is to what the scenario was always guarding — that adding a read port changes
 nothing — and the guarantee it protected is now carried explicitly by the read-only SHALL
 above, which is stronger than an aside in a scenario's THEN.*
+
+### Requirement: Bookings are readable over an authorized management endpoint
+The package SHALL expose the read port over an HTTP endpoint in the Management API, protected
+by the backoffice authorization the section already requires. **Domain types SHALL NOT appear
+in the HTTP contract**, on the same terms as the resource and service endpoints.
+
+The response SHALL carry, per booking, exactly what the read port supplies: the booking's
+identity, **its quotable reference**, its interval and the time zone it was made in, its
+status, when it was created, the booker's name and email, each claimed resource's id and name,
+and **the service it was placed for, or null**. It SHALL report the unpaged total alongside the
+page, so a caller can render a pager.
+
+**The reference SHALL cross the boundary in canonical form.** How it is grouped for reading is
+the client's decision, and a client that searches or compares needs the value exactly as it is
+stored — the same reasoning that keeps widgets out of every other contract this package
+publishes.
+
+**The service SHALL cross the boundary as a single nullable object carrying both id and
+name**, rather than as two parallel nullable fields. "A booking has a service, or it does
+not" is then expressed in the shape, rather than as a rule that two fields must be null
+together — which a client can observe violated and has no way to interpret.
+
+**No field SHALL be added at the HTTP layer that the read port cannot supply.** A field the
+port does not carry is one the screen must obtain another way, which is how a second read
+path into bookings begins.
+
+#### Scenario: A page of bookings is returned with its total
+- **WHEN** an authorized caller requests bookings for a window
+- **THEN** the matching page is returned with the unpaged total, each booking carrying its reference, interval, time zone, status, creation time, booker name and email, its resources with their names, and its service where it has one
+
+#### Scenario: A directly placed booking carries a null service
+- **WHEN** a returned booking was placed directly
+- **THEN** its service member is null, rather than an object with empty or placeholder values
+
+#### Scenario: The endpoint is not anonymous
+- **WHEN** the endpoint is called without backoffice authentication
+- **THEN** the response is 401 and no handler logic executes
+
+#### Scenario: No domain type crosses the HTTP boundary
+- **WHEN** the endpoint's request and response models are inspected
+- **THEN** they are purpose-built models, and no domain or store type appears in the contract
+
+#### Scenario: The reference crosses the boundary unformatted
+- **WHEN** a booking's reference is returned by the endpoint
+- **THEN** it is the canonical stored value, leaving the client to group it for display

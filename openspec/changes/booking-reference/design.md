@@ -158,23 +158,28 @@ dependency is on something written down rather than on an implementation detail.
   Deliberate, and taken now precisely because the window closes at 1.0.
 - **Two identifiers to keep straight.** → D4. Named clearly, documented, and the Guid stays the
   one machines use so the split follows an obvious line.
-- **A generator is a new failure mode.** → Bounded retry with a real domain failure, and the
-  seam is a port so the failure is testable rather than theoretical.
+- **A generator is a new failure mode.** → Bounded retry, then a **throw** — see D3, which
+  corrects this entry's original "a real domain failure". The seam is a port so both the retry
+  and the exhaustion are testable rather than theoretical.
 - **The backfill runs against live data.** → Additive column plus generated values; no existing
-  value is read or overwritten. Still to be settled at apply: whether the backfill is a single
-  set-based statement or a batched one, which depends on how large a real site's booking table
-  is expected to get.
+  value is read or overwritten. **Settled at apply: set-based** — one `UPDATE … WHERE Reference
+  IS NULL`, then a de-duplication loop, then the constraint. Batching would buy nothing a
+  booking table will ever need: this runs once, inside the migration transaction a site is
+  already waiting on at startup, and a table large enough to justify chunking would have a
+  worse problem than this statement. Measured at 500 rows on a real install and 2000 in QA's
+  own database; both immediate.
 
-## Open Questions
+## Open Questions — all answered at apply
 
-- **Does the delivery API response gain the reference?** A headless consumer building its own
-  confirmation screen needs it, and the argument for adding it is the same as for the Razor
-  view. Not scoped here because it widens the change into `delivery-api`; worth settling before
-  apply rather than during.
-- **Should the reference be shown anywhere other than the confirmation and the backoffice
-  list** — the pending/unavailable views, for instance? Probably not, since nothing exists to
-  reference until a booking does, but worth a deliberate look at the shipped views rather than
-  an assumption.
-- **Is `BK-` or any prefix wanted?** It aids recognition in an inbox and costs three
-  characters. Deliberately left open: it is a display concern under D1's canonical/display
-  split, so it can be decided late without a migration.
+- ~~**Does the delivery API response gain the reference?**~~ **Yes** (task 0.1). Both placement
+  responses returned only a Guid, so a headless consumer's confirmation screen had the identical
+  defect this change exists to fix. Widened the change with a `delivery-api` delta.
+- ~~**Should the reference be shown anywhere other than the confirmation and the backoffice
+  list?**~~ **Looked, and found one** (task 3.3). `ServiceConfirmation.cshtml` carried the same
+  `<dt>Reference</dt>` over a Guid. No other shipped view identifies a booking to a person —
+  the pending and unavailable views describe a booking that does not exist yet.
+- ~~**Is `BK-` or any prefix wanted?**~~ **No** (task 0.2, confirmed by Chris). Three characters
+  on every reference for recognition value that only pays off in an inbox, and emails are not in
+  this change. Still reversible without a migration — but note `B` and `K` are both in the
+  alphabet, so a prefix would have to be stripped explicitly by `TryParse`; the display-parse
+  round-trip test would catch anyone who forgot.
