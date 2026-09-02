@@ -28,16 +28,26 @@ public class ChangeDeltaIntegrityTests
         new(@"^###\s+Requirement:\s*(?<name>.+?)\s*$", RegexOptions.Multiline);
 
     /// <summary>
-    /// The section kinds OpenSpec understands. A requirement under anything else is orphaned:
-    /// it will not sync as its author intended, and no guard here can see it.
+    /// The section headings OpenSpec understands, matched <b>exactly</b> after trimming.
     /// </summary>
-    private static readonly string[] SectionKinds = ["ADDED", "MODIFIED", "REMOVED", "RENAMED"];
+    /// <remarks>
+    /// Exact, not <c>Contains</c>, and in both directions. <c>Contains("MODIFIED")</c> accepted
+    /// <c>## Notes about MODIFIED Requirements</c> as a real section, and matching only
+    /// <c>"## "</c>-prefixed lines meant <c>##MODIFIED Requirements</c> and an indented
+    /// <c>  ## MODIFIED Requirements</c> were not seen as sections at all — so every
+    /// requirement beneath them silently inherited the section above, which in a mixed delta is
+    /// <c>ADDED Requirements</c>. Both were measured passing every test in this file while
+    /// OpenSpec itself reclassified three wholesale replacements as ADDED.
+    /// </remarks>
+    private static readonly string[] SectionHeadings =
+        ["ADDED Requirements", "MODIFIED Requirements", "REMOVED Requirements", "RENAMED Requirements"];
 
     /// <summary>An active change's delta: which capability, what it modifies, and what is orphaned.</summary>
     private sealed record Delta(
         string Change,
         string Capability,
         IReadOnlyList<string> Modified,
+        IReadOnlyList<string> Added,
         IReadOnlyList<string> Sections,
         IReadOnlyList<string> Unattributed,
         bool HasTasks);
@@ -66,6 +76,46 @@ public class ChangeDeltaIntegrityTests
                     $"{delta.Change}/{delta.Capability} modifies \"{name}\", which is not a requirement in "
                     + $"openspec/specs/{delta.Capability}/spec.md. It would sync as a new requirement beside "
                     + "the one it meant to replace.");
+            }
+        }
+    }
+
+    [Fact]
+    public void No_added_requirement_already_exists_upstream()
+    {
+        // This guards the CONSEQUENCE rather than the spelling, which is why it survives the
+        // input shapes that defeated three previous versions of the guard below.
+        //
+        // A malformed section heading — "##MODIFIED" without a space, an indented one — does
+        // not make OpenSpec fail. It makes OpenSpec read every requirement beneath it as
+        // ADDED. Measured: with one such heading, three wholesale replacements came back from
+        // `openspec show --json` as "operation": "ADDED", and every gate in this repository
+        // stayed green. At sync they would have landed BESIDE the requirements they meant to
+        // replace, leaving two requirements per subject making overlapping claims.
+        //
+        // An ADDED requirement whose heading already exists upstream is that mistake, whatever
+        // caused it — a malformed heading, a copied section, or an author who meant MODIFIED
+        // and wrote ADDED. It needs no knowledge of markdown to detect.
+        foreach (var delta in ActiveDeltas())
+        {
+            var upstream = Path.Combine(RepoFiles.Root, "openspec", "specs", delta.Capability, "spec.md");
+
+            if (!File.Exists(upstream))
+            {
+                continue;
+            }
+
+            var headings = HeadingsOf(File.ReadAllText(upstream));
+
+            foreach (var name in delta.Added)
+            {
+                Assert.False(
+                    headings.Contains(name),
+                    $"{delta.Change}/{delta.Capability} ADDS \"{name}\", which already exists in "
+                    + $"openspec/specs/{delta.Capability}/spec.md. Syncing would leave two requirements of "
+                    + "that name making overlapping claims. If it was meant to be modified, check the "
+                    + "section heading is exactly \"## MODIFIED Requirements\" — a malformed one is read as "
+                    + "ADDED rather than rejected.");
             }
         }
     }
@@ -203,7 +253,8 @@ public class ChangeDeltaIntegrityTests
                 deltas.Add(new Delta(
                     Path.GetFileName(changeDir),
                     Path.GetFileName(capabilityDir),
-                    ModifiedIn(text),
+                    RequirementsUnder(text, "MODIFIED Requirements"),
+                    RequirementsUnder(text, "ADDED Requirements"),
                     SectionsIn(text),
                     UnattributedIn(text),
                     hasTasks));
@@ -213,66 +264,102 @@ public class ChangeDeltaIntegrityTests
         return deltas;
     }
 
-    /// <summary>Every <c>## </c> section heading, so an unrecognised one can be named in a failure.</summary>
+    /// <summary>
+    /// Walks a delta, yielding each requirement heading with the section it actually sits
+    /// under. <c>null</c> means "a section this guard does not recognise", including none.
+    /// </summary>
+    /// <remarks>
+    /// <b>Any line whose trimmed form starts with <c>##</c> is a boundary</b>, whatever its
+    /// spacing or indentation. That is the whole point: a near-miss heading must END the
+    /// previous section rather than be invisible and let its requirements inherit it. Failing
+    /// closed turns a malformed heading into a named failure; the previous version turned it
+    /// into a silent reattribution, twice.
+    /// <para>
+    /// Fenced code blocks are skipped, so a <c>##</c> or <c>### Requirement:</c> inside an
+    /// example cannot move a section boundary or invent a requirement.
+    /// </para>
+    /// </remarks>
+    private static IEnumerable<(string? Section, string Requirement)> RequirementsIn(string delta)
+    {
+        string? section = null;
+        var fenced = false;
+
+        foreach (var line in Lines(delta))
+        {
+            var trimmed = line.Trim();
+
+            if (trimmed.StartsWith("```", StringComparison.Ordinal))
+            {
+                fenced = !fenced;
+                continue;
+            }
+
+            if (fenced)
+            {
+                continue;
+            }
+
+            if (trimmed.StartsWith("##", StringComparison.Ordinal)
+                && !trimmed.StartsWith("###", StringComparison.Ordinal))
+            {
+                // Matched against the RAW line, not the trimmed one, because OpenSpec's parser
+                // is exactly this strict: `##MODIFIED Requirements` and an indented
+                // `  ## MODIFIED Requirements` are not sections to it — it reads every
+                // requirement beneath them as ADDED. Trimming first made this guard MORE
+                // permissive than the tool, which is disagreement in the other direction and
+                // just as useless: it called both headings valid while OpenSpec was quietly
+                // reclassifying three wholesale replacements.
+                //
+                // So anything that ATTEMPTS a heading and is not exactly `## <Kind>
+                // Requirements` clears the section instead of being ignored. A near-miss must
+                // orphan what follows it, loudly, rather than let it inherit the section above.
+                //
+                // Where the line is drawn was MEASURED against `openspec show --json`, not
+                // reasoned about. For `bookings` (one ADDED requirement, three MODIFIED):
+                //
+                //   ## MODIFIED Requirements     -> ADDED, MODIFIED, MODIFIED, MODIFIED
+                //   ##  MODIFIED Requirements    -> ADDED, MODIFIED, MODIFIED, MODIFIED   (accepted)
+                //   ##MODIFIED Requirements      -> ADDED, ADDED, ADDED, ADDED            (rejected)
+                //
+                // So two spaces is a real heading and this guard must accept it; no space is
+                // not, and this guard must reject it. Anything looser or stricter than that is
+                // a disagreement with the tool that performs the sync, and a disagreement in
+                // either direction is a hole.
+                section = line.StartsWith("## ", StringComparison.Ordinal)
+                          && SectionHeadings.Contains(line[3..].Trim(), StringComparer.Ordinal)
+                    ? line[3..].Trim()
+                    : null;
+
+                continue;
+            }
+
+            var match = RequirementHeading.Match(trimmed);
+
+            if (match.Success)
+            {
+                yield return (section, match.Groups["name"].Value);
+            }
+        }
+    }
+
+    /// <summary>Every <c>## </c> section heading, so a failure can name what was actually there.</summary>
     private static IReadOnlyList<string> SectionsIn(string delta)
         => Lines(delta)
-            .Where(l => l.StartsWith("## ", StringComparison.Ordinal))
-            .Select(l => l[3..].Trim())
+            .Select(l => l.Trim())
+            .Where(l => l.StartsWith("##", StringComparison.Ordinal)
+                        && !l.StartsWith("###", StringComparison.Ordinal))
+            .Select(l => l.TrimStart('#').Trim())
             .ToList();
 
-    /// <summary>
-    /// Requirement headings sitting under a section whose kind OpenSpec does not recognise —
-    /// including the case of no section at all. Each is reported as
-    /// <c>"&lt;section&gt;" / &lt;requirement&gt;</c> so a failure names both.
-    /// </summary>
+    private static IReadOnlyList<string> RequirementsUnder(string delta, string heading)
+        => RequirementsIn(delta).Where(r => r.Section == heading).Select(r => r.Requirement).ToList();
+
+    /// <summary>Requirement headings sitting under no section this guard recognises.</summary>
     private static IReadOnlyList<string> UnattributedIn(string delta)
-    {
-        var orphans = new List<string>();
-        var section = "(no section)";
-
-        foreach (var line in Lines(delta))
-        {
-            if (line.StartsWith("## ", StringComparison.Ordinal))
-            {
-                section = line[3..].Trim();
-                continue;
-            }
-
-            var match = RequirementHeading.Match(line);
-
-            if (match.Success && !SectionKinds.Any(k => section.Contains(k, StringComparison.Ordinal)))
-            {
-                orphans.Add($"\"{section}\" / {match.Groups["name"].Value}");
-            }
-        }
-
-        return orphans;
-    }
-
-    /// <summary>Requirement headings that fall under a <c>## MODIFIED Requirements</c> section.</summary>
-    private static IReadOnlyList<string> ModifiedIn(string delta)
-    {
-        var names = new List<string>();
-        var inModified = false;
-
-        foreach (var line in Lines(delta))
-        {
-            if (line.StartsWith("## ", StringComparison.Ordinal))
-            {
-                inModified = line.Contains("MODIFIED", StringComparison.Ordinal);
-                continue;
-            }
-
-            var match = RequirementHeading.Match(line);
-
-            if (inModified && match.Success)
-            {
-                names.Add(match.Groups["name"].Value);
-            }
-        }
-
-        return names;
-    }
+        => RequirementsIn(delta)
+            .Where(r => r.Section is null)
+            .Select(r => $"(no recognised section) / {r.Requirement}")
+            .ToList();
 
     /// <summary>Lines without their line endings, so CRLF and LF read the same.</summary>
     private static IEnumerable<string> Lines(string text)

@@ -35,10 +35,16 @@ cancelled — so being told at all means it happened.
 
 ### What a booking carries
 
-Whatever you need to write your own message: the id, the interval and the time zone it was
-booked in, the status, when it was created, the booker's name and email, each claimed
-resource's id, and the service it was placed for — or nothing, if it was booked directly
-against a resource.
+Whatever you need to write your own message: the id, **the reference**, the interval and the
+time zone it was booked in, the status, when it was created, the booker's name and email, each
+claimed resource's id, and the service it was placed for — or nothing, if it was booked
+directly against a resource.
+
+**The reference is the one to put in your email.** It is what the person who booked was shown
+on their confirmation, and what they will quote back to you — short, unambiguous when read
+aloud, and stable for the life of the booking. `booking.Reference.Display` groups it for
+reading (`7QX4-M2NP`); `booking.Reference.Value` is the canonical form to store or search by.
+The id is a `Guid` and belongs in your own records, not in a subject line.
 
 ## Subscribing
 

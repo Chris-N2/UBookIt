@@ -490,3 +490,47 @@ The feature code is clean. Both MAJORs are guards that did not observe what they
   `Client/node_modules/*/bin` and destroys the npm binstubs, producing a misleading "cannot find
   module typescript/bin/tsc". It cost the reviewer four build cycles. The sweep used in this
   change prunes `node_modules` explicitly; anyone writing a fresh one should.
+
+## 12. QA round 7
+
+Feature code clean again. Round 6's index guard verified genuine by an independent single
+mutation. Three findings, two of them mine from round 6.
+
+- [x] 12.1 **MAJOR — the guard was vacuous a FIFTH time**, on `##MODIFIED Requirements` (no
+  space) and an indented `  ## MODIFIED Requirements`. Both parsers recognised a section only
+  via `StartsWith("## ")`, so a near-miss was not a boundary at all and everything beneath it
+  **inherited the previous section** — which in a mixed delta is `ADDED Requirements`, and
+  therefore recognised. The exemption round 6 rejected over came back through a different door.
+
+  And it is not cosmetic. QA asked OpenSpec itself: with `##MODIFIED`, all four `bookings`
+  requirements come back from `openspec show --json` as `"operation": "ADDED"` — three
+  wholesale replacements that would sync **beside** the requirements they replace, with every
+  gate green.
+
+  Two fixes, because the mechanism and the consequence both needed one:
+  - **Fail closed.** Any line attempting a heading that is not exactly `## <Kind> Requirements`
+    now *clears* the section rather than being ignored, so a near-miss orphans what follows it
+    loudly. **Where that line falls was measured against `openspec show --json`, not reasoned
+    about**: two spaces (`##  MODIFIED`) is a real heading to OpenSpec and must be accepted; no
+    space is not and must be rejected. My first attempt trimmed before matching and was
+    therefore *more* permissive than the tool — disagreement in the other direction, and just
+    as useless.
+  - **`No_added_requirement_already_exists_upstream`** guards the consequence instead of the
+    spelling: an ADDED requirement whose heading already exists upstream is the mistake,
+    whatever caused it, and detecting it needs no knowledge of markdown at all. This is the
+    assertion that survives input shapes nobody thought to try.
+
+  Probed against seven heading shapes on a **mixed** delta, which is where the previous two
+  versions were blind. All seven now agree with OpenSpec.
+- [x] 12.2 **MAJOR — `docs/notifications.md` enumerated what a booking carries and omitted the
+  reference**, while this change's own proposal says subscribers get it for free. Its reader is
+  the person writing the confirmation email — the *first* of the three motivations in **Why** —
+  and the package's own documentation told them it was not there. Task 5.4's sweep named
+  `booking-page.md` and `backoffice.md` and stopped.
+- [x] 12.3 **MINOR — the twin placement scenarios were treated asymmetrically.** *Booking
+  placement*'s success scenario gained "its reference"; *Service booking placement*'s, in the
+  same delta and the same pass, did not. Identical to the fault 8.6 fixed for
+  `default-frontend`, one capability over. Fixed.
+- [x] 12.4 **NIT — fenced code blocks** are now skipped by the parser, so a `##` or
+  `### Requirement:` inside an example cannot move a boundary or invent a requirement. Latent
+  today; no active delta contains one.

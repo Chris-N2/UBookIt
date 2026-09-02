@@ -92,7 +92,7 @@ The existing `POST /bookings` endpoint SHALL remain unchanged in route, request 
 
 #### Scenario: Valid service placement succeeds
 - **WHEN** a valid service placement is posted for a start and length taken from the service availability response
-- **THEN** the response carries the new booking id, a `Confirmed` status, the resolved resources, and the booked interval
+- **THEN** the response carries the new booking id, its reference, a `Confirmed` status, the resolved resources, and the booked interval
 
 #### Scenario: The resolved resources are reported
 - **WHEN** a service requiring a `room` and a `therapist` is placed
