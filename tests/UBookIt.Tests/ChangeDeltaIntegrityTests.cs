@@ -146,11 +146,20 @@ public class ChangeDeltaIntegrityTests
         {
             var tasks = File.ReadAllText(Path.Combine(RepoFiles.Root, ChangesRoot, delta.Change, "tasks.md"));
 
-            foreach (var name in delta.Modified)
+            // Retire-and-re-add is a wholesale replacement too — it deletes whatever it forgets
+            // to restate, exactly as MODIFIED does — so it must be listed for the same reason.
+            // Before this it escaped: the name landed in Added and Retired, never in Modified,
+            // so the one guard whose purpose is to force a re-diff never saw it. Round 8's
+            // exemption made that silent where it had at least failed loudly before.
+            var replacements = delta.Modified
+                .Concat(delta.Added.Where(n => delta.Retired.Contains(n, StringComparer.Ordinal)))
+                .Distinct(StringComparer.Ordinal);
+
+            foreach (var name in replacements)
             {
                 Assert.True(
                     tasks.Contains(name, StringComparison.Ordinal),
-                    $"{delta.Change} modifies \"{name}\" ({delta.Capability}) but never names it in tasks.md. "
+                    $"{delta.Change} replaces \"{name}\" ({delta.Capability}) but never names it in tasks.md. "
                     + "A wholesale replacement nobody lists is a wholesale replacement nobody diffs.");
             }
         }
@@ -283,11 +292,16 @@ public class ChangeDeltaIntegrityTests
     /// under. <c>null</c> means "a section this guard does not recognise", including none.
     /// </summary>
     /// <remarks>
-    /// <b>Any line whose trimmed form starts with <c>##</c> is a boundary</b>, whatever its
-    /// spacing or indentation. That is the whole point: a near-miss heading must END the
+    /// <b>Any line that attempts a <c>##</c> heading is a boundary</b> — but only one at column
+    /// zero can BE a section, because that is what OpenSpec accepts. A near-miss must END the
     /// previous section rather than be invisible and let its requirements inherit it. Failing
-    /// closed turns a malformed heading into a named failure; the previous version turned it
-    /// into a silent reattribution, twice.
+    /// closed turns a malformed heading into a named failure; earlier versions turned it into a
+    /// silent reattribution, twice.
+    /// <para>
+    /// This remark said "whatever its spacing or indentation" until round 9, describing round
+    /// 7's rule after round 8 had replaced it — a stale claim about a guard, in the file whose
+    /// subject is guards claiming the wrong thing.
+    /// </para>
     /// <para>
     /// Fenced code blocks are skipped, so a <c>##</c> or <c>### Requirement:</c> inside an
     /// example cannot move a section boundary or invent a requirement.
@@ -301,10 +315,15 @@ public class ChangeDeltaIntegrityTests
         foreach (var line in Lines(delta))
         {
             var trimmed = line.Trim();
-            var indent = line.Length - line.TrimStart(' ').Length;
+            var indent = line.Length - line.TrimStart(' ', '	').Length;
 
             // Four or more leading spaces is an indented code block to CommonMark, and OpenSpec
             // ignores it. Skipped before anything else so an example cannot move a boundary.
+            //
+            // Tabs count as indentation. Measuring only spaces made `	## MODIFIED Requirements`
+            // read as column zero here while OpenSpec returned the requirement below it as
+            // ADDED — the same divergence class, surviving one more round because nobody had
+            // tried a tab.
             if (indent >= 4)
             {
                 continue;

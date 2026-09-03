@@ -68,8 +68,19 @@ public class BookingsViewReferenceTests
 
         Assert.True(firstHeader > 0 && firstCell > 0, "The table markup has moved; this guard is measuring nothing.");
 
-        var headerText = source[firstHeader..source.IndexOf("</uui-table-head-cell>", firstHeader, StringComparison.Ordinal)];
-        var cellText = source[firstCell..source.IndexOf("</uui-table-cell>", firstCell, StringComparison.Ordinal)];
+        // Guarded, because a self-closing `<uui-table-head-cell … />` has no closing tag and the
+        // slice would throw ArgumentOutOfRange — fail-closed, but with a diagnostic pointing at
+        // the wrong thing.
+        var headerEnd = source.IndexOf("</uui-table-head-cell>", firstHeader, StringComparison.Ordinal);
+        var cellEnd = source.IndexOf("</uui-table-cell>", firstCell, StringComparison.Ordinal);
+
+        Assert.True(
+            headerEnd > firstHeader && cellEnd > firstCell,
+            "The first header or body cell has no closing tag — the markup shape has changed and this "
+            + "guard can no longer tell which column is first.");
+
+        var headerText = source[firstHeader..headerEnd];
+        var cellText = source[firstCell..cellEnd];
 
         Assert.Contains("\"reference\"", headerText, StringComparison.Ordinal);
         Assert.Contains("bookingReference(booking)", cellText, StringComparison.Ordinal);

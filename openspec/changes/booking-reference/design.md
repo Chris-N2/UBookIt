@@ -34,6 +34,13 @@ and accepted on input in any case with separators and whitespace stripped.
 system that emails a customer a reference which happens to be an obscenity is a story you only
 get to have once. Removing vowels removes the entire class, and it costs almost nothing.
 
+**And `Y` is a vowel** — the decision QA round 8 turned on. This alphabet omitted `AEIOU` and
+kept `Y`, which carries *myth*, *gym* and *crypt* and is the substitution used to write
+offensive words wherever vowels are filtered; the 500-row backfill sample included `G3Y3CNTF`.
+Omitting five letters satisfied a rule about five letters while leaving the sentence above
+false. English words need a vowel, so an alphabet with none — `Y` included — is what actually
+delivers it.
+
 **Why no `0`, `1`, `L`, `O`, `I`, `U`:** the first four are the classic transcription
 confusions, `O` and `I` go with the vowels anyway, and `U` is dropped so that dictating a
 reference over the phone has no homophone traps. What remains is unambiguous spoken, written

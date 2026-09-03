@@ -19,7 +19,10 @@
 - [x] 1.1 A `BookingReference` value object: canonical form (uppercase, no separator),
   a parse that accepts any case with separators and whitespace stripped, equality that is
   case-insensitive, and a display form grouped `XXXX-XXXX`.
-- [x] 1.2 The alphabet is `BCDFGHJKMNPQRSTVWXYZ23456789`, 8 symbols long (design D1). **Assert
+- [x] 1.2 The alphabet is `BCDFGHJKMNPQRSTVWXZ23456789` — 27 symbols — and a reference is 8 of
+  them (design D1). ~~`BCDFGHJKMNPQRSTVWXYZ23456789`~~: `Y` was removed at round 8 because it is
+  a vowel, and this line was the last live sentence in the repository still naming the old
+  alphabet — found by QA after my own sweep of nineteen other claims missed it. **Assert
   the properties, not the constant**: that no vowel is present, that none of `0 1 L O I U`
   is, and that the alphabet therefore cannot spell a word. A test that restates the literal
   proves only that someone typed it twice.
@@ -51,7 +54,7 @@
     **pre-checks inside the placement transaction** and returns `ReferenceTaken`. The index
     remains the guarantee; the check is what makes the ordinary case reportable. The residue,
     stated rather than hidden: a genuine race loses to the index and surfaces as a
-    `DbUpdateException` — a 500 for that booker — instead of being retried. At 28^8 with the
+    `DbUpdateException` — a 500 for that booker — instead of being retried. At 27^8 with the
     pre-check in front of it, that is not a scenario anyone will meet, and the alternative
     (parsing SQL error numbers and index names to tell one violation from another) is a
     fragility with a worse failure mode.
@@ -87,8 +90,13 @@
   that `NEWID()` re-evaluates per occurrence and not once per row.** Had it evaluated once, every
   reference would have been the same symbol eight times over — `GGGGGGGG` — and 500 rows would
   have collapsed to a handful of distinct values, or hung in the de-duplication loop. Samples:
-  `G3Y3CNTF`, `X8K9PM4Q`, `6N83HNVY`, `KG2H9JFX`. Eight independent symbols, no vowels, nothing
-  from `0 1 L O I U`.
+  `G3Y3CNTF`, `X8K9PM4Q`, `6N83HNVY`, `KG2H9JFX`. Eight independent symbols — which is what this
+  measurement was for.
+
+  **Two of those samples contain `Y`, and by this change's own definition that is a vowel.** They
+  are from the pre-round-8 alphabet, and `G3Y3CNTF` is the sample QA later used to show that
+  removing `AEIOU` did not deliver "cannot spell a word" (13.6). Left as they were drawn, because
+  the point of a measurement is what it actually produced.
 
   Performed by hand, once. It is not a regression test and nothing here makes it one.
 
@@ -605,3 +613,44 @@ one cheap test and the guard.
   D3: the retry's bound exists because a broken *generator* would spin forever, whereas this
   loop's population strictly shrinks — each pass rewrites only the duplicates it found — so it
   terminates for the same reason the retry cannot be trusted to.
+
+## 14. QA round 9 — APPROVE WITH NITS
+
+**The bar was met**: nothing that would harm a consumer of this package, and no spec claim left
+untrue after sync. **41 of 41 spec criteria verified**, each with a located implementation and a
+covering test that fails if the code is wrong. QA independently re-measured the alphabet
+(27 symbols, no `AEIOUY`, no `0 1 L O I U`), the migration expression against real SQL Server
+(3000 rows, 3000 distinct, 27 symbols, counts 849–960 against 888.9 expected, zero vowels), and
+diffed all twelve MODIFIED requirements with nothing dropped.
+
+Everything below is a nit, and all are fixed rather than deferred, because each is cheap and
+three of them are the same class this review has been about.
+
+- [x] 14.1 **The must-fix: task 1.2 still named the old alphabet, `Y` included** — the last live
+  sentence in the repository doing so, and the first place a reader looks for "what is the
+  alphabet and why". **My own sweep of nineteen claims missed it**, which is the honest
+  postscript to 13.9: catching the class on my own side once does not mean catching all of it.
+- [x] 14.2 Two more live magnitude claims corrected (`28^8` → `27^8`), and the round-2 backfill
+  samples — two of which contain `Y` — annotated rather than rewritten. They are what the
+  measurement actually produced, and `G3Y3CNTF` is the sample that later exposed the `Y`
+  decision; editing it would erase the evidence.
+- [x] 14.3 **A tab-indented heading was still fail-open.** `indent` counted spaces only, so
+  `	## MODIFIED Requirements` read as column zero here while OpenSpec returned the requirement
+  below it as ADDED. Fixed and re-measured: tool says ADDED, guard rejects, they agree.
+- [x] 14.4 **Round 8's REMOVED/RENAMED exemption opened a blind spot in the guard that matters
+  most.** Retire-and-re-add is a wholesale replacement — it deletes whatever it forgets to
+  restate — but the name landed in `Added`/`Retired` and never in `Modified`, so
+  `Every_modified_requirement_is_named_in_its_change_tasks` never saw it. **Before round 8 it
+  failed loudly; after, it passed silently.** Now folded into the naming check.
+
+  Also noted by QA and left alone: `RENAMED` can never contribute, because OpenSpec spells that
+  section as `- FROM:` list items rather than headings. Inert, not wrong — worth knowing before
+  anyone relies on it.
+- [x] 14.5 The `<remarks>` on `RequirementsIn` still described round 7's rule after round 8
+  replaced it — a stale claim about a guard, in the file whose subject is guards claiming the
+  wrong thing. Corrected.
+- [x] 14.6 The first-column guard threw `ArgumentOutOfRangeException` on a self-closing cell
+  rather than failing with its own message. Fail-closed either way, but the diagnostic pointed
+  at the wrong thing.
+- [x] 14.7 Design D1 explained why `0 1 L O I U` are excluded and never why `Y` is — the
+  decision round 8 turned on. The spec carried it; the design now does too.
