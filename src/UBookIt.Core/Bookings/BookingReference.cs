@@ -46,7 +46,7 @@ public sealed record BookingReference
 
     /// <summary>
     /// Long enough that collisions are not a practical concern for a site's bookings
-    /// (<see cref="Alphabet"/> has 28 symbols, so 28^8 ≈ 3.8 × 10^11), short enough to read in
+    /// (<see cref="Alphabet"/> has 27 symbols, so 27^8 ≈ 2.8 × 10^11), short enough to read in
     /// one breath. Uniqueness is still enforced by the store rather than assumed from this.
     /// </summary>
     public const int Length = 8;

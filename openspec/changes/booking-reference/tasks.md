@@ -587,6 +587,19 @@ one cheap test and the guard.
   integration round-trip catches a dropped *value*, the compiler catches a dropped *argument*
   at every call site, and a test asserting a parameter's optionality would be asserting a
   signature rather than a behaviour. Recorded so the gap is a decision rather than an oversight.
+- [x] 13.9 **The sweep for what MY OWN alphabet change falsified.** Removing `Y` made the
+  alphabet 27 symbols, and **nineteen live claims across code, specs, design and tests still
+  said 28** — `28^8 ≈ 3.8 × 10¹¹`, `has 28 symbols`, `random % 28`, the migration's `nchar(28)`.
+  All corrected to 27 and `2.8 × 10¹¹`. The three `% 28` references left in *this file* are
+  deliberate: they are the historical record of what the code used to do at rounds 5 and 8, and
+  rewriting history to match the present is how a change loses the reason it made a decision.
+
+  Found by sweeping my own change before handing it to QA, which is the first time in nine
+  rounds that this class was caught on my side of the fence rather than the reviewer's.
+
+  Re-measured on real SQL Server, because the previous uniformity measurement was taken against
+  `% 28` and no longer described the code: 27,000 draws, 27 distinct symbols, counts 946–1087
+  against an expected 1000, and **zero vowels including `Y`**.
 - [x] 13.8 **NIT — the migration's de-duplication `WHILE EXISTS` loop is unbounded**, which is
   the shape D3 rules out for the placement retry. The asymmetry is deliberate and now stated in
   D3: the retry's bound exists because a broken *generator* would spin forever, whereas this

@@ -28,7 +28,7 @@ public sealed class RandomBookingReferenceFactory : IBookingReferenceFactory
         for (var i = 0; i < symbols.Length; i++)
         {
             // GetInt32 rejection-samples internally, so the distribution over the alphabet is
-            // uniform. Taking `random % 28` would quietly favour the first few symbols.
+            // uniform. Taking `random % 27` would quietly favour the first few symbols.
             symbols[i] = BookingReference.Alphabet[
                 RandomNumberGenerator.GetInt32(BookingReference.Alphabet.Length)];
         }

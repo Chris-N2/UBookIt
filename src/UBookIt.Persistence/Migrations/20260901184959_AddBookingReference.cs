@@ -32,7 +32,7 @@ namespace UBookIt.Persistence.Migrations
         /// </summary>
         /// <remarks>
         /// <para>
-        /// The obvious spelling, `ABS(CHECKSUM(NEWID())) % 28`, throws: `CHECKSUM` can return
+        /// The obvious spelling, `ABS(CHECKSUM(NEWID())) % 27`, throws: `CHECKSUM` can return
         /// `-2147483648`, whose absolute value overflows a signed 32-bit integer.
         /// </para>
         /// <para>
@@ -74,7 +74,7 @@ namespace UBookIt.Persistence.Migrations
             // Fill, then resolve any collision, then constrain. The loop is not optimism about
             // randomness: a duplicate here would fail the index creation below and take the
             // whole migration — and therefore the site's boot — down with it. Collisions are
-            // vanishingly unlikely at 28^8, which is exactly why the fix must be automatic
+            // vanishingly unlikely at 27^8, which is exactly why the fix must be automatic
             // rather than something an operator is expected to diagnose at three in the
             // morning.
             migrationBuilder.Sql($"""

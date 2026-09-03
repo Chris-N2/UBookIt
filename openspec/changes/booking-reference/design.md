@@ -26,7 +26,7 @@ the conflict model.
 
 ### D1. Eight characters, no vowels, no ambiguous glyphs
 
-**Decision:** the alphabet is `BCDFGHJKMNPQRSTVWXYZ` plus `23456789` — 28 symbols. References
+**Decision:** the alphabet is `BCDFGHJKMNPQRSTVWXZ` plus `23456789` — 27 symbols. References
 are 8 symbols, stored canonical (uppercase, no separator), displayed grouped as `XXXX-XXXX`,
 and accepted on input in any case with separators and whitespace stripped.
 
@@ -39,7 +39,7 @@ confusions, `O` and `I` go with the vowels anyway, and `U` is dropped so that di
 reference over the phone has no homophone traps. What remains is unambiguous spoken, written
 and typed.
 
-**Why eight:** 28⁸ ≈ 3.8 × 10¹¹. For a single site's bookings the collision probability is
+**Why eight:** 27⁸ ≈ 2.8 × 10¹¹. For a single site's bookings the collision probability is
 negligible and the reference still reads in one breath. Grouping into two blocks of four is
 purely for the eye; the stored value has no separator, so the display format can change later
 without a migration.
@@ -56,7 +56,7 @@ guards Core's **package references**, not its purity — a different property.
 
 **The decision survives, on the half of the reasoning that holds:** a port makes the collision
 path reachable. Uniqueness is enforced by the store (D3), so the interesting behaviour is what
-happens when a generated reference is already taken — and at 28⁸ values, waiting for a real
+happens when a generated reference is already taken — and at 27⁸ values, waiting for a real
 collision is not a test strategy. A factory a test can point at a known-duplicate value is the
 only practical way to exercise it.
 
@@ -89,7 +89,7 @@ it → generate again, up to a small bounded number of attempts, then fail.
   the ordinary case reportable without parsing SQL error numbers and index names to work out
   which constraint fired. The residue is real and worth stating: a genuine race loses to the
   index and surfaces as a `DbUpdateException` — a 500 for that booker — rather than being
-  retried. With the pre-check in front of it and 28⁸ values behind it, nobody will meet that;
+  retried. With the pre-check in front of it and 27⁸ values behind it, nobody will meet that;
   the alternative is a fragile string-matching layer whose own failure mode is worse.
 - ~~"fail the placement with a domain failure"~~. Exhaustion **throws**. A `DomainResult` failure
   is for something the caller did; this is the generator being broken. Putting it in the result
@@ -113,7 +113,7 @@ duplicated, so it converges for the same reason the placement retry cannot be tr
 retry depends on an external generator that may be broken and return one value forever; the
 loop depends only on itself.
 
-The retry is a safety net, not a hot path: at 3.8 × 10¹¹ values, a site would need on the order
+The retry is a safety net, not a hot path: at 2.8 × 10¹¹ values, a site would need on the order
 of a million bookings before a collision is even worth thinking about.
 
 ### D4. The Guid stays, and this is two identifiers on purpose

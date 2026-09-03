@@ -144,7 +144,7 @@ public sealed class BookingService(
     /// How many references placement will try before concluding the generator is broken.
     /// </summary>
     /// <remarks>
-    /// Small on purpose. This is not a budget for bad luck — one collision in 28^8 is already
+    /// Small on purpose. This is not a budget for bad luck — one collision in 27^8 is already
     /// remarkable — it is the number of attempts after which "unlucky" stops being the
     /// explanation and "returning the same value" starts.
     /// </remarks>
@@ -366,7 +366,7 @@ public sealed class BookingService(
                 break;
             }
 
-            // Bounded, because an unbounded retry turns a broken generator into a hang. At 28^8
+            // Bounded, because an unbounded retry turns a broken generator into a hang. At 27^8
             // values a genuine collision is already a curiosity; several in a row is not bad
             // luck, it is a generator returning the same value — a bug, and reported as one
             // rather than as something the booker did wrong.

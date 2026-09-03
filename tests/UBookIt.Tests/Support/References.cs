@@ -29,7 +29,7 @@ public static class References
 /// <para>
 /// The reason the generation seam exists. Uniqueness is enforced by the store, so the
 /// behaviour worth testing is what placement does when a reference is already taken — and at
-/// 28^8 values, waiting for a real collision is not a test strategy. This lets a test say
+/// 27^8 values, waiting for a real collision is not a test strategy. This lets a test say
 /// "return this taken reference twice, then a fresh one" and observe the retry.
 /// </para>
 /// </summary>

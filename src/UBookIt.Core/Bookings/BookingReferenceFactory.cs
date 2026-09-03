@@ -5,7 +5,7 @@ namespace UBookIt.Core.Bookings;
 /// <para>
 /// A port rather than a static helper <b>so that the failure case is reachable</b>. Uniqueness
 /// is enforced by the store, so the behaviour worth testing is what placement does when it
-/// draws a reference that is already taken — and at 28^8 values, waiting for a real collision
+/// draws a reference that is already taken — and at 27^8 values, waiting for a real collision
 /// is not a test strategy. A test points this at a known-duplicate value instead.
 /// </para>
 /// <para>
