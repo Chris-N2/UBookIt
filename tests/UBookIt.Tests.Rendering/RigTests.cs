@@ -29,6 +29,7 @@ public class RigTests
             new ServiceConfirmationModel
             {
                 BookingId = Guid.NewGuid(),
+                Reference = "5KGT-BW9D",
                 ServiceName = "Massage",
                 ResourceNames = ["Jane"],
                 LocalStart = "Thursday 20 August 2026, 09:00",

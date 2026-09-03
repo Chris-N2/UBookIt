@@ -391,6 +391,21 @@ public sealed class PlacementResponseModel
 {
     public Guid BookingId { get; set; }
 
+    /// <summary>
+    /// The booking's quotable reference. A consumer of this API builds its own confirmation
+    /// screen, and a person reads it — returning only the opaque id would leave them showing
+    /// something nobody can quote, or inventing a reference the site's backoffice will not
+    /// recognise.
+    /// <para>
+    /// <b>Canonical form, not the grouped display form.</b> This is a data contract, and how a
+    /// reference is presented is the consumer's decision — the same reason this package
+    /// publishes view models and endpoints rather than widgets. Canonical is also what compares
+    /// and stores cleanly; a client that wants <c>XXXX-XXXX</c> can insert the separator, and a
+    /// client that wants to search with it needs it exactly as it is here.
+    /// </para>
+    /// </summary>
+    public string Reference { get; set; } = string.Empty;
+
     public string Status { get; set; } = string.Empty;
 
     public Guid ResourceId { get; set; }
@@ -408,6 +423,21 @@ public sealed class PlacementResponseModel
 public sealed class ServicePlacementResponseModel
 {
     public Guid BookingId { get; set; }
+
+    /// <summary>
+    /// The booking's quotable reference. A consumer of this API builds its own confirmation
+    /// screen, and a person reads it — returning only the opaque id would leave them showing
+    /// something nobody can quote, or inventing a reference the site's backoffice will not
+    /// recognise.
+    /// <para>
+    /// <b>Canonical form, not the grouped display form.</b> This is a data contract, and how a
+    /// reference is presented is the consumer's decision — the same reason this package
+    /// publishes view models and endpoints rather than widgets. Canonical is also what compares
+    /// and stores cleanly; a client that wants <c>XXXX-XXXX</c> can insert the separator, and a
+    /// client that wants to search with it needs it exactly as it is here.
+    /// </para>
+    /// </summary>
+    public string Reference { get; set; } = string.Empty;
 
     public string Status { get; set; } = string.Empty;
 

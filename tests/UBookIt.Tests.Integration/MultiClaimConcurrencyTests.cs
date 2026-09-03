@@ -28,6 +28,7 @@ public class MultiClaimConcurrencyTests(SqlServerFixture fixture)
     private static Booking Claiming(DateTimeOffset startUtc, TimeSpan duration, params Guid[] resourceIds)
         => Booking.Rehydrate(
             Guid.NewGuid(),
+            new RandomBookingReferenceFactory().Next(),
             BookingInterval.Create(startUtc, startUtc + duration, "UTC").Value,
             Booker.Create(null, "Integration Tester", "integration@example.com", "01234 567890").Value,
             resourceIds.Select(id => new ResourceClaim(id)),
@@ -224,6 +225,15 @@ public class MultiClaimConcurrencyTests(SqlServerFixture fixture)
                 // claim row per resource, which is the guarantee above — what changes is
                 // what the booking says about itself, never what it claims.
                 "20260829161913_AddBookingServiceAttribution",
+
+                // Bookings gain `Reference`. Checked: one column on `uBookItBooking`, added
+                // nullable, backfilled, then made NOT NULL — plus a unique index on that
+                // column, which makes this the first entry here to add an index at all.
+                // `uBookItResourceClaim` is not referenced and no claim is created, altered or
+                // removed; the backfill only writes the new column. One booking still holds
+                // one claim row per resource, which is the guarantee above. What changes is
+                // what the booking is CALLED, never what it claims.
+                "20260901184959_AddBookingReference",
             ],
             applied.OrderBy(name => name, StringComparer.Ordinal));
 

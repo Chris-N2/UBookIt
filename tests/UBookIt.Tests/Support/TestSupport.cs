@@ -227,6 +227,16 @@ public sealed class InMemoryBookingStore : IBookingStore
                     FailureCodes.Conflict, "The requested interval conflicts with an existing booking."));
             }
 
+            // Mirrors the unique index in the real store. Without it this fake would accept
+            // two bookings sharing a reference, and every test of the retry would pass here
+            // while the behaviour it claims to cover was never exercised — a fake that is
+            // more permissive than the thing it stands in for tests nothing.
+            if (_bookings.Values.Any(existing => existing.Reference == booking.Reference))
+            {
+                return Task.FromResult(DomainResult<Booking>.Failure(
+                    FailureCodes.ReferenceTaken, "That booking reference is already in use."));
+            }
+
             _bookings[booking.Id] = booking;
             return Task.FromResult(DomainResult<Booking>.Success(booking));
         }

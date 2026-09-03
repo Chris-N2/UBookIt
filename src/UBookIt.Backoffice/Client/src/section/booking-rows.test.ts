@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
 import {
+  bookingReference,
   canCancel,
   currentWeek,
   formatInterval,
@@ -29,6 +30,7 @@ const booking = (overrides: Partial<Parameters<typeof serviceLabel>[0]> = {}) =>
   startUtc: "2026-09-02T08:00:00+00:00",
   endUtc: "2026-09-02T09:00:00+00:00",
   timeZoneId: "Europe/London",
+  reference: "7QX4M2NP",
   service: null,
   ...overrides,
 });
@@ -431,5 +433,26 @@ describe("what the service column says", () => {
     expect(
       serviceLabel(booking({ service: { serviceId: "s1", displayName: "  " } }), "Booked directly"),
     ).toBe("s1");
+  });
+});
+
+describe("bookingReference", () => {
+  it("groups a canonical reference for reading", () => {
+    expect(bookingReference({ reference: "7QX4M2NP" })).toBe("7QX4-M2NP");
+  });
+
+  it("passes through anything that is not the expected length", () => {
+    // Rather than slicing it into something that looks authoritative and is not.
+    expect(bookingReference({ reference: "7QX4" })).toBe("7QX4");
+    expect(bookingReference({ reference: "" })).toBe("");
+  });
+
+  it("survives a row that carries no reference at all", () => {
+    // `BookingLike.reference` is REQUIRED — the endpoint always sends it, and declaring it
+    // optional there would let a missing value render a silently empty cell. This function's
+    // own parameter stays optional on purpose: it is called with plain object literals, and a
+    // blank cell costs less than a thrown render. (The comment here previously said the field
+    // was optional; it stopped being true when the type was tightened, and nobody swept it.)
+    expect(bookingReference({})).toBe("");
   });
 });

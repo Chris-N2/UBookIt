@@ -449,10 +449,18 @@ public static class ViewFixtures
             Errors = errors ?? [],
         };
 
+    /// <summary>The confirmation fixture, exposed so a rule suite can render it directly.</summary>
+    public static BookingConfirmationModel ConfirmationModel() => Confirmation("07700 900123");
+
+    /// <summary>The service confirmation fixture, likewise.</summary>
+    public static ServiceConfirmationModel ServiceConfirmationModel()
+        => ServiceConfirmation(["Treatment Room", "Ada"], "07700 900123");
+
     private static BookingConfirmationModel Confirmation(string? phone)
         => new()
         {
             BookingId = new Guid("00000000-0000-0000-0000-0000000000b1"),
+            Reference = "7QX4-M2NP",
             ResourceName = "Meeting Room A",
             LocalStart = "Thursday 20 August 2026, 09:00",
             LocalEnd = "10:00",
@@ -465,6 +473,7 @@ public static class ViewFixtures
         => new()
         {
             BookingId = new Guid("00000000-0000-0000-0000-0000000000b2"),
+            Reference = "5KGT-BW9D",
             ServiceName = "Massage",
             ResourceNames = resources,
             LocalStart = "Thursday 20 August 2026, 09:00",

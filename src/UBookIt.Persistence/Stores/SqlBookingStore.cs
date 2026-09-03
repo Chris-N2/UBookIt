@@ -114,6 +114,22 @@ internal sealed class SqlBookingStore(UBookItDbContext db) : IBookingStore
                 FailureCodes.Conflict, "The requested interval conflicts with an existing booking.");
         }
 
+        // The unique index is what GUARANTEES reference uniqueness; this check is what makes
+        // the ordinary case reportable, so the service can generate another reference instead
+        // of the whole placement dying on a database exception. Inside the same transaction as
+        // the insert, so it cannot be defeated by anything except a genuine race — and a race
+        // still loses to the index, which is the point of having it.
+        var referenceTaken = await db.Bookings
+            .AnyAsync(b => b.Reference == booking.Reference.Value, cancellationToken)
+            .ConfigureAwait(false);
+
+        if (referenceTaken)
+        {
+            await transaction.RollbackAsync(cancellationToken).ConfigureAwait(false);
+            return DomainResult<Booking>.Failure(
+                FailureCodes.ReferenceTaken, "That booking reference is already in use.");
+        }
+
         db.Bookings.Add(ToRow(booking));
         await db.SaveChangesAsync(cancellationToken).ConfigureAwait(false);
         await transaction.CommitAsync(cancellationToken).ConfigureAwait(false);
@@ -160,6 +176,7 @@ internal sealed class SqlBookingStore(UBookItDbContext db) : IBookingStore
         return new BookingRow
         {
             Id = booking.Id,
+            Reference = booking.Reference.Value,
             StartUtc = booking.Interval.StartUtc,
             EndUtc = booking.Interval.EndUtc,
             TimeZoneId = booking.Interval.TimeZoneId,
@@ -180,6 +197,7 @@ internal sealed class SqlBookingStore(UBookItDbContext db) : IBookingStore
     private static Booking ToDomain(BookingRow row)
         => Booking.Rehydrate(
             row.Id,
+            BookingReference.FromCanonical(row.Reference),
             BookingInterval.Create(row.StartUtc, row.EndUtc, row.TimeZoneId).Value,
             Booker.Create(row.MemberKey, row.BookerName, row.BookerEmail, row.BookerPhone).Value,
             row.Claims.Select(c => new ResourceClaim(c.ResourceId)),

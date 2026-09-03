@@ -194,6 +194,7 @@ public class ServiceAttributionTests
     {
         var booking = Booking.Rehydrate(
             Guid.NewGuid(),
+            References.Any(),
             Interval(),
             TestData.Booker(),
             [new ResourceClaim(Guid.NewGuid())],
@@ -214,6 +215,7 @@ public class ServiceAttributionTests
 
         var result = Booking.Rehydrate(
             Guid.NewGuid(),
+            References.Any(),
             Interval(),
             TestData.Booker(),
             [new ResourceClaim(Guid.NewGuid())],

@@ -42,6 +42,7 @@ internal sealed class SqlBookingManagementStore(UBookItDbContext db) : IBookingM
             .Select(booking => new
             {
                 booking.Id,
+                booking.Reference,
                 booking.StartUtc,
                 booking.EndUtc,
                 booking.TimeZoneId,
@@ -74,6 +75,7 @@ internal sealed class SqlBookingManagementStore(UBookItDbContext db) : IBookingM
         var items = rows
             .Select(row => new BookingSummary(
                 row.Id,
+                BookingReference.FromCanonical(row.Reference),
                 BookingInterval.Create(row.StartUtc, row.EndUtc, row.TimeZoneId).Value,
                 (BookingStatus)row.Status,
                 row.CreatedUtc,

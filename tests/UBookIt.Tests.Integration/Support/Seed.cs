@@ -61,9 +61,11 @@ internal static class Seed
         DateTimeOffset startUtc,
         TimeSpan duration,
         BookingStatus status = BookingStatus.Confirmed,
-        ServiceAttribution? service = null)
+        ServiceAttribution? service = null,
+        BookingReference? reference = null)
         => Booking.Rehydrate(
             Guid.NewGuid(),
+            reference ?? new RandomBookingReferenceFactory().Next(),
             BookingInterval.Create(startUtc, startUtc + duration, "UTC").Value,
             Booker.Create(null, "Integration Tester", "integration@example.com", "01234 567890").Value,
             [new ResourceClaim(resourceId)],

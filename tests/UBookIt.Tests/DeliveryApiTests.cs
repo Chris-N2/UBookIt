@@ -405,6 +405,27 @@ public class DeliveryApiTests
     }
 
     [Fact]
+    public async Task Placement_returns_the_bookings_own_reference()
+    {
+        // Spec: "A direct placement returns something quotable". Compared against the
+        // reference the STORE holds, not against a shape or a non-empty check — a response
+        // hard-wired to a constant satisfies "there is a reference here" and is useless to the
+        // person reading it, and that mutation passed the entire suite before this test.
+        var h = new Harness();
+
+        var model = Ok<PlacementResponseModel>(await h.Bookings.PlaceBooking(h.ValidPlacement()));
+
+        var placed = await h.BookingStore.GetBookingAsync(model.BookingId);
+
+        Assert.NotNull(placed);
+        Assert.Equal(placed.Reference.Value, model.Reference);
+
+        // Canonical, not the grouped display form: this is a data contract and presentation
+        // is the consumer's decision.
+        Assert.DoesNotContain('-', model.Reference);
+    }
+
+    [Fact]
     public async Task Conflicting_placement_is_409()
     {
         var h = new Harness();

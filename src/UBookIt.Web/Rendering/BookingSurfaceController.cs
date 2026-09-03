@@ -189,7 +189,17 @@ public sealed class BookingSurfaceController : SurfaceController
         }
     }
 
-    private static BookingConfirmationModel BuildConfirmation(Booking booking, string resourceName, TimeZoneInfo zone)
+    /// <summary>
+    /// Projects a placed booking into what the confirmation page shows.
+    /// </summary>
+    /// <remarks>
+    /// <c>internal</c> rather than <c>private</c> so it can be asserted directly. The
+    /// surface controllers have no behavioural coverage — they need Umbraco's
+    /// <c>SurfaceController</c> plumbing — so this method was the only reference-carrying
+    /// projection in the package with nothing watching it at all, and substituting a constant
+    /// for the reference passed the entire suite.
+    /// </remarks>
+    internal static BookingConfirmationModel BuildConfirmation(Booking booking, string resourceName, TimeZoneInfo zone)
     {
         var start = TimeZoneInfo.ConvertTime(booking.Interval.StartUtc, zone);
         var end = TimeZoneInfo.ConvertTime(booking.Interval.EndUtc, zone);
@@ -197,6 +207,7 @@ public sealed class BookingSurfaceController : SurfaceController
         return new BookingConfirmationModel
         {
             BookingId = booking.Id,
+            Reference = booking.Reference.Display,
             ResourceName = resourceName,
             LocalStart = start.ToString("dddd d MMMM yyyy, HH:mm", CultureInfo.InvariantCulture),
             LocalEnd = end.ToString("HH:mm", CultureInfo.InvariantCulture),

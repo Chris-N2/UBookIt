@@ -211,6 +211,7 @@ public sealed record BookedResource(Guid ResourceId, string DisplayName);
 /// </remarks>
 public sealed record BookingSummary(
     Guid BookingId,
+    BookingReference Reference,
     BookingInterval Interval,
     BookingStatus Status,
     DateTimeOffset CreatedUtc,

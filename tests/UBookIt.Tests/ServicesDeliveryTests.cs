@@ -529,6 +529,24 @@ public class ServicesDeliveryTests
     }
 
     [Fact]
+    public async Task Spec_scenario_a_service_placement_returns_something_quotable()
+    {
+        // Spec: "A service placement returns something quotable". The service flow needs this
+        // for the same reason the direct one does, and it was the flow whose CONFIRMATION VIEW
+        // was found still printing a Guid — half the product, missed by fixing only one side.
+        var h = Wire();
+
+        var model = Ok<ServicePlacementResponseModel>(
+            await h.Controller.PlaceServiceBooking(h.Service.Id, Placement()));
+
+        var placed = await h.Store.GetBookingAsync(model.BookingId);
+
+        Assert.NotNull(placed);
+        Assert.Equal(placed.Reference.Value, model.Reference);
+        Assert.DoesNotContain('-', model.Reference);
+    }
+
+    [Fact]
     public async Task Spec_scenario_the_resolved_resource_is_reported()
     {
         var h = Wire(null, Room(1), Room(2));
@@ -614,8 +632,14 @@ public class ServicesDeliveryTests
         // into ⑤'s path.
         var properties = typeof(PlacementResponseModel).GetProperties().Select(p => p.Name).ToArray();
 
+        // `Reference` joined this list deliberately: a consumer builds its own confirmation
+        // screen and a person reads it, so returning only the opaque id would leave them
+        // showing a Guid — the very defect this pin's neighbours were written about.
+        //
+        // What the pin guards is unchanged and still holds: ONE `ResourceId`, singular, and no
+        // resource collection. That is ⑤'s contract staying out of the direct endpoint.
         Assert.Equal(
-            ["BookingId", "Status", "ResourceId", "Interval", "Booker"],
+            ["BookingId", "Reference", "Status", "ResourceId", "Interval", "Booker"],
             properties);
 
         Assert.Equal(

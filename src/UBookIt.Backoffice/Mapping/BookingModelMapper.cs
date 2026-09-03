@@ -17,6 +17,7 @@ internal static class BookingModelMapper
     public static BookingModel ToModel(BookingSummary summary) => new()
     {
         BookingId = summary.BookingId,
+        Reference = summary.Reference.Value,
         StartUtc = summary.Interval.StartUtc,
         EndUtc = summary.Interval.EndUtc,
         TimeZoneId = summary.Interval.TimeZoneId,

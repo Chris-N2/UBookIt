@@ -50,6 +50,12 @@ namespace UBookIt.Persistence.Migrations
                     b.Property<Guid?>("MemberKey")
                         .HasColumnType("uniqueidentifier");
 
+                    b.Property<string>("Reference")
+                        .IsRequired()
+                        .HasMaxLength(8)
+                        .HasColumnType("nchar(8)")
+                        .IsFixedLength();
+
                     b.Property<Guid?>("ServiceId")
                         .HasColumnType("uniqueidentifier");
 
@@ -69,6 +75,9 @@ namespace UBookIt.Persistence.Migrations
                         .HasColumnType("nvarchar(64)");
 
                     b.HasKey("Id");
+
+                    b.HasIndex("Reference")
+                        .IsUnique();
 
                     b.HasIndex("StartUtc", "EndUtc");
 

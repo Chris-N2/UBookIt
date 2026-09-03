@@ -235,6 +235,7 @@ public static class ServiceBookingFormBuilder
         return new ServiceConfirmationModel
         {
             BookingId = booking.Id,
+            Reference = booking.Reference.Display,
             ServiceName = serviceName,
             ResourceNames = [.. booking.Claims.Select(claim =>
                 resourceNames.TryGetValue(claim.ResourceId, out var name)

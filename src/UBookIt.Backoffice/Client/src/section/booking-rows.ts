@@ -18,6 +18,10 @@ export type BookingLike = {
   startUtc: string;
   endUtc: string;
   timeZoneId: string;
+  // Required, matching the generated BookingModel — the endpoint always sends it. Declaring
+  // it optional here would let a missing value render a silently empty cell rather than
+  // failing a type check at the one place that would notice.
+  reference: string;
   service?: { serviceId: string; displayName: string } | null;
 };
 
@@ -317,4 +321,32 @@ export function serviceLabel(
   return booking.service.displayName.trim() === ""
     ? booking.service.serviceId
     : booking.service.displayName;
+}
+
+/**
+ * Groups a booking reference for reading: `7QX4M2NP` becomes `7QX4-M2NP`.
+ *
+ * The API sends the canonical form deliberately — how a reference is presented is the
+ * consumer's decision, and canonical is what compares and stores cleanly. This screen is a
+ * consumer, so the grouping happens here rather than on the wire.
+ *
+ * The separator is cosmetic: it is never sent back and never compared against. Anything that
+ * is not the expected length is passed through untouched rather than sliced into something
+ * that looks authoritative and is not.
+ */
+const REFERENCE_LENGTH = 8;
+const REFERENCE_GROUP = 4;
+
+export function bookingReference(booking: { reference?: string }): string {
+  // Still tolerant of an absent value: this is called with plain object literals in tests and
+  // the cost of a blank cell is lower than the cost of a thrown render.
+  const value = booking.reference ?? "";
+
+  // Named rather than inline, because these duplicate BookingReference.Length and its group
+  // size on the C# side and nothing carries a shared constant across the boundary. If the
+  // reference ever changes length, this silently stops grouping and starts passing values
+  // through unformatted — so the numbers are at least findable by searching for the name.
+  return value.length === REFERENCE_LENGTH
+    ? `${value.slice(0, REFERENCE_GROUP)}-${value.slice(REFERENCE_GROUP)}`
+    : value;
 }

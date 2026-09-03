@@ -17,7 +17,7 @@ public class RehydrationTests
         var id = Guid.NewGuid();
         var claims = new[] { new ResourceClaim(Guid.NewGuid()), new ResourceClaim(Guid.NewGuid()) };
 
-        var result = Booking.Rehydrate(id, Interval(), TestData.Booker(), claims, BookingStatus.Declined, TestData.Now);
+        var result = Booking.Rehydrate(id, References.Any(), Interval(), TestData.Booker(), claims, BookingStatus.Declined, TestData.Now);
 
         Assert.True(result.Succeeded);
         var booking = result.Value;
@@ -31,7 +31,7 @@ public class RehydrationTests
     public void Rehydrated_booking_still_enforces_the_status_machine()
     {
         var booking = Booking.Rehydrate(
-            Guid.NewGuid(), Interval(), TestData.Booker(),
+            Guid.NewGuid(), References.Any(), Interval(), TestData.Booker(),
             [new ResourceClaim(Guid.NewGuid())], BookingStatus.Requested, TestData.Now).Value;
 
         Assert.True(booking.Confirm().Succeeded);
@@ -43,7 +43,7 @@ public class RehydrationTests
     public void Zero_claims_is_rejected()
     {
         var result = Booking.Rehydrate(
-            Guid.NewGuid(), Interval(), TestData.Booker(), [], BookingStatus.Confirmed, TestData.Now);
+            Guid.NewGuid(), References.Any(), Interval(), TestData.Booker(), [], BookingStatus.Confirmed, TestData.Now);
 
         Assert.False(result.Succeeded);
         Assert.Equal(FailureCodes.ClaimsInvalid, Assert.Single(result.Failures).Code);
@@ -55,7 +55,7 @@ public class RehydrationTests
         var resourceId = Guid.NewGuid();
 
         var result = Booking.Rehydrate(
-            Guid.NewGuid(), Interval(), TestData.Booker(),
+            Guid.NewGuid(), References.Any(), Interval(), TestData.Booker(),
             [new ResourceClaim(resourceId), new ResourceClaim(resourceId)], BookingStatus.Confirmed, TestData.Now);
 
         Assert.False(result.Succeeded);

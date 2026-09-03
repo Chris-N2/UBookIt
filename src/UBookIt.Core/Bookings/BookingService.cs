@@ -123,8 +123,33 @@ public sealed class BookingService(
     IBookingStore bookingStore,
     TimeProvider timeProvider,
     SiteBookingSettings settings,
-    IBookingObserver? observer = null) : IBookingService
+    IBookingObserver? observer = null,
+    IBookingReferenceFactory? referenceFactory = null) : IBookingService
 {
+    /// <summary>
+    /// Where a booking's quotable reference comes from. Never null.
+    /// </summary>
+    /// <remarks>
+    /// Defaulted, and for a different reason from the observer above. Omitting an observer
+    /// produces silence; omitting this produces a perfectly good random reference, exactly as
+    /// the inline <c>Guid.NewGuid()</c> below produces a perfectly good id. There is no wrong
+    /// fact to record either way, which is what separates both of these from
+    /// <c>Booking.Create</c>'s service attribution — omitting <i>that</i> claimed a service
+    /// booking had been placed directly.
+    /// </remarks>
+    private readonly IBookingReferenceFactory _referenceFactory =
+        referenceFactory ?? new RandomBookingReferenceFactory();
+
+    /// <summary>
+    /// How many references placement will try before concluding the generator is broken.
+    /// </summary>
+    /// <remarks>
+    /// Small on purpose. This is not a budget for bad luck — one collision in 27^8 is already
+    /// remarkable — it is the number of attempts after which "unlucky" stops being the
+    /// explanation and "returning the same value" starts.
+    /// </remarks>
+    private const int MaxReferenceAttempts = 5;
+
     /// <summary>
     /// Where placement and cancellation are reported. Never null.
     /// </summary>
@@ -314,16 +339,44 @@ public sealed class BookingService(
         // Rule 8: conflict — checked atomically by the store across every claimed
         // resource (bookings spec, "Atomic placement contract"). v1 auto-confirms
         // on placement.
-        var booking = Booking.Create(
-            Guid.NewGuid(),
-            interval,
-            request.Booker,
-            [.. resources.Select(r => new ResourceClaim(r.Id))],
-            BookingStatus.Confirmed,
-            window.NowUtc,
-            service);
+        //
+        // The loop is for reference collisions and nothing else: a booking is immutable, so a
+        // taken reference cannot be swapped in place — a new booking has to be built. Every
+        // other outcome, success or failure, leaves immediately, so a rejected placement is
+        // never retried and the pipeline above never runs twice.
+        DomainResult<Booking> placed;
+        var attempt = 0;
 
-        var placed = await bookingStore.PlaceAsync(booking, cancellationToken).ConfigureAwait(false);
+        while (true)
+        {
+            var booking = Booking.Create(
+                Guid.NewGuid(),
+                _referenceFactory.Next(),
+                interval,
+                request.Booker,
+                [.. resources.Select(r => new ResourceClaim(r.Id))],
+                BookingStatus.Confirmed,
+                window.NowUtc,
+                service);
+
+            placed = await bookingStore.PlaceAsync(booking, cancellationToken).ConfigureAwait(false);
+
+            if (placed.Succeeded || !placed.Failures.Any(f => f.Code == FailureCodes.ReferenceTaken))
+            {
+                break;
+            }
+
+            // Bounded, because an unbounded retry turns a broken generator into a hang. At 27^8
+            // values a genuine collision is already a curiosity; several in a row is not bad
+            // luck, it is a generator returning the same value — a bug, and reported as one
+            // rather than as something the booker did wrong.
+            if (++attempt >= MaxReferenceAttempts)
+            {
+                throw new InvalidOperationException(
+                    $"Could not obtain an unused booking reference in {MaxReferenceAttempts} attempts. "
+                    + $"The configured {nameof(IBookingReferenceFactory)} is returning values that are already in use.");
+            }
+        }
 
         // After the store agreed, and only then. Announcing before the commit would report a
         // booking that may not exist; announcing on failure would report one that does not.
