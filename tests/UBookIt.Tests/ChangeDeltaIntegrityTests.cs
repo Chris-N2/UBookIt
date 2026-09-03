@@ -117,12 +117,27 @@ public class ChangeDeltaIntegrityTests
                 continue;
             }
 
-            var headings = HeadingsOf(File.ReadAllText(upstream));
+            var upstreamBodies = BodiesOf(File.ReadAllText(upstream));
+            var deltaBodies = BodiesOf(File.ReadAllText(
+                Path.Combine(RepoFiles.Root, ChangesRoot, delta.Change, "specs", delta.Capability, "spec.md")));
 
             foreach (var name in delta.Added.Where(n => !delta.Retired.Contains(n, StringComparer.Ordinal)))
             {
+                // Already synced is not a duplicate. Between `openspec archive`'s sync step and
+                // the archive itself, every ADDED requirement exists upstream BY DEFINITION —
+                // so comparing names alone made this guard fail on correct work for the whole
+                // of that window. Found the moment it was first exercised on a real sync.
+                //
+                // The failure worth catching is a requirement that would land BESIDE a
+                // DIFFERENT one of the same name. If the upstream body is the delta's body,
+                // this delta is what put it there.
+                var alreadySynced =
+                    upstreamBodies.TryGetValue(name, out var upstreamBody)
+                    && deltaBodies.TryGetValue(name, out var deltaBody)
+                    && Normalise(upstreamBody) == Normalise(deltaBody);
+
                 Assert.False(
-                    headings.Contains(name),
+                    upstreamBodies.ContainsKey(name) && !alreadySynced,
                     $"{delta.Change}/{delta.Capability} ADDS \"{name}\", which already exists in "
                     + $"openspec/specs/{delta.Capability}/spec.md. Syncing would leave two requirements of "
                     + "that name making overlapping claims. If it was meant to be modified, check the "
@@ -406,6 +421,53 @@ public class ChangeDeltaIntegrityTests
     /// <summary>Lines without their line endings, so CRLF and LF read the same.</summary>
     private static IEnumerable<string> Lines(string text)
         => text.Split('\n').Select(l => l.TrimEnd('\r'));
+
+    /// <summary>Requirement name to the text beneath it, up to the next heading.</summary>
+    private static Dictionary<string, string> BodiesOf(string spec)
+    {
+        var bodies = new Dictionary<string, string>(StringComparer.Ordinal);
+        string? current = null;
+        var body = new List<string>();
+
+        void Flush()
+        {
+            if (current is not null)
+            {
+                bodies[current] = string.Join(" ", body);
+            }
+        }
+
+        foreach (var line in Lines(spec))
+        {
+            var match = RequirementHeading.Match(line);
+
+            if (match.Success)
+            {
+                Flush();
+                current = match.Groups["name"].Value;
+                body.Clear();
+                continue;
+            }
+
+            if (line.StartsWith("## ", StringComparison.Ordinal))
+            {
+                Flush();
+                current = null;
+                body.Clear();
+                continue;
+            }
+
+            body.Add(line);
+        }
+
+        Flush();
+
+        return bodies;
+    }
+
+    /// <summary>Collapses whitespace so re-wrapping is not mistaken for a different requirement.</summary>
+    private static string Normalise(string text)
+        => string.Join(" ", text.Split((char[]?)null, StringSplitOptions.RemoveEmptyEntries));
 
     private static HashSet<string> HeadingsOf(string spec)
         => RequirementHeading.Matches(spec)

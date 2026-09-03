@@ -107,11 +107,17 @@ A range wider than the configured maximum SHALL yield the `date-range-too-large`
 - **THEN** the request succeeds, consistent with the rest of the delivery API
 
 ### Requirement: Booking placement
-The delivery API SHALL place bookings over `POST /bookings`. The request body SHALL carry the resource id, the start instant, the duration, and booker contact details (name, email, optional phone). The request model SHALL NOT expose a member key — booker identity is contact details only in v1. Placement SHALL run the Core placement pipeline unchanged. On success the response SHALL carry the created booking's id (the confirmation reference), its status, the resource id, the booked interval as ISO-8601 UTC, and the echoed booker contact details.
+The delivery API SHALL place bookings over `POST /bookings`. The request body SHALL carry the resource id, the start instant, the duration, and booker contact details (name, email, optional phone). The request model SHALL NOT expose a member key — booker identity is contact details only in v1. Placement SHALL run the Core placement pipeline unchanged. On success the response SHALL carry the created booking's id, **its quotable reference**, its status, the resource id, the booked interval as ISO-8601 UTC, and the echoed booker contact details.
+
+**The id is not the confirmation reference, and this requirement used to say it was.** They are
+two identifiers with two readers: the id is opaque and is what routes and payloads carry; the
+reference is what a person quotes. The sentence corrected here is the same false equation that
+`default-frontend` carried, and it is what made a Guid appear on a confirmation under the
+label "Reference".
 
 #### Scenario: Valid placement succeeds
 - **WHEN** a valid placement request is posted for a free, correctly sized, aligned interval
-- **THEN** the response carries the new booking id, a `Confirmed` status, the resource id, and the booked interval
+- **THEN** the response carries the new booking id, its reference, a `Confirmed` status, the resource id, and the booked interval
 
 #### Scenario: Request model carries no member key
 - **WHEN** the placement request model's public shape is inspected
@@ -424,11 +430,11 @@ answer as it does for an unpinned request — `conflict` or `service-unavailable
 rather than blaming the pin. Reporting the pin there would be true but misleading:
 it invites a consumer to offer the resources that were free, and there were none.
 
-The existing `POST /bookings` endpoint SHALL remain unchanged in route, request model, response model, and semantics: direct placement claims exactly one resource and continues to report it as it always has.
+The existing `POST /bookings` endpoint SHALL remain unchanged in route, request model, and semantics: direct placement claims exactly one resource and continues to report it as it always has. **Its response model gains the booking's quotable reference, and nothing else.** This sentence used to say the response model was unchanged as well, and that stopped being true when both placement responses gained the reference — but what it was guarding is untouched: service placement introduces nothing into the direct endpoint, which still reports a single resource id rather than a collection.
 
 #### Scenario: Valid service placement succeeds
 - **WHEN** a valid service placement is posted for a start and length taken from the service availability response
-- **THEN** the response carries the new booking id, a `Confirmed` status, the resolved resources, and the booked interval
+- **THEN** the response carries the new booking id, its reference, a `Confirmed` status, the resolved resources, and the booked interval
 
 #### Scenario: The resolved resources are reported
 - **WHEN** a service requiring a `room` and a `therapist` is placed
@@ -462,9 +468,9 @@ The existing `POST /bookings` endpoint SHALL remain unchanged in route, request 
 - **WHEN** the service placement request model's public shape is inspected
 - **THEN** it exposes name, email, and optional phone, but no member key field
 
-#### Scenario: Direct placement is unchanged
+#### Scenario: Direct placement still claims one resource
 - **WHEN** `POST /bookings` is used to book a resource directly
-- **THEN** its request and response are exactly as before, carrying a single resource id
+- **THEN** its request is exactly as before and its response carries a single resource id rather than a collection — the reference it now also carries is the only addition
 
 #### Scenario: A pin that cannot be honoured is reported, not substituted
 - **WHEN** a service placement names a pinned resource id that is eligible but cannot be included in any assignment at that instant, while an assignment exists without it
@@ -532,3 +538,35 @@ before it writes cannot legitimately provoke it.
 #### Scenario: Service placement on a withholding resource succeeds
 - **WHEN** `POST /services/{id}/bookings` places a service whose role resolves to a resource that withholds direct booking
 - **THEN** the booking is created
+
+### Requirement: A placement response identifies the booking in a form a person can use
+Every successful placement response — direct and service alike — SHALL carry the booking's
+**quotable reference** alongside its identifier.
+
+A consumer of this API builds its own confirmation screen, and that screen is read by the
+person who just booked. Returning only an opaque identifier leaves that consumer with exactly
+two options: show a value nobody can quote, or invent a reference of its own that the site
+owner's backoffice will not recognise. The package already assigns one; withholding it makes
+every headless consumer solve a problem that has been solved.
+
+**The reference SHALL cross the boundary in canonical form** — upper case, no separator — as
+it does on the management endpoint. How it is grouped for reading is the consumer's decision,
+and a consumer that stores it or searches by it needs the value exactly as the package holds
+it. Saying so matters more here than anywhere else: this is the package's most public
+contract, and its own Razor views render the grouped form, so a consumer comparing the two
+would otherwise have to guess which is canonical.
+
+This is stated once, over both endpoints, because the guarantee is about placement rather than
+about either route.
+
+#### Scenario: A direct placement returns something quotable
+- **WHEN** a booking is placed over the direct placement endpoint
+- **THEN** the response carries the booking's reference as well as its identifier
+
+#### Scenario: A service placement returns something quotable
+- **WHEN** a booking is placed over the service placement endpoint
+- **THEN** the response carries the booking's reference as well as its identifier
+
+#### Scenario: The reference crosses the boundary unformatted
+- **WHEN** a placement response carries a reference
+- **THEN** it is the canonical stored value, leaving the consumer to group it for display

@@ -654,3 +654,28 @@ three of them are the same class this review has been about.
   at the wrong thing.
 - [x] 14.7 Design D1 explained why `0 1 L O I U` are excluded and never why `Y` is — the
   decision round 8 turned on. The spec carried it; the design now does too.
+
+## 15. Sync, and one last defect the sync itself exposed
+
+14 deltas across five capabilities, 12 of them wholesale replacements — the largest sync this
+project has done, and the operation the whole review existed to protect.
+
+- [x] 15.1 **Synced and verified independently**, not taken on report. Every replaced
+  requirement is byte-identical to its delta; **no SHALL count and no scenario count fell
+  anywhere**; requirements the change does not touch are byte-identical to `HEAD`. The four
+  guarantees round 3 dropped — versioned endpoint, same swagger group, not-anonymous-under-any-
+  configuration, windowed/paged/filtered — are all present in the synced spec. The three
+  deliberate text drops applied, and the one lost scenario name is the documented rename.
+- [x] 15.2 **The sync exposed a real defect in `No_added_requirement_already_exists_upstream`:
+  it fails on correct work between sync and archive.** Once an ADDED requirement is synced it
+  exists upstream *by definition*, so a name-only comparison made the guard fail for the whole
+  of that window — and the window is precisely when someone is finishing a change.
+
+  Same class as round 8's finding, one step further along: **a guard wrong about what is
+  legitimate.** It now compares the requirement *body*, so "already synced" is distinguishable
+  from "would land beside a different requirement of the same name", which is the failure worth
+  catching. Proven both ways: a duplicate with a different body is caught; this change's own
+  synced requirements are allowed.
+
+  It took a real sync to find, because no probe reproduces the post-sync state — the guard had
+  been exercised only against changes that were not yet applied.
