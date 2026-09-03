@@ -22,9 +22,36 @@ public class BookingReferenceTests
         // Without vowels there is no word to accidentally produce, which is the whole defence
         // against emailing a customer a reference that reads as an obscenity. A filter list
         // would be the alternative and it would be endless, language-specific, and wrong.
-        foreach (var vowel in "AEIOU")
+        //
+        // **Y IS A VOWEL, AND IT USED TO BE IN HERE.** This test asserted the absence of
+        // `AEIOU`, called that "cannot spell a word", and passed — while `Y` carried myth, gym
+        // and crypt, and is the substitution used to write offensive words in filtered
+        // contexts. The recorded backfill sample contained `G3Y3CNTF`. The test was checking
+        // the mechanism it happened to have and calling it the guarantee, which is this
+        // project's most-repeated fault appearing in a test whose own name states the
+        // guarantee.
+        foreach (var vowel in "AEIOUY")
         {
             Assert.DoesNotContain(vowel, BookingReference.Alphabet);
+        }
+    }
+
+    [Fact]
+    public void No_reference_can_be_an_english_word()
+    {
+        // The property the test above is *for*, asserted directly rather than inferred from
+        // which letters are missing: an English word needs a vowel, so a string drawn from an
+        // alphabet with none cannot be one. Stated as a property so that adding a letter back
+        // fails here with a reason, rather than silently widening what a reference can read as.
+        const string Vowels = "AEIOUY";
+
+        Assert.DoesNotContain(BookingReference.Alphabet, c => Vowels.Contains(c));
+
+        var factory = new RandomBookingReferenceFactory();
+
+        for (var i = 0; i < 200; i++)
+        {
+            Assert.DoesNotContain(factory.Next().Value, c => Vowels.Contains(c));
         }
     }
 

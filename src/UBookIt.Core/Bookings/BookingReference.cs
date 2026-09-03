@@ -11,13 +11,23 @@ namespace UBookIt.Core.Bookings;
 /// confirmation view printed one under a <c>&lt;dt&gt;Reference&lt;/dt&gt;</c>.
 /// </para>
 /// <para>
-/// <b>The alphabet is the design.</b> It contains no vowels, so a reference cannot spell a
-/// word — a booking system that emails somebody a reference which happens to read as an
+/// <b>The alphabet is the design.</b> It contains no vowels — <b>including <c>Y</c></b> — so a
+/// reference cannot spell an English word, English words needing a vowel and <c>Y</c> being
+/// one. A booking system that emails somebody a reference which happens to read as an
 /// obscenity has a problem it cannot apologise its way out of, and removing the letters
-/// removes the entire class rather than filtering for it afterwards. It also omits
+/// removes the class rather than filtering for it afterwards. It also omits
 /// <c>0 1 L O I U</c>: the first four are the transcription confusions, and <c>U</c> goes so
 /// that nothing in it has a spoken homophone. What remains is unambiguous read aloud, written
 /// down, or typed back.
+/// <para>
+/// <c>Y</c> was in it until QA round 8, on the reasoning that removing <c>AEIOU</c> removed
+/// vowels. It does not: <c>Y</c> is a vowel, it is the letter that carries words like
+/// <i>myth</i>, <i>gym</i> and <i>crypt</i>, and it is exactly the substitution used to write
+/// offensive words in filtered contexts. The recorded backfill sample contained
+/// <c>G3Y3CNTF</c>. The test named "the alphabet cannot spell a word" was asserting the
+/// absence of five letters and calling that the guarantee — the mechanism, not the thing it
+/// was for, which is this project's most-repeated lesson.
+/// </para>
 /// </para>
 /// <para>
 /// Stored and compared in canonical form — upper case, no separators — while
@@ -32,7 +42,7 @@ public sealed record BookingReference
     /// Consonants and digits only. See the type remarks: no vowels means no accidental words,
     /// and the omitted digits and letters are the ones confused when transcribed.
     /// </summary>
-    public const string Alphabet = "BCDFGHJKMNPQRSTVWXYZ23456789";
+    public const string Alphabet = "BCDFGHJKMNPQRSTVWXZ23456789";
 
     /// <summary>
     /// Long enough that collisions are not a practical concern for a site's bookings

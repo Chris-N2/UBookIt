@@ -107,6 +107,12 @@ untouched, only the error message gets worse.
 **Why a bound rather than a loop:** an unbounded retry turns a bug — an exhausted or broken
 generator — into a hang. A bound turns it into an error message.
 
+**The migration's de-duplication loop is deliberately unbounded, and that is not a
+contradiction.** Its population strictly shrinks: each pass rewrites only the rows it found
+duplicated, so it converges for the same reason the placement retry cannot be trusted to. The
+retry depends on an external generator that may be broken and return one value forever; the
+loop depends only on itself.
+
 The retry is a safety net, not a hot path: at 3.8 × 10¹¹ values, a site would need on the order
 of a million bookings before a collision is even worth thinking about.
 

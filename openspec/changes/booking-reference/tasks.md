@@ -534,3 +534,61 @@ mutation. Three findings, two of them mine from round 6.
 - [x] 12.4 **NIT — fenced code blocks** are now skipped by the parser, so a `##` or
   `### Requirement:` inside an example cannot move a boundary or invent a requirement. Latent
   today; no active delta contains one.
+
+## 13. QA round 8
+
+QA answered the three questions I put to it. **The feature is correct and completely specified**
+— every spec criterion covered by a test that fails if the code is wrong, bar one it found.
+**The parser inside `ChangeDeltaIntegrityTests` is a net negative** and should be replaced
+rather than patched a sixth time. **Product risk nil**; what stood between this and merge was
+one cheap test and the guard.
+
+- [x] 13.1 **MAJOR — "The reference SHALL come first" had no covering test.** A bolded SHALL
+  with a stated reason, and moving the column to the end passed all 1798 .NET and 116 client
+  tests: the guards checked presence and header/cell parity, both position-blind. Now asserted
+  on the first header and first cell, and mutation-checked by moving the column.
+- [x] 13.2 **MAJOR — `No_added_requirement_already_exists_upstream` blocked legitimate work.**
+  A `## REMOVED` entry followed by `## ADDED` re-adding the same name is the split-and-replace
+  idiom; OpenSpec accepts it and **this repository's own archive uses it three times**. The
+  guard failed it. Names retired in the same delta are now exempt, and both directions are
+  proven: the idiom passes, the genuine mistake still fails.
+
+  This is the mirror of the fault this file keeps making — **a guard wrong about what is
+  legitimate costs as much as one blind to what is not.**
+- [x] 13.3 **MINOR — `~~~` fences defeated the parser in the fail-OPEN direction**, proven by
+  QA with a delta whose `~~~` example made three ADDED-that-exist-upstream requirements
+  invisible while `validate --strict` said "valid". Both fence styles now recognised.
+- [x] 13.4 **MINOR — the parser was stricter than the tool in four measured ways** (tab,
+  non-breaking space, lower-case kind, indented code block), each a future build break on a
+  valid delta. **Re-measured against `openspec show --json` across seven shapes and now agrees
+  on all seven.** Two corrections worth recording:
+  - CommonMark allows up to three spaces of heading indent; **OpenSpec does not**. Following
+    the standard rather than the tool would have left that shape classified MODIFIED here and
+    ADDED by the sync — the exact divergence that has produced a finding five rounds running.
+  - My round-6 "catch" of `## Modified Requirements` was **a false positive recorded as a
+    success**: OpenSpec accepts lower case. The probe that looked like evidence was measuring
+    my guard against my assumption, not against the tool.
+- [x] 13.5 **MINOR — the comment misattributed which test catches a malformed heading.**
+  A malformed heading orphans its requirements, so they never reach `Added` and the
+  ADDED-exists guard never fires; `This_guard_is_not_watching_nothing` does. Corrected — the
+  same class of error the file exists to prevent, in the file's own prose.
+- [x] 13.6 **MINOR — `Y` is a vowel, and it was in the alphabet.** `The_alphabet_cannot_spell_a_word`
+  asserted the absence of `AEIOU` and called that the guarantee, while `Y` carries *myth*,
+  *gym* and *crypt* and is the standard substitution for writing offensive words where vowels
+  are filtered. The recorded backfill sample contained `G3Y3CNTF`.
+
+  **This is the project's most-repeated lesson — a rule checking the mechanism, not the
+  guarantee — inside a test whose own name states the guarantee.** `Y` is removed (27 symbols,
+  27⁸ ≈ 2.8 × 10¹¹, still ample), the migration follows, the spec says explicitly that `Y`
+  counts as a vowel and why, and a second test asserts the property directly rather than
+  inferring it from which letters are missing.
+- [x] 13.7 **MINOR — `Booking.Rehydrate`'s reference being required is not asserted**; making
+  the parameter optional compiles and passes the unit suite. Left as-is deliberately: the
+  integration round-trip catches a dropped *value*, the compiler catches a dropped *argument*
+  at every call site, and a test asserting a parameter's optionality would be asserting a
+  signature rather than a behaviour. Recorded so the gap is a decision rather than an oversight.
+- [x] 13.8 **NIT — the migration's de-duplication `WHILE EXISTS` loop is unbounded**, which is
+  the shape D3 rules out for the placement retry. The asymmetry is deliberate and now stated in
+  D3: the retry's bound exists because a broken *generator* would spin forever, whereas this
+  loop's population strictly shrinks — each pass rewrites only the duplicates it found — so it
+  terminates for the same reason the retry cannot be trusted to.

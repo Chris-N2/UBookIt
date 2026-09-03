@@ -36,28 +36,28 @@ namespace UBookIt.Persistence.Migrations
         /// `-2147483648`, whose absolute value overflows a signed 32-bit integer.
         /// </para>
         /// <para>
-        /// The obvious fix, `ABS(CHECKSUM(NEWID()) % 28)`, does not throw but is <b>biased</b>.
-        /// The modulo yields -27..27; taking the absolute value folds ±n onto n, so every
+        /// The obvious fix, `ABS(CHECKSUM(NEWID()) % 27)`, does not throw but is <b>biased</b>.
+        /// The modulo yields -26..26; taking the absolute value folds ±n onto n, so every
         /// symbol but the first is reachable two ways and the first only one — `B` would be
-        /// drawn at half the rate of the other 27. Harmless in isolation, but it would mean
+        /// drawn at half the rate of the other 26. Harmless in isolation, but it would mean
         /// backfilled references and newly-placed ones came from measurably different
         /// distributions, where the design describes exactly one alphabet.
         /// </para>
         /// <para>
         /// Masking the sign bit avoids both. `&amp; 0x7FFFFFFF` yields 0..2147483647 with no
         /// overflow, and the residual modulo bias over 2^31 values is on the order of one part
-        /// in 76 million — uniform to any standard this needs to meet.
+        /// in 79 million — uniform to any standard this needs to meet.
         /// </para>
         /// </remarks>
         private const string ReferenceExpression = """
-            SUBSTRING(@alphabet, (CHECKSUM(NEWID()) & 0x7FFFFFFF) % 28 + 1, 1) +
-            SUBSTRING(@alphabet, (CHECKSUM(NEWID()) & 0x7FFFFFFF) % 28 + 1, 1) +
-            SUBSTRING(@alphabet, (CHECKSUM(NEWID()) & 0x7FFFFFFF) % 28 + 1, 1) +
-            SUBSTRING(@alphabet, (CHECKSUM(NEWID()) & 0x7FFFFFFF) % 28 + 1, 1) +
-            SUBSTRING(@alphabet, (CHECKSUM(NEWID()) & 0x7FFFFFFF) % 28 + 1, 1) +
-            SUBSTRING(@alphabet, (CHECKSUM(NEWID()) & 0x7FFFFFFF) % 28 + 1, 1) +
-            SUBSTRING(@alphabet, (CHECKSUM(NEWID()) & 0x7FFFFFFF) % 28 + 1, 1) +
-            SUBSTRING(@alphabet, (CHECKSUM(NEWID()) & 0x7FFFFFFF) % 28 + 1, 1)
+            SUBSTRING(@alphabet, (CHECKSUM(NEWID()) & 0x7FFFFFFF) % 27 + 1, 1) +
+            SUBSTRING(@alphabet, (CHECKSUM(NEWID()) & 0x7FFFFFFF) % 27 + 1, 1) +
+            SUBSTRING(@alphabet, (CHECKSUM(NEWID()) & 0x7FFFFFFF) % 27 + 1, 1) +
+            SUBSTRING(@alphabet, (CHECKSUM(NEWID()) & 0x7FFFFFFF) % 27 + 1, 1) +
+            SUBSTRING(@alphabet, (CHECKSUM(NEWID()) & 0x7FFFFFFF) % 27 + 1, 1) +
+            SUBSTRING(@alphabet, (CHECKSUM(NEWID()) & 0x7FFFFFFF) % 27 + 1, 1) +
+            SUBSTRING(@alphabet, (CHECKSUM(NEWID()) & 0x7FFFFFFF) % 27 + 1, 1) +
+            SUBSTRING(@alphabet, (CHECKSUM(NEWID()) & 0x7FFFFFFF) % 27 + 1, 1)
             """;
 
         /// <inheritdoc />
@@ -78,7 +78,7 @@ namespace UBookIt.Persistence.Migrations
             // rather than something an operator is expected to diagnose at three in the
             // morning.
             migrationBuilder.Sql($"""
-                DECLARE @alphabet nchar(28) = N'BCDFGHJKMNPQRSTVWXYZ23456789';
+                DECLARE @alphabet nchar(27) = N'BCDFGHJKMNPQRSTVWXZ23456789';
 
                 UPDATE uBookItBooking
                 SET Reference = {ReferenceExpression}

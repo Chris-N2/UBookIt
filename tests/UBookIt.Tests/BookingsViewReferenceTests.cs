@@ -54,6 +54,27 @@ public class BookingsViewReferenceTests
         // per-file, and the assertion above is what should force that conversation.
     }
 
+    [Fact]
+    public void The_reference_is_the_first_column()
+    {
+        // `booking-management` makes this a bolded SHALL with a reason: it is the column an
+        // operator scans while somebody reads a reference out. Nothing asserted it — moving
+        // the column to the end passed all 1798 tests and all 116 client tests, because the
+        // guards above check presence and header/cell parity, and both are position-blind.
+        var source = RepoFiles.Read(Element);
+
+        var firstHeader = source.IndexOf("<uui-table-head-cell", StringComparison.Ordinal);
+        var firstCell = source.IndexOf("<uui-table-cell", StringComparison.Ordinal);
+
+        Assert.True(firstHeader > 0 && firstCell > 0, "The table markup has moved; this guard is measuring nothing.");
+
+        var headerText = source[firstHeader..source.IndexOf("</uui-table-head-cell>", firstHeader, StringComparison.Ordinal)];
+        var cellText = source[firstCell..source.IndexOf("</uui-table-cell>", firstCell, StringComparison.Ordinal)];
+
+        Assert.Contains("\"reference\"", headerText, StringComparison.Ordinal);
+        Assert.Contains("bookingReference(booking)", cellText, StringComparison.Ordinal);
+    }
+
     private static int Occurrences(string haystack, string needle)
     {
         var count = 0;

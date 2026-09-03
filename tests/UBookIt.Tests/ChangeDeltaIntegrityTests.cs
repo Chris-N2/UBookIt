@@ -48,6 +48,7 @@ public class ChangeDeltaIntegrityTests
         string Capability,
         IReadOnlyList<string> Modified,
         IReadOnlyList<string> Added,
+        IReadOnlyList<string> Retired,
         IReadOnlyList<string> Sections,
         IReadOnlyList<string> Unattributed,
         bool HasTasks);
@@ -94,8 +95,19 @@ public class ChangeDeltaIntegrityTests
         // replace, leaving two requirements per subject making overlapping claims.
         //
         // An ADDED requirement whose heading already exists upstream is that mistake, whatever
-        // caused it — a malformed heading, a copied section, or an author who meant MODIFIED
-        // and wrote ADDED. It needs no knowledge of markdown to detect.
+        // caused it — a copied section, or an author who meant MODIFIED and wrote ADDED.
+        //
+        // EXCEPT when the same delta retires it first. `## REMOVED Requirements` for X followed
+        // by `## ADDED Requirements` re-adding X is the split-and-replace idiom, it is used in
+        // this repository's own archive, and OpenSpec accepts it — so flagging it would block
+        // valid work. The first version of this guard did exactly that, which is the mirror of
+        // the fault this file keeps making: a guard that is wrong about what is legitimate is
+        // as costly as one that is blind to what is not.
+        //
+        // NOTE ON ATTRIBUTION, because the comment here was wrong once: a MALFORMED heading is
+        // not caught by this test. The parser orphans those requirements, so they never reach
+        // `Added`, and `This_guard_is_not_watching_nothing` is what fires. This test catches
+        // the case where the sections parse correctly and the author chose the wrong one.
         foreach (var delta in ActiveDeltas())
         {
             var upstream = Path.Combine(RepoFiles.Root, "openspec", "specs", delta.Capability, "spec.md");
@@ -107,7 +119,7 @@ public class ChangeDeltaIntegrityTests
 
             var headings = HeadingsOf(File.ReadAllText(upstream));
 
-            foreach (var name in delta.Added)
+            foreach (var name in delta.Added.Where(n => !delta.Retired.Contains(n, StringComparer.Ordinal)))
             {
                 Assert.False(
                     headings.Contains(name),
@@ -255,6 +267,8 @@ public class ChangeDeltaIntegrityTests
                     Path.GetFileName(capabilityDir),
                     RequirementsUnder(text, "MODIFIED Requirements"),
                     RequirementsUnder(text, "ADDED Requirements"),
+                    [.. RequirementsUnder(text, "REMOVED Requirements"),
+                     .. RequirementsUnder(text, "RENAMED Requirements")],
                     SectionsIn(text),
                     UnattributedIn(text),
                     hasTasks));
@@ -287,8 +301,17 @@ public class ChangeDeltaIntegrityTests
         foreach (var line in Lines(delta))
         {
             var trimmed = line.Trim();
+            var indent = line.Length - line.TrimStart(' ').Length;
 
-            if (trimmed.StartsWith("```", StringComparison.Ordinal))
+            // Four or more leading spaces is an indented code block to CommonMark, and OpenSpec
+            // ignores it. Skipped before anything else so an example cannot move a boundary.
+            if (indent >= 4)
+            {
+                continue;
+            }
+
+            if (trimmed.StartsWith("```", StringComparison.Ordinal)
+                || trimmed.StartsWith("~~~", StringComparison.Ordinal))
             {
                 fenced = !fenced;
                 continue;
@@ -299,35 +322,35 @@ public class ChangeDeltaIntegrityTests
                 continue;
             }
 
-            if (trimmed.StartsWith("##", StringComparison.Ordinal)
+            // Matched against what OpenSpec ACTUALLY does, measured with `openspec show --json`
+            // against every shape either of us could think of:
+            //
+            //   ## MODIFIED Requirements     MODIFIED   ##MODIFIED Requirements   all ADDED
+            //   ##  MODIFIED Requirements    MODIFIED      ## MODIFIED (3 spaces) all ADDED
+            //   ##	MODIFIED Requirements    MODIFIED       ## MODIFIED (4 spaces) all ADDED
+            //   ## Modified Requirements     MODIFIED
+            //
+            // So: a tab separates, and the kind is case-insensitive — CommonMark would also
+            // allow up to three spaces of indent and OpenSpec does NOT, which is why this
+            // requires column zero. Guessing CommonMark here would have left the 3-space shape
+            // silently classified as MODIFIED by this guard and ADDED by the tool — the exact
+            // divergence that has produced a finding in five consecutive rounds.
+            //
+            // Every one of those was a DIVERGENCE, not a hole: this guard was stricter than the
+            // tool in four measured ways and would have failed the build on a perfectly valid
+            // delta. A guard wrong about what is legitimate costs as much as one blind to what
+            // is not — and my round-6 "catch" of `## Modified Requirements` was in fact a false
+            // positive I recorded as a success.
+            if (indent == 0 && trimmed.StartsWith("##", StringComparison.Ordinal)
                 && !trimmed.StartsWith("###", StringComparison.Ordinal))
             {
-                // Matched against the RAW line, not the trimmed one, because OpenSpec's parser
-                // is exactly this strict: `##MODIFIED Requirements` and an indented
-                // `  ## MODIFIED Requirements` are not sections to it — it reads every
-                // requirement beneath them as ADDED. Trimming first made this guard MORE
-                // permissive than the tool, which is disagreement in the other direction and
-                // just as useless: it called both headings valid while OpenSpec was quietly
-                // reclassifying three wholesale replacements.
-                //
-                // So anything that ATTEMPTS a heading and is not exactly `## <Kind>
-                // Requirements` clears the section instead of being ignored. A near-miss must
-                // orphan what follows it, loudly, rather than let it inherit the section above.
-                //
-                // Where the line is drawn was MEASURED against `openspec show --json`, not
-                // reasoned about. For `bookings` (one ADDED requirement, three MODIFIED):
-                //
-                //   ## MODIFIED Requirements     -> ADDED, MODIFIED, MODIFIED, MODIFIED
-                //   ##  MODIFIED Requirements    -> ADDED, MODIFIED, MODIFIED, MODIFIED   (accepted)
-                //   ##MODIFIED Requirements      -> ADDED, ADDED, ADDED, ADDED            (rejected)
-                //
-                // So two spaces is a real heading and this guard must accept it; no space is
-                // not, and this guard must reject it. Anything looser or stricter than that is
-                // a disagreement with the tool that performs the sync, and a disagreement in
-                // either direction is a hole.
-                section = line.StartsWith("## ", StringComparison.Ordinal)
-                          && SectionHeadings.Contains(line[3..].Trim(), StringComparer.Ordinal)
-                    ? line[3..].Trim()
+                var text = trimmed.TrimStart('#');
+
+                // `##Modified` with nothing between hashes and text is not a heading at all —
+                // OpenSpec reads what follows as ADDED — so it must clear the section.
+                section = text.Length > 0 && char.IsWhiteSpace(text[0])
+                          && SectionHeadings.Contains(text.Trim(), StringComparer.OrdinalIgnoreCase)
+                    ? SectionHeadings.First(h => h.Equals(text.Trim(), StringComparison.OrdinalIgnoreCase))
                     : null;
 
                 continue;

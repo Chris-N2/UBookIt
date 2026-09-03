@@ -102,7 +102,7 @@ public class BookingReferenceUniquenessTests(SqlServerFixture fixture)
         fixture.EnsureAvailable();
 
         var resourceId = await Seed.EveryDayRoomAsync(fixture, Ct);
-        var reference = BookingReference.FromCanonical("WXY8NPQ2");
+        var reference = BookingReference.FromCanonical("WXH8NPQ2");
 
         var placed = Seed.ConfirmedBooking(
             resourceId,

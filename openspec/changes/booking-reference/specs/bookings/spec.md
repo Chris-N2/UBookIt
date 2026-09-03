@@ -17,6 +17,11 @@ to be spelled out twice has failed at the one job it has.
 customer a reference which happens to read as an obscenity has a problem it cannot apologise
 its way out of, and the class is removed by construction rather than by a filter list.
 
+**The alphabet SHALL therefore contain no vowel, and `Y` is a vowel.** Stating it explicitly
+because omitting `AEIOU` alone does not deliver the guarantee: `Y` carries *myth*, *gym* and
+*crypt*, and it is the substitution used to write offensive words where vowels are filtered.
+An alphabet that keeps it satisfies a rule about five letters while failing the sentence above.
+
 **The reference SHALL be unique within a site**, and that uniqueness SHALL be **guaranteed by
 the store itself** rather than rest on a check performed beforehand — a check followed by a
 write is a race, and two bookings sharing a reference makes both unquotable. A store MAY also
