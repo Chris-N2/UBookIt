@@ -36,9 +36,60 @@ public class BackofficeDocumentationTests
     [Fact]
     public void The_personal_data_in_booking_records_is_disclosed()
     {
-        // The section is the control over booker names and email addresses. A site owner
-        // cannot weigh a grant they have not been told the consequence of.
-        DocumentationAssert.Says(Docs(), "name and email address of every person who has booked");
+        // A site owner cannot weigh a grant they have not been told the consequence of.
+        //
+        // The sentence this asserted said the SECTION was the control over booker names and
+        // addresses, and that the section grant let anyone read them. Both stopped being true
+        // when withholding shipped, and the wording changed with them — which is what this
+        // guard is for. What survives unchanged is the obligation: the reader must be told the
+        // records contain contact details.
+        //
+        // "name and email address" alone now matches four places in this document, so on its
+        // own it no longer pins the "Grant it deliberately" callout it was written for. The
+        // second assertion is what holds that callout: the reader deciding on the section
+        // grant must be told, there, that contact details are a separate question — otherwise
+        // they grant the section believing it is the only control, which is what the old
+        // wording said and what stopped being true.
+        var docs = Docs();
+
+        DocumentationAssert.Says(docs, "name and email address");
+        DocumentationAssert.Says(docs, "is a second question, answered by the Sensitive data group");
+    }
+
+    [Fact]
+    public void The_second_gate_over_contact_details_is_documented()
+    {
+        // Two questions, and a reader who conflates them grants the wrong thing: the section
+        // decides who sees the bookings, the Sensitive data group decides who sees the people.
+        var docs = Docs();
+
+        DocumentationAssert.Says(docs, "shown only to backoffice users in Umbraco's built-in Sensitive data group");
+        DocumentationAssert.Says(docs, "add Sensitive data");
+    }
+
+    [Fact]
+    public void The_administrator_surprise_is_documented()
+    {
+        // The most likely support ticket this feature will generate, and the one thing that
+        // makes it look like a defect: a brand-new administrator sees every contact detail
+        // hidden, because Umbraco's installer seeds only the original super user.
+        //
+        // Asserted because it is the sentence most likely to be trimmed as verbose by somebody
+        // who already knows how the group works — and its whole audience is the reader who
+        // does not.
+        var docs = Docs();
+
+        DocumentationAssert.Says(docs, "Being an administrator does not grant this");
+        DocumentationAssert.Says(docs, "into the Sensitive data group");
+    }
+
+    [Fact]
+    public void The_redaction_is_documented_as_server_side()
+    {
+        // A reader assessing the package's data handling needs to know the values are not sent
+        // and hidden. "The interface does not display it" and "the browser never receives it"
+        // are different assurances, and only one of them is worth anything.
+        DocumentationAssert.Says(Docs(), "The redaction happens on the server");
     }
 
     [Fact]

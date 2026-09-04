@@ -5,6 +5,8 @@ import type { BookingModel } from "../api/index.js";
 import { toApiErrors } from "./api-errors.js";
 import { confirmDestructive } from "./confirm.js";
 import {
+  bookerCell,
+  bookerNote,
   bookingReference,
   canCancel,
   currentWeek,
@@ -314,6 +316,27 @@ export class UBookItBookingsListElement extends UmbLitElement {
     const showZone = zoneLabelNeeded(this._items) || zoneFallbackOccurred(this._items);
 
     return html`
+      <!--
+        Shown once per page, immediately before the table, when any row's booker was
+        withheld — so a reader meets the explanation on the way in rather than after
+        wondering about the cells.
+
+        role=status, NOT role=alert. The alert above is an interruption because a
+        failed load changes what the reader should do; this is a standing
+        explanation of what they are looking at, and announcing it assertively
+        would talk over them on every page. status announces politely when it
+        appears — which covers paging from a page with no hidden rows to one with
+        them — and reading order covers the first render, where a live region
+        would not announce at all.
+
+        Not aria-describedby on the table: no uui-* component carries that
+        attribute through to its shadow root, so the association would be written,
+        look correct, and reach nothing.
+      -->
+      ${bookerNote(this._items, this.#term("bookerHiddenNote")).map(
+        (note) => html`<p role="status" class="withheld-note">${note}</p>`,
+      )}
+
       <uui-table aria-label=${this.#term("tableLabel")}>
         <uui-table-head>
           <uui-table-head-cell>${this.#term("reference")}</uui-table-head-cell>
@@ -355,6 +378,25 @@ export class UBookItBookingsListElement extends UmbLitElement {
     `;
   }
 
+  /**
+   * The Booker cell, derived in `booking-rows` and only rendered here.
+   *
+   * The union's arms cannot be swapped without a type error — the `hidden` variant
+   * has no `name` — which is the protection the previous ternary lacked: swapping it
+   * rendered an empty cell for a withheld row and "Contact details hidden" for a row
+   * whose details were supplied, with every guard still green.
+   */
+  #bookerCell(booking: BookingModel) {
+    const cell = bookerCell(booking, this.#term("bookerHidden"));
+
+    return cell.kind === "hidden"
+      ? html`<span class="withheld">${cell.label}</span>`
+      : html`
+          ${cell.name}
+          <div class="secondary">${cell.email}</div>
+        `;
+  }
+
   #renderRow(booking: BookingModel, showZone: boolean) {
     // The reader's own locale for month names and clock format; the ZONE comes
     // from the booking. Those are different questions: how a time is written is
@@ -368,8 +410,12 @@ export class UBookItBookingsListElement extends UmbLitElement {
           ${interval.text}${showZone ? html` <span class="zone">${interval.zone}</span>` : nothing}
         </uui-table-cell>
         <uui-table-cell>
-          ${booking.bookerName}
-          <div class="secondary">${booking.bookerEmail}</div>
+          <!--
+            Words, not a blank cell — the same reason "Booked directly" is words.
+            A blank here reads as data that failed to load, and the explanation
+            above the table says why it is missing.
+          -->
+          ${this.#bookerCell(booking)}
         </uui-table-cell>
         <uui-table-cell>
           ${booking.resources.map((resource) => resource.displayName).join(", ")}
@@ -386,7 +432,7 @@ export class UBookItBookingsListElement extends UmbLitElement {
             ? html`<uui-button
                 look="secondary"
                 color="danger"
-                label="${this.#term("cancel")} ${booking.bookerName}"
+                label="${this.#term("cancel")} ${bookingReference(booking)}"
                 @click=${() => this.#cancel(booking)}
               ></uui-button>`
             : nothing}
@@ -398,7 +444,13 @@ export class UBookItBookingsListElement extends UmbLitElement {
   async #cancel(booking: BookingModel) {
     const outcome = await confirmDestructive(this, {
       headline: this.#term("confirmCancelHeadline"),
-      content: this.localize.term("ubookitBookings_confirmCancelContent", booking.bookerName),
+      // By reference, for every operator — see the localization entry. An operator
+      // without sensitive-data access has no name to be shown, and branching on that
+      // would leave two behaviours where the reference serves both better.
+      content: this.localize.term(
+        "ubookitBookings_confirmCancelContent",
+        bookingReference(booking),
+      ),
       confirmLabel: this.#term("confirmCancel"),
     });
 
@@ -504,6 +556,20 @@ export class UBookItBookingsListElement extends UmbLitElement {
     }
     .zone {
       font-size: var(--uui-type-small-size);
+      color: var(--uui-color-text-alt);
+    }
+    /*
+      Italic rather than a lighter colour ALONE: this cell says something different
+      from its neighbours and the difference should not rest on a hue. It still
+      takes the backoffice's own muted token rather than a colour of its own, so a
+      site's theme keeps deciding contrast.
+    */
+    .withheld {
+      font-style: italic;
+      color: var(--uui-color-text-alt);
+    }
+    .withheld-note {
+      margin: var(--uui-size-space-3) 0;
       color: var(--uui-color-text-alt);
     }
     /*

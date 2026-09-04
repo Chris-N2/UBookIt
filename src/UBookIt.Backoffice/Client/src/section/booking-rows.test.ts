@@ -1,5 +1,9 @@
 import { describe, expect, it } from "vitest";
 import {
+  anyBookerWithheld,
+  bookerCell,
+  bookerNote,
+  bookerWithheld,
   bookingReference,
   canCancel,
   currentWeek,
@@ -454,5 +458,184 @@ describe("bookingReference", () => {
     // blank cell costs less than a thrown render. (The comment here previously said the field
     // was optional; it stopped being true when the type was tightened, and nobody swept it.)
     expect(bookingReference({})).toBe("");
+  });
+});
+
+describe("the strings a withheld booker is explained with", () => {
+  // The element's `#term(key: string)` is untyped, so a key that does not exist is not a
+  // compile error — it renders as nothing. A blank Booker cell is the precise state the
+  // requirement forbids, because it reads as data that failed to load rather than as data
+  // being withheld, so the string existing is part of the guarantee and not decoration.
+  //
+  // The same guard already existed for the cancel flow's keys, twenty lines above. It was
+  // written by the change that shipped that flow, for this reason, and adding keys without
+  // extending it is how the next edit removes one silently.
+  it("has a string for every key the withheld booker can emit", async () => {
+    const { default: terms } = await import("../localization/en-us.js");
+    const bookings = (terms as Record<string, Record<string, string>>).ubookitBookings;
+
+    for (const key of ["bookerHidden", "bookerHiddenNote"]) {
+      expect(typeof bookings[key]).toBe("string");
+      expect(bookings[key].length).toBeGreaterThan(0);
+    }
+  });
+
+  it("names the group that grants access, and says being an administrator is not it", async () => {
+    // The note's whole job is to turn "this screen looks broken" into one action. A note
+    // that appeared but named nothing would satisfy a key-exists check and still leave the
+    // reader with no idea what to do — so what it SAYS is asserted, not just that it is
+    // there. The second clause is the one most likely to be trimmed as verbose by somebody
+    // who already knows how the group works, and its whole audience is the reader who does
+    // not: Umbraco seeds only the original super user, so a new administrator sees every
+    // cell hidden.
+    const { default: terms } = await import("../localization/en-us.js");
+    const bookings = (terms as Record<string, Record<string, string>>).ubookitBookings;
+
+    expect(bookings.bookerHiddenNote).toContain("Sensitive data");
+    expect(bookings.bookerHiddenNote).toContain("administrator");
+  });
+
+  it("states the absence rather than masking a value", async () => {
+    // Asterisks or a masked form would imply a value of a particular length and invite
+    // guessing at it; "Not permitted" would describe the reader rather than the data.
+    const { default: terms } = await import("../localization/en-us.js");
+    const bookings = (terms as Record<string, Record<string, string>>).ubookitBookings;
+
+    expect(bookings.bookerHidden).not.toMatch(/[*•]/);
+    expect(bookings.bookerHidden.toLowerCase()).toContain("hidden");
+  });
+});
+
+describe("whether a booker was withheld", () => {
+  // The row shape the endpoint sends, minus everything these decisions ignore.
+  const row = (booker: { name: string; email: string } | null | undefined) => ({
+    startUtc: "2026-09-04T09:00:00Z",
+    endUtc: "2026-09-04T10:00:00Z",
+    timeZoneId: "Europe/London",
+    reference: "7QX4M2NP",
+    booker,
+  });
+
+  it("is withheld when the endpoint sent null", () => {
+    expect(bookerWithheld(row(null))).toBe(true);
+  });
+
+  it("is not withheld when the endpoint sent details", () => {
+    expect(bookerWithheld(row({ name: "Ada Lovelace", email: "ada@example.com" }))).toBe(false);
+  });
+
+  it("treats an absent member as withheld, not as details", () => {
+    // The generated type is `booker?: BookerModel | null`, so undefined is
+    // reachable — and the safe reading of "no details arrived" is that none were
+    // given, never that there are none to give.
+    expect(bookerWithheld(row(undefined))).toBe(true);
+  });
+
+  it("does not confuse an empty name with a withheld booker", () => {
+    // A booker with blank details cannot be produced by the domain, but if one
+    // ever arrived it is a DIFFERENT fault from withholding and must not be
+    // reported as this one — the note would tell an operator to join a group
+    // that would not fix it.
+    expect(bookerWithheld(row({ name: "", email: "" }))).toBe(false);
+  });
+});
+
+describe("whether the page explains why details are hidden", () => {
+  const withBooker = {
+    startUtc: "2026-09-04T09:00:00Z",
+    endUtc: "2026-09-04T10:00:00Z",
+    timeZoneId: "Europe/London",
+    reference: "7QX4M2NP",
+    booker: { name: "Ada Lovelace", email: "ada@example.com" },
+  };
+  const withheld = { ...withBooker, reference: "K3M9PT2R", booker: null };
+
+  it("explains when every row is withheld", () => {
+    expect(anyBookerWithheld([withheld, withheld])).toBe(true);
+  });
+
+  it("explains when only some rows are withheld", () => {
+    // Not a state the endpoint produces today — visibility is decided per
+    // caller, not per row — but the note is derived from the rows rather than
+    // from a page-level flag precisely so that it cannot be missing from a table
+    // that hides something.
+    expect(anyBookerWithheld([withBooker, withheld])).toBe(true);
+  });
+
+  it("stays silent when nothing is withheld", () => {
+    expect(anyBookerWithheld([withBooker, withBooker])).toBe(false);
+  });
+
+  it("stays silent on an empty page", () => {
+    expect(anyBookerWithheld([])).toBe(false);
+  });
+});
+
+describe("what the Booker column says", () => {
+  const row = (booker: { name: string; email: string } | null) => ({
+    startUtc: "2026-09-04T09:00:00Z",
+    endUtc: "2026-09-04T10:00:00Z",
+    timeZoneId: "Europe/London",
+    reference: "7QX4M2NP",
+    booker,
+  });
+
+  // The counterpart of the Service column's tests. These assert the MAPPING, which is
+  // what a grep for the token `bookerWithheld(booking)` in the element could not: the
+  // two arms of that ternary were swapped and every guard stayed green.
+  it("shows the contact details when they were supplied", () => {
+    const cell = bookerCell(row({ name: "Ada Lovelace", email: "ada@example.com" }), "HIDDEN");
+
+    expect(cell.kind).toBe("shown");
+    expect(cell).toEqual({ kind: "shown", name: "Ada Lovelace", email: "ada@example.com" });
+  });
+
+  it("shows the hidden label, and no contact details, when they were withheld", () => {
+    const cell = bookerCell(row(null), "HIDDEN");
+
+    expect(cell).toEqual({ kind: "hidden", label: "HIDDEN" });
+
+    // The inversion that survived every previous guard rendered `booker?.name` for a
+    // withheld row — an empty cell. Nothing about a withheld cell may carry a name.
+    expect(JSON.stringify(cell)).not.toContain("Ada");
+  });
+
+  it("never announces the label over details that were supplied", () => {
+    // The other half of the swap: a row WITH details announcing "Contact details hidden"
+    // tells the operator the opposite of the truth, which is worse than a blank cell.
+    const cell = bookerCell(row({ name: "Ada Lovelace", email: "ada@example.com" }), "HIDDEN");
+
+    expect(JSON.stringify(cell)).not.toContain("HIDDEN");
+  });
+});
+
+describe("whether the page carries the explanation", () => {
+  const withBooker = {
+    startUtc: "2026-09-04T09:00:00Z",
+    endUtc: "2026-09-04T10:00:00Z",
+    timeZoneId: "Europe/London",
+    reference: "7QX4M2NP",
+    booker: { name: "Ada Lovelace", email: "ada@example.com" },
+  };
+  const withheld = { ...withBooker, reference: "K3M9PT2R", booker: null };
+
+  // Returned as a list of zero or one so the template renders it with `.map()` and has
+  // no condition to invert. The polarity WAS invertible, and inverting it showed the
+  // note exactly when nothing was withheld — two scenarios falsified at once, with all
+  // 127 client tests and all 8 source guards green.
+  it("carries the note when a row is withheld", () => {
+    expect(bookerNote([withBooker, withheld], "NOTE")).toEqual(["NOTE"]);
+  });
+
+  it("carries nothing when every row was supplied", () => {
+    expect(bookerNote([withBooker, withBooker], "NOTE")).toEqual([]);
+  });
+
+  it("carries nothing on an empty page", () => {
+    expect(bookerNote([], "NOTE")).toEqual([]);
+  });
+
+  it("carries the note once, however many rows are withheld", () => {
+    expect(bookerNote([withheld, withheld, withheld], "NOTE")).toHaveLength(1);
   });
 });

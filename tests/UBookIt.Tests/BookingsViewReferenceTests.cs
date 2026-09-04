@@ -99,4 +99,137 @@ public class BookingsViewReferenceTests
 
         return count;
     }
+
+    // ------------------------------------------------- withheld booker details
+
+    [Fact]
+    public void The_booker_cell_states_the_absence_rather_than_leaving_it_blank()
+    {
+        // A blank cell reads as data that failed to load. Here it would read as a defect in the
+        // package — which is precisely the support ticket this feature is trying not to
+        // generate — so the cell says something, on the same terms as "Booked directly".
+        //
+        // WIRING ONLY, and deliberately so. This used to grep for `bookerWithheld(booking)` and
+        // was the only thing watching the cell — which meant swapping the two arms of the
+        // template's ternary changed no token and passed every guard, rendering an empty cell
+        // for a withheld row and "Contact details hidden" over a name. The derivation now lives
+        // in `booking-rows.bookerCell`, where the client suite asserts the MAPPING, and the
+        // template's arms cannot be swapped without a type error. What is left for a source
+        // grep is that the element still calls it.
+        var source = RepoFiles.Read(Element);
+
+        // THE WHOLE CALL, because the label crosses the seam as a bare string and that is where
+        // the union's type safety stops. Swapping the two terms — the note's text into the cell
+        // and the cell's label into the note — compiles, passes 134 client tests and passed all
+        // eight of these guards: it puts the full "…Sensitive data group…" paragraph inside
+        // every withheld cell and reduces the note above the table to "Contact details hidden",
+        // which names no group at all.
+        //
+        // `Assert.Contains("bookerHidden", …)` was also weaker than it looked: it is satisfied
+        // by the substring inside `bookerHiddenNote`, so it would have passed with `bookerHidden`
+        // deleted from the element entirely.
+        Assert.Contains(
+            "bookerCell(booking, this.#term(\"bookerHidden\"))",
+            source,
+            StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public void The_page_explains_why_details_are_hidden()
+    {
+        // The note is derived from the rows rather than from a page-level flag or a second
+        // question to Umbraco, so it cannot appear over a table showing every name, nor be
+        // missing from one that hides them.
+        //
+        // WIRING ONLY — see the note above. `bookerNote` returns a list of zero or one and the
+        // template renders it with `.map()`, so there is no condition here to invert; the
+        // polarity is asserted in the client suite, against the function. It was invertible
+        // while this grepped for `anyBookerWithheld(this._items)`, and inverting it showed the
+        // explanation exactly when nothing was withheld, with every guard green.
+        var source = RepoFiles.Read(Element);
+
+        // The whole call, pinning which term goes where — see the sibling guard above.
+        Assert.Contains(
+            "bookerNote(this._items, this.#term(\"bookerHiddenNote\"))",
+            source,
+            StringComparison.Ordinal);
+
+        // ABOVE THE TABLE, not merely present. The spec requires the explanation "once, where
+        // an operator reading the list will see it", and the element justifies `role="status"`
+        // over `role="alert"` on the grounds that "reading order covers the first render, where
+        // a live region would not announce at all". Below the table that justification is
+        // false: a screen-reader user meets every "Contact details hidden" cell before any
+        // explanation of them. Moving the note after `</uui-table>` compiled and passed
+        // everything.
+        var note = source.IndexOf("class=\"withheld-note\"", StringComparison.Ordinal);
+        var table = source.IndexOf("<uui-table", StringComparison.Ordinal);
+
+        Assert.True(note > 0 && table > 0, "The note or the table has moved; this guard is measuring nothing.");
+        Assert.True(
+            note < table,
+            "The explanation of why contact details are hidden renders after the table. It must "
+            + "come first: reading order is what carries it to a screen-reader user on the first "
+            + "render, which is the justification for role=status rather than role=alert.");
+    }
+
+    [Fact]
+    public void The_explanation_is_announced_rather_than_only_rendered()
+    {
+        // role=status, not role=alert: this is a standing explanation of what the reader is
+        // looking at, where the alert above it reports something that just went wrong. An
+        // assertive role would talk over the operator on every page.
+        var source = RepoFiles.Read(Element);
+
+        // Anchored on the note's own class rather than on the term key. The term is now read
+        // before the element is opened — `bookerNote(this._items, this.#term("bookerHiddenNote"))
+        // .map(note => html`<p role="status" …>`)` — so looking backwards from the key finds the
+        // call, not the tag. The class sits on the element that carries the note and nowhere
+        // else, which is the anchor that survives the render being restructured.
+        var note = source.IndexOf("class=\"withheld-note\"", StringComparison.Ordinal);
+
+        Assert.True(note > 0, "The note's element has moved and this guard is measuring nothing.");
+
+        var open = source.LastIndexOf('<', note);
+
+        Assert.True(open > 0, "The note is no longer inside an element.");
+
+        Assert.Contains("role=\"status\"", source[open..note], StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public void The_view_does_not_ask_umbraco_whether_details_may_be_shown()
+    {
+        // The response already says what happened. A second source could answer "yes, you may"
+        // over a row that was withheld anyway, leaving a blank cell and no explanation — the
+        // exact failure the note exists to prevent, arriving by the route meant to prevent it.
+        var source = RepoFiles.Read(Element);
+
+        Assert.DoesNotContain("hasAccessToSensitiveData", source, StringComparison.OrdinalIgnoreCase);
+        Assert.DoesNotContain("currentUser", source, StringComparison.OrdinalIgnoreCase);
+    }
+
+    [Fact]
+    public void A_booking_is_identified_to_the_operator_by_its_reference()
+    {
+        // Both places the view names a particular booking: the per-row control's accessible
+        // name, and the confirmation. Unconditionally, for every operator — a branch that named
+        // the booker where it could would be two behaviours to test for no gain, and would
+        // render "booking for undefined" for anyone without sensitive-data access.
+        var source = RepoFiles.Read(Element);
+
+        Assert.Contains(
+            "label=\"${this.#term(\"cancel\")} ${bookingReference(booking)}\"",
+            source,
+            StringComparison.Ordinal);
+
+        Assert.Contains("confirmCancelContent", source, StringComparison.Ordinal);
+
+        var confirm = source.IndexOf("confirmCancelContent", StringComparison.Ordinal);
+        var afterConfirm = source[confirm..Math.Min(source.Length, confirm + 200)];
+
+        Assert.Contains("bookingReference(booking)", afterConfirm, StringComparison.Ordinal);
+
+        // And the booker is not what identifies it anywhere.
+        Assert.DoesNotContain("booking.bookerName", source, StringComparison.Ordinal);
+    }
 }

@@ -20,14 +20,50 @@ it without being given Content. That is deliberate: the section is the unit of a
 the answer to "can this person manage bookings?" is visible in one place rather than
 inferred from an unrelated permission.
 
-> **Grant it deliberately.** Booking data includes the **name and email address of every
-> person who has booked**. Anyone with this section can read that. It is ordinary personal
-> data and the section is the control over it, so treat the grant as you would access to
-> Members.
+> **Grant it deliberately.** The section grant decides who can see the bookings a site has
+> taken — when they are, what was booked, and whether they were cancelled. Who can see the
+> **name and email address** of the person who booked is a *second* question, answered by
+> the Sensitive data group below.
 
 For reference, the section's alias is `UBookIt.Section`, which is the value stored against
 a user group. You should not need it — the backoffice picker handles this — but it appears
 in logs and in the database, and it is not the display name.
+
+## Who can see booker contact details
+
+Booking rows carry the **name and email address** of the person who booked. Those are shown
+only to backoffice users in Umbraco's built-in **Sensitive data** group. Everyone else sees
+the booking — its reference, when it runs, what it claims, its status — with the contact
+details replaced by *"Contact details hidden"*.
+
+To grant it: **Users → *(the user)* → Groups**, and add **Sensitive data**.
+
+This is Umbraco's own group, not something uBookIt adds. It is the same mechanism that
+governs document-type properties marked as sensitive, so a site that already uses that
+concept is not learning a second one. uBookIt reads it and cannot create, rename or
+reconfigure it.
+
+> **Being an administrator does not grant this.** Umbraco's installer puts only the site's
+> **original** super user — the account created during installation — into the Sensitive
+> data group. Every user created afterwards starts outside it, including one you add to
+> Administrators. So a new colleague with the highest role your site offers will open the
+> Bookings list and find every contact detail hidden. That is uBookIt working correctly, and
+> adding them to Sensitive data is the fix. The list says so on screen for the same reason
+> this paragraph exists.
+
+The redaction happens on the server. A user without the group is not sent the values at all,
+so they are not present in the page, in the browser's network tools, or anywhere else on the
+client — hiding them in the interface would not have been redaction.
+
+Two limits worth stating:
+
+- **It is all-or-nothing.** The group carries no finer grain — there is no "may see names but
+  not email addresses", and no per-resource variation. That is Umbraco's design, and uBookIt
+  uses it rather than inventing a parallel scheme that could disagree with it.
+- **It does not reach your own code.** uBookIt's notifications hand your handlers the whole
+  booking, contact details included, because that is how a site sends its own confirmation
+  emails — see [notifications](notifications.md). There is no signed-in backoffice user in a
+  notification handler, so the question this group answers does not arise there.
 
 ## What is in the section
 
@@ -35,7 +71,7 @@ in logs and in the database, and it is not the display name.
 |---|---|
 | **Resources** | The bookable things themselves: opening hours, exceptions, duration limits, capabilities, and whether each may be booked directly |
 | **Services** | What a visitor books by name, and the resource roles each service resolves to |
-| **Bookings** | What the site has taken: a window you choose, filtered by status, showing the reference, when, who, which resources, which service, and status |
+| **Bookings** | What the site has taken: a window you choose, filtered by status, showing the reference, when, who booked *(if you may see it — below)*, which resources, which service, and status |
 
 **The reference is the first column, because it is the one you scan.** Every booking carries a
 short reference — `7QX4-M2NP` — which the person who booked was shown on their confirmation.
