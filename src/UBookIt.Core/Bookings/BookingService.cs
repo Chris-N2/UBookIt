@@ -116,6 +116,29 @@ public interface IBookingService
     DomainResult CheckPlacementRules(Resource resource, DateTimeOffset start, TimeSpan duration);
 
     Task<DomainResult<Booking>> CancelAsync(Guid bookingId, CancellationToken cancellationToken = default);
+
+    /// <summary>
+    /// Erases a booking's booker contact details and member key, keeping the booking.
+    /// </summary>
+    /// <remarks>
+    /// <para>
+    /// <b>Anonymisation, not deletion.</b> The booking keeps its id, reference, interval,
+    /// time zone, status, creation time, claims and service, and goes on blocking exactly the
+    /// time it blocked before. Deleting it would return time the site had sold, and would
+    /// destroy the site's own record of what happened — which is not what the person asking
+    /// has asked for, and not something a site may concede on their behalf.
+    /// </para>
+    /// <para>
+    /// <b>Idempotent.</b> Erasing an already-erased booking succeeds and changes nothing,
+    /// including the recorded instant. This is deliberately the opposite of
+    /// <see cref="CancelAsync"/>, which refuses a second attempt — see
+    /// <see cref="Booking.EraseBooker"/> for why the two differ.
+    /// </para>
+    /// <para>
+    /// Fails with <see cref="FailureCodes.BookingNotFound"/> when no booking has the id.
+    /// </para>
+    /// </remarks>
+    Task<DomainResult<Booking>> EraseBookerAsync(Guid bookingId, CancellationToken cancellationToken = default);
 }
 
 public sealed class BookingService(
@@ -413,6 +436,29 @@ public sealed class BookingService(
         // just become cancelled, and a second attempt fails above and tells nobody.
         await TellAsync(() => _observer.BookingCancelledAsync(booking, cancellationToken))
             .ConfigureAwait(false);
+
+        return DomainResult<Booking>.Success(booking);
+    }
+
+    public async Task<DomainResult<Booking>> EraseBookerAsync(
+        Guid bookingId, CancellationToken cancellationToken = default)
+    {
+        var booking = await bookingStore.GetBookingAsync(bookingId, cancellationToken).ConfigureAwait(false);
+        if (booking is null)
+        {
+            return DomainResult<Booking>.Failure(
+                FailureCodes.BookingNotFound, $"No booking exists with id {bookingId}.");
+        }
+
+        // The same clock placement uses, so a booking's creation and erasure instants are
+        // comparable and neither is taken from ambient system time at some other layer.
+        booking.EraseBooker(timeProvider.GetUtcNow());
+
+        // Written unconditionally, including when the booking was already erased. Skipping
+        // the write when nothing changed would make the method's success conditional on
+        // state the caller cannot see, and the write is idempotent anyway — it stores the
+        // instant already recorded.
+        await bookingStore.UpdateAsync(booking, cancellationToken).ConfigureAwait(false);
 
         return DomainResult<Booking>.Success(booking);
     }

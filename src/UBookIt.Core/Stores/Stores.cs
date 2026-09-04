@@ -197,9 +197,10 @@ public sealed record BookedResource(Guid ResourceId, string DisplayName);
 /// columns nobody renders.
 /// </para>
 /// <para>
-/// It carries the booker's name and email because that is what a list row shows. Nothing
-/// logs them, and fixtures use invented people — the standing rule, restated because this
-/// is the first Core type built to carry contact details in bulk.
+/// It carries the booker's name and email because that is what a list row shows — or, for a
+/// booking whose personal data was erased, the fact and instant of that erasure instead.
+/// Nothing logs them, and fixtures use invented people — the standing rule, restated because
+/// this is the first Core type built to carry contact details in bulk.
 /// </para>
 /// <para>
 /// The service is the attribution <b>stored on the booking</b>, name included, not a join
@@ -215,10 +216,62 @@ public sealed record BookingSummary(
     BookingInterval Interval,
     BookingStatus Status,
     DateTimeOffset CreatedUtc,
-    string BookerName,
-    string BookerEmail,
+    SummaryBooker Booker,
     IReadOnlyList<BookedResource> Resources,
     ServiceAttribution? Service);
+
+/// <summary>
+/// The booker's contact details as a management list row shows them.
+/// </summary>
+/// <remarks>
+/// <b>Name and email only.</b> The booker's phone number and member key are stored and
+/// rehydrated by the domain and have never crossed this port; a list row does not display
+/// them, and carrying personal data no screen shows would be adding a disclosure with no
+/// purpose to serve it. Held together as one value because they are supplied, withheld and
+/// erased together.
+/// </remarks>
+public sealed record SummaryContact(string Name, string Email);
+
+/// <summary>
+/// The booker on a management list row: contact details, or the fact that they were erased.
+/// </summary>
+/// <remarks>
+/// <para>
+/// The two states the domain permits, carried across the port as two states rather than as
+/// strings that might be empty. A consumer cannot reach a name or an email without first
+/// establishing that <see cref="Contact"/> is present, which is the same guarantee
+/// <see cref="Bookings.Booker"/> makes and for the same reason.
+/// </para>
+/// <para>
+/// <b>This says nothing about who may see the details.</b> The port lists what is stored;
+/// whether a particular caller is permitted to read it is the endpoint's question, decided
+/// against Umbraco's sensitive-data access and applied when the response is composed. A
+/// read port that knew about users would be answering two questions at once.
+/// </para>
+/// </remarks>
+public sealed record SummaryBooker
+{
+    private SummaryBooker(SummaryContact? contact, DateTimeOffset? erasedUtc)
+    {
+        Contact = contact;
+        ErasedUtc = erasedUtc;
+    }
+
+    /// <summary>The contact details, or <c>null</c> where they have been erased.</summary>
+    public SummaryContact? Contact { get; }
+
+    /// <summary>When the details were erased, or <c>null</c> for a booker still carrying them.</summary>
+    public DateTimeOffset? ErasedUtc { get; }
+
+    /// <summary>True when the contact details have been erased.</summary>
+    public bool IsErased => Contact is null;
+
+    /// <summary>A booker whose details are stored.</summary>
+    public static SummaryBooker Of(SummaryContact contact) => new(contact, erasedUtc: null);
+
+    /// <summary>A booker whose details were erased, and when.</summary>
+    public static SummaryBooker Erased(DateTimeOffset erasedUtc) => new(contact: null, erasedUtc);
+}
 
 /// <summary>A page of booking summaries plus the unpaged total, for a management list.</summary>
 public sealed record BookingPage(IReadOnlyList<BookingSummary> Items, int Total);

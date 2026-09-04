@@ -154,7 +154,19 @@ internal sealed class SqlBookingStore(UBookItDbContext db) : IBookingStore
             .FirstAsync(b => b.Id == booking.Id, cancellationToken)
             .ConfigureAwait(false);
 
+        // Every part of a booking the domain permits to change after placement is written
+        // here — the status AND the booker. Writing only the status was correct while a
+        // status change was the only mutation there was, and it silently stopped being
+        // correct the moment erasure existed: the aggregate would carry the erasure, the
+        // call would report success, and the row would keep the person's details. Nothing
+        // asserting against the returned Booking could see it, which is why the covering
+        // test re-reads from storage.
         row.Status = (int)booking.Status;
+        row.MemberKey = booking.Booker.MemberKey;
+        row.BookerName = booking.Booker.Contact?.Name;
+        row.BookerEmail = booking.Booker.Contact?.Email;
+        row.BookerPhone = booking.Booker.Contact?.Phone;
+        row.BookerErasedUtc = booking.Booker.ErasedUtc;
         await db.SaveChangesAsync(cancellationToken).ConfigureAwait(false);
     }
 
@@ -183,9 +195,10 @@ internal sealed class SqlBookingStore(UBookItDbContext db) : IBookingStore
             Status = (int)booking.Status,
             CreatedUtc = booking.CreatedUtc,
             MemberKey = booking.Booker.MemberKey,
-            BookerName = booking.Booker.Name,
-            BookerEmail = booking.Booker.Email,
-            BookerPhone = booking.Booker.Phone,
+            BookerName = booking.Booker.Contact?.Name,
+            BookerEmail = booking.Booker.Contact?.Email,
+            BookerPhone = booking.Booker.Contact?.Phone,
+            BookerErasedUtc = booking.Booker.ErasedUtc,
             ServiceId = serviceId,
             ServiceName = serviceName,
             Claims = booking.Claims
@@ -199,9 +212,31 @@ internal sealed class SqlBookingStore(UBookItDbContext db) : IBookingStore
             row.Id,
             BookingReference.FromCanonical(row.Reference),
             BookingInterval.Create(row.StartUtc, row.EndUtc, row.TimeZoneId).Value,
-            Booker.Create(row.MemberKey, row.BookerName, row.BookerEmail, row.BookerPhone).Value,
+            ToBooker(row),
             row.Claims.Select(c => new ResourceClaim(c.ResourceId)),
             (BookingStatus)row.Status,
             row.CreatedUtc,
             BookingAttributionMapper.ToAttribution(row)).Value;
+
+    /// <summary>
+    /// The stored booker, in whichever of its two states the row holds.
+    /// </summary>
+    /// <remarks>
+    /// <para>
+    /// <b>The erasure column decides, not the absence of a name.</b> Reading "erased" off a
+    /// NULL name would be inferring the state from missing data — which is the reading the
+    /// schema stores <c>BookerErasedUtc</c> precisely to avoid, and which would silently
+    /// convert a row corrupted by some other means into a lawful erasure.
+    /// </para>
+    /// <para>
+    /// <c>Booker.Create</c> is used for the unerased case exactly as before, and its result
+    /// is taken directly: what is stored is historical fact, on the same terms as the stored
+    /// status, and a row that failed validation here would make a booking unreadable for
+    /// having once been valid.
+    /// </para>
+    /// </remarks>
+    private static Booker ToBooker(BookingRow row)
+        => row.BookerErasedUtc is { } erasedUtc
+            ? Booker.Erased(erasedUtc)
+            : Booker.Create(row.MemberKey, row.BookerName, row.BookerEmail, row.BookerPhone).Value;
 }

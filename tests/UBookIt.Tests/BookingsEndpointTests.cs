@@ -85,8 +85,7 @@ public class BookingsEndpointTests
             BookingInterval.Create(startUtc, startUtc.AddHours(1), "Europe/London").Value,
             status,
             new DateTimeOffset(2026, 5, 1, 0, 0, 0, TimeSpan.Zero),
-            "Ada Lovelace",
-            "ada@example.com",
+            SummaryBooker.Of(new SummaryContact("Ada Lovelace", "ada@example.com")),
             [.. resources.Select(r => new BookedResource(r.Id, r.Name))],
             service);
 
@@ -193,6 +192,9 @@ public class BookingsEndpointTests
 
         public Task<DomainResult<Booking>> CancelAsync(
             Guid bookingId, CancellationToken cancellationToken = default) => throw Unexpected();
+
+        public Task<DomainResult<Booking>> EraseBookerAsync(
+            Guid bookingId, CancellationToken cancellationToken = default) => throw Unexpected();
     }
 
     private static T Payload<T>(IActionResult result)
@@ -212,6 +214,9 @@ public class BookingsEndpointTests
             CancelledId = bookingId;
             return Task.FromResult(answer);
         }
+
+        public Task<DomainResult<Booking>> EraseBookerAsync(
+            Guid bookingId, CancellationToken cancellationToken = default) => throw new NotSupportedException();
 
         public Task<DomainResult<Booking>> PlaceAsync(
             BookingRequest request, CancellationToken cancellationToken = default) => throw new NotSupportedException();
@@ -340,9 +345,11 @@ public class BookingsEndpointTests
         // Status is a NAME on the wire. Serialising the enum would put an ordinal here and
         // pin the contract to a Core declaration's order.
         Assert.Equal("Confirmed", item.Status);
-        Assert.NotNull(item.Booker);
-        Assert.Equal("Ada Lovelace", item.Booker.Name);
-        Assert.Equal("ada@example.com", item.Booker.Email);
+        Assert.Equal(BookerConditions.Shown, item.Booker.Condition);
+        Assert.NotNull(item.Booker.Contact);
+        Assert.Equal("Ada Lovelace", item.Booker.Contact.Name);
+        Assert.Equal("ada@example.com", item.Booker.Contact.Email);
+        Assert.Null(item.Booker.ErasedUtc);
         Assert.Equal("Europe/London", item.TimeZoneId);
 
         // Both resources, each with its own name — the mapper had no test before this.
@@ -510,9 +517,11 @@ public class BookingsEndpointTests
         var model = Payload<PagedBookingsModel>(await controller.ListBookings(From, To));
         var item = Assert.Single(model.Items);
 
-        Assert.NotNull(item.Booker);
-        Assert.Equal("Ada Lovelace", item.Booker.Name);
-        Assert.Equal("ada@example.com", item.Booker.Email);
+        Assert.Equal(BookerConditions.Shown, item.Booker.Condition);
+        Assert.NotNull(item.Booker.Contact);
+        Assert.Equal("Ada Lovelace", item.Booker.Contact.Name);
+        Assert.Equal("ada@example.com", item.Booker.Contact.Email);
+        Assert.Null(item.Booker.ErasedUtc);
     }
 
     [Fact]
@@ -535,7 +544,14 @@ public class BookingsEndpointTests
 
         Assert.Equal(75, model.Total);
         Assert.Equal(2, model.Items.Count);
-        Assert.All(model.Items, item => Assert.Null(item.Booker));
+        Assert.All(model.Items, item => Assert.Equal(BookerConditions.Withheld, item.Booker.Condition));
+        Assert.All(model.Items, item => Assert.Null(item.Booker.Contact));
+
+        // Withheld is NOT erased. The row says the details exist and this caller may not see
+        // them, which sends the operator to a colleague — where "erased" would tell them there
+        // is nobody to ask. Reporting either as the other is the failure this condition exists
+        // to prevent, so the negative is asserted as well as the positive.
+        Assert.All(model.Items, item => Assert.Null(item.Booker.ErasedUtc));
 
         // And everything that is not personal data survives — a row withheld down to nothing
         // would be unusable, and the reference is what an operator identifies it by.
@@ -585,7 +601,10 @@ public class BookingsEndpointTests
 
             var model = Payload<PagedBookingsModel>(await controller.ListBookings(From, To));
 
-            Assert.Null(Assert.Single(model.Items).Booker);
+            var booker = Assert.Single(model.Items).Booker;
+
+            Assert.Equal(BookerConditions.Withheld, booker.Condition);
+            Assert.Null(booker.Contact);
         }
     }
 }

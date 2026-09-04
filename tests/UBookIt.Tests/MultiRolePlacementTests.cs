@@ -757,6 +757,10 @@ public class MultiRolePlacementTests
         public Task<DomainResult<Booking>> CancelAsync(
             Guid bookingId, CancellationToken cancellationToken = default)
             => inner.CancelAsync(bookingId, cancellationToken);
+
+        public Task<DomainResult<Booking>> EraseBookerAsync(
+            Guid bookingId, CancellationToken cancellationToken = default)
+            => inner.EraseBookerAsync(bookingId, cancellationToken);
     }
 
     /// <summary>
@@ -792,6 +796,10 @@ public class MultiRolePlacementTests
         public Task<DomainResult<Booking>> CancelAsync(
             Guid bookingId, CancellationToken cancellationToken = default)
             => inner.CancelAsync(bookingId, cancellationToken);
+
+        public Task<DomainResult<Booking>> EraseBookerAsync(
+            Guid bookingId, CancellationToken cancellationToken = default)
+            => inner.EraseBookerAsync(bookingId, cancellationToken);
     }
 
     [Fact]

@@ -22,5 +22,17 @@ namespace UBookIt.Backoffice
         /// holds <see cref="SectionAlias"/>.
         /// </summary>
         public const string SectionAccessPolicy = "UBookItSectionAccess";
+
+        /// <summary>
+        /// The additional authorization policy an endpoint requires when it acts on a
+        /// booker's personal data: the user belongs to Umbraco's built-in <b>Sensitive
+        /// data</b> user group.
+        /// </summary>
+        /// <remarks>
+        /// Applied alongside <see cref="SectionAccessPolicy"/>, never instead of it. Section
+        /// access decides whether a user may reach uBookIt; this decides whether they may act
+        /// on the people inside it.
+        /// </remarks>
+        public const string SensitiveDataAccessPolicy = "UBookItSensitiveDataAccess";
     }
 }

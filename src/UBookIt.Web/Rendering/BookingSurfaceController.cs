@@ -203,6 +203,7 @@ public sealed class BookingSurfaceController : SurfaceController
     {
         var start = TimeZoneInfo.ConvertTime(booking.Interval.StartUtc, zone);
         var end = TimeZoneInfo.ConvertTime(booking.Interval.EndUtc, zone);
+        var contact = PlacedBooking.Contact(booking);
 
         return new BookingConfirmationModel
         {
@@ -211,9 +212,9 @@ public sealed class BookingSurfaceController : SurfaceController
             ResourceName = resourceName,
             LocalStart = start.ToString("dddd d MMMM yyyy, HH:mm", CultureInfo.InvariantCulture),
             LocalEnd = end.ToString("HH:mm", CultureInfo.InvariantCulture),
-            BookerName = booking.Booker.Name,
-            BookerEmail = booking.Booker.Email,
-            BookerPhone = booking.Booker.Phone,
+            BookerName = contact.Name,
+            BookerEmail = contact.Email,
+            BookerPhone = contact.Phone,
         };
     }
 

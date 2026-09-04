@@ -50,6 +50,7 @@ internal sealed class SqlBookingManagementStore(UBookItDbContext db) : IBookingM
                 booking.CreatedUtc,
                 booking.BookerName,
                 booking.BookerEmail,
+                booking.BookerErasedUtc,
 
                 // Read from the booking row, NOT joined to the service table. The stored
                 // name is the snapshot taken at placement; a join would answer with the
@@ -79,8 +80,7 @@ internal sealed class SqlBookingManagementStore(UBookItDbContext db) : IBookingM
                 BookingInterval.Create(row.StartUtc, row.EndUtc, row.TimeZoneId).Value,
                 (BookingStatus)row.Status,
                 row.CreatedUtc,
-                row.BookerName,
-                row.BookerEmail,
+                ToSummaryBooker(row.BookerName, row.BookerEmail, row.BookerErasedUtc),
                 [.. row.Resources.Select(r => new BookedResource(r.Id, r.DisplayName))],
                 BookingAttributionMapper.ToAttribution(row.ServiceId, row.ServiceName)))
             .ToList();
@@ -145,5 +145,38 @@ internal sealed class SqlBookingManagementStore(UBookItDbContext db) : IBookingM
         }
 
         return matching;
+    }
+
+    /// <summary>
+    /// The stored booker columns as the read port's two-state booker.
+    /// </summary>
+    /// <remarks>
+    /// <b>The erasure column decides, not the absence of a name.</b> Inferring "erased" from
+    /// a NULL name would read the state off missing data, which is what storing the instant
+    /// exists to avoid — and it would report a row damaged by any other means as a lawful
+    /// erasure. Mirrors <c>SqlBookingStore.ToBooker</c> deliberately: two projections of the
+    /// same columns that disagreed about what they mean would be worse than either.
+    /// </remarks>
+    private static SummaryBooker ToSummaryBooker(string? name, string? email, DateTimeOffset? erasedUtc)
+    {
+        if (erasedUtc is { } erased)
+        {
+            return SummaryBooker.Erased(erased);
+        }
+
+        // Not suppressed with `!`. A row that is neither erased nor carrying details is a
+        // state the schema and the domain both forbid, so meeting one means something has
+        // written the table by another route — and quietly presenting it as an empty name
+        // on an operator's screen is the worst of the available answers. Failing here says
+        // which row and what is wrong with it.
+        if (name is null || email is null)
+        {
+            throw new InvalidOperationException(
+                "A booking row carries no erasure instant and no booker contact details. "
+                + "The booker columns are NULL only for an erased booking, so this row was "
+                + "not written by uBookIt.");
+        }
+
+        return SummaryBooker.Of(new SummaryContact(name, email));
     }
 }

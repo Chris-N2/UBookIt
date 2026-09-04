@@ -86,7 +86,16 @@ public sealed class Booking
 
     public BookingInterval Interval { get; }
 
-    public Booker Booker { get; }
+    /// <summary>
+    /// Who the booking is for. Always present — erasure removes the person's details, not
+    /// the booker — and mutable only through <see cref="EraseBooker"/>.
+    /// </summary>
+    /// <remarks>
+    /// <c>private set</c> for the same reason <see cref="Status"/> has one: there is exactly
+    /// one way a booking's booker may change after placement, it is named after what it does,
+    /// and it is on the aggregate rather than available to any caller holding a reference.
+    /// </remarks>
+    public Booker Booker { get; private set; }
 
     public IReadOnlyList<ResourceClaim> Claims => _claims;
 
@@ -180,6 +189,43 @@ public sealed class Booking
 
         return DomainResult<Booking>.Success(
             new Booking(id, reference, interval, booker, claimList, status, createdUtc.ToUniversalTime(), service));
+    }
+
+    /// <summary>
+    /// Removes the booker's contact details and member key, recording when.
+    /// </summary>
+    /// <remarks>
+    /// <para>
+    /// <b>Nothing else about the booking changes.</b> Its id, reference, interval, time zone,
+    /// status, creation time, claims and service attribution are untouched — in particular it
+    /// goes on blocking exactly the time it blocked before. An erased booking still occupies
+    /// its slot, which is the whole reason erasure is anonymisation rather than deletion:
+    /// deleting the row would silently return time the site had sold.
+    /// </para>
+    /// <para>
+    /// <b>Erasing an already-erased booking is a no-op, and keeps the first instant.</b>
+    /// Deliberately the opposite conclusion from <see cref="Cancel"/>, which refuses a second
+    /// attempt. Cancelling is a transition whose starting state matters, so a caller told
+    /// "cancelled" when nothing changed cannot tell a completed action from a rejected one.
+    /// Erasure has no starting state to be wrong about: it is absorbing, the observable
+    /// outcome is identical either way — the details are gone — and it is invoked by
+    /// machinery that must be safe to retry. Overwriting the instant would also be a lie
+    /// about when the data actually left.
+    /// </para>
+    /// <para>
+    /// Returns nothing, because there is no way for it to fail. An erasure a caller could
+    /// have refused is an erasure a caller might skip.
+    /// </para>
+    /// </remarks>
+    /// <param name="erasedUtc">When the erasure happened.</param>
+    public void EraseBooker(DateTimeOffset erasedUtc)
+    {
+        if (Booker.IsErased)
+        {
+            return;
+        }
+
+        Booker = Booker.Erased(erasedUtc);
     }
 
     public DomainResult Confirm() => Transition(BookingStatus.Confirmed, BookingStatus.Requested);

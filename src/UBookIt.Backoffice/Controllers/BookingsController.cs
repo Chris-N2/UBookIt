@@ -1,4 +1,5 @@
 using Asp.Versioning;
+using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.Mvc.ModelBinding;
@@ -193,6 +194,71 @@ public class BookingsController(
         {
             BookingId = cancelled.Value.Id,
             Status = cancelled.Value.Status.ToString(),
+        });
+    }
+
+    /// <summary>
+    /// Erases a booking's booker contact details and member key.
+    /// </summary>
+    /// <remarks>
+    /// <para>
+    /// <b>Anonymisation, not deletion — so POST, not DELETE.</b> The booking keeps its row,
+    /// its reference, its interval, its claims and its status, and goes on blocking the time
+    /// it always blocked. What leaves is the person. <c>DELETE</c> would say the opposite of
+    /// all of that, exactly as it would for a cancellation.
+    /// </para>
+    /// <para>
+    /// <b>Gated on sensitive-data access as well as the section</b>, and by policy rather than
+    /// by a check in this method: a caller who may not be shown a booker's name should not be
+    /// able to destroy it, and expressing that as a condition inside the handler would leave a
+    /// route that reaches the operation having established nothing. The policy carries the
+    /// section requirement too, so this attribute only ever narrows what the base controller
+    /// already demands.
+    /// </para>
+    /// <para>
+    /// <b>Idempotent, unlike cancelling.</b> Erasing an already-erased booking succeeds and
+    /// changes nothing, returning the original instant. Cancellation refuses a second attempt
+    /// because it is a transition whose starting state matters; erasure is absorbing, its
+    /// outcome is identical either way, and the retention job that will call it must be safe
+    /// to retry.
+    /// </para>
+    /// <para>
+    /// <b>The response echoes nothing that was erased.</b> See
+    /// <see cref="ErasedBookerModel"/>.
+    /// </para>
+    /// </remarks>
+    /// <param name="id">The booking whose booker to erase.</param>
+    [HttpPost("bookings/{id:guid}/erase-booker")]
+    [Authorize(Policy = Constants.SensitiveDataAccessPolicy)]
+    [ProducesResponseType<ErasedBookerModel>(StatusCodes.Status200OK)]
+    [ProducesResponseType(StatusCodes.Status403Forbidden)]
+    [ProducesResponseType(StatusCodes.Status404NotFound)]
+    public async Task<IActionResult> EraseBooker(Guid id, CancellationToken cancellationToken = default)
+    {
+        var erased = await bookingService.EraseBookerAsync(id, cancellationToken);
+
+        if (!erased.Succeeded)
+        {
+            return erased.Failures.ToProblemResult();
+        }
+
+        // Not asserted away. The domain guarantees a booking is erased once EraseBooker has
+        // run, so a null here would mean that guarantee had broken — and reporting a
+        // successful erasure with a fabricated instant would be the worst available answer to
+        // that, because it says the data is gone when nothing established that it is.
+        if (erased.Value.Booker.ErasedUtc is not { } erasedUtc)
+        {
+            return Problem(
+                title: "The booking was not erased.",
+                detail: "The erase operation reported success but the booking still carries "
+                        + "booker contact details.",
+                statusCode: StatusCodes.Status500InternalServerError);
+        }
+
+        return Ok(new ErasedBookerModel
+        {
+            BookingId = erased.Value.Id,
+            ErasedUtc = erasedUtc,
         });
     }
 

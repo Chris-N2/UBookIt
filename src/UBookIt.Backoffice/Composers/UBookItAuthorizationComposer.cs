@@ -25,13 +25,29 @@ public sealed class UBookItAuthorizationComposer : IComposer
     public void Compose(IUmbracoBuilder builder)
     {
         builder.Services.AddSingleton<IAuthorizationHandler, UBookItSectionHandler>();
+        builder.Services.AddSingleton<IAuthorizationHandler, UBookItSensitiveDataHandler>();
 
         builder.Services.AddAuthorization(options =>
+        {
             options.AddPolicy(Constants.SectionAccessPolicy, policy =>
             {
                 policy.AuthenticationSchemes.Add(
                     OpenIddictValidationAspNetCoreDefaults.AuthenticationScheme);
                 policy.Requirements.Add(new UBookItSectionRequirement());
-            }));
+            });
+
+            // The second gate, for endpoints that act on a booker's personal data. It carries
+            // the section requirement as well as the sensitive-data one, so that applying it
+            // to an action can only ever ADD a condition — an endpoint that named this policy
+            // alone would otherwise be reachable by somebody without the section at all,
+            // which is a widening dressed as a tightening.
+            options.AddPolicy(Constants.SensitiveDataAccessPolicy, policy =>
+            {
+                policy.AuthenticationSchemes.Add(
+                    OpenIddictValidationAspNetCoreDefaults.AuthenticationScheme);
+                policy.Requirements.Add(new UBookItSectionRequirement());
+                policy.Requirements.Add(new UBookItSensitiveDataRequirement());
+            });
+        });
     }
 }

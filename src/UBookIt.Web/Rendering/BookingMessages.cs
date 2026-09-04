@@ -164,8 +164,8 @@ public static class BookingMessages
     private static string? FieldIdFor(DomainFailure failure)
         => failure.Field switch
         {
-            nameof(Booker.Name) => BookingFieldIds.Name,
-            nameof(Booker.Email) => BookingFieldIds.Email,
+            nameof(BookerContact.Name) => BookingFieldIds.Name,
+            nameof(BookerContact.Email) => BookingFieldIds.Email,
             _ => failure.Code switch
             {
                 // Duration bounds concern the length control specifically.

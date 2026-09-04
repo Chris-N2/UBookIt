@@ -94,6 +94,12 @@ public sealed class UBookItDbContext(DbContextOptions<UBookItDbContext> options)
             // check followed by an insert is a race, and two bookings sharing a reference
             // makes both of them unquotable — the one thing a reference exists to prevent.
             booking.HasIndex(b => b.Reference).IsUnique();
+            // Nullable, and their nullability means ERASED — never "a placement omitted
+            // them". The domain requires a name and a well-formed email of every booker it
+            // places, so no row is written with these NULL; they become NULL only when a
+            // booking's personal data is erased, and BookerErasedUtc records when. The
+            // lengths are unchanged: what a stored name may be is not affected by whether it
+            // can later be removed.
             booking.Property(b => b.BookerName).HasMaxLength(256);
             booking.Property(b => b.BookerEmail).HasMaxLength(320);
             booking.Property(b => b.BookerPhone).HasMaxLength(64);

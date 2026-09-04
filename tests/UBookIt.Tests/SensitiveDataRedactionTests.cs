@@ -52,8 +52,7 @@ public class SensitiveDataRedactionTests
                 "Europe/London").Value,
             BookingStatus.Confirmed,
             new DateTimeOffset(2026, 5, 1, 0, 0, 0, TimeSpan.Zero),
-            "Ada Lovelace",
-            "ada@example.com",
+            SummaryBooker.Of(new SummaryContact("Ada Lovelace", "ada@example.com")),
             [new BookedResource(RoomId, "Meeting Room A"), new BookedResource(TherapistId, "MRC Therapist")],
             new ServiceAttribution(ServiceId, "Initial Consultation"));
 
@@ -62,9 +61,11 @@ public class SensitiveDataRedactionTests
     {
         var model = BookingModelMapper.ToModel(Summary(), BookerVisibility.Shown);
 
-        Assert.NotNull(model.Booker);
-        Assert.Equal("Ada Lovelace", model.Booker.Name);
-        Assert.Equal("ada@example.com", model.Booker.Email);
+        Assert.Equal(BookerConditions.Shown, model.Booker.Condition);
+        Assert.NotNull(model.Booker.Contact);
+        Assert.Equal("Ada Lovelace", model.Booker.Contact.Name);
+        Assert.Equal("ada@example.com", model.Booker.Contact.Email);
+        Assert.Null(model.Booker.ErasedUtc);
     }
 
     [Fact]
@@ -72,7 +73,12 @@ public class SensitiveDataRedactionTests
     {
         var model = BookingModelMapper.ToModel(Summary(), BookerVisibility.Withheld);
 
-        Assert.Null(model.Booker);
+        Assert.Equal(BookerConditions.Withheld, model.Booker.Condition);
+        Assert.Null(model.Booker.Contact);
+
+        // Withheld, not erased. The two absences send an operator to different places, so
+        // the wrong one is asserted against as well as the right one.
+        Assert.Null(model.Booker.ErasedUtc);
     }
 
     [Fact]
@@ -140,10 +146,25 @@ public class SensitiveDataRedactionTests
     /// tests that exercise them.
     /// </para>
     /// </remarks>
+    /// <remarks>
+    /// <b><c>BookerContactModel</c> is listed as well as <c>BookerModel</c>, and that is not
+    /// tidiness.</b> Splitting the booker into a condition plus a nested contact object moved
+    /// the personal data down a level: with only the outer model recorded, a phone number added
+    /// to the inner one would reach every permitted caller without this guard noticing — the
+    /// exact case it exists for. A model that carries personal data is guarded wherever it ends
+    /// up, not wherever it used to be.
+    /// </remarks>
     [Theory]
     [InlineData(typeof(BookingModel),
         "BookingId,Reference,StartUtc,EndUtc,TimeZoneId,Status,CreatedUtc,Booker,Resources,Service")]
-    [InlineData(typeof(BookerModel), "Name,Email")]
+    // Condition and ErasedUtc were weighed against the question this guard's failure asks.
+    // Neither is personal data: Condition says which of shown/withheld/erased applies, and
+    // ErasedUtc says when a record stopped holding a person — facts about the ROW, disclosing
+    // nothing about who the booker was. They sit outside the contact object deliberately, since
+    // both must reach a caller who may not see contact details. The name and email stay inside
+    // it, where the mapper decides them.
+    [InlineData(typeof(BookerModel), "Condition,Contact,ErasedUtc")]
+    [InlineData(typeof(BookerContactModel), "Name,Email")]
     public void The_booking_response_models_have_not_gained_a_member_nobody_decided_about(
         Type model, string expected)
     {
@@ -287,8 +308,27 @@ public class SensitiveDataRedactionTests
     /// </para>
     /// <para>
     /// Comment-stripped, so the prose explaining the mechanism does not read as a second one.
-    /// The occurrence list is compared whole rather than searched, on the same reasoning as the
+    /// The identifier set is compared whole rather than searched, on the same reasoning as the
     /// membership snapshot: a check that something is absent passes when the scan breaks.
+    /// </para>
+    /// <para>
+    /// <b>It once recorded exactly one identifier, and that was too narrow a rule for the
+    /// guarantee it stands for.</b> The requirement forbids a second <i>source of truth</i> — a
+    /// group, a flag, a setting of our own. It does not forbid naming the concept. Adding an
+    /// authorization policy for the erase endpoint introduced a requirement, a handler and a
+    /// policy constant, none of which decides anything: the handler asks Umbraco and returns
+    /// the answer. Failing that was the guard checking its mechanism rather than its guarantee.
+    /// </para>
+    /// <para>
+    /// So it now asserts both halves separately. The set still has to be stated whole, so a new
+    /// name is still a deliberate decision rather than a silent addition — and the thing the
+    /// requirement actually forbids is asserted directly, by name, instead of being implied by
+    /// the set having one element.
+    /// </para>
+    /// <para>
+    /// Compared as a <b>sorted distinct set</b>. The previous ordered-list form also depended on
+    /// the order <c>RepoFiles.Paths</c> happens to enumerate in, which is a property of the file
+    /// system rather than of the package.
     /// </para>
     /// </remarks>
     [Fact]
@@ -307,19 +347,54 @@ public class SensitiveDataRedactionTests
                 Regex.Matches(code, @"\w*SensitiveData\w*").Select(match => match.Value));
         }
 
-        // Exactly one, and it is Umbraco's extension method. Not `SensitiveDataGroupKey`, which
-        // would mean reimplementing the membership test against the constant ourselves; not a
-        // settings property; not a named group of our own.
-        Assert.Equal(["HasAccessToSensitiveData"], occurrences);
+        // Every identifier in the package that names the concept. Each is either Umbraco's own
+        // membership test or plumbing that routes to it — none of them holds a group key, reads
+        // a setting, or decides membership itself:
+        //
+        //   HasAccessToSensitiveData      Umbraco's extension method. THE decision, and the
+        //                                 only thing here that makes one.
+        //   UBookItSensitiveDataHandler   Calls it and succeeds or fails the requirement.
+        //   UBookItSensitiveDataRequirement / SensitiveDataAccessPolicy
+        //                                 The policy the erase endpoint carries, so its gate is
+        //                                 a property of the endpoint rather than a line inside
+        //                                 it. Neither carries a value.
+        //   UBookItSensitiveDataAccess    The file's own type-name prefix.
+        Assert.Equal(
+            [
+                "HasAccessToSensitiveData",
+                "SensitiveDataAccessPolicy",
+                "UBookItSensitiveDataAccess",
+                "UBookItSensitiveDataHandler",
+                "UBookItSensitiveDataRequirement",
+            ],
+            occurrences.Distinct().Order(StringComparer.Ordinal).ToList());
+
+        // The half the requirement is actually about, asserted directly rather than inferred
+        // from the size of the set above. Reimplementing the membership test against Umbraco's
+        // group key, or introducing a setting of our own, would add a SECOND answer to a
+        // question Umbraco already answers — and two answers are free to disagree.
+        Assert.DoesNotContain("SensitiveDataGroupKey", occurrences);
+        Assert.DoesNotContain(
+            occurrences,
+            occurrence => occurrence.Contains("Setting", StringComparison.Ordinal)
+                || occurrence.Contains("GroupKey", StringComparison.Ordinal)
+                || occurrence.Contains("Flag", StringComparison.Ordinal));
+
+        // And the decision itself is still made by asking Umbraco, so the set above cannot be
+        // satisfied by plumbing that routes to nothing.
+        Assert.Contains("HasAccessToSensitiveData", occurrences);
     }
 
     [Fact]
-    public void The_contract_states_what_a_null_booker_means()
+    public void The_contract_states_why_contact_details_are_absent()
     {
-        // The shape carries most of this — a nullable object rather than two blankable strings —
-        // but the shape cannot say WHICH of the two readings is intended, and the requirement is
-        // that the package states it. Every other load-bearing sentence this change writes is
-        // pinned; this one disambiguates the null itself and was not.
+        // Was `The_contract_states_what_a_null_booker_means`, and the null it pinned no longer
+        // exists: absence acquired a second cause — erasure — so the member stopped being
+        // nullable and states its condition instead. The GUARANTEE is unchanged and is what is
+        // pinned here: a caller must be told WHY there are no contact details, rather than left
+        // to infer it. What changed is that the shape now carries the answer, so the sentence
+        // to pin is the one saying the condition is stated rather than inferred.
+        //
         // Normalised first: an XML doc sentence wraps across `///` lines, so a raw substring
         // match asserts the line breaks rather than the sentence, and fails the moment somebody
         // reflows the comment. Strip the markers and collapse whitespace, then match the words.
@@ -330,11 +405,25 @@ public class SensitiveDataRedactionTests
             @"\s+",
             " ");
 
-        Assert.Contains("means withheld", prose, StringComparison.Ordinal);
+        // The three conditions are named, so a reader of the contract alone knows the full set.
+        Assert.Contains("shown, withheld, or erased", prose, StringComparison.Ordinal);
+
+        // Read, never deduced — the property that makes the third state worth having.
         Assert.Contains(
-            "A booking without a booker is not a state the domain can produce",
+            "it never infers one from the absence of a field",
             prose,
             StringComparison.Ordinal);
+
+        // Still true, and still the reason absence at this level can carry meaning at all.
+        Assert.Contains(
+            "Every booking has a booker",
+            prose,
+            StringComparison.Ordinal);
+
+        // Erasure beats withholding, stated where a client integrator reads rather than only in
+        // the spec — this is the rule that keeps "ask a colleague" from being said about a
+        // booking nobody can recover.
+        Assert.Contains("Erasure outranks withholding", prose, StringComparison.Ordinal);
     }
 
     [Fact]

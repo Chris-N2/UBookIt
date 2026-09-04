@@ -37,13 +37,7 @@ internal static class BookingModelMapper
         TimeZoneId = summary.Interval.TimeZoneId,
         Status = summary.Status.ToString(),
         CreatedUtc = summary.CreatedUtc,
-        Booker = bookerVisibility is BookerVisibility.Shown
-            ? new BookerModel
-            {
-                Name = summary.BookerName,
-                Email = summary.BookerEmail,
-            }
-            : null,
+        Booker = ToBookerModel(summary.Booker, bookerVisibility),
         Resources = [.. summary.Resources.Select(resource => new BookedResourceModel
         {
             ResourceId = resource.ResourceId,
@@ -57,4 +51,45 @@ internal static class BookingModelMapper
             }
             : null,
     };
+
+    /// <summary>
+    /// The booker's condition on the wire: erased, shown, or withheld — decided in that order.
+    /// </summary>
+    /// <remarks>
+    /// <para>
+    /// <b>Erasure is tested first because it settles the question.</b> Where the details have
+    /// been erased there is nothing to withhold from anybody, so the caller's permission does
+    /// not arise; asking it first and reporting "withheld" to a user without sensitive-data
+    /// access would tell them to go and ask a colleague who cannot help them either.
+    /// </para>
+    /// <para>
+    /// <b><paramref name="visibility"/> stays required even though this branch ignores it.</b>
+    /// It is unused only where there is nothing to disclose, and making it optional to reflect
+    /// that would hand every other caller a way to omit the decision — which is exactly what
+    /// the required argument exists to prevent.
+    /// </para>
+    /// <para>
+    /// Withholding is the fall-through, so a visibility this method does not recognise
+    /// withholds rather than discloses.
+    /// </para>
+    /// </remarks>
+    private static BookerModel ToBookerModel(SummaryBooker booker, BookerVisibility visibility)
+    {
+        if (booker.ErasedUtc is { } erasedUtc)
+        {
+            return new BookerModel
+            {
+                Condition = BookerConditions.Erased,
+                ErasedUtc = erasedUtc,
+            };
+        }
+
+        return booker.Contact is { } contact && visibility is BookerVisibility.Shown
+            ? new BookerModel
+            {
+                Condition = BookerConditions.Shown,
+                Contact = new BookerContactModel { Name = contact.Name, Email = contact.Email },
+            }
+            : new BookerModel { Condition = BookerConditions.Withheld };
+    }
 }
