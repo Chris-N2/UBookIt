@@ -17,7 +17,13 @@ namespace UBookIt.Backoffice.Models;
 /// is the answer travelling from one to the other.
 /// </para>
 /// </remarks>
-public enum BookerVisibility
+/// <remarks>
+/// <b>Internal, matching its only consumer.</b> <c>BookingModelMapper</c> is internal, so this
+/// was public surface with no caller outside the assembly — and the front-end contract this
+/// package publishes is API endpoints and view models, not C# mapping types. An alternative UI
+/// consumes the JSON, where withholding is already expressed by a null booker.
+/// </remarks>
+internal enum BookerVisibility
 {
     /// <summary>The details are withheld: the row carries no booker at all.</summary>
     /// <remarks>

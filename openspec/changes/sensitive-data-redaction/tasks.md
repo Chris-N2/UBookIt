@@ -122,3 +122,48 @@ ever attacked.
 - [x] 10.6 **MINOR** — nothing asserted the note renders **above** the table; moving it after `</uui-table>` compiled and passed everything. Not cosmetic: the spec requires it "where an operator reading the list will see it", and the element justifies `role="status"` over `role="alert"` on the grounds that reading order carries it on first render. Below the table a screen-reader user meets every hidden cell before any explanation of them. Now asserted by index.
 - [x] 10.7 QA re-ran all eight of its earlier mutations against the shipped code; each fails with its intended message. It also confirmed the client inversions fail the **MSBuild** build, not merely the editor — `npm run build` is `tsc && vite build` and the csproj runs it — so the discriminated union is a real gate rather than an editor-only guarantee.
 - [x] 10.8 QA answered the question left open at 9.10: excluding `Name.Contains('<')` does skip a **local function**, which a person can legitimately write — but one is reachable only from its enclosing member, and that member is checked, *provided the return-type filter sees it*. 10.2 is what makes that exclusion safe by construction rather than by luck.
+
+## 11. QA round 5 — APPROVE WITH NITS, both taken
+
+Round 5 was deliberately pointed away from the guards and at **the claims this change makes
+about the world**, where a mistake would be an actual disclosure rather than an unprotected one.
+All four non-goals were verified independently, and no disclosure channel was found.
+
+**Verified, not assumed** — each by enumeration rather than by reading the proposal:
+
+- **The delivery API has no booking read path.** All eleven routed actions enumerated; the only
+  response models carrying a booker are the two POST placement responses, built from the booking
+  that POST just created.
+- **`Booker.Phone` and `Booker.MemberKey` never reach the management port.** `BookingSummary`
+  carries two booker fields and the SQL projection selects exactly those two. (`Phone` *is* on
+  the delivery wire, echoed to the person who submitted it — correct, and outside this change.)
+- **Nothing in the package re-emits from a notification.** The only subscribers in the repo are
+  in `UBookIt.TestSite` (`IsPackable=false`), logging id, start and service name.
+- **The Razor views are structurally safe.** There is no by-id or by-reference booking read
+  anywhere in `UBookIt.Web`, so no route *can* render another booking's booker.
+- **Logging and exceptions are clean.** The one call site touching a booking logs `booking.Id`
+  and nothing else; no `throw` interpolates a booker value; `Booker.Create` emits generic
+  messages and never echoes the submitted value.
+
+- [x] 11.1 **NIT** — the "package uses Umbraco's own group" scenario has two halves and only the
+  first was observed: a fixture using the real key says nothing about whether a *second*
+  mechanism exists beside it. Added `The_package_defines_no_sensitive_data_mechanism_of_its_own`,
+  comparing the whole list of `SensitiveData`-shaped identifiers in comment-stripped source
+  against exactly `["HasAccessToSensitiveData"]` — so neither a settings property nor a
+  hardcoded `SensitiveDataGroupKey` can appear. The roadmap's permissions work is precisely when
+  somebody would reach for one. Mutation-checked.
+- [x] 11.2 **NIT** — nothing pinned the sentence that disambiguates the null. The shape carries
+  most of the meaning but cannot say *which* reading is intended, and every other load-bearing
+  sentence in this change is pinned. Added `The_contract_states_what_a_null_booker_means`,
+  normalising `///` wrapping first so it asserts the sentence rather than the line breaks.
+- [x] 11.3 **The first attempt to mutation-check 11.2 proved nothing and nearly passed as
+  evidence.** The replacement targeted the contiguous sentence, which does not exist in the file
+  precisely because it wraps across `///` lines — so nothing was mutated and the test passed
+  vacuously. Re-run against text that exists on one line, with the script asserting the
+  substitution applied before trusting the result. **Third time this class of false green has
+  appeared** (stale build, failed compile, and now a no-op edit); the rule is that a mutation must
+  be shown to have taken effect before its result means anything.
+- [x] 11.4 **Observation taken.** `BookerVisibility` was `public` while its only consumer,
+  `BookingModelMapper`, is `internal` — public surface with no caller outside the assembly. Made
+  `internal`: the front-end contract this package publishes is endpoints and view models, not C#
+  mapping types, and an alternative UI consumes the JSON, where withholding is already a null.

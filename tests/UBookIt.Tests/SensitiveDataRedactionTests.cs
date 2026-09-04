@@ -270,6 +270,73 @@ public class SensitiveDataRedactionTests
                 || (type.IsGenericType && type.GetGenericArguments().Any(CarriesARow));
     }
 
+    /// <summary>
+    /// The package decides sensitive-data access one way: by asking Umbraco.
+    /// </summary>
+    /// <remarks>
+    /// <para>
+    /// The requirement has two halves — that the package uses Umbraco's built-in group, and that
+    /// it <b>defines no group, flag or configuration setting of its own for the purpose</b>. Only
+    /// the first was observed; a fixture using the real group key says nothing about whether a
+    /// second mechanism exists beside it.
+    /// </para>
+    /// <para>
+    /// The second half is the one worth guarding, because a parallel mechanism is a second answer
+    /// to the same question, free to disagree with the first — and the roadmap's permissions work
+    /// is exactly when somebody would reach for a <c>UBookIt:SensitiveDataGroupKey</c> setting.
+    /// </para>
+    /// <para>
+    /// Comment-stripped, so the prose explaining the mechanism does not read as a second one.
+    /// The occurrence list is compared whole rather than searched, on the same reasoning as the
+    /// membership snapshot: a check that something is absent passes when the scan breaks.
+    /// </para>
+    /// </remarks>
+    [Fact]
+    public void The_package_defines_no_sensitive_data_mechanism_of_its_own()
+    {
+        var occurrences = new List<string>();
+
+        foreach (var path in RepoFiles.Paths("src", "*.cs"))
+        {
+            var code = string.Join(
+                '\n',
+                File.ReadAllLines(path)
+                    .Where(line => !line.TrimStart().StartsWith("//", StringComparison.Ordinal)));
+
+            occurrences.AddRange(
+                Regex.Matches(code, @"\w*SensitiveData\w*").Select(match => match.Value));
+        }
+
+        // Exactly one, and it is Umbraco's extension method. Not `SensitiveDataGroupKey`, which
+        // would mean reimplementing the membership test against the constant ourselves; not a
+        // settings property; not a named group of our own.
+        Assert.Equal(["HasAccessToSensitiveData"], occurrences);
+    }
+
+    [Fact]
+    public void The_contract_states_what_a_null_booker_means()
+    {
+        // The shape carries most of this — a nullable object rather than two blankable strings —
+        // but the shape cannot say WHICH of the two readings is intended, and the requirement is
+        // that the package states it. Every other load-bearing sentence this change writes is
+        // pinned; this one disambiguates the null itself and was not.
+        // Normalised first: an XML doc sentence wraps across `///` lines, so a raw substring
+        // match asserts the line breaks rather than the sentence, and fails the moment somebody
+        // reflows the comment. Strip the markers and collapse whitespace, then match the words.
+        var source = RepoFiles.Read("src/UBookIt.Backoffice/Models/BookingModels.cs");
+
+        var prose = Regex.Replace(
+            Regex.Replace(source, @"^\s*///", " ", RegexOptions.Multiline),
+            @"\s+",
+            " ");
+
+        Assert.Contains("means withheld", prose, StringComparison.Ordinal);
+        Assert.Contains(
+            "A booking without a booker is not a state the domain can produce",
+            prose,
+            StringComparison.Ordinal);
+    }
+
     [Fact]
     public void Only_recorded_files_can_compose_a_booking_row()
     {
