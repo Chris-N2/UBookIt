@@ -1,4 +1,5 @@
 using System.Reflection;
+using System.Runtime.CompilerServices;
 using System.Text.RegularExpressions;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.Mvc.Routing;
@@ -197,11 +198,26 @@ public class SensitiveDataRedactionTests
     [Fact]
     public void Every_route_that_composes_a_booking_row_requires_the_decision()
     {
-        var routes = typeof(BookingModelMapper)
-            .GetMethods(
+        // EVERY type in the assembly, not just the mapper. Scoping this to
+        // `typeof(BookingModelMapper)` would have left the same hole one file over: a static
+        // factory on `BookingModel` itself lives in `BookingModels.cs`, which the file scan
+        // already whitelists, so neither guard would have seen it. That is precisely the shape
+        // of defect the file-versus-route distinction exists to close, and closing it in one
+        // place while leaving it open in another is how this guard has failed three times.
+        var routes = typeof(BookingModelMapper).Assembly.GetTypes()
+            .Where(type => type.GetCustomAttribute<CompilerGeneratedAttribute>() is null)
+            .SelectMany(type => type.GetMethods(
                 BindingFlags.Public | BindingFlags.NonPublic | BindingFlags.Static
-                | BindingFlags.Instance | BindingFlags.DeclaredOnly)
+                | BindingFlags.Instance | BindingFlags.DeclaredOnly))
             .Where(method => method.ReturnType == typeof(BookingModel))
+            // Compiler-generated members are excluded, and this was measured rather than
+            // assumed: the controller's `Select(summary => ToModel(summary, visibility))`
+            // compiles to a closure method returning a BookingModel whose visibility is
+            // CAPTURED rather than passed, so the guard fired on the very call site that is
+            // correct. Excluding them costs nothing — a lambda is not a route a caller can
+            // reach, and the method it calls is checked on its own.
+            .Where(method => method.GetCustomAttribute<CompilerGeneratedAttribute>() is null
+                && method.Name.Contains('<', StringComparison.Ordinal) is false)
             .ToArray();
 
         // A scan over nothing passes every assertion made about it — and this guard exists
@@ -215,14 +231,14 @@ public class SensitiveDataRedactionTests
 
             Assert.True(
                 decision is not null,
-                $"BookingModelMapper.{route.Name} returns a BookingModel without taking a "
+                $"{route.DeclaringType?.Name}.{route.Name} returns a BookingModel without taking a "
                 + "BookerVisibility. Every route composing a row that carries booker contact "
                 + "details must state whether they may be seen; one that does not reaches every "
                 + "caller, including one with no sensitive-data access.");
 
             Assert.False(
                 decision!.HasDefaultValue,
-                $"BookingModelMapper.{route.Name} takes a BookerVisibility with a default value, "
+                $"{route.DeclaringType?.Name}.{route.Name} takes a BookerVisibility with a default value, "
                 + "so a caller may omit the decision and receive whichever answer the default "
                 + "happens to be. The decision must be required, not merely available.");
         }
