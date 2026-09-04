@@ -93,8 +93,14 @@ emailing bookers, and both are easier to reason about once "who may see this" ha
 - `src/UBookIt.Backoffice/Client/src/` — regenerated API types; `bookings-list.element.ts`
   renders the withheld placeholder and the explanatory note; the cancel control and its
   confirmation switch to the reference; new `en-US` localization entries.
-- `tests/UBookIt.Tests/` — endpoint tests for both user shapes, a mapper test, and the
-  reflection guard over the response model.
+- `tests/UBookIt.Tests/` — endpoint tests for both user shapes, a mapper test, the
+  reflection guard over the response model, and a guard that the mapper is the only place a
+  booking row is composed.
+- `tests/UBookIt.Tests/ChangeDeltaIntegrityTests.cs` — **an existing repo guard is relaxed.**
+  `Every_modified_requirement_names_one_that_exists` required an upstream spec for every active
+  delta, which a change introducing a new capability cannot satisfy. Scoped to deltas that
+  actually modify a requirement. Called out here rather than left in the diff, because it is a
+  guard against silently mis-synced deltas.
 
 **No change**: `UBookIt.Core`, `UBookIt.Persistence`, `UBookIt.Web`, the database schema (no
 migration), and every delivery endpoint.

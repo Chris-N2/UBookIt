@@ -459,6 +459,51 @@ describe("bookingReference", () => {
   });
 });
 
+describe("the strings a withheld booker is explained with", () => {
+  // The element's `#term(key: string)` is untyped, so a key that does not exist is not a
+  // compile error — it renders as nothing. A blank Booker cell is the precise state the
+  // requirement forbids, because it reads as data that failed to load rather than as data
+  // being withheld, so the string existing is part of the guarantee and not decoration.
+  //
+  // The same guard already existed for the cancel flow's keys, twenty lines above. It was
+  // written by the change that shipped that flow, for this reason, and adding keys without
+  // extending it is how the next edit removes one silently.
+  it("has a string for every key the withheld booker can emit", async () => {
+    const { default: terms } = await import("../localization/en-us.js");
+    const bookings = (terms as Record<string, Record<string, string>>).ubookitBookings;
+
+    for (const key of ["bookerHidden", "bookerHiddenNote"]) {
+      expect(typeof bookings[key]).toBe("string");
+      expect(bookings[key].length).toBeGreaterThan(0);
+    }
+  });
+
+  it("names the group that grants access, and says being an administrator is not it", async () => {
+    // The note's whole job is to turn "this screen looks broken" into one action. A note
+    // that appeared but named nothing would satisfy a key-exists check and still leave the
+    // reader with no idea what to do — so what it SAYS is asserted, not just that it is
+    // there. The second clause is the one most likely to be trimmed as verbose by somebody
+    // who already knows how the group works, and its whole audience is the reader who does
+    // not: Umbraco seeds only the original super user, so a new administrator sees every
+    // cell hidden.
+    const { default: terms } = await import("../localization/en-us.js");
+    const bookings = (terms as Record<string, Record<string, string>>).ubookitBookings;
+
+    expect(bookings.bookerHiddenNote).toContain("Sensitive data");
+    expect(bookings.bookerHiddenNote).toContain("administrator");
+  });
+
+  it("states the absence rather than masking a value", async () => {
+    // Asterisks or a masked form would imply a value of a particular length and invite
+    // guessing at it; "Not permitted" would describe the reader rather than the data.
+    const { default: terms } = await import("../localization/en-us.js");
+    const bookings = (terms as Record<string, Record<string, string>>).ubookitBookings;
+
+    expect(bookings.bookerHidden).not.toMatch(/[*•]/);
+    expect(bookings.bookerHidden.toLowerCase()).toContain("hidden");
+  });
+});
+
 describe("whether a booker was withheld", () => {
   // The row shape the endpoint sends, minus everything these decisions ignore.
   const row = (booker: { name: string; email: string } | null | undefined) => ({

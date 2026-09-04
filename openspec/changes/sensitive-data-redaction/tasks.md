@@ -40,6 +40,11 @@ listed here so the re-diff has somewhere a reader will look.
 - [x] 4.6 Add a guard asserting no management endpoint parameter accepts a booker name or email as a filter, search or sort key.
 - [x] 4.7 Extend `BookingsViewReferenceTests` (or add alongside) for the hidden cell, the once-per-page note, its absence when nothing is withheld, and reference-based identification of the cancel control and confirmation.
 
+## 4a. Repo guard relaxed by this change (declared, not incidental)
+
+- [x] 4a.1 `tests/UBookIt.Tests/ChangeDeltaIntegrityTests.cs` — `Every_modified_requirement_names_one_that_exists` asserted an upstream spec exists for **every** active delta, which a change introducing a **new** capability cannot satisfy: that file does not exist until sync. Scoped to deltas whose `Modified` list is non-empty, which is what the guard's own rationale describes. A delta that modifies a requirement and has no upstream spec still fails.
+- [x] 4a.2 It had never fired because it walks active changes only, and by archive time a capability is upstream — `sensitive-data` is the first new capability proposed since the guard was written. Recorded here because relaxing a guard that exists to catch silently-mis-synced deltas is exactly the kind of edit that should be declared rather than found in a diff.
+
 ## 5. Documentation
 
 - [x] 5.1 Add a Sensitive data subsection to `docs/backoffice.md` under "Who can use it": what requires membership, how to grant it, and that Umbraco's installer places only the original super user in the group so a later administrator is not in it.
@@ -69,3 +74,12 @@ listed here so the re-diff has somewhere a reader will look.
   - `docs/backoffice.md` — "Anyone with this section can read that", of booker names and email addresses. Directly falsified: the section grant no longer discloses them. Rewritten to separate the two gates.
   - `README.md` — the same claim in shorter form, in the install instructions. It would have been the first thing a new user read about this, and it was the one the docs sweep nearly missed, because the phrasing differs. Rewritten.
   - `openspec/specs/resource-management/spec.md` — "these endpoints return **personal data** — a booking carries the booker's name and email". **Not falsified, and left alone.** Its subject is why uBookIt's endpoints authorize on uBookIt's own section, and that reasoning is untouched: a booking does carry contact details, and the endpoints can still return them. Sensitive-data access is a second, inner gate rather than a replacement, so the requirement makes no claim this change contradicts. Narrowing it would have put six scenarios about resource authorization at risk to restate something they do not cover.
+
+## 7. QA round 1 — REJECT, remediated
+
+- [x] 7.1 **MAJOR** — the two new localization strings had no test. `#term(key: string)` is untyped so tsc cannot catch a missing key, and a missing key renders as **nothing**: a blank Booker cell, the exact state the requirement forbids. An identical guard for the cancel flow's keys already sat twenty lines above the new tests, added by change ⑲ for this reason, and was not extended. Added three tests in that pattern: the keys exist and are non-empty; the note names "Sensitive data" and "administrator"; the cell states an absence rather than masking a value. Mutation-checked twice — deleting the key fails 2, and a note that exists but names nothing fails 1, so the guard checks what it *says* and not merely that it is there.
+- [x] 7.2 **MINOR** — the guard relaxation above was undeclared. Now declared in tasks §4a and in the proposal's Impact.
+- [x] 7.3 **MINOR** — `sensitive-data`'s "no route skips the decision" was guarded for the mapper but not against a *second* composition site: `BookingModel` is a public POCO with a settable `Booker`. Task 2.3 checked that by hand once, and this change's own argument is that a one-time check is not a guard. Added `The_mapper_is_the_only_place_a_booking_row_is_composed`, a source-level scan (the property is an absence, so no compiled artefact carries it).
+- [x] 7.4 **MINOR** — `docs/backoffice.md`'s "What is in the section" table still said Bookings shows "who", unqualified, in the summary a reader scans first. Qualified.
+- [x] 7.5 **NIT** — `The_personal_data_in_booking_records_is_disclosed` had been weakened to a phrase matching four places in the document, so it no longer pinned the "Grant it deliberately" callout. Added an assertion that does.
+- [x] 7.6 **NIT** — dropped "query" and "term" from the forbidden-parameter list; both match ordinary unrelated parameter names, and a guard that fires for the wrong reason gets relaxed. "search" already covers the endpoint it is really about.

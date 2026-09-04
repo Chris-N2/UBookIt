@@ -131,6 +131,49 @@ public class SensitiveDataRedactionTests
     }
 
     [Fact]
+    public void The_mapper_is_the_only_place_a_booking_row_is_composed()
+    {
+        // The `sensitive-data` capability requires that composing a response carrying contact
+        // details REQUIRES the visibility decision, and that there is no route which skips it.
+        // The mapper's required argument guarantees that for the mapper — and `BookingModel` is
+        // a public class with a settable `Booker`, so `new BookingModel { Booker = ... }`
+        // elsewhere would be exactly the unguarded route the requirement forbids.
+        //
+        // That was checked once by hand while this change was applied. A one-time check is not
+        // a guard, which is the argument this change itself makes about the field-addition
+        // risk — so the second-composition-site risk gets a standing check too rather than
+        // being left to whoever reads the diff next.
+        //
+        // Source-level because the property is an ABSENCE: no compiled artefact carries "there
+        // is no other constructor call", and a test that exercised the one call site would
+        // prove only that it maps correctly, never that it is alone.
+        var offenders = new List<string>();
+
+        foreach (var path in RepoFiles.Paths("src", "*.cs"))
+        {
+            var text = File.ReadAllText(path);
+
+            if (!text.Contains("new BookingModel", StringComparison.Ordinal))
+            {
+                continue;
+            }
+
+            if (Path.GetFileName(path) != "BookingModelMapper.cs")
+            {
+                offenders.Add(Path.GetFileName(path));
+            }
+        }
+
+        Assert.True(
+            offenders.Count == 0,
+            "A booking row is composed outside BookingModelMapper, in: "
+            + string.Join(", ", offenders)
+            + ". Every route to a response carrying booker contact details must take the "
+            + "visibility decision, and only the mapper requires it. Compose it through "
+            + "BookingModelMapper.ToModel rather than constructing the model directly.");
+    }
+
+    [Fact]
     public void No_booking_endpoint_can_be_asked_about_a_booker()
     {
         // A caller who may not read an email but may filter by one can confirm an address by
@@ -148,7 +191,11 @@ public class SensitiveDataRedactionTests
 
         Assert.NotEmpty(parameters);
 
-        foreach (var forbidden in new[] { "name", "email", "booker", "search", "query", "term" })
+        // "query" and "term" were here and are gone: both match ordinary parameter names that
+        // have nothing to do with a booker — `queryMode`, `searchTerm` on some future unrelated
+        // endpoint — and a guard that fires for the wrong reason gets read as noise and then
+        // relaxed. "search" already catches the endpoint this is really about.
+        foreach (var forbidden in new[] { "name", "email", "booker", "search" })
         {
             Assert.DoesNotContain(
                 parameters,

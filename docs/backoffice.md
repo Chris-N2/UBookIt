@@ -71,7 +71,7 @@ Two limits worth stating:
 |---|---|
 | **Resources** | The bookable things themselves: opening hours, exceptions, duration limits, capabilities, and whether each may be booked directly |
 | **Services** | What a visitor books by name, and the resource roles each service resolves to |
-| **Bookings** | What the site has taken: a window you choose, filtered by status, showing the reference, when, who, which resources, which service, and status |
+| **Bookings** | What the site has taken: a window you choose, filtered by status, showing the reference, when, who booked *(if you may see it — below)*, which resources, which service, and status |
 
 **The reference is the first column, because it is the one you scan.** Every booking carries a
 short reference — `7QX4-M2NP` — which the person who booked was shown on their confirmation.

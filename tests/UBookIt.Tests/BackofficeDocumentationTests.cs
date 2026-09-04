@@ -43,7 +43,17 @@ public class BackofficeDocumentationTests
         // when withholding shipped, and the wording changed with them — which is what this
         // guard is for. What survives unchanged is the obligation: the reader must be told the
         // records contain contact details.
-        DocumentationAssert.Says(Docs(), "name and email address");
+        //
+        // "name and email address" alone now matches four places in this document, so on its
+        // own it no longer pins the "Grant it deliberately" callout it was written for. The
+        // second assertion is what holds that callout: the reader deciding on the section
+        // grant must be told, there, that contact details are a separate question — otherwise
+        // they grant the section believing it is the only control, which is what the old
+        // wording said and what stopped being true.
+        var docs = Docs();
+
+        DocumentationAssert.Says(docs, "name and email address");
+        DocumentationAssert.Says(docs, "is a second question, answered by the Sensitive data group");
     }
 
     [Fact]
