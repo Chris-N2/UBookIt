@@ -50,13 +50,18 @@ listed here so the re-diff has somewhere a reader will look.
 
 - [x] 6.1 `dotnet build` clean against a **zero** warning baseline, and the full .NET and client suites green.
 - [x] 6.2 `openspec validate --strict` for the change.
-- [ ] 6.3 Live check — **BLOCKED, needs Chris.** Confirm in a browser that the list shows hidden cells plus the note for a user without sensitive-data access, and details for one with it.
+- [x] 6.3 Live check — **DONE in Chrome against the running TestSite, 2026-09-04.** Chris logged in; the group was toggled on `uBookIt Admin` and restored.
 
-  **The method in this task as written does not work, and the replacement is better.** Creating a second backoffice user requires completing an Umbraco invite, which goes by email — there is no SMTP on the dev site, so the second account can never be activated to log in as.
+  Method used was the replacement described below, not the original: creating a second user needs an Umbraco invite by email and there is no SMTP on the dev site, so that account could never be activated to log in as. Instead the super user's own Sensitive data membership was removed and re-added.
 
-  Do this instead: **remove the super user from the Sensitive data group**, reload Bookings, observe the hidden cells and the note; then add them back and observe the details return. That exercises the identical code path — `HasAccessToSensitiveData()` is group membership and nothing else — needs no new user, no email and no second login, and it is reversible in two clicks.
+  **With the group (baseline):** row `QSXG-Q8QQ` showed `Alan Turing` / `alan@example.com`. Intercepted response carried `booker: {name, email}` and the item keys were exactly the ten recorded in the membership guard — an independent confirmation of that guard against the live wire format.
 
-  What is still true from the original wording: **the super user's default view is not evidence.** They are in the group by install, so seeing names proves only the Shown path. The withheld path is the one that has never been seen in a browser.
+  **Without the group:** the cell read *"Contact details hidden"* in italics; the note rendered once above the table naming the Sensitive data group; the reference stayed in the first column and the cancel control read "Cancel booking QSXG-Q8QQ". **The intercepted response carried `booker: null`, and the name and email appeared nowhere in the 471-byte payload** — the disclosure guarantee, verified end to end rather than inferred. The row and the total were unchanged (`Showing 1–1 of 1`), so withholding removed details from a row rather than a row from the results.
+
+  **Re-added:** details returned, note disappeared. Account left exactly as found (Administrators + Sensitive data).
+
+  **Incidental finding worth keeping:** this site's `claude-mcp-ubookit` user is in Administrators and *not* in Sensitive data — a live instance of the documented gotcha, sitting in the wild on the first site anyone looked at.
+
 - [x] 6.4 Sweep `openspec/specs/` and `docs/` for any sentence this change falsifies, and record the result in this file whether or not anything is found.
 
   **Result: two falsified sentences found, both fixed; one assessed and deliberately left.**
