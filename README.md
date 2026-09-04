@@ -14,8 +14,11 @@ Then run the site. uBookIt installs its schema on first boot.
 
 **One step you will otherwise look for:** the **uBookIt** section is not visible until you
 grant it, the same as any other Umbraco section — *Users → User Groups → (a group) → Sections*.
-Grant it deliberately rather than to everyone: booking data includes the name and email address
-of every person who has booked. See [the backoffice docs](docs/backoffice.md).
+Grant it deliberately rather than to everyone: it decides who can see the bookings a site has
+taken. Who can see the **name and email address** of the person who booked is a second
+question, answered by Umbraco's built-in **Sensitive data** group — and note that only the
+site's original super user is in that group to begin with, so a newly created administrator
+sees those details hidden until you add them. See [the backoffice docs](docs/backoffice.md).
 
 > **uBookIt is at `0.1.0`, and the public API may still move.** It does what the list below
 > says and it does it properly, but the version is not decoration: treat contracts as settled

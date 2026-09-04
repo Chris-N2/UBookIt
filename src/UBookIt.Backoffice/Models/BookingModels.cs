@@ -22,6 +22,29 @@ public class BookedServiceModel
     public string DisplayName { get; set; } = string.Empty;
 }
 
+/// <summary>The person a booking was made for, as the list row shows them.</summary>
+/// <remarks>
+/// <para>
+/// Carried as an object rather than as flat members on the row so that withholding it is
+/// expressible: see <see cref="BookingModel.Booker"/>. Every booking has one — the domain
+/// requires a non-empty name and a well-formed email of every booker — so this type is
+/// never a half-populated stand-in for a booking that lacks contact details.
+/// </para>
+/// <para>
+/// It carries <b>only</b> what the management read port supplies. The booker's phone number
+/// and member key are stored and rehydrated by the domain, and have never reached this port;
+/// adding either here would be adding personal data at the HTTP layer that the port cannot
+/// fill, which the endpoint's contract forbids for the ordinary reason and this capability
+/// forbids for a second one.
+/// </para>
+/// </remarks>
+public class BookerModel
+{
+    public string Name { get; set; } = string.Empty;
+
+    public string Email { get; set; } = string.Empty;
+}
+
 /// <summary>
 /// A booking as a management list row.
 /// </summary>
@@ -74,9 +97,31 @@ public class BookingModel
 
     public DateTimeOffset CreatedUtc { get; set; }
 
-    public string BookerName { get; set; } = string.Empty;
-
-    public string BookerEmail { get; set; } = string.Empty;
+    /// <summary>
+    /// The booker's contact details, or <c>null</c> where they were withheld from the caller.
+    /// </summary>
+    /// <remarks>
+    /// <para>
+    /// <b><c>null</c> means withheld, and it cannot mean anything else.</b> A booking without a
+    /// booker is not a state the domain can produce — a name and an email are required of every
+    /// one — so the null is free to carry a single meaning. A caller that is not permitted to
+    /// see contact details receives the row with everything else intact and this member absent.
+    /// </para>
+    /// <para>
+    /// <b>BREAKING (unpublished):</b> this replaces the flat <c>BookerName</c> and
+    /// <c>BookerEmail</c> strings. One nullable object rather than two parallel nullable
+    /// fields, for the same reason <see cref="Service"/> is one: withholding is a fact about
+    /// the pair, and two fields that must be blank together can be observed half-populated by a
+    /// client with no correct way to read that state. Blanking them instead was rejected —
+    /// a default value in a response is not evidence of the underlying state.
+    /// </para>
+    /// <para>
+    /// The decision is made server-side, before this model is composed. It is never a matter of
+    /// a client receiving the details and declining to render them: the values would be in the
+    /// payload, readable by exactly the user the site meant to exclude.
+    /// </para>
+    /// </remarks>
+    public BookerModel? Booker { get; set; }
 
     public IReadOnlyList<BookedResourceModel> Resources { get; set; } = [];
 

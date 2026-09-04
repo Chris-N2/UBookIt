@@ -4,6 +4,9 @@ using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.Mvc.ModelBinding;
 using UBookIt.Backoffice.Mapping;
 using UBookIt.Backoffice.Models;
+using Umbraco.Cms.Core.Models;
+using Umbraco.Cms.Core.Models.Membership;
+using Umbraco.Cms.Core.Security;
 using UBookIt.Core;
 using UBookIt.Core.Bookings;
 using UBookIt.Core.Common;
@@ -25,13 +28,20 @@ namespace UBookIt.Backoffice.Controllers;
 /// is the second and last of v1's management verbs; approving, declining and amending are
 /// each domain changes rather than endpoints, and none of them is here.
 /// </para>
+/// <para>
+/// <b>Two gates, answering different questions.</b> The base controller's section policy
+/// decides whether this user may reach uBookIt at all; Umbraco's sensitive-data access decides
+/// whether the rows they get carry the booker's contact details. A user holding the section
+/// alone gets every booking, without the people.
+/// </para>
 /// </remarks>
 [ApiVersion("1.0")]
 [ApiExplorerSettings(GroupName = "UBookIt.Backoffice")]
 public class BookingsController(
     IBookingManagementStore bookingStore,
     IBookingService bookingService,
-    SiteBookingSettings settings) : UBookItBackofficeApiControllerBase
+    SiteBookingSettings settings,
+    IBackOfficeSecurityAccessor backOfficeSecurityAccessor) : UBookItBackofficeApiControllerBase
 {
     /// <summary>
     /// The bookings overlapping a window of site-local dates.
@@ -102,11 +112,42 @@ public class BookingsController(
 
         var page = await bookingStore.ListAsync(query.Value, cancellationToken);
 
+        var bookerVisibility = ResolveBookerVisibility();
+
         return Ok(new PagedBookingsModel
         {
             Total = page.Total,
-            Items = [.. page.Items.Select(BookingModelMapper.ToModel)],
+            Items = [.. page.Items.Select(summary => BookingModelMapper.ToModel(summary, bookerVisibility))],
         });
+    }
+
+    /// <summary>
+    /// Whether this caller may be shown booker contact details, per Umbraco's Sensitive data
+    /// group.
+    /// </summary>
+    /// <remarks>
+    /// <para>
+    /// Membership of a built-in group with a fixed key, tested through Umbraco rather than
+    /// against the key directly, and deliberately not a uBookIt setting of its own: Umbraco
+    /// already ships the group and applies the same concept to content properties marked
+    /// sensitive, so a site meets one idea rather than two that are free to disagree.
+    /// </para>
+    /// <para>
+    /// <b>An unresolvable user withholds.</b> The endpoint is already authorized, so a null
+    /// here should not occur — and "should not occur" is how a defaulted <c>true</c> ships. The
+    /// branch is written rather than assumed away for the same reason the query result above is
+    /// mapped rather than asserted impossible, and with more at stake: the failure mode of
+    /// guessing wrong is disclosing personal data to somebody the site excluded, where the
+    /// failure mode of withholding is a support question.
+    /// </para>
+    /// </remarks>
+    private BookerVisibility ResolveBookerVisibility()
+    {
+        IUser? currentUser = backOfficeSecurityAccessor.BackOfficeSecurity?.CurrentUser;
+
+        return currentUser?.HasAccessToSensitiveData() is true
+            ? BookerVisibility.Shown
+            : BookerVisibility.Withheld;
     }
 
     /// <summary>

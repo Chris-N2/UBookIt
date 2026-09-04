@@ -9,6 +9,11 @@ using UBookIt.Core.Bookings;
 using UBookIt.Core.Common;
 using UBookIt.Core.Resources;
 using UBookIt.Core.Stores;
+using Umbraco.Cms.Core;
+using Umbraco.Cms.Core.Configuration.Models;
+using Umbraco.Cms.Core.Models.Membership;
+using Umbraco.Cms.Core.Models.Membership.Permissions;
+using Umbraco.Cms.Core.Security;
 
 namespace UBookIt.Tests;
 
@@ -86,13 +91,77 @@ public class BookingsEndpointTests
             service);
 
     private static (BookingsController Controller, RecordingStore Store) Endpoint(
-        BookingPage? page = null, string zone = "UTC", IBookingService? bookingService = null)
+        BookingPage? page = null,
+        string zone = "UTC",
+        IBookingService? bookingService = null,
+        IBackOfficeSecurityAccessor? security = null)
     {
         var store = new RecordingStore(page ?? new BookingPage([], 0));
 
         return (
-            new BookingsController(store, bookingService ?? new UnusedBookingService(), Settings(zone)),
+            new BookingsController(
+                store,
+                bookingService ?? new UnusedBookingService(),
+                Settings(zone),
+                // Defaults to a user who may see contact details, so that every test written
+                // before withholding existed still asserts what it was written to assert. The
+                // withholding tests pass their own.
+                security ?? Security(sensitiveData: true)),
             store);
+    }
+
+    /// <summary>
+    /// A backoffice user who is, or is not, in Umbraco's Sensitive data group.
+    /// </summary>
+    /// <remarks>
+    /// Built on Umbraco's real <c>User</c> and <c>ReadOnlyUserGroup</c> and its real group key,
+    /// rather than a stubbed <c>IUser</c> — the same reasoning the section-access tests record.
+    /// A stub would be a second opinion about what membership means, and this is precisely the
+    /// question under test.
+    /// </remarks>
+    private static IBackOfficeSecurityAccessor Security(bool sensitiveData)
+    {
+        var user = new User(new GlobalSettings());
+
+        user.AddGroup(new ReadOnlyUserGroup(
+            id: 1,
+            // The real built-in key when the user is meant to have access, and a group that is
+            // emphatically NOT it otherwise — rather than no group at all, so the negative case
+            // is "a user in some other group" and not "a user in none", which is the state an
+            // ordinary editor is actually in.
+            key: sensitiveData ? Constants.Security.SensitiveDataGroupKey : Guid.NewGuid(),
+            name: "Test group",
+            description: null,
+            icon: null,
+            startContentId: null,
+            startMediaId: null,
+            alias: "testGroup",
+            allowedLanguages: [],
+            allowedSections: [UBookIt.Backoffice.Constants.SectionAlias],
+            permissions: new HashSet<string>(),
+            granularPermissions: new HashSet<IGranularPermission>(),
+            hasAccessToAllLanguages: true));
+
+        return new StubBackOfficeSecurityAccessor(new StubBackOfficeSecurity(user));
+    }
+
+    private sealed class StubBackOfficeSecurityAccessor(IBackOfficeSecurity? security)
+        : IBackOfficeSecurityAccessor
+    {
+        public IBackOfficeSecurity? BackOfficeSecurity { get; } = security;
+    }
+
+    private sealed class StubBackOfficeSecurity(IUser? currentUser) : IBackOfficeSecurity
+    {
+        public IUser? CurrentUser { get; } = currentUser;
+
+        public bool UserHasSectionAccess(string section, IUser user)
+            => throw new InvalidOperationException(
+                "The endpoint decides visibility from group membership, not from section access.");
+
+        public bool IsAuthenticated()
+            => throw new InvalidOperationException(
+                "The endpoint does not authenticate; the authorization policy has already run.");
     }
 
     /// <summary>
@@ -271,8 +340,9 @@ public class BookingsEndpointTests
         // Status is a NAME on the wire. Serialising the enum would put an ordinal here and
         // pin the contract to a Core declaration's order.
         Assert.Equal("Confirmed", item.Status);
-        Assert.Equal("Ada Lovelace", item.BookerName);
-        Assert.Equal("ada@example.com", item.BookerEmail);
+        Assert.NotNull(item.Booker);
+        Assert.Equal("Ada Lovelace", item.Booker.Name);
+        Assert.Equal("ada@example.com", item.Booker.Email);
         Assert.Equal("Europe/London", item.TimeZoneId);
 
         // Both resources, each with its own name — the mapper had no test before this.
@@ -424,5 +494,98 @@ public class BookingsEndpointTests
 
         Assert.Equal(StatusCodes.Status400BadRequest, problem.StatusCode);
         Assert.Null(store.LastQuery);
+    }
+
+    // ---------------------------------------------------------------- withholding
+
+    [Fact]
+    public async Task A_caller_with_sensitive_data_access_is_given_the_booker()
+    {
+        var page = new BookingPage(
+            [Summary(new DateTimeOffset(2026, 6, 2, 9, 0, 0, TimeSpan.Zero), BookingStatus.Confirmed)],
+            Total: 1);
+
+        var (controller, _) = Endpoint(page, security: Security(sensitiveData: true));
+
+        var model = Payload<PagedBookingsModel>(await controller.ListBookings(From, To));
+        var item = Assert.Single(model.Items);
+
+        Assert.NotNull(item.Booker);
+        Assert.Equal("Ada Lovelace", item.Booker.Name);
+        Assert.Equal("ada@example.com", item.Booker.Email);
+    }
+
+    [Fact]
+    public async Task A_caller_without_sensitive_data_access_is_given_the_same_rows_without_the_booker()
+    {
+        // Two bookings and a total larger than the page, so this also asserts what withholding
+        // does NOT do: it removes details from rows, never rows from the result. A filter that
+        // dropped what it could not show would silently answer a different question, and the
+        // operator would have no way to see that anything was missing.
+        var page = new BookingPage(
+            [
+                Summary(new DateTimeOffset(2026, 6, 2, 9, 0, 0, TimeSpan.Zero), BookingStatus.Confirmed),
+                Summary(new DateTimeOffset(2026, 6, 3, 9, 0, 0, TimeSpan.Zero), BookingStatus.Cancelled),
+            ],
+            Total: 75);
+
+        var (controller, _) = Endpoint(page, security: Security(sensitiveData: false));
+
+        var model = Payload<PagedBookingsModel>(await controller.ListBookings(From, To));
+
+        Assert.Equal(75, model.Total);
+        Assert.Equal(2, model.Items.Count);
+        Assert.All(model.Items, item => Assert.Null(item.Booker));
+
+        // And everything that is not personal data survives — a row withheld down to nothing
+        // would be unusable, and the reference is what an operator identifies it by.
+        Assert.All(model.Items, item => Assert.False(string.IsNullOrWhiteSpace(item.Reference)));
+        Assert.All(model.Items, item => Assert.Equal("Europe/London", item.TimeZoneId));
+    }
+
+    [Fact]
+    public async Task A_withheld_booker_leaves_nothing_behind_in_the_serialized_payload()
+    {
+        // Asserting `Booker is null` proves the member is empty; it does not prove the values
+        // are gone. A future shape that kept a copy elsewhere — a display string, a search
+        // key, an audit field — would satisfy that assertion and still disclose the address.
+        // The guarantee is about the payload, so the payload is what is searched.
+        var page = new BookingPage(
+            [Summary(new DateTimeOffset(2026, 6, 2, 9, 0, 0, TimeSpan.Zero), BookingStatus.Confirmed)],
+            Total: 1);
+
+        var (controller, _) = Endpoint(page, security: Security(sensitiveData: false));
+
+        var model = Payload<PagedBookingsModel>(await controller.ListBookings(From, To));
+        var json = System.Text.Json.JsonSerializer.Serialize(model);
+
+        Assert.DoesNotContain("Ada", json, StringComparison.OrdinalIgnoreCase);
+        Assert.DoesNotContain("Lovelace", json, StringComparison.OrdinalIgnoreCase);
+        Assert.DoesNotContain("ada@example.com", json, StringComparison.OrdinalIgnoreCase);
+        Assert.DoesNotContain("example.com", json, StringComparison.OrdinalIgnoreCase);
+    }
+
+    [Fact]
+    public async Task An_unresolvable_current_user_is_withheld_from_rather_than_trusted()
+    {
+        // Both ways the accessor can fail to name a user. The endpoint is already authorized so
+        // neither should occur — which is exactly why they are tested: "cannot happen" is how a
+        // defaulted `true` ships, and the failure mode of guessing wrong here is disclosure.
+        var page = new BookingPage(
+            [Summary(new DateTimeOffset(2026, 6, 2, 9, 0, 0, TimeSpan.Zero), BookingStatus.Confirmed)],
+            Total: 1);
+
+        foreach (var security in new IBackOfficeSecurityAccessor[]
+        {
+            new StubBackOfficeSecurityAccessor(null),
+            new StubBackOfficeSecurityAccessor(new StubBackOfficeSecurity(null)),
+        })
+        {
+            var (controller, _) = Endpoint(page, security: security);
+
+            var model = Payload<PagedBookingsModel>(await controller.ListBookings(From, To));
+
+            Assert.Null(Assert.Single(model.Items).Booker);
+        }
     }
 }

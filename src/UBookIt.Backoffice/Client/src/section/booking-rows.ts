@@ -23,6 +23,10 @@ export type BookingLike = {
   // failing a type check at the one place that would notice.
   reference: string;
   service?: { serviceId: string; displayName: string } | null;
+  // Optional and nullable, matching the generated BookingModel. `null` means the endpoint
+  // WITHHELD the details from this caller; it can never mean the booking has no booker,
+  // because the domain requires a name and an email of every one.
+  booker?: { name: string; email: string } | null;
 };
 
 /** A window as the endpoint takes it: two site-local dates, never instants. */
@@ -321,6 +325,36 @@ export function serviceLabel(
   return booking.service.displayName.trim() === ""
     ? booking.service.serviceId
     : booking.service.displayName;
+}
+
+/**
+ * Whether this row's booker contact details were withheld from the caller.
+ *
+ * A decision rather than an inline `!booking.booker`, because it is exactly the
+ * class of thing this module exists for: both states render a plausible row, and
+ * a reader looking at the table cannot tell "hidden because you may not see it"
+ * from "hidden because the cell broke". The condition is asserted here instead.
+ *
+ * **This is read from the payload, never from the current user's permissions.**
+ * The response already says what happened — the details are absent or they are
+ * not — and asking Umbraco a second time would be a second source of truth,
+ * free to answer "yes, you may" over a row that was withheld anyway and leave
+ * the operator with a blank cell and no explanation. That is the exact failure
+ * this feature exists to prevent, so the check has one source.
+ */
+export function bookerWithheld(booking: BookingLike): boolean {
+  return !booking.booker;
+}
+
+/**
+ * Whether the page needs the explanation of why details are hidden.
+ *
+ * Derived from the rows rather than from a page-level flag, so the note cannot
+ * appear over a table that shows every name, and cannot be missing from one that
+ * hides them.
+ */
+export function anyBookerWithheld(bookings: readonly BookingLike[]): boolean {
+  return bookings.some(bookerWithheld);
 }
 
 /**

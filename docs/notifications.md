@@ -40,6 +40,13 @@ time zone it was booked in, the status, when it was created, the booker's name a
 claimed resource's id, and the service it was placed for — or nothing, if it was booked
 directly against a resource.
 
+**The contact details are here deliberately, and they are not filtered.** The backoffice
+redacts a booker's name and email from users outside Umbraco's Sensitive data group — see
+[the backoffice section](backoffice.md) — and that does **not** apply here. It is not an
+oversight: that rule answers "may this signed-in person see somebody else's details", and
+there is no signed-in person in a notification handler. Your code needs the address precisely
+so it can write to it. Where the details go from here is yours to decide.
+
 **The reference is the one to put in your email.** It is what the person who booked was shown
 on their confirmation, and what they will quote back to you — short, unambiguous when read
 aloud, and stable for the life of the booking. `booking.Reference.Display` groups it for

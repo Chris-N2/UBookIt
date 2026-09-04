@@ -62,6 +62,20 @@ public class ChangeDeltaIntegrityTests
         // claims and no sign that anything went wrong.
         foreach (var delta in ActiveDeltas())
         {
+            // A delta that modifies nothing has no upstream requirement to name, and a change
+            // introducing a NEW capability has no upstream spec at all — that file does not
+            // exist until the change is synced. Asserting its existence unconditionally made
+            // every new capability a failure, which this guard never intended: its whole
+            // subject, stated above, is a MODIFIED entry silently syncing as an ADDED one.
+            //
+            // It went unnoticed because this walks active changes only, and by the time a
+            // change is archived its capability is upstream. The first new capability proposed
+            // after the guard was written is what found it.
+            if (delta.Modified.Count == 0)
+            {
+                continue;
+            }
+
             var upstream = Path.Combine(RepoFiles.Root, "openspec", "specs", delta.Capability, "spec.md");
 
             Assert.True(

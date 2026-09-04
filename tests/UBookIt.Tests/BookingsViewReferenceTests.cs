@@ -99,4 +99,87 @@ public class BookingsViewReferenceTests
 
         return count;
     }
+
+    // ------------------------------------------------- withheld booker details
+
+    [Fact]
+    public void The_booker_cell_states_the_absence_rather_than_leaving_it_blank()
+    {
+        // A blank cell reads as data that failed to load. Here it would read as a defect in the
+        // package — which is precisely the support ticket this feature is trying not to
+        // generate — so the cell says something, on the same terms as "Booked directly".
+        var source = RepoFiles.Read(Element);
+
+        Assert.Contains("bookerWithheld(booking)", source, StringComparison.Ordinal);
+        Assert.Contains("bookerHidden", source, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public void The_page_explains_why_details_are_hidden()
+    {
+        // The note is derived from the rows — `anyBookerWithheld` — rather than from a
+        // page-level flag or a second question to Umbraco, so it cannot appear over a table
+        // showing every name, nor be missing from one that hides them.
+        var source = RepoFiles.Read(Element);
+
+        Assert.Contains("anyBookerWithheld(this._items)", source, StringComparison.Ordinal);
+        Assert.Contains("bookerHiddenNote", source, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public void The_explanation_is_announced_rather_than_only_rendered()
+    {
+        // role=status, not role=alert: this is a standing explanation of what the reader is
+        // looking at, where the alert above it reports something that just went wrong. An
+        // assertive role would talk over the operator on every page.
+        var source = RepoFiles.Read(Element);
+
+        var note = source.IndexOf("bookerHiddenNote", StringComparison.Ordinal);
+
+        Assert.True(note > 0, "The note has moved and this guard is measuring nothing.");
+
+        // Look back to the start of the element that carries it.
+        var open = source.LastIndexOf('<', note);
+
+        Assert.True(open > 0, "The note is no longer inside an element.");
+
+        Assert.Contains("role=\"status\"", source[open..note], StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public void The_view_does_not_ask_umbraco_whether_details_may_be_shown()
+    {
+        // The response already says what happened. A second source could answer "yes, you may"
+        // over a row that was withheld anyway, leaving a blank cell and no explanation — the
+        // exact failure the note exists to prevent, arriving by the route meant to prevent it.
+        var source = RepoFiles.Read(Element);
+
+        Assert.DoesNotContain("hasAccessToSensitiveData", source, StringComparison.OrdinalIgnoreCase);
+        Assert.DoesNotContain("currentUser", source, StringComparison.OrdinalIgnoreCase);
+    }
+
+    [Fact]
+    public void A_booking_is_identified_to_the_operator_by_its_reference()
+    {
+        // Both places the view names a particular booking: the per-row control's accessible
+        // name, and the confirmation. Unconditionally, for every operator — a branch that named
+        // the booker where it could would be two behaviours to test for no gain, and would
+        // render "booking for undefined" for anyone without sensitive-data access.
+        var source = RepoFiles.Read(Element);
+
+        Assert.Contains(
+            "label=\"${this.#term(\"cancel\")} ${bookingReference(booking)}\"",
+            source,
+            StringComparison.Ordinal);
+
+        Assert.Contains("confirmCancelContent", source, StringComparison.Ordinal);
+
+        var confirm = source.IndexOf("confirmCancelContent", StringComparison.Ordinal);
+        var afterConfirm = source[confirm..Math.Min(source.Length, confirm + 200)];
+
+        Assert.Contains("bookingReference(booking)", afterConfirm, StringComparison.Ordinal);
+
+        // And the booker is not what identifies it anywhere.
+        Assert.DoesNotContain("booking.bookerName", source, StringComparison.Ordinal);
+    }
 }

@@ -326,6 +326,30 @@ export default {
     reference: "Reference",
     when: "When",
     booker: "Booker",
+
+    // ------------------------------------------------- booker details hidden
+    //
+    // Shown in the Booker cell when the endpoint withheld the details. Words
+    // rather than a blank cell, for the same reason "Booked directly" is: an
+    // empty cell reads as data that failed to load, and here it would read as a
+    // defect in the package.
+    //
+    // NOT asterisks or a masked form — those imply a value of a particular
+    // length and invite guessing at it. NOT "Not permitted", which describes the
+    // reader rather than the data.
+    bookerHidden: "Contact details hidden",
+
+    // Shown once, above the table, when any row on the page is hidden.
+    //
+    // The second sentence is the load-bearing one. Umbraco's installer puts only
+    // the site's ORIGINAL super user in the Sensitive data group, so a colleague
+    // made an administrator tomorrow sees every cell hidden while holding the
+    // highest role the site offers. Without this sentence the obvious conclusion
+    // is that uBookIt is broken, and the next action is a defect report.
+    bookerHiddenNote:
+      "Booker contact details are shown only to backoffice users in Umbraco's Sensitive data "
+      + "group. Being an administrator does not grant this on its own.",
+
     resources: "Resources",
     service: "Service",
     status: "Status",
@@ -346,9 +370,15 @@ export default {
 
     // ---------------------------------------------------------------- cancel
     //
-    // The confirmation says who the booking is for, because that is what an
-    // operator recognises in a list of times — and because cancelling the wrong
-    // one cannot be undone from here.
+    // The confirmation names the booking by its REFERENCE, for every operator.
+    //
+    // It said who the booking was for until contact details became withholdable,
+    // at which point that wording had two problems: it renders "the booking for
+    // undefined" for an operator who may not see the name, and preserving it
+    // would mean branching — two behaviours to reason about and two to test, for
+    // no gain. The reference is also the better identifier: it is unique where
+    // two bookings may share a booker's name, and it is what the customer on the
+    // telephone is reading out.
     //
     // It also says the package tells nobody. That sentence is the whole reason
     // the notification hook shipped in the same change: an operator who assumes
@@ -356,10 +386,10 @@ export default {
     // arrives for a booking that no longer exists. It belongs at the moment of
     // deciding, not in documentation nobody is reading just then.
     actions: "Actions",
-    cancel: "Cancel booking for",
+    cancel: "Cancel booking",
     confirmCancelHeadline: "Cancel booking",
     confirmCancelContent:
-      "Cancel the booking for %0%? The time is released immediately. uBookIt does not tell "
+      "Cancel booking %0%? The time is released immediately. uBookIt does not tell "
       + "the person who booked — if they should know, you will need to contact them.",
     // NOT "Cancel booking". The modal's own dismiss button says "Cancel", so a confirm
     // button reading "Cancel booking" puts the same word on both — one meaning "do the

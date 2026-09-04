@@ -1,5 +1,7 @@
 import { describe, expect, it } from "vitest";
 import {
+  anyBookerWithheld,
+  bookerWithheld,
   bookingReference,
   canCancel,
   currentWeek,
@@ -454,5 +456,70 @@ describe("bookingReference", () => {
     // blank cell costs less than a thrown render. (The comment here previously said the field
     // was optional; it stopped being true when the type was tightened, and nobody swept it.)
     expect(bookingReference({})).toBe("");
+  });
+});
+
+describe("whether a booker was withheld", () => {
+  // The row shape the endpoint sends, minus everything these decisions ignore.
+  const row = (booker: { name: string; email: string } | null | undefined) => ({
+    startUtc: "2026-09-04T09:00:00Z",
+    endUtc: "2026-09-04T10:00:00Z",
+    timeZoneId: "Europe/London",
+    reference: "7QX4M2NP",
+    booker,
+  });
+
+  it("is withheld when the endpoint sent null", () => {
+    expect(bookerWithheld(row(null))).toBe(true);
+  });
+
+  it("is not withheld when the endpoint sent details", () => {
+    expect(bookerWithheld(row({ name: "Ada Lovelace", email: "ada@example.com" }))).toBe(false);
+  });
+
+  it("treats an absent member as withheld, not as details", () => {
+    // The generated type is `booker?: BookerModel | null`, so undefined is
+    // reachable — and the safe reading of "no details arrived" is that none were
+    // given, never that there are none to give.
+    expect(bookerWithheld(row(undefined))).toBe(true);
+  });
+
+  it("does not confuse an empty name with a withheld booker", () => {
+    // A booker with blank details cannot be produced by the domain, but if one
+    // ever arrived it is a DIFFERENT fault from withholding and must not be
+    // reported as this one — the note would tell an operator to join a group
+    // that would not fix it.
+    expect(bookerWithheld(row({ name: "", email: "" }))).toBe(false);
+  });
+});
+
+describe("whether the page explains why details are hidden", () => {
+  const withBooker = {
+    startUtc: "2026-09-04T09:00:00Z",
+    endUtc: "2026-09-04T10:00:00Z",
+    timeZoneId: "Europe/London",
+    reference: "7QX4M2NP",
+    booker: { name: "Ada Lovelace", email: "ada@example.com" },
+  };
+  const withheld = { ...withBooker, reference: "K3M9PT2R", booker: null };
+
+  it("explains when every row is withheld", () => {
+    expect(anyBookerWithheld([withheld, withheld])).toBe(true);
+  });
+
+  it("explains when only some rows are withheld", () => {
+    // Not a state the endpoint produces today — visibility is decided per
+    // caller, not per row — but the note is derived from the rows rather than
+    // from a page-level flag precisely so that it cannot be missing from a table
+    // that hides something.
+    expect(anyBookerWithheld([withBooker, withheld])).toBe(true);
+  });
+
+  it("stays silent when nothing is withheld", () => {
+    expect(anyBookerWithheld([withBooker, withBooker])).toBe(false);
+  });
+
+  it("stays silent on an empty page", () => {
+    expect(anyBookerWithheld([])).toBe(false);
   });
 });
