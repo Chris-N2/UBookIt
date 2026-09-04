@@ -209,7 +209,19 @@ public class SensitiveDataRedactionTests
             .SelectMany(type => type.GetMethods(
                 BindingFlags.Public | BindingFlags.NonPublic | BindingFlags.Static
                 | BindingFlags.Instance | BindingFlags.DeclaredOnly))
-            .Where(method => method.ReturnType == typeof(BookingModel))
+            // BY CONSTRUCTION, not by enumeration — and this is the fifth version of this
+            // guard, so the distinction is the whole point. An exact `== typeof(BookingModel)`
+            // is blind to every shape a row can arrive in: `IReadOnlyList<BookingModel>`,
+            // `BookingModel[]`, `Task<BookingModel>`, and `PagedBookingsModel`, which is the
+            // actual HTTP response type. All four were measured composing rows hard-coded to
+            // Shown while 1821 tests passed, and `ToModels` is not contrived: the controller
+            // already does that `Select` inline, so lifting it out is the ordinary next edit.
+            //
+            // Each previous repair corrected the EXTENSION the last one got wrong — the
+            // literal, the idiom, comments, the file — while the INTENSION, "no route composes
+            // a row without the decision", stayed a list. `CarriesARow` recurses, so a shape
+            // nobody has thought of yet is covered rather than added later.
+            .Where(method => CarriesARow(method.ReturnType))
             // Compiler-generated members are excluded, and this was measured rather than
             // assumed: the controller's `Select(summary => ToModel(summary, visibility))`
             // compiles to a closure method returning a BookingModel whose visibility is
@@ -223,6 +235,11 @@ public class SensitiveDataRedactionTests
         // A scan over nothing passes every assertion made about it — and this guard exists
         // because three that found nothing each certified a defect.
         Assert.NotEmpty(routes);
+
+        // And it must still see the one route that legitimately exists. `NotEmpty` alone would
+        // pass if the filter stopped seeing `ToModel` while matching something else — the exact
+        // weakness that was fixed in the sibling guard in this same file and not carried across.
+        Assert.Contains(routes, route => route.Name == nameof(BookingModelMapper.ToModel));
 
         foreach (var route in routes)
         {
@@ -242,6 +259,15 @@ public class SensitiveDataRedactionTests
                 + "so a caller may omit the decision and receive whichever answer the default "
                 + "happens to be. The decision must be required, not merely available.");
         }
+
+        // Any shape that carries a booking row to a caller: the row itself, the page that
+        // wraps it, and any array, collection or Task of either — recursively, so
+        // `Task<IReadOnlyList<BookingModel>>` is covered without naming it.
+        static bool CarriesARow(Type type)
+            => type == typeof(BookingModel)
+                || type == typeof(PagedBookingsModel)
+                || (type.IsArray && CarriesARow(type.GetElementType()!))
+                || (type.IsGenericType && type.GetGenericArguments().Any(CarriesARow));
     }
 
     [Fact]

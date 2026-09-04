@@ -118,8 +118,20 @@ public class BookingsViewReferenceTests
         // grep is that the element still calls it.
         var source = RepoFiles.Read(Element);
 
-        Assert.Contains("bookerCell(booking", source, StringComparison.Ordinal);
-        Assert.Contains("bookerHidden", source, StringComparison.Ordinal);
+        // THE WHOLE CALL, because the label crosses the seam as a bare string and that is where
+        // the union's type safety stops. Swapping the two terms — the note's text into the cell
+        // and the cell's label into the note — compiles, passes 134 client tests and passed all
+        // eight of these guards: it puts the full "…Sensitive data group…" paragraph inside
+        // every withheld cell and reduces the note above the table to "Contact details hidden",
+        // which names no group at all.
+        //
+        // `Assert.Contains("bookerHidden", …)` was also weaker than it looked: it is satisfied
+        // by the substring inside `bookerHiddenNote`, so it would have passed with `bookerHidden`
+        // deleted from the element entirely.
+        Assert.Contains(
+            "bookerCell(booking, this.#term(\"bookerHidden\"))",
+            source,
+            StringComparison.Ordinal);
     }
 
     [Fact]
@@ -136,8 +148,28 @@ public class BookingsViewReferenceTests
         // explanation exactly when nothing was withheld, with every guard green.
         var source = RepoFiles.Read(Element);
 
-        Assert.Contains("bookerNote(this._items", source, StringComparison.Ordinal);
-        Assert.Contains("bookerHiddenNote", source, StringComparison.Ordinal);
+        // The whole call, pinning which term goes where — see the sibling guard above.
+        Assert.Contains(
+            "bookerNote(this._items, this.#term(\"bookerHiddenNote\"))",
+            source,
+            StringComparison.Ordinal);
+
+        // ABOVE THE TABLE, not merely present. The spec requires the explanation "once, where
+        // an operator reading the list will see it", and the element justifies `role="status"`
+        // over `role="alert"` on the grounds that "reading order covers the first render, where
+        // a live region would not announce at all". Below the table that justification is
+        // false: a screen-reader user meets every "Contact details hidden" cell before any
+        // explanation of them. Moving the note after `</uui-table>` compiled and passed
+        // everything.
+        var note = source.IndexOf("class=\"withheld-note\"", StringComparison.Ordinal);
+        var table = source.IndexOf("<uui-table", StringComparison.Ordinal);
+
+        Assert.True(note > 0 && table > 0, "The note or the table has moved; this guard is measuring nothing.");
+        Assert.True(
+            note < table,
+            "The explanation of why contact details are hidden renders after the table. It must "
+            + "come first: reading order is what carries it to a screen-reader user on the first "
+            + "render, which is the justification for role=status rather than role=alert.");
     }
 
     [Fact]
