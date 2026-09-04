@@ -1,6 +1,7 @@
 using System.Reflection;
 using System.Text.RegularExpressions;
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.AspNetCore.Mvc.Routing;
 using UBookIt.Backoffice.Controllers;
 using UBookIt.Backoffice.Mapping;
 using UBookIt.Backoffice.Models;
@@ -166,6 +167,67 @@ public class SensitiveDataRedactionTests
             + "object reaches every caller, including one with no sensitive-data access.");
     }
 
+    /// <summary>
+    /// Every route that composes a booking row states the visibility decision, and cannot
+    /// decline to.
+    /// </summary>
+    /// <remarks>
+    /// <para>
+    /// <b>This states the guarantee. <see cref="Only_recorded_files_can_compose_a_booking_row"/>
+    /// states a proxy for it.</b> Three successive versions of that scan were blind — to the
+    /// literal it matched, then to the construction idiom, then to comments — and each repair
+    /// corrected the mechanism the previous one got wrong while leaving the requirement itself
+    /// unobserved. What <c>sensitive-data</c> requires is that <i>no route composes a row
+    /// without the decision</i>. A file is not a route, and the place a second route is likeliest
+    /// to appear is inside the one file that scan whitelists.
+    /// </para>
+    /// <para>
+    /// Measured: adding <c>ToModel(BookingSummary) =&gt; ToModel(summary, Shown)</c> to the
+    /// mapper — a route composing a row carrying the booker's name and email, defaulting to
+    /// disclosure — passed all 1820 tests.
+    /// </para>
+    /// <para>
+    /// Reflection rather than source, because the property is about which members exist, and an
+    /// assembly carries exactly that. A <i>defaulted</i> parameter is refused as well as a
+    /// missing one: <c>BookerVisibility visibility = BookerVisibility.Shown</c> satisfies "takes
+    /// the decision" while letting every caller omit it, which is the same disclosure by another
+    /// spelling.
+    /// </para>
+    /// </remarks>
+    [Fact]
+    public void Every_route_that_composes_a_booking_row_requires_the_decision()
+    {
+        var routes = typeof(BookingModelMapper)
+            .GetMethods(
+                BindingFlags.Public | BindingFlags.NonPublic | BindingFlags.Static
+                | BindingFlags.Instance | BindingFlags.DeclaredOnly)
+            .Where(method => method.ReturnType == typeof(BookingModel))
+            .ToArray();
+
+        // A scan over nothing passes every assertion made about it — and this guard exists
+        // because three that found nothing each certified a defect.
+        Assert.NotEmpty(routes);
+
+        foreach (var route in routes)
+        {
+            var decision = route.GetParameters()
+                .SingleOrDefault(parameter => parameter.ParameterType == typeof(BookerVisibility));
+
+            Assert.True(
+                decision is not null,
+                $"BookingModelMapper.{route.Name} returns a BookingModel without taking a "
+                + "BookerVisibility. Every route composing a row that carries booker contact "
+                + "details must state whether they may be seen; one that does not reaches every "
+                + "caller, including one with no sensitive-data access.");
+
+            Assert.False(
+                decision!.HasDefaultValue,
+                $"BookingModelMapper.{route.Name} takes a BookerVisibility with a default value, "
+                + "so a caller may omit the decision and receive whichever answer the default "
+                + "happens to be. The decision must be required, not merely available.");
+        }
+    }
+
     [Fact]
     public void Only_recorded_files_can_compose_a_booking_row()
     {
@@ -246,77 +308,123 @@ public class SensitiveDataRedactionTests
         // EVERY management controller, not just this one. The comment here used to claim the
         // guard would catch "a search endpoint added tomorrow" while scanning
         // `typeof(BookingsController)` alone — which is precisely the endpoint it would not see.
-        // The section-access tests already enumerate the assembly; this does the same.
         //
-        // AND the properties of complex parameters, not just parameter names. A query surface
-        // grows by acquiring a filter object — `[FromQuery] BookerFilter? filter` binds
-        // `?filter.BookerEmail=`, and a scan of parameter names sees only "filter". Measured:
-        // that shape passed the previous version of this test.
+        // AND the properties of complex parameters, RECURSIVELY. A query surface grows by
+        // acquiring a filter object: `[FromQuery] BookerFilter? filter` binds
+        // `?filter.BookerEmail=`, and a scan of parameter names sees only "filter". A nested one
+        // binds `?filter.Contact.Email=` and a one-level scan sees only "filter" and "Contact".
+        // Both shapes were measured passing earlier versions of this test.
         //
-        // GET actions only, deliberately. The risk is an oracle — asking about a value you were
-        // not given — which requires a read. A write that carries booker details is placement,
-        // and forbidding "name" there would fail on every legitimate create endpoint.
-        var identifiers = new List<string>();
-        var getActions = 0;
+        // TWO SCOPES, because the two rules justify different ones:
+        //
+        //   `booker`/`email` apply to EVERY http method. The spec says "no endpoint", and a
+        //     POST named `bookings/search` taking a booker's email is a read whatever its verb —
+        //     measured passing while this was GET-only. Safe to widen: no parameter or model
+        //     property anywhere in the Backoffice contract carries either word except on the
+        //     booking row itself, which is not a parameter.
+        //
+        //   The generic search words apply to GETs only. `name` is an ordinary field on a
+        //     create or update body, and firing there would be a false positive on every
+        //     legitimate write — a guard that fires for the wrong reason is read as noise and
+        //     then relaxed, which is how the previous round lost `term` altogether.
+        var readIdentifiers = new List<string>();
+        var allIdentifiers = new List<string>();
+        var scannedControllers = new List<string>();
 
         foreach (var controller in typeof(BookingsController).Assembly.GetTypes()
             .Where(type => typeof(ControllerBase).IsAssignableFrom(type) && !type.IsAbstract))
         {
+            scannedControllers.Add(controller.Name);
+
             foreach (var method in controller.GetMethods(
                 BindingFlags.Public | BindingFlags.Instance | BindingFlags.DeclaredOnly))
             {
-                if (method.GetCustomAttributes<HttpGetAttribute>().Any() is false)
+                if (method.GetCustomAttributes<HttpMethodAttribute>().Any() is false)
                 {
                     continue;
                 }
 
-                getActions++;
+                var isRead = method.GetCustomAttributes<HttpGetAttribute>().Any();
 
                 foreach (var parameter in method.GetParameters())
                 {
-                    identifiers.Add(parameter.Name ?? string.Empty);
-
-                    // A complex bound type contributes its own property names to the query
-                    // surface; a primitive, a Guid or a CancellationToken contributes nothing.
-                    var type = Nullable.GetUnderlyingType(parameter.ParameterType) ?? parameter.ParameterType;
-
-                    if (type.IsPrimitive || type.IsEnum || type == typeof(string) || type.Namespace?.StartsWith("System", StringComparison.Ordinal) is true)
+                    foreach (var identifier in Identifiers(parameter.Name, parameter.ParameterType, depth: 0))
                     {
-                        continue;
-                    }
+                        allIdentifiers.Add(identifier);
 
-                    identifiers.AddRange(
-                        type.GetProperties(BindingFlags.Public | BindingFlags.Instance)
-                            .Select(property => property.Name));
+                        if (isRead)
+                        {
+                            readIdentifiers.Add(identifier);
+                        }
+                    }
                 }
             }
         }
 
-        // A scan over nothing passes every assertion made about it.
-        Assert.NotEmpty(identifiers);
-        Assert.True(getActions > 1, "Only one GET action was found; this guard is no longer scanning the assembly.");
+        // ANTI-VACUITY, and it names the controller this guard exists for. `NotEmpty` plus a
+        // count was not enough: blinding the scan to BookingsContoller specifically still left
+        // plenty of identifiers from Resources and Services, and both checks passed.
+        Assert.Contains(nameof(BookingsController), scannedControllers);
+        Assert.Contains("resourceIds", readIdentifiers);
 
-        // Two rules, because they fail differently. A booker field is recognisable by name
-        // wherever it appears, so "booker" and "email" match as substrings. The generic
-        // search words match EXACTLY — `term`, `query`, `q` — because as substrings they hit
-        // ordinary unrelated names (`queryMode`), and a guard that fires for the wrong reason
-        // is read as noise and then relaxed. Dropping them entirely was my own over-correction:
-        // measured, `[FromQuery] string? term` then passed.
-        foreach (var identifier in identifiers)
+        foreach (var identifier in allIdentifiers)
         {
             Assert.False(
                 identifier.Contains("booker", StringComparison.OrdinalIgnoreCase)
                 || identifier.Contains("email", StringComparison.OrdinalIgnoreCase),
-                $"A management GET exposes '{identifier}'. Answering questions about a booker's "
-                + "contact details is not withholding them: a caller who may not read an email "
-                + "but may filter by one can confirm it by watching whether a row comes back.");
+                $"A management endpoint exposes '{identifier}'. Answering questions about a "
+                + "booker's contact details is not withholding them: a caller who may not read "
+                + "an email but may filter by one can confirm it by watching whether a row "
+                + "comes back.");
+        }
 
+        foreach (var identifier in readIdentifiers)
+        {
             Assert.False(
                 new[] { "name", "search", "searchterm", "term", "query", "q", "keyword" }
                     .Contains(identifier, StringComparer.OrdinalIgnoreCase),
-                $"A management GET exposes '{identifier}', a free-text search surface over "
+                $"A management read exposes '{identifier}', a free-text search surface over "
                 + "bookings. If it cannot reach booker contact details, name it for what it "
                 + "searches and record why here.");
+        }
+    }
+
+    /// <summary>
+    /// A bound parameter's own name plus, for a complex type, the names it binds beneath it.
+    /// </summary>
+    /// <remarks>
+    /// Depth-bounded and cycle-safe. Three levels because `?filter.Contact.Email=` is two, and
+    /// the next shape somebody writes will be one deeper than whatever is guarded — the cost of
+    /// a level is a reflection walk over a handful of view models.
+    /// </remarks>
+    private static IEnumerable<string> Identifiers(string? name, Type type, int depth)
+    {
+        if (name is not null)
+        {
+            yield return name;
+        }
+
+        if (depth >= 3)
+        {
+            yield break;
+        }
+
+        var bound = Nullable.GetUnderlyingType(type) ?? type;
+
+        // A primitive, a string, a Guid, a CancellationToken or a collection of them binds no
+        // names of its own.
+        if (bound.IsPrimitive || bound.IsEnum || bound == typeof(string)
+            || bound.Namespace?.StartsWith("System", StringComparison.Ordinal) is true)
+        {
+            yield break;
+        }
+
+        foreach (var property in bound.GetProperties(BindingFlags.Public | BindingFlags.Instance))
+        {
+            foreach (var identifier in Identifiers(property.Name, property.PropertyType, depth + 1))
+            {
+                yield return identifier;
+            }
         }
     }
 }

@@ -108,21 +108,35 @@ public class BookingsViewReferenceTests
         // A blank cell reads as data that failed to load. Here it would read as a defect in the
         // package — which is precisely the support ticket this feature is trying not to
         // generate — so the cell says something, on the same terms as "Booked directly".
+        //
+        // WIRING ONLY, and deliberately so. This used to grep for `bookerWithheld(booking)` and
+        // was the only thing watching the cell — which meant swapping the two arms of the
+        // template's ternary changed no token and passed every guard, rendering an empty cell
+        // for a withheld row and "Contact details hidden" over a name. The derivation now lives
+        // in `booking-rows.bookerCell`, where the client suite asserts the MAPPING, and the
+        // template's arms cannot be swapped without a type error. What is left for a source
+        // grep is that the element still calls it.
         var source = RepoFiles.Read(Element);
 
-        Assert.Contains("bookerWithheld(booking)", source, StringComparison.Ordinal);
+        Assert.Contains("bookerCell(booking", source, StringComparison.Ordinal);
         Assert.Contains("bookerHidden", source, StringComparison.Ordinal);
     }
 
     [Fact]
     public void The_page_explains_why_details_are_hidden()
     {
-        // The note is derived from the rows — `anyBookerWithheld` — rather than from a
-        // page-level flag or a second question to Umbraco, so it cannot appear over a table
-        // showing every name, nor be missing from one that hides them.
+        // The note is derived from the rows rather than from a page-level flag or a second
+        // question to Umbraco, so it cannot appear over a table showing every name, nor be
+        // missing from one that hides them.
+        //
+        // WIRING ONLY — see the note above. `bookerNote` returns a list of zero or one and the
+        // template renders it with `.map()`, so there is no condition here to invert; the
+        // polarity is asserted in the client suite, against the function. It was invertible
+        // while this grepped for `anyBookerWithheld(this._items)`, and inverting it showed the
+        // explanation exactly when nothing was withheld, with every guard green.
         var source = RepoFiles.Read(Element);
 
-        Assert.Contains("anyBookerWithheld(this._items)", source, StringComparison.Ordinal);
+        Assert.Contains("bookerNote(this._items", source, StringComparison.Ordinal);
         Assert.Contains("bookerHiddenNote", source, StringComparison.Ordinal);
     }
 
@@ -134,11 +148,15 @@ public class BookingsViewReferenceTests
         // assertive role would talk over the operator on every page.
         var source = RepoFiles.Read(Element);
 
-        var note = source.IndexOf("bookerHiddenNote", StringComparison.Ordinal);
+        // Anchored on the note's own class rather than on the term key. The term is now read
+        // before the element is opened — `bookerNote(this._items, this.#term("bookerHiddenNote"))
+        // .map(note => html`<p role="status" …>`)` — so looking backwards from the key finds the
+        // call, not the tag. The class sits on the element that carries the note and nowhere
+        // else, which is the anchor that survives the render being restructured.
+        var note = source.IndexOf("class=\"withheld-note\"", StringComparison.Ordinal);
 
-        Assert.True(note > 0, "The note has moved and this guard is measuring nothing.");
+        Assert.True(note > 0, "The note's element has moved and this guard is measuring nothing.");
 
-        // Look back to the start of the element that carries it.
         var open = source.LastIndexOf('<', note);
 
         Assert.True(open > 0, "The note is no longer inside an element.");

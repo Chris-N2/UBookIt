@@ -357,6 +357,54 @@ export function anyBookerWithheld(bookings: readonly BookingLike[]): boolean {
   return bookings.some(bookerWithheld);
 }
 
+/** What the Booker cell shows: either the contact details, or a stated absence. */
+export type BookerCell =
+  | { readonly kind: "hidden"; readonly label: string }
+  | { readonly kind: "shown"; readonly name: string; readonly email: string };
+
+/**
+ * What the Booker column says — the counterpart of {@link serviceLabel}.
+ *
+ * **This exists because the predicate was covered and its consumer was not.**
+ * `bookerWithheld` was tested; the template that consumed it was checked only by
+ * grepping the element's source for the token `bookerWithheld(booking)`. Swapping
+ * the two arms of that ternary left every guard green: a withheld row rendered
+ * `booking.booker?.name`, which is null, producing the empty cell the requirement
+ * forbids — and a row whose details *were* supplied announced "Contact details
+ * hidden", telling the operator the opposite of the truth. Presence of a token is
+ * not the behaviour; this module's own header says the seam belongs here, where a
+ * cell's derivation can be asserted directly.
+ *
+ * **A discriminated union rather than a boolean plus two strings**, so that
+ * swapping the arms in the template is a type error rather than a silent
+ * inversion: the `hidden` variant has no `name` to read.
+ */
+export function bookerCell(booking: BookingLike, hiddenLabel: string): BookerCell {
+  if (bookerWithheld(booking)) {
+    return { kind: "hidden", label: hiddenLabel };
+  }
+
+  // Non-null by the predicate above; stated rather than assumed because the
+  // narrowing is the whole point of the branch.
+  const booker = booking.booker!;
+
+  return { kind: "shown", name: booker.name, email: booker.email };
+}
+
+/**
+ * The explanation, as a list of zero or one — **not** a value plus a condition.
+ *
+ * Returning a list lets the template render it with `.map()` and no conditional
+ * at all, which is the point: inverting a condition that does not exist is not
+ * expressible. The polarity was invertible while the element asked
+ * `anyBookerWithheld(...) ? html\`…\` : nothing`, and swapping it showed the note
+ * exactly when nothing was withheld — falsifying two scenarios at once with all
+ * 127 client tests and all 8 source guards still green.
+ */
+export function bookerNote(bookings: readonly BookingLike[], note: string): readonly string[] {
+  return anyBookerWithheld(bookings) ? [note] : [];
+}
+
 /**
  * Groups a booking reference for reading: `7QX4M2NP` becomes `7QX4-M2NP`.
  *

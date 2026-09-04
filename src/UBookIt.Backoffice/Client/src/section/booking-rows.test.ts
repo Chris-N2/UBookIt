@@ -1,6 +1,8 @@
 import { describe, expect, it } from "vitest";
 import {
   anyBookerWithheld,
+  bookerCell,
+  bookerNote,
   bookerWithheld,
   bookingReference,
   canCancel,
@@ -566,5 +568,74 @@ describe("whether the page explains why details are hidden", () => {
 
   it("stays silent on an empty page", () => {
     expect(anyBookerWithheld([])).toBe(false);
+  });
+});
+
+describe("what the Booker column says", () => {
+  const row = (booker: { name: string; email: string } | null) => ({
+    startUtc: "2026-09-04T09:00:00Z",
+    endUtc: "2026-09-04T10:00:00Z",
+    timeZoneId: "Europe/London",
+    reference: "7QX4M2NP",
+    booker,
+  });
+
+  // The counterpart of the Service column's tests. These assert the MAPPING, which is
+  // what a grep for the token `bookerWithheld(booking)` in the element could not: the
+  // two arms of that ternary were swapped and every guard stayed green.
+  it("shows the contact details when they were supplied", () => {
+    const cell = bookerCell(row({ name: "Ada Lovelace", email: "ada@example.com" }), "HIDDEN");
+
+    expect(cell.kind).toBe("shown");
+    expect(cell).toEqual({ kind: "shown", name: "Ada Lovelace", email: "ada@example.com" });
+  });
+
+  it("shows the hidden label, and no contact details, when they were withheld", () => {
+    const cell = bookerCell(row(null), "HIDDEN");
+
+    expect(cell).toEqual({ kind: "hidden", label: "HIDDEN" });
+
+    // The inversion that survived every previous guard rendered `booker?.name` for a
+    // withheld row — an empty cell. Nothing about a withheld cell may carry a name.
+    expect(JSON.stringify(cell)).not.toContain("Ada");
+  });
+
+  it("never announces the label over details that were supplied", () => {
+    // The other half of the swap: a row WITH details announcing "Contact details hidden"
+    // tells the operator the opposite of the truth, which is worse than a blank cell.
+    const cell = bookerCell(row({ name: "Ada Lovelace", email: "ada@example.com" }), "HIDDEN");
+
+    expect(JSON.stringify(cell)).not.toContain("HIDDEN");
+  });
+});
+
+describe("whether the page carries the explanation", () => {
+  const withBooker = {
+    startUtc: "2026-09-04T09:00:00Z",
+    endUtc: "2026-09-04T10:00:00Z",
+    timeZoneId: "Europe/London",
+    reference: "7QX4M2NP",
+    booker: { name: "Ada Lovelace", email: "ada@example.com" },
+  };
+  const withheld = { ...withBooker, reference: "K3M9PT2R", booker: null };
+
+  // Returned as a list of zero or one so the template renders it with `.map()` and has
+  // no condition to invert. The polarity WAS invertible, and inverting it showed the
+  // note exactly when nothing was withheld — two scenarios falsified at once, with all
+  // 127 client tests and all 8 source guards green.
+  it("carries the note when a row is withheld", () => {
+    expect(bookerNote([withBooker, withheld], "NOTE")).toEqual(["NOTE"]);
+  });
+
+  it("carries nothing when every row was supplied", () => {
+    expect(bookerNote([withBooker, withBooker], "NOTE")).toEqual([]);
+  });
+
+  it("carries nothing on an empty page", () => {
+    expect(bookerNote([], "NOTE")).toEqual([]);
+  });
+
+  it("carries the note once, however many rows are withheld", () => {
+    expect(bookerNote([withheld, withheld, withheld], "NOTE")).toHaveLength(1);
   });
 });

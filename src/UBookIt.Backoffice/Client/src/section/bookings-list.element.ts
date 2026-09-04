@@ -5,8 +5,8 @@ import type { BookingModel } from "../api/index.js";
 import { toApiErrors } from "./api-errors.js";
 import { confirmDestructive } from "./confirm.js";
 import {
-  anyBookerWithheld,
-  bookerWithheld,
+  bookerCell,
+  bookerNote,
   bookingReference,
   canCancel,
   currentWeek,
@@ -333,9 +333,9 @@ export class UBookItBookingsListElement extends UmbLitElement {
         attribute through to its shadow root, so the association would be written,
         look correct, and reach nothing.
       -->
-      ${anyBookerWithheld(this._items)
-        ? html`<p role="status" class="withheld-note">${this.#term("bookerHiddenNote")}</p>`
-        : nothing}
+      ${bookerNote(this._items, this.#term("bookerHiddenNote")).map(
+        (note) => html`<p role="status" class="withheld-note">${note}</p>`,
+      )}
 
       <uui-table aria-label=${this.#term("tableLabel")}>
         <uui-table-head>
@@ -378,6 +378,25 @@ export class UBookItBookingsListElement extends UmbLitElement {
     `;
   }
 
+  /**
+   * The Booker cell, derived in `booking-rows` and only rendered here.
+   *
+   * The union's arms cannot be swapped without a type error — the `hidden` variant
+   * has no `name` — which is the protection the previous ternary lacked: swapping it
+   * rendered an empty cell for a withheld row and "Contact details hidden" for a row
+   * whose details were supplied, with every guard still green.
+   */
+  #bookerCell(booking: BookingModel) {
+    const cell = bookerCell(booking, this.#term("bookerHidden"));
+
+    return cell.kind === "hidden"
+      ? html`<span class="withheld">${cell.label}</span>`
+      : html`
+          ${cell.name}
+          <div class="secondary">${cell.email}</div>
+        `;
+  }
+
   #renderRow(booking: BookingModel, showZone: boolean) {
     // The reader's own locale for month names and clock format; the ZONE comes
     // from the booking. Those are different questions: how a time is written is
@@ -396,12 +415,7 @@ export class UBookItBookingsListElement extends UmbLitElement {
             A blank here reads as data that failed to load, and the explanation
             above the table says why it is missing.
           -->
-          ${bookerWithheld(booking)
-            ? html`<span class="withheld">${this.#term("bookerHidden")}</span>`
-            : html`
-                ${booking.booker?.name}
-                <div class="secondary">${booking.booker?.email}</div>
-              `}
+          ${this.#bookerCell(booking)}
         </uui-table-cell>
         <uui-table-cell>
           ${booking.resources.map((resource) => resource.displayName).join(", ")}
