@@ -150,73 +150,62 @@ internal sealed class SqlBookingStore(UBookItDbContext db) : IBookingStore
 
     public async Task UpdateAsync(Booking booking, CancellationToken cancellationToken = default)
     {
-        var status = (int)booking.Status;
-        var memberKey = booking.Booker.MemberKey;
-        var name = booking.Booker.Contact?.Name;
-        var email = booking.Booker.Contact?.Email;
-        var phone = booking.Booker.Contact?.Phone;
-        var erasedUtc = booking.Booker.ErasedUtc;
+        var row = await db.Bookings
+            .FirstAsync(b => b.Id == booking.Id, cancellationToken)
+            .ConfigureAwait(false);
 
-        // Every part of a booking the domain permits to change after placement is written
-        // here — the status AND the booker. Writing only the status was correct while a
-        // status change was the only mutation there was, and it silently stopped being
-        // correct the moment erasure existed: the aggregate carried the erasure, the call
-        // reported success, and the row kept the person's details.
+        // The STATUS, and nothing else — see IBookingStore.UpdateAsync.
         //
-        // THE STORED ERASURE WINS, ALWAYS — AND THE TEST FOR IT IS PART OF THE WRITE.
+        // This method briefly wrote the booker too, to stop erasure being a silent no-op
+        // through it. That fix produced two further defects in as many reviews: first a
+        // cancellation restoring a person somebody had erased in between, then, once the
+        // booker columns were guarded, an ERASURE reverting a committed cancellation and
+        // re-blocking a slot that had been released. Both came from one method writing
+        // columns its caller had not changed.
         //
-        // Callers do read-modify-write with no re-read and the row has no concurrency token,
-        // so an aggregate can be older than the row it is about to overwrite. Harmless for
-        // the status — a lost transition is refused on the next attempt — and catastrophic
-        // for the booker, because the stale value is a person's name and the fresh one is
-        // their absence: an operator who opened a cancellation before a colleague erased the
-        // booking would, on completing it, write the name back over the NULLs.
+        // Erasure now has its own write over its own columns, so the two cannot collide and
+        // neither needs to defend against the other.
+        row.Status = (int)booking.Status;
+        await db.SaveChangesAsync(cancellationToken).ConfigureAwait(false);
+    }
+
+    public async Task<bool> EraseBookerAsync(
+        Guid bookingId, DateTimeOffset erasedUtc, CancellationToken cancellationToken = default)
+    {
+        // ONE STATEMENT, AND THE TEST FOR "ALREADY ERASED" IS INSIDE IT.
         //
-        // A previous version of this method tested `row.BookerErasedUtc` after a SELECT and
-        // applied the decision in a later UPDATE. That is check-then-act: the erasure can
-        // land in the window between the two statements, and the UPDATE then restores the
-        // person having already decided it would not. It narrowed the race from "however long
-        // an operator spends on a confirmation dialog" to "one round trip" and left it open —
-        // and, worse, it argued in a comment that absorption is a property of the ROW while
-        // implementing it in application code, which cannot deliver a row-level property.
+        // Each booker column is set to a CASE over the row's own pre-update BookerErasedUtc,
+        // which SQL Server evaluates against the row as it stands when it takes the lock. A
+        // row that already records an erasure keeps every value it has, including the FIRST
+        // instant — the one a data subject was told.
         //
-        // So the predicate lives INSIDE the statement. Every booker column is set to a CASE
-        // over the row's own pre-update `BookerErasedUtc`, evaluated by the server against the
-        // row it is locking. There is no window, and no interleaving of any two callers can
-        // put a person back into an erased row. The status is set unconditionally alongside
-        // them, in the same statement, so cancelling an erased booking still cancels it.
+        // Not a SELECT-then-decide-then-UPDATE. That shape was tried and rejected in review:
+        // the erasure can commit in the window between the two statements, and the UPDATE
+        // then restores the person having already decided it would not. It does not make the
+        // race smaller in any way that matters, and it argues for a row-level guarantee while
+        // implementing it in application code, which cannot deliver one.
         //
-        // Still exactly one write path, which the persistence capability requires: one
-        // method, and now one statement. A separate erase-only method would be a second route
-        // to the same row, free to disagree with this one.
-        //
-        // Re-erasing an already-erased booking therefore leaves the booker columns exactly as
-        // they are, including the FIRST erasure's instant — the one that must survive.
+        // Takes an id and an instant rather than an aggregate, so there is no stale copy of
+        // anything to write back and no column outside the booker can be touched. That is why
+        // this does not disturb a concurrent cancellation.
         var affected = await db.Bookings
-            .Where(b => b.Id == booking.Id)
+            .Where(b => b.Id == bookingId)
             .ExecuteUpdateAsync(
                 setters => setters
-                    .SetProperty(b => b.Status, status)
-                    .SetProperty(b => b.MemberKey, b => b.BookerErasedUtc == null ? memberKey : b.MemberKey)
-                    .SetProperty(b => b.BookerName, b => b.BookerErasedUtc == null ? name : b.BookerName)
-                    .SetProperty(b => b.BookerEmail, b => b.BookerErasedUtc == null ? email : b.BookerEmail)
-                    .SetProperty(b => b.BookerPhone, b => b.BookerErasedUtc == null ? phone : b.BookerPhone)
+                    .SetProperty(b => b.MemberKey, b => b.BookerErasedUtc == null ? null : b.MemberKey)
+                    .SetProperty(b => b.BookerName, b => b.BookerErasedUtc == null ? null : b.BookerName)
+                    .SetProperty(b => b.BookerEmail, b => b.BookerErasedUtc == null ? null : b.BookerEmail)
+                    .SetProperty(b => b.BookerPhone, b => b.BookerErasedUtc == null ? null : b.BookerPhone)
                     .SetProperty(
                         b => b.BookerErasedUtc,
                         b => b.BookerErasedUtc == null ? erasedUtc : b.BookerErasedUtc),
                 cancellationToken)
             .ConfigureAwait(false);
 
-        // The previous implementation used `FirstAsync`, which threw when no row matched.
-        // `ExecuteUpdateAsync` reports a count instead, so the same contract is kept
-        // explicitly rather than lost in the change of mechanism: a caller that updates a
-        // booking which is not there has made a mistake and should hear about it, not receive
-        // a silent success.
-        if (affected == 0)
-        {
-            throw new InvalidOperationException(
-                $"No booking exists with id {booking.Id}; nothing was updated.");
-        }
+        // Reports existence, not change. Erasing an already-erased booking matches a row and
+        // writes nothing, and that is a success — the caller asked for the booking to be
+        // erased and it is.
+        return affected > 0;
     }
 
     /// <summary>

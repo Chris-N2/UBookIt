@@ -250,6 +250,74 @@ public class BookerErasureTests
     }
 
     [Fact]
+    public async Task Erasing_goes_through_the_erase_write_and_never_through_the_status_write()
+    {
+        // THE SHAPE THAT THE LAST THREE DEFECTS ALL CAME FROM, pinned directly.
+        //
+        // Erasure used to read a booking, mutate the aggregate and hand the whole thing to
+        // UpdateAsync. Everything that aggregate carried was then written from a copy that
+        // could already be stale — which produced, in consecutive reviews, a cancellation
+        // restoring an erased person, and then an erasure reverting a committed cancellation
+        // and re-blocking a released slot.
+        //
+        // The behavioural tests could not see the difference: a single-threaded test cannot
+        // stage the interleaving, so a read-modify-write implementation passes all of them.
+        // What distinguishes the designs is WHICH WRITE the verb uses, so that is asserted —
+        // and asserted in both directions, because "it calls erase" would still pass if it
+        // also called the status write.
+        var resource = BookableResource();
+        var resources = new InMemoryResourceStore().Add(resource);
+        var store = new InMemoryBookingStore();
+        var bookings = new BookingService(
+            resources, store, new FixedTimeProvider(ErasedAt), TestData.Settings);
+
+        var placed = await bookings.PlaceAsync(new BookingRequest
+        {
+            ResourceId = resource.Id,
+            Start = TestData.Utc(TestData.BaseDate, "10:00"),
+            Duration = TimeSpan.FromMinutes(60),
+            Booker = TestData.Booker(),
+        });
+
+        Assert.True(placed.Succeeded);
+
+        var updatesBefore = store.UpdateCount;
+
+        Assert.True((await bookings.EraseBookerAsync(placed.Value.Id)).Succeeded);
+
+        Assert.Equal(1, store.EraseCount);
+
+        // It must not ALSO write the status. Writing a status the caller never changed is
+        // precisely how the erasure reverted a cancellation.
+        Assert.Equal(updatesBefore, store.UpdateCount);
+    }
+
+    [Fact]
+    public async Task Cancelling_goes_through_the_status_write_and_never_through_the_erase_write()
+    {
+        // The mirror, so the pair says the two verbs use disjoint writes rather than merely
+        // that one of them uses the right one.
+        var resource = BookableResource();
+        var resources = new InMemoryResourceStore().Add(resource);
+        var store = new InMemoryBookingStore();
+        var bookings = new BookingService(
+            resources, store, new FixedTimeProvider(ErasedAt), TestData.Settings);
+
+        var placed = await bookings.PlaceAsync(new BookingRequest
+        {
+            ResourceId = resource.Id,
+            Start = TestData.Utc(TestData.BaseDate, "10:00"),
+            Duration = TimeSpan.FromMinutes(60),
+            Booker = TestData.Booker(),
+        });
+
+        Assert.True((await bookings.CancelAsync(placed.Value.Id)).Succeeded);
+
+        Assert.Equal(0, store.EraseCount);
+        Assert.True(store.UpdateCount > 0);
+    }
+
+    [Fact]
     public async Task Erasing_a_booking_that_does_not_exist_fails()
     {
         var (bookings, _, _) = TestData.Services(BookableResource());

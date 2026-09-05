@@ -1,5 +1,7 @@
 using Microsoft.Data.SqlClient;
 using Microsoft.EntityFrameworkCore;
+using System.Data.Common;
+using Microsoft.EntityFrameworkCore.Diagnostics;
 using UBookIt.Core;
 using UBookIt.Core.Availability;
 using UBookIt.Core.Bookings;
@@ -98,6 +100,25 @@ public sealed class SqlServerFixture : IAsyncLifetime
     public UBookItDbContext CreateContext() => new(Options);
 
     /// <summary>
+    /// A context that reports every command it sends, for tests about the SHAPE of a write
+    /// rather than its result.
+    /// </summary>
+    /// <remarks>
+    /// Some guarantees are invisible in the data. Whether a conditional update is one
+    /// statement or a read followed by a write produces identical rows in a single-threaded
+    /// test and different rows only under an interleaving a test cannot stage — so the thing
+    /// to assert is what was sent.
+    /// </remarks>
+    public UBookItDbContext CreateContext(IInterceptor interceptor)
+    {
+        var builder = new DbContextOptionsBuilder<UBookItDbContext>();
+        UBookItDbContext.ConfigureSqlServer(builder, new UBookItDbContext(Options).Database.GetConnectionString()!);
+        builder.AddInterceptors(interceptor);
+
+        return new UBookItDbContext(builder.Options);
+    }
+
+    /// <summary>
     /// Core services wired to real SQL stores, fixed clock, UTC site zone.
     /// The two backing contexts are tracked and disposed with the fixture.
     /// </summary>
@@ -130,4 +151,46 @@ public sealed class FixedTimeProvider(DateTimeOffset nowUtc) : TimeProvider
 public sealed class SqlServerCollection : ICollectionFixture<SqlServerFixture>
 {
     public const string Name = "SqlServer";
+}
+
+/// <summary>Records the text of every command a context sends.</summary>
+internal sealed class CommandRecordingInterceptor : DbCommandInterceptor
+{
+    private readonly List<string> _commands = [];
+
+    public IReadOnlyList<string> Commands => _commands;
+
+    public override InterceptionResult<int> NonQueryExecuting(
+        DbCommand command, CommandEventData eventData, InterceptionResult<int> result)
+    {
+        _commands.Add(command.CommandText);
+        return base.NonQueryExecuting(command, eventData, result);
+    }
+
+    public override ValueTask<InterceptionResult<int>> NonQueryExecutingAsync(
+        DbCommand command,
+        CommandEventData eventData,
+        InterceptionResult<int> result,
+        CancellationToken cancellationToken = default)
+    {
+        _commands.Add(command.CommandText);
+        return base.NonQueryExecutingAsync(command, eventData, result, cancellationToken);
+    }
+
+    public override InterceptionResult<DbDataReader> ReaderExecuting(
+        DbCommand command, CommandEventData eventData, InterceptionResult<DbDataReader> result)
+    {
+        _commands.Add(command.CommandText);
+        return base.ReaderExecuting(command, eventData, result);
+    }
+
+    public override ValueTask<InterceptionResult<DbDataReader>> ReaderExecutingAsync(
+        DbCommand command,
+        CommandEventData eventData,
+        InterceptionResult<DbDataReader> result,
+        CancellationToken cancellationToken = default)
+    {
+        _commands.Add(command.CommandText);
+        return base.ReaderExecutingAsync(command, eventData, result, cancellationToken);
+    }
 }

@@ -172,6 +172,81 @@ public class BookerErasureStorageTests(SqlServerFixture fixture)
     }
 
     [Fact]
+    public async Task An_erasure_cannot_revert_a_cancellation_that_committed_while_it_ran()
+    {
+        // THE MIRROR OF THE UN-ERASURE DEFECT, and the one that cost more.
+        //
+        // Erasure used to read a booking, mutate the aggregate and write the whole thing back,
+        // which meant it wrote the STATUS too — from a copy taken before a cancellation landed.
+        // Cancelled reverted to Confirmed, and a Confirmed booking BLOCKS: a slot the customer
+        // had released was silently re-taken, and anything placed into the freed time was now
+        // an overlapping confirmed booking that no conflict check would ever run against again.
+        //
+        // The interleaving is reproduced by taking the aggregate BEFORE the cancellation, the
+        // way the old implementation did, and erasing after it.
+        fixture.EnsureAvailable();
+
+        var booking = await PlaceAsync();
+
+        await using var staleContext = fixture.CreateContext();
+        var stale = await new SqlBookingStore(staleContext).GetBookingAsync(booking.Id, Ct);
+        Assert.NotNull(stale);
+        Assert.Equal(BookingStatus.Confirmed, stale.Status);
+
+        var (bookings, _) = fixture.CreateServices(Now);
+        Assert.True((await bookings.CancelAsync(booking.Id, Ct)).Succeeded);
+
+        // The erasure proceeds, holding a copy that still says Confirmed.
+        Assert.True((await bookings.EraseBookerAsync(booking.Id, Ct)).Succeeded);
+
+        await using var after = fixture.CreateContext();
+        var stored = await after.Bookings.SingleAsync(b => b.Id == booking.Id, Ct);
+
+        // The cancellation stands.
+        Assert.Equal((int)BookingStatus.Cancelled, stored.Status);
+
+        // And the erasure happened — absorbing one write must not cost the other.
+        Assert.Null(stored.BookerName);
+        Assert.Equal(Now, stored.BookerErasedUtc);
+    }
+
+    [Fact]
+    public async Task The_erase_write_issues_one_statement_and_reads_nothing_first()
+    {
+        // WHAT DISTINGUISHES THIS IMPLEMENTATION FROM THE ONE REVIEW REJECTED.
+        //
+        // Two rounds of review turned on a difference no assertion in this suite could see:
+        // a SELECT-then-decide-then-UPDATE passes every behavioural test above, because the
+        // interleaving that breaks it cannot be produced from a single-threaded test. The
+        // shapes are distinguishable by what they SEND, so that is what is asserted.
+        //
+        // A mechanism guard, and named as one — it observes the statement count, not the
+        // absence of a race. But it is falsifiable, where the comment it replaces was not:
+        // reintroducing the read-then-write shape fails this immediately.
+        fixture.EnsureAvailable();
+
+        var booking = await PlaceAsync();
+
+        var interceptor = new CommandRecordingInterceptor();
+        await using var context = fixture.CreateContext(interceptor);
+
+        var erased = await new SqlBookingStore(context).EraseBookerAsync(booking.Id, Now, Ct);
+        Assert.True(erased);
+
+        var command = Assert.Single(interceptor.Commands);
+        Assert.StartsWith("UPDATE", command.TrimStart(), StringComparison.OrdinalIgnoreCase);
+
+        // The decision is IN the statement: the stored instant is what each column is tested
+        // against, so there is no earlier read whose answer could have gone stale.
+        Assert.Contains("CASE", command, StringComparison.OrdinalIgnoreCase);
+        Assert.Contains("BookerErasedUtc", command, StringComparison.Ordinal);
+
+        // And it touches NOTHING but the booker. Writing a status here is what reverted a
+        // cancellation: the erasure carried a value its caller had never changed.
+        Assert.DoesNotContain("[Status]", command, StringComparison.Ordinal);
+    }
+
+    [Fact]
     public async Task A_cancellation_holding_a_stale_booking_cannot_un_erase_it()
     {
         // THE INTERLEAVING THAT UN-ERASED A PERSON.

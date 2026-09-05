@@ -170,4 +170,5 @@ one a resource allows is the *booked directly* setting on the resource itself.
   above.
 
 These are stated because a management section invites the assumption that it manages
-everything. It configures what can be booked, reads what has been, and calls one off.
+everything. It configures what can be booked, reads what has been, calls one off, and erases a
+booker's details on request.

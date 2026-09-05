@@ -171,17 +171,21 @@ deleted with nothing in the diff that looks like a deletion.
 
 ## 9. Documentation and close-out
 
-- [x] 9.0 **Sync-time edit that no delta can carry.** `openspec/specs/booking-management/spec.md`
-      lines 17–23 (the capability's **Purpose**, not a requirement) says the honest v1 verbs are
-      "*see* and *cancel*", that this capability "is about **those two verbs**", and names
-      "editing a booker" as the kind of thing that lives elsewhere. This change adds a third
-      verb and a third endpoint to that capability, so the paragraph will stand as a false
-      summary of its own capability once archived. Deltas modify **requirements**; there is no
-      delta form for Purpose prose, so this is recorded here as an explicit action for whoever
-      syncs, rather than hand-edited now and forgotten. Replace "those two verbs" with the three
-      that then exist — see, cancel and erase a booker — and drop "editing a booker" from the
-      list of things that are not here, since erasing one now is.
-
+- [x] 9.0 **Purpose prose, edited on this branch rather than deferred to sync.**
+      `openspec/specs/booking-management/spec.md`'s **Purpose** said the honest v1 verbs are
+      "*see* and *cancel*" and named "editing a booker" among things that live elsewhere, while
+      this change adds a third endpoint to that capability. Deltas modify **requirements**;
+      OpenSpec has no form for Purpose prose, and the repo's own precedent is to hand-edit it —
+      three previous changes did, at sync. **Recording it as an instruction for the syncer was
+      not enough**: nothing would have failed if nobody read the checklist, which is the same
+      "stated but unenforced" fault this change has been rejected for elsewhere. So the edit is
+      made here, and guarded by
+      `BackofficeDocumentationTests.The_capabilitys_own_summary_names_every_verb_the_capability_has`,
+      which enumerates the controller's routes and requires the Purpose to describe each one —
+      so a fourth endpoint fails until somebody says what it is.
+      *The spec text says erasing a booker is not the same as editing one, and says why; the
+      earlier wording of this task said the opposite. The spec is right — nothing here permits
+      changing a booker's details, only removing them.*
 - [x] 9.1 `docs/backoffice.md`: what erasure does, that it is irreversible, that it needs the Sensitive data group, that it erases **one booking** and not a person's other bookings, and that erasing a future booking leaves the site unable to contact somebody who will arrive.
 - [x] 9.2 State the single-durable-home constraint where a future change will meet it, so that emails and any audit trail have to confront it.
 - [x] 9.3 Sibling-spec sweep (**done**: `default-frontend` and `delivery-api` mentions are all placement-time, where a booking always carries details; `resource-management`'s is authorization rationale, still true. Nothing falsified beyond the two already fixed in `persistence`.): grep the other specs in `openspec/specs/` for sentences this change falsifies — in particular anything asserting a booking always has readable contact details, or that `uBookItBooking`'s booker columns are non-null. Two were already found (`persistence`'s "`UpdateAsync` SHALL persist status changes" and its no-new-migration scenario); assume there are more and look rather than assuming there are not.

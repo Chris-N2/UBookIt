@@ -193,15 +193,42 @@ public class BackofficeDocumentationTests
         // enough: a checklist entry nobody reads leaves the archived spec describing a
         // surface that does not exist, to a reader deriving the capability from it.
         //
-        // Tied to the CODE rather than to a word count, so it goes stale in the direction
-        // that matters: add a fourth endpoint to this controller and this fails until the
-        // summary is told about it.
         var purpose = Support.RepoFiles.Read("openspec/specs/booking-management/spec.md");
-        var controller = Support.RepoFiles.Read(
-            "src/UBookIt.Backoffice/Controllers/BookingsController.cs");
 
-        Assert.Contains("erase-booker", controller, StringComparison.Ordinal);
-        DocumentationAssert.Says(purpose, "erase a booker's contact details");
+        // The controller's ROUTES, enumerated. The previous version of this test asserted
+        // three literal strings and claimed in its comment to be "tied to the CODE… add a
+        // fourth endpoint and this fails" — which was simply untrue, nothing counted
+        // anything. It was the same fault it had been written to prevent, one layer up.
+        var routes = System.Text.RegularExpressions.Regex
+            .Matches(
+                Support.RepoFiles.Read("src/UBookIt.Backoffice/Controllers/BookingsController.cs"),
+                @"\[Http(?:Get|Post|Put|Delete|Patch)\(""([^""]+)""\)\]")
+            .Select(match => match.Groups[1].Value)
+            .ToList();
+
+        // The fixture is load-bearing: a regex that stopped matching would make every
+        // assertion below vacuous. Three today — list, cancel, erase-booker.
+        Assert.Equal(3, routes.Count);
+
+        // Each verb the capability offers is named in the paragraph that summarises it. Keyed
+        // off the route, so a THIRD endpoint fails here until somebody says what it is.
+        var described = new Dictionary<string, string>
+        {
+            ["bookings/{id:guid}/cancel"] = "cancel",
+            ["bookings/{id:guid}/erase-booker"] = "erase a booker's contact details",
+        };
+
+        foreach (var route in routes.Where(route => route != "bookings"))
+        {
+            Assert.True(
+                described.TryGetValue(route, out var phrase),
+                $"BookingsController exposes '{route}', which this test does not know about. "
+                + "Add it here AND to the capability's Purpose paragraph, which summarises what "
+                + "the capability does and is read by anyone deriving its surface from the spec.");
+
+            DocumentationAssert.Says(purpose, phrase);
+        }
+
         Assert.DoesNotContain("about those two verbs", purpose, StringComparison.Ordinal);
     }
 

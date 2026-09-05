@@ -39,6 +39,15 @@ namespace UBookIt.Persistence.Migrations
         }
 
         /// <inheritdoc />
+        /// <remarks>
+        /// <b>Not a supported path, and destructive if it were run.</b> Narrowing the columns
+        /// back requires a value for every row, so EF's generated <c>defaultValue: ""</c> turns
+        /// every erased booking into a booker with an empty name and email — the blanked
+        /// representation the booker-erasure capability forbids by name, and one the domain
+        /// then refuses to rehydrate. The package applies migrations forward only, at startup,
+        /// and its persistence capability requires them to be additive; this exists because the
+        /// tooling generates it, not because anything calls it.
+        /// </remarks>
         protected override void Down(MigrationBuilder migrationBuilder)
         {
             migrationBuilder.DropColumn(

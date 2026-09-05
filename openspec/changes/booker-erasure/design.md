@@ -134,21 +134,60 @@ nothing new to learn.
 The verb on the service is `IBookingService.EraseBookerAsync(Guid bookingId, …)`, alongside
 `CancelAsync`, taking its instant from the already-injected `TimeProvider`.
 
-### D5 — `UpdateAsync` must persist the booker columns, and a test must prove it
+### D5 — Erasure gets its own write; `UpdateAsync` keeps writing the status and nothing else
 
-`SqlBookingStore.UpdateAsync` sets `row.Status` and nothing else. Erasure through it would
-change the aggregate in memory, return success, and leave the database untouched — and every
-test that asserted against the returned `Booking` would agree it worked.
+`SqlBookingStore.UpdateAsync` sets `row.Status` and nothing else, so erasure routed through it
+would change the aggregate in memory, return success, and leave the database untouched — every
+test asserting against the returned `Booking` would agree it worked.
 
-`UpdateAsync` therefore writes the booker columns as well as the status, and its port
-documentation stops saying "a status change". The guard is a **round-trip through storage**:
-erase, then re-read the booking from a fresh context, and assert the columns are null. Asserting
-on the returned aggregate proves nothing here, which is precisely the unobservable-mutation trap
-this project has hit before.
+The first answer was to widen `UpdateAsync`. **The right answer is to give erasure its own
+write:** `IBookingStore.EraseBookerAsync(bookingId, erasedUtc)`, taking an id and an instant
+rather than an aggregate, issuing one `UPDATE` whose booker columns are each a `CASE` over the
+row's own stored `BookerErasedUtc`. `UpdateAsync` is left as it was, and its documentation now
+says "the status, and nothing else" rather than merely implying it.
 
-*Alternative considered:* a dedicated `EraseBookerAsync` on the store issuing a targeted
-`UPDATE`. Rejected — a second write path to the same row, free to disagree with the first about
-what a booking's persisted state is.
+Three properties follow, none of which needed defending against anything:
+
+- **Disjoint columns.** Cancellation writes `Status`; erasure writes the booker. No interleaving
+  of the two can lose either, because they never write the same column.
+- **No stale copy.** Erasure carries no aggregate, so there is nothing out of date to write.
+- **Absorbing in the statement.** An already-erased row keeps every value it holds, including
+  the first instant, decided by the server against the row it is locking rather than by
+  application code against a value it read earlier.
+
+The guard is a **round-trip through storage** — erase, re-read from a fresh context, assert the
+columns are null — because asserting on the returned aggregate proves nothing. And because a
+read-modify-write implementation passes every behavioural test a single-threaded suite can
+write, the *shape* is pinned too: the service's erase verb must call the erase write and must
+not call the status write, asserted in both directions.
+
+*Alternative considered, rejected, and then adopted after it turned out to be right:* a
+dedicated `EraseBookerAsync` on the store issuing a targeted `UPDATE`. The stated reason for
+rejecting it — "a second write path to the same row, free to disagree with the first about what
+a booking's persisted state is" — does not survive contact with the case, because the two
+paths write **disjoint columns**. `UpdateAsync` writes the status; the erase writes the booker.
+Two writers that share no column cannot disagree about anything.
+
+**That rejection produced three consecutive defects, one per review round**, and they are worth
+recording because they are the same fault wearing different clothes. Widening `UpdateAsync` to
+carry the booker made every caller's stale aggregate a hazard to every column:
+
+1. a cancellation, holding a copy read before an erasure, wrote the person's name back;
+2. guarding the booker columns against that left the check outside the statement, so the
+   erasure could still land in the window between the read and the write;
+3. moving the guard into the statement left `Status` unconditional — so an **erasure** holding a
+   pre-cancellation copy reverted the cancellation, re-blocking a slot the customer had
+   released and exposing it to a double booking.
+
+Each fix was correct about the symptom in front of it. The shape was wrong: **a whole-aggregate
+write, driven by read-modify-write callers with no concurrency control, exposes every field to
+every other verb's staleness.** Erasure now says one thing to storage — *this booking is erased,
+as at this instant* — carrying no copy of anything it did not change, and the class is gone
+rather than patched.
+
+`IBookingStore.UpdateAsync`'s documentation says "status, and nothing else" for the same
+reason: the constraint that keeps the two apart belongs where an implementer of the port will
+read it, not only in the SQL class.
 
 ### D6 — Erasure is idempotent, unlike cancellation
 

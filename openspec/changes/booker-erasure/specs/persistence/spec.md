@@ -95,25 +95,33 @@ which is the correct reading of a booking nobody has erased.
 - **THEN** its erased-UTC column is NULL and it reports contact details rather than an erasure
 
 ### Requirement: Store implementations honour Core semantics
-`UBookIt.Persistence` SHALL provide SQL Server implementations of `IResourceStore` and `IBookingStore`. `GetClaimsAsync` SHALL return claims of any status whose booking interval overlaps the queried half-open range for the resource, and SHALL be served by an index on the booking interval (no table scan of bookings by date). **`UpdateAsync` SHALL persist every part of a booking that the domain permits to change after placement — its status and its booker — and not merely the status.**
+`UBookIt.Persistence` SHALL provide SQL Server implementations of `IResourceStore` and `IBookingStore`. `GetClaimsAsync` SHALL return claims of any status whose booking interval overlaps the queried half-open range for the resource, and SHALL be served by an index on the booking interval (no table scan of bookings by date). **`UpdateAsync` SHALL persist a booking's status, and SHALL NOT write its booker.** A booking's
+booker is written by the erasure operation below and by nothing else.
 
-**This is a widening, and it closes a real hole.** The previous wording described the only mutation that existed at the time; an implementation faithful to it writes the status column and nothing else, so erasing a booker through the same port would change the aggregate in memory, report success, and leave the row untouched. A test asserting against the returned aggregate would agree it had worked. What a caller needs guaranteed is that a persisted change is persisted, not that one named column is.
+**The two SHALL touch disjoint columns.** Callers read, mutate and write back with no re-read,
+so an aggregate handed to a store can be older than the stored row. A write that carries columns
+its caller did not change makes that staleness everyone's problem: a cancellation would restore
+a person somebody erased in between, and an erasure would revert a cancellation and re-block a
+slot that had been released. Bounding each write to what its verb actually changes removes the
+interaction rather than defending against it.
 
-**A change SHALL be observable by re-reading.** Verification of `UpdateAsync` SHALL read the booking back from storage rather than inspecting the instance that was passed in, because the instance carries the change whether or not the store wrote it.
+**A store SHALL expose an operation that erases a booking's booker, taking the booking's id and
+the instant** — not an aggregate, so there is no stale copy of anything to write back.
 
-**A stored erasure SHALL NOT be overwritten by any later write.** Once a booking's row records
-an erasure, a write carrying booker contact details SHALL leave the stored booker untouched —
-including the recorded instant — and SHALL apply only the rest of what it carries.
+**The erasure SHALL be absorbing at the point of storage.** Once a booking records an erasure, a
+later erasure SHALL leave it exactly as it stands, including the first instant, and **no
+operation any implementation offers SHALL return an erased booker to carrying contact details.**
+This is a promise the package makes to a data subject; an implementation that let a later write
+restore a person would falsify it while every test written against the port passed.
 
-**This is a guarantee about the row, not about detecting a conflict.** Callers do
-read-modify-write with no re-read, so an aggregate can be older than the row it overwrites.
-For a status that is harmless: a lost transition is refused on the next attempt. For a booker
-it is catastrophic, because the stale value is a person and the fresh one is their absence — an
-operator who opened a cancellation before a colleague erased the booking would, on completing
-it, write the name back over the NULLs, with both requests reporting success and nothing
-logging it. Erasure is absorbing at the point of storage or it is not absorbing at all.
+**The check SHALL NOT be a read followed by a write.** An implementation that reads the stored
+state, decides, and then writes leaves a window in which an erasure can commit between the two
+statements — which is not a smaller version of the guarantee but the absence of it. The
+condition belongs inside the write.
 
-**There SHALL be exactly one write path for a booking's mutable state.** Erasure SHALL NOT be given a store method of its own issuing a targeted update — a second path to the same row is free to disagree with the first about what a booking's persisted state is.
+**A change SHALL be observable by re-reading.** Verification SHALL read the booking back from
+storage rather than inspecting the instance that was passed in, because the instance carries the
+change whether or not the store wrote it.
 
 The multi-resource claims read SHALL be served by a single query over the same index, not by iterating the single-resource read, and SHALL return the same claims that per-resource reads would return for the same ids and range.
 

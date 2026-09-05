@@ -173,8 +173,57 @@ public interface IBookingStore
 
     Task<Booking?> GetBookingAsync(Guid bookingId, CancellationToken cancellationToken = default);
 
-    /// <summary>Persists a status change to an existing booking.</summary>
+    /// <summary>
+    /// Persists a booking's <b>status</b>, and nothing else.
+    /// </summary>
+    /// <remarks>
+    /// <para>
+    /// <b>Deliberately narrow, after three consecutive defects caused by widening it.</b> The
+    /// booker is written by <see cref="EraseBookerAsync"/> and by nothing else, so the two
+    /// operations touch disjoint columns and no interleaving of them can lose either.
+    /// </para>
+    /// <para>
+    /// Callers read, mutate and write back with no re-read, so the aggregate handed here can be
+    /// older than the stored row. Writing only the status bounds what that staleness can cost
+    /// to a lost transition, which the status machine refuses on the next attempt. An
+    /// implementation that also wrote the booker would let a cancellation restore a person
+    /// somebody erased in between; one that wrote the status from an erasure's aggregate would
+    /// revert a cancellation and re-block a released slot. Both have happened here.
+    /// </para>
+    /// </remarks>
     Task UpdateAsync(Booking booking, CancellationToken cancellationToken = default);
+
+    /// <summary>
+    /// Removes a booking's booker contact details and member key, recording when.
+    /// </summary>
+    /// <remarks>
+    /// <para>
+    /// <b>By id and instant, not by aggregate</b> — so there is no stale copy to write, and no
+    /// column outside the booker can be touched. The whole operation is "make this booking
+    /// erased, as at this instant".
+    /// </para>
+    /// <para>
+    /// <b>An implementation SHALL make the erasure absorbing at the point of storage.</b> Once a
+    /// booking records an erasure, this SHALL leave it exactly as it stands — including the
+    /// first erasure's instant — rather than re-erasing it, and no implementation SHALL provide
+    /// any way to return an erased booker to carrying contact details. Erasure is irreversible,
+    /// and that is a promise the package makes to a data subject, not an incidental property of
+    /// one storage engine: a substituted store that let a later write restore a person would
+    /// falsify it while every test that runs against it passed.
+    /// </para>
+    /// <para>
+    /// <b>The check SHALL NOT be a read followed by a write.</b> An implementation that reads
+    /// the current state, decides, and then writes leaves a window in which an erasure can land
+    /// between the two — which is not a smaller version of the guarantee, it is the absence of
+    /// it. The test belongs inside the write.
+    /// </para>
+    /// </remarks>
+    /// <returns>
+    /// <c>true</c> when a booking with that id exists, whether or not it was already erased;
+    /// <c>false</c> when none does.
+    /// </returns>
+    Task<bool> EraseBookerAsync(
+        Guid bookingId, DateTimeOffset erasedUtc, CancellationToken cancellationToken = default);
 }
 
 /// <summary>One resource a booking claims, with the name a list row displays.</summary>

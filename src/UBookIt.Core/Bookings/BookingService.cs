@@ -443,40 +443,45 @@ public sealed class BookingService(
     public async Task<DomainResult<Booking>> EraseBookerAsync(
         Guid bookingId, CancellationToken cancellationToken = default)
     {
-        var booking = await bookingStore.GetBookingAsync(bookingId, cancellationToken).ConfigureAwait(false);
-        if (booking is null)
+        // Straight to the store's erase, with no read-modify-write of an aggregate.
+        //
+        // Reading a booking, calling EraseBooker on it and writing the whole thing back is
+        // what produced the last two defects: whatever else that aggregate carried was written
+        // too, from a copy that could already be out of date. Erasure needs to say one thing —
+        // "this booking is erased, as at this instant" — and saying only that removes the
+        // entire class.
+        //
+        // The clock is still this service's, so the instant is comparable with the creation
+        // time and is not read from ambient system time at the storage layer.
+        var existed = await bookingStore
+            .EraseBookerAsync(bookingId, timeProvider.GetUtcNow(), cancellationToken)
+            .ConfigureAwait(false);
+
+        if (!existed)
         {
             return DomainResult<Booking>.Failure(
                 FailureCodes.BookingNotFound, $"No booking exists with id {bookingId}.");
         }
 
-        // The same clock placement uses, so a booking's creation and erasure instants are
-        // comparable and neither is taken from ambient system time at some other layer.
-        booking.EraseBooker(timeProvider.GetUtcNow());
-
-        // Written unconditionally, including when the booking was already erased. Skipping
-        // the write when nothing changed would make the method's success conditional on
-        // state the caller cannot see, and the write is idempotent anyway — the store keeps
-        // whatever erasure the row already records.
-        await bookingStore.UpdateAsync(booking, cancellationToken).ConfigureAwait(false);
-
-        // Re-read, and return what STORAGE holds rather than what this call computed.
-        //
-        // The store absorbs a booker write onto a row that already records an erasure, so
-        // these two can differ: erase the same booking twice at once and both callers
-        // computed their own instant, while the row keeps the first. Returning the local one
-        // would report a timestamp the database does not have — and this value is published,
-        // as the erase endpoint's `erasedUtc`, over a contract that says it is the FIRST
-        // erasure's instant. An answer about stored state has to come from storage.
-        //
-        // One extra read on an operation a site performs rarely, in exchange for a response
-        // that cannot be wrong.
+        // Read back, and report what STORAGE holds rather than what this call intended. The
+        // store absorbs an erasure onto a row that already records one, so a second caller's
+        // instant is not the stored instant — and this value is published as the endpoint's
+        // `erasedUtc` under a contract saying it is the FIRST erasure's. An answer about
+        // stored state has to come from storage.
         var stored = await bookingStore.GetBookingAsync(bookingId, cancellationToken).ConfigureAwait(false);
 
-        return stored is null
-            ? DomainResult<Booking>.Failure(
-                FailureCodes.BookingNotFound, $"No booking exists with id {bookingId}.")
-            : DomainResult<Booking>.Success(stored);
+        if (stored is null)
+        {
+            // The write matched a row and the read did not find one. Nothing in the package
+            // deletes a booking, so this is unreachable — and it is answered rather than
+            // asserted away because the honest report is "something is wrong", never "no such
+            // booking". The caller's data HAS been erased; telling them it never existed would
+            // be the one answer guaranteed to be false.
+            throw new InvalidOperationException(
+                $"Booking {bookingId} was erased but could not be read back.");
+        }
+
+        return DomainResult<Booking>.Success(stored);
     }
 
     public DomainResult CheckPlacementRules(Resource resource, DateTimeOffset start, TimeSpan duration)
