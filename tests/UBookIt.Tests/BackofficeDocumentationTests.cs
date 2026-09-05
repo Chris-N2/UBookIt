@@ -183,6 +183,29 @@ public class BackofficeDocumentationTests
     }
 
     [Fact]
+    public void The_capabilitys_own_summary_names_every_verb_the_capability_has()
+    {
+        // A capability's Purpose is prose, and OpenSpec deltas carry requirements — so this
+        // paragraph is edited by hand at sync time, which is the established mechanism here
+        // and also the one nothing enforces. It said the honest verbs are "see and cancel"
+        // and named "editing a booker" among the things that live elsewhere, while this
+        // capability grew a third endpoint. Recording the needed edit in tasks.md was not
+        // enough: a checklist entry nobody reads leaves the archived spec describing a
+        // surface that does not exist, to a reader deriving the capability from it.
+        //
+        // Tied to the CODE rather than to a word count, so it goes stale in the direction
+        // that matters: add a fourth endpoint to this controller and this fails until the
+        // summary is told about it.
+        var purpose = Support.RepoFiles.Read("openspec/specs/booking-management/spec.md");
+        var controller = Support.RepoFiles.Read(
+            "src/UBookIt.Backoffice/Controllers/BookingsController.cs");
+
+        Assert.Contains("erase-booker", controller, StringComparison.Ordinal);
+        DocumentationAssert.Says(purpose, "erase a booker's contact details");
+        Assert.DoesNotContain("about those two verbs", purpose, StringComparison.Ordinal);
+    }
+
+    [Fact]
     public void The_two_surprising_things_about_the_recorded_service_are_stated()
     {
         // Both of these look like defects to someone who has not been told, and both are

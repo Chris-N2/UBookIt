@@ -456,11 +456,27 @@ public sealed class BookingService(
 
         // Written unconditionally, including when the booking was already erased. Skipping
         // the write when nothing changed would make the method's success conditional on
-        // state the caller cannot see, and the write is idempotent anyway — it stores the
-        // instant already recorded.
+        // state the caller cannot see, and the write is idempotent anyway — the store keeps
+        // whatever erasure the row already records.
         await bookingStore.UpdateAsync(booking, cancellationToken).ConfigureAwait(false);
 
-        return DomainResult<Booking>.Success(booking);
+        // Re-read, and return what STORAGE holds rather than what this call computed.
+        //
+        // The store absorbs a booker write onto a row that already records an erasure, so
+        // these two can differ: erase the same booking twice at once and both callers
+        // computed their own instant, while the row keeps the first. Returning the local one
+        // would report a timestamp the database does not have — and this value is published,
+        // as the erase endpoint's `erasedUtc`, over a contract that says it is the FIRST
+        // erasure's instant. An answer about stored state has to come from storage.
+        //
+        // One extra read on an operation a site performs rarely, in exchange for a response
+        // that cannot be wrong.
+        var stored = await bookingStore.GetBookingAsync(bookingId, cancellationToken).ConfigureAwait(false);
+
+        return stored is null
+            ? DomainResult<Booking>.Failure(
+                FailureCodes.BookingNotFound, $"No booking exists with id {bookingId}.")
+            : DomainResult<Booking>.Success(stored);
     }
 
     public DomainResult CheckPlacementRules(Resource resource, DateTimeOffset start, TimeSpan duration)

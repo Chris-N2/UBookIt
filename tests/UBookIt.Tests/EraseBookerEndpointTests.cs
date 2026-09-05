@@ -196,6 +196,36 @@ public class EraseBookerEndpointTests
     }
 
     [Fact]
+    public async Task The_sensitive_data_policy_carries_the_backoffice_authentication_scheme()
+    {
+        // The sibling guard on the section policy exists because deleting this exact line
+        // "passed 860/860" — its comment says so. The new policy adds the same line and had
+        // no equivalent test, which is a recorded lesson not carried across to the code it
+        // was about.
+        //
+        // Harmless today only because this policy is never named alone: the base controller's
+        // section policy always applies too, and its scheme IS guarded. But the composer's own
+        // comment invites naming this one by itself, and that is exactly the configuration in
+        // which a missing scheme bites — an authenticated user rejected with nothing useful to
+        // say about why, because the request never resolved to a backoffice principal.
+        var services = new ServiceCollection();
+        services.AddLogging();
+
+        new UBookIt.Backoffice.Composers.UBookItAuthorizationComposer()
+            .Compose(new ServicesOnlyUmbracoBuilder(services));
+
+        await using var provider = services.BuildServiceProvider();
+        var policy = await provider
+            .GetRequiredService<IAuthorizationPolicyProvider>()
+            .GetPolicyAsync(UBookIt.Backoffice.Constants.SensitiveDataAccessPolicy);
+
+        Assert.NotNull(policy);
+        Assert.Contains(
+            OpenIddict.Validation.AspNetCore.OpenIddictValidationAspNetCoreDefaults.AuthenticationScheme,
+            policy.AuthenticationSchemes);
+    }
+
+    [Fact]
     public async Task The_section_policy_does_NOT_require_sensitive_data()
     {
         // The other direction, and the one that would break the whole section if it drifted:

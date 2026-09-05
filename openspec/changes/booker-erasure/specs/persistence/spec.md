@@ -157,6 +157,6 @@ The type-filtered resource listing SHALL be a single query filtered on the resou
 - **WHEN** resources are listed by type key
 - **THEN** each returned resource carries its open hours and date exceptions, sufficient to compute its availability without a further load
 
-#### Scenario: The claims reads and type listing add no migration of their own
+#### Scenario: No migration is added
 - **WHEN** the multi-resource claims read and the type-filtered listing are inspected
 - **THEN** they read existing tables through existing indexes, requiring no schema change

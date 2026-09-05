@@ -76,6 +76,21 @@ deleted with nothing in the diff that looks like a deletion.
       (`Booker.Name`/`.Email`/`.Phone` removed), which the first draft of this change omitted:
       the wire break was carefully qualified as unpublished and the same question was never
       asked about Core, where the answer is the opposite.
+- [x] 8.9 **`bookings` → "Availability and placement service ports".**
+      Added at QA round 3. The requirement enumerates what `UBookIt.Core`'s booking service is
+      — "placement running the validation pipeline, and cancellation applying the status
+      machine" — and this change adds a third verb to that service while leaving the sentence
+      at two. Carried forward: every word of the dependency constraints, the generation-port
+      reasoning, the service-store and management-store rules, the unpaged type listing, the
+      batched claims read, the pure projection, the only-one-member rule, the earlier
+      widening note, and all eight scenarios verbatim. Changed: the verb list, plus a note
+      recording that this is the third widening and why it changes nothing the requirement
+      protects. **Nothing dropped.**
+      *THIRD occurrence of one lesson on one change. 9.3 swept outward at three sibling
+      capabilities; round 1 found the miss in `booking-management`, round 2 in
+      `sensitive-data`, round 3 here in `bookings`. Sweeping "the capability you are editing"
+      is not one check — it is one per capability the change touches, and this change touches
+      four.*
 - [x] 8.2 **`booking-management` → "Bookings can be enumerated for management".** Carried
       forward: everything a row shows without a further read; resource names as a guarantee; the
       service name snapshot and its reason; the reference and the telephone case; read-only.
@@ -171,4 +186,13 @@ deleted with nothing in the diff that looks like a deletion.
 - [x] 9.2 State the single-durable-home constraint where a future change will meet it, so that emails and any audit trail have to confront it.
 - [x] 9.3 Sibling-spec sweep (**done**: `default-frontend` and `delivery-api` mentions are all placement-time, where a booking always carries details; `resource-management`'s is authorization rationale, still true. Nothing falsified beyond the two already fixed in `persistence`.): grep the other specs in `openspec/specs/` for sentences this change falsifies — in particular anything asserting a booking always has readable contact details, or that `uBookItBooking`'s booker columns are non-null. Two were already found (`persistence`'s "`UpdateAsync` SHALL persist status changes" and its no-new-migration scenario); assume there are more and look rather than assuming there are not.
 - [x] 9.4 Clean build from a clean tree; zero warnings; full .NET and client suites green.
-- [x] 9.5 Run `openspec validate booker-erasure --strict`.
+- [x] 9.5 Run `openspec validate booker-erasure --strict`. **Validated on BOTH the pinned CLI
+      (1.6.0) and the current one (1.12.0).** 1.12.0 initially refused two deltas: it treats a
+      scenario RENAMED inside a `MODIFIED` block as a dropped scenario, and refuses to archive
+      rather than lose it. It was right to. Two scenarios had been renamed while their content
+      was rescoped — `persistence`'s "No migration is added" and `sensitive-data`'s "Null cannot
+      be misread as 'no booker'" — and although §8.5 and §8.6 record why the content changed,
+      the tool cannot read prose and a reader diffing names would have seen two deletions.
+      Both original names are restored; the rescoped content stays. **The name is the
+      scenario's identity and the body is what a MODIFIED entry is for; renaming both at once
+      makes a change indistinguishable from a removal.**

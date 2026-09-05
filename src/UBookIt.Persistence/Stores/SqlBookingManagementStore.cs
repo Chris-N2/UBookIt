@@ -80,7 +80,7 @@ internal sealed class SqlBookingManagementStore(UBookItDbContext db) : IBookingM
                 BookingInterval.Create(row.StartUtc, row.EndUtc, row.TimeZoneId).Value,
                 (BookingStatus)row.Status,
                 row.CreatedUtc,
-                ToSummaryBooker(row.BookerName, row.BookerEmail, row.BookerErasedUtc),
+                ToSummaryBooker(row.Id, row.BookerName, row.BookerEmail, row.BookerErasedUtc),
                 [.. row.Resources.Select(r => new BookedResource(r.Id, r.DisplayName))],
                 BookingAttributionMapper.ToAttribution(row.ServiceId, row.ServiceName)))
             .ToList();
@@ -157,7 +157,8 @@ internal sealed class SqlBookingManagementStore(UBookItDbContext db) : IBookingM
     /// erasure. Mirrors <c>SqlBookingStore.ToBooker</c> deliberately: two projections of the
     /// same columns that disagreed about what they mean would be worse than either.
     /// </remarks>
-    private static SummaryBooker ToSummaryBooker(string? name, string? email, DateTimeOffset? erasedUtc)
+    private static SummaryBooker ToSummaryBooker(
+        Guid bookingId, string? name, string? email, DateTimeOffset? erasedUtc)
     {
         if (erasedUtc is { } erased)
         {
@@ -171,8 +172,12 @@ internal sealed class SqlBookingManagementStore(UBookItDbContext db) : IBookingM
         // which row and what is wrong with it.
         if (name is null || email is null)
         {
+            // The id, so the message says WHICH row — the comment above promised that and the
+            // previous version did not deliver it, which is the same fault as a test whose
+            // comment claims more than it checks. An id is not personal data, and without one
+            // an operator is told a row somewhere in the window is broken.
             throw new InvalidOperationException(
-                "A booking row carries no erasure instant and no booker contact details. "
+                $"Booking {bookingId} carries no erasure instant and no booker contact details. "
                 + "The booker columns are NULL only for an erased booking, so this row was "
                 + "not written by uBookIt.");
         }

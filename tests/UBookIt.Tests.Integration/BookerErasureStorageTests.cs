@@ -217,6 +217,67 @@ public class BookerErasureStorageTests(SqlServerFixture fixture)
     }
 
     [Fact]
+    public async Task Two_erasures_racing_leave_one_instant_and_both_callers_are_told_it()
+    {
+        // The interleaving the previous fix could not survive, and the reason this one is a
+        // single statement rather than a read-then-write.
+        //
+        // Both services read the booking while it is unerased, so BOTH compute their own
+        // instant — exactly the state a check-then-act guard evaluates before the other
+        // write lands. Whichever commits second must be absorbed by the row, and must not
+        // report its own clock reading as the erasure time: the endpoint publishes that value
+        // over a contract saying it is the FIRST erasure's instant.
+        fixture.EnsureAvailable();
+
+        var booking = await PlaceAsync();
+
+        var (first, _) = fixture.CreateServices(Now);
+        var (second, _) = fixture.CreateServices(Now.AddDays(30));
+
+        var a = await first.EraseBookerAsync(booking.Id, Ct);
+        var b = await second.EraseBookerAsync(booking.Id, Ct);
+
+        Assert.True(a.Succeeded);
+        Assert.True(b.Succeeded);
+
+        // One instant in the row...
+        await using var after = fixture.CreateContext();
+        var stored = await after.Bookings.SingleAsync(x => x.Id == booking.Id, Ct);
+        Assert.Equal(Now, stored.BookerErasedUtc);
+
+        // ...and both callers were told THAT one, not the one they each computed. The second
+        // caller's own clock said Now+30d; reporting it would tell a data subject their
+        // details were removed a month later than they were.
+        Assert.Equal(Now, a.Value.Booker.ErasedUtc);
+        Assert.Equal(Now, b.Value.Booker.ErasedUtc);
+    }
+
+    [Fact]
+    public async Task A_status_change_still_lands_on_an_erased_booking()
+    {
+        // The other half of absorbing the booker write: it must absorb ONLY the booker. A
+        // guard that skipped the whole update would make an erased booking uncancellable,
+        // which is a worse defect than the one it was closing — the operator would get a
+        // success and no cancellation, and the slot would stay blocked forever.
+        fixture.EnsureAvailable();
+
+        var booking = await PlaceAsync();
+
+        var (bookings, _) = fixture.CreateServices(Now);
+        Assert.True((await bookings.EraseBookerAsync(booking.Id, Ct)).Succeeded);
+
+        var cancelled = await bookings.CancelAsync(booking.Id, Ct);
+        Assert.True(cancelled.Succeeded);
+
+        await using var after = fixture.CreateContext();
+        var stored = await after.Bookings.SingleAsync(x => x.Id == booking.Id, Ct);
+
+        Assert.Equal((int)BookingStatus.Cancelled, stored.Status);
+        Assert.Null(stored.BookerName);
+        Assert.Equal(Now, stored.BookerErasedUtc);
+    }
+
+    [Fact]
     public async Task Erasing_an_already_erased_booking_keeps_the_first_instant_in_storage()
     {
         // The other side of "the stored erasure wins": the guard skips the booker columns on

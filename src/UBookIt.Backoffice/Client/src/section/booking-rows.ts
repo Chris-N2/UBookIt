@@ -367,7 +367,13 @@ export function serviceLabel(
  * the inference the three-state contract was introduced to remove.
  */
 export function bookerWithheld(booking: BookingLike): boolean {
-  return booking.booker.condition === BOOKER_WITHHELD;
+  // Anything that is not shown and not erased counts as withheld, which matches how
+  // `bookerCell` falls through: an unrecognised condition from a newer server renders the
+  // hidden label, so the page must also carry the explanation of what would reveal it.
+  // Comparing against the literal "Withheld" instead left the two disagreeing — the cell
+  // said "Contact details hidden" and nothing on the page said how to see them, which is
+  // the exact combination the collection-view requirement exists to prevent.
+  return !bookerShown(booking) && !bookerErased(booking);
 }
 
 /** Whether this row's booker contact details were erased — for everybody, permanently. */

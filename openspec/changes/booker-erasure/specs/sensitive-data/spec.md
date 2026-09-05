@@ -84,7 +84,7 @@ NOT be reported by empty or masked contact details.
 - **WHEN** a response withholds a booker's contact details
 - **THEN** the name and the email are withheld together, and no state exists in which one is present and the other is not
 
-#### Scenario: A response cannot be misread as "no booker"
+#### Scenario: Null cannot be misread as "no booker"
 - **WHEN** a client receives a booking carrying no contact details
 - **THEN** the response states whether they were withheld or erased, and the package's contract states that a booking without a booker cannot exist
 
