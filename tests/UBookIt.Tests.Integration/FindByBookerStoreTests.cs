@@ -204,6 +204,15 @@ public class FindByBookerStoreTests(SqlServerFixture fixture)
 
         // No row appears on both pages: ordering is total (start, then id), so paging is stable.
         Assert.Empty(first.Items.Select(r => r.BookingId).Intersect(second.Items.Select(r => r.BookingId)));
+
+        // A page of ZERO returns no rows and the real total — which the requirement states is
+        // NOT the count-only form it forbids elsewhere. The prohibition is on offering a count
+        // to somebody who may not see what is counted; this caller may read every row it would
+        // have returned, so a page size of nothing discloses nothing new.
+        var none = await FindAsync(address, skip: 0, take: 0);
+
+        Assert.Empty(none.Items);
+        Assert.Equal(3, none.Total);
     }
 
     [Fact]

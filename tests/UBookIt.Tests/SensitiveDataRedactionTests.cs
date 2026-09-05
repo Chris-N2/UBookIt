@@ -629,7 +629,24 @@ public class SensitiveDataRedactionTests
         //     create or update body, and firing there would be a false positive on every
         //     legitimate write — a guard that fires for the wrong reason is read as noise and
         //     then relaxed, which is how the previous round lost `term` altogether.
-        var readIdentifiers = new List<string>();
+        // The management actions that CHANGE something. Everything else is a read, and a read
+        // may not expose a free-text search surface over bookings without being named here and
+        // justified. Recorded rather than inferred from the HTTP verb, because this package
+        // deliberately uses POST for a read that takes a sensitive value.
+        string[] KnownWrites =
+        [
+            "BookingsController.CancelBooking",
+            "BookingsController.EraseBooker",
+            "ResourcesController.CreateResource",
+            "ResourcesController.UpdateResource",
+            "ResourcesController.DeleteResource",
+            "ServicesController.CreateService",
+            "ServicesController.UpdateService",
+            "ServicesController.DeleteService",
+        ];
+
+        var scannedActions = new List<string>();
+        var readIdentifiers = new List<(string Identifier, string Where)>();
         var allIdentifiers = new List<(string Identifier, string Where, bool Gated)>();
         var scannedControllers = new List<string>();
 
@@ -646,7 +663,32 @@ public class SensitiveDataRedactionTests
                     continue;
                 }
 
-                var isRead = method.GetCustomAttributes<HttpGetAttribute>().Any();
+                // A READ, which is no longer the same set as "a GET".
+                //
+                // This asked `HttpGetAttribute` alone, and that was harmless for exactly as
+                // long as every management read was a GET. `find-by-booker` ended that: it is
+                // a POST BECAUSE it takes a contact detail, since an address in a query string
+                // is written to the web server's log, every proxy's log and the browser's
+                // history. So the package's own precedent for "a read that takes a sensitive
+                // value" is a POST — and the free-text rule below, which exists to force any
+                // search surface over bookings to be named and justified, could not see one.
+                // An ungated `[HttpPost("bookings/search")] Search([FromQuery] string term)`
+                // passed this guard.
+                //
+                // Widening to "GET or POST" outright would fire on every legitimate write body
+                // carrying a `name`, which is the false positive the rule below is scoped to
+                // avoid — and a guard that cries wolf gets relaxed rather than fixed. So the
+                // WRITES are enumerated instead: anything not recorded as one is treated as a
+                // read. A new POST therefore has to be classified by whoever adds it, which is
+                // the decision this guard exists to force.
+                var route = method.GetCustomAttributes<HttpMethodAttribute>()
+                    .Select(attribute => attribute.Template)
+                    .FirstOrDefault(template => template is not null);
+
+                var isWrite = KnownWrites.Contains(
+                    $"{controller.Name}.{method.Name}", StringComparer.Ordinal);
+
+                var isRead = !isWrite;
 
                 // The action's OWN authorization, not the controller's. The base controller's
                 // section policy applies to everything and would make every endpoint look
@@ -656,13 +698,16 @@ public class SensitiveDataRedactionTests
 
                 foreach (var parameter in method.GetParameters())
                 {
+                scannedActions.Add($"{controller.Name}.{method.Name}");
+                _ = route;
+
                     foreach (var identifier in Identifiers(parameter.Name, parameter.ParameterType, depth: 0))
                     {
                         allIdentifiers.Add((identifier, $"{controller.Name}.{method.Name}", gated));
 
                         if (isRead)
                         {
-                            readIdentifiers.Add(identifier);
+                            readIdentifiers.Add((identifier, $"{controller.Name}.{method.Name}"));
                         }
                     }
                 }
@@ -673,7 +718,7 @@ public class SensitiveDataRedactionTests
         // count was not enough: blinding the scan to BookingsContoller specifically still left
         // plenty of identifiers from Resources and Services, and both checks passed.
         Assert.Contains(nameof(BookingsController), scannedControllers);
-        Assert.Contains("resourceIds", readIdentifiers);
+        Assert.Contains(readIdentifiers, entry => entry.Identifier == "resourceIds");
 
         // ANTI-VACUITY for the rule below: at least one endpoint really does take a contact
         // detail now, so a scan that stopped recognising them would fail here rather than
@@ -697,11 +742,19 @@ public class SensitiveDataRedactionTests
         // protect, wearing the right policy. `design.md` D3 promised "the restatement must keep
         // a tripwire"; it kept one of the two.
         //
-        // Recorded as a SET rather than as a search for suspicious words, on the same reasoning
-        // as the membership snapshots: a list of forbidden spellings passes on the next one
-        // somebody invents, and the parameter that widens this will be called `match` or `mode`
-        // or `q`, not `contains`. Every contact-detail parameter in the package is named here,
-        // and a new one fails until an author states what it does.
+        // Recorded as a SET rather than as a search for suspicious operation words: a list of
+        // forbidden spellings passes on the next one somebody invents, and the parameter that
+        // widens this will be called `match` or `mode` or `q`, not `contains`. Every parameter
+        // this scan RECOGNISES as a contact detail is named here, and a new one fails until an
+        // author states what it does.
+        //
+        // **The limit of that claim, stated because the first version of this comment
+        // overreached it:** the set is populated by a name filter — `booker` or `email` — so a
+        // parameter called `subject`, `address` or `who` carrying an address enters neither
+        // this set nor the gating check below. That is the same class of gap as the free-text
+        // list further down, and it is why the free-text list exists alongside this: between
+        // them they cover the words somebody actually reaches for. Neither is a proof, and a
+        // reviewer should read new parameters rather than trusting either.
         string[] recordedContactParameters =
         [
             "BookingsController.FindBookingsByBooker: Email",
@@ -726,10 +779,18 @@ public class SensitiveDataRedactionTests
             + Environment.NewLine
             + "A parameter accepting a contact detail may exist ONLY if its endpoint requires "
             + "sensitive-data access as its own authorization AND it matches the whole value "
-            + "exactly — no prefix, substring, wildcard or fuzzy form, no ordering by a contact "
-            + "detail, and no count-only response. A partial match answers WHICH PEOPLE match a "
-            + "fragment, which is an enumeration facility rather than a lookup. If the new "
-            + "parameter satisfies both, record it here.");
+            + "exactly. A partial match answers WHICH PEOPLE match a fragment, which is an "
+            + "enumeration facility rather than a lookup."
+            + Environment.NewLine
+            + Environment.NewLine
+            + "THIS guard sees only the first of those two. It compares parameter NAMES, so it "
+            + "cannot tell equality from a substring match — keeping a parameter called 'email' "
+            + "while matching with Contains passes here and passes the whole unit suite. "
+            + "Exactness is observed in the INTEGRATION suite, by "
+            + "FindByBookerStoreTests.The_search_emits_an_equality_comparison_and_never_a_LIKE "
+            + "and .Matching_is_exact_and_a_fragment_finds_nothing. If you record a new "
+            + "parameter here, give it an equivalent there — this message is not evidence that "
+            + "its matching was checked.");
 
         foreach (var (identifier, where, gated) in allIdentifiers)
         {
@@ -747,14 +808,31 @@ public class SensitiveDataRedactionTests
                 + "check inside the handler does not satisfy this and cannot be seen from here.");
         }
 
-        foreach (var identifier in readIdentifiers)
+        // ANTI-VACUITY for the write list: every name recorded there must still exist, or the
+        // list is quietly widening the read set as actions are renamed.
+        Assert.All(
+            KnownWrites,
+            write => Assert.Contains(write, scannedActions));
+
+        foreach (var (identifier, where) in readIdentifiers)
         {
             Assert.False(
                 new[] { "name", "search", "searchterm", "term", "query", "q", "keyword" }
                     .Contains(identifier, StringComparer.OrdinalIgnoreCase),
-                $"A management read exposes '{identifier}', a free-text search surface over "
-                + "bookings. If it cannot reach booker contact details, name it for what it "
-                + "searches and record why here.");
+                $"{where} exposes '{identifier}', which reads as a free-text search surface "
+                + "over bookings, and this guard treats it as a READ."
+                + Environment.NewLine
+                + Environment.NewLine
+                + "If it is actually a WRITE — a create or an update whose body legitimately "
+                + "carries a name — record it in KnownWrites above and this stops applying. "
+                + "Reads are the default deliberately: the package uses POST for a read that "
+                + "takes a sensitive value, so the HTTP verb cannot classify these and "
+                + "somebody has to."
+                + Environment.NewLine
+                + Environment.NewLine
+                + "If it IS a read, it must not offer free text over bookings: a caller who "
+                + "may not see a booker's details could confirm one by watching whether a row "
+                + "comes back. Name it for what it searches and record why here.");
         }
     }
 

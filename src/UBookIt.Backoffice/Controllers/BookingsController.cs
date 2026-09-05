@@ -256,6 +256,11 @@ public class BookingsController(
 
         var page = await bookingStore.FindByBookerEmailAsync(query.Value, cancellationToken);
 
+        // Resolved once, not per row — the same user gives the same answer, and hoisting it
+        // matches how the list endpoint above does it. Two adjacent endpoints calling the same
+        // decision differently invites a reader to wonder which is right.
+        var bookerVisibility = ResolveBookerVisibility();
+
         // ASKED, not assumed from having got here.
         //
         // Reaching this action means the policy held, so `Shown` would be correct — and it
@@ -270,7 +275,7 @@ public class BookingsController(
         return Ok(new PagedBookingsModel
         {
             Total = page.Total,
-            Items = [.. page.Items.Select(summary => BookingModelMapper.ToModel(summary, ResolveBookerVisibility()))],
+            Items = [.. page.Items.Select(summary => BookingModelMapper.ToModel(summary, bookerVisibility))],
         });
     }
 

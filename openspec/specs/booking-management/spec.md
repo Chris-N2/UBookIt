@@ -20,7 +20,8 @@ deliberate.** Placement auto-confirms — `bookings` states that no v1 pathway p
 email address*, *cancel* and *erase a booker's contact details*. Approving, declining and
 amending a booking's time are each a change to the domain rather than a screen over an existing
 one. This capability is about those four verbs and the path each takes — the ports, the authorized endpoints over them, and the backoffice
-views an operator works in — and the requirements below, not this paragraph, say what exists.
+views an operator works in — and the requirements below, not this paragraph, say what
+exists.
 
 *Finding by address joined the list with the `find-by-booker` change, and is here rather than
 elsewhere for the reason erasure is: the endpoint an operator reaches it through is one of this

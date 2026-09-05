@@ -171,6 +171,43 @@ public class BackofficeDocumentationTests
     }
 
     [Fact]
+    public void The_documentation_says_how_to_find_the_bookings_to_erase()
+    {
+        // `booker-erasure` → "What erasure does not reach is documented" was MODIFIED by
+        // find-by-booker so that its first boundary points at the search: the documentation
+        // SHALL direct an operator to search first and erase each result, and SHALL state that
+        // the search finds bookings made with THAT address.
+        //
+        // Those SHALLs arrived in a review round and shipped with nothing observing them —
+        // deleting the whole "Finding the bookings to erase" section left 1056 unit and 749
+        // rendering tests green. That is the failure this file's own comments name: a spec
+        // requirement discharged only by prose is discharged by nothing.
+        //
+        // The four claims below are the ones an operator acts on, and each fails differently
+        // if it goes missing: without the first they erase the one booking they were shown and
+        // believe they are done; without the second they read a single result as proof there is
+        // only one; without the third they expect a partial search to work; without the fourth
+        // they treat an empty result as confirmation that an erasure succeeded.
+        var docs = Docs();
+
+        DocumentationAssert.Says(docs, "search first, then erase each result");
+        DocumentationAssert.Says(docs, "It finds bookings made with *that* address");
+        DocumentationAssert.Says(docs, "It matches the whole address, exactly");
+        DocumentationAssert.Says(docs, "an empty result does not prove an erasure worked");
+    }
+
+    [Fact]
+    public void The_documentation_says_the_search_needs_the_same_group_as_reading_and_erasing()
+    {
+        // The gate is the point of the feature: somebody who may not see a booker's name must
+        // not be able to ask questions about one. An operator told the search exists but not
+        // what it requires meets a 403 and reads it as a defect.
+        var docs = Docs();
+
+        DocumentationAssert.Says(docs, "same Sensitive data group");
+    }
+
+    [Fact]
     public void The_documentation_says_erasure_cannot_be_undone()
     {
         // Separate from the pair above because it is the claim most likely to be softened by

@@ -88,7 +88,7 @@ public class FindByBookerEndpointTests
     }
 
     [Fact]
-    public async Task A_caller_the_endpoint_cannot_identify_is_withheld_from_rather_than_trusted()
+    public async Task A_caller_outside_the_group_is_withheld_from_rather_than_trusted()
     {
         // DEFENCE IN DEPTH, and the reason this endpoint asks Umbraco rather than inferring
         // "shown" from having been reached.
