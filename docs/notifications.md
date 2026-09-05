@@ -126,3 +126,7 @@ person who performed it — never the address that was erased.
 - Approving or declining a booking. No v1 pathway produces those statuses.
 - Amending a booking's time. There is no such operation; the shape of it is a cancellation
   and a new booking.
+- **Erasing a booker's details.** It changes a booking and raises nothing — which matters most
+  to whoever read the section above and is now wondering how to erase their own copy. There is
+  no notification to subscribe to, so a system holding contact details must be reconciled some
+  other way. Keeping the booking reference instead of the person avoids the problem entirely.

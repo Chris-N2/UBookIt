@@ -172,40 +172,32 @@ public class BookerErasureStorageTests(SqlServerFixture fixture)
     }
 
     [Fact]
-    public async Task An_erasure_cannot_revert_a_cancellation_that_committed_while_it_ran()
+    public async Task A_cancellation_survives_an_erasure_that_follows_it()
     {
-        // THE MIRROR OF THE UN-ERASURE DEFECT, and the one that cost more.
+        // The observable half of the round-4 CRITICAL: erasure must not disturb the status.
         //
-        // Erasure used to read a booking, mutate the aggregate and write the whole thing back,
-        // which meant it wrote the STATUS too — from a copy taken before a cancellation landed.
-        // Cancelled reverted to Confirmed, and a Confirmed booking BLOCKS: a slot the customer
-        // had released was silently re-taken, and anything placed into the freed time was now
-        // an overlapping confirmed booking that no conflict check would ever run against again.
+        // **What this does NOT do is stage the interleaving that caused it.** The defect
+        // needed the erasure to hold an aggregate read BEFORE the cancellation, and the verb
+        // now takes only an id, so a single-threaded test cannot construct one — an earlier
+        // version of this test read a stale aggregate to look as though it did and then never
+        // used it, which is the third unfalsifiable test this change has produced and the
+        // reason the claim is spelled out rather than implied.
         //
-        // The interleaving is reproduced by taking the aggregate BEFORE the cancellation, the
-        // way the old implementation did, and erasing after it.
+        // The guarantee is held by `The_erase_write_issues_one_statement_and_reads_nothing_first`,
+        // which asserts the erasure's UPDATE does not touch [Status] at all. This test is the
+        // end-to-end confirmation that the two verbs compose.
         fixture.EnsureAvailable();
 
         var booking = await PlaceAsync();
-
-        await using var staleContext = fixture.CreateContext();
-        var stale = await new SqlBookingStore(staleContext).GetBookingAsync(booking.Id, Ct);
-        Assert.NotNull(stale);
-        Assert.Equal(BookingStatus.Confirmed, stale.Status);
-
         var (bookings, _) = fixture.CreateServices(Now);
-        Assert.True((await bookings.CancelAsync(booking.Id, Ct)).Succeeded);
 
-        // The erasure proceeds, holding a copy that still says Confirmed.
+        Assert.True((await bookings.CancelAsync(booking.Id, Ct)).Succeeded);
         Assert.True((await bookings.EraseBookerAsync(booking.Id, Ct)).Succeeded);
 
         await using var after = fixture.CreateContext();
         var stored = await after.Bookings.SingleAsync(b => b.Id == booking.Id, Ct);
 
-        // The cancellation stands.
         Assert.Equal((int)BookingStatus.Cancelled, stored.Status);
-
-        // And the erasure happened — absorbing one write must not cost the other.
         Assert.Null(stored.BookerName);
         Assert.Equal(Now, stored.BookerErasedUtc);
     }

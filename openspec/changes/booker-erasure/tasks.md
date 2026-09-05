@@ -143,13 +143,28 @@ deleted with nothing in the diff that looks like a deletion.
       columns are nullable and an erasure instant is added. **Nothing dropped.**
 - [x] 8.5 **`persistence` → "Store implementations honour Core semantics".** Carried forward:
       SQL Server implementations of both stores; `GetClaimsAsync` overlap semantics and its
-      index; the batched multi-resource read; the type-filtered listing. Changed: `UpdateAsync`
-      persists **every** post-placement mutation rather than "status changes" — a widening that
-      closes the hole in which erasure was a silent no-op. **Deliberately rescoped, and this is
-      the one to look at twice:** the scenario asserting "the migrations folder contains no new
-      migration" was written about that change's two reads and, left standing, reads as a
-      prohibition on the package ever adding a migration. It is restated as a claim about those
-      two reads, which is what it always meant. This change does add a migration.
+      index; the batched multi-resource read; the type-filtered listing. All five original
+      scenarios restated.
+      **REWRITTEN AT QA ROUND 4, and this entry was stale until round 5 caught it.** It
+      previously recorded the round-1 decision — "`UpdateAsync` persists **every**
+      post-placement mutation rather than 'status changes' — a widening" — which round 4
+      reversed after that widening produced three consecutive defects. The requirement now says
+      the opposite: `UpdateAsync` writes the **status and not the booker**, a store exposes a
+      **separate** erasure taking an id and an instant, the two touch **disjoint columns**, the
+      erasure is absorbing **inside the write statement**, and no implementation may return an
+      erased booker to carrying details.
+      *A stale §8 entry is worse than none: this section is the artifact the project uses to
+      prove guarantees survived a wholesale replacement, so one describing a superseded decision
+      certifies a diff nobody re-did. It also left a scenario standing — "no separate
+      erasure-only update method exists alongside `UpdateAsync`" — that FORBADE the design the
+      same requirement mandates, which change ③ would have read as a prohibition on the very
+      verb it must call. Replaced with two scenarios stating what the split actually
+      guarantees.*
+      **Deliberately rescoped, and still worth looking at twice:** the scenario asserting "the
+      migrations folder contains no new migration" was written about that change's two reads
+      and, left standing, reads as a prohibition on the package ever adding a migration. It is
+      restated as a claim about those two reads, which is what it always meant. This change does
+      add a migration.
 - [x] 8.8 **`sensitive-data` → "Personal data is shown only to a backoffice user Umbraco permits to see it".**
       Added at QA round 2, which found the scenario *A permitted user sees contact details*
       falsified by this change: it said "**each** booking's booker name and email are present",
@@ -190,6 +205,13 @@ deleted with nothing in the diff that looks like a deletion.
 - [x] 9.2 State the single-durable-home constraint where a future change will meet it, so that emails and any audit trail have to confront it.
 - [x] 9.3 Sibling-spec sweep (**done**: `default-frontend` and `delivery-api` mentions are all placement-time, where a booking always carries details; `resource-management`'s is authorization rationale, still true. Nothing falsified beyond the two already fixed in `persistence`.): grep the other specs in `openspec/specs/` for sentences this change falsifies — in particular anything asserting a booking always has readable contact details, or that `uBookItBooking`'s booker columns are non-null. Two were already found (`persistence`'s "`UpdateAsync` SHALL persist status changes" and its no-new-migration scenario); assume there are more and look rather than assuming there are not.
 - [x] 9.4 Clean build from a clean tree; zero warnings; full .NET and client suites green.
+- [ ] 9.6 **Release decision, deliberately left open and recorded so it is not lost.**
+      `Directory.Build.props` is still `0.1.0` and this change declares two breaks to published
+      API — `Booker.Name`/`.Email`/`.Phone` removed, and `IBookingStore` gaining a member. The
+      proposal states that whether `0.1.0` consumers exist is a release decision rather than
+      this change's; the version bump therefore belongs to whoever cuts `0.3.0`, and this entry
+      exists so that person meets the question rather than discovering it. **Left unticked on
+      purpose:** it is not work this change performs.
 - [x] 9.5 Run `openspec validate booker-erasure --strict`. **Validated on BOTH the pinned CLI
       (1.6.0) and the current one (1.12.0).** 1.12.0 initially refused two deltas: it treats a
       scenario RENAMED inside a `MODIFIED` block as a dropped scenario, and refuses to archive

@@ -153,9 +153,13 @@ The type-filtered resource listing SHALL be a single query filtered on the resou
 - **WHEN** the tests covering `UpdateAsync` are inspected
 - **THEN** they assert against state read back from storage rather than against the aggregate handed to the store
 
-#### Scenario: Erasure uses the same write path as a status change
+#### Scenario: The two writes touch disjoint columns
 - **WHEN** the booking store's write surface is inspected
-- **THEN** no separate erasure-only update method exists alongside `UpdateAsync`
+- **THEN** the status write does not write the booker, and the erasure write does not write the status
+
+#### Scenario: The erasure write takes an id and an instant
+- **WHEN** the erasure operation's signature is inspected
+- **THEN** it takes the booking's id and the instant, and no aggregate whose other values it could write back
 
 #### Scenario: Batched claims are one round trip
 - **WHEN** claims are read for several resource ids over a range

@@ -231,9 +231,13 @@ public class BookerErasureTests
         // the retention job will depend on, and the one that makes a retry after a timeout
         // safe rather than a second, differently-dated erasure.
         var resource = BookableResource();
-        var (bookings, _, _) = TestData.Services(resource, nowUtc: ErasedAt);
+        var resources = new InMemoryResourceStore().Add(resource);
+        var store = new InMemoryBookingStore();
 
-        var placed = await bookings.PlaceAsync(new BookingRequest
+        var first = new BookingService(
+            resources, store, new FixedTimeProvider(ErasedAt), TestData.Settings);
+
+        var placed = await first.PlaceAsync(new BookingRequest
         {
             ResourceId = resource.Id,
             Start = TestData.Utc(TestData.BaseDate, "10:00"),
@@ -241,9 +245,17 @@ public class BookerErasureTests
             Booker = TestData.Booker(),
         });
 
-        Assert.True((await bookings.EraseBookerAsync(placed.Value.Id)).Succeeded);
+        Assert.True((await first.EraseBookerAsync(placed.Value.Id)).Succeeded);
 
-        var again = await bookings.EraseBookerAsync(placed.Value.Id);
+        // A DIFFERENT clock for the second attempt. Sharing one made this unable to see the
+        // property it names: an implementation that re-erased on every call would write the
+        // same instant and pass, so the test could not tell absorbing from re-erasing — which
+        // is the whole difference between "a retry is safe" and "a retry moves the date a
+        // data subject was told".
+        var second = new BookingService(
+            resources, store, new FixedTimeProvider(ErasedAt.AddDays(30)), TestData.Settings);
+
+        var again = await second.EraseBookerAsync(placed.Value.Id);
 
         Assert.True(again.Succeeded);
         Assert.Equal(ErasedAt, again.Value.Booker.ErasedUtc);

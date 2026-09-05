@@ -111,8 +111,10 @@ public sealed class SqlServerFixture : IAsyncLifetime
     /// </remarks>
     public UBookItDbContext CreateContext(IInterceptor interceptor)
     {
+        using var probe = new UBookItDbContext(Options);
+
         var builder = new DbContextOptionsBuilder<UBookItDbContext>();
-        UBookItDbContext.ConfigureSqlServer(builder, new UBookItDbContext(Options).Database.GetConnectionString()!);
+        UBookItDbContext.ConfigureSqlServer(builder, probe.Database.GetConnectionString()!);
         builder.AddInterceptors(interceptor);
 
         return new UBookItDbContext(builder.Options);

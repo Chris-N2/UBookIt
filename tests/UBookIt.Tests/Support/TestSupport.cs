@@ -320,6 +320,25 @@ public sealed class InMemoryBookingStore : IBookingStore
         }
     }
 
+    /// <summary>
+    /// <b>Where this double still differs from SQL, stated rather than left to be discovered.</b>
+    /// </summary>
+    /// <remarks>
+    /// <para>
+    /// <see cref="EraseBookerAsync"/> mutates the stored aggregate in place while
+    /// <see cref="UpdateAsync"/> replaces the entry with a rebuilt one, so a caller holding a
+    /// reference sees an erasure and not a status change. Harmless — nothing holds one across
+    /// a write — but it means the stale-copy interleaving that rounds 2 to 4 turned on
+    /// <b>cannot be staged through this double at all</b>, which is why those guarantees live
+    /// in the integration suite against a real database and not here.
+    /// </para>
+    /// <para>
+    /// <see cref="PlaceAsync"/> also stores the caller's live instance rather than a copy, so a
+    /// test that mutates a placed aggregate mutates the store with no write. No test relies on
+    /// that today, and it is recorded because "no test relies on it" is luck rather than
+    /// construction.
+    /// </para>
+    /// </remarks>
     /// <summary>The stored booking with a different status, and everything else untouched.</summary>
     private static Booking Rebuild(Booking stored, BookingStatus status)
         => Booking.Rehydrate(

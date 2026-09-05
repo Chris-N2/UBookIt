@@ -216,6 +216,20 @@ public sealed class Booking
     /// Returns nothing, because there is no way for it to fail. An erasure a caller could
     /// have refused is an erasure a caller might skip.
     /// </para>
+    /// <para>
+    /// <b>This changes the aggregate and NOTHING ELSE — it does not persist.</b> Handing the
+    /// result to <see cref="Stores.IBookingStore.UpdateAsync"/> will not erase anything: that
+    /// method writes the status and deliberately not the booker. To erase a stored booking,
+    /// call <c>IBookingService.EraseBookerAsync</c>, or the store's own
+    /// <c>EraseBookerAsync</c> — either of which reaches the one write that touches the
+    /// booker columns.
+    /// </para>
+    /// <para>
+    /// Stated here because this is the method a caller reaches for first, and because the
+    /// combination "erase the aggregate, then update it" is a silent no-op that returns
+    /// success and satisfies any assertion made against the returned booking. That exact
+    /// mistake is what the storage round-trip tests exist to catch.
+    /// </para>
     /// </remarks>
     /// <param name="erasedUtc">When the erasure happened.</param>
     public void EraseBooker(DateTimeOffset erasedUtc)
