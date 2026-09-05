@@ -231,6 +231,7 @@ public static class ServiceBookingFormBuilder
     {
         var start = TimeZoneInfo.ConvertTime(booking.Interval.StartUtc, zone);
         var end = TimeZoneInfo.ConvertTime(booking.Interval.EndUtc, zone);
+        var contact = PlacedBooking.Contact(booking);
 
         return new ServiceConfirmationModel
         {
@@ -243,9 +244,9 @@ public static class ServiceBookingFormBuilder
                     : claim.ResourceId.ToString())],
             LocalStart = start.ToString("dddd d MMMM yyyy, HH:mm", CultureInfo.InvariantCulture),
             LocalEnd = end.ToString("HH:mm", CultureInfo.InvariantCulture),
-            BookerName = booking.Booker.Name,
-            BookerEmail = booking.Booker.Email,
-            BookerPhone = booking.Booker.Phone,
+            BookerName = contact.Name,
+            BookerEmail = contact.Email,
+            BookerPhone = contact.Phone,
         };
     }
 

@@ -154,8 +154,58 @@ internal sealed class SqlBookingStore(UBookItDbContext db) : IBookingStore
             .FirstAsync(b => b.Id == booking.Id, cancellationToken)
             .ConfigureAwait(false);
 
+        // The STATUS, and nothing else — see IBookingStore.UpdateAsync.
+        //
+        // This method briefly wrote the booker too, to stop erasure being a silent no-op
+        // through it. That fix produced two further defects in as many reviews: first a
+        // cancellation restoring a person somebody had erased in between, then, once the
+        // booker columns were guarded, an ERASURE reverting a committed cancellation and
+        // re-blocking a slot that had been released. Both came from one method writing
+        // columns its caller had not changed.
+        //
+        // Erasure now has its own write over its own columns, so the two cannot collide and
+        // neither needs to defend against the other.
         row.Status = (int)booking.Status;
         await db.SaveChangesAsync(cancellationToken).ConfigureAwait(false);
+    }
+
+    public async Task<bool> EraseBookerAsync(
+        Guid bookingId, DateTimeOffset erasedUtc, CancellationToken cancellationToken = default)
+    {
+        // ONE STATEMENT, AND THE TEST FOR "ALREADY ERASED" IS INSIDE IT.
+        //
+        // Each booker column is set to a CASE over the row's own pre-update BookerErasedUtc,
+        // which SQL Server evaluates against the row as it stands when it takes the lock. A
+        // row that already records an erasure keeps every value it has, including the FIRST
+        // instant — the one a data subject was told.
+        //
+        // Not a SELECT-then-decide-then-UPDATE. That shape was tried and rejected in review:
+        // the erasure can commit in the window between the two statements, and the UPDATE
+        // then restores the person having already decided it would not. It does not make the
+        // race smaller in any way that matters, and it argues for a row-level guarantee while
+        // implementing it in application code, which cannot deliver one.
+        //
+        // Takes an id and an instant rather than an aggregate, so there is no stale copy of
+        // anything to write back and no column outside the booker can be touched. That is why
+        // this does not disturb a concurrent cancellation.
+        var affected = await db.Bookings
+            .Where(b => b.Id == bookingId)
+            .ExecuteUpdateAsync(
+                setters => setters
+                    .SetProperty(b => b.MemberKey, b => b.BookerErasedUtc == null ? null : b.MemberKey)
+                    .SetProperty(b => b.BookerName, b => b.BookerErasedUtc == null ? null : b.BookerName)
+                    .SetProperty(b => b.BookerEmail, b => b.BookerErasedUtc == null ? null : b.BookerEmail)
+                    .SetProperty(b => b.BookerPhone, b => b.BookerErasedUtc == null ? null : b.BookerPhone)
+                    .SetProperty(
+                        b => b.BookerErasedUtc,
+                        b => b.BookerErasedUtc == null ? erasedUtc : b.BookerErasedUtc),
+                cancellationToken)
+            .ConfigureAwait(false);
+
+        // Reports existence, not change. Erasing an already-erased booking matches a row and
+        // writes nothing, and that is a success — the caller asked for the booking to be
+        // erased and it is.
+        return affected > 0;
     }
 
     /// <summary>
@@ -183,9 +233,10 @@ internal sealed class SqlBookingStore(UBookItDbContext db) : IBookingStore
             Status = (int)booking.Status,
             CreatedUtc = booking.CreatedUtc,
             MemberKey = booking.Booker.MemberKey,
-            BookerName = booking.Booker.Name,
-            BookerEmail = booking.Booker.Email,
-            BookerPhone = booking.Booker.Phone,
+            BookerName = booking.Booker.Contact?.Name,
+            BookerEmail = booking.Booker.Contact?.Email,
+            BookerPhone = booking.Booker.Contact?.Phone,
+            BookerErasedUtc = booking.Booker.ErasedUtc,
             ServiceId = serviceId,
             ServiceName = serviceName,
             Claims = booking.Claims
@@ -199,9 +250,31 @@ internal sealed class SqlBookingStore(UBookItDbContext db) : IBookingStore
             row.Id,
             BookingReference.FromCanonical(row.Reference),
             BookingInterval.Create(row.StartUtc, row.EndUtc, row.TimeZoneId).Value,
-            Booker.Create(row.MemberKey, row.BookerName, row.BookerEmail, row.BookerPhone).Value,
+            ToBooker(row),
             row.Claims.Select(c => new ResourceClaim(c.ResourceId)),
             (BookingStatus)row.Status,
             row.CreatedUtc,
             BookingAttributionMapper.ToAttribution(row)).Value;
+
+    /// <summary>
+    /// The stored booker, in whichever of its two states the row holds.
+    /// </summary>
+    /// <remarks>
+    /// <para>
+    /// <b>The erasure column decides, not the absence of a name.</b> Reading "erased" off a
+    /// NULL name would be inferring the state from missing data — which is the reading the
+    /// schema stores <c>BookerErasedUtc</c> precisely to avoid, and which would silently
+    /// convert a row corrupted by some other means into a lawful erasure.
+    /// </para>
+    /// <para>
+    /// <c>Booker.Create</c> is used for the unerased case exactly as before, and its result
+    /// is taken directly: what is stored is historical fact, on the same terms as the stored
+    /// status, and a row that failed validation here would make a booking unreadable for
+    /// having once been valid.
+    /// </para>
+    /// </remarks>
+    private static Booker ToBooker(BookingRow row)
+        => row.BookerErasedUtc is { } erasedUtc
+            ? Booker.Erased(erasedUtc)
+            : Booker.Create(row.MemberKey, row.BookerName, row.BookerEmail, row.BookerPhone).Value;
 }

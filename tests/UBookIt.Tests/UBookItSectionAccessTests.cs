@@ -71,6 +71,12 @@ public class UBookItSectionAccessTests
         await new UBookItSectionHandler(new StubAuthorizationHelper(user))
             .HandleAsync(context);
 
+        // A refusal must be an explicit Fail(), not silence: HasSucceeded is false either way,
+        // so a helper reading only that cannot tell them apart, and silence would let another
+        // handler for this requirement grant what this one refused. Pre-existing gap, found
+        // while closing the identical one on the sensitive-data handler.
+        Assert.Equal(context.HasSucceeded, !context.HasFailed);
+
         return context.HasSucceeded;
     }
 

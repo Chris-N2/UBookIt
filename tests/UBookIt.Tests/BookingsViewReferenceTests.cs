@@ -128,8 +128,17 @@ public class BookingsViewReferenceTests
         // `Assert.Contains("bookerHidden", …)` was also weaker than it looked: it is satisfied
         // by the substring inside `bookerHiddenNote`, so it would have passed with `bookerHidden`
         // deleted from the element entirely.
+        //
+        // **There are now TWO labels crossing this seam, so the risk this guard covers grew.**
+        // `bookerCell` takes the hidden label and the erased label as bare strings in
+        // positional order; swapping them at this call site compiles, passes every client test
+        // — those pass their own sentinels in, so they can only see a swap INSIDE the function
+        // — and puts "Contact details erased" on rows an operator could have read by joining a
+        // group, while telling them a permanently erased row is merely hidden. That is the
+        // precise confusion the third condition was introduced to remove, reintroduced at the
+        // one place the type system cannot see it.
         Assert.Contains(
-            "bookerCell(booking, this.#term(\"bookerHidden\"))",
+            "bookerCell(booking, this.#term(\"bookerHidden\"), this.#term(\"bookerErased\"))",
             source,
             StringComparison.Ordinal);
     }

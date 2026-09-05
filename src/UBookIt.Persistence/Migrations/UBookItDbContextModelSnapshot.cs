@@ -28,12 +28,13 @@ namespace UBookIt.Persistence.Migrations
                         .HasColumnType("uniqueidentifier");
 
                     b.Property<string>("BookerEmail")
-                        .IsRequired()
                         .HasMaxLength(320)
                         .HasColumnType("nvarchar(320)");
 
+                    b.Property<DateTimeOffset?>("BookerErasedUtc")
+                        .HasColumnType("datetimeoffset");
+
                     b.Property<string>("BookerName")
-                        .IsRequired()
                         .HasMaxLength(256)
                         .HasColumnType("nvarchar(256)");
 

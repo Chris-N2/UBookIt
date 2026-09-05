@@ -108,13 +108,41 @@ internal sealed class BookingRow
     /// </remarks>
     public required string Reference { get; set; }
 
+    /// <summary>
+    /// The booker's Umbraco member key, where they had one. NULL once erased, on the same
+    /// terms as the contact columns — a member key identifies a person as reliably as an
+    /// email address, so an erasure that left it behind would not be one.
+    /// </summary>
     public Guid? MemberKey { get; set; }
 
-    public required string BookerName { get; set; }
+    /// <summary>
+    /// The booker's name, or NULL once erased.
+    /// </summary>
+    /// <remarks>
+    /// <b>Nullable means erased — it never means "a placement that omitted it".</b> The
+    /// domain requires a non-empty name and a well-formed email of every booker it places,
+    /// so no row is ever written with these NULL at placement. They become NULL only when
+    /// somebody erases the booking's personal data, and <see cref="BookerErasedUtc"/> then
+    /// records when, so that the state is stored as a fact rather than inferred from
+    /// missing values.
+    /// </remarks>
+    public string? BookerName { get; set; }
 
-    public required string BookerEmail { get; set; }
+    /// <inheritdoc cref="BookerName"/>
+    public string? BookerEmail { get; set; }
 
+    /// <inheritdoc cref="BookerName"/>
     public string? BookerPhone { get; set; }
+
+    /// <summary>
+    /// When this booking's booker contact details were erased, or NULL if they never were.
+    /// </summary>
+    /// <remarks>
+    /// Non-NULL exactly when <see cref="BookerName"/> and <see cref="BookerEmail"/> are
+    /// NULL. Stored rather than derived from their absence so that "erased" is something the
+    /// row states, and so that a reader is never asked to interpret a missing value.
+    /// </remarks>
+    public DateTimeOffset? BookerErasedUtc { get; set; }
 
     /// <summary>
     /// The service this booking was placed for, or NULL for one placed directly.

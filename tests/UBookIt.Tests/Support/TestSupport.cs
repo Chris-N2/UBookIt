@@ -165,6 +165,18 @@ public sealed class InMemoryServiceStore : IServiceStore, IServiceManagementStor
 /// </summary>
 public sealed class InMemoryBookingStore : IBookingStore
 {
+    // WHERE THIS DOUBLE STILL DIFFERS FROM THE SQL STORE, stated rather than left to be found.
+    //
+    // `EraseBookerAsync` mutates the stored aggregate in place while `UpdateAsync` replaces the
+    // entry with a rebuilt one, so a caller holding a reference sees an erasure and not a
+    // status change. Harmless — nothing holds one across a write — but it means the stale-copy
+    // interleaving that three review rounds turned on CANNOT be staged through this double at
+    // all, which is why those guarantees live in the integration suite against a real database.
+    //
+    // `PlaceAsync` also stores the caller's live instance rather than a copy, so a test that
+    // mutates a placed aggregate mutates the store with no write. Nothing relies on that today,
+    // and it is recorded because "nothing relies on it" is luck rather than construction.
+
     private readonly Lock _gate = new();
     private readonly Dictionary<Guid, Booking> _bookings = [];
 
@@ -267,15 +279,70 @@ public sealed class InMemoryBookingStore : IBookingStore
     /// </remarks>
     public int UpdateCount { get; private set; }
 
+    /// <summary>
+    /// Persists a status change — and, unlike the aggregate-swap this used to be, ONLY that.
+    /// </summary>
+    /// <remarks>
+    /// It replaced the whole stored aggregate, which made this double more permissive than the
+    /// thing it stands in for: writing back a pre-erasure copy restored the person, so erasure
+    /// was reversible through the package's own test store while the SQL one refused it. A fake
+    /// that is more permissive than the real implementation tests nothing — and here it would
+    /// have hidden the exact defect two reviews spent themselves finding.
+    /// </remarks>
     public Task UpdateAsync(Booking booking, CancellationToken cancellationToken = default)
     {
         lock (_gate)
         {
             UpdateCount++;
-            _bookings[booking.Id] = booking;
+
+            if (!_bookings.TryGetValue(booking.Id, out var stored))
+            {
+                throw new InvalidOperationException(
+                    $"No booking exists with id {booking.Id}; nothing was updated.");
+            }
+
+            // The status, rebuilt onto whatever booker is stored — never the caller's copy of
+            // it. Mirrors the SQL store writing one column.
+            _bookings[booking.Id] = Rebuild(stored, booking.Status);
             return Task.CompletedTask;
         }
     }
+
+    /// <summary>How many times the booker-erasure write was asked for.</summary>
+    public int EraseCount { get; private set; }
+
+    /// <inheritdoc />
+    public Task<bool> EraseBookerAsync(
+        Guid bookingId, DateTimeOffset erasedUtc, CancellationToken cancellationToken = default)
+    {
+        lock (_gate)
+        {
+            EraseCount++;
+
+            if (!_bookings.TryGetValue(bookingId, out var stored))
+            {
+                return Task.FromResult(false);
+            }
+
+            // Absorbing, exactly as the port requires: an already-erased booking keeps the
+            // first instant. `Booking.EraseBooker` is itself a no-op on an erased booker, so
+            // this is the domain's own rule rather than a second copy of it.
+            stored.EraseBooker(erasedUtc);
+            return Task.FromResult(true);
+        }
+    }
+
+    /// <summary>The stored booking with a different status, and everything else untouched.</summary>
+    private static Booking Rebuild(Booking stored, BookingStatus status)
+        => Booking.Rehydrate(
+            stored.Id,
+            stored.Reference,
+            stored.Interval,
+            stored.Booker,
+            stored.Claims,
+            status,
+            stored.CreatedUtc,
+            stored.Service).Value;
 }
 
 /// <summary>

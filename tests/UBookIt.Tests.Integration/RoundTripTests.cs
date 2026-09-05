@@ -107,9 +107,13 @@ public class RoundTripTests(SqlServerFixture fixture)
         Assert.Equal(BookingStatus.Confirmed, reloaded.Status);
         Assert.Equal(booking.CreatedUtc, reloaded.CreatedUtc);
         Assert.Null(reloaded.Booker.MemberKey);
-        Assert.Equal("Integration Tester", reloaded.Booker.Name);
-        Assert.Equal("integration@example.com", reloaded.Booker.Email);
-        Assert.Equal("01234 567890", reloaded.Booker.Phone);
+        var contact = reloaded.Booker.Contact;
+        Assert.NotNull(contact);
+        Assert.Equal("Integration Tester", contact.Name);
+        Assert.Equal("integration@example.com", contact.Email);
+        Assert.Equal("01234 567890", contact.Phone);
+        Assert.Null(reloaded.Booker.ErasedUtc);
+        Assert.False(reloaded.Booker.IsErased);
         Assert.Equal(resourceId, Assert.Single(reloaded.Claims).ResourceId);
     }
 

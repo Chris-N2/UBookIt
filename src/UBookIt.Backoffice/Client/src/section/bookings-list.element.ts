@@ -387,14 +387,26 @@ export class UBookItBookingsListElement extends UmbLitElement {
    * whose details were supplied, with every guard still green.
    */
   #bookerCell(booking: BookingModel) {
-    const cell = bookerCell(booking, this.#term("bookerHidden"));
+    const cell = bookerCell(booking, this.#term("bookerHidden"), this.#term("bookerErased"));
 
-    return cell.kind === "hidden"
-      ? html`<span class="withheld">${cell.label}</span>`
-      : html`
+    // Switched on the discriminant rather than chained ternaries, so that adding a fourth
+    // condition to the union is a compile error here instead of falling silently into the
+    // last arm — which for a cell about personal data would render somebody's name under
+    // the wrong explanation.
+    switch (cell.kind) {
+      case "hidden":
+        return html`<span class="withheld">${cell.label}</span>`;
+      case "erased":
+        // Its own class, not `withheld`. The entire requirement is that these two read as
+        // different things; sharing a class leaves a site unable to style them apart and
+        // quietly says they are the same kind of absence.
+        return html`<span class="erased">${cell.label}</span>`;
+      case "shown":
+        return html`
           ${cell.name}
           <div class="secondary">${cell.email}</div>
         `;
+    }
   }
 
   #renderRow(booking: BookingModel, showZone: boolean) {
@@ -564,7 +576,8 @@ export class UBookItBookingsListElement extends UmbLitElement {
       takes the backoffice's own muted token rather than a colour of its own, so a
       site's theme keeps deciding contrast.
     */
-    .withheld {
+    .withheld,
+    .erased {
       font-style: italic;
       color: var(--uui-color-text-alt);
     }

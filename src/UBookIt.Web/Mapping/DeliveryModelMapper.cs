@@ -144,12 +144,16 @@ internal static class DeliveryModelMapper
         };
 
     private static BookerModel ToBookerModel(Booking booking)
-        => new()
+    {
+        var contact = PlacedBooking.Contact(booking);
+
+        return new BookerModel
         {
-            Name = booking.Booker.Name,
-            Email = booking.Booker.Email,
-            Phone = booking.Booker.Phone,
+            Name = contact.Name,
+            Email = contact.Email,
+            Phone = contact.Phone,
         };
+    }
 
     /// <summary>
     /// Builds a validated <see cref="BookingRequest"/> from the request body.

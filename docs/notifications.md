@@ -96,9 +96,37 @@ handler: write to a queue you control, and let that fail and retry on its own te
 Failures are logged, so a handler that throws leaves a trace naming the booking id rather
 than vanishing. The log records the id and nothing else about the booker.
 
+## If you store what a notification hands you, erasure will not reach it
+
+Your handler receives the whole booking, contact details included, because that is how a site
+sends its own confirmation email. **If you write those details anywhere durable — a queue that
+keeps message bodies, a CRM, an audit table, a log line, a report — you have created a second
+copy of somebody's personal data, and uBookIt cannot erase it.**
+
+This matters because uBookIt promises that erasing a booking removes the person from it, and
+that promise is only honest while the booking row is the *only* place the details live. Inside
+the package it is: nothing logs them, no cache holds them, and the public booking API has no
+endpoint that reads a booking back. Outside the package, that is your side of the line.
+
+So if you keep anything:
+
+- Prefer keeping the **booking reference** rather than the person. It is stable, it is not
+  personal data, it survives erasure, and it is what somebody quotes on the telephone.
+- If you must keep contact details, subscribe to erasure in your own system too — a copy you
+  cannot remove on request is the problem the erasure feature exists to solve, relocated to a
+  place nobody thinks to look.
+
+The same applies to anything you build on top of the erase endpoint: an audit record of *who
+erased what* is a sensible thing to keep, and it should record the booking reference and the
+person who performed it — never the address that was erased.
+
 ## What does not raise a notification
 
 - Editing resources or services. They are configuration, not events.
 - Approving or declining a booking. No v1 pathway produces those statuses.
 - Amending a booking's time. There is no such operation; the shape of it is a cancellation
   and a new booking.
+- **Erasing a booker's details.** It changes a booking and raises nothing — which matters most
+  to whoever read the section above and is now wondering how to erase their own copy. There is
+  no notification to subscribe to, so a system holding contact details must be reconciled some
+  other way. Keeping the booking reference instead of the person avoids the problem entirely.

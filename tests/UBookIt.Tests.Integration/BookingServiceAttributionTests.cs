@@ -241,7 +241,9 @@ public class BookingServiceAttributionTests(SqlServerFixture fixture)
         Assert.Equal(bookingId, listed.BookingId);
         Assert.Equal(BookingStatus.Cancelled, listed.Status);
         Assert.Equal("Consultation", listed.Service?.DisplayName);
-        Assert.Equal("Integration Tester", listed.BookerName);
+        var listedContact = listed.Booker.Contact;
+        Assert.NotNull(listedContact);
+        Assert.Equal("Integration Tester", listedContact.Name);
         Assert.Equal(from.AddHours(1), listed.Interval.StartUtc);
     }
 

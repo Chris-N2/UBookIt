@@ -116,6 +116,29 @@ public interface IBookingService
     DomainResult CheckPlacementRules(Resource resource, DateTimeOffset start, TimeSpan duration);
 
     Task<DomainResult<Booking>> CancelAsync(Guid bookingId, CancellationToken cancellationToken = default);
+
+    /// <summary>
+    /// Erases a booking's booker contact details and member key, keeping the booking.
+    /// </summary>
+    /// <remarks>
+    /// <para>
+    /// <b>Anonymisation, not deletion.</b> The booking keeps its id, reference, interval,
+    /// time zone, status, creation time, claims and service, and goes on blocking exactly the
+    /// time it blocked before. Deleting it would return time the site had sold, and would
+    /// destroy the site's own record of what happened — which is not what the person asking
+    /// has asked for, and not something a site may concede on their behalf.
+    /// </para>
+    /// <para>
+    /// <b>Idempotent.</b> Erasing an already-erased booking succeeds and changes nothing,
+    /// including the recorded instant. This is deliberately the opposite of
+    /// <see cref="CancelAsync"/>, which refuses a second attempt — see
+    /// <see cref="Booking.EraseBooker"/> for why the two differ.
+    /// </para>
+    /// <para>
+    /// Fails with <see cref="FailureCodes.BookingNotFound"/> when no booking has the id.
+    /// </para>
+    /// </remarks>
+    Task<DomainResult<Booking>> EraseBookerAsync(Guid bookingId, CancellationToken cancellationToken = default);
 }
 
 public sealed class BookingService(
@@ -415,6 +438,50 @@ public sealed class BookingService(
             .ConfigureAwait(false);
 
         return DomainResult<Booking>.Success(booking);
+    }
+
+    public async Task<DomainResult<Booking>> EraseBookerAsync(
+        Guid bookingId, CancellationToken cancellationToken = default)
+    {
+        // Straight to the store's erase, with no read-modify-write of an aggregate.
+        //
+        // Reading a booking, calling EraseBooker on it and writing the whole thing back is
+        // what produced the last two defects: whatever else that aggregate carried was written
+        // too, from a copy that could already be out of date. Erasure needs to say one thing —
+        // "this booking is erased, as at this instant" — and saying only that removes the
+        // entire class.
+        //
+        // The clock is still this service's, so the instant is comparable with the creation
+        // time and is not read from ambient system time at the storage layer.
+        var existed = await bookingStore
+            .EraseBookerAsync(bookingId, timeProvider.GetUtcNow(), cancellationToken)
+            .ConfigureAwait(false);
+
+        if (!existed)
+        {
+            return DomainResult<Booking>.Failure(
+                FailureCodes.BookingNotFound, $"No booking exists with id {bookingId}.");
+        }
+
+        // Read back, and report what STORAGE holds rather than what this call intended. The
+        // store absorbs an erasure onto a row that already records one, so a second caller's
+        // instant is not the stored instant — and this value is published as the endpoint's
+        // `erasedUtc` under a contract saying it is the FIRST erasure's. An answer about
+        // stored state has to come from storage.
+        var stored = await bookingStore.GetBookingAsync(bookingId, cancellationToken).ConfigureAwait(false);
+
+        if (stored is null)
+        {
+            // The write matched a row and the read did not find one. Nothing in the package
+            // deletes a booking, so this is unreachable — and it is answered rather than
+            // asserted away because the honest report is "something is wrong", never "no such
+            // booking". The caller's data HAS been erased; telling them it never existed would
+            // be the one answer guaranteed to be false.
+            throw new InvalidOperationException(
+                $"Booking {bookingId} was erased but could not be read back.");
+        }
+
+        return DomainResult<Booking>.Success(stored);
     }
 
     public DomainResult CheckPlacementRules(Resource resource, DateTimeOffset start, TimeSpan duration)

@@ -22,27 +22,102 @@ public class BookedServiceModel
     public string DisplayName { get; set; } = string.Empty;
 }
 
-/// <summary>The person a booking was made for, as the list row shows them.</summary>
+/// <summary>
+/// Why a booking's row does or does not carry contact details, by name.
+/// </summary>
 /// <remarks>
 /// <para>
-/// Carried as an object rather than as flat members on the row so that withholding it is
-/// expressible: see <see cref="BookingModel.Booker"/>. Every booking has one — the domain
-/// requires a non-empty name and a well-formed email of every booker — so this type is
-/// never a half-populated stand-in for a booking that lacks contact details.
+/// <b>Stated, never inferred.</b> There are two reasons a caller may receive no contact
+/// details — they may not see them, or nobody can — and they demand different actions:
+/// <i>ask a colleague who has access</i> versus <i>this is gone permanently</i>. A client
+/// made to tell those apart by observing which fields are absent would be deducing something
+/// the server already knows.
+/// </para>
+/// <para>
+/// <b>Constants rather than an enum</b>, on the same terms as
+/// <see cref="BookingModel.Status"/>: an enum's members are a versioning commitment, and
+/// putting one on the wire couples this published contract to the order and spelling of a
+/// declaration elsewhere.
+/// </para>
+/// </remarks>
+public static class BookerConditions
+{
+    /// <summary>The details are present in <see cref="BookerModel.Contact"/>.</summary>
+    public const string Shown = "Shown";
+
+    /// <summary>The details exist, and this caller is not permitted to see them.</summary>
+    public const string Withheld = "Withheld";
+
+    /// <summary>The details were erased. Nobody can retrieve them.</summary>
+    public const string Erased = "Erased";
+}
+
+/// <summary>The booker's contact details, where the row carries them.</summary>
+/// <remarks>
+/// <para>
+/// Held together as one object so that name and email cannot be observed half-populated:
+/// they are supplied, withheld and erased together, and a client meeting one without the
+/// other would have no correct way to read it.
 /// </para>
 /// <para>
 /// It carries <b>only</b> what the management read port supplies. The booker's phone number
 /// and member key are stored and rehydrated by the domain, and have never reached this port;
 /// adding either here would be adding personal data at the HTTP layer that the port cannot
-/// fill, which the endpoint's contract forbids for the ordinary reason and this capability
-/// forbids for a second one.
+/// fill, which the endpoint's contract forbids for the ordinary reason and the sensitive-data
+/// capability forbids for a second one.
 /// </para>
 /// </remarks>
-public class BookerModel
+public class BookerContactModel
 {
     public string Name { get; set; } = string.Empty;
 
     public string Email { get; set; } = string.Empty;
+}
+
+/// <summary>The person a booking was made for, as the list row shows them.</summary>
+/// <remarks>
+/// <para>
+/// <b>Always present, and it states its own condition.</b> Every booking has a booker — the
+/// domain requires one, and erasure removes the person's details rather than the booker — so
+/// this member is never null. What varies is whether <see cref="Contact"/> accompanies it,
+/// and <see cref="Condition"/> says why.
+/// </para>
+/// <para>
+/// <b>BREAKING (unpublished):</b> this replaces a nullable booker member whose null meant
+/// "withheld from you". That null was spent the moment erasure existed: absence acquired a
+/// second cause, and a member whose absence is already meaningful must not be overloaded to
+/// carry withholding as well. Stating the condition removes the ambiguity rather than
+/// documenting it.
+/// </para>
+/// </remarks>
+public class BookerModel
+{
+    /// <summary>
+    /// One of <see cref="BookerConditions"/>: <c>Shown</c>, <c>Withheld</c> or <c>Erased</c>.
+    /// </summary>
+    /// <remarks>
+    /// Defaults to <see cref="BookerConditions.Withheld"/> so that a model built without
+    /// stating a condition discloses nothing, on the same terms as <c>BookerVisibility</c>
+    /// making withholding its zero value.
+    /// </remarks>
+    public string Condition { get; set; } = BookerConditions.Withheld;
+
+    /// <summary>
+    /// The contact details, present only when <see cref="Condition"/> is <c>Shown</c>.
+    /// </summary>
+    /// <remarks>
+    /// Absent for both of the other conditions, and in neither case blanked: a default value
+    /// in a response is not evidence of the underlying state, and a client cannot tell one
+    /// from the other. Which of the two applies is read from <see cref="Condition"/>, not
+    /// from this being null.
+    /// </remarks>
+    public BookerContactModel? Contact { get; set; }
+
+    /// <summary>
+    /// When the details were erased, present only when <see cref="Condition"/> is
+    /// <c>Erased</c>.
+    /// </summary>
+    public DateTimeOffset? ErasedUtc { get; set; }
 }
 
 /// <summary>
@@ -98,30 +173,29 @@ public class BookingModel
     public DateTimeOffset CreatedUtc { get; set; }
 
     /// <summary>
-    /// The booker's contact details, or <c>null</c> where they were withheld from the caller.
+    /// The person the booking was made for, and whether this caller may see their details.
     /// </summary>
     /// <remarks>
     /// <para>
-    /// <b><c>null</c> means withheld, and it cannot mean anything else.</b> A booking without a
-    /// booker is not a state the domain can produce — a name and an email are required of every
-    /// one — so the null is free to carry a single meaning. A caller that is not permitted to
-    /// see contact details receives the row with everything else intact and this member absent.
-    /// </para>
-    /// <para>
-    /// <b>BREAKING (unpublished):</b> this replaces the flat <c>BookerName</c> and
-    /// <c>BookerEmail</c> strings. One nullable object rather than two parallel nullable
-    /// fields, for the same reason <see cref="Service"/> is one: withholding is a fact about
-    /// the pair, and two fields that must be blank together can be observed half-populated by a
-    /// client with no correct way to read that state. Blanking them instead was rejected —
-    /// a default value in a response is not evidence of the underlying state.
+    /// <b>Never null.</b> It states one of three conditions — shown, withheld, or erased — and
+    /// carries the contact details only for the first. A client reads the condition; it never
+    /// infers one from the absence of a field.
     /// </para>
     /// <para>
     /// The decision is made server-side, before this model is composed. It is never a matter of
     /// a client receiving the details and declining to render them: the values would be in the
     /// payload, readable by exactly the user the site meant to exclude.
     /// </para>
+    /// <para>
+    /// <b>Erasure outranks withholding.</b> Where details have been erased there is nothing to
+    /// withhold, so a caller without sensitive-data access is told the booking is erased rather
+    /// than that its details are hidden. That a record was erased is a fact about the record,
+    /// not about the person, and it discloses nothing about who they were — while telling an
+    /// operator the difference between "ask a colleague who has access" and "there is nobody
+    /// to ask".
+    /// </para>
     /// </remarks>
-    public BookerModel? Booker { get; set; }
+    public BookerModel Booker { get; set; } = new();
 
     public IReadOnlyList<BookedResourceModel> Resources { get; set; } = [];
 
@@ -165,6 +239,36 @@ public class CancelledBookingModel
 
     /// <summary>The booking's status by name — <c>Cancelled</c>, on success.</summary>
     public string Status { get; set; } = string.Empty;
+}
+
+/// <summary>
+/// What an erasure returns: the booking's identity and when its booker was erased.
+/// </summary>
+/// <remarks>
+/// <para>
+/// <b>Deliberately not a whole <see cref="BookingModel"/></b>, for the same reason
+/// <see cref="CancelledBookingModel"/> is not: this path reaches the booking through the
+/// domain, which knows a booking's resource <i>ids</i> and not their names, so a response
+/// shaped like the list's would be quietly less true than it.
+/// </para>
+/// <para>
+/// <b>It carries nothing that was erased.</b> Returning the removed name or address as
+/// confirmation would hand back the data the operation exists to remove — and would put it
+/// in a response body, a browser's network log and any proxy in between, at the exact moment
+/// the site was told to stop holding it.
+/// </para>
+/// <para>
+/// The instant is returned because it is the one fact the caller did not already have, and
+/// because it is what makes a repeated call legible: an erasure that reports the original
+/// instant is telling the caller this was already done, without failing.
+/// </para>
+/// </remarks>
+public class ErasedBookerModel
+{
+    public Guid BookingId { get; set; }
+
+    /// <summary>When the booker's details were erased — the <b>first</b> erasure's instant.</summary>
+    public DateTimeOffset ErasedUtc { get; set; }
 }
 
 /// <summary>A page of bookings plus the unpaged total, matching the other list endpoints.</summary>

@@ -461,8 +461,10 @@ public class BookingManagementStoreTests(SqlServerFixture fixture)
             only.Resources,
             resource => resource.ResourceId == second && resource.DisplayName == "Bricklayers Arms");
 
-        Assert.Equal("Integration Tester", only.BookerName);
-        Assert.Equal("integration@example.com", only.BookerEmail);
+        var listedContact = only.Booker.Contact;
+        Assert.NotNull(listedContact);
+        Assert.Equal("Integration Tester", listedContact.Name);
+        Assert.Equal("integration@example.com", listedContact.Email);
         Assert.Equal(BookingStatus.Confirmed, only.Status);
         Assert.Equal(from.AddHours(9), only.Interval.StartUtc);
     }

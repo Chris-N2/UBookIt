@@ -152,6 +152,108 @@ public class BackofficeDocumentationTests
     }
 
     [Fact]
+    public void The_two_things_erasure_does_not_reach_are_documented()
+    {
+        // The `booker-erasure` capability makes these normative — "What erasure does not reach
+        // is documented" — with a scenario each, and a spec requirement discharged only by
+        // prose is discharged by nothing: somebody tidying the page deletes a paragraph, the
+        // suite stays green, and the requirement is violated with nothing to notice it.
+        //
+        // Both omissions arrive as incidents rather than as questions. The first arrives as a
+        // data-protection failure: an operator erases the one booking they were shown and
+        // believes the person is gone from the system. The second arrives as a support call
+        // about a booking nobody can ring, which is what the requirement itself says.
+        var docs = Docs();
+
+        DocumentationAssert.Says(docs, "It erases one booking, not a person");
+        DocumentationAssert.Says(docs, "You can erase a booking that has not happened yet");
+        DocumentationAssert.Says(docs, "unable to contact somebody who is going to turn up");
+    }
+
+    [Fact]
+    public void The_documentation_says_erasure_cannot_be_undone()
+    {
+        // Separate from the pair above because it is the claim most likely to be softened by
+        // somebody who finds it alarming — and softening it is how a site comes to believe
+        // there is a way back. There is not, and that is the feature.
+        var docs = Docs();
+
+        DocumentationAssert.Says(docs, "It cannot be undone");
+        DocumentationAssert.Says(docs, "anonymising the booking, not deleting it");
+    }
+
+    [Fact]
+    public void The_capabilitys_own_summary_names_every_verb_the_capability_has()
+    {
+        // A capability's Purpose is prose, and OpenSpec deltas carry requirements — so this
+        // paragraph is edited by hand at sync time, which is the established mechanism here
+        // and also the one nothing enforces. It said the honest verbs are "see and cancel"
+        // and named "editing a booker" among the things that live elsewhere, while this
+        // capability grew a third endpoint. Recording the needed edit in tasks.md was not
+        // enough: a checklist entry nobody reads leaves the archived spec describing a
+        // surface that does not exist, to a reader deriving the capability from it.
+        //
+        // The PURPOSE SECTION, sliced out — not the whole file.
+        //
+        // This read the entire spec and matched anywhere in it, which made the sibling
+        // assertion on "cancel" vacuous: that word appears 56 times across the requirements.
+        // Only "erase a booker's contact details" happened to be unique to the summary, so the
+        // guard worked by luck of vocabulary rather than by construction — and the phrase a
+        // FOURTH endpoint's author would add is not something they choose for uniqueness.
+        var spec = Support.RepoFiles.Read("openspec/specs/booking-management/spec.md");
+        var purposeStart = spec.IndexOf("## Purpose", StringComparison.Ordinal);
+        Assert.True(purposeStart >= 0, "The capability spec has no ## Purpose section to check.");
+
+        var nextSection = spec.IndexOf(Environment.NewLine + "## ", purposeStart + 1, StringComparison.Ordinal);
+
+        if (nextSection < 0)
+        {
+            nextSection = spec.IndexOf("\n## ", purposeStart + 1, StringComparison.Ordinal);
+        }
+        Assert.True(nextSection > purposeStart, "The Purpose section has no following section.");
+
+        var purpose = spec[purposeStart..nextSection];
+
+        // The controller's ROUTES, enumerated. The previous version of this test asserted
+        // three literal strings and claimed in its comment to be "tied to the CODE… add a
+        // fourth endpoint and this fails" — which was simply untrue, nothing counted
+        // anything. It was the same fault it had been written to prevent, one layer up.
+        var routes = System.Text.RegularExpressions.Regex
+            .Matches(
+                Support.RepoFiles.Read("src/UBookIt.Backoffice/Controllers/BookingsController.cs"),
+                @"\[Http(?:Get|Post|Put|Delete|Patch)\(""([^""]+)""\)\]")
+            .Select(match => match.Groups[1].Value)
+            .ToList();
+
+        // The fixture is load-bearing: a regex that stopped matching would make the loop below
+        // iterate over nothing and pass. A LOWER bound rather than an exact count, so that a
+        // fourth endpoint reaches the loop and fails with the message written for it, instead
+        // of tripping "expected 3, got 4" here and telling its author nothing useful.
+        Assert.True(routes.Count >= 3, $"Expected at least 3 routes, found {routes.Count}.");
+
+        // Each verb the capability offers is named in the paragraph that summarises it. Keyed
+        // off the route, so a FOURTH endpoint fails here until somebody says what it is.
+        var described = new Dictionary<string, string>
+        {
+            ["bookings/{id:guid}/cancel"] = "cancel",
+            ["bookings/{id:guid}/erase-booker"] = "erase a booker's contact details",
+        };
+
+        foreach (var route in routes.Where(route => route != "bookings"))
+        {
+            Assert.True(
+                described.TryGetValue(route, out var phrase),
+                $"BookingsController exposes '{route}', which this test does not know about. "
+                + "Add it here AND to the capability's Purpose paragraph, which summarises what "
+                + "the capability does and is read by anyone deriving its surface from the spec.");
+
+            DocumentationAssert.Says(purpose, phrase);
+        }
+
+        Assert.DoesNotContain("about those two verbs", purpose, StringComparison.Ordinal);
+    }
+
+    [Fact]
     public void The_two_surprising_things_about_the_recorded_service_are_stated()
     {
         // Both of these look like defects to someone who has not been told, and both are
