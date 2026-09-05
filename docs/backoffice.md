@@ -65,6 +65,54 @@ Two limits worth stating:
   emails — see [notifications](notifications.md). There is no signed-in backoffice user in a
   notification handler, so the question this group answers does not arise there.
 
+## Erasing a booker's details
+
+A person can ask you to remove the personal data you hold about them. uBookIt does this by
+**anonymising the booking, not deleting it**: the booking keeps its reference, its time, the
+resources it claims and its status, and it goes on blocking that slot. What leaves is the
+person — name, email address, phone number, and the member key if there was one.
+
+Deleting the row instead would quietly hand back time you had sold, and destroy your own
+record of what happened. That is not what somebody asking to be forgotten has asked for, and
+it is not something a site can agree to on their behalf.
+
+`POST /umbraco/ubookitbackoffice/api/v1/bookings/{id}/erase-booker`
+
+**Who can do it.** The same **Sensitive data** group that decides who may *read* contact
+details also decides who may erase them, on top of access to the uBookIt section. A user your
+site has decided may not so much as see a booker's name cannot destroy it.
+
+**It cannot be undone.** There is no restore. Once the details are gone, no permission, no
+group and no support call brings them back — which is the whole point, and the reason the
+next two limits matter.
+
+**Running it twice is safe.** Erasing an already-erased booking succeeds and changes nothing,
+keeping the *first* erasure's timestamp. That is deliberately unlike cancelling, which refuses
+a second attempt: a retry after a network timeout must not become a second, differently-dated
+erasure.
+
+After erasure, everyone with access to the section — in the Sensitive data group or not —
+sees the row marked *"Contact details erased"* rather than *"Contact details hidden"*. The two
+say different things and lead to different actions: **hidden** means a colleague in the group
+can read them for you, and **erased** means there is nobody to ask.
+
+### Two things it does not do
+
+- **It erases one booking, not a person.** If somebody booked with you three times, that is
+  three erasures. uBookIt does not search for a person's other bookings — the management list
+  deliberately offers no filter on names or email addresses, because a filter over values you
+  may not read is a way of asking about them. Locating every booking for one person is a
+  separate feature and is not built yet.
+- **You can erase a booking that has not happened yet, and nothing stops you.** Doing so
+  leaves you unable to contact somebody who is going to turn up. Whether the reason you held
+  their details still applies is your site's judgement and not the package's, so uBookIt
+  permits it and tells you the consequence rather than deciding for you.
+
+> **There is no erase button in the backoffice yet.** The endpoint is available for a site or
+> an integration to call. A one-way, irreversible action needs a confirmation step designed
+> for it, and shipping the button before that step would be the easiest way to lose somebody's
+> booking details to a mis-click.
+
 ## What is in the section
 
 | | |
@@ -118,6 +166,8 @@ one a resource allows is the *booked directly* setting on the resource itself.
   but no pathway produces them today.
 - **It does not amend a booking's time.** There is no reschedule; the shape of that
   operation is a cancellation and a new booking.
+- **It does not find a person across bookings.** Erasure works on one booking at a time; see
+  above.
 
 These are stated because a management section invites the assumption that it manages
 everything. It configures what can be booked, reads what has been, and calls one off.

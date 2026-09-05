@@ -339,6 +339,16 @@ export default {
     // reader rather than the data.
     bookerHidden: "Contact details hidden",
 
+    // ------------------------------------------------- booker details erased
+    // Shown in the Booker cell when the details were ERASED rather than withheld.
+    // Deliberately different words from `bookerHidden`, because the two send an
+    // operator to different places: "hidden" means a colleague in the Sensitive
+    // data group can read them, and "erased" means nobody can, ever. Telling
+    // somebody to go and ask when there is nothing to ask for wastes their time
+    // and the caller's, and reads as the package being broken when the request
+    // comes back empty-handed.
+    bookerErased: "Contact details erased",
+
     // Shown once, above the table, when any row on the page is hidden.
     //
     // The second sentence is the load-bearing one. Umbraco's installer puts only

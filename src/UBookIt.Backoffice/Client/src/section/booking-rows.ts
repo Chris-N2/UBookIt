@@ -23,11 +23,27 @@ export type BookingLike = {
   // failing a type check at the one place that would notice.
   reference: string;
   service?: { serviceId: string; displayName: string } | null;
-  // Optional and nullable, matching the generated BookingModel. `null` means the endpoint
-  // WITHHELD the details from this caller; it can never mean the booking has no booker,
-  // because the domain requires a name and an email of every one.
-  booker?: { name: string; email: string } | null;
+  // Required and never null, matching the generated BookingModel. It STATES its condition
+  // rather than leaving one to be inferred from which fields are absent: there are two
+  // reasons a row may carry no contact details — this caller may not see them, or nobody
+  // can — and they send an operator to different places.
+  booker: {
+    condition: string;
+    contact?: { name: string; email: string } | null;
+    erasedUtc?: string | null;
+  };
 };
+
+/**
+ * The conditions the endpoint publishes, by name.
+ *
+ * Strings rather than a TypeScript enum because that is what crosses the wire, and the
+ * server publishes them as names for the same reason it publishes status names: an enum's
+ * ordinals would couple this client to the order of a C# declaration.
+ */
+export const BOOKER_SHOWN = "Shown";
+export const BOOKER_WITHHELD = "Withheld";
+export const BOOKER_ERASED = "Erased";
 
 /** A window as the endpoint takes it: two site-local dates, never instants. */
 export type Window = {
@@ -328,22 +344,35 @@ export function serviceLabel(
 }
 
 /**
- * Whether this row's booker contact details were withheld from the caller.
+ * Whether this row's booker contact details were withheld from *this caller*.
  *
- * A decision rather than an inline `!booking.booker`, because it is exactly the
- * class of thing this module exists for: both states render a plausible row, and
- * a reader looking at the table cannot tell "hidden because you may not see it"
- * from "hidden because the cell broke". The condition is asserted here instead.
+ * A decision rather than an inline check, because it is exactly the class of thing this
+ * module exists for: every condition renders a plausible row, and a reader looking at the
+ * table cannot tell "hidden because you may not see it" from "hidden because the cell
+ * broke". The condition is asserted here instead.
  *
- * **This is read from the payload, never from the current user's permissions.**
- * The response already says what happened — the details are absent or they are
- * not — and asking Umbraco a second time would be a second source of truth,
- * free to answer "yes, you may" over a row that was withheld anyway and leave
- * the operator with a blank cell and no explanation. That is the exact failure
- * this feature exists to prevent, so the check has one source.
+ * **Withheld is not erased, and the difference is the whole point.** A withheld row tells
+ * an operator to ask a colleague who is in the Sensitive data group. An erased row tells
+ * them there is nobody to ask, because the details are gone permanently. Treating the
+ * second as the first sends somebody on an errand that cannot succeed.
+ *
+ * **Read from the payload, never from the current user's permissions.** The response
+ * already says what happened, and asking Umbraco a second time would be a second source of
+ * truth, free to answer "yes, you may" over a row that carried nothing anyway and leave the
+ * operator with a blank cell and no explanation. That is the exact failure this feature
+ * exists to prevent, so the check has one source.
+ *
+ * **Compared against the published name, not against absence.** `!booking.booker.contact`
+ * is true for erased rows too, so deriving the condition from a missing field is precisely
+ * the inference the three-state contract was introduced to remove.
  */
 export function bookerWithheld(booking: BookingLike): boolean {
-  return !booking.booker;
+  return booking.booker.condition === BOOKER_WITHHELD;
+}
+
+/** Whether this row's booker contact details were erased — for everybody, permanently. */
+export function bookerErased(booking: BookingLike): boolean {
+  return booking.booker.condition === BOOKER_ERASED;
 }
 
 /**
@@ -352,14 +381,20 @@ export function bookerWithheld(booking: BookingLike): boolean {
  * Derived from the rows rather than from a page-level flag, so the note cannot
  * appear over a table that shows every name, and cannot be missing from one that
  * hides them.
+ *
+ * **Erased rows do not count.** The note says membership of the Sensitive data group would
+ * reveal these details. For an erased booking that is false — no group membership brings
+ * back data nobody holds — so a page whose only absences are erasures must not show it, or
+ * the package is telling an operator to go and get a permission that will not help.
  */
 export function anyBookerWithheld(bookings: readonly BookingLike[]): boolean {
   return bookings.some(bookerWithheld);
 }
 
-/** What the Booker cell shows: either the contact details, or a stated absence. */
+/** What the Booker cell shows: the contact details, or one of two stated absences. */
 export type BookerCell =
   | { readonly kind: "hidden"; readonly label: string }
+  | { readonly kind: "erased"; readonly label: string }
   | { readonly kind: "shown"; readonly name: string; readonly email: string };
 
 /**
@@ -379,16 +414,31 @@ export type BookerCell =
  * swapping the arms in the template is a type error rather than a silent
  * inversion: the `hidden` variant has no `name` to read.
  */
-export function bookerCell(booking: BookingLike, hiddenLabel: string): BookerCell {
-  if (bookerWithheld(booking)) {
+export function bookerCell(
+  booking: BookingLike,
+  hiddenLabel: string,
+  erasedLabel: string,
+): BookerCell {
+  if (bookerErased(booking)) {
+    return { kind: "erased", label: erasedLabel };
+  }
+
+  const contact = booking.booker.contact;
+
+  // Anything that is not a shown row carrying contact details is an absence, and it is
+  // reported as withheld. The fall-through is deliberately the cautious one: a condition
+  // this client does not recognise — a value added by a newer server — renders as hidden
+  // rather than as a blank cell or a thrown render.
+  if (!bookerShown(booking) || !contact) {
     return { kind: "hidden", label: hiddenLabel };
   }
 
-  // Non-null by the predicate above; stated rather than assumed because the
-  // narrowing is the whole point of the branch.
-  const booker = booking.booker!;
+  return { kind: "shown", name: contact.name, email: contact.email };
+}
 
-  return { kind: "shown", name: booker.name, email: booker.email };
+/** Whether the row carries contact details this caller may read. */
+function bookerShown(booking: BookingLike): boolean {
+  return booking.booker.condition === BOOKER_SHOWN;
 }
 
 /**

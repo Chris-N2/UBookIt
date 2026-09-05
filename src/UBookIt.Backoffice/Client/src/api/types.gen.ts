@@ -19,9 +19,15 @@ export type BookedServiceModel = {
     displayName: string;
 };
 
-export type BookerModel = {
+export type BookerContactModel = {
     name: string;
     email: string;
+};
+
+export type BookerModel = {
+    condition: string;
+    contact?: BookerContactModel | null;
+    erasedUtc?: string | null;
 };
 
 export type BookingModel = {
@@ -32,7 +38,7 @@ export type BookingModel = {
     timeZoneId: string;
     status: string;
     createdUtc: string;
-    booker?: BookerModel | null;
+    booker: BookerModel;
     resources: Array<BookedResourceModel>;
     service?: BookedServiceModel | null;
 };

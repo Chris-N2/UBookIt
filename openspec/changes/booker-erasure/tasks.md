@@ -40,11 +40,11 @@
 
 ## 6. Backoffice client
 
-- [ ] 6.1 Regenerate or hand-update the generated API client types for the new booker shape.
-- [ ] 6.2 Render the three conditions in the bookings table: contact details, "hidden", and "erased" — three distinct cells, no blanks.
-- [ ] 6.3 Show the Sensitive-data-group explanation only when at least one row is genuinely **withheld**; a page whose absences are all erasures must not show it.
-- [ ] 6.4 Add the new strings to `en-US` localization.
-- [ ] 6.5 Do not add an erase button in this change — the endpoint is the deliverable, and a destructive irreversible action needs a confirmation design that is not in this change's scope. Note it as follow-up.
+- [x] 6.1 Regenerate or hand-update the generated API client types for the new booker shape.
+- [x] 6.2 Render the three conditions in the bookings table: contact details, "hidden", and "erased" — three distinct cells, no blanks.
+- [x] 6.3 Show the Sensitive-data-group explanation only when at least one row is genuinely **withheld**; a page whose absences are all erasures must not show it.
+- [x] 6.4 Add the new strings to `en-US` localization.
+- [x] 6.5 Do not add an erase button in this change — the endpoint is the deliverable, and a destructive irreversible action needs a confirmation design that is not in this change's scope. Note it as follow-up.
 
 ## 7. Verification
 
@@ -56,10 +56,10 @@
 - [x] 7.4 **Round-trip test through storage** for the erasure — erase, re-read in a **fresh context**, assert the columns are null and the instant set. Asserting on the returned aggregate proves nothing here.
 - [x] 7.5 **Mutation-check task 3.3**: revert `UpdateAsync` to writing only the status and confirm 7.4 fails. If it passes, 7.4 is measuring the in-memory aggregate and must be rewritten.
 - [x] 7.6 Mutation-check the precedence in 5.4: make withheld win over erased and confirm a test fails; make erased render as withheld for a non-sensitive-data caller and confirm a test fails.
-- [ ] 7.7 Endpoint tests: erase succeeds for a permitted user; is refused for section-access-only; is 401 anonymous; is idempotent; 404s on an unknown id; response carries no erased values.
-- [ ] 7.8 List-endpoint tests: erased reported as erased to **both** kinds of caller; withheld still reported as withheld; the booker member is never absent; reference survives both conditions.
+- [x] 7.7 Endpoint tests: erase succeeds for a permitted user; is refused for section-access-only; is 401 anonymous; is idempotent; 404s on an unknown id; response carries no erased values.
+- [x] 7.8 List-endpoint tests: erased reported as erased to **both** kinds of caller; withheld still reported as withheld; the booker member is never absent; reference survives both conditions.
 - [x] 7.9 Integration test against real SQL Server covering the migration applying to a database holding pre-existing bookings, which keep their details.
-- [ ] 7.10 Client tests for the three cells and for the explanation's suppression on an all-erased page.
+- [x] 7.10 Client tests for the three cells and for the explanation's suppression on an all-erased page.
 
 ## 8. Modified requirements — the guarantee diff
 
@@ -115,8 +115,8 @@ deleted with nothing in the diff that looks like a deletion.
 
 ## 9. Documentation and close-out
 
-- [ ] 9.1 `docs/backoffice.md`: what erasure does, that it is irreversible, that it needs the Sensitive data group, that it erases **one booking** and not a person's other bookings, and that erasing a future booking leaves the site unable to contact somebody who will arrive.
-- [ ] 9.2 State the single-durable-home constraint where a future change will meet it, so that emails and any audit trail have to confront it.
-- [ ] 9.3 Sibling-spec sweep: grep the other specs in `openspec/specs/` for sentences this change falsifies — in particular anything asserting a booking always has readable contact details, or that `uBookItBooking`'s booker columns are non-null. Two were already found (`persistence`'s "`UpdateAsync` SHALL persist status changes" and its no-new-migration scenario); assume there are more and look rather than assuming there are not.
-- [ ] 9.4 Clean build from a clean tree; zero warnings; full .NET and client suites green.
-- [ ] 9.5 Run `openspec validate booker-erasure --strict`.
+- [x] 9.1 `docs/backoffice.md`: what erasure does, that it is irreversible, that it needs the Sensitive data group, that it erases **one booking** and not a person's other bookings, and that erasing a future booking leaves the site unable to contact somebody who will arrive.
+- [x] 9.2 State the single-durable-home constraint where a future change will meet it, so that emails and any audit trail have to confront it.
+- [x] 9.3 Sibling-spec sweep (**done**: `default-frontend` and `delivery-api` mentions are all placement-time, where a booking always carries details; `resource-management`'s is authorization rationale, still true. Nothing falsified beyond the two already fixed in `persistence`.): grep the other specs in `openspec/specs/` for sentences this change falsifies — in particular anything asserting a booking always has readable contact details, or that `uBookItBooking`'s booker columns are non-null. Two were already found (`persistence`'s "`UpdateAsync` SHALL persist status changes" and its no-new-migration scenario); assume there are more and look rather than assuming there are not.
+- [x] 9.4 Clean build from a clean tree; zero warnings; full .NET and client suites green.
+- [x] 9.5 Run `openspec validate booker-erasure --strict`.
