@@ -51,6 +51,11 @@ Only one such member SHALL be added. An additional overload taking the resource 
 - **WHEN** the pure projection is passed a claim belonging to a different resource that would, if applied, remove all of this resource's free time
 - **THEN** the result is unchanged from passing no claims at all
 
+**BREAKING — published port.** `IBookingStore` gains an operation that erases a booking's
+booker. A host supplying its own store implementation must add it, and must satisfy the
+absorption and irreversibility the port documents — those are guarantees the package makes to a
+data subject, so they belong to the port rather than to one storage engine.
+
 *The booking service's enumeration is widened a third time, on the reasoning already recorded
 above: the constraint was never about how many verbs there are. Erasure is a domain operation
 on a booking — it mutates the aggregate through a named method and persists through the store
