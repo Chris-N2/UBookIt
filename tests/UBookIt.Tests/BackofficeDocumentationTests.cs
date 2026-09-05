@@ -202,9 +202,21 @@ public class BackofficeDocumentationTests
         // The gate is the point of the feature: somebody who may not see a booker's name must
         // not be able to ask questions about one. An operator told the search exists but not
         // what it requires meets a 403 and reads it as a defect.
+        //
+        // **The phrase must be unique to the SEARCH section**, and the first version of this
+        // test was not. It asserted "same Sensitive data group", which already matched a
+        // sentence about the ERASE verb forty lines earlier — so deleting the entire search
+        // section left this green while its sibling correctly failed. Mutation-checking the
+        // pair together hid it: one assertion carried the other.
+        //
+        // The lesson is narrower than "mutation-check your tests", which was already the rule
+        // and was already followed. It is that a documentation assertion has to be checked
+        // AGAINST THE DELETION OF THE THING IT DESCRIBES, one assertion at a time — a phrase
+        // that reads as specific can be satisfied by prose elsewhere in the same file.
         var docs = Docs();
 
-        DocumentationAssert.Says(docs, "same Sensitive data group");
+        DocumentationAssert.Says(
+            docs, "it needs the **same Sensitive data group** as reading or erasing contact details");
     }
 
     [Fact]

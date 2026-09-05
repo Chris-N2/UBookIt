@@ -10,7 +10,7 @@
 - [x] 2.2 One additive migration. Check the generated SQL is `CREATE INDEX` only — no column change, no data statement.
 - [x] 2.3 Regenerate the model snapshot; confirm the diff is the index and nothing else.
 - [x] 2.4 Implement the lookup in `SqlBookingManagementStore`, reusing the existing projection so the row shape cannot drift from the list's.
-- [x] 2.5 Confirm the query actually uses the index rather than scanning — read the plan or the generated SQL, do not assume it from the index existing.
+- [x] 2.5 Confirm the query actually uses the index rather than scanning. **What ships is narrower than this task's wording and the difference is worth stating:** the index's existence and non-uniqueness are read from `sys.indexes` (the catalogue, not the EF model), and the emitted predicate is asserted to be `[BookerEmail] = ` and never `LIKE`. Neither reads an execution PLAN. Together they establish the index exists on the filtered column and the query can use it; they do not establish the optimiser chose it. A plan assertion on a throwaway database is unreliable, and no requirement asks for one — recorded so nobody reads this tick as more than it is.
 - [x] 2.6 **Re-check the availability path's plan.** Done — the claims-read suite (5 tests, including the half-open overlap and the batched multi-resource read) passes unchanged with the new index present. The index is on `BookerEmail`, which no availability predicate references. A new index changes the optimiser's options; `persistence` has a standing QA gate that the date-range lookup must not table-scan.
 
 ## 3. Endpoint
@@ -29,7 +29,7 @@
 - [x] 4.4 **Mutation-check the gate** — done, two ways: removing `[Authorize]` from the search fails the endpoint test AND the capability tripwire; adding an ungated `bookerEmail` parameter to the ordinary list fails the tripwire by name. Remove `HasAccessToSensitiveData` from the handler and confirm the handler tests fail (they already exist).
 - [x] 4.5 **Mutation-check exactness**: make the store match with `Contains` or `StartsWith` and confirm a test fails. This is the guarantee most likely to be widened later by somebody being helpful.
 - [x] 4.6 Guard that the endpoint's parameters offer no ordering by, or count of, a contact detail.
-- [x] 4.7 Integration test against real SQL Server for the index migration applying to a database holding existing bookings.
+- [x] 4.7 Integration test against real SQL Server for the index migration. **Narrower than the wording:** what is asserted is the exact applied-migration set, against a database the fixture migrated. There is no separate upgrade test over pre-existing rows as `booker-erasure` needed, because a bare `CREATE INDEX` adds no column and can neither fail on existing data nor alter it — stated rather than left as a gap somebody re-derives.
 - [x] 4.8 **Every test written to close a review finding gets mutation-checked before it is believed.** Five unfalsifiable tests were written on `booker-erasure`, two of them while fixing the other three.
 
 ## 5. Modified requirements — the guarantee diff

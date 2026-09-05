@@ -646,6 +646,7 @@ public class SensitiveDataRedactionTests
         ];
 
         var scannedActions = new List<string>();
+        var classifiedActions = new List<string>();
         var readIdentifiers = new List<(string Identifier, string Where)>();
         var allIdentifiers = new List<(string Identifier, string Where, bool Gated)>();
         var scannedControllers = new List<string>();
@@ -681,14 +682,13 @@ public class SensitiveDataRedactionTests
                 // WRITES are enumerated instead: anything not recorded as one is treated as a
                 // read. A new POST therefore has to be classified by whoever adds it, which is
                 // the decision this guard exists to force.
-                var route = method.GetCustomAttributes<HttpMethodAttribute>()
-                    .Select(attribute => attribute.Template)
-                    .FirstOrDefault(template => template is not null);
-
                 var isWrite = KnownWrites.Contains(
                     $"{controller.Name}.{method.Name}", StringComparer.Ordinal);
 
                 var isRead = !isWrite;
+
+                classifiedActions.Add(
+                    $"{controller.Name}.{method.Name} = {(isWrite ? "write" : "read")}");
 
                 // The action's OWN authorization, not the controller's. The base controller's
                 // section policy applies to everything and would make every endpoint look
@@ -696,11 +696,10 @@ public class SensitiveDataRedactionTests
                 var gated = method.GetCustomAttributes<AuthorizeAttribute>()
                     .Any(attribute => attribute.Policy == UBookIt.Backoffice.Constants.SensitiveDataAccessPolicy);
 
+                scannedActions.Add($"{controller.Name}.{method.Name}");
+
                 foreach (var parameter in method.GetParameters())
                 {
-                scannedActions.Add($"{controller.Name}.{method.Name}");
-                _ = route;
-
                     foreach (var identifier in Identifiers(parameter.Name, parameter.ParameterType, depth: 0))
                     {
                         allIdentifiers.Add((identifier, $"{controller.Name}.{method.Name}", gated));
@@ -808,11 +807,55 @@ public class SensitiveDataRedactionTests
                 + "check inside the handler does not satisfy this and cannot be seen from here.");
         }
 
-        // ANTI-VACUITY for the write list: every name recorded there must still exist, or the
-        // list is quietly widening the read set as actions are renamed.
-        Assert.All(
-            KnownWrites,
-            write => Assert.Contains(write, scannedActions));
+        // THE CLASSIFICATION ITSELF IS RECORDED, not merely the names of the writes.
+        //
+        // `KnownWrites` EXEMPTS whatever is on it: an action listed there is treated as a write
+        // and the free-text rule below stops applying to it. Asserting only that its entries
+        // still exist left the obvious bypass open — add a read to the list and a failing guard
+        // goes green, which is exactly what the failure message invites a hurried reader to do.
+        // A guard whose escape hatch nobody guards is the fault this rule was built to catch,
+        // one level up.
+        //
+        // So the whole action set is recorded with its classification. Adding an action fails
+        // this; RECLASSIFYING one fails it too, and the failure names both sides. The list can
+        // still be edited — it must be, when a genuine write arrives — but not silently, and
+        // not as a way of quieting the rule underneath.
+        string[] recordedActions =
+        [
+            "BookingsController.CancelBooking = write",
+            "BookingsController.EraseBooker = write",
+            "BookingsController.FindBookingsByBooker = read",
+            "BookingsController.ListBookings = read",
+            "ResourcesController.CreateResource = write",
+            "ResourcesController.DeleteResource = write",
+            "ResourcesController.GetResource = read",
+            "ResourcesController.ListCapabilities = read",
+            "ResourcesController.ListResourceTypes = read",
+            "ResourcesController.ListResources = read",
+            "ResourcesController.UpdateResource = write",
+            "ServicesController.CreateService = write",
+            "ServicesController.DeleteService = write",
+            "ServicesController.GetService = read",
+            "ServicesController.ListServices = read",
+            "ServicesController.PreviewServiceConfiguration = read",
+            "ServicesController.UpdateService = write",
+        ];
+
+        Assert.True(
+            classifiedActions.Order(StringComparer.Ordinal).SequenceEqual(
+                recordedActions.Order(StringComparer.Ordinal)),
+            "The management actions, or how they are classified, have changed."
+            + Environment.NewLine
+            + $"  recorded: {string.Join(", ", recordedActions.Order(StringComparer.Ordinal))}"
+            + Environment.NewLine
+            + $"  actual:   {string.Join(", ", classifiedActions.Order(StringComparer.Ordinal))}"
+            + Environment.NewLine
+            + "A READ may not expose a free-text search surface over bookings. Marking one as a "
+            + "write in KnownWrites exempts it from that rule — which is a decision, not a "
+            + "formality, so it has to be made here as well. If an action genuinely changes "
+            + "something, record it as a write in BOTH places and say so in the change. Note "
+            + "that a POST is not evidence either way: this package uses POST for a read that "
+            + "carries a sensitive value.");
 
         foreach (var (identifier, where) in readIdentifiers)
         {
