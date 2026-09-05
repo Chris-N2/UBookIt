@@ -645,7 +645,6 @@ public class SensitiveDataRedactionTests
             "ServicesController.DeleteService",
         ];
 
-        var scannedActions = new List<string>();
         var classifiedActions = new List<string>();
         var readIdentifiers = new List<(string Identifier, string Where)>();
         var allIdentifiers = new List<(string Identifier, string Where, bool Gated)>();
@@ -695,8 +694,6 @@ public class SensitiveDataRedactionTests
                 // gated; what this requirement is about is the second, narrower gate.
                 var gated = method.GetCustomAttributes<AuthorizeAttribute>()
                     .Any(attribute => attribute.Policy == UBookIt.Backoffice.Constants.SensitiveDataAccessPolicy);
-
-                scannedActions.Add($"{controller.Name}.{method.Name}");
 
                 foreach (var parameter in method.GetParameters())
                 {

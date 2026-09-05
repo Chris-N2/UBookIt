@@ -44,8 +44,11 @@ public class BackofficeDocumentationTests
         // guard is for. What survives unchanged is the obligation: the reader must be told the
         // records contain contact details.
         //
-        // "name and email address" alone now matches four places in this document, so on its
-        // own it no longer pins the "Grant it deliberately" callout it was written for. The
+        // "name and email address" alone matches this document in more than one place — two, at
+        // the last count — so on its own it no longer pins the "Grant it deliberately" callout
+        // it was written for. The number is deliberately not restated precisely: a comment
+        // carrying a count nobody re-measures goes stale on the next edit, and it is the
+        // "more than one" that the argument below rests on. The
         // second assertion is what holds that callout: the reader deciding on the section
         // grant must be told, there, that contact details are a separate question — otherwise
         // they grant the section believing it is the only control, which is what the old
