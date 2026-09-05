@@ -48,6 +48,20 @@ would return nothing at all once the service is deleted — so a row would eithe
 itself after the fact or lose an attribution it definitely had. The id is stored alongside
 for a caller that needs the service as it is now.
 
+**The booker's email column SHALL be indexed.** The index exists so a subject's bookings can be
+found from their address without a window — see the `booking-management` capability. Unindexed,
+that read is a scan of a table which grows without limit, reintroducing the cost the list's window
+guard exists to bound; indexed, it costs what that person's bookings cost.
+
+**It SHALL NOT be unique.** One person may book many times, and a uniqueness constraint here would
+refuse the second booking. It is also not a natural key: erasure sets the column NULL, so the
+value is not stable for the life of the row.
+
+*An index on personal data, added in order to build the tool that removes personal data — which
+reads oddly and is therefore written down rather than left to be noticed. It is sound: an UPDATE
+maintains the index with the row, so an erased booking leaves the index at the moment its address
+does, and the index holds nothing the table does not.*
+
 **The migration introducing the booker columns' nullability SHALL be additive and SHALL NOT
 back-fill.** Widening a non-nullable column to nullable destroys nothing and cannot fail on
 existing data; every existing row keeps its contact details and acquires a NULL erased-UTC,
@@ -100,6 +114,14 @@ which is the correct reading of a booking nobody has erased.
 #### Scenario: Erasure keeps the row and its claims
 - **WHEN** a booking's booker is erased
 - **THEN** the booking row and every one of its claim rows remain, and no cascade removes them
+
+#### Scenario: The booker email column is indexed and not unique
+- **WHEN** the schema is inspected
+- **THEN** an index covers the booker email column, and it does not enforce uniqueness
+
+#### Scenario: One booker may hold several bookings
+- **WHEN** two bookings are stored carrying the same booker email address
+- **THEN** both are accepted
 
 #### Scenario: An unerased booking has no erasure instant
 - **WHEN** a booking that has never been erased is reloaded through the store
