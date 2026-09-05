@@ -16,11 +16,18 @@ pipeline.
 
 **What "management" means in v1 is narrower than the word suggests, and the boundary is
 deliberate.** Placement auto-confirms — `bookings` states that no v1 pathway produces
-`Requested` or `Declined` — so the honest verbs are *see*, *cancel* and *erase a booker's
-contact details*. Approving, declining and amending a booking's time are each a change to the
-domain rather than a screen over an existing one. This capability is about those three verbs
-and the path each takes — the ports, the authorized endpoints over them, and the backoffice
-views an operator works in — and the requirements below, not this paragraph, say what exists.
+`Requested` or `Declined` — so the honest verbs are *see*, *find a subject's bookings by their
+email address*, *cancel* and *erase a booker's contact details*. Approving, declining and
+amending a booking's time are each a change to the domain rather than a screen over an existing
+one. This capability is about those four verbs and the path each takes — the ports, the authorized endpoints over them, and the backoffice
+views an operator works in — and the requirements below, not this paragraph, say what
+exists.
+
+*Finding by address joined the list with the `find-by-booker` change, and is here rather than
+elsewhere for the reason erasure is: the endpoint an operator reaches it through is one of this
+capability's, gated by this capability's authorization. It is a separate read from the list
+because it must answer without a window, which the list's own requirement forbids and SHALL
+continue to forbid.*
 
 *Erasure joined the list with the `booker-erasure` change. It is a change to the domain on
 exactly the terms the sentence above describes — a named operation on the aggregate, not a
@@ -137,8 +144,15 @@ own, distinct from the over-wide one, so a caller can tell "you asked for nothin
 "you asked for too much".
 
 **The cost SHALL be stated rather than left to be discovered:** a booking whose date is
-not known cannot be found through this port. Locating a booking from a booker's name,
-email or reference is a different query with different indexing, and is not provided here.
+not known cannot be found **by this read**. Locating a booking from a booker's name or reference
+is a different query with different indexing, and is not provided by it.
+
+**Locating a booking by a booker's email address IS provided, as a separate read of its own** —
+see *A subject's bookings can be found by their email address*. It is separate precisely because
+it is unwindowed: this requirement's window is not optional and SHALL NOT be made so to
+accommodate it. A query that must answer without a date belongs beside this one, never inside it,
+because the guarantee here is one no caller can decline and a nullable window would make the
+unbounded call the easiest one to write.
 
 #### Scenario: A booking overlapping the window is listed
 - **WHEN** a booking starts before the window and ends inside it
@@ -205,8 +219,16 @@ several guarantees wearing one name.
 - **THEN** it already carries the default statuses and an empty resource set, rather than leaving each store to decide
 
 ### Requirement: Results are paged in a stable order
-A list query SHALL be paged, and SHALL report the **total** number of bookings matching
-the window and filters, so a caller can render a pager.
+**Every paged read this capability offers** SHALL be paged, and SHALL report the **total**
+number of bookings matching the query, so a caller can render a pager. For the windowed list
+that is the window and its filters; for the by-address search it is the address.
+
+*Widened from "a list query … matching the window and filters" when the by-address search
+arrived. The guarantee was never about windows: it is that a pager is told how many rows exist
+rather than how many it was handed, and that paging over a non-total order cannot repeat or drop
+them. A search reporting its page size as its total would tell an operator honouring an erasure
+request that a person has fewer bookings than they do, which is the worst version of this
+failure — so the requirement had to reach it.*
 
 Results SHALL be ordered by start time and then by booking identity, both ascending. The
 identity tiebreak is required, not decorative: two bookings may share a start time, and
@@ -219,8 +241,9 @@ would sort the same values. What this requirement guarantees is that the order i
 and stable across pages, not that it matches any particular caller-side sort.
 
 A page size SHALL be bounded, so that a caller asking for an unreasonable page receives a
-capped one rather than the whole window. The bound SHALL match the one the other
-management list reads already apply, so that page sizes do not differ per capability.
+capped one rather than the whole result. The bound SHALL match the one the other
+management list reads already apply, so that page sizes do not differ per capability — or per
+read within one capability, which is the same argument one level down.
 
 **A test for this SHALL include bookings that share a start time**, because a fixture of
 distinct start times passes against an ordering that has no tiebreak at all.
@@ -235,7 +258,7 @@ distinct start times passes against an ordering that has no tiebreak at all.
 
 #### Scenario: The total counts matches, not the page
 - **WHEN** a page of results is returned
-- **THEN** the reported total is the number of bookings matching the window and filters, not the number in the page
+- **THEN** the reported total is the number of bookings the query matched — the window and its filters for the list, the address for the search — not the number in the page
 
 ### Requirement: Status and resource filter the list, and the status default excludes what is not booked
 A list query SHALL be filterable by **status** and by **resource**. With the window, those
@@ -977,3 +1000,76 @@ exposed to assistive technology on the same terms as the view's other messages.
 #### Scenario: An erased row is still identifiable
 - **WHEN** a listed booking's booker was erased
 - **THEN** the row still shows its reference, time, resources, service and status
+
+### Requirement: A subject's bookings can be found by their email address
+
+The management read port SHALL provide a read that returns the bookings whose booker holds a
+given email address, and the package SHALL expose it over a **versioned** backoffice endpoint in
+the same swagger group as its other management endpoints.
+
+**It SHALL require sensitive-data access as the endpoint's own authorization**, per the
+`sensitive-data` capability, in addition to the section access every management endpoint
+requires — and by the same policy the erase endpoint carries, so that reading a booker's details,
+finding them and destroying them are one decision rather than three that may drift.
+
+**It SHALL match the address exactly**, offering no prefix, substring, wildcard or fuzzy form, no
+ordering by a contact detail and no count-only response. Comparison SHALL follow the store's
+collation, and that SHALL be stated rather than made configurable: an option here would be a
+second answer to whether two addresses are the same.
+
+**A page of zero SHALL NOT be treated as a count-only form.** Asking for no rows returns none,
+with the real total — and that is not the disclosure the exactness rule forbids, because this
+caller may read every row it would have returned. The prohibition is on offering a count to
+somebody who may not see what is counted; a page size is not that.
+
+**It SHALL be unwindowed**, because a subject's request carries no date, and **SHALL be paged**,
+because a prolific booker is not a bounded result set. The absence of a window is why this is a
+separate read: the list's window is not optional and SHALL NOT be relaxed to serve this.
+
+**Its rows SHALL be the rows the list returns** — the same summary, carrying the booker in the
+same three stated conditions — so that one composition serves both and no second description of a
+booking exists to disagree with the first.
+
+**An erased booking SHALL NOT be returned by any search**, because it holds no address to match.
+This follows from erasure rather than being enforced separately, and it means a subject's bookings
+leave their own results as they are erased.
+
+**The read SHALL be served by an index on the stored address.** Unwindowed and unindexed, it is a
+scan of a table that grows without limit — reintroducing the cost the list's window exists to
+bound, which would make this a worse trade than the gap it closes.
+
+#### Scenario: A subject's bookings are found by their address
+- **WHEN** a caller with sensitive-data access searches for an address two bookings hold
+- **THEN** both are returned, with their booker's contact details, whatever dates they fall on
+
+#### Scenario: The search is not windowed
+- **WHEN** a booking lies outside any window the list endpoint would accept
+- **THEN** it is still returned by a search for its booker's address
+
+#### Scenario: A different address matches nothing
+- **WHEN** a caller searches for an address no booking holds
+- **THEN** an empty page is returned rather than an error
+
+#### Scenario: Matching is exact
+- **WHEN** a caller searches for a fragment, prefix or wildcard form of an address a booking holds
+- **THEN** that booking is not returned, and the endpoint offers no parameter that would make it so
+
+#### Scenario: An erased booking is not found by the address it once held
+- **WHEN** a booking's booker has been erased and a caller searches for the address it previously held
+- **THEN** it is not returned
+
+#### Scenario: Section access alone cannot search
+- **WHEN** a backoffice user with section access but without sensitive-data access calls the search
+- **THEN** the request is refused, and the refusal does not depend on whether any booking holds the address
+
+#### Scenario: The search is not anonymous
+- **WHEN** the endpoint is called without backoffice authentication
+- **THEN** the response is 401 and no handler logic executes
+
+#### Scenario: Results page like the list
+- **WHEN** more bookings hold an address than fit on one page
+- **THEN** the remaining ones are reachable, and the total reported is the number matching rather than the number on the page
+
+#### Scenario: The list's window is untouched
+- **WHEN** the list endpoint's parameters are inspected after this read exists
+- **THEN** its window is still required and still bounded, and no parameter accepts a booker contact detail

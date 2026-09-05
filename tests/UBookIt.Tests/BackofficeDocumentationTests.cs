@@ -44,8 +44,11 @@ public class BackofficeDocumentationTests
         // guard is for. What survives unchanged is the obligation: the reader must be told the
         // records contain contact details.
         //
-        // "name and email address" alone now matches four places in this document, so on its
-        // own it no longer pins the "Grant it deliberately" callout it was written for. The
+        // "name and email address" alone matches this document in more than one place — two, at
+        // the last count — so on its own it no longer pins the "Grant it deliberately" callout
+        // it was written for. The number is deliberately not restated precisely: a comment
+        // carrying a count nobody re-measures goes stale on the next edit, and it is the
+        // "more than one" that the argument below rests on. The
         // second assertion is what holds that callout: the reader deciding on the section
         // grant must be told, there, that contact details are a separate question — otherwise
         // they grant the section believing it is the only control, which is what the old
@@ -171,6 +174,55 @@ public class BackofficeDocumentationTests
     }
 
     [Fact]
+    public void The_documentation_says_how_to_find_the_bookings_to_erase()
+    {
+        // `booker-erasure` → "What erasure does not reach is documented" was MODIFIED by
+        // find-by-booker so that its first boundary points at the search: the documentation
+        // SHALL direct an operator to search first and erase each result, and SHALL state that
+        // the search finds bookings made with THAT address.
+        //
+        // Those SHALLs arrived in a review round and shipped with nothing observing them —
+        // deleting the whole "Finding the bookings to erase" section left 1056 unit and 749
+        // rendering tests green. That is the failure this file's own comments name: a spec
+        // requirement discharged only by prose is discharged by nothing.
+        //
+        // The four claims below are the ones an operator acts on, and each fails differently
+        // if it goes missing: without the first they erase the one booking they were shown and
+        // believe they are done; without the second they read a single result as proof there is
+        // only one; without the third they expect a partial search to work; without the fourth
+        // they treat an empty result as confirmation that an erasure succeeded.
+        var docs = Docs();
+
+        DocumentationAssert.Says(docs, "search first, then erase each result");
+        DocumentationAssert.Says(docs, "It finds bookings made with *that* address");
+        DocumentationAssert.Says(docs, "It matches the whole address, exactly");
+        DocumentationAssert.Says(docs, "an empty result does not prove an erasure worked");
+    }
+
+    [Fact]
+    public void The_documentation_says_the_search_needs_the_same_group_as_reading_and_erasing()
+    {
+        // The gate is the point of the feature: somebody who may not see a booker's name must
+        // not be able to ask questions about one. An operator told the search exists but not
+        // what it requires meets a 403 and reads it as a defect.
+        //
+        // **The phrase must be unique to the SEARCH section**, and the first version of this
+        // test was not. It asserted "same Sensitive data group", which already matched a
+        // sentence about the ERASE verb forty lines earlier — so deleting the entire search
+        // section left this green while its sibling correctly failed. Mutation-checking the
+        // pair together hid it: one assertion carried the other.
+        //
+        // The lesson is narrower than "mutation-check your tests", which was already the rule
+        // and was already followed. It is that a documentation assertion has to be checked
+        // AGAINST THE DELETION OF THE THING IT DESCRIBES, one assertion at a time — a phrase
+        // that reads as specific can be satisfied by prose elsewhere in the same file.
+        var docs = Docs();
+
+        DocumentationAssert.Says(
+            docs, "it needs the **same Sensitive data group** as reading or erasing contact details");
+    }
+
+    [Fact]
     public void The_documentation_says_erasure_cannot_be_undone()
     {
         // Separate from the pair above because it is the claim most likely to be softened by
@@ -229,12 +281,13 @@ public class BackofficeDocumentationTests
         // iterate over nothing and pass. A LOWER bound rather than an exact count, so that a
         // fourth endpoint reaches the loop and fails with the message written for it, instead
         // of tripping "expected 3, got 4" here and telling its author nothing useful.
-        Assert.True(routes.Count >= 3, $"Expected at least 3 routes, found {routes.Count}.");
+        Assert.True(routes.Count >= 4, $"Expected at least 4 routes, found {routes.Count}.");
 
         // Each verb the capability offers is named in the paragraph that summarises it. Keyed
         // off the route, so a FOURTH endpoint fails here until somebody says what it is.
         var described = new Dictionary<string, string>
         {
+            ["bookings/find-by-booker"] = "find a subject's bookings by their email address",
             ["bookings/{id:guid}/cancel"] = "cancel",
             ["bookings/{id:guid}/erase-booker"] = "erase a booker's contact details",
         };

@@ -526,4 +526,127 @@ public interface IBookingManagementStore
     /// </para>
     /// </summary>
     Task<BookingPage> ListAsync(BookingQuery query, CancellationToken cancellationToken = default);
+
+    /// <summary>
+    /// The bookings whose booker holds <paramref name="query"/>'s email address, ordered and
+    /// paged on the same terms as <see cref="ListAsync"/>.
+    /// </summary>
+    /// <remarks>
+    /// <para>
+    /// <b>Unwindowed, and that is why it is a second read rather than a filter on the first.</b>
+    /// A data subject's request carries an address and no dates, so this must answer without a
+    /// window — and <see cref="BookingQuery"/> cannot express one, by construction, because an
+    /// unbounded list is the cost hole that type exists to close. Relaxing the window there to
+    /// serve this would remove a guarantee from every caller in order to serve one.
+    /// </para>
+    /// <para>
+    /// <b>The address SHALL be matched exactly.</b> No prefix, substring, wildcard or fuzzy
+    /// form, and no ordering by a contact detail. An exact match answers whether a given person
+    /// is in the records; a partial match answers <i>which people match a fragment</i>, which is
+    /// an enumeration facility rather than a lookup and which nothing this package does needs.
+    /// See the <c>sensitive-data</c> capability, which requires this of any surface accepting
+    /// contact details as input.
+    /// </para>
+    /// <para>
+    /// <b>An erased booking is never returned</b>, because it holds no address to match. That
+    /// follows from erasure rather than being enforced here, and it means a subject's bookings
+    /// leave their own results as they are erased.
+    /// </para>
+    /// <para>
+    /// <b>This port answers about stored values; it does not decide who may ask.</b> Whether a
+    /// caller may reach this at all is the endpoint's question, settled against Umbraco's
+    /// sensitive-data access before the call is made. A read port that knew about users would
+    /// be answering two questions at once.
+    /// </para>
+    /// </remarks>
+    Task<BookingPage> FindByBookerEmailAsync(
+        BookerEmailQuery query, CancellationToken cancellationToken = default);
+}
+
+/// <summary>
+/// What a search for a subject's bookings asks for: one address and a page — and, like
+/// <see cref="BookingQuery"/>, it cannot be constructed in a state the store would refuse.
+/// </summary>
+/// <remarks>
+/// <para>
+/// <b>A type rather than two loose parameters</b>, for the reason <see cref="BookingQuery"/>
+/// is one: the guard belongs where the value is made, not in a service in front of the store
+/// that a caller could route around. There is no window to bound here, but there is still a
+/// blank address and an unbounded page, and both are refused at construction.
+/// </para>
+/// <para>
+/// <b>No status or resource filter, deliberately.</b> A subject asking to be forgotten is
+/// asking about every booking they made, and a filtered search would quietly answer a
+/// narrower question than the one the law asks. Adding one later would be adding a way to
+/// under-report, which is the failure mode that matters here.
+/// </para>
+/// </remarks>
+public sealed class BookerEmailQuery
+{
+    /// <inheritdoc cref="BookingQuery.MaxTake"/>
+    public const int MaxTake = BookingQuery.MaxTake;
+
+    /// <inheritdoc cref="BookingQuery.DefaultSkip"/>
+    public const int DefaultSkip = BookingQuery.DefaultSkip;
+
+    /// <inheritdoc cref="BookingQuery.DefaultTake"/>
+    public const int DefaultTake = BookingQuery.DefaultTake;
+
+    private BookerEmailQuery(string email, int skip, int take)
+    {
+        Email = email;
+        Skip = skip;
+        Take = take;
+    }
+
+    /// <summary>
+    /// The address to match, trimmed. Compared <b>exactly</b>, under the store's collation.
+    /// </summary>
+    public string Email { get; }
+
+    public int Skip { get; }
+
+    public int Take { get; }
+
+    /// <summary>
+    /// Builds a search, or explains why it is unusable.
+    /// </summary>
+    /// <remarks>
+    /// <para>
+    /// The address is validated through the same domain rule placement uses, so "what counts as
+    /// an address" has one answer in this package rather than two that may disagree. A blank or
+    /// malformed one is refused rather than matched: searching for nothing would return
+    /// whatever the store happens to hold for a value no booking can have, and telling a caller
+    /// "no bookings" for a request that was never a valid question is the wrong answer to give
+    /// somebody exercising a right.
+    /// </para>
+    /// <para>
+    /// Trimmed on the way in, matching how the domain stores it, so a copied-and-pasted address
+    /// with a trailing space finds the person rather than reporting that they are not there.
+    /// </para>
+    /// <para>
+    /// <b>The name passed to the domain factory is a placeholder and never leaves this method.</b>
+    /// <c>Booker.Create</c> validates a whole booker, and only its email rule is wanted here;
+    /// reimplementing that rule would be a second answer to "what is an address", which is the
+    /// one thing worth avoiding when the answer decides whether somebody's data is found.
+    /// </para>
+    /// </remarks>
+    public static DomainResult<BookerEmailQuery> Create(string? email, int skip, int take)
+    {
+        var booker = Booker.Create(memberKey: null, name: "unused", email: email);
+
+        if (!booker.Succeeded)
+        {
+            return DomainResult<BookerEmailQuery>.Failure(booker.Failures);
+        }
+
+        // Paging is CLAMPED, not refused — exactly as BookingQuery does it. Two query types
+        // that disagreed about whether an over-large page is an error or a ceiling would give
+        // the same caller different answers on two endpoints, and neither would be wrong.
+        return DomainResult<BookerEmailQuery>.Success(
+            new BookerEmailQuery(
+                booker.Value.Contact!.Email,
+                Math.Max(0, skip),
+                Math.Clamp(take, 0, MaxTake)));
+    }
 }

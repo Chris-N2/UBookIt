@@ -198,6 +198,88 @@ public class BookingsController(
     }
 
     /// <summary>
+    /// Finds every booking whose booker holds a given email address.
+    /// </summary>
+    /// <remarks>
+    /// <para>
+    /// <b>This exists so an erasure request can be honoured.</b> A data subject writes in with
+    /// an address, not a date and not a booking id — and the management list is windowed, so
+    /// without this an operator has to guess when somebody booked. The erase verb was shipped
+    /// before the means of finding what to erase; this is the other half.
+    /// </para>
+    /// <para>
+    /// <b>Gated on sensitive-data access, as the endpoint's own authorization.</b> The same
+    /// policy the erase endpoint carries, which composes the section requirement too, so naming
+    /// it can only narrow. Expressed as a policy rather than a check inside the handler for the
+    /// reason the <c>sensitive-data</c> capability now states outright: a filter whose gate is a
+    /// condition in a handler is correct only while everybody remembers to write it, and leaves
+    /// a route that reaches the query having established nothing.
+    /// </para>
+    /// <para>
+    /// <b>A separate endpoint rather than a filter on the list, for two independent reasons.</b>
+    /// The query must be unwindowed, and <c>BookingQuery</c> cannot express that by
+    /// construction — relaxing its window to serve this would remove a guarantee from every
+    /// caller of the list. And the authorization differs, which belongs in the endpoint rather
+    /// than in one of its parameters.
+    /// </para>
+    /// <para>
+    /// <b>POST, for a read.</b> See <see cref="FindBookingsByBookerModel"/>: an address in a
+    /// query string is logged by the web server, by every proxy, and by the browser, none of
+    /// which this endpoint's gate controls.
+    /// </para>
+    /// <para>
+    /// <b>The refusal does not depend on the answer.</b> A caller who may not read contact
+    /// details is refused by the policy before any query runs, so they learn nothing from
+    /// asking — not from a count, not from an error, and not from how long it took.
+    /// </para>
+    /// </remarks>
+    [HttpPost("bookings/find-by-booker")]
+    [Authorize(Policy = Constants.SensitiveDataAccessPolicy)]
+    [ProducesResponseType<PagedBookingsModel>(StatusCodes.Status200OK)]
+    [ProducesResponseType(StatusCodes.Status400BadRequest)]
+    [ProducesResponseType(StatusCodes.Status403Forbidden)]
+    public async Task<IActionResult> FindBookingsByBooker(
+        [FromBody] FindBookingsByBookerModel request,
+        CancellationToken cancellationToken = default)
+    {
+        ArgumentNullException.ThrowIfNull(request);
+
+        var query = BookerEmailQuery.Create(
+            request.Email,
+            request.Skip ?? BookerEmailQuery.DefaultSkip,
+            request.Take ?? BookerEmailQuery.DefaultTake);
+
+        if (!query.Succeeded)
+        {
+            return query.Failures.ToProblemResult();
+        }
+
+        var page = await bookingStore.FindByBookerEmailAsync(query.Value, cancellationToken);
+
+        // Resolved once, not per row — the same user gives the same answer, and hoisting it
+        // matches how the list endpoint above does it. Two adjacent endpoints calling the same
+        // decision differently invites a reader to wonder which is right.
+        var bookerVisibility = ResolveBookerVisibility();
+
+        // ASKED, not assumed from having got here.
+        //
+        // Reaching this action means the policy held, so `Shown` would be correct — and it
+        // would be correct because of a registration in a composer, one file away, rather than
+        // because anybody checked. The `sensitive-data` capability says the package determines
+        // this "by asking Umbraco whether the user belongs to the built-in Sensitive data user
+        // group", and that is a cheap call on a class this controller already has.
+        //
+        // The cost is one method call; what it buys is that a mis-composed policy makes this
+        // endpoint withhold, exactly as the list does, instead of being the one place in the
+        // package that discloses on the strength of an attribute.
+        return Ok(new PagedBookingsModel
+        {
+            Total = page.Total,
+            Items = [.. page.Items.Select(summary => BookingModelMapper.ToModel(summary, bookerVisibility))],
+        });
+    }
+
+    /// <summary>
     /// Erases a booking's booker contact details and member key.
     /// </summary>
     /// <remarks>

@@ -38,7 +38,61 @@ internal sealed class SqlBookingManagementStore(UBookItDbContext db) : IBookingM
         // as the total is a pager that never offers a second page.
         var total = await matching.CountAsync(cancellationToken).ConfigureAwait(false);
 
-        var rows = await OrderedPage(matching, query)
+        var items = await PageAsync(OrderedPage(matching, query), cancellationToken).ConfigureAwait(false);
+
+        return new BookingPage(items, total);
+    }
+
+    public async Task<BookingPage> FindByBookerEmailAsync(
+        BookerEmailQuery query, CancellationToken cancellationToken = default)
+    {
+        ArgumentNullException.ThrowIfNull(query);
+
+        // Unwindowed by design — a data subject's request carries an address and no dates.
+        // Affordable because BookerEmail is indexed; without that index this is a scan of a
+        // table that grows without limit, which is the cost the list's window guard exists to
+        // bound and the reason that guard must not simply be relaxed to serve this.
+        //
+        // EQUALITY, never Contains or StartsWith. A partial match answers "which of your
+        // bookers are at this domain", which is an enumeration facility rather than a lookup;
+        // the sensitive-data capability forbids it of any surface taking contact details as
+        // input. Case sensitivity follows the column's collation, which is stated in the spec
+        // rather than made an option — an option here would be a second answer to whether two
+        // addresses are the same.
+        //
+        // An erased booking has a NULL address and therefore matches nothing. That falls out
+        // of erasure rather than being filtered for: a subject's bookings leave their own
+        // search results as they are erased.
+        var matching = Matching(query);
+
+        var total = await matching.CountAsync(cancellationToken).ConfigureAwait(false);
+
+        // Ordered and paged through the SAME expression the list uses, not a copy of it — two
+        // bookings routinely share a start time, and Skip/Take over an order that is not total
+        // silently repeats or drops rows between pages. For a search an operator is working
+        // through to honour an erasure request, that means erasing one booking twice and never
+        // seeing another.
+        var items = await PageAsync(OrderedPage(matching, query.Skip, query.Take), cancellationToken)
+            .ConfigureAwait(false);
+
+        return new BookingPage(items, total);
+    }
+
+    /// <summary>
+    /// Materializes a page of bookings into summaries — <b>the one projection both reads
+    /// share.</b>
+    /// </summary>
+    /// <remarks>
+    /// Extracted rather than copied when the by-address search arrived. Two projections of the
+    /// same rows are two descriptions of a booking, free to disagree about the booker's
+    /// condition, a resource's name or a service attribution — and a caller meeting the
+    /// difference has no way to tell which is right. The screen renders both responses with the
+    /// same code, so they had better be the same shape.
+    /// </remarks>
+    private async Task<IReadOnlyList<BookingSummary>> PageAsync(
+        IQueryable<Entities.BookingRow> page, CancellationToken cancellationToken)
+    {
+        var rows = await page
             .Select(booking => new
             {
                 booking.Id,
@@ -73,7 +127,7 @@ internal sealed class SqlBookingManagementStore(UBookItDbContext db) : IBookingM
             .ToListAsync(cancellationToken)
             .ConfigureAwait(false);
 
-        var items = rows
+        return rows
             .Select(row => new BookingSummary(
                 row.Id,
                 BookingReference.FromCanonical(row.Reference),
@@ -84,8 +138,6 @@ internal sealed class SqlBookingManagementStore(UBookItDbContext db) : IBookingM
                 [.. row.Resources.Select(r => new BookedResource(r.Id, r.DisplayName))],
                 BookingAttributionMapper.ToAttribution(row.ServiceId, row.ServiceName)))
             .ToList();
-
-        return new BookingPage(items, total);
     }
 
     /// <summary>
@@ -105,11 +157,34 @@ internal sealed class SqlBookingManagementStore(UBookItDbContext db) : IBookingM
     /// </summary>
     internal IQueryable<Entities.BookingRow> OrderedPage(
         IQueryable<Entities.BookingRow> matching, BookingQuery query)
+        => OrderedPage(matching, query.Skip, query.Take);
+
+    /// <summary>
+    /// The ordering and paging, for <b>every</b> read this store offers.
+    /// </summary>
+    /// <remarks>
+    /// The by-address search duplicated this inline when it arrived, which put it outside the
+    /// one seam built to guard the tiebreak — so deleting <c>ThenBy(Id)</c> from it broke
+    /// nothing and no test could see it. One expression, so a single guard covers both reads
+    /// and the next one inherits it rather than repeating the mistake.
+    /// </remarks>
+    internal IQueryable<Entities.BookingRow> OrderedPage(
+        IQueryable<Entities.BookingRow> matching, int skip, int take)
         => matching
             .OrderBy(booking => booking.StartUtc)
             .ThenBy(booking => booking.Id)
-            .Skip(query.Skip)
-            .Take(query.Take);
+            .Skip(skip)
+            .Take(take);
+
+    /// <summary>Convenience for tests: the ordered, paged query for a by-address search.</summary>
+    internal IQueryable<Entities.BookingRow> OrderedPage(BookerEmailQuery query)
+        => OrderedPage(Matching(query), query.Skip, query.Take);
+
+    /// <summary>The bookings holding an address — the search's selection, before ordering.</summary>
+    internal IQueryable<Entities.BookingRow> Matching(BookerEmailQuery query)
+        => db.Bookings
+            .AsNoTracking()
+            .Where(booking => booking.BookerEmail == query.Email);
 
     /// <summary>Convenience for tests: the ordered, paged query for a whole request.</summary>
     internal IQueryable<Entities.BookingRow> OrderedPage(BookingQuery query)

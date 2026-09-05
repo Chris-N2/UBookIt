@@ -52,6 +52,16 @@ public class BookingsEndpointTests
             LastQuery = query;
             return Task.FromResult(page);
         }
+
+        /// <summary>The by-address search this double records, for the search endpoint's tests.</summary>
+        public BookerEmailQuery? LastEmailQuery { get; private set; }
+
+        public Task<BookingPage> FindByBookerEmailAsync(
+            BookerEmailQuery query, CancellationToken cancellationToken = default)
+        {
+            LastEmailQuery = query;
+            return Task.FromResult(page);
+        }
     }
 
     [Fact]

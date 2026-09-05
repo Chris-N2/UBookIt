@@ -1,6 +1,7 @@
 using System.Reflection;
 using System.Runtime.CompilerServices;
 using System.Text.RegularExpressions;
+using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.Mvc.Routing;
 using UBookIt.Backoffice.Controllers;
@@ -590,6 +591,22 @@ public class SensitiveDataRedactionTests
         // watching whether a row comes back, and enumerate candidates the same way. Withholding
         // a value while answering questions about it is not withholding it.
         //
+        // **WHAT CHANGED, AND WHAT DID NOT.** This used to assert that NO endpoint anywhere
+        // named a booker or an email. The requirement it stands for was reopened deliberately
+        // (find-by-booker, signed off 2026-09-05) once a data subject's erasure request — which
+        // arrives as an email address and nothing else — could not otherwise be honoured.
+        //
+        // The guarantee is unchanged and is what is asserted now: an endpoint may accept a
+        // contact detail ONLY if it requires sensitive-data access as its OWN authorization. A
+        // caller who could already read every address on the page learns nothing from asking
+        // about one; a caller who could not must not be able to ask at all. So the tripwire
+        // still fires on exactly the thing it was built to catch — a filter added to an
+        // endpoint gated on section access alone — and no longer fires on the gated lookup.
+        //
+        // It is a POLICY that satisfies this, never a check inside a handler: a condition
+        // somebody must remember to write leaves a route that reaches the query having
+        // established nothing, and reflection cannot see it at all.
+        //
         // EVERY management controller, not just this one. The comment here used to claim the
         // guard would catch "a search endpoint added tomorrow" while scanning
         // `typeof(BookingsController)` alone — which is precisely the endpoint it would not see.
@@ -612,8 +629,25 @@ public class SensitiveDataRedactionTests
         //     create or update body, and firing there would be a false positive on every
         //     legitimate write — a guard that fires for the wrong reason is read as noise and
         //     then relaxed, which is how the previous round lost `term` altogether.
-        var readIdentifiers = new List<string>();
-        var allIdentifiers = new List<string>();
+        // The management actions that CHANGE something. Everything else is a read, and a read
+        // may not expose a free-text search surface over bookings without being named here and
+        // justified. Recorded rather than inferred from the HTTP verb, because this package
+        // deliberately uses POST for a read that takes a sensitive value.
+        string[] KnownWrites =
+        [
+            "BookingsController.CancelBooking",
+            "BookingsController.EraseBooker",
+            "ResourcesController.CreateResource",
+            "ResourcesController.UpdateResource",
+            "ResourcesController.DeleteResource",
+            "ServicesController.CreateService",
+            "ServicesController.UpdateService",
+            "ServicesController.DeleteService",
+        ];
+
+        var classifiedActions = new List<string>();
+        var readIdentifiers = new List<(string Identifier, string Where)>();
+        var allIdentifiers = new List<(string Identifier, string Where, bool Gated)>();
         var scannedControllers = new List<string>();
 
         foreach (var controller in typeof(BookingsController).Assembly.GetTypes()
@@ -629,17 +663,47 @@ public class SensitiveDataRedactionTests
                     continue;
                 }
 
-                var isRead = method.GetCustomAttributes<HttpGetAttribute>().Any();
+                // A READ, which is no longer the same set as "a GET".
+                //
+                // This asked `HttpGetAttribute` alone, and that was harmless for exactly as
+                // long as every management read was a GET. `find-by-booker` ended that: it is
+                // a POST BECAUSE it takes a contact detail, since an address in a query string
+                // is written to the web server's log, every proxy's log and the browser's
+                // history. So the package's own precedent for "a read that takes a sensitive
+                // value" is a POST — and the free-text rule below, which exists to force any
+                // search surface over bookings to be named and justified, could not see one.
+                // An ungated `[HttpPost("bookings/search")] Search([FromQuery] string term)`
+                // passed this guard.
+                //
+                // Widening to "GET or POST" outright would fire on every legitimate write body
+                // carrying a `name`, which is the false positive the rule below is scoped to
+                // avoid — and a guard that cries wolf gets relaxed rather than fixed. So the
+                // WRITES are enumerated instead: anything not recorded as one is treated as a
+                // read. A new POST therefore has to be classified by whoever adds it, which is
+                // the decision this guard exists to force.
+                var isWrite = KnownWrites.Contains(
+                    $"{controller.Name}.{method.Name}", StringComparer.Ordinal);
+
+                var isRead = !isWrite;
+
+                classifiedActions.Add(
+                    $"{controller.Name}.{method.Name} = {(isWrite ? "write" : "read")}");
+
+                // The action's OWN authorization, not the controller's. The base controller's
+                // section policy applies to everything and would make every endpoint look
+                // gated; what this requirement is about is the second, narrower gate.
+                var gated = method.GetCustomAttributes<AuthorizeAttribute>()
+                    .Any(attribute => attribute.Policy == UBookIt.Backoffice.Constants.SensitiveDataAccessPolicy);
 
                 foreach (var parameter in method.GetParameters())
                 {
                     foreach (var identifier in Identifiers(parameter.Name, parameter.ParameterType, depth: 0))
                     {
-                        allIdentifiers.Add(identifier);
+                        allIdentifiers.Add((identifier, $"{controller.Name}.{method.Name}", gated));
 
                         if (isRead)
                         {
-                            readIdentifiers.Add(identifier);
+                            readIdentifiers.Add((identifier, $"{controller.Name}.{method.Name}"));
                         }
                     }
                 }
@@ -650,27 +714,165 @@ public class SensitiveDataRedactionTests
         // count was not enough: blinding the scan to BookingsContoller specifically still left
         // plenty of identifiers from Resources and Services, and both checks passed.
         Assert.Contains(nameof(BookingsController), scannedControllers);
-        Assert.Contains("resourceIds", readIdentifiers);
+        Assert.Contains(readIdentifiers, entry => entry.Identifier == "resourceIds");
 
-        foreach (var identifier in allIdentifiers)
+        // ANTI-VACUITY for the rule below: at least one endpoint really does take a contact
+        // detail now, so a scan that stopped recognising them would fail here rather than
+        // reporting that nothing needs gating.
+        Assert.Contains(
+            allIdentifiers,
+            entry => entry.Identifier.Contains("email", StringComparison.OrdinalIgnoreCase));
+
+        // THE SECOND OBLIGATION, and the one the first version of this guard lost.
+        //
+        // The reopened requirement forbids two things, not one: an UNGATED endpoint accepting a
+        // contact detail (below), and ANY such endpoint offering a partial, prefix, substring,
+        // fuzzy or wildcard form, an ordering by a contact detail, or a count-only response.
+        // The narrowed guard enforced only the first, so a GATED
+        //
+        //     [HttpGet("bookings/enumerate-by-domain")]
+        //     [Authorize(Policy = Constants.SensitiveDataAccessPolicy)]
+        //     public IActionResult Enumerate([FromQuery] string bookerEmailContains)
+        //
+        // passed it — an enumeration facility over exactly the values this capability exists to
+        // protect, wearing the right policy. `design.md` D3 promised "the restatement must keep
+        // a tripwire"; it kept one of the two.
+        //
+        // Recorded as a SET rather than as a search for suspicious operation words: a list of
+        // forbidden spellings passes on the next one somebody invents, and the parameter that
+        // widens this will be called `match` or `mode` or `q`, not `contains`. Every parameter
+        // this scan RECOGNISES as a contact detail is named here, and a new one fails until an
+        // author states what it does.
+        //
+        // **The limit of that claim, stated because the first version of this comment
+        // overreached it:** the set is populated by a name filter — `booker` or `email` — so a
+        // parameter called `subject`, `address` or `who` carrying an address enters neither
+        // this set nor the gating check below. That is the same class of gap as the free-text
+        // list further down, and it is why the free-text list exists alongside this: between
+        // them they cover the words somebody actually reaches for. Neither is a proof, and a
+        // reviewer should read new parameters rather than trusting either.
+        string[] recordedContactParameters =
+        [
+            "BookingsController.FindBookingsByBooker: Email",
+        ];
+
+        var contactParameters = allIdentifiers
+            .Where(entry =>
+                entry.Identifier.Contains("booker", StringComparison.OrdinalIgnoreCase)
+                || entry.Identifier.Contains("email", StringComparison.OrdinalIgnoreCase))
+            .Select(entry => $"{entry.Where}: {entry.Identifier}")
+            .Distinct()
+            .OrderBy(entry => entry, StringComparer.Ordinal)
+            .ToList();
+
+        Assert.True(
+            contactParameters.SequenceEqual(recordedContactParameters.Order(StringComparer.Ordinal)),
+            "The set of endpoint parameters naming a booker contact detail has changed."
+            + Environment.NewLine
+            + $"  recorded: {string.Join(", ", recordedContactParameters.Order(StringComparer.Ordinal))}"
+            + Environment.NewLine
+            + $"  actual:   {string.Join(", ", contactParameters)}"
+            + Environment.NewLine
+            + "A parameter accepting a contact detail may exist ONLY if its endpoint requires "
+            + "sensitive-data access as its own authorization AND it matches the whole value "
+            + "exactly. A partial match answers WHICH PEOPLE match a fragment, which is an "
+            + "enumeration facility rather than a lookup."
+            + Environment.NewLine
+            + Environment.NewLine
+            + "THIS guard sees only the first of those two. It compares parameter NAMES, so it "
+            + "cannot tell equality from a substring match — keeping a parameter called 'email' "
+            + "while matching with Contains passes here and passes the whole unit suite. "
+            + "Exactness is observed in the INTEGRATION suite, by "
+            + "FindByBookerStoreTests.The_search_emits_an_equality_comparison_and_never_a_LIKE "
+            + "and .Matching_is_exact_and_a_fragment_finds_nothing. If you record a new "
+            + "parameter here, give it an equivalent there — this message is not evidence that "
+            + "its matching was checked.");
+
+        foreach (var (identifier, where, gated) in allIdentifiers)
         {
-            Assert.False(
+            var isContactDetail =
                 identifier.Contains("booker", StringComparison.OrdinalIgnoreCase)
-                || identifier.Contains("email", StringComparison.OrdinalIgnoreCase),
-                $"A management endpoint exposes '{identifier}'. Answering questions about a "
-                + "booker's contact details is not withholding them: a caller who may not read "
-                + "an email but may filter by one can confirm it by watching whether a row "
-                + "comes back.");
+                || identifier.Contains("email", StringComparison.OrdinalIgnoreCase);
+
+            Assert.False(
+                isContactDetail && !gated,
+                $"{where} accepts '{identifier}' without requiring sensitive-data access as its "
+                + "own authorization. Answering questions about a booker's contact details is "
+                + "not withholding them: a caller who may not read an email but may filter by "
+                + "one can confirm it by watching whether a row comes back. Carry "
+                + "[Authorize(Policy = Constants.SensitiveDataAccessPolicy)] on the action - a "
+                + "check inside the handler does not satisfy this and cannot be seen from here.");
         }
 
-        foreach (var identifier in readIdentifiers)
+        // THE CLASSIFICATION ITSELF IS RECORDED, not merely the names of the writes.
+        //
+        // `KnownWrites` EXEMPTS whatever is on it: an action listed there is treated as a write
+        // and the free-text rule below stops applying to it. Asserting only that its entries
+        // still exist left the obvious bypass open — add a read to the list and a failing guard
+        // goes green, which is exactly what the failure message invites a hurried reader to do.
+        // A guard whose escape hatch nobody guards is the fault this rule was built to catch,
+        // one level up.
+        //
+        // So the whole action set is recorded with its classification. Adding an action fails
+        // this; RECLASSIFYING one fails it too, and the failure names both sides. The list can
+        // still be edited — it must be, when a genuine write arrives — but not silently, and
+        // not as a way of quieting the rule underneath.
+        string[] recordedActions =
+        [
+            "BookingsController.CancelBooking = write",
+            "BookingsController.EraseBooker = write",
+            "BookingsController.FindBookingsByBooker = read",
+            "BookingsController.ListBookings = read",
+            "ResourcesController.CreateResource = write",
+            "ResourcesController.DeleteResource = write",
+            "ResourcesController.GetResource = read",
+            "ResourcesController.ListCapabilities = read",
+            "ResourcesController.ListResourceTypes = read",
+            "ResourcesController.ListResources = read",
+            "ResourcesController.UpdateResource = write",
+            "ServicesController.CreateService = write",
+            "ServicesController.DeleteService = write",
+            "ServicesController.GetService = read",
+            "ServicesController.ListServices = read",
+            "ServicesController.PreviewServiceConfiguration = read",
+            "ServicesController.UpdateService = write",
+        ];
+
+        Assert.True(
+            classifiedActions.Order(StringComparer.Ordinal).SequenceEqual(
+                recordedActions.Order(StringComparer.Ordinal)),
+            "The management actions, or how they are classified, have changed."
+            + Environment.NewLine
+            + $"  recorded: {string.Join(", ", recordedActions.Order(StringComparer.Ordinal))}"
+            + Environment.NewLine
+            + $"  actual:   {string.Join(", ", classifiedActions.Order(StringComparer.Ordinal))}"
+            + Environment.NewLine
+            + "A READ may not expose a free-text search surface over bookings. Marking one as a "
+            + "write in KnownWrites exempts it from that rule — which is a decision, not a "
+            + "formality, so it has to be made here as well. If an action genuinely changes "
+            + "something, record it as a write in BOTH places and say so in the change. Note "
+            + "that a POST is not evidence either way: this package uses POST for a read that "
+            + "carries a sensitive value.");
+
+        foreach (var (identifier, where) in readIdentifiers)
         {
             Assert.False(
                 new[] { "name", "search", "searchterm", "term", "query", "q", "keyword" }
                     .Contains(identifier, StringComparer.OrdinalIgnoreCase),
-                $"A management read exposes '{identifier}', a free-text search surface over "
-                + "bookings. If it cannot reach booker contact details, name it for what it "
-                + "searches and record why here.");
+                $"{where} exposes '{identifier}', which reads as a free-text search surface "
+                + "over bookings, and this guard treats it as a READ."
+                + Environment.NewLine
+                + Environment.NewLine
+                + "If it is actually a WRITE — a create or an update whose body legitimately "
+                + "carries a name — record it in KnownWrites above and this stops applying. "
+                + "Reads are the default deliberately: the package uses POST for a read that "
+                + "takes a sensitive value, so the HTTP verb cannot classify these and "
+                + "somebody has to."
+                + Environment.NewLine
+                + Environment.NewLine
+                + "If it IS a read, it must not offer free text over bookings: a caller who "
+                + "may not see a booker's details could confirm one by watching whether a row "
+                + "comes back. Name it for what it searches and record why here.");
         }
     }
 
