@@ -63,22 +63,17 @@ internal sealed class SqlBookingManagementStore(UBookItDbContext db) : IBookingM
         // An erased booking has a NULL address and therefore matches nothing. That falls out
         // of erasure rather than being filtered for: a subject's bookings leave their own
         // search results as they are erased.
-        var matching = db.Bookings
-            .AsNoTracking()
-            .Where(booking => booking.BookerEmail == query.Email);
+        var matching = Matching(query);
 
         var total = await matching.CountAsync(cancellationToken).ConfigureAwait(false);
 
-        // Ordered by start then id, the same total order the list uses, so paging is stable
-        // for the same reason: two bookings routinely share a start time, and Skip/Take over a
-        // non-total order silently repeats or drops rows between pages.
-        var page = matching
-            .OrderBy(booking => booking.StartUtc)
-            .ThenBy(booking => booking.Id)
-            .Skip(query.Skip)
-            .Take(query.Take);
-
-        var items = await PageAsync(page, cancellationToken).ConfigureAwait(false);
+        // Ordered and paged through the SAME expression the list uses, not a copy of it — two
+        // bookings routinely share a start time, and Skip/Take over an order that is not total
+        // silently repeats or drops rows between pages. For a search an operator is working
+        // through to honour an erasure request, that means erasing one booking twice and never
+        // seeing another.
+        var items = await PageAsync(OrderedPage(matching, query.Skip, query.Take), cancellationToken)
+            .ConfigureAwait(false);
 
         return new BookingPage(items, total);
     }
@@ -162,11 +157,34 @@ internal sealed class SqlBookingManagementStore(UBookItDbContext db) : IBookingM
     /// </summary>
     internal IQueryable<Entities.BookingRow> OrderedPage(
         IQueryable<Entities.BookingRow> matching, BookingQuery query)
+        => OrderedPage(matching, query.Skip, query.Take);
+
+    /// <summary>
+    /// The ordering and paging, for <b>every</b> read this store offers.
+    /// </summary>
+    /// <remarks>
+    /// The by-address search duplicated this inline when it arrived, which put it outside the
+    /// one seam built to guard the tiebreak — so deleting <c>ThenBy(Id)</c> from it broke
+    /// nothing and no test could see it. One expression, so a single guard covers both reads
+    /// and the next one inherits it rather than repeating the mistake.
+    /// </remarks>
+    internal IQueryable<Entities.BookingRow> OrderedPage(
+        IQueryable<Entities.BookingRow> matching, int skip, int take)
         => matching
             .OrderBy(booking => booking.StartUtc)
             .ThenBy(booking => booking.Id)
-            .Skip(query.Skip)
-            .Take(query.Take);
+            .Skip(skip)
+            .Take(take);
+
+    /// <summary>Convenience for tests: the ordered, paged query for a by-address search.</summary>
+    internal IQueryable<Entities.BookingRow> OrderedPage(BookerEmailQuery query)
+        => OrderedPage(Matching(query), query.Skip, query.Take);
+
+    /// <summary>The bookings holding an address — the search's selection, before ordering.</summary>
+    internal IQueryable<Entities.BookingRow> Matching(BookerEmailQuery query)
+        => db.Bookings
+            .AsNoTracking()
+            .Where(booking => booking.BookerEmail == query.Email);
 
     /// <summary>Convenience for tests: the ordered, paged query for a whole request.</summary>
     internal IQueryable<Entities.BookingRow> OrderedPage(BookingQuery query)

@@ -256,13 +256,21 @@ public class BookingsController(
 
         var page = await bookingStore.FindByBookerEmailAsync(query.Value, cancellationToken);
 
-        // The caller reached this at all, so they hold sensitive-data access and the rows carry
-        // their details. Passed explicitly rather than assumed: the mapper requires the decision
-        // as an argument, which is what stops a future caller composing a row without making it.
+        // ASKED, not assumed from having got here.
+        //
+        // Reaching this action means the policy held, so `Shown` would be correct — and it
+        // would be correct because of a registration in a composer, one file away, rather than
+        // because anybody checked. The `sensitive-data` capability says the package determines
+        // this "by asking Umbraco whether the user belongs to the built-in Sensitive data user
+        // group", and that is a cheap call on a class this controller already has.
+        //
+        // The cost is one method call; what it buys is that a mis-composed policy makes this
+        // endpoint withhold, exactly as the list does, instead of being the one place in the
+        // package that discloses on the strength of an attribute.
         return Ok(new PagedBookingsModel
         {
             Total = page.Total,
-            Items = [.. page.Items.Select(summary => BookingModelMapper.ToModel(summary, BookerVisibility.Shown))],
+            Items = [.. page.Items.Select(summary => BookingModelMapper.ToModel(summary, ResolveBookerVisibility()))],
         });
     }
 

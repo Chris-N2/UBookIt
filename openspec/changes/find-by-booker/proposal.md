@@ -54,16 +54,21 @@ capability of its own would split one rule across two places.)*
 
 ### Modified Capabilities
 
+- `booker-erasure`: **What erasure does not reach is documented** states that the package "does
+  not claim to find them all" — true when erasure shipped with no way to find anything, and made
+  false by this change. The boundary moves rather than disappearing: erasure still reaches one
+  booking per operation, and a search still matches one address.
 - `sensitive-data`: **Withheld data SHALL NOT be reachable by asking about it** currently forbids
   any filter, search, sort or count over contact details, at any endpoint. It is restated to
   forbid answering such a question to a caller who may not read the values, and to require that
   any endpoint accepting contact details as input carries sensitive-data access as **its own**
   authorization, matches exactly, and offers no partial, prefix, sort or count form.
-- `booking-management`: **Bookings can be enumerated for management** records that locating a
-  booking from an email "is not provided here". The port gains a second read that does provide
-  it, on its own terms. A new requirement covers the endpoint.
-- `persistence`: **Schema shape and naming** gains an index on the booker email column, and the
-  store requirement gains the lookup's contract.
+- `booking-management`: **The list is windowed, and the window is bounded** records that locating
+  a booking from an email "is not provided here"; it now says a separate read provides it, and
+  that this requirement's window is not to be relaxed to accommodate it. **Results are paged in a
+  stable order** widens from the windowed list to every paged read. A new requirement covers the
+  port's second read and its endpoint.
+- `persistence`: **Schema shape and naming** gains a non-unique index on the booker email column.
 
 ## Non-goals
 

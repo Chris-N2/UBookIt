@@ -122,8 +122,12 @@ public class FindByBookerStoreTests(SqlServerFixture fixture)
         Assert.Empty((await FindAsync($"ada@{domain}".Replace("ada@", "ad@"))).Items);
         Assert.Empty((await FindAsync($"bob@{domain}")).Items);
 
-        // A prefix of a real address finds nothing, and so does a longer string containing one.
-        Assert.Empty((await FindAsync($"a@{domain}")).Items);
+        // A strict PREFIX of a stored address finds nothing — the case that separates equality
+        // from StartsWith, and the one the earlier version of this test did not actually cover
+        // (`a@domain` is not a prefix of `ada@domain`). And a longer address CONTAINING a
+        // stored one finds nothing either, which separates equality from Contains.
+        await PlaceAsync($"grace@{domain}.uk");
+        Assert.Empty((await FindAsync($"grace@{domain}")).Items);
         Assert.Empty((await FindAsync($"xada@{domain}")).Items);
 
         // The exact value still does — so the four negatives above are narrowing, not a broken
@@ -203,6 +207,80 @@ public class FindByBookerStoreTests(SqlServerFixture fixture)
     }
 
     [Fact]
+    public async Task Pages_do_not_overlap_or_lose_rows_when_bookings_share_a_start_time()
+    {
+        // THE FIXTURE THE REQUIREMENT NAMES, and the one this change failed to use.
+        //
+        // "Results are paged in a stable order" says, in a sentence this change carried forward
+        // and then widened to reach every paged read: "A test for this SHALL include bookings
+        // that share a start time, because a fixture of distinct start times passes against an
+        // ordering that has no tiebreak at all." The first version of the by-address paging
+        // test seeded three DISTINCT starts and passed with `ThenBy(Id)` deleted.
+        //
+        // THREE bookings at ONE instant, read as two pages of two. Without a total order the
+        // page boundary falls somewhere the database has not committed to, and a row is
+        // repeated on both pages while another is never returned — which for an operator
+        // working a search to honour an erasure request means erasing one booking twice and
+        // never seeing the third.
+        fixture.EnsureAvailable();
+
+        var address = $"tied-{Guid.NewGuid():N}@example.com";
+        var at = Start.AddDays(700);
+
+        await PlaceAsync(address, at);
+        await PlaceAsync(address, at);
+        await PlaceAsync(address, at);
+
+        var first = await FindAsync(address, skip: 0, take: 2);
+        var second = await FindAsync(address, skip: 2, take: 2);
+
+        Assert.Equal(3, first.Total);
+        Assert.Equal(2, first.Items.Count);
+        Assert.Single(second.Items);
+
+        var seen = first.Items.Concat(second.Items).Select(row => row.BookingId).ToList();
+
+        // Every booking exactly once across the two pages — no repeat, nothing lost.
+        Assert.Equal(3, seen.Distinct().Count());
+        Assert.Equal(3, seen.Count);
+    }
+
+    [Fact]
+    public void The_search_orders_by_start_then_identity()
+    {
+        // The tiebreak has no observable effect on a database where Id happens to be the
+        // clustered key — SQL Server's incidental order already matches it — so the shared-start
+        // test above can pass against an ordering with no tiebreak at all, on some data, by
+        // luck. The only way to catch its removal is to read the emitted ORDER BY, which is why
+        // the store exposes the ordering as a seam and why the search now goes through it
+        // instead of duplicating it inline.
+        fixture.EnsureAvailable();
+
+        var query = BookerEmailQuery.Create("ada@example.com", 0, 20);
+        Assert.True(query.Succeeded);
+
+        using var context = fixture.CreateContext();
+        var sql = new SqlBookingManagementStore(context).OrderedPage(query.Value).ToQueryString();
+
+        var offset = sql.IndexOf("OFFSET", StringComparison.Ordinal);
+
+        Assert.True(
+            offset >= 0,
+            $"The search no longer emits OFFSET/FETCH, so there is no paging clause to check "
+            + $"and this guard is not testing what it claims. SQL was: {sql}");
+
+        var paging = sql[..offset];
+        var orderBy = paging[paging.LastIndexOf("ORDER BY", StringComparison.Ordinal)..];
+
+        Assert.Contains("[StartUtc]", orderBy, StringComparison.Ordinal);
+        Assert.Contains("[Id]", orderBy, StringComparison.Ordinal);
+        Assert.True(
+            orderBy.IndexOf("[StartUtc]", StringComparison.Ordinal)
+                < orderBy.IndexOf("[Id]", StringComparison.Ordinal),
+            $"Start time must be the primary sort key. ORDER BY was: {orderBy}");
+    }
+
+    [Fact]
     public async Task The_rows_are_the_same_shape_the_list_returns()
     {
         // One projection serves both reads. A second description of a booking, free to disagree
@@ -255,19 +333,20 @@ public class FindByBookerStoreTests(SqlServerFixture fixture)
         await using var context = fixture.CreateContext();
 
         var indexes = await context.Database
-            .SqlQuery<string>($@"
-                SELECT i.name AS [Value]
+            .SqlQuery<IndexRow>($@"
+                SELECT i.name AS [Name], i.is_unique AS [IsUnique]
                 FROM sys.indexes i
                 JOIN sys.index_columns ic ON ic.object_id = i.object_id AND ic.index_id = i.index_id
                 JOIN sys.columns c ON c.object_id = i.object_id AND c.column_id = ic.column_id
                 WHERE i.object_id = OBJECT_ID('uBookItBooking')
-                  AND c.name = 'BookerEmail'
-                  AND i.is_unique = 0")
+                  AND c.name = 'BookerEmail'")
             .ToListAsync(Ct);
 
-        // Present, and NOT unique — one person books many times, and a unique index here would
-        // refuse their second booking.
+        // EVERY index over the column, then assert about all of them — filtering to the
+        // non-unique ones and asserting NotEmpty would pass with a unique index sitting beside
+        // a non-unique one, which is the state that would actually refuse a second booking.
         Assert.NotEmpty(indexes);
+        Assert.All(indexes, index => Assert.False(index.IsUnique));
     }
 
     [Fact]
@@ -301,4 +380,7 @@ public class FindByBookerStoreTests(SqlServerFixture fixture)
 
         Assert.Contains(commands, c => c.Contains("[BookerEmail] = ", StringComparison.Ordinal));
     }
+
+    /// <summary>One index over a column, and whether it enforces uniqueness.</summary>
+    private sealed record IndexRow(string Name, bool IsUnique);
 }

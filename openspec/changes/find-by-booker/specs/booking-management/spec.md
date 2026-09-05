@@ -103,7 +103,7 @@ distinct start times passes against an ordering that has no tiebreak at all.
 
 #### Scenario: The total counts matches, not the page
 - **WHEN** a page of results is returned
-- **THEN** the reported total is the number of bookings matching the window and filters, not the number in the page
+- **THEN** the reported total is the number of bookings the query matched — the window and its filters for the list, the address for the search — not the number in the page
 
 ## ADDED Requirements
 
@@ -122,6 +122,11 @@ finding them and destroying them are one decision rather than three that may dri
 ordering by a contact detail and no count-only response. Comparison SHALL follow the store's
 collation, and that SHALL be stated rather than made configurable: an option here would be a
 second answer to whether two addresses are the same.
+
+**A page of zero SHALL NOT be treated as a count-only form.** Asking for no rows returns none,
+with the real total — and that is not the disclosure the exactness rule forbids, because this
+caller may read every row it would have returned. The prohibition is on offering a count to
+somebody who may not see what is counted; a page size is not that.
 
 **It SHALL be unwindowed**, because a subject's request carries no date, and **SHALL be paged**,
 because a prolific booker is not a bounded result set. The absence of a window is why this is a

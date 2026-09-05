@@ -70,12 +70,12 @@ public class FindByBookerEndpointTests
     }
 
     [Fact]
-    public async Task The_rows_carry_contact_details_because_the_caller_holds_the_group()
+    public async Task The_rows_carry_contact_details_when_the_caller_is_in_the_group()
     {
-        // Reaching this endpoint at all means holding sensitive-data access, so withholding the
-        // details from the response would be answering a question about a booker while refusing
-        // to say who they are — which is the one shape this feature must not have.
-        var (controller, _) = Endpoint(Summary());
+        // Answering a question about a booker while refusing to say who they are is the one
+        // shape this feature must not have — the operator would find the booking and still not
+        // know whose it is.
+        var (controller, _) = Endpoint(Summary(), sensitiveData: true);
 
         var model = Payload<PagedBookingsModel>(
             await controller.FindBookingsByBooker(new FindBookingsByBookerModel { Email = "ada@example.com" }));
@@ -85,6 +85,32 @@ public class FindByBookerEndpointTests
         Assert.Equal(BookerConditions.Shown, row.Booker.Condition);
         Assert.NotNull(row.Booker.Contact);
         Assert.Equal("ada@example.com", row.Booker.Contact.Email);
+    }
+
+    [Fact]
+    public async Task A_caller_the_endpoint_cannot_identify_is_withheld_from_rather_than_trusted()
+    {
+        // DEFENCE IN DEPTH, and the reason this endpoint asks Umbraco rather than inferring
+        // "shown" from having been reached.
+        //
+        // The policy should make this unreachable: it composes the section requirement and the
+        // sensitive-data one, so a caller who got here holds both. But "should" is doing all
+        // the work in that sentence — it is true because of a registration in a composer one
+        // file away, and if that registration is ever mis-composed this endpoint is the one
+        // place in the package that discloses on the strength of an attribute while the list
+        // beside it correctly withholds.
+        //
+        // The rows still come back. Withholding removes the people, never the bookings.
+        var (controller, _) = Endpoint(Summary(), sensitiveData: false);
+
+        var model = Payload<PagedBookingsModel>(
+            await controller.FindBookingsByBooker(new FindBookingsByBookerModel { Email = "ada@example.com" }));
+
+        var row = Assert.Single(model.Items);
+
+        Assert.Equal(BookerConditions.Withheld, row.Booker.Condition);
+        Assert.Null(row.Booker.Contact);
+        Assert.False(string.IsNullOrWhiteSpace(row.Reference));
     }
 
     [Fact]
@@ -166,7 +192,7 @@ public class FindByBookerEndpointTests
             Service: null);
 
     private static (BookingsController Controller, SearchingStore Store) Endpoint(
-        BookingSummary? summary = null, int total = 1)
+        BookingSummary? summary = null, int total = 1, bool sensitiveData = true)
     {
         var page = summary is null
             ? new BookingPage([], 0)
@@ -179,7 +205,7 @@ public class FindByBookerEndpointTests
                 store,
                 new UnusedBookingService(),
                 new UBookIt.Core.SiteBookingSettings { TimeZoneId = "UTC" },
-                new StubAccessor()),
+                Security(sensitiveData)),
             store);
     }
 
@@ -231,8 +257,54 @@ public class FindByBookerEndpointTests
             Guid bookingId, CancellationToken cancellationToken = default) => throw Unexpected();
     }
 
-    private sealed class StubAccessor : Umbraco.Cms.Core.Security.IBackOfficeSecurityAccessor
+    /// <summary>
+    /// A backoffice user who is, or is not, in Umbraco's Sensitive data group.
+    /// </summary>
+    /// <remarks>
+    /// Umbraco's real <c>User</c>, <c>ReadOnlyUserGroup</c> and real group key rather than a
+    /// stubbed <c>IUser</c> — a stub would be a second opinion about what membership means, and
+    /// membership is what the endpoint asks about.
+    /// </remarks>
+    private static Umbraco.Cms.Core.Security.IBackOfficeSecurityAccessor Security(bool sensitiveData)
     {
-        public Umbraco.Cms.Core.Security.IBackOfficeSecurity? BackOfficeSecurity => null;
+        var user = new Umbraco.Cms.Core.Models.Membership.User(
+            new Umbraco.Cms.Core.Configuration.Models.GlobalSettings());
+
+        user.AddGroup(new Umbraco.Cms.Core.Models.Membership.ReadOnlyUserGroup(
+            id: 1,
+            key: sensitiveData ? Umbraco.Cms.Core.Constants.Security.SensitiveDataGroupKey : Guid.NewGuid(),
+            name: "Test group",
+            description: null,
+            icon: null,
+            startContentId: null,
+            startMediaId: null,
+            alias: "testGroup",
+            allowedLanguages: [],
+            allowedSections: [UBookIt.Backoffice.Constants.SectionAlias],
+            permissions: new HashSet<string>(),
+            granularPermissions: new HashSet<Umbraco.Cms.Core.Models.Membership.Permissions.IGranularPermission>(),
+            hasAccessToAllLanguages: true));
+
+        return new StubAccessor(new StubSecurity(user));
+    }
+
+    private sealed class StubAccessor(Umbraco.Cms.Core.Security.IBackOfficeSecurity? security)
+        : Umbraco.Cms.Core.Security.IBackOfficeSecurityAccessor
+    {
+        public Umbraco.Cms.Core.Security.IBackOfficeSecurity? BackOfficeSecurity { get; } = security;
+    }
+
+    private sealed class StubSecurity(Umbraco.Cms.Core.Models.Membership.IUser? currentUser)
+        : Umbraco.Cms.Core.Security.IBackOfficeSecurity
+    {
+        public Umbraco.Cms.Core.Models.Membership.IUser? CurrentUser { get; } = currentUser;
+
+        public bool UserHasSectionAccess(string section, Umbraco.Cms.Core.Models.Membership.IUser user)
+            => throw new InvalidOperationException(
+                "The endpoint decides visibility from group membership, not from section access.");
+
+        public bool IsAuthenticated()
+            => throw new InvalidOperationException(
+                "The endpoint does not authenticate; the authorization policy has already run.");
     }
 }

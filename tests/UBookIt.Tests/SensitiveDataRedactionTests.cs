@@ -682,6 +682,55 @@ public class SensitiveDataRedactionTests
             allIdentifiers,
             entry => entry.Identifier.Contains("email", StringComparison.OrdinalIgnoreCase));
 
+        // THE SECOND OBLIGATION, and the one the first version of this guard lost.
+        //
+        // The reopened requirement forbids two things, not one: an UNGATED endpoint accepting a
+        // contact detail (below), and ANY such endpoint offering a partial, prefix, substring,
+        // fuzzy or wildcard form, an ordering by a contact detail, or a count-only response.
+        // The narrowed guard enforced only the first, so a GATED
+        //
+        //     [HttpGet("bookings/enumerate-by-domain")]
+        //     [Authorize(Policy = Constants.SensitiveDataAccessPolicy)]
+        //     public IActionResult Enumerate([FromQuery] string bookerEmailContains)
+        //
+        // passed it — an enumeration facility over exactly the values this capability exists to
+        // protect, wearing the right policy. `design.md` D3 promised "the restatement must keep
+        // a tripwire"; it kept one of the two.
+        //
+        // Recorded as a SET rather than as a search for suspicious words, on the same reasoning
+        // as the membership snapshots: a list of forbidden spellings passes on the next one
+        // somebody invents, and the parameter that widens this will be called `match` or `mode`
+        // or `q`, not `contains`. Every contact-detail parameter in the package is named here,
+        // and a new one fails until an author states what it does.
+        string[] recordedContactParameters =
+        [
+            "BookingsController.FindBookingsByBooker: Email",
+        ];
+
+        var contactParameters = allIdentifiers
+            .Where(entry =>
+                entry.Identifier.Contains("booker", StringComparison.OrdinalIgnoreCase)
+                || entry.Identifier.Contains("email", StringComparison.OrdinalIgnoreCase))
+            .Select(entry => $"{entry.Where}: {entry.Identifier}")
+            .Distinct()
+            .OrderBy(entry => entry, StringComparer.Ordinal)
+            .ToList();
+
+        Assert.True(
+            contactParameters.SequenceEqual(recordedContactParameters.Order(StringComparer.Ordinal)),
+            "The set of endpoint parameters naming a booker contact detail has changed."
+            + Environment.NewLine
+            + $"  recorded: {string.Join(", ", recordedContactParameters.Order(StringComparer.Ordinal))}"
+            + Environment.NewLine
+            + $"  actual:   {string.Join(", ", contactParameters)}"
+            + Environment.NewLine
+            + "A parameter accepting a contact detail may exist ONLY if its endpoint requires "
+            + "sensitive-data access as its own authorization AND it matches the whole value "
+            + "exactly — no prefix, substring, wildcard or fuzzy form, no ordering by a contact "
+            + "detail, and no count-only response. A partial match answers WHICH PEOPLE match a "
+            + "fragment, which is an enumeration facility rather than a lookup. If the new "
+            + "parameter satisfies both, record it here.");
+
         foreach (var (identifier, where, gated) in allIdentifiers)
         {
             var isContactDetail =
