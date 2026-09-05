@@ -12,9 +12,21 @@ The package SHALL require SQL Server 2019 or later (including LocalDB and Azure 
 - **THEN** the only configured EF Core provider is SQL Server
 
 ### Requirement: Schema shape and naming
-All uBookIt tables SHALL carry the `uBookIt` prefix. The schema SHALL comprise: `uBookItResource` (id, type key, display name, description, constraint values), `uBookItResourceOpenHours` (per weekly window: day of week, start time, end time), `uBookItResourceException` (per exception window: date, nullable start/end times where a closure is a single row with NULL times), `uBookItResourceCapability` (resource id and capability key, unique per pair), `uBookItServiceRoleCapability` (service role id and capability key, unique per pair), `uBookItBooking` (**reference**, UTC start and end, IANA time zone id, status, created UTC, nullable member key, booker name, email, nullable phone, **nullable service id and nullable service name**), and `uBookItResourceClaim` (booking id, resource id, unique per pair). The mapping SHALL round-trip the Core value objects without loss.
+All uBookIt tables SHALL carry the `uBookIt` prefix. The schema SHALL comprise: `uBookItResource` (id, type key, display name, description, constraint values), `uBookItResourceOpenHours` (per weekly window: day of week, start time, end time), `uBookItResourceException` (per exception window: date, nullable start/end times where a closure is a single row with NULL times), `uBookItResourceCapability` (resource id and capability key, unique per pair), `uBookItServiceRoleCapability` (service role id and capability key, unique per pair), `uBookItBooking` (**reference**, UTC start and end, IANA time zone id, status, created UTC, nullable member key, **nullable booker name, nullable email, nullable phone, nullable booker-erased UTC**, **nullable service id and nullable service name**), and `uBookItResourceClaim` (booking id, resource id, unique per pair). The mapping SHALL round-trip the Core value objects without loss.
 
 Each capability table SHALL enforce uniqueness of its owner-and-key pair at the schema level, so that a duplicate capability is impossible in storage and not only in the domain. Capability rows SHALL be removed with their owning resource or service role.
+
+**The booking's booker columns SHALL be nullable together, and their nullability SHALL mean
+erased.** Name and email are required of every booker the domain places, so a NULL in either is
+not a placement that omitted them — it is a booking whose personal data was removed. The
+erased-UTC column is what says so: it SHALL be non-NULL exactly when the contact columns are
+NULL, so that "erased" is recorded as a fact rather than inferred from missing values. **The
+member key SHALL be cleared by the same operation**, so that no column of the row identifies
+the person.
+
+**Erasure SHALL be an UPDATE of the booking's row, never a DELETE.** The row keeps its
+reference, interval, status and claims; only the person leaves. A schema-level cascade or
+trigger that removed the row on erasure would return sold time to availability.
 
 **The booking's reference SHALL be stored in canonical form and SHALL be uniquely indexed.**
 Canonical form — a fixed-length, upper-case value with no separator — is what makes the index
@@ -22,6 +34,7 @@ mean anything: a reference stored as it was typed would let two rows differ only
 be, to every person who reads them, the same reference. **The uniqueness SHALL be enforced by
 the schema**, because a check performed before writing is a race, and two bookings sharing a
 reference makes both of them unquotable — which is the one thing a reference exists to prevent.
+**Erasure SHALL NOT alter the reference**, so an erased booking remains quotable.
 
 **The booking's service columns SHALL NOT carry a foreign key to the service table, and
 SHALL NOT be affected by any cascade.** A booking is a historical fact that must survive
@@ -34,6 +47,11 @@ resolved on read. Joining the service table on read would return the *current* n
 would return nothing at all once the service is deleted — so a row would either retitle
 itself after the fact or lose an attribution it definitely had. The id is stored alongside
 for a caller that needs the service as it is now.
+
+**The migration introducing the booker columns' nullability SHALL be additive and SHALL NOT
+back-fill.** Widening a non-nullable column to nullable destroys nothing and cannot fail on
+existing data; every existing row keeps its contact details and acquires a NULL erased-UTC,
+which is the correct reading of a booking nobody has erased.
 
 #### Scenario: Resource availability round-trips
 - **WHEN** a resource with weekly windows, a closure exception, an override exception, and non-default constraints is saved and reloaded through the store
@@ -71,6 +89,22 @@ for a caller that needs the service as it is now.
 - **WHEN** a booking placed directly is reloaded through the store
 - **THEN** its service columns are NULL, and it reports no service attribution rather than an empty one
 
+#### Scenario: An erasure reaches the database
+- **WHEN** a booking's booker is erased through the store and the row is then re-read in a fresh context
+- **THEN** its booker name, email, phone and member key columns are NULL and its erased-UTC column carries the erasure instant
+
+#### Scenario: An erased booking round-trips
+- **WHEN** a booking whose booker was erased is reloaded through the store
+- **THEN** it reports an erased booker with the stored erasure instant, and its interval, zone, status, created timestamp, service attribution, reference and claims are value-equal to what was placed
+
+#### Scenario: Erasure keeps the row and its claims
+- **WHEN** a booking's booker is erased
+- **THEN** the booking row and every one of its claim rows remain, and no cascade removes them
+
+#### Scenario: An unerased booking has no erasure instant
+- **WHEN** a booking that has never been erased is reloaded through the store
+- **THEN** its erased-UTC column is NULL and it reports contact details rather than an erasure
+
 ### Requirement: Migrations apply at startup into a package-private history table
 EF Core migrations SHALL be applied automatically during Umbraco application startup once the site database is configured, and SHALL be recorded in the `__uBookItEFMigrationsHistory` table, never EF Core's default history table. Migration application SHALL be idempotent. Migrations SHALL be additive-only per project convention; a destructive migration requires explicit spec approval.
 
@@ -83,13 +117,39 @@ EF Core migrations SHALL be applied automatically during Umbraco application sta
 - **THEN** no error occurs and the schema is unchanged
 
 ### Requirement: Store implementations honour Core semantics
-`UBookIt.Persistence` SHALL provide SQL Server implementations of `IResourceStore` and `IBookingStore`. `GetClaimsAsync` SHALL return claims of any status whose booking interval overlaps the queried half-open range for the resource, and SHALL be served by an index on the booking interval (no table scan of bookings by date). `UpdateAsync` SHALL persist status changes.
+`UBookIt.Persistence` SHALL provide SQL Server implementations of `IResourceStore` and `IBookingStore`. `GetClaimsAsync` SHALL return claims of any status whose booking interval overlaps the queried half-open range for the resource, and SHALL be served by an index on the booking interval (no table scan of bookings by date). **`UpdateAsync` SHALL persist a booking's status, and SHALL NOT write its booker.** A booking's
+booker is written by the erasure operation below and by nothing else.
+
+**The two SHALL touch disjoint columns.** Callers read, mutate and write back with no re-read,
+so an aggregate handed to a store can be older than the stored row. A write that carries columns
+its caller did not change makes that staleness everyone's problem: a cancellation would restore
+a person somebody erased in between, and an erasure would revert a cancellation and re-block a
+slot that had been released. Bounding each write to what its verb actually changes removes the
+interaction rather than defending against it.
+
+**A store SHALL expose an operation that erases a booking's booker, taking the booking's id and
+the instant** — not an aggregate, so there is no stale copy of anything to write back.
+
+**The erasure SHALL be absorbing at the point of storage.** Once a booking records an erasure, a
+later erasure SHALL leave it exactly as it stands, including the first instant, and **no
+operation any implementation offers SHALL return an erased booker to carrying contact details.**
+This is a promise the package makes to a data subject; an implementation that let a later write
+restore a person would falsify it while every test written against the port passed.
+
+**The check SHALL NOT be a read followed by a write.** An implementation that reads the stored
+state, decides, and then writes leaves a window in which an erasure can commit between the two
+statements — which is not a smaller version of the guarantee but the absence of it. The
+condition belongs inside the write.
+
+**A change SHALL be observable by re-reading.** Verification SHALL read the booking back from
+storage rather than inspecting the instance that was passed in, because the instance carries the
+change whether or not the store wrote it.
 
 The multi-resource claims read SHALL be served by a single query over the same index, not by iterating the single-resource read, and SHALL return the same claims that per-resource reads would return for the same ids and range.
 
 The type-filtered resource listing SHALL be a single query filtered on the resource type column, eagerly loading the same child collections as the existing resource reads so returned aggregates are complete enough for availability computation. It SHALL apply no paging.
 
-These additions SHALL require no schema change and no new migration: they read existing tables through existing indexes.
+**The claims reads and the type-filtered listing** SHALL require no schema change and no new migration: they read existing tables through existing indexes. (Previously stated of "these additions" and scoped by its change; restated against the reads it was always about, because as a standing sentence it read as a prohibition on the package ever adding a migration — which the booker columns do add.)
 
 #### Scenario: Claims query uses half-open overlap
 - **WHEN** a booking ends exactly at the queried range start
@@ -98,6 +158,30 @@ These additions SHALL require no schema change and no new migration: they read e
 #### Scenario: Status change persists
 - **WHEN** a booking is cancelled via the booking service and reloaded
 - **THEN** its stored status is `Cancelled` and its claims no longer block placement
+
+#### Scenario: A later write cannot restore an erased booker
+- **WHEN** a booking is read, then erased by another caller, and the first caller then writes its stale copy back through the store
+- **THEN** the stored booker remains erased with its original instant, and the rest of that caller's change is applied
+
+#### Scenario: Re-writing an already-erased booking does not move the instant
+- **WHEN** an erased booking is written back through the store
+- **THEN** its stored erasure instant is unchanged
+
+#### Scenario: A booker erasure persists
+- **WHEN** a booking's booker is erased via the booking service and the booking is reloaded in a fresh context
+- **THEN** its stored booker columns are NULL and its stored erasure instant is set
+
+#### Scenario: Persistence is verified by re-reading, not by the passed instance
+- **WHEN** the tests covering `UpdateAsync` are inspected
+- **THEN** they assert against state read back from storage rather than against the aggregate handed to the store
+
+#### Scenario: The two writes touch disjoint columns
+- **WHEN** the booking store's write surface is inspected
+- **THEN** the status write does not write the booker, and the erasure write does not write the status
+
+#### Scenario: The erasure write takes an id and an instant
+- **WHEN** the erasure operation's signature is inspected
+- **THEN** it takes the booking's id and the instant, and no aggregate whose other values it could write back
 
 #### Scenario: Batched claims are one round trip
 - **WHEN** claims are read for several resource ids over a range
@@ -108,8 +192,8 @@ These additions SHALL require no schema change and no new migration: they read e
 - **THEN** each returned resource carries its open hours and date exceptions, sufficient to compute its availability without a further load
 
 #### Scenario: No migration is added
-- **WHEN** the migrations folder is inspected after this change
-- **THEN** it contains no new migration, and the existing schema is unchanged
+- **WHEN** the multi-resource claims read and the type-filtered listing are inspected
+- **THEN** they read existing tables through existing indexes, requiring no schema change
 
 ### Requirement: Atomic placement on SQL Server
 `IBookingStore.PlaceAsync` SHALL execute within a single database transaction that (1) acquires an exclusive per-resource application lock (`sp_getapplock`, transaction-owned, lock resource derived from the resource id) for every claimed resource in ascending resource-id order, (2) re-checks conflicts (half-open overlap against blocking-status claims) under that lock, (3) verifies the booking's reference is unused, and (4) inserts the booking and its claims. A detected conflict SHALL produce the structured `conflict` failure, and a reference already in use SHALL produce `reference-taken`; either SHALL leave the database unchanged. **The reference check is for reportability, not for correctness** — the unique index is what guarantees uniqueness, and step (3) exists so that a collision can be answered with another reference instead of a database exception. Under concurrent conflicting placements, exactly one SHALL succeed.
