@@ -59,7 +59,19 @@ public class UBookItSensitiveDataAccessTests
         return user;
     }
 
-    private static async Task<bool> IsAuthorizedAsync(IUser? user)
+    /// <summary>
+    /// Runs the handler and returns the whole context — <b>not just whether it succeeded.</b>
+    /// </summary>
+    /// <remarks>
+    /// <c>HasSucceeded</c> is <c>false</c> both when the handler calls <c>Fail()</c> and when it
+    /// returns having done nothing, so a helper returning only that cannot observe the
+    /// difference. The handler's own documentation claims it "fails explicitly rather than
+    /// merely declining to succeed", and replacing <c>context.Fail()</c> with an empty branch
+    /// left all four of these tests — and the whole suite — green. Behaviourally identical
+    /// today, because nothing else can satisfy this requirement; a real hole the moment a
+    /// second handler for it exists, since silence lets that one grant what this one refused.
+    /// </remarks>
+    private static async Task<AuthorizationHandlerContext> EvaluateAsync(IUser? user)
     {
         var requirement = new UBookItSensitiveDataRequirement();
         var context = new AuthorizationHandlerContext(
@@ -68,7 +80,22 @@ public class UBookItSensitiveDataAccessTests
         await new UBookItSensitiveDataHandler(new StubAuthorizationHelper(user))
             .HandleAsync(context);
 
-        return context.HasSucceeded;
+        return context;
+    }
+
+    private static async Task<bool> IsAuthorizedAsync(IUser? user)
+        => (await EvaluateAsync(user)).HasSucceeded;
+
+    private static async Task AssertRefusedExplicitlyAsync(IUser? user)
+    {
+        var context = await EvaluateAsync(user);
+
+        Assert.False(context.HasSucceeded);
+        Assert.True(
+            context.HasFailed,
+            "The handler declined to succeed but did not FAIL. Another handler for this "
+            + "requirement could then satisfy it, granting erasure to a caller this one "
+            + "refused — which is not the same guarantee.");
     }
 
     [Fact]
@@ -83,7 +110,7 @@ public class UBookItSensitiveDataAccessTests
         // A group that is emphatically NOT the sensitive-data one, rather than no group at
         // all: "an ordinary editor" is a user who belongs to something, and a handler that
         // only refused the group-less would let every one of them through.
-        Assert.False(await IsAuthorizedAsync(UserInGroup(Guid.NewGuid())));
+        await AssertRefusedExplicitlyAsync(UserInGroup(Guid.NewGuid()));
     }
 
     [Fact]
@@ -99,7 +126,7 @@ public class UBookItSensitiveDataAccessTests
             UBookIt.Backoffice.Constants.SectionAlias,
             sectionOnly.AllowedSections);
 
-        Assert.False(await IsAuthorizedAsync(sectionOnly));
+        await AssertRefusedExplicitlyAsync(sectionOnly);
     }
 
     [Fact]
@@ -109,7 +136,7 @@ public class UBookItSensitiveDataAccessTests
         // the requirement unmet but allow another handler to satisfy it, which is not the same
         // guarantee — and the failure mode of guessing here is destroying somebody's data on
         // behalf of a caller nobody could identify.
-        Assert.False(await IsAuthorizedAsync(null));
+        await AssertRefusedExplicitlyAsync(null);
     }
 
     /// <summary>

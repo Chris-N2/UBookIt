@@ -193,7 +193,26 @@ public class BackofficeDocumentationTests
         // enough: a checklist entry nobody reads leaves the archived spec describing a
         // surface that does not exist, to a reader deriving the capability from it.
         //
-        var purpose = Support.RepoFiles.Read("openspec/specs/booking-management/spec.md");
+        // The PURPOSE SECTION, sliced out — not the whole file.
+        //
+        // This read the entire spec and matched anywhere in it, which made the sibling
+        // assertion on "cancel" vacuous: that word appears 56 times across the requirements.
+        // Only "erase a booker's contact details" happened to be unique to the summary, so the
+        // guard worked by luck of vocabulary rather than by construction — and the phrase a
+        // FOURTH endpoint's author would add is not something they choose for uniqueness.
+        var spec = Support.RepoFiles.Read("openspec/specs/booking-management/spec.md");
+        var purposeStart = spec.IndexOf("## Purpose", StringComparison.Ordinal);
+        Assert.True(purposeStart >= 0, "The capability spec has no ## Purpose section to check.");
+
+        var nextSection = spec.IndexOf(Environment.NewLine + "## ", purposeStart + 1, StringComparison.Ordinal);
+
+        if (nextSection < 0)
+        {
+            nextSection = spec.IndexOf("\n## ", purposeStart + 1, StringComparison.Ordinal);
+        }
+        Assert.True(nextSection > purposeStart, "The Purpose section has no following section.");
+
+        var purpose = spec[purposeStart..nextSection];
 
         // The controller's ROUTES, enumerated. The previous version of this test asserted
         // three literal strings and claimed in its comment to be "tied to the CODE… add a
@@ -206,12 +225,14 @@ public class BackofficeDocumentationTests
             .Select(match => match.Groups[1].Value)
             .ToList();
 
-        // The fixture is load-bearing: a regex that stopped matching would make every
-        // assertion below vacuous. Three today — list, cancel, erase-booker.
-        Assert.Equal(3, routes.Count);
+        // The fixture is load-bearing: a regex that stopped matching would make the loop below
+        // iterate over nothing and pass. A LOWER bound rather than an exact count, so that a
+        // fourth endpoint reaches the loop and fails with the message written for it, instead
+        // of tripping "expected 3, got 4" here and telling its author nothing useful.
+        Assert.True(routes.Count >= 3, $"Expected at least 3 routes, found {routes.Count}.");
 
         // Each verb the capability offers is named in the paragraph that summarises it. Keyed
-        // off the route, so a THIRD endpoint fails here until somebody says what it is.
+        // off the route, so a FOURTH endpoint fails here until somebody says what it is.
         var described = new Dictionary<string, string>
         {
             ["bookings/{id:guid}/cancel"] = "cancel",
