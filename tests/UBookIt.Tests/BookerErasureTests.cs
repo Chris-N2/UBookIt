@@ -73,6 +73,24 @@ public class BookerErasureTests
     }
 
     [Fact]
+    public void The_read_ports_booker_cannot_be_given_contact_details_back_either()
+    {
+        // SummaryBooker has the identical shape and carries the same two-state guarantee
+        // across the read port, so it is open to the identical edit: add `init` to `Contact`
+        // and `with { Contact = ... }` reconstitutes a person on a row the endpoint is about
+        // to render. Guarded on the same terms as Booker rather than left as the one of the
+        // pair somebody thought of.
+        var settable = typeof(SummaryBooker)
+            .GetProperties(BindingFlags.Public | BindingFlags.Instance)
+            .Where(property => property.SetMethod is not null)
+            .Select(property => property.Name)
+            .ToList();
+
+        Assert.Empty(settable);
+        Assert.Empty(typeof(SummaryBooker).GetConstructors(BindingFlags.Public | BindingFlags.Instance));
+    }
+
+    [Fact]
     public void An_erased_booker_carries_nothing_of_the_person()
     {
         var booker = Booker.Erased(ErasedAt);

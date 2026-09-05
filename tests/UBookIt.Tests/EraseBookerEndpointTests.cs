@@ -76,8 +76,15 @@ public class EraseBookerEndpointTests
         // Returning the removed name or address as confirmation would hand back the data the
         // operation exists to remove — into a response body, a browser's network log and any
         // proxy in between, at the exact moment the site was told to stop holding it.
-        // Serialized and searched rather than asserted field by field, because a field added
-        // later would pass a field-by-field check it was never added to.
+        //
+        // **What this test can and cannot see.** The aggregate it is handed is already erased,
+        // so it carries no name for the controller to echo even if the controller tried: this
+        // observes that the composed payload is clean, NOT that a leak would be caught. The
+        // guarantee is held by two other things — `SensitiveDataRedactionTests`' membership
+        // snapshot over `ErasedBookerModel`, which fails if the model gains a member at all,
+        // and the sibling test below, which passes a booking that DOES still carry details and
+        // asserts none of them reach the response. Stated because a test whose comment claims
+        // more than it checks is worse than no comment: the next reader trusts it.
         var booking = Erased();
         var result = await Endpoint(
             new ErasingBookingService(DomainResult<Booking>.Success(booking))).EraseBooker(booking.Id);

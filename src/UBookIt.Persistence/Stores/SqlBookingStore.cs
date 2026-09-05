@@ -162,11 +162,45 @@ internal sealed class SqlBookingStore(UBookItDbContext db) : IBookingStore
         // asserting against the returned Booking could see it, which is why the covering
         // test re-reads from storage.
         row.Status = (int)booking.Status;
-        row.MemberKey = booking.Booker.MemberKey;
-        row.BookerName = booking.Booker.Contact?.Name;
-        row.BookerEmail = booking.Booker.Contact?.Email;
-        row.BookerPhone = booking.Booker.Contact?.Phone;
-        row.BookerErasedUtc = booking.Booker.ErasedUtc;
+
+        // THE STORED ERASURE WINS, ALWAYS.
+        //
+        // Every caller here does read-modify-write with no re-read and no concurrency token,
+        // so an aggregate can be older than the row it is about to overwrite. That is
+        // harmless for the status — a stale status write loses a transition, which the
+        // status machine already refuses on the next attempt — and it is catastrophic for
+        // the booker, because the stale value is a person's name and the fresh one is their
+        // absence:
+        //
+        //   1. an operator opens cancel; CancelAsync loads the booking, details and all
+        //   2. a second operator erases it; the columns go NULL and the instant is set
+        //   3. the cancel completes, writing "Ada Lovelace" back over the NULLs
+        //
+        // Two ordinary requests, both reporting success, and the data subject who was told
+        // their details were gone is back in the database. `docs/backoffice.md` says "It
+        // cannot be undone. There is no restore" — this is what makes that true rather than
+        // aspirational.
+        //
+        // Enforced HERE rather than by a concurrency token, because the guarantee is not
+        // "detect a conflicting write" but "erasure is absorbing": once the row records an
+        // erasure, no later write may put a person back into it, stale or not. A rowversion
+        // would turn this into an error for the cancelling operator to retry; absorbing it
+        // needs nobody to do anything. And it is one write path, which the persistence
+        // capability requires — a separate erase-only method would be a second route to the
+        // same row, free to disagree with this one.
+        //
+        // Re-erasing an already-erased booking therefore skips these columns entirely: the
+        // row already holds the right values, including the FIRST erasure's instant, which
+        // is the one that must survive.
+        if (row.BookerErasedUtc is null)
+        {
+            row.MemberKey = booking.Booker.MemberKey;
+            row.BookerName = booking.Booker.Contact?.Name;
+            row.BookerEmail = booking.Booker.Contact?.Email;
+            row.BookerPhone = booking.Booker.Contact?.Phone;
+            row.BookerErasedUtc = booking.Booker.ErasedUtc;
+        }
+
         await db.SaveChangesAsync(cancellationToken).ConfigureAwait(false);
     }
 

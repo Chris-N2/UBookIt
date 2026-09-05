@@ -165,6 +165,10 @@ public class SensitiveDataRedactionTests
     // it, where the mapper decides them.
     [InlineData(typeof(BookerModel), "Condition,Contact,ErasedUtc")]
     [InlineData(typeof(BookerContactModel), "Name,Email")]
+    // The erase endpoint's response. It carries no personal data today, and it is the most
+    // tempting place in the package to add some — "here is what we removed for you" — over a
+    // requirement that forbids exactly that. Guarded so the temptation costs a failing test.
+    [InlineData(typeof(ErasedBookerModel), "BookingId,ErasedUtc")]
     public void The_booking_response_models_have_not_gained_a_member_nobody_decided_about(
         Type model, string expected)
     {
@@ -386,50 +390,86 @@ public class SensitiveDataRedactionTests
     }
 
     /// <summary>
-    /// Booker contact details have exactly one durable home, so erasing it erases the data.
+    /// Every durable row type and what it carries, so a second home for personal data cannot
+    /// arrive unnoticed.
     /// </summary>
     /// <remarks>
     /// <para>
-    /// The <c>booker-erasure</c> capability makes this a requirement, and <c>design.md</c> names
-    /// it as the mitigation for the change's headline risk — that a later feature re-homes the
-    /// data and quietly reduces erasure to a gesture. A mitigation that exists only as a
-    /// sentence in a spec is not a mitigation: the features most likely to break it (0.5.0's
-    /// confirmation emails, an erasure audit trail, a retention report) will be written by
-    /// somebody who has not read it.
+    /// The <c>booker-erasure</c> capability requires that booker contact details have exactly
+    /// one durable home, and <c>design.md</c> names that as the mitigation for the change's
+    /// headline risk — that a later feature re-homes the data and reduces erasure to a gesture.
+    /// A mitigation that exists only as a sentence is not one: the features most likely to
+    /// break it (0.5.0's confirmation emails, an erasure audit table, a retention report) will
+    /// be written by somebody who has not read the spec.
     /// </para>
     /// <para>
-    /// <b>What this detects is the same class of thing as the membership snapshot: CHANGE.</b>
-    /// It cannot recognise a durable store — nothing in a type makes one — so it enumerates the
-    /// persistence layer's row types and records which carry booker contact columns. Exactly
-    /// one does. A second row type acquiring a booker name or email fails this and forces the
-    /// author to say how it gets erased.
+    /// <b>A membership snapshot, not a search for three column names.</b> An earlier form
+    /// filtered on properties literally called <c>BookerName</c>/<c>BookerEmail</c>/
+    /// <c>BookerPhone</c> — which is the mechanism, not the guarantee, and every plausible way
+    /// of breaking the requirement evades it: <c>ErasureAuditRow.SubjectEmail</c>,
+    /// <c>OutboxMessageRow.RecipientAddress</c>, <c>ReportRow.CustomerName</c>. None of those
+    /// spellings is on the list, all of them are a second durable home.
+    /// </para>
+    /// <para>
+    /// So this records the whole persistence surface — every row type and every property —
+    /// and fails on <b>any</b> difference. What it detects is CHANGE, which it can do
+    /// honestly; it cannot recognise personal data, and a guard claiming to would be checking
+    /// a mechanism while appearing to promise a guarantee. What it buys is that a column
+    /// cannot join a stored row without somebody answering the question in the failure
+    /// message.
     /// </para>
     /// </remarks>
     [Fact]
-    public void Booker_contact_details_have_exactly_one_durable_home()
+    public void The_durable_storage_surface_has_not_changed_without_a_decision()
     {
-        var rowTypes = typeof(UBookIt.Persistence.UBookItDbContext).Assembly
+        var actual = typeof(UBookIt.Persistence.UBookItDbContext).Assembly
             .GetTypes()
             .Where(type => type.Name.EndsWith("Row", StringComparison.Ordinal))
+            .OrderBy(type => type.Name, StringComparer.Ordinal)
+            .Select(type => type.Name + ": " + string.Join(
+                ",",
+                type.GetProperties(BindingFlags.Public | BindingFlags.Instance)
+                    .Select(property => property.Name)
+                    .OrderBy(name => name, StringComparer.Ordinal)))
             .ToList();
 
-        // The fixture is load-bearing: an empty or tiny list satisfies the assertion below
-        // while observing nothing, which is how this class of guard passes after its scan
-        // silently breaks.
-        Assert.True(rowTypes.Count >= 5, $"Only {rowTypes.Count} row types found; the scan is broken.");
+        // Measured from the assembly, not written from memory. A recorded set somebody typed
+        // out by hand is a second description of the schema, and the first thing it does is
+        // disagree with the real one.
+        string[] recorded =
+        [
+            "BookingRow: BookerEmail,BookerErasedUtc,BookerName,BookerPhone,Claims,CreatedUtc,EndUtc,Id,MemberKey,Reference,ServiceId,ServiceName,StartUtc,Status,TimeZoneId",
+            "ClaimRow: BookingId,Id,ResourceId",
+            "ExceptionRow: Date,EndTime,Id,ResourceId,StartTime",
+            "OpenHoursRow: DayOfWeek,EndTime,Id,ResourceId,StartTime",
+            "ResourceCapabilityRow: Key,ResourceId",
+            "ResourceRow: Capabilities,Description,DirectlyBookable,DisplayName,Exceptions,GranularityMinutes,HorizonDays,Id,LeadTimeMinutes,MaxDurationMinutes,MinDurationMinutes,OpenHours,Type",
+            "ServiceRoleCapabilityRow: Key,ServiceRoleId",
+            "ServiceRoleRow: Capabilities,Count,Id,ResourceType,ServiceId,VisitorSelectable",
+            "ServiceRow: DurationKind,Id,MaxDurationMinutes,MinDurationMinutes,Name,Roles",
+        ];
 
-        var carriers = rowTypes
-            .Where(type => type
-                .GetProperties(BindingFlags.Public | BindingFlags.Instance)
-                .Any(property =>
-                    property.Name.Contains("BookerName", StringComparison.Ordinal)
-                    || property.Name.Contains("BookerEmail", StringComparison.Ordinal)
-                    || property.Name.Contains("BookerPhone", StringComparison.Ordinal)))
-            .Select(type => type.Name)
-            .OrderBy(name => name, StringComparer.Ordinal)
+        Assert.True(
+            actual.SequenceEqual(recorded),
+            "The persistence layer's stored shape has changed."
+            + Environment.NewLine + "  recorded:" + Environment.NewLine + "    "
+            + string.Join(Environment.NewLine + "    ", recorded)
+            + Environment.NewLine + "  actual:" + Environment.NewLine + "    "
+            + string.Join(Environment.NewLine + "    ", actual)
+            + Environment.NewLine
+            + "If the difference stores a person's name, email address, phone number or member "
+            + "key, it is a SECOND durable home for personal data — and the booker-erasure "
+            + "capability requires exactly one, because erasing one home while another keeps a "
+            + "copy is not erasure. Either erase it with the booking, or do not store it.");
+
+        // Still exactly one row carrying the booker's contact columns. Asserted separately so
+        // the specific guarantee is stated, not merely implied by the snapshot above.
+        var carriers = actual
+            .Where(entry => entry.Contains("BookerName", StringComparison.Ordinal))
             .ToList();
 
-        Assert.Equal(["BookingRow"], carriers);
+        Assert.Single(carriers);
+        Assert.StartsWith("BookingRow:", carriers[0], StringComparison.Ordinal);
     }
 
     [Fact]

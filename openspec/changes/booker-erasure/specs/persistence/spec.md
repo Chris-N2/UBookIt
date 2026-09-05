@@ -101,6 +101,18 @@ which is the correct reading of a booking nobody has erased.
 
 **A change SHALL be observable by re-reading.** Verification of `UpdateAsync` SHALL read the booking back from storage rather than inspecting the instance that was passed in, because the instance carries the change whether or not the store wrote it.
 
+**A stored erasure SHALL NOT be overwritten by any later write.** Once a booking's row records
+an erasure, a write carrying booker contact details SHALL leave the stored booker untouched —
+including the recorded instant — and SHALL apply only the rest of what it carries.
+
+**This is a guarantee about the row, not about detecting a conflict.** Callers do
+read-modify-write with no re-read, so an aggregate can be older than the row it overwrites.
+For a status that is harmless: a lost transition is refused on the next attempt. For a booker
+it is catastrophic, because the stale value is a person and the fresh one is their absence — an
+operator who opened a cancellation before a colleague erased the booking would, on completing
+it, write the name back over the NULLs, with both requests reporting success and nothing
+logging it. Erasure is absorbing at the point of storage or it is not absorbing at all.
+
 **There SHALL be exactly one write path for a booking's mutable state.** Erasure SHALL NOT be given a store method of its own issuing a targeted update — a second path to the same row is free to disagree with the first about what a booking's persisted state is.
 
 The multi-resource claims read SHALL be served by a single query over the same index, not by iterating the single-resource read, and SHALL return the same claims that per-resource reads would return for the same ids and range.
@@ -116,6 +128,14 @@ The type-filtered resource listing SHALL be a single query filtered on the resou
 #### Scenario: Status change persists
 - **WHEN** a booking is cancelled via the booking service and reloaded
 - **THEN** its stored status is `Cancelled` and its claims no longer block placement
+
+#### Scenario: A later write cannot restore an erased booker
+- **WHEN** a booking is read, then erased by another caller, and the first caller then writes its stale copy back through the store
+- **THEN** the stored booker remains erased with its original instant, and the rest of that caller's change is applied
+
+#### Scenario: Re-writing an already-erased booking does not move the instant
+- **WHEN** an erased booking is written back through the store
+- **THEN** its stored erasure instant is unchanged
 
 #### Scenario: A booker erasure persists
 - **WHEN** a booking's booker is erased via the booking service and the booking is reloaded in a fresh context

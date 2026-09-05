@@ -101,6 +101,16 @@ that failed on already-done would make a retry indistinguishable from a fault.
 - **WHEN** the package's operations on a booking are inspected
 - **THEN** none of them returns an erased booker to carrying contact details
 
+#### Scenario: A concurrent write cannot restore erased details
+- **WHEN** one caller is holding a copy of a booking read before its erasure, and writes that copy back after the erasure has happened
+- **THEN** the booking remains erased, and the details are not restored by that write
+
+**Irreversibility SHALL hold against writes that never intended to reverse it.** The operation
+that undoes an erasure is not a restore anybody wrote; it is an ordinary write — a
+cancellation, a status change, anything that carries a booker — arriving with a copy read
+before the erasure. Stating irreversibility only against operations that *mean* to restore
+would leave the actual failure mode outside the requirement.
+
 ### Requirement: Only a caller permitted to read contact details may erase them
 
 Erasure SHALL require the same **sensitive-data access** that reading a booker's contact

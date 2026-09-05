@@ -172,6 +172,81 @@ public class BookerErasureStorageTests(SqlServerFixture fixture)
     }
 
     [Fact]
+    public async Task A_cancellation_holding_a_stale_booking_cannot_un_erase_it()
+    {
+        // THE INTERLEAVING THAT UN-ERASED A PERSON.
+        //
+        // Every other test in this file erases LAST, which is why the whole suite was green
+        // while this was broken: nothing ever wrote a booking AFTER an erasure. Two ordinary
+        // backoffice requests are enough — an operator opens cancel, a colleague erases, the
+        // cancel completes and puts the name back — and both report success.
+        //
+        // The stale aggregate is obtained the way CancelAsync obtains one: read the booking
+        // BEFORE the erasure, then hand it to the store afterwards. Not simulated with a
+        // hand-built object, because the fault is that a real read-modify-write can straddle
+        // an erasure.
+        fixture.EnsureAvailable();
+
+        var booking = await PlaceAsync();
+
+        await using var staleContext = fixture.CreateContext();
+        var stale = await new SqlBookingStore(staleContext).GetBookingAsync(booking.Id, Ct);
+        Assert.NotNull(stale);
+        Assert.NotNull(stale.Booker.Contact);
+
+        var (bookings, _) = fixture.CreateServices(Now);
+        Assert.True((await bookings.EraseBookerAsync(booking.Id, Ct)).Succeeded);
+
+        // The cancellation proceeds on the stale aggregate, exactly as CancelAsync would.
+        Assert.True(stale.Cancel().Succeeded);
+        await new SqlBookingStore(staleContext).UpdateAsync(stale, Ct);
+
+        await using var after = fixture.CreateContext();
+        var stored = await after.Bookings.SingleAsync(b => b.Id == booking.Id, Ct);
+
+        // The person stays gone.
+        Assert.Null(stored.BookerName);
+        Assert.Null(stored.BookerEmail);
+        Assert.Null(stored.BookerPhone);
+        Assert.Null(stored.MemberKey);
+        Assert.Equal(Now, stored.BookerErasedUtc);
+
+        // And the cancellation still happened — absorbing the booker write must not quietly
+        // swallow the status change the caller actually asked for.
+        Assert.Equal((int)BookingStatus.Cancelled, stored.Status);
+    }
+
+    [Fact]
+    public async Task Erasing_an_already_erased_booking_keeps_the_first_instant_in_storage()
+    {
+        // The other side of "the stored erasure wins": the guard skips the booker columns on
+        // a row that already records an erasure, so re-erasing must not be able to move the
+        // instant either. Asserted through the store rather than the aggregate, because the
+        // aggregate's own idempotence is already covered and it is the ROW that must not
+        // drift.
+        fixture.EnsureAvailable();
+
+        var booking = await PlaceAsync();
+
+        var (first, _) = fixture.CreateServices(Now);
+        Assert.True((await first.EraseBookerAsync(booking.Id, Ct)).Succeeded);
+
+        await using var reread = fixture.CreateContext();
+        var erased = await new SqlBookingStore(reread).GetBookingAsync(booking.Id, Ct);
+        Assert.NotNull(erased);
+        Assert.True(erased.Booker.IsErased);
+
+        // A fresh aggregate, already erased, written again through the same path.
+        await new SqlBookingStore(reread).UpdateAsync(erased, Ct);
+
+        await using var after = fixture.CreateContext();
+        var stored = await after.Bookings.SingleAsync(b => b.Id == booking.Id, Ct);
+
+        Assert.Equal(Now, stored.BookerErasedUtc);
+        Assert.Null(stored.BookerName);
+    }
+
+    [Fact]
     public async Task The_management_list_reports_an_erased_booking_as_erased()
     {
         fixture.EnsureAvailable();

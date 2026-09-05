@@ -135,6 +135,17 @@ deleted with nothing in the diff that looks like a deletion.
       migration" was written about that change's two reads and, left standing, reads as a
       prohibition on the package ever adding a migration. It is restated as a claim about those
       two reads, which is what it always meant. This change does add a migration.
+- [x] 8.8 **`sensitive-data` → "Personal data is shown only to a backoffice user Umbraco permits to see it".**
+      Added at QA round 2, which found the scenario *A permitted user sees contact details*
+      falsified by this change: it said "**each** booking's booker name and email are present",
+      and a permitted user reading an erased booking is correctly given neither. Carried
+      forward: details shown only with sensitive-data access, decided by asking Umbraco; no
+      group, flag or setting of our own; the decision made server-side before composition;
+      section access still required as a separate gate. All four original scenarios restated,
+      the first narrowed to bookings that have not been erased, the second widened to cover
+      both kinds of absence, and a new scenario added for the erased case. **Nothing dropped.**
+      *Second time this lesson has landed on this change: 9.3 swept three sibling capabilities
+      and neither of the two I was editing. Round 1 found the first; this is the other.*
 - [x] 8.6 **`sensitive-data` → "A withheld value is absent, not blanked".** Carried forward:
       omit rather than blank; details withheld together as a single member; no blanking even
       where a field is not nullable; and the principle that a member whose absence is already
@@ -144,6 +155,17 @@ deleted with nothing in the diff that looks like a deletion.
       documentation, plus two new scenarios covering the erased case.
 
 ## 9. Documentation and close-out
+
+- [x] 9.0 **Sync-time edit that no delta can carry.** `openspec/specs/booking-management/spec.md`
+      lines 17–23 (the capability's **Purpose**, not a requirement) says the honest v1 verbs are
+      "*see* and *cancel*", that this capability "is about **those two verbs**", and names
+      "editing a booker" as the kind of thing that lives elsewhere. This change adds a third
+      verb and a third endpoint to that capability, so the paragraph will stand as a false
+      summary of its own capability once archived. Deltas modify **requirements**; there is no
+      delta form for Purpose prose, so this is recorded here as an explicit action for whoever
+      syncs, rather than hand-edited now and forgotten. Replace "those two verbs" with the three
+      that then exist — see, cancel and erase a booker — and drop "editing a booker" from the
+      list of things that are not here, since erasing one now is.
 
 - [x] 9.1 `docs/backoffice.md`: what erasure does, that it is irreversible, that it needs the Sensitive data group, that it erases **one booking** and not a person's other bookings, and that erasing a future booking leaves the site unable to contact somebody who will arrive.
 - [x] 9.2 State the single-durable-home constraint where a future change will meet it, so that emails and any audit trail have to confront it.
