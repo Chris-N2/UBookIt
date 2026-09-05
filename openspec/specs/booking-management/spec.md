@@ -16,11 +16,17 @@ pipeline.
 
 **What "management" means in v1 is narrower than the word suggests, and the boundary is
 deliberate.** Placement auto-confirms — `bookings` states that no v1 pathway produces
-`Requested` or `Declined` — so the honest verbs are *see*, *cancel* and *erase a booker's
-contact details*. Approving, declining and amending a booking's time are each a change to the
-domain rather than a screen over an existing one. This capability is about those three verbs
-and the path each takes — the ports, the authorized endpoints over them, and the backoffice
+`Requested` or `Declined` — so the honest verbs are *see*, *find a subject's bookings by their
+email address*, *cancel* and *erase a booker's contact details*. Approving, declining and
+amending a booking's time are each a change to the domain rather than a screen over an existing
+one. This capability is about those four verbs and the path each takes — the ports, the authorized endpoints over them, and the backoffice
 views an operator works in — and the requirements below, not this paragraph, say what exists.
+
+*Finding by address joined the list with the `find-by-booker` change, and is here rather than
+elsewhere for the reason erasure is: the endpoint an operator reaches it through is one of this
+capability's, gated by this capability's authorization. It is a separate read from the list
+because it must answer without a window, which the list's own requirement forbids and SHALL
+continue to forbid.*
 
 *Erasure joined the list with the `booker-erasure` change. It is a change to the domain on
 exactly the terms the sentence above describes — a named operation on the aggregate, not a

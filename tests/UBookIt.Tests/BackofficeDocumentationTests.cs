@@ -229,12 +229,13 @@ public class BackofficeDocumentationTests
         // iterate over nothing and pass. A LOWER bound rather than an exact count, so that a
         // fourth endpoint reaches the loop and fails with the message written for it, instead
         // of tripping "expected 3, got 4" here and telling its author nothing useful.
-        Assert.True(routes.Count >= 3, $"Expected at least 3 routes, found {routes.Count}.");
+        Assert.True(routes.Count >= 4, $"Expected at least 4 routes, found {routes.Count}.");
 
         // Each verb the capability offers is named in the paragraph that summarises it. Keyed
         // off the route, so a FOURTH endpoint fails here until somebody says what it is.
         var described = new Dictionary<string, string>
         {
+            ["bookings/find-by-booker"] = "find a subject's bookings by their email address",
             ["bookings/{id:guid}/cancel"] = "cancel",
             ["bookings/{id:guid}/erase-booker"] = "erase a booker's contact details",
         };

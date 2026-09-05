@@ -96,13 +96,38 @@ sees the row marked *"Contact details erased"* rather than *"Contact details hid
 say different things and lead to different actions: **hidden** means a colleague in the group
 can read them for you, and **erased** means there is nobody to ask.
 
+### Finding the bookings to erase
+
+A request to be forgotten arrives as an email address, so there is a search for exactly that:
+
+`POST /umbraco/ubookitbackoffice/api/v1/bookings/find-by-booker`
+
+It returns every booking still holding that address, with no date window — a subject's request
+never says when they booked — and it needs the **same Sensitive data group** as reading or
+erasing contact details. Somebody who may not see a booker's name cannot ask questions about one
+either.
+
+**It matches the whole address, exactly.** There is no partial, prefix or wildcard search, and
+there will not be: *"which of my bookers are at this domain"* is a different question from *"is
+this person in my records"*, and only the second one is anybody's business. Matching follows your
+database's collation, which for a default SQL Server install means capitalisation does not
+matter.
+
+**Erased bookings do not appear.** They hold no address to match. Two consequences worth knowing:
+a person's bookings drop out of their own search results as you erase them, and **an empty result
+does not prove an erasure worked** — it means either "erased" or "never booked here", and the
+search cannot tell you which. If you need to confirm, note the booking references before you
+erase.
+
 ### Two things it does not do
 
 - **It erases one booking, not a person.** If somebody booked with you three times, that is
-  three erasures. uBookIt does not search for a person's other bookings — the management list
-  deliberately offers no filter on names or email addresses, because a filter over values you
-  may not read is a way of asking about them. Locating every booking for one person is a
-  separate feature and is not built yet.
+  three erasures — search first, then erase each result. uBookIt will not erase them in one
+  call: a bulk irreversible action needs a confirmation step designed for it, and that is not
+  built.
+- **It finds bookings made with *that* address.** Somebody who booked twice under two different
+  addresses has one set found. Nothing can fix that, and it is stated so that a search returning
+  one booking is not read as proof there is only one.
 - **You can erase a booking that has not happened yet, and nothing stops you.** Doing so
   leaves you unable to contact somebody who is going to turn up. Whether the reason you held
   their details still applies is your site's judgement and not the package's, so uBookIt

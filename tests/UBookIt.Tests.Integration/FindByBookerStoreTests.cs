@@ -1,0 +1,304 @@
+using Microsoft.EntityFrameworkCore;
+using UBookIt.Core;
+using UBookIt.Core.Bookings;
+using UBookIt.Core.Stores;
+using UBookIt.Persistence.Stores;
+using UBookIt.Tests.Integration.Support;
+
+namespace UBookIt.Tests.Integration;
+
+/// <summary>
+/// Finding a subject's bookings by their email address, against a real database.
+/// </summary>
+/// <remarks>
+/// <para>
+/// The two properties that matter here cannot be established anywhere else. <b>Exactness</b> is a
+/// property of the SQL the store emits — an in-memory double that filtered with <c>==</c> would
+/// pass while the real query used <c>LIKE</c>, and the difference between them is a lookup and an
+/// enumeration tool. <b>Unwindowedness</b> is only meaningful against a store that could have
+/// windowed it.
+/// </para>
+/// <para>
+/// Each test seeds its own resource, because the fixture's database is shared across the
+/// collection and every test here books the same window.
+/// </para>
+/// </remarks>
+[Collection(SqlServerCollection.Name)]
+public class FindByBookerStoreTests(SqlServerFixture fixture)
+{
+    private static CancellationToken Ct => TestContext.Current.CancellationToken;
+
+    private static readonly DateTimeOffset Now = new(2026, 9, 5, 9, 0, 0, TimeSpan.Zero);
+    private static readonly DateTimeOffset Start = new(2026, 9, 10, 10, 0, 0, TimeSpan.Zero);
+
+    private async Task<(Guid ResourceId, Booking Booking)> PlaceAsync(
+        string email, DateTimeOffset? start = null, string name = "Integration Tester")
+    {
+        var resourceId = await Seed.EveryDayRoomAsync(fixture, Ct);
+        var at = start ?? Start;
+
+        var booking = Booking.Rehydrate(
+            Guid.NewGuid(),
+            new RandomBookingReferenceFactory().Next(),
+            BookingInterval.Create(at, at.AddHours(1), "UTC").Value,
+            Booker.Create(null, name, email, "01234 567890").Value,
+            [new ResourceClaim(resourceId)],
+            BookingStatus.Confirmed,
+            Now.AddDays(-1)).Value;
+
+        await using var context = fixture.CreateContext();
+        var placed = await new SqlBookingStore(context).PlaceAsync(booking, Ct);
+
+        Assert.True(placed.Succeeded);
+        return (resourceId, placed.Value);
+    }
+
+    private async Task<BookingPage> FindAsync(string email, int skip = 0, int take = 50)
+    {
+        var query = BookerEmailQuery.Create(email, skip, take);
+        Assert.True(query.Succeeded);
+
+        await using var context = fixture.CreateContext();
+        return await new SqlBookingManagementStore(context).FindByBookerEmailAsync(query.Value, Ct);
+    }
+
+    [Fact]
+    public async Task Every_booking_a_person_made_is_found()
+    {
+        fixture.EnsureAvailable();
+
+        var address = $"subject-{Guid.NewGuid():N}@example.com";
+        var (_, first) = await PlaceAsync(address);
+        var (_, second) = await PlaceAsync(address, Start.AddDays(400));
+
+        var page = await FindAsync(address);
+
+        // Both, and the total counts both — an operator honouring an erasure request needs to
+        // know there are two, not to erase the one they happened to see.
+        Assert.Equal(2, page.Total);
+        Assert.Contains(page.Items, row => row.BookingId == first.Id);
+        Assert.Contains(page.Items, row => row.BookingId == second.Id);
+    }
+
+    [Fact]
+    public async Task A_booking_far_outside_any_acceptable_window_is_still_found()
+    {
+        // THE REASON THIS IS A SEPARATE READ. The management list refuses a window wider than
+        // MaxQueryRangeDays (31), so a booking made 400 days out is unreachable through it
+        // without knowing roughly when it is — which a data subject's request never says.
+        fixture.EnsureAvailable();
+
+        var address = $"faraway-{Guid.NewGuid():N}@example.com";
+        var (_, booking) = await PlaceAsync(address, Start.AddDays(400));
+
+        var page = await FindAsync(address);
+
+        Assert.Equal(booking.Id, Assert.Single(page.Items).BookingId);
+    }
+
+    [Fact]
+    public async Task An_address_nobody_holds_returns_an_empty_page()
+    {
+        fixture.EnsureAvailable();
+
+        var page = await FindAsync($"nobody-{Guid.NewGuid():N}@example.com");
+
+        Assert.Empty(page.Items);
+        Assert.Equal(0, page.Total);
+    }
+
+    [Fact]
+    public async Task Matching_is_exact_and_a_fragment_finds_nothing()
+    {
+        // THE NARROWING THAT KEEPS THIS A LOOKUP. Run against real SQL because that is where
+        // the difference lives: `Contains` compiles to LIKE '%…%' and would answer "which of
+        // your bookers are at this domain", which is an enumeration facility rather than a
+        // lookup and which the sensitive-data capability forbids.
+        fixture.EnsureAvailable();
+
+        var domain = $"exact-{Guid.NewGuid():N}.example.com";
+        await PlaceAsync($"ada@{domain}");
+
+        Assert.Empty((await FindAsync($"ada@{domain}".Replace("ada@", "ad@"))).Items);
+        Assert.Empty((await FindAsync($"bob@{domain}")).Items);
+
+        // A prefix of a real address finds nothing, and so does a longer string containing one.
+        Assert.Empty((await FindAsync($"a@{domain}")).Items);
+        Assert.Empty((await FindAsync($"xada@{domain}")).Items);
+
+        // The exact value still does — so the four negatives above are narrowing, not a broken
+        // query that would have returned nothing whatever it was asked.
+        Assert.Single((await FindAsync($"ada@{domain}")).Items);
+    }
+
+    [Fact]
+    public async Task A_domain_shared_by_two_people_returns_only_the_one_asked_for()
+    {
+        // The enumeration case stated positively: two bookers at one domain, and a search for
+        // either must not surface the other. This is the query somebody would reach for if the
+        // match were ever loosened.
+        fixture.EnsureAvailable();
+
+        var domain = $"shared-{Guid.NewGuid():N}.example.com";
+        var (_, ada) = await PlaceAsync($"ada@{domain}", name: "Ada");
+        await PlaceAsync($"grace@{domain}", Start.AddDays(1), name: "Grace");
+
+        var page = await FindAsync($"ada@{domain}");
+
+        Assert.Equal(ada.Id, Assert.Single(page.Items).BookingId);
+        Assert.Equal(1, page.Total);
+    }
+
+    [Fact]
+    public async Task An_erased_booking_is_not_found_by_the_address_it_once_held()
+    {
+        // Falls out of erasure rather than being filtered for: the column is NULL, so it
+        // matches nothing. The consequence worth stating is that a completed erasure is NOT
+        // verifiable by searching for the person again — an empty result means either "erased"
+        // or "never booked", and the operator cannot tell which.
+        fixture.EnsureAvailable();
+
+        var address = $"erased-{Guid.NewGuid():N}@example.com";
+        var (_, booking) = await PlaceAsync(address);
+
+        Assert.Single((await FindAsync(address)).Items);
+
+        var (bookings, _) = fixture.CreateServices(Now);
+        Assert.True((await bookings.EraseBookerAsync(booking.Id, Ct)).Succeeded);
+
+        var page = await FindAsync(address);
+
+        Assert.Empty(page.Items);
+        Assert.Equal(0, page.Total);
+
+        // The booking itself is still there, still holding its slot — it is the address that
+        // is gone, not the record.
+        await using var context = fixture.CreateContext();
+        Assert.True(await context.Bookings.AnyAsync(b => b.Id == booking.Id, Ct));
+    }
+
+    [Fact]
+    public async Task Results_page_with_the_unpaged_total()
+    {
+        fixture.EnsureAvailable();
+
+        var address = $"prolific-{Guid.NewGuid():N}@example.com";
+        await PlaceAsync(address);
+        await PlaceAsync(address, Start.AddDays(1));
+        await PlaceAsync(address, Start.AddDays(2));
+
+        var first = await FindAsync(address, skip: 0, take: 2);
+        var second = await FindAsync(address, skip: 2, take: 2);
+
+        Assert.Equal(2, first.Items.Count);
+        Assert.Single(second.Items);
+
+        // The total is what matched, not what fitted — a pager told "2" never offers page two,
+        // and an operator would erase two of three bookings believing they were done.
+        Assert.Equal(3, first.Total);
+        Assert.Equal(3, second.Total);
+
+        // No row appears on both pages: ordering is total (start, then id), so paging is stable.
+        Assert.Empty(first.Items.Select(r => r.BookingId).Intersect(second.Items.Select(r => r.BookingId)));
+    }
+
+    [Fact]
+    public async Task The_rows_are_the_same_shape_the_list_returns()
+    {
+        // One projection serves both reads. A second description of a booking, free to disagree
+        // about a resource name or the booker's condition, is what the shared projection exists
+        // to prevent — and the backoffice renders both responses with the same code.
+        fixture.EnsureAvailable();
+
+        var address = $"shape-{Guid.NewGuid():N}@example.com";
+        var (resourceId, booking) = await PlaceAsync(address);
+
+        var found = Assert.Single((await FindAsync(address)).Items);
+
+        var query = BookingQuery.Create(
+            Start.AddDays(-1),
+            Start.AddDays(1),
+            new SiteBookingSettings { TimeZoneId = "UTC" },
+            [BookingStatus.Confirmed],
+            [resourceId],
+            BookingQuery.DefaultSkip,
+            BookingQuery.DefaultTake);
+
+        Assert.True(query.Succeeded);
+
+        await using var context = fixture.CreateContext();
+        var listed = Assert.Single(
+            (await new SqlBookingManagementStore(context).ListAsync(query.Value, Ct)).Items);
+
+        Assert.Equal(listed.BookingId, found.BookingId);
+        Assert.Equal(listed.Reference.Value, found.Reference.Value);
+        Assert.Equal(listed.Status, found.Status);
+        Assert.Equal(listed.Interval, found.Interval);
+        Assert.Equal(
+            listed.Resources.Select(r => (r.ResourceId, r.DisplayName)),
+            found.Resources.Select(r => (r.ResourceId, r.DisplayName)));
+        Assert.Equal(listed.Booker.Contact?.Email, found.Booker.Contact?.Email);
+        Assert.Equal(listed.Booker.IsErased, found.Booker.IsErased);
+    }
+
+    [Fact]
+    public async Task The_index_the_migration_created_covers_the_column_the_search_filters_on()
+    {
+        // The index is a PRECONDITION, not an optimisation: unwindowed and unindexed, this is a
+        // scan of a table that grows without limit — reintroducing the cost the list's window
+        // guard exists to bound.
+        //
+        // Read from the database's own catalogue rather than from the model, so it observes what
+        // the migration actually created rather than what EF intended.
+        fixture.EnsureAvailable();
+
+        await using var context = fixture.CreateContext();
+
+        var indexes = await context.Database
+            .SqlQuery<string>($@"
+                SELECT i.name AS [Value]
+                FROM sys.indexes i
+                JOIN sys.index_columns ic ON ic.object_id = i.object_id AND ic.index_id = i.index_id
+                JOIN sys.columns c ON c.object_id = i.object_id AND c.column_id = ic.column_id
+                WHERE i.object_id = OBJECT_ID('uBookItBooking')
+                  AND c.name = 'BookerEmail'
+                  AND i.is_unique = 0")
+            .ToListAsync(Ct);
+
+        // Present, and NOT unique — one person books many times, and a unique index here would
+        // refuse their second booking.
+        Assert.NotEmpty(indexes);
+    }
+
+    [Fact]
+    public async Task The_search_emits_an_equality_comparison_and_never_a_LIKE()
+    {
+        // WHERE EXACTNESS ACTUALLY LIVES. `Contains` and `StartsWith` compile to LIKE, and the
+        // behavioural tests above cannot tell the difference on the data they seed — a LIKE
+        // '%ada@…%' matches the same single row. The shapes are distinguishable by what is
+        // SENT, so that is what is asserted, and it is the assertion that would fail the moment
+        // somebody makes the match "more helpful".
+        fixture.EnsureAvailable();
+
+        var address = $"sql-{Guid.NewGuid():N}@example.com";
+        await PlaceAsync(address);
+
+        var query = BookerEmailQuery.Create(address, 0, 50);
+        Assert.True(query.Succeeded);
+
+        var interceptor = new CommandRecordingInterceptor();
+        await using var context = fixture.CreateContext(interceptor);
+
+        await new SqlBookingManagementStore(context).FindByBookerEmailAsync(query.Value, Ct);
+
+        var commands = interceptor.Commands.Where(c => c.Contains("uBookItBooking", StringComparison.Ordinal)).ToList();
+        Assert.NotEmpty(commands);
+
+        foreach (var command in commands)
+        {
+            Assert.DoesNotContain("LIKE", command, StringComparison.OrdinalIgnoreCase);
+        }
+
+        Assert.Contains(commands, c => c.Contains("[BookerEmail] = ", StringComparison.Ordinal));
+    }
+}

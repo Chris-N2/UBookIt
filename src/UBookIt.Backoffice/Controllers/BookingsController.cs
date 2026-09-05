@@ -198,6 +198,75 @@ public class BookingsController(
     }
 
     /// <summary>
+    /// Finds every booking whose booker holds a given email address.
+    /// </summary>
+    /// <remarks>
+    /// <para>
+    /// <b>This exists so an erasure request can be honoured.</b> A data subject writes in with
+    /// an address, not a date and not a booking id — and the management list is windowed, so
+    /// without this an operator has to guess when somebody booked. The erase verb was shipped
+    /// before the means of finding what to erase; this is the other half.
+    /// </para>
+    /// <para>
+    /// <b>Gated on sensitive-data access, as the endpoint's own authorization.</b> The same
+    /// policy the erase endpoint carries, which composes the section requirement too, so naming
+    /// it can only narrow. Expressed as a policy rather than a check inside the handler for the
+    /// reason the <c>sensitive-data</c> capability now states outright: a filter whose gate is a
+    /// condition in a handler is correct only while everybody remembers to write it, and leaves
+    /// a route that reaches the query having established nothing.
+    /// </para>
+    /// <para>
+    /// <b>A separate endpoint rather than a filter on the list, for two independent reasons.</b>
+    /// The query must be unwindowed, and <c>BookingQuery</c> cannot express that by
+    /// construction — relaxing its window to serve this would remove a guarantee from every
+    /// caller of the list. And the authorization differs, which belongs in the endpoint rather
+    /// than in one of its parameters.
+    /// </para>
+    /// <para>
+    /// <b>POST, for a read.</b> See <see cref="FindBookingsByBookerModel"/>: an address in a
+    /// query string is logged by the web server, by every proxy, and by the browser, none of
+    /// which this endpoint's gate controls.
+    /// </para>
+    /// <para>
+    /// <b>The refusal does not depend on the answer.</b> A caller who may not read contact
+    /// details is refused by the policy before any query runs, so they learn nothing from
+    /// asking — not from a count, not from an error, and not from how long it took.
+    /// </para>
+    /// </remarks>
+    [HttpPost("bookings/find-by-booker")]
+    [Authorize(Policy = Constants.SensitiveDataAccessPolicy)]
+    [ProducesResponseType<PagedBookingsModel>(StatusCodes.Status200OK)]
+    [ProducesResponseType(StatusCodes.Status400BadRequest)]
+    [ProducesResponseType(StatusCodes.Status403Forbidden)]
+    public async Task<IActionResult> FindBookingsByBooker(
+        [FromBody] FindBookingsByBookerModel request,
+        CancellationToken cancellationToken = default)
+    {
+        ArgumentNullException.ThrowIfNull(request);
+
+        var query = BookerEmailQuery.Create(
+            request.Email,
+            request.Skip ?? BookerEmailQuery.DefaultSkip,
+            request.Take ?? BookerEmailQuery.DefaultTake);
+
+        if (!query.Succeeded)
+        {
+            return query.Failures.ToProblemResult();
+        }
+
+        var page = await bookingStore.FindByBookerEmailAsync(query.Value, cancellationToken);
+
+        // The caller reached this at all, so they hold sensitive-data access and the rows carry
+        // their details. Passed explicitly rather than assumed: the mapper requires the decision
+        // as an argument, which is what stops a future caller composing a row without making it.
+        return Ok(new PagedBookingsModel
+        {
+            Total = page.Total,
+            Items = [.. page.Items.Select(summary => BookingModelMapper.ToModel(summary, BookerVisibility.Shown))],
+        });
+    }
+
+    /// <summary>
     /// Erases a booking's booker contact details and member key.
     /// </summary>
     /// <remarks>

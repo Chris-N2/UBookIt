@@ -63,6 +63,48 @@ unbounded call the easiest one to write.
 - **WHEN** a list query's window ends at or before it starts
 - **THEN** the query fails with a stable failure code distinguishable from the over-wide one, and no results are returned
 
+### Requirement: Results are paged in a stable order
+**Every paged read this capability offers** SHALL be paged, and SHALL report the **total**
+number of bookings matching the query, so a caller can render a pager. For the windowed list
+that is the window and its filters; for the by-address search it is the address.
+
+*Widened from "a list query … matching the window and filters" when the by-address search
+arrived. The guarantee was never about windows: it is that a pager is told how many rows exist
+rather than how many it was handed, and that paging over a non-total order cannot repeat or drop
+them. A search reporting its page size as its total would tell an operator honouring an erasure
+request that a person has fewer bookings than they do, which is the worst version of this
+failure — so the requirement had to reach it.*
+
+Results SHALL be ordered by start time and then by booking identity, both ascending. The
+identity tiebreak is required, not decorative: two bookings may share a start time, and
+paging over an order that is not total silently repeats or drops rows between pages.
+
+**The ordering is a total order rather than a specified sequence of ids.** How a store
+orders two identities is its own concern — SQL Server, for instance, compares
+`uniqueidentifier` by its last six bytes rather than in the order a caller's language
+would sort the same values. What this requirement guarantees is that the order is total
+and stable across pages, not that it matches any particular caller-side sort.
+
+A page size SHALL be bounded, so that a caller asking for an unreasonable page receives a
+capped one rather than the whole result. The bound SHALL match the one the other
+management list reads already apply, so that page sizes do not differ per capability — or per
+read within one capability, which is the same argument one level down.
+
+**A test for this SHALL include bookings that share a start time**, because a fixture of
+distinct start times passes against an ordering that has no tiebreak at all.
+
+#### Scenario: Pages do not overlap or lose rows
+- **WHEN** results are read one page at a time and then concatenated
+- **THEN** every matching booking appears exactly once, in start-time order
+
+#### Scenario: Bookings sharing a start time page stably
+- **WHEN** several bookings share a start time and are read across a page boundary
+- **THEN** none is repeated and none is skipped
+
+#### Scenario: The total counts matches, not the page
+- **WHEN** a page of results is returned
+- **THEN** the reported total is the number of bookings matching the window and filters, not the number in the page
+
 ## ADDED Requirements
 
 ### Requirement: A subject's bookings can be found by their email address

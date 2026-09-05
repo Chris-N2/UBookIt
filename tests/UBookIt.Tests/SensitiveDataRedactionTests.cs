@@ -1,6 +1,7 @@
 using System.Reflection;
 using System.Runtime.CompilerServices;
 using System.Text.RegularExpressions;
+using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.Mvc.Routing;
 using UBookIt.Backoffice.Controllers;
@@ -590,6 +591,22 @@ public class SensitiveDataRedactionTests
         // watching whether a row comes back, and enumerate candidates the same way. Withholding
         // a value while answering questions about it is not withholding it.
         //
+        // **WHAT CHANGED, AND WHAT DID NOT.** This used to assert that NO endpoint anywhere
+        // named a booker or an email. The requirement it stands for was reopened deliberately
+        // (find-by-booker, signed off 2026-09-05) once a data subject's erasure request — which
+        // arrives as an email address and nothing else — could not otherwise be honoured.
+        //
+        // The guarantee is unchanged and is what is asserted now: an endpoint may accept a
+        // contact detail ONLY if it requires sensitive-data access as its OWN authorization. A
+        // caller who could already read every address on the page learns nothing from asking
+        // about one; a caller who could not must not be able to ask at all. So the tripwire
+        // still fires on exactly the thing it was built to catch — a filter added to an
+        // endpoint gated on section access alone — and no longer fires on the gated lookup.
+        //
+        // It is a POLICY that satisfies this, never a check inside a handler: a condition
+        // somebody must remember to write leaves a route that reaches the query having
+        // established nothing, and reflection cannot see it at all.
+        //
         // EVERY management controller, not just this one. The comment here used to claim the
         // guard would catch "a search endpoint added tomorrow" while scanning
         // `typeof(BookingsController)` alone — which is precisely the endpoint it would not see.
@@ -613,7 +630,7 @@ public class SensitiveDataRedactionTests
         //     legitimate write — a guard that fires for the wrong reason is read as noise and
         //     then relaxed, which is how the previous round lost `term` altogether.
         var readIdentifiers = new List<string>();
-        var allIdentifiers = new List<string>();
+        var allIdentifiers = new List<(string Identifier, string Where, bool Gated)>();
         var scannedControllers = new List<string>();
 
         foreach (var controller in typeof(BookingsController).Assembly.GetTypes()
@@ -631,11 +648,17 @@ public class SensitiveDataRedactionTests
 
                 var isRead = method.GetCustomAttributes<HttpGetAttribute>().Any();
 
+                // The action's OWN authorization, not the controller's. The base controller's
+                // section policy applies to everything and would make every endpoint look
+                // gated; what this requirement is about is the second, narrower gate.
+                var gated = method.GetCustomAttributes<AuthorizeAttribute>()
+                    .Any(attribute => attribute.Policy == UBookIt.Backoffice.Constants.SensitiveDataAccessPolicy);
+
                 foreach (var parameter in method.GetParameters())
                 {
                     foreach (var identifier in Identifiers(parameter.Name, parameter.ParameterType, depth: 0))
                     {
-                        allIdentifiers.Add(identifier);
+                        allIdentifiers.Add((identifier, $"{controller.Name}.{method.Name}", gated));
 
                         if (isRead)
                         {
@@ -652,15 +675,27 @@ public class SensitiveDataRedactionTests
         Assert.Contains(nameof(BookingsController), scannedControllers);
         Assert.Contains("resourceIds", readIdentifiers);
 
-        foreach (var identifier in allIdentifiers)
+        // ANTI-VACUITY for the rule below: at least one endpoint really does take a contact
+        // detail now, so a scan that stopped recognising them would fail here rather than
+        // reporting that nothing needs gating.
+        Assert.Contains(
+            allIdentifiers,
+            entry => entry.Identifier.Contains("email", StringComparison.OrdinalIgnoreCase));
+
+        foreach (var (identifier, where, gated) in allIdentifiers)
         {
-            Assert.False(
+            var isContactDetail =
                 identifier.Contains("booker", StringComparison.OrdinalIgnoreCase)
-                || identifier.Contains("email", StringComparison.OrdinalIgnoreCase),
-                $"A management endpoint exposes '{identifier}'. Answering questions about a "
-                + "booker's contact details is not withholding them: a caller who may not read "
-                + "an email but may filter by one can confirm it by watching whether a row "
-                + "comes back.");
+                || identifier.Contains("email", StringComparison.OrdinalIgnoreCase);
+
+            Assert.False(
+                isContactDetail && !gated,
+                $"{where} accepts '{identifier}' without requiring sensitive-data access as its "
+                + "own authorization. Answering questions about a booker's contact details is "
+                + "not withholding them: a caller who may not read an email but may filter by "
+                + "one can confirm it by watching whether a row comes back. Carry "
+                + "[Authorize(Policy = Constants.SensitiveDataAccessPolicy)] on the action - a "
+                + "check inside the handler does not satisfy this and cannot be seen from here.");
         }
 
         foreach (var identifier in readIdentifiers)

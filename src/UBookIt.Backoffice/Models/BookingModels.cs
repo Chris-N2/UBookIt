@@ -271,6 +271,48 @@ public class ErasedBookerModel
     public DateTimeOffset ErasedUtc { get; set; }
 }
 
+/// <summary>
+/// What a search for a subject's bookings asks for: one address, and a page.
+/// </summary>
+/// <remarks>
+/// <para>
+/// <b>A request body rather than a query string, and the endpoint is a POST for a read.</b> An
+/// email address in a URL is written to the web server's log, to every proxy's log in between,
+/// and to the operator's browser history — none of which the endpoint's own authorization
+/// controls. This capability's whole point is that a booker's address reaches only somebody
+/// Umbraco permits to see it, and a gate that holds for the response while the request scatters
+/// the value through the infrastructure is not much of a gate. POST keeps it in a body that
+/// nothing logs by default.
+/// </para>
+/// <para>
+/// The cost is that a read is not a GET: it is not cacheable and not bookmarkable. Neither is
+/// wanted here — a search for a person is a thing to do once and not to leave lying in a URL bar
+/// — so the trade is one-sided.
+/// </para>
+/// <para>
+/// <b>No status or resource filter.</b> Somebody asking to be forgotten is asking about every
+/// booking they made; a filtered search would answer a narrower question than the one they asked
+/// and report fewer of their records than exist.
+/// </para>
+/// </remarks>
+public class FindBookingsByBookerModel
+{
+    /// <summary>
+    /// The address to find, matched <b>exactly</b>.
+    /// </summary>
+    /// <remarks>
+    /// No prefix, substring or wildcard form is offered, here or anywhere. An exact match
+    /// answers whether a given person is in the records; a partial one answers which people
+    /// match a fragment, which is an enumeration facility and is forbidden by the
+    /// <c>sensitive-data</c> capability rather than merely unimplemented.
+    /// </remarks>
+    public string Email { get; set; } = string.Empty;
+
+    public int? Skip { get; set; }
+
+    public int? Take { get; set; }
+}
+
 /// <summary>A page of bookings plus the unpaged total, matching the other list endpoints.</summary>
 public class PagedBookingsModel
 {

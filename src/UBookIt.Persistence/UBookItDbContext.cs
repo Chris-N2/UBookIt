@@ -103,6 +103,22 @@ public sealed class UBookItDbContext(DbContextOptions<UBookItDbContext> options)
             booking.Property(b => b.BookerName).HasMaxLength(256);
             booking.Property(b => b.BookerEmail).HasMaxLength(320);
             booking.Property(b => b.BookerPhone).HasMaxLength(64);
+
+            // Serves the by-address search a data-subject request needs. That read is
+            // UNWINDOWED by necessity — a request carries an address and no dates — so without
+            // this it is a scan of a table that grows without limit, reintroducing the very
+            // cost the management list's window guard exists to bound. The index is what makes
+            // the search affordable rather than merely permitted.
+            //
+            // NOT unique: one person books many times, and uniqueness here would refuse their
+            // second booking. It is not a natural key either — erasure sets the column NULL, so
+            // the value is not stable for the life of the row.
+            //
+            // An index on personal data, added to build the tool that REMOVES personal data,
+            // which reads oddly enough to be worth stating: it is sound because an UPDATE
+            // maintains the index with the row, so an erased booking leaves the index at the
+            // moment its address does, and the index holds nothing the table does not.
+            booking.HasIndex(b => b.BookerEmail);
             // Matches the service's own name column, because it stores the same value —
             // a snapshot of it. A shorter bound here would silently truncate a name the
             // service itself accepts; an unbounded one would be the only unbounded string

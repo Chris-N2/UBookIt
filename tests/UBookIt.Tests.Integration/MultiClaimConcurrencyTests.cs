@@ -246,6 +246,14 @@ public class MultiClaimConcurrencyTests(SqlServerFixture fixture)
                 // per resource, which is the guarantee above. What changes is who the booking
                 // was FOR, never what it claims.
                 "20260904220933_AddBookerErasure",
+
+                // An index on `uBookItBooking.BookerEmail`, so a data-subject request can be
+                // answered without a date. Checked: one CREATE INDEX, no column altered, no
+                // data statement, and `uBookItResourceClaim` is not referenced — an index
+                // creates and removes no rows anywhere. One booking still holds one claim row
+                // per resource, which is the guarantee above. What changes is how quickly a
+                // booking can be FOUND, never what it claims.
+                "20260905134054_AddBookerEmailIndex",
             ],
             applied.OrderBy(name => name, StringComparer.Ordinal));
 
