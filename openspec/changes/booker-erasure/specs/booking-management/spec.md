@@ -45,6 +45,22 @@ cancel and erase endpoints in this same capability reach the domain, never this 
 - **WHEN** a listed booking claims a resource
 - **THEN** that resource's name is present in the result, without the caller reading the resource separately
 
+#### Scenario: The service comes back with the list
+- **WHEN** a listed booking was placed through a service
+- **THEN** that service's id and its name as recorded at placement are present in the result, without the caller reading the service separately
+
+#### Scenario: A directly placed booking reports no service
+- **WHEN** a listed booking was placed directly
+- **THEN** it carries no service attribution, distinguishable from a service whose name is empty
+
+#### Scenario: An operator can match what a caller reads out
+- **WHEN** a listed booking is displayed to an operator
+- **THEN** its quotable reference is among what is shown, so a booking can be identified from what the customer has in front of them
+
+#### Scenario: The front-end reads are unaffected
+- **WHEN** this port is added
+- **THEN** the availability and placement reads behave exactly as before, and no booking is placed, cancelled or altered **by this port**
+
 #### Scenario: An erased booking is listed as erased
 - **WHEN** a booking whose booker was erased is listed
 - **THEN** it appears in the results carrying the fact and instant of erasure, no name or email, and every other field it always carried
@@ -56,6 +72,11 @@ cancel and erase endpoints in this same capability reach the domain, never this 
 #### Scenario: The port stays read-only
 - **WHEN** the port's surface is inspected
 - **THEN** it offers no operation that changes a booking, erasure included
+
+*The front-end scenario above said "by any operation in this capability" until cancellation
+joined it. The narrowing is to what the scenario was always guarding — that adding a read port
+changes nothing — and the guarantee it protected is now carried explicitly by the read-only
+SHALL above, which is stronger than an aside in a scenario's THEN.*
 
 ### Requirement: Bookings are readable over an authorized management endpoint
 The package SHALL expose a **versioned** backoffice endpoint, **in the same swagger group as
@@ -176,6 +197,83 @@ together — which a client can observe violated and has no way to interpret.
 #### Scenario: The reference survives erasure
 - **WHEN** a booking's booker has been erased
 - **THEN** its reference is still returned, in canonical form
+
+### Requirement: Bookings have a backoffice collection view
+The package SHALL register a **Bookings** view in the uBookIt backoffice section, beside the
+resource and service views and under the same section condition, listing the bookings the
+management endpoint returns.
+
+The list SHALL be a semantic table built from the backoffice UI library, showing per booking:
+**its quotable reference**, when it runs, **the booker — their contact details, or a statement
+of why the row carries none**, the
+resources it claims by name, the service it was placed for, and its status. **The reference
+SHALL come first**, because it is the column an operator scans while somebody reads it out —
+which is the case the whole identifier exists for. It SHALL show the unpaged total and page
+through results, in the same idiom the section's existing lists use.
+
+**A withheld booker SHALL be rendered as a stated absence, not as an empty cell.** The view
+SHALL show a localized indication that contact details are hidden, for the same reason a
+booking with no service says so rather than leaving its cell blank: a blank cell reads as
+missing data, and here it would read as a defect in the package.
+
+**Where any row's booker is withheld, the view SHALL explain why**, once, where an operator
+reading the list will see it — naming Umbraco's Sensitive data group as what grants access.
+An operator who has just been made an administrator and finds every contact detail hidden has
+no way to reach that explanation from the screen otherwise, and the most likely next action is
+a defect report. The explanation SHALL be exposed to assistive technology on the same terms as
+the view's other messages, rather than only rendered.
+
+**The view SHALL NOT compute anything the endpoint does not return.** A value the endpoint
+cannot supply is a finding about the endpoint, not a calculation to add to a screen — the
+same rule the endpoint already carries about fields the read port cannot supply, pointed one
+layer further out. **It SHALL NOT ask any other source whether contact details may be shown**:
+the response already says so by what it carries, and a second source could disagree with the
+first while looking authoritative.
+
+**Formatting a value the endpoint did return is not computing one.** The reference crosses
+the boundary canonical and is grouped for reading on the way to the screen, exactly as an
+instant crosses as UTC and is rendered in the booking's zone. The rule above is about the
+view inventing data; presentation of data it was given is the view's own business, and
+stating that here keeps a reader of this requirement alone from seeing a prohibition being
+broken.
+
+No third-party widget framework SHALL be used, and every string the view displays SHALL come
+from the package's localization with `en-US` provided.
+
+#### Scenario: The section lists bookings
+- **WHEN** a backoffice user with access to the uBookIt section and to sensitive data opens the Bookings view
+- **THEN** bookings in the default window are listed with their reference, time, booker, resources, service and status, and the unpaged total is shown
+
+#### Scenario: A withheld booker says so
+- **WHEN** a listed booking's booker was withheld by the endpoint
+- **THEN** the cell states that contact details are hidden, rather than being blank, and the row is still identifiable by its reference
+
+#### Scenario: The operator is told what grants access
+- **WHEN** any row on the page has a withheld booker
+- **THEN** the view explains once that contact details require membership of Umbraco's Sensitive data group, exposed to assistive technology rather than only rendered
+
+#### Scenario: A page with nothing withheld carries no explanation
+- **WHEN** no row's booker was withheld from the caller
+- **THEN** the explanation is not shown, whether the rows carry contact details or record an erasure
+
+#### Scenario: Visibility is read from the response, not asked elsewhere
+- **WHEN** the view's decision to show or hide contact details is inspected
+- **THEN** it follows from what the endpoint returned, with no separate query about the current user's permissions
+
+#### Scenario: Paging reaches the rest
+- **WHEN** more bookings match than fit on one page
+- **THEN** the remaining bookings are reachable, and the total reported is the number matching the query rather than the number on the page
+
+#### Scenario: A booking placed directly says so
+- **WHEN** a listed booking has no service
+- **THEN** the view states that it was booked directly, rather than leaving the cell blank as though the value were missing
+
+*Two clauses above were restated for the three-condition contract. "The booker where the
+endpoint supplied one" described a member that could be absent; it is now always supplied and
+states its own condition, so the sentence described nothing. And the no-explanation scenario
+said "every row's booker was supplied", which after erasure is vacuously true of every page
+including an all-erased one — it no longer selected the case it was written to guard. Both are
+restatements of the same guarantees against the new shape, not narrowings.*
 
 ## ADDED Requirements
 

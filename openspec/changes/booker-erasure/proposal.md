@@ -27,6 +27,17 @@ retention → privacy notice); it goes first because every later one needs the v
   data group — the same group that decides who may read those details in the first place.
   Erasure is irreversible and idempotent: erasing an erased booking succeeds and changes
   nothing, so a retry is always safe.
+- **BREAKING — `UBookIt.Core`'s published public API changes.** `Booker.Name`, `Booker.Email`
+  and `Booker.Phone` shipped in `0.1.0` and are **removed**; the values move into a nested
+  `Booker.Contact`, which is null exactly when the booker is erased. `BookingSummary`'s
+  positional signature changes as two `string` members become one `SummaryBooker`, and
+  `IBookingService` gains `EraseBookerAsync`, which breaks any external implementer.
+  **This is not qualified by "unpublished" — `0.1.0` is on NuGet and these members were in
+  it.** The compatibility promise in CLAUDE.md requires the call-out; the change is
+  nonetheless proposed rather than deferred, because the alternative is a domain that cannot
+  express erasure at all, and because the compiler names every affected call site rather than
+  letting one fail at runtime. Whether `0.1.0` consumers exist is a release decision, not this
+  change's to make.
 - **BREAKING (unpublished): the wire gains an explicit three-state booker.**
   `BookingModel.Booker` stops being nullable. It becomes a member that is always present and
   states which of *shown*, *withheld* or *erased* applies, carrying contact details only in the

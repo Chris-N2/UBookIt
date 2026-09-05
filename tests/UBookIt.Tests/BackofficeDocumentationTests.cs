@@ -152,6 +152,37 @@ public class BackofficeDocumentationTests
     }
 
     [Fact]
+    public void The_two_things_erasure_does_not_reach_are_documented()
+    {
+        // The `booker-erasure` capability makes these normative — "What erasure does not reach
+        // is documented" — with a scenario each, and a spec requirement discharged only by
+        // prose is discharged by nothing: somebody tidying the page deletes a paragraph, the
+        // suite stays green, and the requirement is violated with nothing to notice it.
+        //
+        // Both omissions arrive as incidents rather than as questions. The first arrives as a
+        // data-protection failure: an operator erases the one booking they were shown and
+        // believes the person is gone from the system. The second arrives as a support call
+        // about a booking nobody can ring, which is what the requirement itself says.
+        var docs = Docs();
+
+        DocumentationAssert.Says(docs, "It erases one booking, not a person");
+        DocumentationAssert.Says(docs, "You can erase a booking that has not happened yet");
+        DocumentationAssert.Says(docs, "unable to contact somebody who is going to turn up");
+    }
+
+    [Fact]
+    public void The_documentation_says_erasure_cannot_be_undone()
+    {
+        // Separate from the pair above because it is the claim most likely to be softened by
+        // somebody who finds it alarming — and softening it is how a site comes to believe
+        // there is a way back. There is not, and that is the feature.
+        var docs = Docs();
+
+        DocumentationAssert.Says(docs, "It cannot be undone");
+        DocumentationAssert.Says(docs, "anonymising the booking, not deleting it");
+    }
+
+    [Fact]
     public void The_two_surprising_things_about_the_recorded_service_are_stated()
     {
         // Both of these look like defects to someone who has not been told, and both are

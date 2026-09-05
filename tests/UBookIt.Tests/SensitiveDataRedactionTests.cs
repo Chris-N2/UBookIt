@@ -385,6 +385,53 @@ public class SensitiveDataRedactionTests
         Assert.Contains("HasAccessToSensitiveData", occurrences);
     }
 
+    /// <summary>
+    /// Booker contact details have exactly one durable home, so erasing it erases the data.
+    /// </summary>
+    /// <remarks>
+    /// <para>
+    /// The <c>booker-erasure</c> capability makes this a requirement, and <c>design.md</c> names
+    /// it as the mitigation for the change's headline risk — that a later feature re-homes the
+    /// data and quietly reduces erasure to a gesture. A mitigation that exists only as a
+    /// sentence in a spec is not a mitigation: the features most likely to break it (0.5.0's
+    /// confirmation emails, an erasure audit trail, a retention report) will be written by
+    /// somebody who has not read it.
+    /// </para>
+    /// <para>
+    /// <b>What this detects is the same class of thing as the membership snapshot: CHANGE.</b>
+    /// It cannot recognise a durable store — nothing in a type makes one — so it enumerates the
+    /// persistence layer's row types and records which carry booker contact columns. Exactly
+    /// one does. A second row type acquiring a booker name or email fails this and forces the
+    /// author to say how it gets erased.
+    /// </para>
+    /// </remarks>
+    [Fact]
+    public void Booker_contact_details_have_exactly_one_durable_home()
+    {
+        var rowTypes = typeof(UBookIt.Persistence.UBookItDbContext).Assembly
+            .GetTypes()
+            .Where(type => type.Name.EndsWith("Row", StringComparison.Ordinal))
+            .ToList();
+
+        // The fixture is load-bearing: an empty or tiny list satisfies the assertion below
+        // while observing nothing, which is how this class of guard passes after its scan
+        // silently breaks.
+        Assert.True(rowTypes.Count >= 5, $"Only {rowTypes.Count} row types found; the scan is broken.");
+
+        var carriers = rowTypes
+            .Where(type => type
+                .GetProperties(BindingFlags.Public | BindingFlags.Instance)
+                .Any(property =>
+                    property.Name.Contains("BookerName", StringComparison.Ordinal)
+                    || property.Name.Contains("BookerEmail", StringComparison.Ordinal)
+                    || property.Name.Contains("BookerPhone", StringComparison.Ordinal)))
+            .Select(type => type.Name)
+            .OrderBy(name => name, StringComparer.Ordinal)
+            .ToList();
+
+        Assert.Equal(["BookingRow"], carriers);
+    }
+
     [Fact]
     public void The_contract_states_why_contact_details_are_absent()
     {

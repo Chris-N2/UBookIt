@@ -35,8 +35,16 @@ key would leave the identity intact and the erasure a gesture.
 - **THEN** the stored name, email address, phone number and member key are all absent
 
 #### Scenario: The reference survives erasure
-- **WHEN** an erased booking is looked up by the reference its booker was given
-- **THEN** it is found, and the reference is unchanged
+- **WHEN** an erased booking is read back from storage and listed for management
+- **THEN** its reference is unchanged and still identifies it, so an operator can match what a caller reads out
+
+<!-- This scenario said "looked up BY the reference", which names an operation the package does
+     not have: there is no lookup-by-reference on any port, and `booking-management` records
+     that finding a booking from a reference "is a different query with different indexing, and
+     is not provided here". A scenario describing behaviour that does not exist cannot be
+     verified and quietly asserts the feature is there. What erasure actually guarantees — that
+     the reference is untouched and the row stays findable through the reads that do exist — is
+     what is stated now. -->
 
 ### Requirement: An erased booker is a state, not a blank
 

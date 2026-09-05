@@ -3,6 +3,13 @@
 ### Requirement: Booker identity
 A booking's booker SHALL carry an optional opaque member key (`Guid?`, never an Umbraco type) and contact details: a non-empty name, a well-formed email address, and an optional phone number. Contact details SHALL be required regardless of whether a member key is present.
 
+**BREAKING — published API.** The members carrying those details change shape: `Booker.Name`,
+`Booker.Email` and `Booker.Phone`, all public in `0.1.0`, are replaced by a single nullable
+`Booker.Contact`. The behaviour this requirement describes is unchanged for every booking a
+placement creates; what changes is how a caller reads it. The break is stated here rather than
+left to be discovered, because `UBookIt.Core` is published and its surface is a compatibility
+promise.
+
 **A booker SHALL be in one of exactly two states: carrying contact details, or erased.** An
 erased booker carries no name, no email address, no phone number and no member key, and records
 the instant at which the erasure happened. There is no third state, and in particular no state

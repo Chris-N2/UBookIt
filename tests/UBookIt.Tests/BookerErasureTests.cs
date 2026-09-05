@@ -1,3 +1,4 @@
+using System.Reflection;
 using UBookIt.Backoffice.Mapping;
 using UBookIt.Backoffice.Models;
 using UBookIt.Core.Bookings;
@@ -38,6 +39,38 @@ public class BookerErasureTests
             status,
             TestData.Now,
             new ServiceAttribution(Guid.NewGuid(), "Initial Consultation")).Value;
+
+    [Fact]
+    public void An_erased_booker_cannot_be_given_contact_details_back()
+    {
+        // The `booker-erasure` capability requires that no operation returns an erased booker
+        // to carrying contact details, and that the neither-state is unconstructible. Both hold
+        // ONLY because the constructor is private and no property has an `init` accessor —
+        // which is a thinner thread than it looks. `Booker` is a record, so adding `init` to
+        // `Contact` is an edit that reads as ordinary modernisation, produces no warning and
+        // breaks no behavioural test, and it immediately makes
+        //
+        //     Booker.Erased(t) with { Contact = new BookerContact(...) }
+        //
+        // legal from any assembly. Un-erasure would be back, silently, in a package whose
+        // documentation promises there is no way back.
+        //
+        // Asserted over the construction surface rather than by attempting the mutation,
+        // because the mutation would not compile today — a test that cannot be written is not
+        // the same as a guarantee that cannot be broken.
+        var settable = typeof(Booker)
+            .GetProperties(BindingFlags.Public | BindingFlags.Instance)
+            .Where(property => property.SetMethod is not null)
+            .Select(property => property.Name)
+            .ToList();
+
+        Assert.Empty(settable);
+
+        var publicConstructors = typeof(Booker)
+            .GetConstructors(BindingFlags.Public | BindingFlags.Instance);
+
+        Assert.Empty(publicConstructors);
+    }
 
     [Fact]
     public void An_erased_booker_carries_nothing_of_the_person()

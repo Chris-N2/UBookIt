@@ -72,13 +72,26 @@ deleted with nothing in the diff that looks like a deletion.
       are required regardless of the member key; both original scenarios verbatim. Added: the
       two-state rule, that placement only ever produces the details-carrying state, and that the
       neither-state is unconstructible. **Nothing dropped** — the validation requirement is
-      unchanged for every booking the domain creates.
+      unchanged for every booking the domain creates. **Also declares the published-API break**
+      (`Booker.Name`/`.Email`/`.Phone` removed), which the first draft of this change omitted:
+      the wire break was carefully qualified as unpublished and the same question was never
+      asked about Core, where the answer is the opposite.
 - [x] 8.2 **`booking-management` → "Bookings can be enumerated for management".** Carried
       forward: everything a row shows without a further read; resource names as a guarantee; the
       service name snapshot and its reason; the reference and the telephone case; read-only.
       Changed: the booker crosses as contact-details-or-erasure rather than as two non-null
-      strings. **Nothing dropped**; the read-only sentence is strengthened to name the erase
-      endpoint alongside cancel.
+      strings. The read-only sentence is strengthened to name the erase endpoint alongside
+      cancel.
+      **CORRECTED AFTER QA — this entry previously read "Nothing dropped" and was wrong.** The
+      requirement carries **six** scenarios, not the two the first draft restated: *The service
+      comes back with the list*, *A directly placed booking reports no service*, *An operator
+      can match what a caller reads out* and *The front-end reads are unaffected* were deleted
+      silently, along with the italic note recording why the last had once been narrowed. All
+      four are restored verbatim, and the note with them. The cause is worth recording because
+      it is not the one CLAUDE.md warns about: the guarantees were not weighed and rejected,
+      they were never *read* — the requirement was skimmed to the end of a `sed` window and the
+      window stopped twenty lines short of the requirement. **Diffing guarantees requires first
+      establishing where the requirement ends.**
 - [x] 8.3 **`booking-management` → "Bookings are readable over an authorized management endpoint".**
       <!-- Kept on one line deliberately: the integrity guard matches the requirement name in
            tasks.md, and a name wrapped across two lines is a name it cannot see. -->
@@ -91,6 +104,23 @@ deleted with nothing in the diff that looks like a deletion.
       guarantee it protected (a client can tell "not given" from "nothing here", and cannot
       observe a half-populated pair) is restated in the new shape and strengthened, since the
       null it relied on had acquired a second cause.
+- [x] 8.7 **`booking-management` → "Bookings have a backoffice collection view".**
+      Added after QA, and only because QA's sweep found what mine did not: this requirement was
+      left untouched while the contract underneath it changed, so two of its clauses had gone
+      stale. Carried forward: the view is registered beside the others under the same section
+      condition; a semantic table from the UI library; the reference first and why; the unpaged
+      total and paging; a withheld booker stated rather than blank; the group explanation and
+      the administrator surprise; visibility read from the response and never asked elsewhere;
+      no computing what the endpoint did not return; formatting is not computing; no third-party
+      widget framework; every string localized with `en-US`. All seven scenarios restated.
+      **Two clauses restated rather than dropped:** "the booker where the endpoint supplied one"
+      described a member that could be absent and now always is present, and the
+      no-explanation scenario's *"every row's booker was supplied"* became vacuously true of
+      every page — including an all-erased one, which is the case it most needed to select.
+      Both are the same guarantees against the new shape. **Nothing dropped.**
+      *The lesson is the recorded one: the capability you are already modifying is the one you
+      are least likely to sweep. My 9.3 sweep looked outward at three sibling capabilities and
+      never at the untouched requirements of the capability I had my hands in.*
 - [x] 8.4 **`persistence` → "Schema shape and naming".** Carried forward: the `uBookIt` prefix,
       the full table list, capability uniqueness and cascade, the canonical uniquely-indexed
       reference and its reasoning, the no-foreign-key service columns, the placement-time
