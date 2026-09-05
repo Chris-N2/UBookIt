@@ -234,6 +234,18 @@ public class MultiClaimConcurrencyTests(SqlServerFixture fixture)
                 // one claim row per resource, which is the guarantee above. What changes is
                 // what the booking is CALLED, never what it claims.
                 "20260901184959_AddBookingReference",
+
+                // Bookings gain `BookerErasedUtc`, and `BookerName`/`BookerEmail` widen to
+                // nullable. Checked: three column changes on `uBookItBooking` — two
+                // `ALTER COLUMN ... NULL` widenings and one additive nullable column — with no
+                // index, no foreign key, no data statement and no back-fill.
+                // `uBookItResourceClaim` is not referenced, and erasure is an UPDATE of the
+                // booking row that removes no claim: an erased booking keeps every claim it
+                // held and goes on blocking the same time, which is the whole reason erasure
+                // is anonymisation rather than deletion. One booking still holds one claim row
+                // per resource, which is the guarantee above. What changes is who the booking
+                // was FOR, never what it claims.
+                "20260904220933_AddBookerErasure",
             ],
             applied.OrderBy(name => name, StringComparer.Ordinal));
 

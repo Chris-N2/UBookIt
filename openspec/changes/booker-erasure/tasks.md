@@ -53,12 +53,12 @@
       **Done after the change, against the code.** Ten endpoints: `GET resources/{id}/free-time`, `GET resources/{id}/slots`, `GET resources/{id}/bookable-starts`, `GET resources`, `GET resources/{id}`, `GET services`, `GET services/{id}`, `GET services/{id}/bookable-starts`, `POST bookings`, `POST services/{id}/bookings`.
       **No GET returns a booking.** The only booker-carrying responses are the two placements, echoing the request body in the same request, so no anonymous surface can read a stored booker — erased or not. `UBookIt.Web` gained no endpoint in this change; its only edits were the four compile sites and `PlacedBooking`.
 - [x] 7.3 Unit tests: erase changes only the booker; an erased booking still blocks; the clock supplies the instant; a second erasure keeps the first instant; the neither-state is unconstructible; placement never produces an erased booker.
-- [ ] 7.4 **Round-trip test through storage** for the erasure — erase, re-read in a **fresh context**, assert the columns are null and the instant set. Asserting on the returned aggregate proves nothing here.
-- [ ] 7.5 **Mutation-check task 3.3**: revert `UpdateAsync` to writing only the status and confirm 7.4 fails. If it passes, 7.4 is measuring the in-memory aggregate and must be rewritten.
+- [x] 7.4 **Round-trip test through storage** for the erasure — erase, re-read in a **fresh context**, assert the columns are null and the instant set. Asserting on the returned aggregate proves nothing here.
+- [x] 7.5 **Mutation-check task 3.3**: revert `UpdateAsync` to writing only the status and confirm 7.4 fails. If it passes, 7.4 is measuring the in-memory aggregate and must be rewritten.
 - [x] 7.6 Mutation-check the precedence in 5.4: make withheld win over erased and confirm a test fails; make erased render as withheld for a non-sensitive-data caller and confirm a test fails.
 - [ ] 7.7 Endpoint tests: erase succeeds for a permitted user; is refused for section-access-only; is 401 anonymous; is idempotent; 404s on an unknown id; response carries no erased values.
 - [ ] 7.8 List-endpoint tests: erased reported as erased to **both** kinds of caller; withheld still reported as withheld; the booker member is never absent; reference survives both conditions.
-- [ ] 7.9 Integration test against real SQL Server covering the migration applying to a database holding pre-existing bookings, which keep their details.
+- [x] 7.9 Integration test against real SQL Server covering the migration applying to a database holding pre-existing bookings, which keep their details.
 - [ ] 7.10 Client tests for the three cells and for the explanation's suppression on an all-erased page.
 
 ## 8. Modified requirements — the guarantee diff
