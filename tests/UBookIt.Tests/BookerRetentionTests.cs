@@ -662,6 +662,19 @@ public class BookerRetentionTests
             // hosts to write substitute store implementations, and any of them called Sql-anything
             // would have been silently unseen.
             ["SqlBookingStore.EraseBookerAsync"] = "the storage half of the verb",
+
+            // The in-memory aggregate transition the verb performs. Also not a third path —
+            // it writes nothing and is reachable only through the verb above, and `bookings`
+            // separately requires that the erased state be reachable only by erasing a booking
+            // or rehydrating one already erased.
+            //
+            // Recorded rather than excluded, because it was hidden by a
+            // `t != typeof(Booking) && t != typeof(Booker)` clause carrying no comment — the
+            // THIRD instance of the same escape-hatch shape in this one test, after the
+            // dictionary comparison and the `Sql` name filter. Excluding the TYPE meant any
+            // erase-shaped member added to `Booking` later would be invisible to the tripwire,
+            // which is precisely what a tripwire must not permit.
+            ["Booking.EraseBooker"] = "the domain transition the verb performs",
         };
 
         var assemblies = new[]
@@ -675,7 +688,6 @@ public class BookerRetentionTests
             .SelectMany(a => a.GetTypes())
             .Where(t => t is { IsAbstract: false, IsInterface: false })
             .Where(t => t.Namespace?.StartsWith("UBookIt", StringComparison.Ordinal) == true)
-            .Where(t => t != typeof(Booking) && t != typeof(Booker))
             .SelectMany(t => t
                 .GetMethods(BindingFlags.Public | BindingFlags.Instance | BindingFlags.DeclaredOnly)
                 // Property accessors, not operations. `BookerModel.get_ErasedUtc` and
@@ -716,9 +728,14 @@ public class BookerRetentionTests
                 return "the verb both paths use";
             }
 
-            return typeof(IBookingStore).IsAssignableFrom(type)
-                ? "the storage half of the verb"
-                : "UNCLASSIFIED — neither gated, nor unattended, nor the verb, nor its storage";
+            if (typeof(IBookingStore).IsAssignableFrom(type))
+            {
+                return "the storage half of the verb";
+            }
+
+            return type == typeof(Booking)
+                ? "the domain transition the verb performs"
+                : "UNCLASSIFIED — not gated, not unattended, and neither the verb, its storage, nor its domain transition";
         }
 
         var derived = found.ToDictionary(
@@ -732,7 +749,7 @@ public class BookerRetentionTests
 
         // Anti-vacuity: an over-eager filter would turn this into a test that passes by looking
         // at nothing, which is exactly how a tripwire stops being one.
-        Assert.Equal(4, found.Count);
+        Assert.Equal(5, found.Count);
     }
 
     [Fact]
