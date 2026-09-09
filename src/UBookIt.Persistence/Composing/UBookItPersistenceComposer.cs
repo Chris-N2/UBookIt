@@ -154,8 +154,27 @@ public sealed class UBookItPersistenceComposer : IComposer
     /// recovered from. A site wanting the aggressive policy writes <c>1</c>.
     /// </para>
     /// </remarks>
+    /// <remarks>
+    /// <para>
+    /// <b>An upper bound, because the job subtracts this from the current instant.</b>
+    /// <c>DateTimeOffset.AddDays</c> throws once the result leaves the representable range, so a
+    /// nonsense-but-positive value — a pasted timestamp, a millisecond count — would give a site
+    /// an exception every hour instead of a retention policy. Refused here, where the answer is
+    /// "off" and an error is logged, rather than thrown hourly out of a background job.
+    /// </para>
+    /// <para>
+    /// A century, and the number is not arbitrary in the direction that matters: any value above
+    /// it is either a mistake or an attempt to say "never", and **the setting already has a way
+    /// to say never** — leave it out. So nothing expressible is lost, and the failure it removes
+    /// is real.
+    /// </para>
+    /// </remarks>
+    internal const int MaxRetentionDays = 36525;
+
     internal static int? ResolveRetentionDays(IConfiguration configuration)
-        => int.TryParse(configuration[RetentionDaysSettingKey], out var days) && days > 0
-            ? days
-            : null;
+        => int.TryParse(configuration[RetentionDaysSettingKey], out var days)
+            && days > 0
+            && days <= MaxRetentionDays
+                ? days
+                : null;
 }

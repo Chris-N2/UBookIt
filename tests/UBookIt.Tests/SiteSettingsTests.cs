@@ -104,6 +104,8 @@ public class SiteSettingsTests
     [InlineData("90.5")]   // not whole
     [InlineData("0")]      // the "off" somebody meant to write
     [InlineData("-5")]     // negative
+    [InlineData("99999999")]        // beyond the maximum; subtracting it would throw
+    [InlineData("1757000000000")]   // a pasted millisecond timestamp
     public void An_unreadable_retention_period_resolves_to_off_and_never_to_a_default(string configured)
     {
         // The whole point of this test, and the reason it does not mirror the
@@ -125,8 +127,10 @@ public class SiteSettingsTests
     [InlineData("")]
     [InlineData("  ")]
     [InlineData("lots")]
+    [InlineData("90.5")]   // the one form the resolution theory covered and this one did not
     [InlineData("0")]
     [InlineData("-5")]
+    [InlineData("99999999")]
     public void A_retention_period_that_was_written_and_cannot_be_read_logs_an_error(string configured)
     {
         var logger = new CapturingLogger();
@@ -164,6 +168,41 @@ public class SiteSettingsTests
         RunUBookItMigrations.ErrorIfRetentionUnreadable(RetentionConfig("90"), logger);
 
         Assert.Empty(logger.Entries);
+    }
+
+    [Fact]
+    public void The_largest_usable_period_is_accepted_and_one_more_is_not()
+    {
+        // The boundary itself, so the cap cannot drift silently in either direction: too low and
+        // a site loses a period it could legitimately want, too high and the sweep throws every
+        // hour instead of erasing.
+        Assert.Equal(
+            UBookItPersistenceComposer.MaxRetentionDays,
+            UBookItPersistenceComposer.ResolveSettings(
+                RetentionConfig($"{UBookItPersistenceComposer.MaxRetentionDays}")).RetentionDays);
+
+        Assert.Null(UBookItPersistenceComposer.ResolveSettings(
+            RetentionConfig($"{UBookItPersistenceComposer.MaxRetentionDays + 1}")).RetentionDays);
+    }
+
+    [Fact]
+    public void Every_accepted_period_can_actually_be_subtracted_from_now()
+    {
+        // The property the cap exists for, asserted rather than inferred from the number. The job
+        // computes `GetUtcNow().AddDays(-period)`, which THROWS once the result leaves the
+        // representable range — so a site with a nonsense-but-positive value would get an
+        // exception every hour rather than a policy. Verified at the boundary against the widest
+        // clock the job could be handed.
+        var accepted = UBookItPersistenceComposer.ResolveSettings(
+            RetentionConfig($"{UBookItPersistenceComposer.MaxRetentionDays}")).RetentionDays;
+
+        Assert.NotNull(accepted);
+
+        // DateTimeOffset.MinValue is the worst case: any earlier "now" is unreachable.
+        var exception = Record.Exception(
+            () => DateTimeOffset.MinValue.AddYears(200).AddDays(-accepted!.Value));
+
+        Assert.Null(exception);
     }
 
     private sealed class CapturingLogger : ILogger

@@ -124,6 +124,11 @@ internal sealed class BookerRetentionJob(
                     // stopped here leaves every booking it reached erased and every booking it did
                     // not reach still due — which is what makes the next run complete the work
                     // with no double erasure and no gap.
+                    //
+                    // Guarded by A_sweep_cancelled_PART_WAY_stops_and_leaves_the_rest_due, which
+                    // cancels from INSIDE the loop. QA found this check unfalsifiable when the
+                    // only interruption test cancelled before the run: the while condition is then
+                    // false on entry and this line is never reached.
                     break;
                 }
 

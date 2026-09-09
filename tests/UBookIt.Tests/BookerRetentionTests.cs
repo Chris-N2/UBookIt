@@ -1,3 +1,5 @@
+using System.Reflection;
+using Microsoft.AspNetCore.Authorization;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Logging.Abstractions;
@@ -339,10 +341,80 @@ public class BookerRetentionTests
     }
 
     [Fact]
+    public async Task A_sweep_cancelled_PART_WAY_stops_and_leaves_the_rest_due()
+    {
+        // THE SCENARIO THE TEST BELOW CANNOT REACH.
+        //
+        // "Interrupted AFTER erasing some of the due bookings" needs cancellation to arrive
+        // mid-batch. Cancelling before the run makes `while (!token.IsCancellationRequested)`
+        // false on entry, so the loop body never executes and the guard inside it — the one that
+        // stops the sweep between units of work — is never reached. QA proved that by deleting
+        // that guard and watching all 1095 unit tests stay green.
+        //
+        // So the token is cancelled BY the erasure of the third booking, from inside the loop.
+        var due = Enumerable.Range(0, 10).Select(i => EndedDaysAgo(RetentionDays + 10 + i)).ToList();
+
+        using var cts = new CancellationTokenSource();
+        var harness = Build(seed: due, bookingService: null);
+
+        var store = harness.Store;
+        var services = new ServiceCollection();
+        services.AddSingleton<IBookingStore>(store);
+        services.AddSingleton<IResourceStore>(new InMemoryResourceStore());
+        var clock = new FixedTimeProvider(Now);
+        services.AddSingleton<TimeProvider>(clock);
+        var settings = TestData.Settings with { RetentionDays = RetentionDays };
+        services.AddSingleton(settings);
+        services.AddScoped<IBookingService>(sp => new CancelsAfter(
+            new BookingService(sp.GetRequiredService<IResourceStore>(), store, clock, settings),
+            cts,
+            after: 3));
+
+        var provider = services.BuildServiceProvider();
+        var job = new BookerRetentionJob(
+            provider.GetRequiredService<IServiceScopeFactory>(), settings, clock, new CapturingLogger());
+
+        await job.ExecuteAsync(cts.Token);
+
+        // Stopped where it was told to. Erasure is absorbing, so this is only safe if the sweep
+        // stops BETWEEN bookings rather than part-way through one — and if it stopped at all,
+        // which is what the count shows.
+        Assert.Equal(3, store.EraseCount);
+
+        var erased = new List<Booking>();
+        foreach (var booking in due)
+        {
+            if ((await Reread(store, booking)).Booker.IsErased)
+            {
+                erased.Add(booking);
+            }
+        }
+
+        Assert.Equal(3, erased.Count);
+
+        // And the rest are still due — the half that makes the next run able to finish the work.
+        var stillDue = await store.GetBookingIdsDueForErasureAsync(Now.AddDays(-RetentionDays), 100);
+        Assert.Equal(7, stillDue.Count);
+
+        // Resumption, with a fresh token, completes it without re-erasing the first three.
+        var finishing = new BookerRetentionJob(
+            provider.GetRequiredService<IServiceScopeFactory>(), settings, clock, new CapturingLogger());
+
+        await finishing.ExecuteAsync(CancellationToken.None);
+
+        foreach (var booking in due)
+        {
+            Assert.True((await Reread(store, booking)).Booker.IsErased);
+        }
+    }
+
+    [Fact]
     public async Task An_interrupted_sweep_leaves_what_it_reached_erased_and_the_rest_due()
     {
         // Cancelled before it starts: nothing is erased, and — the half that matters — nothing is
-        // left in a state the next run cannot finish.
+        // left in a state the next run cannot finish. The PART-WAY case is the test above; this
+        // one only covers entry, and is kept because "an already-cancelled token does no work"
+        // is worth pinning separately from "a sweep stops when cancelled mid-flight".
         var due = Enumerable.Range(0, 5).Select(i => EndedDaysAgo(RetentionDays + 10 + i)).ToList();
         var harness = Build(seed: due);
 
@@ -383,23 +455,65 @@ public class BookerRetentionTests
         // retention reporting as the feature that would casually create a second. A log is
         // durable. This asserts over what the sweep actually emitted, with a booker whose values
         // are distinctive enough to find.
-        var due = EndedDaysAgo(RetentionDays + 10);
-        var harness = Build(seed: [due]);
+        // ALL FOUR members the requirement names, over ALL THREE paths that log. The first
+        // version checked name and email on the success path only — a finding enumerates a
+        // sample, not the population, and the warning and error paths are the ones where a
+        // failure message could most plausibly carry a person.
+        var succeeds = EndedDaysAgo(RetentionDays + 10);
+        var fails = EndedDaysAgo(RetentionDays + 20);
+        var throws = EndedDaysAgo(RetentionDays + 30);
+
+        var harness = Build(seed: [succeeds, fails, throws]);
 
         // READ BEFORE THE SWEEP. The in-memory store keeps the caller's live instance and erases
-        // it in place, so `due.Booker.Contact` is null by the time the sweep returns — reading it
-        // afterwards throws, which is how this test first failed. The values have to be captured
-        // while the person is still there.
-        var name = due.Booker.Contact!.Name;
-        var email = due.Booker.Contact!.Email;
+        // it in place, so `Booker.Contact` is null by the time the sweep returns — reading it
+        // afterwards throws, which is how this test first failed.
+        var people = new[] { succeeds, fails, throws }
+            .Select(b => (b.Booker.Contact!.Name, b.Booker.Contact!.Email, b.Booker.Contact!.Phone, b.Booker.MemberKey))
+            .ToList();
 
-        await harness.Job.ExecuteAsync(CancellationToken.None);
+        var store = harness.Store;
+        var clock = new FixedTimeProvider(Now);
+        var settings = TestData.Settings with { RetentionDays = RetentionDays };
+        var services = new ServiceCollection();
+        services.AddSingleton<IBookingStore>(store);
+        services.AddSingleton<IResourceStore>(new InMemoryResourceStore());
+        services.AddSingleton<TimeProvider>(clock);
+        services.AddSingleton(settings);
+        services.AddScoped<IBookingService>(sp => new FailsAndThrows(
+            new BookingService(sp.GetRequiredService<IResourceStore>(), store, clock, settings),
+            returnsFailureFor: fails.Id,
+            throwsFor: throws.Id));
 
-        var emitted = string.Join("\n", harness.Logger.Entries.Select(e => e.Message));
+        var provider = services.BuildServiceProvider();
+        var logger = new CapturingLogger();
+        var job = new BookerRetentionJob(
+            provider.GetRequiredService<IServiceScopeFactory>(), settings, clock, logger);
 
-        Assert.NotEmpty(harness.Logger.Entries);
-        Assert.DoesNotContain(name, emitted, StringComparison.OrdinalIgnoreCase);
-        Assert.DoesNotContain(email, emitted, StringComparison.OrdinalIgnoreCase);
+        await job.ExecuteAsync(CancellationToken.None);
+
+        var emitted = string.Join("\n", logger.Entries.Select(e => e.Message));
+
+        // All three paths ran: one success line, one warning, one error.
+        Assert.Contains(logger.Entries, e => e.Level == LogLevel.Warning);
+        Assert.Contains(logger.Entries, e => e.Level == LogLevel.Error);
+        Assert.Contains(logger.Entries, e => e.Level == LogLevel.Information);
+
+        foreach (var (name, email, phone, memberKey) in people)
+        {
+            Assert.DoesNotContain(name, emitted, StringComparison.OrdinalIgnoreCase);
+            Assert.DoesNotContain(email, emitted, StringComparison.OrdinalIgnoreCase);
+
+            if (!string.IsNullOrEmpty(phone))
+            {
+                Assert.DoesNotContain(phone, emitted, StringComparison.OrdinalIgnoreCase);
+            }
+
+            if (memberKey is Guid key)
+            {
+                Assert.DoesNotContain(key.ToString(), emitted, StringComparison.OrdinalIgnoreCase);
+            }
+        }
     }
 
     [Fact]
@@ -459,6 +573,135 @@ public class BookerRetentionTests
             + ". Resolve these from a scope created per unit of work instead.");
 
         Assert.Contains(typeof(IServiceScopeFactory), taken);
+    }
+
+    [Fact]
+    public async Task A_scope_is_created_PER_BATCH_and_not_once_for_the_run()
+    {
+        // The other half of the persistence scenario — "within a scope it creates per unit of
+        // work". The constructor assertion above covers only that no scoped service is captured;
+        // hoisting CreateScope() out of the loop satisfies it while holding one DbContext for the
+        // whole sweep, which on a first run over a large table is the whole sweep.
+        //
+        // Counted through a factory wrapping the real one, so this observes scopes actually
+        // created rather than the shape of the code.
+        var due = Enumerable.Range(0, (BookerRetentionJob.BatchSize * 2) + 10)
+            .Select(i => EndedDaysAgo(RetentionDays + 1 + i))
+            .ToList();
+
+        var harness = Build(seed: due);
+        var store = harness.Store;
+        var clock = new FixedTimeProvider(Now);
+        var settings = TestData.Settings with { RetentionDays = RetentionDays };
+
+        var services = new ServiceCollection();
+        services.AddSingleton<IBookingStore>(store);
+        services.AddSingleton<IResourceStore>(new InMemoryResourceStore());
+        services.AddSingleton<TimeProvider>(clock);
+        services.AddSingleton(settings);
+        services.AddScoped<IBookingService, BookingService>();
+
+        var provider = services.BuildServiceProvider();
+        var counting = new CountingScopeFactory(provider.GetRequiredService<IServiceScopeFactory>());
+
+        var job = new BookerRetentionJob(counting, settings, clock, new CapturingLogger());
+        await job.ExecuteAsync(CancellationToken.None);
+
+        // Three full batches plus the empty one that ends the run. More than one is the
+        // guarantee; the exact count is asserted so hoisting the scope fails loudly rather than
+        // merely differently.
+        Assert.Equal(4, counting.ScopesCreated);
+    }
+
+    [Fact]
+    public void Every_erasure_path_is_classified_under_one_of_the_two_requirements()
+    {
+        // THE TRIPWIRE, which was prose only until QA said so. `booker-erasure` requires that
+        // every erasure path either carries sensitive-data access as its own authorization or
+        // satisfies every obligation on an unattended path, and that there is no third option.
+        // Without an enumeration a future third path trips nothing and the rule becomes advisory,
+        // which is the failure this project keeps rediscovering.
+        //
+        // Recorded WITH the classification, so adding a path fails here AND reclassifying an
+        // existing one fails — the escape-hatch lesson from find-by-booker R3.
+        var classified = new Dictionary<string, string>(StringComparer.Ordinal)
+        {
+            // Carries [Authorize(SensitiveDataAccessPolicy)] as its own authorization.
+            ["BookingsController.EraseBooker"] = "caller-gated",
+
+            // Unattended. Its obligations are asserted by the other tests in this class:
+            // identifiers only, no contact detail handled, unreachable from a request.
+            ["BookerRetentionJob.ExecuteAsync"] = "unattended",
+
+            // The verb both paths go through — the single implementation, not a third path.
+            ["BookingService.EraseBookerAsync"] = "the verb both paths use",
+        };
+
+        var assemblies = new[]
+        {
+            typeof(BookerRetentionJob).Assembly,
+            typeof(BookingService).Assembly,
+            typeof(UBookIt.Backoffice.Constants).Assembly,
+        };
+
+        var found = assemblies
+            .SelectMany(a => a.GetTypes())
+            .Where(t => t is { IsAbstract: false, IsInterface: false })
+            .Where(t => t.Namespace?.StartsWith("UBookIt", StringComparison.Ordinal) == true)
+            .Where(t => t != typeof(Booking) && t != typeof(Booker))
+            .Where(t => !t.Name.StartsWith("Sql", StringComparison.Ordinal))
+            .SelectMany(t => t
+                .GetMethods(BindingFlags.Public | BindingFlags.Instance | BindingFlags.DeclaredOnly)
+                // Property accessors, not operations. `BookerModel.get_ErasedUtc` and
+                // `BookingRow.set_BookerErasedUtc` match "Erase" as a substring and are places
+                // erasure is REPORTED or STORED, never performed. Excluded by the compiler's own
+                // marker rather than by a `get_`/`set_` name test, so an accessor cannot slip
+                // through by being named unusually.
+                .Where(m => !m.IsSpecialName)
+                .Select(m => (Type: t, Method: m, Name: $"{t.Name}.{m.Name}")))
+            .Where(x => x.Name.Contains("Erase", StringComparison.Ordinal)
+                || x.Name == "BookerRetentionJob.ExecuteAsync")
+            .DistinctBy(x => x.Name, StringComparer.Ordinal)
+            .OrderBy(x => x.Name, StringComparer.Ordinal)
+            .ToList();
+
+        // THE CLASSIFICATION IS DERIVED FROM THE CODE, not read back from the record.
+        //
+        // This first compared only the KEYS, which made the classification decorative: relabelling
+        // the retention job "caller-gated" passed. That is the escape-hatch defect from
+        // find-by-booker R3 — a guard whose exemption list is itself unguarded — committed in the
+        // very test whose comment cites it. Now each path's classification is worked out from what
+        // the code actually is, so a wrong label fails and names both sides.
+        static string Classify(Type type, MethodInfo method)
+        {
+            if (method.GetCustomAttributes<AuthorizeAttribute>()
+                .Any(a => a.Policy == UBookIt.Backoffice.Constants.SensitiveDataAccessPolicy))
+            {
+                return "caller-gated";
+            }
+
+            if (typeof(IDistributedBackgroundJob).IsAssignableFrom(type))
+            {
+                return "unattended";
+            }
+
+            return typeof(IBookingService).IsAssignableFrom(type)
+                ? "the verb both paths use"
+                : "UNCLASSIFIED — neither gated, nor unattended, nor the verb itself";
+        }
+
+        var derived = found.ToDictionary(
+            x => x.Name,
+            x => Classify(x.Type, x.Method),
+            StringComparer.Ordinal);
+
+        Assert.Equal(
+            classified.OrderBy(kv => kv.Key, StringComparer.Ordinal),
+            derived.OrderBy(kv => kv.Key, StringComparer.Ordinal));
+
+        // Anti-vacuity: an over-eager filter would turn this into a test that passes by looking
+        // at nothing, which is exactly how a tripwire stops being one.
+        Assert.Equal(3, found.Count);
     }
 
     [Fact]
@@ -526,6 +769,93 @@ public class BookerRetentionTests
 
         public DomainResult CheckPlacementRules(Resource resource, DateTimeOffset start, TimeSpan duration)
             => throw new NotSupportedException();
+    }
+
+    /// <summary>Cancels the run from inside the loop, once <paramref name="after"/> erasures have succeeded.</summary>
+    /// <remarks>
+    /// The only way to reach the sweep's mid-batch cancellation check: the token has to become
+    /// cancelled while the loop is running, and nothing outside the loop can time that reliably.
+    /// </remarks>
+    private sealed class CancelsAfter(IBookingService inner, CancellationTokenSource cts, int after) : IBookingService
+    {
+        private int _erased;
+
+        public Task<DomainResult<Booking>> PlaceAsync(BookingRequest request, CancellationToken cancellationToken = default)
+            => inner.PlaceAsync(request, cancellationToken);
+
+        public Task<DomainResult<Booking>> PlaceAsync(MultiClaimBookingRequest request, CancellationToken cancellationToken = default)
+            => inner.PlaceAsync(request, cancellationToken);
+
+        public Task<DomainResult<Booking>> PlaceForServiceAsync(ServiceAttribution service, MultiClaimBookingRequest request, CancellationToken cancellationToken = default)
+            => inner.PlaceForServiceAsync(service, request, cancellationToken);
+
+        public Task<DomainResult<Booking>> CancelAsync(Guid bookingId, CancellationToken cancellationToken = default)
+            => inner.CancelAsync(bookingId, cancellationToken);
+
+        public async Task<DomainResult<Booking>> EraseBookerAsync(Guid bookingId, CancellationToken cancellationToken = default)
+        {
+            // Erase FIRST, then cancel. Cancelling before the erasure would leave the booking due
+            // and make the count assertion pass for the wrong reason.
+            var result = await inner.EraseBookerAsync(bookingId, cancellationToken);
+
+            if (result.Succeeded && ++_erased == after)
+            {
+                await cts.CancelAsync();
+            }
+
+            return result;
+        }
+
+        public DomainResult CheckPlacementRules(Resource resource, DateTimeOffset start, TimeSpan duration)
+            => inner.CheckPlacementRules(resource, start, duration);
+    }
+
+    /// <summary>Counts the scopes the job creates, delegating to the real factory.</summary>
+    private sealed class CountingScopeFactory(IServiceScopeFactory inner) : IServiceScopeFactory
+    {
+        public int ScopesCreated { get; private set; }
+
+        public IServiceScope CreateScope()
+        {
+            ScopesCreated++;
+            return inner.CreateScope();
+        }
+    }
+
+    /// <summary>Fails one booking with a domain failure and throws for another.</summary>
+    /// <remarks>
+    /// Drives the sweep's warning path and its error path in a single run, so the logging
+    /// assertion can observe every message the job is capable of emitting rather than the success
+    /// line alone.
+    /// </remarks>
+    private sealed class FailsAndThrows(IBookingService inner, Guid returnsFailureFor, Guid throwsFor) : IBookingService
+    {
+        public Task<DomainResult<Booking>> PlaceAsync(BookingRequest request, CancellationToken cancellationToken = default)
+            => inner.PlaceAsync(request, cancellationToken);
+
+        public Task<DomainResult<Booking>> PlaceAsync(MultiClaimBookingRequest request, CancellationToken cancellationToken = default)
+            => inner.PlaceAsync(request, cancellationToken);
+
+        public Task<DomainResult<Booking>> PlaceForServiceAsync(ServiceAttribution service, MultiClaimBookingRequest request, CancellationToken cancellationToken = default)
+            => inner.PlaceForServiceAsync(service, request, cancellationToken);
+
+        public Task<DomainResult<Booking>> CancelAsync(Guid bookingId, CancellationToken cancellationToken = default)
+            => inner.CancelAsync(bookingId, cancellationToken);
+
+        public Task<DomainResult<Booking>> EraseBookerAsync(Guid bookingId, CancellationToken cancellationToken = default)
+        {
+            if (bookingId == throwsFor)
+            {
+                throw new InvalidOperationException($"Booking {bookingId} was erased but could not be read back.");
+            }
+
+            return bookingId == returnsFailureFor
+                ? Task.FromResult(DomainResult<Booking>.Failure(FailureCodes.BookingNotFound, "no"))
+                : inner.EraseBookerAsync(bookingId, cancellationToken);
+        }
+
+        public DomainResult CheckPlacementRules(Resource resource, DateTimeOffset start, TimeSpan duration)
+            => inner.CheckPlacementRules(resource, start, duration);
     }
 
     private sealed class ThrowsForOne(IBookingService inner, Guid throwsFor) : IBookingService

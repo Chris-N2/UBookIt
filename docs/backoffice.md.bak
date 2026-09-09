@@ -179,17 +179,10 @@ its status all survive; only the person leaves.
 start deleting your data because you upgraded.
 
 **A value it cannot read means off, not a default.** If the setting is blank, is not a number,
-is zero or negative, or is larger than 36525 (a century), uBookIt logs an **error** at startup
-and erases nothing. It will never guess a period on your behalf: keeping data longer than you
-meant is something you can correct, and erasing it sooner than you meant is not. If you want the
-shortest possible period, set `1` — `0` is treated as a mistake, because it is far more often
-somebody writing "off". A period beyond a century is refused for the same reason: it is either a
-typo or an attempt to say "never", and removing the setting already says never.
-
-**To turn retention off, remove the setting — do not blank it.** An empty value counts as one
-you meant to write and could not be read, so it is reported as an error rather than passed over
-in silence. That is deliberate: an environment variable resolving to nothing on a site that
-meant `90` is exactly the case worth interrupting somebody for. A JSON `null` reads as absent.
+or is zero or negative, uBookIt logs an **error** at startup and erases nothing. It will never
+guess a period on your behalf: keeping data longer than you meant is something you can correct,
+and erasing it sooner than you meant is not. If you want the shortest possible period, set `1`
+— `0` is treated as a mistake, because it is far more often somebody writing "off".
 
 **The clock runs from the end of the booking**, not from when it was made or when anything
 happened to it.

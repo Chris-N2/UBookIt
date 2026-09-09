@@ -27,6 +27,15 @@ would put every guarantee it carries at risk of being dropped in the restatement
 Nothing it says becomes false here — the booking table's columns are unchanged, and this adds a
 concern rather than altering one.*
 
+**The cost of that choice, stated rather than left to be discovered.** `Schema shape and naming`
+already carries the booker-email index that `find-by-booker` added inside it, so index guarantees
+now live in two requirements and a reader of that one gets an incomplete picture of what the
+booking table is indexed for. **Any future reader deriving the schema's indexes SHALL read both**,
+and a change adding a third index SHOULD decide deliberately which of the two homes it belongs in
+rather than inheriting this one by default. Splitting was still the right call here — a wholesale
+replacement risks silent deletion, which is worse than a cross-reference — but it is a trade, not
+a free win.
+
 #### Scenario: The retention index exists and is filtered
 - **WHEN** the schema is inspected
 - **THEN** an index covers the booking's end instant and is filtered to rows whose erased-UTC column is NULL

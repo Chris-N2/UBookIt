@@ -33,11 +33,29 @@ keep.
   changes ② and ③ of 0.3.0 exist for. *Decided with sign-off; the alternative needed a
   cancellation timestamp the schema does not have.*
 
-### Not a breaking change, and no destructive schema change
+### BREAKING — published port
 
-Nothing is removed from the public API. `SiteBookingSettings` gains an optional property, the
-booking store gains a read, and the migration adds an index — additive on every count. No column
-is dropped, no data is rewritten by the migration itself.
+**`IBookingStore` gains `GetBookingIdsDueForErasureAsync`.** A host supplying its own store
+implementation must add it, so this is a breaking change to published API and is called out here
+rather than left to be discovered — as `booker-erasure` and `find-by-booker` each did for theirs.
+It is 0.3.0's fourth break of the published surface.
+
+*This section originally read "Not a breaking change", on the grounds that nothing was removed
+and the addition was additive. That was wrong twice over: adding a member to an interface a host
+implements breaks that host, and `tasks.md` 2.1 had already recorded the obligation to declare it
+— ticked, and undone. Corrected after QA; recorded rather than quietly rewritten, because the
+mistake was reasoning from "additive" to "not breaking" and that inference will look just as
+reasonable next time.*
+
+**The member's shape is part of the contract, not an implementation detail.** It returns booking
+**ids**, and a substituted implementation may not widen it to return bookings — see the `bookings`
+delta. Returning a row carrying a booker would satisfy the compiler and falsify
+`booker-erasure`'s requirement that the unattended path handle no contact detail.
+
+### No destructive schema change
+
+`SiteBookingSettings` gains an optional property, and the migration adds an index. No column is
+dropped and no data is rewritten by the migration itself.
 
 **But the feature is destructive by design, and once, at the moment it is switched on.** Erasure
 is irreversible. A site setting `RetentionDays` to 90 on a database holding three years of
@@ -64,6 +82,10 @@ the whole point, but it must be documented as a one-way door rather than discove
   mechanism with obligations the unattended path must meet, and keep the tripwire. Also, the
   requirement *"What erasure does not reach is documented"* describes erasure as something an
   operator performs on one booking; it needs to cover erasure that nobody performed.
+- `bookings`: *Availability and placement service ports* is where a reader derives what
+  `IBookingStore` **is**, and it is where `booker-erasure` recorded its own addition to that port.
+  The new due-read belongs there on the same terms, with its breaking-change note and the
+  restriction that it may not be widened to carry a booker.
 - `persistence`: the composition requirement enumerates what the composer registers and how a
   missing setting behaves; the retention job and the retention setting join that list, and an
   unreadable retention value has to behave *unlike* the existing settings — it may not fall back

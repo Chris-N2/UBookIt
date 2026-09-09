@@ -21,6 +21,14 @@ data**, so the failure direction is chosen to keep data rather than to keep the 
 somebody writing "off" than somebody asking for immediate erasure, and only one of those
 misreadings can be undone.
 
+**A value too large to be subtracted from the present instant SHALL also mean no retention.**
+The sweep computes its cutoff by subtracting the period from now, and a period beyond the
+representable range of a date makes that computation fail rather than produce a cutoff — so a
+pasted timestamp or a millisecond count would give a site a recurring error instead of a policy.
+The package SHALL therefore refuse periods above a stated maximum of at least a century. Nothing
+expressible is lost: a value above it is either a mistake or an attempt to say *never*, and
+**omitting the setting already says never**.
+
 **An unreadable configured value SHALL be reported at startup as an error**, distinguishably from
 the setting being absent. Silence would leave a site believing retention is on while nothing
 erases — and, once a privacy notice publishes the period, telling visitors something untrue.
@@ -43,6 +51,10 @@ to accidentally publish the second as the first.
 #### Scenario: An unreadable period means off, not a default
 - **WHEN** the site configuration carries a retention period that is blank, non-numeric, zero or negative
 - **THEN** the package's settings report no retention period, no default period is substituted, and no booking's personal data is erased on the package's own initiative
+
+#### Scenario: An unusably large period means off rather than a recurring failure
+- **WHEN** the site configuration carries a retention period larger than the package's stated maximum
+- **THEN** the package's settings report no retention period, an error is reported at startup, and the sweep neither erases anything nor fails when it runs
 
 #### Scenario: An unreadable period is complained about
 - **WHEN** the site configuration carries a retention period that was written but cannot be read as a positive whole number of days
