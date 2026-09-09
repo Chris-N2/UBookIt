@@ -27,6 +27,7 @@ internal sealed class RunUBookItMigrations(
         }
 
         WarnIfTimeZoneNotConfigured(configuration, logger);
+        ErrorIfRetentionUnreadable(configuration, logger);
 
         try
         {
@@ -56,6 +57,37 @@ internal sealed class RunUBookItMigrations(
             logger.LogWarning(
                 "No '{SettingKey}' configuration value found; uBookIt is defaulting the site booking time zone to UTC.",
                 UBookItPersistenceComposer.TimeZoneSettingKey);
+        }
+    }
+
+    /// <summary>
+    /// Reports a retention period that was written and could not be read. Says nothing when none
+    /// was written.
+    /// </summary>
+    /// <remarks>
+    /// <para>
+    /// <b>An error rather than a warning</b>, which is louder than the time-zone case above and
+    /// meant to be. A missing time zone defaults to UTC and the site keeps working; an unreadable
+    /// retention period leaves retention silently off, and a later change publishes the configured
+    /// period in a privacy notice — so the site would be telling visitors their data is erased
+    /// after a period that nothing is enforcing. That is a fault worth interrupting somebody for.
+    /// </para>
+    /// <para>
+    /// <b>Silent when the setting is absent.</b> Not configuring retention is an ordinary choice
+    /// and the package's default; complaining about it every startup would bury the message that
+    /// matters among ones that do not.
+    /// </para>
+    /// </remarks>
+    internal static void ErrorIfRetentionUnreadable(IConfiguration configuration, ILogger logger)
+    {
+        if (UBookItPersistenceComposer.IsRetentionConfigured(configuration)
+            && UBookItPersistenceComposer.ResolveRetentionDays(configuration) is null)
+        {
+            logger.LogError(
+                "uBookIt could not read '{SettingKey}' as a positive whole number of days. "
+                + "Retention is OFF and no booking's personal data will be erased automatically. "
+                + "No default period has been substituted, because erasure cannot be undone.",
+                UBookItPersistenceComposer.RetentionDaysSettingKey);
         }
     }
 }

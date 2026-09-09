@@ -308,6 +308,41 @@ public sealed class InMemoryBookingStore : IBookingStore
         }
     }
 
+    /// <summary>How many times the due-for-erasure read was asked for.</summary>
+    /// <remarks>
+    /// Counted so a test can assert that retention, when it is switched off, issues <b>no query
+    /// at all</b> — rather than issuing one and discarding the answer. "Nothing was erased" is
+    /// satisfied by both, and only one of them is the requirement.
+    /// </remarks>
+    public int DueForErasureReads { get; private set; }
+
+    /// <inheritdoc />
+    public Task<IReadOnlyList<Guid>> GetBookingIdsDueForErasureAsync(
+        DateTimeOffset cutoffUtc, int take, CancellationToken cancellationToken = default)
+    {
+        lock (_gate)
+        {
+            DueForErasureReads++;
+
+            // Mirrors the SQL predicate exactly, ordering included. The ordering is not cosmetic
+            // here: the sweep takes the head of this set repeatedly and relies on each erasure
+            // removing a booking from it, so a double that returned an arbitrary top-n could make
+            // a non-terminating sweep look like a terminating one.
+            //
+            // No status filter, matching the port. A double that quietly filtered would make the
+            // status-blindness tests pass without the production query being status-blind.
+            IReadOnlyList<Guid> due = _bookings.Values
+                .Where(b => b.Interval.EndUtc < cutoffUtc && !b.Booker.IsErased)
+                .OrderBy(b => b.Interval.EndUtc)
+                .ThenBy(b => b.Id)
+                .Take(take)
+                .Select(b => b.Id)
+                .ToList();
+
+            return Task.FromResult(due);
+        }
+    }
+
     /// <summary>How many times the booker-erasure write was asked for.</summary>
     public int EraseCount { get; private set; }
 

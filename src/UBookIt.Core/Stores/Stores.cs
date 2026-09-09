@@ -224,6 +224,43 @@ public interface IBookingStore
     /// </returns>
     Task<bool> EraseBookerAsync(
         Guid bookingId, DateTimeOffset erasedUtc, CancellationToken cancellationToken = default);
+
+    /// <summary>
+    /// The ids of at most <paramref name="take"/> bookings whose interval ended before
+    /// <paramref name="cutoffUtc"/> and whose booker has not been erased, ordered by end instant
+    /// then id.
+    /// </summary>
+    /// <remarks>
+    /// <para>
+    /// <b>It returns identifiers, and that is a security property rather than an economy.</b> The
+    /// <c>booker-erasure</c> capability requires that only a caller permitted to read a booker's
+    /// contact details may destroy them. Retention erases with no caller at all, so that gate
+    /// cannot be applied to it — and what makes the exception honest instead of a hole is that the
+    /// unattended path has nothing to read: this selects on time alone, accepts no contact detail,
+    /// and hands back nothing but ids. Widening the return type to a row carrying a name or an
+    /// address would put personal data in the hands of the one code path with no user accountable
+    /// for it, and would falsify the requirement without changing a line of the requirement.
+    /// </para>
+    /// <para>
+    /// <b>No status filter.</b> A booking that was cancelled, declined or never confirmed holds a
+    /// real person's details exactly as firmly as one that went ahead, and a status filter here
+    /// would be a way for the sweep to under-erase — the failure mode that matters. Deliberately
+    /// absent, on the same reasoning that keeps one off a subject's search.
+    /// </para>
+    /// <para>
+    /// <b>The ordering is required, not a convenience.</b> The sweep repeatedly takes the head of
+    /// this set, relying on each erasure removing a booking from it. An unordered top-n may return
+    /// different rows on each call, and the sweep's termination argument assumes progress.
+    /// </para>
+    /// <para>
+    /// <b>Callers page by taking the head repeatedly, never by offset.</b> Erasing a booking
+    /// removes it from this result, so an offset advanced past a batch just erased skips exactly
+    /// as many un-erased bookings as it erased — leaving them behind while the sweep reports
+    /// success. There is deliberately no skip parameter to make that mistake with.
+    /// </para>
+    /// </remarks>
+    Task<IReadOnlyList<Guid>> GetBookingIdsDueForErasureAsync(
+        DateTimeOffset cutoffUtc, int take, CancellationToken cancellationToken = default);
 }
 
 /// <summary>One resource a booking claims, with the name a list row displays.</summary>

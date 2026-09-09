@@ -130,3 +130,9 @@ person who performed it — never the address that was erased.
   to whoever read the section above and is now wondering how to erase their own copy. There is
   no notification to subscribe to, so a system holding contact details must be reconciled some
   other way. Keeping the booking reference instead of the person avoids the problem entirely.
+
+  **And erasure does not always follow a call you made.** If the site configures a retention
+  period, bookings are erased on a timer with nothing calling the endpoint — so a downstream
+  copy can go stale without any request of yours having gone anywhere. Reconciling against the
+  erase endpoint's callers is therefore not enough on such a site; keeping the reference rather
+  than the person still is.

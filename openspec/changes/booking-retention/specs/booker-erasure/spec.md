@@ -1,51 +1,27 @@
-## RENAMED Requirements
-
-- FROM: `### Requirement: Only a caller permitted to read contact details may erase them`
-- TO: `### Requirement: Erasure is gated on the access to read what it destroys`
-
-The old name says *caller*, and retention erases with no caller at all. Left as it was, the
-requirement's name would assert something the package no longer does, and the first reader
-looking for the rule that governs the timer would conclude there wasn't one. The guarantee is
-unchanged and is stated below; only its name has stopped excluding the case it has to cover.
-
 ## MODIFIED Requirements
 
-### Requirement: Erasure is gated on the access to read what it destroys
+### Requirement: Only a caller permitted to read contact details may erase them
 
-Erasure requested by a backoffice user SHALL require the same **sensitive-data access** that
-reading a booker's contact details requires, per the `sensitive-data` capability, **in addition
-to** the section access every management endpoint requires.
+Erasure SHALL require the same **sensitive-data access** that reading a booker's contact
+details requires, per the `sensitive-data` capability, **in addition to** the section access
+every management endpoint requires.
 
 **The gate SHALL be a property of the operation, not a condition inside it.** A caller without
-sensitive-data access SHALL be refused before any erasure occurs, rather than reaching a handler
-that decides.
+sensitive-data access SHALL be refused before any erasure occurs, rather than reaching a
+handler that decides.
 
 The reasoning is that erasure is the most consequential thing the package will do to a booking
 and it cannot be undone. A user the site has decided may not so much as read a booker's name
 should not be able to destroy it.
 
-**A site's own configured retention policy erases with no user, and is permitted to.** The gate
-above governs a person asking the package to erase somebody's data. It cannot govern unattended
-work, because there is nobody to test — and it must not be read as forbidding it, or a site could
-never operate a retention policy at all. What replaces the gate is not trust: an unattended
-erasure path SHALL meet **all** of the following, and the guarantee the gate exists to deliver is
-that **nothing reaches or destroys a booker's contact details without the access to read them**,
-which the obligations deliver by leaving nothing to read.
-
-- It SHALL select bookings by **time and erasure state alone**, and SHALL accept no contact
-  detail as input.
-- It SHALL receive **booking identifiers only** from storage — no name, email address, phone
-  number or member key.
-- It SHALL NOT read, log, report or otherwise handle a contact detail at any point.
-- It SHALL NOT be reachable from any HTTP request, and SHALL be configured only where a site's
-  configuration is — which is to say by somebody with more access than any backoffice group
-  confers, not less.
-
-**Every other erasure path SHALL carry the caller gate.** A new way to erase SHALL either require
-sensitive-data access as its own authorization, or satisfy every obligation above. There is no
-third option, and in particular an unattended path that handles contact details for any reason is
-not one. This clause is the tripwire: without it, "the timer is exempt" becomes a precedent that
-any caller-less code can claim.
+**This requirement governs erasure that somebody asks for, and says nothing about erasure that
+nobody asks for.** It was written when a caller was the only way an erasure could happen, so its
+name and its wording both assume one. A site's own configured retention policy erases with no
+user to test, and this rule cannot be applied to it — but it must not be read as forbidding it
+either, or a site could never operate a retention policy at all. What governs the unattended case
+instead is *An unattended erasure path handles no contact detail*, below, which is where the same
+guarantee is delivered by different means. **Neither requirement is an exception to the other:
+between them they cover every way an erasure can happen, and the second one says so explicitly.**
 
 #### Scenario: A permitted user can erase
 - **WHEN** a backoffice user with section access and sensitive-data access erases a booking's booker
@@ -58,18 +34,6 @@ any caller-less code can claim.
 #### Scenario: The gate belongs to the operation
 - **WHEN** the erase operation's authorization is inspected
 - **THEN** sensitive-data access is required to reach it at all, rather than tested within a handler that would otherwise proceed
-
-#### Scenario: The unattended path handles no contact detail
-- **WHEN** the package's unattended erasure path is inspected
-- **THEN** it selects bookings by time and erasure state, receives only booking identifiers, and handles no name, email address, phone number or member key
-
-#### Scenario: The unattended path is not reachable from a request
-- **WHEN** the package's endpoints are enumerated
-- **THEN** none of them performs an unattended erasure sweep or erases more than one booking
-
-#### Scenario: Every erasure path is accounted for
-- **WHEN** the package's erasure paths are enumerated
-- **THEN** each one either requires sensitive-data access as its own authorization or satisfies every obligation on an unattended path, and none is exempt on any other ground
 
 ### Requirement: What erasure does not reach is documented
 
@@ -109,3 +73,59 @@ a booking nobody can ring, and the third as a bug report about vanishing data.
 #### Scenario: Erasure without an actor is documented
 - **WHEN** a reader consults the backoffice documentation
 - **THEN** it states that a booking's personal data may also be erased automatically where the site has configured a retention period, and points to where that is described
+
+## ADDED Requirements
+
+### Requirement: An unattended erasure path handles no contact detail
+
+An erasure performed without a caller — by a site's configured retention policy, or by any
+future unattended path — SHALL meet **all** of the following:
+
+- It SHALL select bookings by **time and erasure state alone**, and SHALL accept no contact
+  detail as input.
+- It SHALL receive **booking identifiers only** from storage: no name, email address, phone
+  number or member key.
+- It SHALL NOT read, log, report or otherwise handle a contact detail at any point.
+- It SHALL NOT be reachable from any HTTP request, and SHALL be configured only where a site's
+  configuration is.
+
+**These obligations deliver the same guarantee the caller gate delivers, by a different route.**
+The guarantee is that *nothing reaches or destroys a booker's contact details without the access
+to read them*. A caller is held to it by being asked for that access. An unattended path cannot
+be — there is nobody to ask — so it is held to it by having nothing to read: it never sees a
+contact detail, so there is no access it could be exceeding. The exemption is from the
+*mechanism*, never from the guarantee.
+
+**It is not "the timer is trusted".** Trust would be an exemption; this is a construction. A
+retention sweep that selected rows carrying names and addresses would put personal data in the
+hands of the one code path with no user accountable for it, and would falsify this requirement
+without a word of it changing — which is precisely why the obligations are on the *shape of the
+data the path handles* rather than on the path's good intentions.
+
+**Every erasure path SHALL be covered by one of the two requirements.** A new way to erase SHALL
+either require sensitive-data access as its own authorization, per *Only a caller permitted to
+read contact details may erase them*, or satisfy every obligation above. **There is no third
+option**, and in particular an unattended path that handles contact details for any reason is not
+one. This clause is the tripwire: without it, "the retention job is exempt" becomes a precedent
+any caller-less code can claim, and the caller gate becomes advisory.
+
+**Configuration is not a weaker gate than the backoffice one.** An unattended path is switched on
+in a site's configuration, which needs deployment or server access — strictly more than
+membership of a backoffice group. Stated so that "it has no permission check" is not mistaken for
+"anybody can turn it on".
+
+#### Scenario: The unattended path handles no contact detail
+- **WHEN** the package's unattended erasure path is inspected
+- **THEN** it selects bookings by time and erasure state, receives only booking identifiers, and handles no name, email address, phone number or member key
+
+#### Scenario: The selection cannot be widened to carry a person
+- **WHEN** the read that feeds an unattended erasure is inspected
+- **THEN** its inputs carry no contact detail and its result carries booking identifiers and nothing else
+
+#### Scenario: The unattended path is not reachable from a request
+- **WHEN** the package's endpoints are enumerated
+- **THEN** none of them performs an unattended erasure sweep or erases more than one booking
+
+#### Scenario: Every erasure path is accounted for
+- **WHEN** the package's erasure paths are enumerated
+- **THEN** each one either requires sensitive-data access as its own authorization or satisfies every obligation on an unattended path, and none is exempt on any other ground

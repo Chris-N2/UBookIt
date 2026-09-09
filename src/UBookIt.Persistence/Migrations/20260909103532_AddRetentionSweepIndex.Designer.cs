@@ -3,6 +3,7 @@ using System;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Infrastructure;
 using Microsoft.EntityFrameworkCore.Metadata;
+using Microsoft.EntityFrameworkCore.Migrations;
 using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 using UBookIt.Persistence;
 
@@ -11,9 +12,11 @@ using UBookIt.Persistence;
 namespace UBookIt.Persistence.Migrations
 {
     [DbContext(typeof(UBookItDbContext))]
-    partial class UBookItDbContextModelSnapshot : ModelSnapshot
+    [Migration("20260909103532_AddRetentionSweepIndex")]
+    partial class AddRetentionSweepIndex
     {
-        protected override void BuildModel(ModelBuilder modelBuilder)
+        /// <inheritdoc />
+        protected override void BuildTargetModel(ModelBuilder modelBuilder)
         {
 #pragma warning disable 612, 618
             modelBuilder
