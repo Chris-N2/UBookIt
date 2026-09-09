@@ -45,7 +45,10 @@ public class BookerRetentionTests
     /// everything else.
     /// </remarks>
     private static Booking EndedDaysAgo(
-        double days, BookingStatus status = BookingStatus.Confirmed, Guid? resourceId = null)
+        double days,
+        BookingStatus status = BookingStatus.Confirmed,
+        Guid? resourceId = null,
+        Booker? booker = null)
     {
         var endUtc = Now.AddDays(-days);
 
@@ -53,7 +56,7 @@ public class BookerRetentionTests
             Guid.NewGuid(),
             References.Any(),
             BookingInterval.Create(endUtc.AddHours(-1), endUtc, TestData.LondonZoneId).Value,
-            TestData.Booker(),
+            booker ?? TestData.Booker(),
             [new ResourceClaim(resourceId ?? Guid.NewGuid())],
             status,
             Now.AddDays(-365),
@@ -459,9 +462,23 @@ public class BookerRetentionTests
         // version checked name and email on the success path only — a finding enumerates a
         // sample, not the population, and the warning and error paths are the ones where a
         // failure message could most plausibly carry a person.
-        var succeeds = EndedDaysAgo(RetentionDays + 10);
-        var fails = EndedDaysAgo(RetentionDays + 20);
-        var throws = EndedDaysAgo(RetentionDays + 30);
+        //
+        // THE FIXTURE CARRIES A PHONE AND A MEMBER KEY, and that is the whole reason this reads
+        // as it does. The first attempt at this widening guarded those two assertions with
+        // `if (phone is not empty)` and `if (memberKey is Guid)` over the standard fixture, which
+        // has neither — so both branches were dead and the suite could not tell a job that logged
+        // a member key from one that did not. An assertion behind a condition the fixture never
+        // satisfies is not a weak assertion, it is no assertion. The conditionals are gone and
+        // the values are seeded instead, so every one of the four is exercised.
+        //
+        // The member key matters most of the four: it is the identifier that survives when a name
+        // does not, which is why booker-erasure singles it out.
+        static Booker Identifiable(string tag) => Booker.Create(
+            Guid.NewGuid(), $"Distinctive {tag} Person", $"{tag}@example.com", $"0700 000 {tag}").Value;
+
+        var succeeds = EndedDaysAgo(RetentionDays + 10, booker: Identifiable("111"));
+        var fails = EndedDaysAgo(RetentionDays + 20, booker: Identifiable("222"));
+        var throws = EndedDaysAgo(RetentionDays + 30, booker: Identifiable("333"));
 
         var harness = Build(seed: [succeeds, fails, throws]);
 
@@ -501,18 +518,16 @@ public class BookerRetentionTests
 
         foreach (var (name, email, phone, memberKey) in people)
         {
+            // Unconditional, all four. The fixture guarantees a phone and a member key are
+            // present, so these are asserted rather than skipped — and the two guards below stop
+            // that guarantee from quietly lapsing if the fixture is ever changed back.
+            Assert.False(string.IsNullOrWhiteSpace(phone), "The fixture must carry a phone number, or the phone assertion below tests nothing.");
+            Assert.NotNull(memberKey);
+
             Assert.DoesNotContain(name, emitted, StringComparison.OrdinalIgnoreCase);
             Assert.DoesNotContain(email, emitted, StringComparison.OrdinalIgnoreCase);
-
-            if (!string.IsNullOrEmpty(phone))
-            {
-                Assert.DoesNotContain(phone, emitted, StringComparison.OrdinalIgnoreCase);
-            }
-
-            if (memberKey is Guid key)
-            {
-                Assert.DoesNotContain(key.ToString(), emitted, StringComparison.OrdinalIgnoreCase);
-            }
+            Assert.DoesNotContain(phone!, emitted, StringComparison.OrdinalIgnoreCase);
+            Assert.DoesNotContain(memberKey!.Value.ToString(), emitted, StringComparison.OrdinalIgnoreCase);
         }
     }
 
@@ -635,6 +650,18 @@ public class BookerRetentionTests
 
             // The verb both paths go through — the single implementation, not a third path.
             ["BookingService.EraseBookerAsync"] = "the verb both paths use",
+
+            // The storage half of that same verb: the one statement that actually clears the
+            // columns. NOT a third path — nothing reaches it except the verb above — but it is
+            // reached BY an erasure, so it is classified rather than excluded.
+            //
+            // It was previously hidden by a `!t.Name.StartsWith("Sql")` filter with no comment,
+            // which is the escape-hatch defect this test was written to close, relocated from the
+            // dictionary into the filter above it. An exemption keyed on a type NAME is worse
+            // than the one it replaced: the `bookings` delta this change adds explicitly invites
+            // hosts to write substitute store implementations, and any of them called Sql-anything
+            // would have been silently unseen.
+            ["SqlBookingStore.EraseBookerAsync"] = "the storage half of the verb",
         };
 
         var assemblies = new[]
@@ -649,7 +676,6 @@ public class BookerRetentionTests
             .Where(t => t is { IsAbstract: false, IsInterface: false })
             .Where(t => t.Namespace?.StartsWith("UBookIt", StringComparison.Ordinal) == true)
             .Where(t => t != typeof(Booking) && t != typeof(Booker))
-            .Where(t => !t.Name.StartsWith("Sql", StringComparison.Ordinal))
             .SelectMany(t => t
                 .GetMethods(BindingFlags.Public | BindingFlags.Instance | BindingFlags.DeclaredOnly)
                 // Property accessors, not operations. `BookerModel.get_ErasedUtc` and
@@ -685,9 +711,14 @@ public class BookerRetentionTests
                 return "unattended";
             }
 
-            return typeof(IBookingService).IsAssignableFrom(type)
-                ? "the verb both paths use"
-                : "UNCLASSIFIED — neither gated, nor unattended, nor the verb itself";
+            if (typeof(IBookingService).IsAssignableFrom(type))
+            {
+                return "the verb both paths use";
+            }
+
+            return typeof(IBookingStore).IsAssignableFrom(type)
+                ? "the storage half of the verb"
+                : "UNCLASSIFIED — neither gated, nor unattended, nor the verb, nor its storage";
         }
 
         var derived = found.ToDictionary(
@@ -701,7 +732,7 @@ public class BookerRetentionTests
 
         // Anti-vacuity: an over-eager filter would turn this into a test that passes by looking
         // at nothing, which is exactly how a tripwire stops being one.
-        Assert.Equal(3, found.Count);
+        Assert.Equal(4, found.Count);
     }
 
     [Fact]

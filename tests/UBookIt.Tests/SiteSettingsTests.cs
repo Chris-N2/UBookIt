@@ -198,9 +198,25 @@ public class SiteSettingsTests
 
         Assert.NotNull(accepted);
 
-        // DateTimeOffset.MinValue is the worst case: any earlier "now" is unreachable.
-        var exception = Record.Exception(
-            () => DateTimeOffset.MinValue.AddYears(200).AddDays(-accepted!.Value));
+        // The clock the job is actually handed, plus a wide margin either side — NOT
+        // DateTimeOffset.MinValue.
+        //
+        // An earlier version said "MinValue is the worst case: any earlier now is unreachable"
+        // and then quietly used `MinValue.AddYears(200)` to make itself pass. The sentence was
+        // false: MinValue.AddDays(-36525) throws, and so does MinValue.AddYears(100).AddDays(...)
+        // — only the 200 survived, which made the number silently load-bearing while the comment
+        // justifying it was wrong. A reader would have trusted it.
+        //
+        // The honest property is narrower and is the one that matters: every accepted period can
+        // be subtracted from any instant a running site's clock could hold. Year 1 is not such an
+        // instant; the cap is a century, so the true floor is year 101 and the margin below is
+        // deliberate rather than tuned until green.
+        var exception = Record.Exception(() =>
+        {
+            _ = new DateTimeOffset(2026, 1, 1, 0, 0, 0, TimeSpan.Zero).AddDays(-accepted!.Value);
+            _ = new DateTimeOffset(1000, 1, 1, 0, 0, 0, TimeSpan.Zero).AddDays(-accepted!.Value);
+            _ = DateTimeOffset.MaxValue.AddDays(-accepted!.Value);
+        });
 
         Assert.Null(exception);
     }

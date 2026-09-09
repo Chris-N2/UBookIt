@@ -353,8 +353,23 @@ public class BackofficeDocumentationTests
         var docs = Docs();
 
         DocumentationAssert.Says(docs, "Every booking counts, whatever its status");
-        DocumentationAssert.Says(docs, "is never erased by retention");
+
+        // The SUBJECT, not just the predicate. "is never erased by retention" alone was satisfied
+        // by any sentence ending that way — including "A cancelled booking is never erased by
+        // retention", which is flatly wrong and is the most likely miswording, since it is the
+        // rule a reader is most tempted to assume. What the spec requires is that the doc say a
+        // booking whose interval HAS NOT ENDED is never erased, so that is what is pinned.
+        DocumentationAssert.Says(docs, "A booking whose slot has not ended is never erased by retention");
+
         DocumentationAssert.Says(docs, "A value it cannot read means off, not a default");
+
+        // The cap, tied to the constant the code reads — the same treatment the setting key gets
+        // above, and for the same reason: a literal in prose can drift from the value that
+        // enforces it with nothing to notice.
+        Assert.Contains(
+            $"{UBookItPersistenceComposer.MaxRetentionDays}",
+            docs,
+            StringComparison.Ordinal);
     }
 
     [Fact]
@@ -368,6 +383,21 @@ public class BackofficeDocumentationTests
 
         DocumentationAssert.Says(docs, "Details can also disappear with nobody having erased them");
         DocumentationAssert.Says(docs, "almost certainly that, and not a fault");
+
+        // "and points to where that is described" is half the scenario, and it was the unguarded
+        // half: deleting the link left this test green. The anchor is asserted as a link rather
+        // than as prose, because a reader following a broken pointer is no better served than one
+        // given no pointer at all.
+        Assert.Contains(
+            "(#erasing-old-bookings-automatically)",
+            docs,
+            StringComparison.Ordinal);
+
+        // And the heading it points at, so the link cannot survive its own target being renamed.
+        Assert.Contains(
+            "## Erasing old bookings automatically",
+            docs,
+            StringComparison.Ordinal);
     }
 
     [Fact]
