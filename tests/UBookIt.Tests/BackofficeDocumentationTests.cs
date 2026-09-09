@@ -1,4 +1,5 @@
 using UBookIt.Backoffice;
+using UBookIt.Persistence.Composing;
 using UBookIt.Tests.Support;
 
 namespace UBookIt.Tests;
@@ -304,6 +305,99 @@ public class BackofficeDocumentationTests
         }
 
         Assert.DoesNotContain("about those two verbs", purpose, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public void The_retention_setting_is_documented_with_its_unit_and_its_default()
+    {
+        // A site owner cannot configure what is not named, and cannot reason about a period
+        // whose starting point is not stated. The key itself is asserted against the constant
+        // the code reads, so a rename cannot leave the documentation pointing at nothing.
+        var docs = Docs();
+
+        Assert.Contains(
+            UBookItPersistenceComposer.RetentionDaysSettingKey.Split(':')[^1],
+            docs,
+            StringComparison.Ordinal);
+
+        DocumentationAssert.Says(docs, "It is off unless you set it");
+        DocumentationAssert.Says(docs, "whose slot **ended** more than that many days ago");
+        DocumentationAssert.Says(docs, "The setting is read at startup");
+    }
+
+    [Fact]
+    public void The_one_way_door_is_documented()
+    {
+        // THE MOST LOAD-BEARING SENTENCES IN THE DOCUMENT, and the reason this test exists.
+        //
+        // Enabling retention erases a site's history on the first run, irreversibly, and there
+        // is no confirmation step — the spec says outright that this paragraph IS the
+        // confirmation dialog, because a config file has nowhere to put one. Undocumented, the
+        // feature's first use is a disaster; and until this test existed the callout could be
+        // edited away with a green suite.
+        var docs = Docs();
+
+        DocumentationAssert.Says(docs, "Turning this on erases your history immediately");
+        DocumentationAssert.Says(docs, "Not gradually — on the first run, within minutes");
+        DocumentationAssert.Says(docs, "no permission, group or support call brings any of them back");
+        DocumentationAssert.Says(docs, "There is no \"are you sure?\" step");
+    }
+
+    [Fact]
+    public void The_boundaries_of_what_retention_reaches_are_documented()
+    {
+        // Each of these is a decision that looks like a defect to somebody who has not been
+        // told: that a cancelled booking is erased on the same clock as one that went ahead,
+        // that a future-dated booking is never reached however old, and that an unreadable
+        // value disables the feature rather than defaulting it.
+        var docs = Docs();
+
+        DocumentationAssert.Says(docs, "Every booking counts, whatever its status");
+
+        // The SUBJECT, not just the predicate. "is never erased by retention" alone was satisfied
+        // by any sentence ending that way — including "A cancelled booking is never erased by
+        // retention", which is flatly wrong and is the most likely miswording, since it is the
+        // rule a reader is most tempted to assume. What the spec requires is that the doc say a
+        // booking whose interval HAS NOT ENDED is never erased, so that is what is pinned.
+        DocumentationAssert.Says(docs, "A booking whose slot has not ended is never erased by retention");
+
+        DocumentationAssert.Says(docs, "A value it cannot read means off, not a default");
+
+        // The cap, tied to the constant the code reads — the same treatment the setting key gets
+        // above, and for the same reason: a literal in prose can drift from the value that
+        // enforces it with nothing to notice.
+        Assert.Contains(
+            $"{UBookItPersistenceComposer.MaxRetentionDays}",
+            docs,
+            StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public void Erasure_that_nobody_performed_is_documented()
+    {
+        // `booker-erasure` requires the reader be told erasure is not exclusively something a
+        // person does. Without it, the first automatically erased booking is a bug report about
+        // vanishing data — and the operator has no way to reach the explanation, since there is
+        // no actor to look up.
+        var docs = Docs();
+
+        DocumentationAssert.Says(docs, "Details can also disappear with nobody having erased them");
+        DocumentationAssert.Says(docs, "almost certainly that, and not a fault");
+
+        // "and points to where that is described" is half the scenario, and it was the unguarded
+        // half: deleting the link left this test green. The anchor is asserted as a link rather
+        // than as prose, because a reader following a broken pointer is no better served than one
+        // given no pointer at all.
+        Assert.Contains(
+            "(#erasing-old-bookings-automatically)",
+            docs,
+            StringComparison.Ordinal);
+
+        // And the heading it points at, so the link cannot survive its own target being renamed.
+        Assert.Contains(
+            "## Erasing old bookings automatically",
+            docs,
+            StringComparison.Ordinal);
     }
 
     [Fact]

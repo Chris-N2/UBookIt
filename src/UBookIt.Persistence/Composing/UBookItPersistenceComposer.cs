@@ -5,11 +5,13 @@ using UBookIt.Core.Availability;
 using UBookIt.Core.Bookings;
 using UBookIt.Core.Services;
 using UBookIt.Core.Stores;
+using UBookIt.Persistence.Jobs;
 using UBookIt.Persistence.Notifications;
 using UBookIt.Persistence.Stores;
 using Umbraco.Cms.Core.Composing;
 using Umbraco.Cms.Core.DependencyInjection;
 using Umbraco.Cms.Core.Notifications;
+using Umbraco.Cms.Infrastructure.BackgroundJobs;
 using Umbraco.Extensions;
 
 namespace UBookIt.Persistence.Composing;
@@ -26,6 +28,7 @@ public sealed class UBookItPersistenceComposer : IComposer
     public const string DefaultTimeZoneId = "UTC";
     public const string MaxQueryRangeDaysSettingKey = "UBookIt:MaxQueryRangeDays";
     public const int DefaultMaxQueryRangeDays = 31;
+    public const string RetentionDaysSettingKey = "UBookIt:RetentionDays";
 
     public void Compose(IUmbracoBuilder builder)
     {
@@ -69,6 +72,17 @@ public sealed class UBookItPersistenceComposer : IComposer
         builder.Services.AddScoped<IBookingService, BookingService>();
         builder.Services.AddScoped<IServiceBookingService, ServiceBookingService>();
 
+        // Registered UNCONDITIONALLY, whether or not retention is configured — the job reads the
+        // setting itself and returns immediately when there is none. Registering it only when a
+        // period is configured would make the setting's effect depend on the state of
+        // configuration at startup in a second, invisible way: a site that corrected a mistyped
+        // value would still have no job to run, and would be waiting on a restart for a different
+        // reason than the one it thought.
+        //
+        // AddSingleton rather than an extension method: Umbraco has no AddDistributedBackgroundJob
+        // helper and registers its own the same way.
+        builder.Services.AddSingleton<IDistributedBackgroundJob, BookerRetentionJob>();
+
         builder.AddNotificationAsyncHandler<UmbracoApplicationStartedNotification, RunUBookItMigrations>();
     }
 
@@ -82,6 +96,7 @@ public sealed class UBookItPersistenceComposer : IComposer
             ? configuration[TimeZoneSettingKey]!
             : DefaultTimeZoneId,
         MaxQueryRangeDays = ResolveMaxQueryRangeDays(configuration),
+        RetentionDays = ResolveRetentionDays(configuration),
     };
 
     internal static bool IsTimeZoneConfigured(IConfiguration configuration)
@@ -96,4 +111,70 @@ public sealed class UBookItPersistenceComposer : IComposer
         => int.TryParse(configuration[MaxQueryRangeDaysSettingKey], out var days) && days > 0
             ? days
             : DefaultMaxQueryRangeDays;
+
+    /// <summary>
+    /// Whether the site wrote anything at all for <c>UBookIt:RetentionDays</c>, readable or not.
+    /// </summary>
+    /// <remarks>
+    /// <para>
+    /// Separate from <see cref="ResolveRetentionDays"/> so that "nobody configured retention" and
+    /// "somebody configured retention and it could not be read" stay distinguishable. They resolve
+    /// to the same setting — off — but only one of them is a fault, and reporting the ordinary
+    /// choice as a fault would train a site owner to ignore the message that matters.
+    /// </para>
+    /// <para>
+    /// <b>Presence, not non-blankness</b> — which is deliberately unlike
+    /// <see cref="IsTimeZoneConfigured"/>. A blank value is ambiguous: it looks like an
+    /// unconfigured setting and it looks like an environment variable that resolved to nothing on
+    /// a site that meant to set 90. Treating it as absent would answer that ambiguity with
+    /// silence, and silence is the wrong answer for a setting whose failure mode is a site
+    /// believing its data is being erased when nothing is erasing it. The blank still resolves to
+    /// off; it just does not do so quietly.
+    /// </para>
+    /// </remarks>
+    internal static bool IsRetentionConfigured(IConfiguration configuration)
+        => configuration[RetentionDaysSettingKey] is not null;
+
+    /// <summary>
+    /// The configured retention period in days, or <c>null</c> for no retention.
+    /// </summary>
+    /// <remarks>
+    /// <para>
+    /// <b>Deliberately NOT shaped like <see cref="ResolveMaxQueryRangeDays"/>.</b> That method
+    /// substitutes a working default for a value it cannot read, because the cost of being wrong
+    /// is a rejected query. Here the cost of being wrong is erasing personal data irreversibly on
+    /// a period nobody wrote, so every unreadable form resolves to <c>null</c> and no default is
+    /// ever substituted. Being wrong in this direction keeps data longer than intended, which the
+    /// site can fix; being wrong in the other direction cannot be undone by anyone.
+    /// </para>
+    /// <para>
+    /// <b>Zero is refused rather than read as "erase as soon as a booking ends".</b> That is a
+    /// coherent policy, but <c>RetentionDays: 0</c> is far likelier to be somebody writing "off"
+    /// than somebody asking for immediate erasure — and only one of those two misreadings can be
+    /// recovered from. A site wanting the aggressive policy writes <c>1</c>.
+    /// </para>
+    /// </remarks>
+    /// <remarks>
+    /// <para>
+    /// <b>An upper bound, because the job subtracts this from the current instant.</b>
+    /// <c>DateTimeOffset.AddDays</c> throws once the result leaves the representable range, so a
+    /// nonsense-but-positive value — a pasted timestamp, a millisecond count — would give a site
+    /// an exception every hour instead of a retention policy. Refused here, where the answer is
+    /// "off" and an error is logged, rather than thrown hourly out of a background job.
+    /// </para>
+    /// <para>
+    /// A century, and the number is not arbitrary in the direction that matters: any value above
+    /// it is either a mistake or an attempt to say "never", and **the setting already has a way
+    /// to say never** — leave it out. So nothing expressible is lost, and the failure it removes
+    /// is real.
+    /// </para>
+    /// </remarks>
+    internal const int MaxRetentionDays = 36525;
+
+    internal static int? ResolveRetentionDays(IConfiguration configuration)
+        => int.TryParse(configuration[RetentionDaysSettingKey], out var days)
+            && days > 0
+            && days <= MaxRetentionDays
+                ? days
+                : null;
 }

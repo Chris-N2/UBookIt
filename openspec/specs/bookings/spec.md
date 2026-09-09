@@ -247,6 +247,28 @@ nothing new into Core. Listing it matters because this requirement is where a re
 what `UBookIt.Core`'s booking service IS; leaving it at two would describe a surface that no
 longer exists.*
 
+**BREAKING — published port, and the second such addition in this capability.** `IBookingStore`
+gains a read returning the **ids** of bookings whose interval ended before a given instant and
+whose booker has not been erased. A host supplying its own store implementation must add it.
+
+**It returns identifiers rather than bookings, and that is a constraint on the port rather than a
+convenience for its caller.** Its consumer is the unattended retention sweep, which per
+`booker-erasure` must handle no contact detail at any point — that obligation is what allows an
+erasure with no caller to exist without weakening the rule that only somebody permitted to read
+contact details may destroy them. A substituted implementation that returned whole bookings would
+satisfy the compiler and falsify the guarantee, so the port SHALL NOT be widened to carry a
+booker, and a host implementing it inherits that restriction.
+
+**It SHALL apply no status filter**, for the same reason the subject search carries none: a
+booking that was cancelled, declined or never confirmed holds a real person's details exactly as
+firmly as one that went ahead, and a filter here would be a way for the sweep to under-erase.
+
+*The store port's enumeration grows for the same reason the service's did, and the note above
+applies unchanged: the constraint was never about how many members there are. This one adds no
+dependency to Core and no verb to the booking service — retention erases through the service
+operation that already exists, so what is new here is only a way to find what the clock has
+caught.*
+
 ### Requirement: Placement and cancellation are observable
 `UBookIt.Core` SHALL report, through a port it declares itself, that a booking has been
 **placed** and that a booking has been **cancelled**. A host SHALL be able to observe both

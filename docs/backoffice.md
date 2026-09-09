@@ -138,6 +138,75 @@ erase.
 > for it, and shipping the button before that step would be the easiest way to lose somebody's
 > booking details to a mis-click.
 
+### Details can also disappear with nobody having erased them
+
+If your site has configured a **retention period**, bookings are erased automatically once they
+are old enough — see [Erasing old bookings automatically](#erasing-old-bookings-automatically)
+below. A booking marked *"Contact details erased"* with no record of anyone erasing it is
+almost certainly that, and not a fault.
+
+## Erasing old bookings automatically
+
+Erasing on request answers somebody who asks. Retention answers the other half: personal data
+should not be kept for ever just because nobody got round to removing it.
+
+Set a number of days in `appsettings.json`:
+
+```json
+{
+  "UBookIt": {
+    "RetentionDays": 90
+  }
+}
+```
+
+uBookIt then erases the booker of every booking whose slot **ended** more than that many days
+ago, using exactly the same erasure described above — the booking, its reference, its time and
+its status all survive; only the person leaves.
+
+> ### Turning this on erases your history immediately
+>
+> **Not gradually — on the first run, within minutes.** If you set `RetentionDays` to 90 on a
+> site holding three years of bookings, almost every booker's name, email address and phone
+> number is gone before the hour is out, and **no permission, group or support call brings any
+> of them back**.
+>
+> There is no "are you sure?" step, because there is nowhere to put one: the setting takes
+> effect in a config file, not in a screen. This paragraph is the confirmation dialog. Decide
+> the number with that in mind, and consider whether you want a database backup first.
+
+**It is off unless you set it.** No `RetentionDays`, no automatic erasure — uBookIt will not
+start deleting your data because you upgraded.
+
+**A value it cannot read means off, not a default.** If the setting is blank, is not a number,
+is zero or negative, or is larger than 36525 (a century), uBookIt logs an **error** at startup
+and erases nothing. It will never guess a period on your behalf: keeping data longer than you
+meant is something you can correct, and erasing it sooner than you meant is not. If you want the
+shortest possible period, set `1` — `0` is treated as a mistake, because it is far more often
+somebody writing "off". A period beyond a century is refused for the same reason: it is either a
+typo or an attempt to say "never", and removing the setting already says never.
+
+**To turn retention off, remove the setting — do not blank it.** An empty value counts as one
+you meant to write and could not be read, so it is reported as an error rather than passed over
+in silence. That is deliberate: an environment variable resolving to nothing on a site that
+meant `90` is exactly the case worth interrupting somebody for. A JSON `null` reads as absent.
+
+**The clock runs from the end of the booking**, not from when it was made or when anything
+happened to it.
+
+**Every booking counts, whatever its status.** Cancelled, declined and never-confirmed bookings
+hold a real person's details just as firmly as ones that went ahead, so retention treats them
+alike.
+
+**A booking whose slot has not ended is never erased by retention**, however long ago it was
+made and even if it was cancelled months in advance. If you want somebody's details gone before
+then, erase that booking by hand — that is what the endpoint above is for.
+
+**The setting is read at startup**, so a change to it takes effect when the site restarts.
+
+**On a load-balanced site it runs once**, not once per server. uBookIt uses Umbraco's own
+scheduling to arrange that.
+
 ## What is in the section
 
 | | |

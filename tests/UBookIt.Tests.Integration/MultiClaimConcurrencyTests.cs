@@ -254,6 +254,27 @@ public class MultiClaimConcurrencyTests(SqlServerFixture fixture)
                 // per resource, which is the guarantee above. What changes is how quickly a
                 // booking can be FOUND, never what it claims.
                 "20260905134054_AddBookerEmailIndex",
+
+                // A filtered index on `uBookItBooking.EndUtc`, keyed on the end instant and
+                // filtered to rows whose `BookerErasedUtc` is NULL, so the retention sweep can
+                // find bookings due for erasure without scanning. Checked: one CREATE INDEX with
+                // a WHERE clause, no column altered, no data statement, and
+                // `uBookItResourceClaim` is not referenced.
+                //
+                // Worth more than the usual glance because this is the first index here whose
+                // key column, `EndUtc`, is one the CLAIM-overlap query also filters on — so
+                // "it touches a column nothing else queries", the argument the entry above
+                // could lean on, is not available. Checked properly: the claims read joins
+                // through `uBookItResourceClaim` and filters `StartUtc < to AND from < EndUtc`,
+                // which the existing `(StartUtc, EndUtc)` index still covers as a seek on its
+                // leading column; the new index is filtered to un-erased rows and so cannot
+                // serve that query better, or at all, for the erased ones. The whole
+                // claims-read and concurrency suite passes with it present.
+                //
+                // One booking still holds one claim row per resource, which is the guarantee
+                // above. What changes is how quickly a booking's AGE can be found, never what
+                // it claims.
+                "20260909103532_AddRetentionSweepIndex",
             ],
             applied.OrderBy(name => name, StringComparer.Ordinal));
 

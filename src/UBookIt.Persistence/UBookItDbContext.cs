@@ -130,6 +130,23 @@ public sealed class UBookItDbContext(DbContextOptions<UBookItDbContext> options)
             booking.Property(b => b.ServiceName).HasMaxLength(512);
             // The availability date-range lookup must hit this index (QA gate).
             booking.HasIndex(b => new { b.StartUtc, b.EndUtc }).IncludeProperties(b => b.Status);
+
+            // Serves the retention sweep, which asks for bookings that ENDED before a cutoff and
+            // have not been erased. The index above leads on StartUtc, so it cannot seek on the
+            // end — a sweep relying on it would scan a table that grows without limit.
+            //
+            // FILTERED, and that is what keeps it cheap in the steady state: it holds only
+            // un-erased bookings, so on a site running retention it settles at roughly one
+            // retention period's worth and stops growing. An unfiltered index would keep an entry
+            // for every booking the site has ever taken, including all the erased ones the sweep
+            // must never select again — the rows it would be largest for are exactly the rows it
+            // exists to exclude.
+            //
+            // The filter's predicate mirrors the store query's, in the same order, so that a
+            // change to either is visibly a change to both.
+            booking.HasIndex(b => b.EndUtc)
+                .HasFilter("[BookerErasedUtc] IS NULL")
+                .HasDatabaseName("IX_uBookItBooking_EndUtc_Unerased");
             booking.HasMany(b => b.Claims).WithOne().HasForeignKey(c => c.BookingId).OnDelete(DeleteBehavior.Cascade);
         });
 

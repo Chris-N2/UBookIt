@@ -208,6 +208,29 @@ internal sealed class SqlBookingStore(UBookItDbContext db) : IBookingStore
         return affected > 0;
     }
 
+    public async Task<IReadOnlyList<Guid>> GetBookingIdsDueForErasureAsync(
+        DateTimeOffset cutoffUtc, int take, CancellationToken cancellationToken = default)
+    {
+        // Projects to the id BEFORE anything materialises, so no booker column is ever read out
+        // of the database on this path — see IBookingStore for why that is the requirement and
+        // not an optimisation.
+        //
+        // The predicate is the filtered index's definition, deliberately: EndUtc keyed, and
+        // BookerErasedUtc IS NULL as the filter. Written in the same order so that a change to one
+        // is visibly a change to the other.
+        //
+        // No status filter. Status-blindness is the requirement.
+        return await db.Bookings
+            .AsNoTracking()
+            .Where(b => b.EndUtc < cutoffUtc && b.BookerErasedUtc == null)
+            .OrderBy(b => b.EndUtc)
+            .ThenBy(b => b.Id)
+            .Take(take)
+            .Select(b => b.Id)
+            .ToListAsync(cancellationToken)
+            .ConfigureAwait(false);
+    }
+
     /// <summary>
     /// Transaction-owned exclusive app lock scoped to one resource's calendar.
     /// Released automatically at commit/rollback.
