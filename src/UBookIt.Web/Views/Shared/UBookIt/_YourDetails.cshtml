@@ -33,14 +33,26 @@
                aria-describedby="@(emailError is not null ? "ubookit-email-hint ubookit-email-error" : "ubookit-email-hint")"
                required />
         @*
-            "We'll send your booking confirmation here" was equally untrue and predates this
-            change: `docs/notifications.md` says in bold that uBookIt sends nothing itself, so on
-            a default install no confirmation is sent anywhere. Corrected alongside the privacy
-            notice rather than after it — fixing one and leaving the other would have the package
-            making two contradictory claims about the same field, on the same screen, three lines
-            apart.
+            THE HINT IS BOUND BY THE PRIVACY NOTICE'S REQUIREMENT, not merely consistent with it.
+            That requirement governs "any surface of the same form that mentions contact", and this
+            is one — the notice and this hint make claims about the same field, on the same screen,
+            a few lines apart, so a site where one promises a confirmation and the other does not
+            is a site contradicting itself about what it does with an address it is asking for.
+
+            "We'll send your booking confirmation here" was the original wording and was simply
+            untrue: the package sent nothing at all, on any site. It is true again now, but only
+            where a site has turned booker messages on AND the host can send them — which is
+            exactly what SendsBookerEmail is, read from the same value the notice reads and the
+            sending path is gated on.
         *@
-        <span id="ubookit-email-hint" class="ubookit-hint">So this site can contact you about your booking.</span>
+        @if (Model.PrivacyNotice.SendsBookerEmail)
+        {
+            <span id="ubookit-email-hint" class="ubookit-hint">We'll send your booking confirmation here.</span>
+        }
+        else
+        {
+            <span id="ubookit-email-hint" class="ubookit-hint">So this site can contact you about your booking.</span>
+        }
         @if (emailError is not null)
         {
             <span id="ubookit-email-error" class="ubookit-field-error">@emailError</span>

@@ -278,6 +278,82 @@ public class BookingEmailTests
         Assert.Contains(logger.Entries, e => e.Contains(booking.Id.ToString(), StringComparison.Ordinal));
     }
 
+    // ---- the seam between the promise and the behaviour --------------------------------------
+
+    /// <summary>
+    /// THE ONE THAT WOULD CATCH THE DRIFT. The privacy notice may say a confirmation will be sent
+    /// only where one will be, and both halves live in different assemblies — the notice in the
+    /// rendering project, the sending in persistence. Each half is well covered on its own, which
+    /// is exactly the shape in which a seam goes untested by either.
+    /// </summary>
+    /// <remarks>
+    /// So this drives BOTH: it renders the notice's predicate and it runs the handler, over every
+    /// combination of the two settings and the host's answer, and asserts they agree. Restating
+    /// the conjunction in either place — or gating the notice on the setting alone, which is the
+    /// likely mistake — fails here rather than shipping a site that promises a confirmation it
+    /// never sends.
+    /// </remarks>
+    [Theory]
+    [InlineData(false, false, false)]
+    [InlineData(false, true, false)]
+    [InlineData(true, false, false)]
+    [InlineData(true, true, true)]
+    public async Task The_notice_promises_a_message_exactly_when_one_is_sent(
+        bool sendBookerEmails, bool hostCanSendMail, bool expected)
+    {
+        var settings = new SiteBookingSettings
+        {
+            TimeZoneId = TestData.LondonZoneId,
+            Notifications = Notifications(sendBookerEmails),
+        };
+
+        // What the booking form would tell the visitor.
+        var promised = UBookIt.Web.Rendering.PrivacyNoticeView
+            .From(settings, hostCanSendMail)
+            .SendsBookerEmail;
+
+        // What actually happens when they book.
+        var sender = new RecordingEmailSender { CanSend = hostCanSendMail };
+        var handler = new BookingEmailHandler(
+            settings, sender, Composer(), new StubHostingEnvironment(), NullLogger<BookingEmailHandler>.Instance);
+
+        await handler.HandleAsync(new BookingPlacedNotification(Booking()), CancellationToken.None);
+
+        var sent = sender.Sent.Any(m => m.To.Contains("ada@example.com"));
+
+        Assert.Equal(expected, promised);
+        Assert.Equal(promised, sent);
+    }
+
+    /// <summary>
+    /// Internal recipients are invisible to the notice: a site telling its own staff is not a
+    /// message to the booker, and saying so on the form would describe processing that person
+    /// will never see.
+    /// </summary>
+    [Fact]
+    public async Task Telling_the_site_does_not_make_the_notice_promise_anything()
+    {
+        var settings = new SiteBookingSettings
+        {
+            TimeZoneId = TestData.LondonZoneId,
+            Notifications = Notifications(sendBooker: false, recipients: ["desk@example.com"]),
+        };
+
+        var promised = UBookIt.Web.Rendering.PrivacyNoticeView.From(settings, true).SendsBookerEmail;
+
+        var sender = new RecordingEmailSender();
+        var handler = new BookingEmailHandler(
+            settings, sender, Composer(), new StubHostingEnvironment(), NullLogger<BookingEmailHandler>.Instance);
+
+        await handler.HandleAsync(new BookingPlacedNotification(Booking()), CancellationToken.None);
+
+        Assert.False(promised);
+        // Anti-vacuity: something WAS sent, just not to the booker — so the assertion above is
+        // about who was written to rather than about a handler that did nothing at all.
+        Assert.Single(sender.Sent);
+        Assert.DoesNotContain(sender.Sent, m => m.To.Contains("ada@example.com"));
+    }
+
     // ---- fixtures ---------------------------------------------------------------------------
 
     private static BookingNotificationSettings Notifications(

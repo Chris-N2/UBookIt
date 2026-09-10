@@ -58,13 +58,12 @@ public sealed class BookingEmailHandler(
         Booking booking, BookingEvent bookingEvent, CancellationToken cancellationToken)
     {
         var notifications = settings.Notifications;
-        var toBooker = notifications.SendBookerEmails;
         var toSite = notifications.HasInternalRecipients;
 
         // ASKED BEFORE THE HOST IS, and that order is load-bearing. A site that has asked for
         // nothing must not be affected by its mail configuration at all — including by a host
         // whose CanSendRequiredEmail() throws, which Umbraco's own default sender does.
-        if (!toBooker && !toSite)
+        if (!notifications.SendBookerEmails && !toSite)
         {
             return;
         }
@@ -77,10 +76,26 @@ public sealed class BookingEmailHandler(
         //
         // Asked per message rather than cached: EmailSender watches IOptionsMonitor<GlobalSettings>
         // and re-reads on change, so mail configuration can appear or vanish while the site runs.
-        if (!emailSender.CanSendRequiredEmail())
+        var hostCanSendMail = emailSender.CanSendRequiredEmail();
+
+        if (!hostCanSendMail)
         {
             return;
         }
+
+        // The same expression the privacy notice is rendered from, called rather than restated so
+        // there is one definition of "will the booker be written to".
+        //
+        // HONESTLY: at this point it is EQUIVALENT to reading SendBookerEmails directly, because
+        // the early return above has already established hostCanSendMail. Mutation testing
+        // demonstrated exactly that — swapping this for the bare setting changed no test, and it
+        // is an equivalent mutant rather than a gap. The load-bearing use of the shared predicate
+        // is on the NOTICE side, where gating on the setting alone WOULD promise a confirmation
+        // that is never sent, and where a mutation is caught.
+        //
+        // It is still called here rather than open-coded, so that a later change to the rule has
+        // one place to change and this site cannot be overlooked.
+        var toBooker = notifications.WillEmailBooker(hostCanSendMail);
 
         // THE SITE IS TOLD FIRST, and this is the ordering doing a job rather than an accident.
         // Neither send is wrapped, so whichever runs second is lost if the first throws. The

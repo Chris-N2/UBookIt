@@ -233,7 +233,22 @@ public interface IBookingFormView
 /// configured value could not be used as a link. Never a placeholder: a link that goes nowhere is
 /// worse than no link here, because it looks like the policy exists.
 /// </param>
-public sealed record PrivacyNoticeView(int? RetentionDays, string? PolicyUrl)
+/// <param name="SendsBookerEmail">
+/// Whether a message will actually be sent to the person filling in this form.
+/// <para>
+/// <b>The whole condition, not the setting alone.</b> A site that has asked for booker messages on
+/// a host that cannot send mail sends nothing, and a notice promising a confirmation there would
+/// assert processing the package does not perform — which is the one thing this capability's own
+/// requirement forbids. So this is <see cref="BookingNotificationSettings.WillEmailBooker"/>, the
+/// same expression the sending path is gated on, rather than a restatement of it.
+/// </para>
+/// <para>
+/// <b>Internal recipients do not affect it.</b> The notice speaks to the person filling in the
+/// form; a site telling its own staff that a booking happened is not a message to the booker, and
+/// saying so here would describe processing that person will never see.
+/// </para>
+/// </param>
+public sealed record PrivacyNoticeView(int? RetentionDays, string? PolicyUrl, bool SendsBookerEmail)
 {
     /// <summary>Whether the site has configured an automatic removal period.</summary>
     /// <remarks>
@@ -255,11 +270,20 @@ public sealed record PrivacyNoticeView(int? RetentionDays, string? PolicyUrl)
     /// guarantee that the notice and the retention sweep cannot disagree is a property of there
     /// being one source, not of two call sites happening to agree today.
     /// </remarks>
-    public static PrivacyNoticeView From(SiteBookingSettings settings)
+    /// <param name="settings">The site's settings.</param>
+    /// <param name="hostCanSendMail">
+    /// Whether the host reports it can send mail. Passed in rather than read here because this
+    /// type is a view model and asking is a collaborator's job — and because the caller is the one
+    /// that can decide what to do when the host refuses to answer.
+    /// </param>
+    public static PrivacyNoticeView From(SiteBookingSettings settings, bool hostCanSendMail)
     {
         ArgumentNullException.ThrowIfNull(settings);
 
-        return new PrivacyNoticeView(settings.RetentionDays, settings.PrivacyPolicyUrl);
+        return new PrivacyNoticeView(
+            settings.RetentionDays,
+            settings.PrivacyPolicyUrl,
+            settings.Notifications.WillEmailBooker(hostCanSendMail));
     }
 }
 

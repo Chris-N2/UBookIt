@@ -66,4 +66,29 @@ public sealed record BookingNotificationSettings
 
     /// <summary>True when the site has configured at least one usable internal recipient.</summary>
     public bool HasInternalRecipients => InternalRecipients.Count > 0;
+
+    /// <summary>
+    /// Whether the person who booked will actually be sent a message, given whether the host can
+    /// send mail at all.
+    /// </summary>
+    /// <param name="hostCanSendMail">
+    /// Whether the host reports it can send mail. Supplied by the caller rather than read here
+    /// because this assembly has no dependencies and therefore no way to ask.
+    /// </param>
+    /// <remarks>
+    /// <para>
+    /// <b>This exists so that the sentence and the behaviour cannot come to disagree.</b> The
+    /// booking form's privacy notice may say a confirmation will be sent only where one will be,
+    /// and the sending path must send only under the same condition — so both call this, and it is
+    /// the whole of the condition rather than a restatement of it. A site that asked for messages
+    /// on a host that cannot send them sends nothing, and its notice must therefore promise
+    /// nothing; keeping the two in step by writing the conjunction out twice is how they drift.
+    /// </para>
+    /// <para>
+    /// It lives here, on a settings record in an assembly with no package references at all,
+    /// because it is the only place the front end and the sending path can both reach: the
+    /// rendering assembly does not reference the persistence one.
+    /// </para>
+    /// </remarks>
+    public bool WillEmailBooker(bool hostCanSendMail) => SendBookerEmails && hostCanSendMail;
 }

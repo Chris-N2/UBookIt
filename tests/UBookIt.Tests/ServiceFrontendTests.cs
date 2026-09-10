@@ -76,7 +76,7 @@ public class ServiceFrontendTests
         var (core, bookings, _) = TestData.ServiceBookingWith(serviceStore, resourceStore);
 
         return new Harness(
-            new ServiceBookingFlow(serviceStore, core, TestData.Settings, new FixedTimeProvider(TestData.Now)),
+            new ServiceBookingFlow(serviceStore, core, TestData.Settings, new FixedTimeProvider(TestData.Now), new TestEmailSender()),
             core,
             bookings,
             service,
@@ -120,7 +120,7 @@ public class ServiceFrontendTests
         var (core, _, _) = TestData.ServiceBookingWith(serviceStore, resourceStore);
 
         var flow = new ServiceBookingFlow(
-            serviceStore, core, settings, new FixedTimeProvider(TestData.Now));
+            serviceStore, core, settings, new FixedTimeProvider(TestData.Now), new TestEmailSender());
 
         var outcome = await flow.BuildAsync(service.Id, On(Date, 60));
 
@@ -1616,7 +1616,7 @@ public class ServiceFrontendTests
             resources,
             new AvailabilityService(resources, store, time, TestData.Settings),
             TestData.Settings,
-            time);
+            time, new TestEmailSender());
 
         var outcome = await flow.BuildAsync(room.Id, On(Date, 60));
 
@@ -1651,7 +1651,7 @@ public class ServiceFrontendTests
             resources,
             new AvailabilityService(resources, store, time, TestData.Settings),
             TestData.Settings,
-            time);
+            time, new TestEmailSender());
 
         var outcome = await flow.BuildAsync(Id(3), On(Date));
 

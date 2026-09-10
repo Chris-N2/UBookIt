@@ -22,7 +22,7 @@ public class DefaultFrontendTests
     /// but "the notice is absent from my reasoning" and "the notice is in its default state"
     /// are different claims, and only one of them is true here.
     /// </remarks>
-    private static readonly PrivacyNoticeView NoRetention = new(null, null);
+    private static readonly PrivacyNoticeView NoRetention = new(null, null, false);
 
     /// <summary>The default window, for tests that are not about the window.</summary>
     /// <remarks>

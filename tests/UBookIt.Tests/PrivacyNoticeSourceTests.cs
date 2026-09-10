@@ -58,7 +58,7 @@ public class PrivacyNoticeSourceTests
             resources,
             new AvailabilityService(resources, bookings, time, settings),
             settings,
-            time);
+            time, new TestEmailSender());
 
         var outcome = await flow.BuildAsync(
             room.Id,
@@ -80,7 +80,7 @@ public class PrivacyNoticeSourceTests
         // which is a promise no site has made.
         var settings = TestData.Settings with { RetentionDays = null };
 
-        var notice = PrivacyNoticeView.From(settings);
+        var notice = PrivacyNoticeView.From(settings, hostCanSendMail: false);
 
         Assert.Null(notice.RetentionDays);
         Assert.False(notice.HasRetentionPeriod);

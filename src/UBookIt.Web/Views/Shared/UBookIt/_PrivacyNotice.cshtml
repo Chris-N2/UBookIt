@@ -28,23 +28,41 @@
 *@
 <div class="ubookit-privacy">
     @*
-        WHY, and it says "can contact you" rather than "will confirm it with you" — which is a
-        correction, not a nicety.
+        WHY, AND THE SENTENCE CHANGES WITH THE SITE — because neither wording is true everywhere.
 
         This read "to hold your booking, to identify it, and to confirm it with you" until QA
-        pointed at `docs/notifications.md`: **uBookIt sends nothing itself. No email. No SMS. No
-        message of any kind.** Placing a booking shows a confirmation on screen and stores it. So
-        on a default install the address is not used to confirm anything with anybody, and the
-        phone number is not used for any stated purpose at all — it is stored.
+        pointed at what the package actually did: it sent nothing at all, so on a default install
+        the address confirmed nothing with anybody. It was corrected to "can contact you", which is
+        true whether or not anything is ever sent.
 
-        That made the notice assert processing the package does not perform, which is the one
-        thing this capability's own requirement forbids it to do. A purpose statement — these
-        details are held so the site is ABLE to reach you — is true whether or not a site has
-        wired up notifications; a promise that a message is sent is true only for sites that have.
+        Now that the package CAN send, "can contact you" is the weaker half of a pair rather than
+        the whole answer. A site that has turned booker messages on and can actually send them will
+        send a confirmation to this address, and a notice that declined to say so would understate
+        the processing being performed on the very page collecting the address — the same fault as
+        overstating it, in the other direction.
+
+        SendsBookerEmail is the WHOLE condition, not the setting: it is
+        BookingNotificationSettings.WillEmailBooker, the same expression the sending path is gated
+        on. That is deliberate and load-bearing. A site that asks for messages on a host with no
+        mail configuration sends nothing, and this must promise nothing there — writing the
+        conjunction out again here is exactly how the sentence and the behaviour would drift apart.
     *@
     <p>
-        We use your name and email address — and your phone number, if you give one — to hold and
-        identify your booking, and so that this site can contact you about it.
+        @if (notice.SendsBookerEmail)
+        {
+            <text>
+                We use your name and email address — and your phone number, if you give one — to hold
+                and identify your booking. We will send your booking confirmation to that email
+                address, and use it to contact you about your booking.
+            </text>
+        }
+        else
+        {
+            <text>
+                We use your name and email address — and your phone number, if you give one — to hold
+                and identify your booking, and so that this site can contact you about it.
+            </text>
+        }
     </p>
     <p>
         @if (notice.HasRetentionPeriod)

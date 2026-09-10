@@ -48,20 +48,20 @@
 - [x] 3.6 No booker name, address or telephone number in any log line, including failure paths.
 - [x] 3.7 Tests: both directions independently; neither; erased booker; a failing send leaving the
       booking untouched and unreported; nothing retried.
-- [ ] 3.8 **Mutation-check the PII-in-logs guard and the erased-booker guard one at a time** — a
+- [x] 3.8 **Mutation-check the PII-in-logs guard and the erased-booker guard one at a time** — a
       pair checked together can carry a passenger that could never have failed.
 
 ## 4. The privacy notice
 
-- [ ] 4.1 Add the send predicate to `PrivacyNoticeView`, constructed in the one place
+- [x] 4.1 Add the send predicate to `PrivacyNoticeView`, constructed in the one place
       `PrivacyNoticeView.From` already constructs everything else.
-- [ ] 4.2 The predicate is the **full conjunction** — setting ∧ host can send — not the setting
+- [x] 4.2 The predicate is the **full conjunction** — setting ∧ host can send — not the setting
       alone (design D8), so the sentence and the behaviour cannot diverge.
-- [ ] 4.3 Second conditional sentence in `_PrivacyNotice.cshtml`, in the same derived-not-authored
+- [x] 4.3 Second conditional sentence in `_PrivacyNotice.cshtml`, in the same derived-not-authored
       shape the retention sentence already uses.
-- [ ] 4.4 Govern the email field hint in `_YourDetails.cshtml` by the same predicate — the
+- [x] 4.4 Govern the email field hint in `_YourDetails.cshtml` by the same predicate — the
       requirement binds every surface of the form that mentions contact, not the notice alone.
-- [ ] 4.5 Tests over all four combinations of (setting on/off × host can send/cannot), plus a site
+- [x] 4.5 Tests over all four combinations of (setting on/off × host can send/cannot), plus a site
       with internal recipients and no booker messages.
 
 ## 5. Documentation
