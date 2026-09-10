@@ -258,6 +258,7 @@ public static class ServiceBookingFormBuilder
         IReadOnlyList<ServiceBookableStart> starts,
         int durationMinutes,
         TimeZoneInfo zone,
+        PrivacyNoticeView privacyNotice,
         FailedSubmission? failed = null,
         string? flowToken = null,
         ResourceChoiceState choice = default)
@@ -266,6 +267,7 @@ public static class ServiceBookingFormBuilder
 
         return new ServiceFormModel
         {
+            PrivacyNotice = privacyNotice,
             ResourceChoices = choice.Choices ?? [],
             ChosenResourceId = choice.Chosen,
             ResourceChoiceCount = choice.Count,

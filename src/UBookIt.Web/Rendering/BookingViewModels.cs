@@ -10,6 +10,9 @@ namespace UBookIt.Web.Rendering;
 /// </summary>
 public sealed class BookingFormModel : IBookingFormView
 {
+    /// <inheritdoc />
+    public required PrivacyNoticeView PrivacyNotice { get; init; }
+
     public required Guid ResourceId { get; init; }
 
     public required string ResourceName { get; init; }

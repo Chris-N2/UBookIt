@@ -234,9 +234,18 @@
 .ubookit-notice,
 .ubookit-no-times,
 .ubookit-no-choices,
-.ubookit-fixed-length {
+.ubookit-fixed-length,
+.ubookit-privacy {
     max-width: var(--ubookit-measure, 34rem);
 }
+
+/* The privacy notice takes a measure and NOTHING ELSE — no muting, no rule, no hue.
+   It is deliberately not grouped with `.ubookit-notice` below, whose left rule marks an
+   explanation the visitor has to act on: this is disclosure, not an instruction. And it
+   is deliberately not muted like `.ubookit-hint`, because reduced contrast on the one
+   paragraph telling somebody what happens to their personal data is the wrong trade to
+   make. Setting no colour leaves it at whatever the host renders body text as, which is
+   the highest contrast available on the page. */
 
 /* An explanation the visitor has to act on, marked by a rule rather than a hue. */
 .ubookit-notice,

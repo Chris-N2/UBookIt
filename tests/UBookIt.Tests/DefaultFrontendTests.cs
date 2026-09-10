@@ -14,6 +14,15 @@ namespace UBookIt.Tests;
 /// </summary>
 public class DefaultFrontendTests
 {
+
+    /// <summary>The default install: no retention period configured, no policy link.</summary>
+    /// <remarks>
+    /// Named rather than inlined so that every existing test says which configuration it is
+    /// building a form for. These tests are about times and lengths, not about the notice —
+    /// but "the notice is absent from my reasoning" and "the notice is in its default state"
+    /// are different claims, and only one of them is true here.
+    /// </remarks>
+    private static readonly PrivacyNoticeView NoRetention = new(null, null);
     private static readonly DateOnly Date = TestData.BaseDate;
 
     // --- which unavailable answer the flow gives (services spec / default-frontend) ---
@@ -174,7 +183,7 @@ public class DefaultFrontendTests
 
         var model = BookingFormBuilder.Build(
             room, Date, today, Starts(("09:00", 60), ("09:30", 30)),
-            TimeSpan.FromMinutes(30), TestData.London);
+            TimeSpan.FromMinutes(30), TestData.London, NoRetention);
 
         Assert.True(model.HasTimes);
         Assert.Equal(2, model.Times.Count);
@@ -189,7 +198,7 @@ public class DefaultFrontendTests
         var room = TestData.Room();
         var today = BookingFormBuilder.TodayIn(TestData.Now, TestData.London);
 
-        var model = BookingFormBuilder.Build(room, Date, today, [], TimeSpan.FromMinutes(30), TestData.London);
+        var model = BookingFormBuilder.Build(room, Date, today, [], TimeSpan.FromMinutes(30), TestData.London, NoRetention);
 
         Assert.False(model.HasTimes);
         Assert.Empty(model.Times);
@@ -321,7 +330,7 @@ public class DefaultFrontendTests
 
         var model = BookingFormBuilder.Build(
             room, Date, today, Starts(("09:00", 120), ("11:00", 30)),
-            TimeSpan.FromMinutes(60), TestData.London);
+            TimeSpan.FromMinutes(60), TestData.London, NoRetention);
 
         var only = Assert.Single(model.Times);
         Assert.Equal(
@@ -337,7 +346,7 @@ public class DefaultFrontendTests
 
         var model = BookingFormBuilder.Build(
             room, Date, today, Starts(("09:00", 90), ("11:00", 30)),
-            TimeSpan.FromMinutes(180), TestData.London);
+            TimeSpan.FromMinutes(180), TestData.London, NoRetention);
 
         Assert.False(model.HasTimes);
         Assert.True(model.LengthIsTheProblem);
@@ -364,7 +373,7 @@ public class DefaultFrontendTests
 
         var model = BookingFormBuilder.Build(
             room, Date, today, [], BookingFormBuilder.ResolveDisplayDuration(room, failed.DurationMinutes),
-            TestData.London, failed);
+            TestData.London, NoRetention, failed);
 
         // The chosen length survives a failed submission alongside the details.
         Assert.Equal(60, model.DurationMinutes);

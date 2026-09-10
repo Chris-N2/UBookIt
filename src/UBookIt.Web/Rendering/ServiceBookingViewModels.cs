@@ -11,6 +11,9 @@ namespace UBookIt.Web.Rendering;
 /// </summary>
 public sealed class ServiceFormModel : IBookingFormView
 {
+    /// <inheritdoc />
+    public required PrivacyNoticeView PrivacyNotice { get; init; }
+
     public required Guid ServiceId { get; init; }
 
     public required string ServiceName { get; init; }

@@ -129,6 +129,7 @@ changing one is a breaking change and will be called out as such in a release no
 |---|---|
 | `~/Views/Shared/UBookIt/_DateAndLength.cshtml` | `IBookingFormView` |
 | `~/Views/Shared/UBookIt/_ErrorSummary.cshtml` | `IBookingFormView` |
+| `~/Views/Shared/UBookIt/_PrivacyNotice.cshtml` | `IBookingFormView` |
 | `~/Views/Shared/UBookIt/_Times.cshtml` | `IBookingFormView` |
 | `~/Views/Shared/UBookIt/_YourDetails.cshtml` | `IBookingFormView` |
 
@@ -170,11 +171,33 @@ and so are they.
 
 uBookIt makes **no claim about a theme in either direction**. It does not assert that
 your theme is accessible, and it does not require anything of it. If you want a bar to
-build to, uBookIt's own views are the worked example, and the four shared partials
-above carry a good deal of that work already.
+build to, uBookIt's own views are the worked example, and the shared partials above
+carry a good deal of that work already.
 
 For every view your theme does not supply, uBookIt's own view renders and every one of
 its guarantees holds unchanged.
+
+### One omission worth singling out: the privacy notice
+
+`_YourDetails` renders a short notice telling the visitor what happens to the contact
+details it is collecting — what is taken, why, how long it is kept, and who can see it.
+The retention sentence is read from the site's configured retention period, so it cannot
+say something the code does not do.
+
+**If your theme supplies its own view for the step that collects contact details, whether
+that notice appears is your decision.** uBookIt hands your view the facts on
+`IBookingFormView.PrivacyNotice` — the retention period, or its absence, and the site's
+privacy policy link — so you can render them in your own markup and your own wording.
+It cannot make you, and it does not try.
+
+This is the same rule as every other markup guarantee on this page, and it is called out
+separately for one reason: **the failure is invisible.** A theme that drops the time
+picker produces a site that visibly does not work, and somebody reports it within the
+hour. A theme that drops the privacy notice produces a site that works perfectly and
+tells its visitors nothing about their personal data — and nobody reports that at all.
+
+If your theme replaces `_YourDetails`, either call `_PrivacyNotice` from it or render the
+same four facts yourself.
 
 ## What has been measured
 

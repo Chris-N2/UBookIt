@@ -1,3 +1,5 @@
+using UBookIt.Core;
+
 namespace UBookIt.Web.Rendering;
 
 /// <summary>
@@ -142,4 +144,80 @@ public interface IBookingFormView
 
     /// <summary>The error message associated with a field id, if any (for aria wiring).</summary>
     string? ErrorFor(string fieldId);
+
+    /// <summary>
+    /// What the form tells a person about the personal data it is asking for.
+    /// </summary>
+    /// <remarks>
+    /// <para>
+    /// <b>It passes this interface's own test, though not in the obvious way.</b> The rule above
+    /// is that a member must be answerable from <em>what is being booked</em> rather than from
+    /// <em>which flow is asking</em>, and the notice is answerable from neither — it is a
+    /// property of the site. What the rule is protecting against is a per-flow flag turning a
+    /// shared partial into a lowest-common-denominator component by accretion, and a value that
+    /// is <em>identical in both flows</em> cannot do that. It belongs here because
+    /// <c>_YourDetails</c> renders it and both flows render <c>_YourDetails</c>.
+    /// </para>
+    /// <para>
+    /// <b>Values, never a sentence.</b> A theme receives this model, so a pre-composed English
+    /// string would let a theme print our wording or discard it wholesale and nothing else.
+    /// Structured values let it state the same facts in its own markup, its own words and its
+    /// own language — which is the front-end contract applied to prose: the package publishes
+    /// data, and turning data into sentences belongs to the view.
+    /// </para>
+    /// </remarks>
+    PrivacyNoticeView PrivacyNotice { get; }
+}
+
+/// <summary>
+/// The facts the booking form states about the personal data it collects.
+/// </summary>
+/// <param name="RetentionDays">
+/// How many days after a booking's end its personal data is erased automatically, or
+/// <c>null</c> when the site has configured no retention period.
+/// <para>
+/// <b>Read from the same settings value the retention sweep acts on.</b> There is deliberately
+/// no second copy and nothing authored: a notice written independently of the code could claim a
+/// period the code does not keep, which is the failure this whole feature exists to prevent and
+/// the reason it was built after retention rather than before it.
+/// </para>
+/// <para>
+/// <b>Null is a state to render, not a state to skip.</b> Retention is off by default, so a view
+/// that omitted the sentence when this is null would be omitting it on most installs — publishing
+/// a notice quietly missing one of the four things it exists to say, in the ordinary case.
+/// </para>
+/// </param>
+/// <param name="PolicyUrl">
+/// A link to the site's own privacy policy, or <c>null</c> when none is configured or the
+/// configured value could not be used as a link. Never a placeholder: a link that goes nowhere is
+/// worse than no link here, because it looks like the policy exists.
+/// </param>
+public sealed record PrivacyNoticeView(int? RetentionDays, string? PolicyUrl)
+{
+    /// <summary>Whether the site has configured an automatic removal period.</summary>
+    /// <remarks>
+    /// Named rather than left as a null check at each call site, because the two branches say
+    /// materially different things to a visitor and a view that reads
+    /// <c>@if (Model.PrivacyNotice.HasRetentionPeriod)</c> states which case it is rendering.
+    /// </remarks>
+    public bool HasRetentionPeriod => RetentionDays is not null;
+
+    /// <summary>Whether the site has configured a usable link to its own privacy policy.</summary>
+    public bool HasPolicyUrl => !string.IsNullOrWhiteSpace(PolicyUrl);
+
+    /// <summary>
+    /// The notice for a site, from its settings.
+    /// </summary>
+    /// <remarks>
+    /// <b>The only place this type is constructed from settings, deliberately.</b> Both flows go
+    /// through here, so neither can acquire its own reading of the retention period — and the
+    /// guarantee that the notice and the retention sweep cannot disagree is a property of there
+    /// being one source, not of two call sites happening to agree today.
+    /// </remarks>
+    public static PrivacyNoticeView From(SiteBookingSettings settings)
+    {
+        ArgumentNullException.ThrowIfNull(settings);
+
+        return new PrivacyNoticeView(settings.RetentionDays, settings.PrivacyPolicyUrl);
+    }
 }

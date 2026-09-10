@@ -221,6 +221,107 @@ public class SiteSettingsTests
         Assert.Null(exception);
     }
 
+    private static IConfiguration PolicyUrlConfig(string? value)
+    {
+        var values = new Dictionary<string, string?>();
+        if (value is not null)
+        {
+            values[UBookItPersistenceComposer.PrivacyPolicyUrlSettingKey] = value;
+        }
+
+        return new ConfigurationBuilder().AddInMemoryCollection(values).Build();
+    }
+
+    [Fact]
+    public void No_policy_link_is_configured_by_default()
+        => Assert.Null(UBookItPersistenceComposer.ResolveSettings(PolicyUrlConfig(null)).PrivacyPolicyUrl);
+
+    [Theory]
+    [InlineData("https://example.com/privacy")]
+    [InlineData("http://example.com/privacy")]
+    [InlineData("/privacy")]
+    [InlineData("/legal/privacy-policy")]
+    public void A_usable_policy_link_is_accepted(string configured)
+        => Assert.Equal(
+            configured,
+            UBookItPersistenceComposer.ResolveSettings(PolicyUrlConfig(configured)).PrivacyPolicyUrl);
+
+    [Theory]
+    [InlineData("")]                            // blank
+    [InlineData("   ")]                         // whitespace
+    [InlineData("javascript:alert(1)")]         // executes on click, in an href
+    [InlineData("JavaScript:alert(1)")]         // and the scheme is case-insensitive
+    [InlineData("data:text/html,<script>1</script>")]
+    [InlineData("file:///etc/passwd")]
+    [InlineData("vbscript:msgbox(1)")]
+    [InlineData("//evil.example/privacy")]      // protocol-relative: looks local, is not
+    [InlineData("privacy")]                     // no leading slash: resolves against the current path
+    [InlineData("../privacy")]
+    // FOUND BY QA, and each of these was ACCEPTED before the control-character rule.
+    //
+    // A browser removes every ASCII tab and newline from a URL BEFORE parsing it, so each of
+    // the first three resolves to the protocol-relative //evil.example that the rule below
+    // exists to refuse. The interior character survives Trim(), which only touches the ends —
+    // one character defeated the guarantee the comment on that rule states.
+    [InlineData("/\t/evil.example")]
+    [InlineData("/\n/evil.example")]
+    [InlineData("/\r/evil.example")]
+    [InlineData("/pri\u0000vacy")]
+    //
+    // Backslashes go with them. "/\\evil.example/x" is refused on Windows only by accident —
+    // .NET parses it as an implicit UNC `file:` URI, so the scheme allow-list catches it — and
+    // that parsing is platform-specific. Umbraco 17 on .NET 10 is routinely hosted on Linux,
+    // where it would fall into the relative branch and be accepted, while a browser reads the
+    // backslash as a slash and navigates to https://evil.example/x.
+    [InlineData("/\\evil.example/x")]
+    [InlineData("\\\\evil.example\\x")]
+    public void An_unusable_policy_link_resolves_to_none(string configured)
+    {
+        // THE ONE SETTING WHOSE VALUE REACHES AN href ON A PUBLIC PAGE, so what it refuses
+        // matters more than what it accepts. The list is an allow-list in the code — http,
+        // https, or a single-slash relative path — which is why the schemes below are refused
+        // without any of them being named there. A block-list would have to enumerate the
+        // dangerous ones correctly, and forever.
+        Assert.Null(UBookItPersistenceComposer.ResolveSettings(PolicyUrlConfig(configured)).PrivacyPolicyUrl);
+    }
+
+    [Theory]
+    [InlineData("")]
+    [InlineData("   ")]
+    [InlineData("javascript:alert(1)")]
+    [InlineData("//evil.example/privacy")]
+    [InlineData("privacy")]
+    public void A_policy_link_that_was_written_and_cannot_be_used_logs_an_error(string configured)
+    {
+        var logger = new CapturingLogger();
+
+        RunUBookItMigrations.ErrorIfPrivacyPolicyUrlUnusable(PolicyUrlConfig(configured), logger);
+
+        var entry = Assert.Single(logger.Entries);
+        Assert.Equal(LogLevel.Error, entry.Level);
+        Assert.Contains(UBookItPersistenceComposer.PrivacyPolicyUrlSettingKey, entry.Message);
+    }
+
+    [Fact]
+    public void An_absent_policy_link_logs_nothing()
+    {
+        var logger = new CapturingLogger();
+
+        RunUBookItMigrations.ErrorIfPrivacyPolicyUrlUnusable(PolicyUrlConfig(null), logger);
+
+        Assert.Empty(logger.Entries);
+    }
+
+    [Fact]
+    public void A_usable_policy_link_logs_nothing()
+    {
+        var logger = new CapturingLogger();
+
+        RunUBookItMigrations.ErrorIfPrivacyPolicyUrlUnusable(PolicyUrlConfig("/privacy"), logger);
+
+        Assert.Empty(logger.Entries);
+    }
+
     private sealed class CapturingLogger : ILogger
     {
         public List<(LogLevel Level, string Message)> Entries { get; } = [];

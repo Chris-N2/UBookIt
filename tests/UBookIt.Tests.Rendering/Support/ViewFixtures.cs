@@ -104,6 +104,7 @@ public static class ViewFixtures
         ViewInventory.DateAndLength,
         ViewInventory.Times,
         ViewInventory.YourDetails,
+        ViewInventory.PrivacyNotice,
     ];
 
     /// <summary>Every single-view case, used by the per-view property rule.</summary>
@@ -159,6 +160,7 @@ public static class ViewFixtures
             ViewInventory.Times,
             ViewInventory.ErrorSummary,
             ViewInventory.YourDetails,
+            ViewInventory.PrivacyNotice,
         })
         {
             foreach (var (state, model) in FormStates())
@@ -247,6 +249,25 @@ public static class ViewFixtures
     /// </summary>
     private static IEnumerable<(string State, IBookingFormView Model)> FormStates()
     {
+        // THE PRIVACY NOTICE'S FOUR COMBINATIONS, first because they are the ones most
+        // easily left unexercised: every other state below leaves the notice in its default
+        // shape, so without these the configured-period and policy-link branches would never
+        // render and rule 3 would report the view fully covered.
+        //
+        // The default install — no period, no link — is deliberately NOT among these four as a
+        // special case: it is what every other state in this method already renders, which is
+        // correct, because it is what every site renders until somebody configures something.
+        yield return ("service: retention period stated", Service(
+            privacyNotice: new PrivacyNoticeView(90, null)));
+        yield return ("service: retention of one day", Service(
+            privacyNotice: new PrivacyNoticeView(1, null)));
+        yield return ("service: policy link, no period", Service(
+            privacyNotice: new PrivacyNoticeView(null, "/privacy")));
+        yield return ("service: period and policy link", Service(
+            privacyNotice: new PrivacyNoticeView(90, "https://example.com/privacy")));
+        yield return ("resource: period and policy link", Resource(
+            privacyNotice: new PrivacyNoticeView(30, "/privacy")));
+
         yield return ("service: times, no errors", Service());
         yield return ("service: no times", Service(times: []));
         yield return ("service: length is the problem", Service(times: [], longest: 60));
@@ -396,9 +417,14 @@ public static class ViewFixtures
         string? email = null,
         string? phone = null,
         string? selectedTimeIso = null,
-        string? flowToken = null)
+        string? flowToken = null,
+        PrivacyNoticeView? privacyNotice = null)
         => new()
         {
+            // Defaults to the DEFAULT INSTALL: no retention period and no policy link. A
+            // fixture that defaulted to a configured period would exercise the branch most
+            // sites never see and leave the common one untested.
+            PrivacyNotice = privacyNotice ?? new PrivacyNoticeView(null, null),
             ServiceId = new Guid("00000000-0000-0000-0000-000000000900"),
             ServiceName = "Massage",
             FlowToken = flowToken,
@@ -429,9 +455,12 @@ public static class ViewFixtures
         string? email = null,
         string? phone = null,
         string? selectedTimeIso = null,
-        string? flowToken = null)
+        string? flowToken = null,
+        PrivacyNoticeView? privacyNotice = null)
         => new()
         {
+            /// <inheritdoc cref="Service" />
+            PrivacyNotice = privacyNotice ?? new PrivacyNoticeView(null, null),
             ResourceId = new Guid("00000000-0000-0000-0000-000000000001"),
             ResourceName = "Meeting Room A",
             FlowToken = flowToken,

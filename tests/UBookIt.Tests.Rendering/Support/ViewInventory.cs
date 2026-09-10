@@ -34,6 +34,8 @@ public static class ViewInventory
 
     public const string YourDetails = "~/Views/Shared/UBookIt/_YourDetails.cshtml";
 
+    public const string PrivacyNotice = "~/Views/Shared/UBookIt/_PrivacyNotice.cshtml";
+
     public const string Catalogue = "~/Views/Shared/Components/BookingFlow/Catalogue.cshtml";
 
     /// <summary>

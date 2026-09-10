@@ -72,6 +72,7 @@ public class ClassVocabularyTests
             "ubookit-no-choices",
             "ubookit-no-times",
             "ubookit-notice",
+            "ubookit-privacy",
             "ubookit-submit",
             "ubookit-times",
             "ubookit-times-option",
@@ -150,6 +151,7 @@ public class ClassVocabularyTests
             "ubookit-no-choices",
             "ubookit-no-times",
             "ubookit-notice",
+            "ubookit-privacy",
             "ubookit-submit",
             "ubookit-times",
         ];

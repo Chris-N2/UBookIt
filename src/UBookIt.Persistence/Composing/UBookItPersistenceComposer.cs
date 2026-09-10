@@ -29,6 +29,7 @@ public sealed class UBookItPersistenceComposer : IComposer
     public const string MaxQueryRangeDaysSettingKey = "UBookIt:MaxQueryRangeDays";
     public const int DefaultMaxQueryRangeDays = 31;
     public const string RetentionDaysSettingKey = "UBookIt:RetentionDays";
+    public const string PrivacyPolicyUrlSettingKey = "UBookIt:PrivacyPolicyUrl";
 
     public void Compose(IUmbracoBuilder builder)
     {
@@ -97,6 +98,7 @@ public sealed class UBookItPersistenceComposer : IComposer
             : DefaultTimeZoneId,
         MaxQueryRangeDays = ResolveMaxQueryRangeDays(configuration),
         RetentionDays = ResolveRetentionDays(configuration),
+        PrivacyPolicyUrl = ResolvePrivacyPolicyUrl(configuration),
     };
 
     internal static bool IsTimeZoneConfigured(IConfiguration configuration)
@@ -177,4 +179,89 @@ public sealed class UBookItPersistenceComposer : IComposer
             && days <= MaxRetentionDays
                 ? days
                 : null;
+
+    /// <summary>
+    /// Whether the site wrote anything at all for <c>UBookIt:PrivacyPolicyUrl</c>, usable or not.
+    /// </summary>
+    /// <remarks>
+    /// Presence rather than non-blankness, for the reason
+    /// <see cref="IsRetentionConfigured"/> uses it: a blank value looks like an unconfigured
+    /// setting and like an environment variable that resolved to nothing, and only one of those
+    /// is worth telling somebody about.
+    /// </remarks>
+    internal static bool IsPrivacyPolicyUrlConfigured(IConfiguration configuration)
+        => configuration[PrivacyPolicyUrlSettingKey] is not null;
+
+    /// <summary>
+    /// The configured privacy policy link, or <c>null</c> when none is configured or the
+    /// configured value cannot be used as a link.
+    /// </summary>
+    /// <remarks>
+    /// <para>
+    /// <b>This is the only setting whose value reaches an <c>href</c> on a public page</b>, so
+    /// what it REFUSES matters more than what it accepts. A permissive resolver here is not an
+    /// inconvenience, it is a script-injection vector: <c>javascript:</c> in an anchor's href
+    /// executes on click, and the value arrives from configuration a site may template from an
+    /// environment variable.
+    /// </para>
+    /// <para>
+    /// So the rule is an allow-list, never a block-list. Absolute URIs are accepted only for
+    /// <c>http</c> and <c>https</c>; anything else absolute — <c>javascript:</c>, <c>data:</c>,
+    /// <c>file:</c>, and every scheme nobody has thought of yet — is refused by not being on the
+    /// list. A block-list would have to enumerate the dangerous schemes correctly and forever.
+    /// </para>
+    /// <para>
+    /// Site-relative paths are accepted, because a site's policy page is usually its own, and
+    /// they must begin with a single <c>/</c>: <c>//evil.example</c> is protocol-relative and
+    /// navigates off-site while looking local.
+    /// </para>
+    /// </remarks>
+    internal static string? ResolvePrivacyPolicyUrl(IConfiguration configuration)
+    {
+        var configured = configuration[PrivacyPolicyUrlSettingKey];
+
+        if (string.IsNullOrWhiteSpace(configured))
+        {
+            return null;
+        }
+
+        var value = configured.Trim();
+
+        // CONTROL CHARACTERS AND BACKSLASHES, REFUSED BEFORE ANYTHING ELSE — and this is not
+        // belt-and-braces, it closes a measured bypass of the rule below.
+        //
+        // `Trim()` removes only leading and trailing whitespace, so `/<TAB>/evil.example` reached
+        // the relative branch, satisfied "starts with one slash and not two", and rendered as
+        // `href="/&#x9;/evil.example"`. The HTML parser decodes that back to a raw tab inside the
+        // attribute, and the URL parser then strips every ASCII tab and newline from its input
+        // BEFORE parsing (URL Standard, "Remove all ASCII tab or newline") — leaving
+        // `//evil.example`, which is exactly the protocol-relative value the rule below exists to
+        // refuse. One character defeated it.
+        //
+        // The backslash goes with them for a related reason. `/\evil.example/x` is refused today
+        // on Windows only by accident: .NET parses it as an implicit UNC `file:` URI, so the
+        // scheme allow-list catches it. That parsing is Windows-specific, and Umbraco 17 on
+        // .NET 10 is routinely hosted on Linux, where the value would fall into the relative
+        // branch and be accepted — while a browser resolves `\` as `/` for special schemes and
+        // navigates to https://evil.example/x. Refusing it outright removes the question rather
+        // than relying on a platform's parser to keep answering it the same way.
+        if (value.Any(char.IsControl) || value.Contains('\\', StringComparison.Ordinal))
+        {
+            return null;
+        }
+
+        if (Uri.TryCreate(value, UriKind.Absolute, out var absolute))
+        {
+            return absolute.Scheme == Uri.UriSchemeHttp || absolute.Scheme == Uri.UriSchemeHttps
+                ? value
+                : null;
+        }
+
+        // Site-relative: one leading slash and not two. A protocol-relative "//host/path" is
+        // parsed as relative by Uri.TryCreate but navigates off-site, which is exactly the value
+        // somebody would use to make an off-site link look like a local one.
+        return value.StartsWith('/') && !value.StartsWith("//", StringComparison.Ordinal)
+            ? value
+            : null;
+    }
 }

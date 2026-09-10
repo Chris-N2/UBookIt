@@ -94,6 +94,41 @@ public class ServiceFrontendTests
     private static BookingFlowInput On(DateOnly date, int? minutes = null, string? token = null)
         => new() { Date = date, DurationMinutes = minutes, FlowToken = token };
 
+    [Fact]
+    public async Task The_service_flow_states_the_retention_period_the_sweep_would_act_on()
+    {
+        // THE FLOW QA MUTATED. Replacing this flow's `PrivacyNoticeView.From(settings)` with
+        // `new PrivacyNoticeView(30, …)` — a notice telling every visitor "we keep them for 30
+        // days" while the sweep acted on the configured period — left all 2091 tests green,
+        // because the only test for that guarantee called the factory directly and never
+        // touched a flow. A guard that watches a reconstruction of the thing it guards watches
+        // nothing.
+        //
+        // 137 because no other fixture uses it: a flow that hard-coded a plausible number would
+        // otherwise pass by coincidence. And the assertion compares against the SETTINGS rather
+        // than against 137, because the guarantee is that the two agree, not that either equals
+        // a literal.
+        var settings = TestData.Settings with
+        {
+            RetentionDays = 137,
+            PrivacyPolicyUrl = "/distinctive-policy",
+        };
+
+        var service = Svc("Massage", null, new ServiceRole(ResourceTypes.Room, 1));
+        var serviceStore = new InMemoryServiceStore().Add(service);
+        var resourceStore = new InMemoryResourceStore().Add(Res(1, ResourceTypes.Room, "Treatment Room"));
+        var (core, _, _) = TestData.ServiceBookingWith(serviceStore, resourceStore);
+
+        var flow = new ServiceBookingFlow(
+            serviceStore, core, settings, new FixedTimeProvider(TestData.Now));
+
+        var outcome = await flow.BuildAsync(service.Id, On(Date, 60));
+
+        Assert.NotNull(outcome.Form);
+        Assert.Equal(settings.RetentionDays, outcome.Form!.PrivacyNotice.RetentionDays);
+        Assert.Equal(settings.PrivacyPolicyUrl, outcome.Form.PrivacyNotice.PolicyUrl);
+    }
+
     private static async Task<IReadOnlyList<RoleCandidates>> PoolsOf(Harness harness)
     {
         var resolved = await harness.Core.ResolveCandidatesAsync(harness.Service.Id);
@@ -1840,6 +1875,45 @@ public class ServiceFrontendTests
             RepoFiles.Read("src/UBookIt.Web/Views/Shared/Components/BookingFlow/Service.cshtml"),
         };
 
+        // REACHABILITY IS TRANSITIVE, and it was not until a partial acquired a partial.
+        //
+        // This asked only whether a FLOW mentioned each file, which was the same question
+        // while every shared partial was called directly by one. `_PrivacyNotice` is called
+        // by `_YourDetails` — it belongs inside that fieldset, and asking each flow to place
+        // it instead would reintroduce exactly the duplication `_YourDetails` exists to
+        // prevent.
+        //
+        // Widened rather than exempted. The rule's own stated purpose is that "a flow partial
+        // nothing references is dead code wearing a live seam", and a partial referenced by a
+        // live partial is not dead — so the honest reading of the rule already included this
+        // case and the implementation did not. An exemption would have made `_PrivacyNotice`
+        // unchecked; this keeps it checked, one link further along.
+        var reachable = new HashSet<string>(StringComparer.Ordinal);
+        var frontier = flows.ToList();
+
+        while (frontier.Count > 0)
+        {
+            var next = new List<string>();
+
+            foreach (var path in RepoFiles.Paths("src/UBookIt.Web/Views/Shared/UBookIt", "*.cshtml"))
+            {
+                var name = Path.GetFileNameWithoutExtension(path);
+
+                if (reachable.Contains(name))
+                {
+                    continue;
+                }
+
+                if (frontier.Any(text => text.Contains($"UBookIt/{name}.cshtml", StringComparison.Ordinal)))
+                {
+                    reachable.Add(name);
+                    next.Add(RepoFiles.Read(path));
+                }
+            }
+
+            frontier = next;
+        }
+
         // The one partial in this folder whose consumer is NOT a flow, named rather
         // than filtered by a pattern. `_Styles.cshtml` is rendered by the consuming
         // SITE's layout, into the document head — a flow cannot reach the head at all,
@@ -1865,7 +1939,11 @@ public class ServiceFrontendTests
                 continue;
             }
 
-            Assert.Contains(flows, flow => flow.Contains($"UBookIt/{name}.cshtml", StringComparison.Ordinal));
+            Assert.True(
+                reachable.Contains(name),
+                $"{name}.cshtml is in the shared-partial folder but no flow reaches it, directly or "
+                + "through another partial a flow reaches. A partial nothing references is dead code "
+                + "wearing a live seam.");
         }
     }
 
@@ -1883,7 +1961,9 @@ public class ServiceFrontendTests
             .Order(StringComparer.Ordinal)
             .ToList();
 
-        Assert.Equal(["_DateAndLength", "_ErrorSummary", "_Times", "_YourDetails"], covered);
+        Assert.Equal(
+            ["_DateAndLength", "_ErrorSummary", "_PrivacyNotice", "_Times", "_YourDetails"],
+            covered);
     }
 
     [Fact]

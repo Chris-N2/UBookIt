@@ -401,6 +401,51 @@ public class BackofficeDocumentationTests
     }
 
     [Fact]
+    public void The_privacy_notice_and_its_setting_are_documented()
+    {
+        var docs = Docs();
+
+        Assert.Contains(
+            UBookItPersistenceComposer.PrivacyPolicyUrlSettingKey.Split(':')[^1],
+            docs,
+            StringComparison.Ordinal);
+
+        DocumentationAssert.Says(docs, "above the button that submits it");
+        DocumentationAssert.Says(docs, "You cannot mistype the retention period into it");
+    }
+
+    [Fact]
+    public void The_notice_is_documented_as_not_being_a_privacy_policy()
+    {
+        // The boundary a site owner most needs and is least likely to assume. Left unstated,
+        // somebody reads a compliant-looking paragraph on their booking form and concludes they
+        // have a privacy policy.
+        var docs = Docs();
+
+        DocumentationAssert.Says(docs, "This notice is not a privacy policy");
+        DocumentationAssert.Says(docs, "If you need a privacy policy, you still need one");
+    }
+
+    [Fact]
+    public void The_refusal_of_an_unusable_policy_link_is_documented()
+    {
+        // Why this setting is stricter than the others, in the terms that make it obvious: it is
+        // the only value that reaches a link on a public page.
+        var docs = Docs();
+
+        DocumentationAssert.Says(docs, "Anything else is refused and logged as an error");
+        DocumentationAssert.Says(docs, "not by blocking the dangerous ones, but by allowing only these");
+    }
+
+    [Fact]
+    public void The_default_rendering_with_no_retention_period_is_documented()
+    {
+        // The DEFAULT install. A site owner reading "it says so plainly rather than going quiet"
+        // knows the awkward-sounding sentence on their form is deliberate rather than a bug.
+        DocumentationAssert.Says(Docs(), "If you have not, it says so plainly rather than going quiet");
+    }
+
+    [Fact]
     public void The_two_surprising_things_about_the_recorded_service_are_stated()
     {
         // Both of these look like defects to someone who has not been told, and both are

@@ -139,4 +139,27 @@ public class ThemeDocumentationTests
         DocumentationAssert.Says(docs, "with no stylesheet applied at all");
         DocumentationAssert.Says(docs, "which is why no stylesheet can make the flow inoperable");
     }
+
+    [Fact]
+    public void Theme_authors_are_told_the_privacy_notice_is_theirs_to_render()
+    {
+        // FOUND BY MUTATION, not by writing the test first. Listing `_PrivacyNotice` in the
+        // building-blocks table was asserted; the paragraph explaining that a theme replacing
+        // `_YourDetails` decides whether the notice appears at all was not — so the whole
+        // narrative could have been deleted with a green suite, leaving only a table row.
+        //
+        // It matters more than an ordinary documentation clause because the omission it warns
+        // about is invisible: a theme that drops the time picker produces a site that visibly
+        // does not work, and a theme that drops the privacy notice produces a site that works
+        // perfectly and tells its visitors nothing.
+        var docs = Theming();
+
+        DocumentationAssert.Says(docs, "whether that notice appears is your decision");
+        DocumentationAssert.Says(docs, "the failure is invisible");
+        DocumentationAssert.Says(docs, "either call `_PrivacyNotice` from it or render the same four facts yourself");
+
+        // And that the facts are handed over, which is what makes the choice a real one rather
+        // than an instruction to reinvent them.
+        DocumentationAssert.Says(docs, "hands your view the facts on");
+    }
 }
