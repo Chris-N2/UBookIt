@@ -38,4 +38,29 @@ public sealed record SiteBookingSettings
     /// </para>
     /// </remarks>
     public int? RetentionDays { get; init; }
+
+    /// <summary>
+    /// A link to the site's own privacy policy, presented by the booking form's privacy notice,
+    /// or <c>null</c> when the site has configured none.
+    /// </summary>
+    /// <remarks>
+    /// <para>
+    /// <b>The package writes the sentences it can keep true; this is where everything else
+    /// lives.</b> What is collected, why, for how long and who can see it are facts about this
+    /// package's own code. Jurisdiction, the identity of the data controller, other processing a
+    /// site performs and how to complain are not — and a package that guessed at them would be
+    /// putting words a site never wrote onto its public pages.
+    /// </para>
+    /// <para>
+    /// <b>Null means no link, and the notice renders without one.</b> It is not a placeholder to
+    /// be filled in with "#": a link that goes nowhere is worse on a privacy notice than no link,
+    /// because it looks like the policy exists.
+    /// </para>
+    /// <para>
+    /// <b>A value that cannot be used as a link resolves to null.</b> This is the one setting
+    /// whose value reaches an <c>href</c> on a public page, so what is refused matters more here
+    /// than for the others — see the resolution in the persistence composer.
+    /// </para>
+    /// </remarks>
+    public string? PrivacyPolicyUrl { get; init; }
 }

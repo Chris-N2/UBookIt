@@ -207,6 +207,53 @@ then, erase that booking by hand — that is what the endpoint above is for.
 **On a load-balanced site it runs once**, not once per server. uBookIt uses Umbraco's own
 scheduling to arrange that.
 
+## What visitors are told
+
+The booking form carries a short privacy notice, above the button that submits it. It says
+four things, and every one of them is a fact about what uBookIt does rather than a claim
+somebody wrote:
+
+- **What is collected** — the booker's name and email address, and their phone number if
+  they give one.
+- **Why** — to hold the booking, identify it, and confirm it.
+- **How long it is kept** — read from `RetentionDays`. If you have set a period, the notice
+  states it. If you have not, it says so plainly rather than going quiet.
+- **Who can see it** — that contact details are visible in the backoffice only to staff with
+  access to personal data.
+
+**You cannot mistype the retention period into it.** There is no wording to keep in step with
+your configuration, because the sentence is generated from the same value the retention job
+acts on. Change the period, restart, and the notice changes with it.
+
+### Linking your own privacy policy
+
+```json
+{
+  "UBookIt": {
+    "PrivacyPolicyUrl": "/privacy"
+  }
+}
+```
+
+An absolute `https://` URL or a site-relative path beginning with a single `/`. When set, the
+notice links to it; when not, the notice renders its four statements and no link.
+
+**Anything else is refused and logged as an error**, and the notice then renders without a
+link. That is deliberately stricter than uBookIt's other settings: this is the only value that
+ends up in a link on a public page, so a `javascript:` URL there would be a script running on
+your visitors' click. uBookIt accepts the two forms above and nothing else — not by blocking
+the dangerous ones, but by allowing only these.
+
+> **This notice is not a privacy policy.** It describes what one package does with what one
+> form collects. It says nothing about who you are as a data controller, your lawful basis,
+> your jurisdiction, anything else you do with the data, or how somebody complains — because
+> uBookIt cannot know any of that. If you need a privacy policy, you still need one, and the
+> setting above is how the booking form points at it.
+
+**A theme can replace it.** If your site uses a uBookIt theme that supplies its own view for
+the contact-details step, whether the notice appears is the theme's decision — see the
+theming guide. Nothing about it will look broken if a theme leaves it out.
+
 ## What is in the section
 
 | | |

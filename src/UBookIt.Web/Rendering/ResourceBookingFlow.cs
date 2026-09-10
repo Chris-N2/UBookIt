@@ -90,7 +90,8 @@ public sealed class ResourceBookingFlow(
 
         return new ResourceFlowOutcome(
             BookingFormBuilder.Build(
-                resource, selectedDate, today, starts, duration, zone, failed, input.FlowToken),
+                resource, selectedDate, today, starts, duration, zone,
+                PrivacyNoticeView.From(settings), failed, input.FlowToken),
             null);
     }
 }

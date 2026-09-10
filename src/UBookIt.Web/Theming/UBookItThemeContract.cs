@@ -83,6 +83,7 @@ public static class UBookItThemeContract
     [
         "~/Views/Shared/UBookIt/_DateAndLength.cshtml",
         "~/Views/Shared/UBookIt/_ErrorSummary.cshtml",
+        "~/Views/Shared/UBookIt/_PrivacyNotice.cshtml",
         "~/Views/Shared/UBookIt/_Times.cshtml",
         "~/Views/Shared/UBookIt/_YourDetails.cshtml",
     ];

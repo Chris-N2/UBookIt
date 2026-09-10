@@ -469,3 +469,26 @@ public sealed class ApiErrorModel
 
     public string? Field { get; set; }
 }
+
+/// <summary>
+/// What this site does with the personal data a booking collects, as data a consumer can act on.
+/// </summary>
+/// <remarks>
+/// Carries the retention period and nothing else. Deliberately not a rendered notice: see
+/// <see cref="UBookIt.Web.Controllers.PrivacyController"/> for why the package publishes the
+/// number rather than its own English sentences.
+/// </remarks>
+public sealed class PrivacyModel
+{
+    /// <summary>
+    /// How many days after a booking's end its personal data is erased automatically, or
+    /// <c>null</c> when this site has configured no automatic removal.
+    /// </summary>
+    /// <remarks>
+    /// <b>Null, never <c>0</c>.</b> A consumer must be able to tell "erased after N days" from
+    /// "no automatic removal period is set", and reporting the second as a number would let it
+    /// publish a promise this site has not made. The same distinction the setting itself is
+    /// nullable to preserve.
+    /// </remarks>
+    public int? RetentionDays { get; init; }
+}

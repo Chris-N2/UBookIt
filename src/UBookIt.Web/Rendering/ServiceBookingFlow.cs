@@ -92,7 +92,8 @@ public sealed class ServiceBookingFlow(
 
         return new ServiceFlowOutcome(
             ServiceBookingFormBuilder.Build(
-                service, pools, selectedDate, today, starts, duration, zone, failed, input.FlowToken, choice),
+                service, pools, selectedDate, today, starts, duration, zone,
+                PrivacyNoticeView.From(settings), failed, input.FlowToken, choice),
             null);
     }
 }

@@ -1,0 +1,64 @@
+@using UBookIt.Web.Rendering
+@model IBookingFormView
+@{
+    var notice = Model.PrivacyNotice;
+    var days = notice.RetentionDays;
+}
+@*
+    What happens to the details this form is asking for. Rendered from ONE place because
+    both flows collect contact details through _YourDetails, and a second copy is how the
+    retention sentence would come to say two different things.
+
+    THE FOUR STATEMENTS ARE FACTS ABOUT THIS PACKAGE, and every one of them is checkable
+    against code in this repository: what is collected is what the fields above collect,
+    why is what placement does with it, how long is `SiteBookingSettings.RetentionDays` —
+    the same value the retention sweep acts on — and who can see it is the Sensitive data
+    group check the backoffice applies. Nothing here asserts a lawful basis, a controller
+    identity or a jurisdiction; those need a site's own judgement and live behind its own
+    policy link.
+
+    NO HEADING, deliberately. The document's heading outline is the site's, not the
+    package's, and a heading inside a fieldset that already has a legend would be adding
+    to an outline we do not own to solve a problem we do not have.
+
+    NO CONTROL, deliberately. There is nothing to tick and nothing to agree to: the basis
+    for holding a booker's details is performance of the booking, and an unrefusable
+    tickbox would misrepresent that as consent — which would also imply a right to
+    withdraw it and make the site's own records revocable.
+*@
+<div class="ubookit-privacy">
+    <p>
+        We use your name and email address — and your phone number, if you give one — to hold
+        your booking, to identify it, and to confirm it with you.
+    </p>
+    <p>
+        @if (notice.HasRetentionPeriod)
+        {
+            @* Stated from the configured period, never authored. A sentence written by hand
+               here could claim a period the code does not keep, which is the failure this
+               whole notice exists to prevent. *@
+            <text>
+                We keep them for @days @(days == 1 ? "day" : "days") after your booking. After that
+                we remove them permanently — the booking itself is kept, without your details.
+            </text>
+        }
+        else
+        {
+            @* The DEFAULT rendering, because retention is off unless a site turns it on. Saying
+               nothing here would omit one of the four statements on most installs, invisibly.
+               So it says what is true of this configuration and promises nothing. *@
+            <text>
+                We keep them until we remove them. This site has not set a period for removing
+                them automatically.
+            </text>
+        }
+        In this site's backoffice they can be seen only by staff who have been given access to
+        personal data.
+    </p>
+    @if (notice.HasPolicyUrl)
+    {
+        <p>
+            <a href="@notice.PolicyUrl">Read this site's privacy policy</a>
+        </p>
+    }
+</div>

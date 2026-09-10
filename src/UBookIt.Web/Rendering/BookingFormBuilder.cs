@@ -98,6 +98,7 @@ public static class BookingFormBuilder
         IReadOnlyList<BookableStart> starts,
         TimeSpan duration,
         TimeZoneInfo zone,
+        PrivacyNoticeView privacyNotice,
         FailedSubmission? failed = null,
         string? flowToken = null)
     {
@@ -105,6 +106,7 @@ public static class BookingFormBuilder
 
         return new BookingFormModel
         {
+            PrivacyNotice = privacyNotice,
             FlowToken = flowToken,
             ResourceId = resource.Id,
             ResourceName = resource.DisplayName,

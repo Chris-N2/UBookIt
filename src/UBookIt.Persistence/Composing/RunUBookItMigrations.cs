@@ -28,6 +28,7 @@ internal sealed class RunUBookItMigrations(
 
         WarnIfTimeZoneNotConfigured(configuration, logger);
         ErrorIfRetentionUnreadable(configuration, logger);
+        ErrorIfPrivacyPolicyUrlUnusable(configuration, logger);
 
         try
         {
@@ -88,6 +89,38 @@ internal sealed class RunUBookItMigrations(
                 + "Retention is OFF and no booking's personal data will be erased automatically. "
                 + "No default period has been substituted, because erasure cannot be undone.",
                 UBookItPersistenceComposer.RetentionDaysSettingKey);
+        }
+    }
+
+    /// <summary>
+    /// Reports a privacy policy link that was written and cannot be used. Says nothing when none
+    /// was written.
+    /// </summary>
+    /// <remarks>
+    /// <para>
+    /// Same shape and same reasoning as the retention case above: a value that was written and
+    /// could not be understood is a fault, while its absence is an ordinary choice. What differs
+    /// is where the consequence lands — a site that mistypes this gets a privacy notice with no
+    /// link to its own policy, on the page where the package asks people for their contact
+    /// details, and nothing on that page says anything is missing.
+    /// </para>
+    /// <para>
+    /// The message names the schemes that are accepted rather than the one that was refused,
+    /// because the refusal is an allow-list: telling somebody "javascript: is not allowed" would
+    /// invite them to try the next scheme, while telling them what IS allowed answers the
+    /// question they actually have.
+    /// </para>
+    /// </remarks>
+    internal static void ErrorIfPrivacyPolicyUrlUnusable(IConfiguration configuration, ILogger logger)
+    {
+        if (UBookItPersistenceComposer.IsPrivacyPolicyUrlConfigured(configuration)
+            && UBookItPersistenceComposer.ResolvePrivacyPolicyUrl(configuration) is null)
+        {
+            logger.LogError(
+                "uBookIt could not use '{SettingKey}' as a link. The booking form's privacy notice "
+                + "will render without a link to the site's privacy policy. Accepted values are an "
+                + "absolute http or https URL, or a site-relative path beginning with a single '/'.",
+                UBookItPersistenceComposer.PrivacyPolicyUrlSettingKey);
         }
     }
 }

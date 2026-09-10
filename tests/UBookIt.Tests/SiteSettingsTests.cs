@@ -221,6 +221,89 @@ public class SiteSettingsTests
         Assert.Null(exception);
     }
 
+    private static IConfiguration PolicyUrlConfig(string? value)
+    {
+        var values = new Dictionary<string, string?>();
+        if (value is not null)
+        {
+            values[UBookItPersistenceComposer.PrivacyPolicyUrlSettingKey] = value;
+        }
+
+        return new ConfigurationBuilder().AddInMemoryCollection(values).Build();
+    }
+
+    [Fact]
+    public void No_policy_link_is_configured_by_default()
+        => Assert.Null(UBookItPersistenceComposer.ResolveSettings(PolicyUrlConfig(null)).PrivacyPolicyUrl);
+
+    [Theory]
+    [InlineData("https://example.com/privacy")]
+    [InlineData("http://example.com/privacy")]
+    [InlineData("/privacy")]
+    [InlineData("/legal/privacy-policy")]
+    public void A_usable_policy_link_is_accepted(string configured)
+        => Assert.Equal(
+            configured,
+            UBookItPersistenceComposer.ResolveSettings(PolicyUrlConfig(configured)).PrivacyPolicyUrl);
+
+    [Theory]
+    [InlineData("")]                            // blank
+    [InlineData("   ")]                         // whitespace
+    [InlineData("javascript:alert(1)")]         // executes on click, in an href
+    [InlineData("JavaScript:alert(1)")]         // and the scheme is case-insensitive
+    [InlineData("data:text/html,<script>1</script>")]
+    [InlineData("file:///etc/passwd")]
+    [InlineData("vbscript:msgbox(1)")]
+    [InlineData("//evil.example/privacy")]      // protocol-relative: looks local, is not
+    [InlineData("privacy")]                     // no leading slash: resolves against the current path
+    [InlineData("../privacy")]
+    public void An_unusable_policy_link_resolves_to_none(string configured)
+    {
+        // THE ONE SETTING WHOSE VALUE REACHES AN href ON A PUBLIC PAGE, so what it refuses
+        // matters more than what it accepts. The list is an allow-list in the code — http,
+        // https, or a single-slash relative path — which is why the schemes below are refused
+        // without any of them being named there. A block-list would have to enumerate the
+        // dangerous ones correctly, and forever.
+        Assert.Null(UBookItPersistenceComposer.ResolveSettings(PolicyUrlConfig(configured)).PrivacyPolicyUrl);
+    }
+
+    [Theory]
+    [InlineData("")]
+    [InlineData("   ")]
+    [InlineData("javascript:alert(1)")]
+    [InlineData("//evil.example/privacy")]
+    [InlineData("privacy")]
+    public void A_policy_link_that_was_written_and_cannot_be_used_logs_an_error(string configured)
+    {
+        var logger = new CapturingLogger();
+
+        RunUBookItMigrations.ErrorIfPrivacyPolicyUrlUnusable(PolicyUrlConfig(configured), logger);
+
+        var entry = Assert.Single(logger.Entries);
+        Assert.Equal(LogLevel.Error, entry.Level);
+        Assert.Contains(UBookItPersistenceComposer.PrivacyPolicyUrlSettingKey, entry.Message);
+    }
+
+    [Fact]
+    public void An_absent_policy_link_logs_nothing()
+    {
+        var logger = new CapturingLogger();
+
+        RunUBookItMigrations.ErrorIfPrivacyPolicyUrlUnusable(PolicyUrlConfig(null), logger);
+
+        Assert.Empty(logger.Entries);
+    }
+
+    [Fact]
+    public void A_usable_policy_link_logs_nothing()
+    {
+        var logger = new CapturingLogger();
+
+        RunUBookItMigrations.ErrorIfPrivacyPolicyUrlUnusable(PolicyUrlConfig("/privacy"), logger);
+
+        Assert.Empty(logger.Entries);
+    }
+
     private sealed class CapturingLogger : ILogger
     {
         public List<(LogLevel Level, string Message)> Entries { get; } = [];

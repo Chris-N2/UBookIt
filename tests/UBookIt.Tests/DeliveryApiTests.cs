@@ -26,6 +26,76 @@ public class DeliveryApiTests
 {
     private static readonly DateOnly BaseDate = TestData.BaseDate;
 
+    [Fact]
+    public void The_privacy_read_publishes_a_configured_retention_period()
+    {
+        var settings = TestData.Settings with { RetentionDays = 90 };
+
+        var result = Assert.IsType<OkObjectResult>(new PrivacyController(settings).GetPrivacy());
+        var model = Assert.IsType<PrivacyModel>(result.Value);
+
+        Assert.Equal(90, model.RetentionDays);
+    }
+
+    [Fact]
+    public void The_privacy_read_reports_no_period_as_null_and_never_as_a_number()
+    {
+        // A consumer must be able to tell "erased after N days" from "no automatic removal is
+        // set", because only one of those is a promise it may publish on its own page. Reporting
+        // the second as 0 would let it tell visitors their data goes immediately.
+        var settings = TestData.Settings with { RetentionDays = null };
+
+        var result = Assert.IsType<OkObjectResult>(new PrivacyController(settings).GetPrivacy());
+        var model = Assert.IsType<PrivacyModel>(result.Value);
+
+        Assert.Null(model.RetentionDays);
+        Assert.NotEqual(0, model.RetentionDays ?? -1);
+    }
+
+    [Fact]
+    public void The_privacy_read_publishes_no_prose()
+    {
+        // The number, and nothing else. Publishing the package's English sentences would make
+        // untranslatable prose part of a versioned contract — and a headless consumer writes its
+        // own page in its own language anyway.
+        var members = typeof(PrivacyModel)
+            .GetProperties()
+            .Select(p => (p.Name, p.PropertyType))
+            .ToList();
+
+        var member = Assert.Single(members);
+        Assert.Equal(nameof(PrivacyModel.RetentionDays), member.Name);
+        Assert.Equal(typeof(int?), member.PropertyType);
+    }
+
+    [Fact]
+    public void Retention_does_not_ride_on_the_resource_or_service_reads()
+    {
+        // It is a site-wide fact. Repeating it on every row of a paged read would duplicate one
+        // value and invite a consumer to believe it varies by resource.
+        foreach (var type in new[] { typeof(ResourceReadModel), typeof(ServiceReadModel) })
+        {
+            Assert.DoesNotContain(
+                type.GetProperties(),
+                p => p.Name.Contains("Retention", StringComparison.OrdinalIgnoreCase));
+        }
+    }
+
+    [Fact]
+    public void The_privacy_read_carries_no_authorization_of_its_own()
+    {
+        // Anonymous on the same terms as every other delivery endpoint, inherited from the base
+        // controller rather than restated — and asserted so that adding a policy here, which
+        // would break every headless consumer, cannot pass unnoticed.
+        var attributes = typeof(PrivacyController)
+            .GetCustomAttributes(inherit: false)
+            .Select(a => a.GetType().Name)
+            .ToList();
+
+        Assert.DoesNotContain("AuthorizeAttribute", attributes);
+        Assert.Contains("ApiVersionAttribute", attributes);
+    }
+
     private sealed class Harness
     {
         public Resource Room { get; }

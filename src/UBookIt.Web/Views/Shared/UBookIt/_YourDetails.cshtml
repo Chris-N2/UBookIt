@@ -45,5 +45,9 @@
                autocomplete="tel" />
     </div>
 
+    @* Before the submit control, in the DOM order a screen reader follows, so that what
+       happens to the details is read before they are handed over rather than after. *@
+    @await Html.PartialAsync("~/Views/Shared/UBookIt/_PrivacyNotice.cshtml", Model)
+
     <button type="submit" class="ubookit-submit">Book</button>
 </fieldset>
