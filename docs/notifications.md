@@ -157,8 +157,24 @@ copy of somebody's personal data, and uBookIt cannot erase it.**
 
 This matters because uBookIt promises that erasing a booking removes the person from it, and
 that promise is only honest while the booking row is the *only* place the details live. Inside
-the package it is: nothing logs them, no cache holds them, and the public booking API has no
-endpoint that reads a booking back. Outside the package, that is your side of the line.
+the package that is very nearly true, and the exception is worth stating plainly rather than
+leaving you to discover it:
+
+- **uBookIt never writes a booker's name, address or telephone number to a log itself.** Its own
+  log lines identify a booking by its id, including when sending fails.
+- **No cache holds them**, and the public booking API has no endpoint that reads a booking back.
+- **But if you enable emails, a mail server's error can quote the address back at you.** An SMTP
+  rejection commonly echoes the recipient — `550 5.1.1 <someone@example.com>: Recipient address
+  rejected` — and that error is reported through Umbraco's normal error logging. The address is
+  in text the mail server wrote, not text uBookIt wrote, and uBookIt does not attempt to redact a
+  third-party error: doing so would as likely destroy the diagnostic that makes a failed send
+  findable at all.
+
+  So on a site that sends email, **treat your application log as somewhere contact details can
+  appear**, and set its retention accordingly. This is the same consideration as any other system
+  that sends mail on your behalf.
+
+Outside the package, that is your side of the line.
 
 So if you keep anything:
 

@@ -1,3 +1,4 @@
+using System.Text.RegularExpressions;
 using Microsoft.Extensions.Logging.Abstractions;
 using UBookIt.Core;
 using UBookIt.Core.Bookings;
@@ -19,6 +20,15 @@ namespace UBookIt.Tests;
 public class BookingEmailTests
 {
     private static readonly Guid ResourceId = Guid.NewGuid();
+
+    /// <summary>
+    /// Any GUID, in the forms a log line renders one. Hex digits collide with short alphabetic
+    /// needles — "Ada" is three of them — so an identifier that is not personal data must be out
+    /// of the haystack before personal data is looked for in it.
+    /// </summary>
+    private static readonly Regex AnyGuid = new(
+        "[0-9a-fA-F]{8}-?[0-9a-fA-F]{4}-?[0-9a-fA-F]{4}-?[0-9a-fA-F]{4}-?[0-9a-fA-F]{12}",
+        RegexOptions.Compiled);
 
     // ---- composing --------------------------------------------------------------------------
 
@@ -302,8 +312,12 @@ public class BookingEmailTests
             // This is not hypothetical: EraseBookerEndpointTests has the same collision and has
             // been failing intermittently in this repository for some time, misdiagnosed once as a
             // build race. See the deferred obligations note.
-            var haystack = (entry.Message + " " + entry.Exception)
-                .Replace(booking.Id.ToString(), "{booking-id}", StringComparison.Ordinal);
+            // EVERY GUID, not just this booking's. Redacting the one identifier present today
+            // fixes today and leaves the class: the composer's warning is ABOUT a resource read,
+            // so a line carrying `claim.ResourceId` is the obvious next addition — and it would
+            // reintroduce the collision while looking exactly like a PII leak. Same lesson as the
+            // defect this redaction exists to fix, one level up.
+            var haystack = AnyGuid.Replace(entry.Message + " " + entry.Exception, "{guid}");
 
             Assert.DoesNotContain("Ada", haystack, StringComparison.OrdinalIgnoreCase);
             Assert.DoesNotContain("Lovelace", haystack, StringComparison.OrdinalIgnoreCase);

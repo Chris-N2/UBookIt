@@ -86,6 +86,33 @@ public class NotificationDocumentationTests
         Assert.Contains("Sensitive data", docs, StringComparison.Ordinal);
     }
 
+    /// <summary>
+    /// What the package does and does not guarantee about personal data in logs.
+    /// </summary>
+    /// <remarks>
+    /// <b>Pinned because its predecessor was pinned by nothing, and that is how it survived.</b>
+    /// The erasure section used to assert flatly that "nothing logs them" — an absolute claim
+    /// about the whole package, true when written and falsified the moment the package could hand
+    /// a booker's address to a mail client. This change's own outward sweep read this file, caught
+    /// the "sends nothing" claim at the top, and walked past its sibling four sections down.
+    /// <para>
+    /// Both halves are asserted together on purpose: the guarantee uBookIt CAN keep (it writes no
+    /// contact details itself) and the one it cannot (a mail server's error may quote the address).
+    /// Keeping only the first would restore exactly the over-claim this replaced.
+    /// </para>
+    /// </remarks>
+    [Fact]
+    public void What_can_and_cannot_be_kept_out_of_logs_is_stated()
+    {
+        var docs = Docs();
+
+        DocumentationAssert.Says(
+            docs, "uBookIt never writes a booker's name, address or telephone number to a log itself");
+        DocumentationAssert.Says(docs, "a mail server's error can quote the address back at you");
+        DocumentationAssert.Says(
+            docs, "treat your application log as somewhere contact details can appear");
+    }
+
     [Fact]
     public void The_delivery_limit_is_stated()
     {

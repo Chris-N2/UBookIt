@@ -98,8 +98,17 @@ public sealed class UmbracoBookingObserver(
             // that can. The booking is committed; a subscriber's fault must not become the
             // booker's problem.
             //
-            // The booking id only — a notification failure is not a reason to write a
-            // booker's name or email into a log.
+            // THE BOOKING ID ONLY — a notification failure is not a reason to write a booker's
+            // name or email into a log. That governs what THIS package writes, and it is the
+            // whole of what it can govern.
+            //
+            // It does not govern the exception, and since 0.5.0 that distinction is reachable
+            // rather than academic: the package can now hand a booker's address to a mail client,
+            // and an SMTP rejection commonly echoes the recipient into its own message. Such an
+            // exception arrives here and is logged with the error, as it must be — redacting text
+            // a third party wrote would as likely destroy the diagnostic that makes a failed send
+            // findable. `docs/notifications.md` says so rather than implying a guarantee this
+            // cannot keep.
             logger.LogError(
                 exception,
                 "A handler for the booking-{What} notification threw. Booking {BookingId} is "
