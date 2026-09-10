@@ -96,15 +96,22 @@ public class PrivacyNoticeSourceTests
         //
         // Source-level because that is where the property lives: "one construction site" is not
         // observable from behaviour while every site happens to agree.
+        //
         // Counted per file rather than classified as inside-or-outside the factory. Counting is
         // strictly stronger and far clearer: a second construction added to the factory's OWN
         // file would satisfy any "is it in the right file?" test, and it is just as much a second
         // source as one added to a flow.
-        var constructions = RepoFiles
+        //
+        // `.cshtml` IS SCANNED TOO. A view can reach settings through `@inject`, so "the scan
+        // only looked at C#" would be a hole with a real shape rather than a theoretical one.
+        var scanned = RepoFiles
             .Paths("src", "*.cs")
-            .Select(path => (
-                File: path.Replace('\\', '/')[(path.Replace('\\', '/').IndexOf("/src/", StringComparison.Ordinal) + 1)..],
-                Count: Regex.Matches(File.ReadAllText(path), @"new\s+PrivacyNoticeView\s*\(").Count))
+            .Concat(RepoFiles.Paths("src", "*.cshtml"))
+            .Select(path => (Path: path, File: Relative(path)))
+            .ToList();
+
+        var constructions = scanned
+            .Select(x => (x.File, Count: ConstructionsIn(File.ReadAllText(x.Path))))
             .Where(x => x.Count > 0)
             .OrderBy(x => x.File, StringComparer.Ordinal)
             .ToList();
@@ -114,5 +121,77 @@ public class PrivacyNoticeSourceTests
 
         Assert.EndsWith("src/UBookIt.Web/Rendering/BookingFormView.cs", only.File, StringComparison.Ordinal);
         Assert.Equal(1, only.Count);
+
+        // THE SCAN'S OWN ESCAPE HATCH, CLOSED — and the first attempt at closing it did not.
+        //
+        // Narrowing the root from "src" to "src/UBookIt.Web/Rendering" left this test green while
+        // hiding every construction outside one folder. An emptied scan fails on Assert.Single,
+        // but a NARROWED one did not. Named files rather than a count floor, because a floor is a
+        // number somebody lowers.
+        //
+        // The first list named three files that ALL LIVE IN `Rendering` — so the narrowing kept
+        // every one of them and the guard stayed green against the very mutation it was written
+        // for. A required-file list only closes narrowing if its members are spread across the
+        // roots somebody might narrow to, which is why Core and Persistence are named here even
+        // though neither constructs the type: what they are doing in this list is being
+        // ELSEWHERE.
+        foreach (var required in new[]
+        {
+            "src/UBookIt.Web/Rendering/BookingFormView.cs",
+            "src/UBookIt.Web/Rendering/ResourceBookingFlow.cs",
+            "src/UBookIt.Web/Rendering/ServiceBookingFlow.cs",
+            "src/UBookIt.Web/Views/Shared/UBookIt/_PrivacyNotice.cshtml",
+            "src/UBookIt.Core/SiteBookingSettings.cs",
+            "src/UBookIt.Persistence/Composing/UBookItPersistenceComposer.cs",
+        })
+        {
+            Assert.Contains(
+                scanned,
+                x => x.File.EndsWith(required, StringComparison.Ordinal));
+        }
+    }
+
+    private static string Relative(string path)
+    {
+        var normalised = path.Replace('\\', '/');
+
+        return normalised[(normalised.IndexOf("/src/", StringComparison.Ordinal) + 1)..];
+    }
+
+    /// <summary>
+    /// How many times a source file produces a <see cref="PrivacyNoticeView"/> — by construction
+    /// or by <c>with</c>.
+    /// </summary>
+    /// <remarks>
+    /// <para>
+    /// <b><c>with</c> is a second construction and carries no <c>new</c>.</b> QA proved the first
+    /// version blind to it: replacing a flow's <c>PrivacyNoticeView.From(settings)</c> with
+    /// <c>PrivacyNoticeView.From(settings) with { RetentionDays = … }</c> left all 2104 tests
+    /// green. The type is a record, so <c>with</c> is available to every caller and is the
+    /// idiomatic way to clone one — which put the most natural form of the exact case this guard
+    /// exists to catch outside its reach.
+    /// </para>
+    /// <para>
+    /// <b>What this still cannot see, stated rather than left to be discovered.</b> A <c>with</c>
+    /// applied to a local — <c>var n = form.PrivacyNotice; var m = n with { … };</c> — names the
+    /// type nowhere and no regex over source will find it. That is why this guard is
+    /// defence-in-depth over the two behavioural tests above rather than a proof: those catch a
+    /// flow stating the wrong value however it was built, and this catches a second construction
+    /// route that would be correct today. Neither subsumes the other, and neither is complete.
+    /// </para>
+    /// </remarks>
+    private static int ConstructionsIn(string source)
+    {
+        var news = Regex.Matches(source, @"new\s+PrivacyNoticeView\s*\(").Count;
+
+        // A `with` in any statement that names the type. Split on `;` so a `with` elsewhere in
+        // the file cannot be attributed to a mention of the type several statements away.
+        var withs = source
+            .Split(';')
+            .Count(statement =>
+                statement.Contains("PrivacyNoticeView", StringComparison.Ordinal)
+                && Regex.IsMatch(statement, @"\bwith\b\s*\{"));
+
+        return news + withs;
     }
 }
