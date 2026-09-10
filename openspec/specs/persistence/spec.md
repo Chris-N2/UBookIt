@@ -255,6 +255,14 @@ Umbraco's background jobs are singletons resolved from the root container while 
 stores, services and DbContext are scoped; a singleton capturing a scoped dependency would hold
 one DbContext for the life of the application.
 
+**A configured privacy policy link that cannot be used as a link SHALL be treated as absent**, and
+reported at startup, rather than carried through to a public page. It is resolved on the same
+principle as the retention period and for a related reason: the cost of being wrong is visible to
+visitors rather than to an operator. A site that configured nothing is silent, as with every other
+setting; a site that configured something unusable is told, because the alternative is a broken
+link on the page where the package asks people for their contact details. See the `privacy-notice`
+capability, which owns the meaning of the setting.
+
 #### Scenario: Site boots with services resolvable
 - **WHEN** an Umbraco site referencing the package starts with a configured SQL Server database
 - **THEN** `IBookingService` and `IAvailabilityQueryService` are resolvable from the container and the uBookIt tables exist
@@ -278,6 +286,14 @@ one DbContext for the life of the application.
 #### Scenario: The job does not capture a scoped dependency
 - **WHEN** the retention job's construction is inspected
 - **THEN** it holds no scoped service, and obtains the ones it needs within a scope it creates per unit of work
+
+#### Scenario: An unusable privacy policy link does not reach a page
+- **WHEN** the site configuration carries a privacy policy link that cannot be used as a link
+- **THEN** the settings report no policy link, an error is logged identifying the setting, and no link is rendered
+
+#### Scenario: An absent privacy policy link is silent
+- **WHEN** the site configuration carries no privacy policy link
+- **THEN** the settings report none and nothing is logged about it
 
 ### Requirement: Integration test coverage on real SQL Server
 Integration tests SHALL run against a real SQL Server instance (connection from the `UBOOKIT_TEST_DB` environment variable, defaulting to LocalDB), creating and dropping a uniquely named database per run. They SHALL cover: migration application and idempotency, resource and booking round-trip fidelity, half-open overlap at the SQL layer, status-change persistence, and the concurrency proof. When no SQL Server is reachable the tests SHALL skip with an explicit diagnostic, never silently pass.
