@@ -94,6 +94,41 @@ public class ServiceFrontendTests
     private static BookingFlowInput On(DateOnly date, int? minutes = null, string? token = null)
         => new() { Date = date, DurationMinutes = minutes, FlowToken = token };
 
+    [Fact]
+    public async Task The_service_flow_states_the_retention_period_the_sweep_would_act_on()
+    {
+        // THE FLOW QA MUTATED. Replacing this flow's `PrivacyNoticeView.From(settings)` with
+        // `new PrivacyNoticeView(30, …)` — a notice telling every visitor "we keep them for 30
+        // days" while the sweep acted on the configured period — left all 2091 tests green,
+        // because the only test for that guarantee called the factory directly and never
+        // touched a flow. A guard that watches a reconstruction of the thing it guards watches
+        // nothing.
+        //
+        // 137 because no other fixture uses it: a flow that hard-coded a plausible number would
+        // otherwise pass by coincidence. And the assertion compares against the SETTINGS rather
+        // than against 137, because the guarantee is that the two agree, not that either equals
+        // a literal.
+        var settings = TestData.Settings with
+        {
+            RetentionDays = 137,
+            PrivacyPolicyUrl = "/distinctive-policy",
+        };
+
+        var service = Svc("Massage", null, new ServiceRole(ResourceTypes.Room, 1));
+        var serviceStore = new InMemoryServiceStore().Add(service);
+        var resourceStore = new InMemoryResourceStore().Add(Res(1, ResourceTypes.Room, "Treatment Room"));
+        var (core, _, _) = TestData.ServiceBookingWith(serviceStore, resourceStore);
+
+        var flow = new ServiceBookingFlow(
+            serviceStore, core, settings, new FixedTimeProvider(TestData.Now));
+
+        var outcome = await flow.BuildAsync(service.Id, On(Date, 60));
+
+        Assert.NotNull(outcome.Form);
+        Assert.Equal(settings.RetentionDays, outcome.Form!.PrivacyNotice.RetentionDays);
+        Assert.Equal(settings.PrivacyPolicyUrl, outcome.Form.PrivacyNotice.PolicyUrl);
+    }
+
     private static async Task<IReadOnlyList<RoleCandidates>> PoolsOf(Harness harness)
     {
         var resolved = await harness.Core.ResolveCandidatesAsync(harness.Service.Id);

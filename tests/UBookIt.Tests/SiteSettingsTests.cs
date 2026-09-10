@@ -257,6 +257,24 @@ public class SiteSettingsTests
     [InlineData("//evil.example/privacy")]      // protocol-relative: looks local, is not
     [InlineData("privacy")]                     // no leading slash: resolves against the current path
     [InlineData("../privacy")]
+    // FOUND BY QA, and each of these was ACCEPTED before the control-character rule.
+    //
+    // A browser removes every ASCII tab and newline from a URL BEFORE parsing it, so each of
+    // the first three resolves to the protocol-relative //evil.example that the rule below
+    // exists to refuse. The interior character survives Trim(), which only touches the ends —
+    // one character defeated the guarantee the comment on that rule states.
+    [InlineData("/\t/evil.example")]
+    [InlineData("/\n/evil.example")]
+    [InlineData("/\r/evil.example")]
+    [InlineData("/pri\u0000vacy")]
+    //
+    // Backslashes go with them. "/\\evil.example/x" is refused on Windows only by accident —
+    // .NET parses it as an implicit UNC `file:` URI, so the scheme allow-list catches it — and
+    // that parsing is platform-specific. Umbraco 17 on .NET 10 is routinely hosted on Linux,
+    // where it would fall into the relative branch and be accepted, while a browser reads the
+    // backslash as a slash and navigates to https://evil.example/x.
+    [InlineData("/\\evil.example/x")]
+    [InlineData("\\\\evil.example\\x")]
     public void An_unusable_policy_link_resolves_to_none(string configured)
     {
         // THE ONE SETTING WHOSE VALUE REACHES AN href ON A PUBLIC PAGE, so what it refuses

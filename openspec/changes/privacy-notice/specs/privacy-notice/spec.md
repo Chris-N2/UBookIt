@@ -7,7 +7,7 @@ details are collected**, and SHALL state all four of:
 
 - **what** personal data is collected — the booker's name, email address and, where given, phone
   number;
-- **why** it is collected — to hold, identify and confirm the booking;
+- **why** it is collected — to hold and identify the booking, and so that the site is able to contact the booker about it;
 - **how long** it is kept, per the requirement below;
 - **who can see it** — that a booker's contact details are shown only to backoffice users
   Umbraco permits to see sensitive data, per the `sensitive-data` capability.
@@ -83,6 +83,16 @@ be putting words a site never wrote onto its public pages.
 rendered as a broken link on a public page. The notice renders without a link in that case, on
 the same terms as a site that configured none.
 
+**The notice SHALL NOT state that any message is sent.** The package sends nothing — no email,
+no SMS, no message of any kind — so a notice promising a confirmation would assert processing the
+package does not perform, on the very page where it is asking for the address. Whether a site
+contacts a booker is the site's own arrangement, built on the notifications it may subscribe to.
+What the notice may say is why the details are held: that the site is **able** to make contact.
+
+*Recorded as a requirement rather than left to the wording, because it is a mistake the package
+had already made elsewhere and would make again: the form's email field carried the hint "We'll
+send your booking confirmation here" from long before this capability existed.*
+
 **The notice is not a privacy policy and the documentation SHALL say so** — it is a factual
 statement about one package's handling of the data one form collects, and a site that needs a
 policy still needs a policy.
@@ -102,6 +112,10 @@ policy still needs a policy.
 #### Scenario: The package writes no policy of its own
 - **WHEN** the notice's statements are inspected
 - **THEN** each is a statement about what this package collects, why, for how long, or who can see it, and none asserts a lawful basis, a controller identity, a jurisdiction, or any processing the package does not perform
+
+#### Scenario: No message is promised
+- **WHEN** the notice renders, in any configuration
+- **THEN** it states no message that will be sent to the booker, and any surface of the same form that mentions contact states only that the site is able to make contact
 
 ### Requirement: The notice is data on the view model, not markup alone
 

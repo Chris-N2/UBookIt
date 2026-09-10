@@ -27,9 +27,24 @@
     withdraw it and make the site's own records revocable.
 *@
 <div class="ubookit-privacy">
+    @*
+        WHY, and it says "can contact you" rather than "will confirm it with you" — which is a
+        correction, not a nicety.
+
+        This read "to hold your booking, to identify it, and to confirm it with you" until QA
+        pointed at `docs/notifications.md`: **uBookIt sends nothing itself. No email. No SMS. No
+        message of any kind.** Placing a booking shows a confirmation on screen and stores it. So
+        on a default install the address is not used to confirm anything with anybody, and the
+        phone number is not used for any stated purpose at all — it is stored.
+
+        That made the notice assert processing the package does not perform, which is the one
+        thing this capability's own requirement forbids it to do. A purpose statement — these
+        details are held so the site is ABLE to reach you — is true whether or not a site has
+        wired up notifications; a promise that a message is sent is true only for sites that have.
+    *@
     <p>
-        We use your name and email address — and your phone number, if you give one — to hold
-        your booking, to identify it, and to confirm it with you.
+        We use your name and email address — and your phone number, if you give one — to hold and
+        identify your booking, and so that this site can contact you about it.
     </p>
     <p>
         @if (notice.HasRetentionPeriod)

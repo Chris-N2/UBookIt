@@ -215,7 +215,10 @@ somebody wrote:
 
 - **What is collected** — the booker's name and email address, and their phone number if
   they give one.
-- **Why** — to hold the booking, identify it, and confirm it.
+- **Why** — to hold and identify the booking, and so the site is able to contact the booker
+  about it. **It does not say a confirmation will be sent**, because uBookIt sends nothing:
+  whether your site emails or rings anybody is your own arrangement, built on the
+  notifications described in `docs/notifications.md`.
 - **How long it is kept** — read from `RetentionDays`. If you have set a period, the notice
   states it. If you have not, it says so plainly rather than going quiet.
 - **Who can see it** — that contact details are visible in the backoffice only to staff with

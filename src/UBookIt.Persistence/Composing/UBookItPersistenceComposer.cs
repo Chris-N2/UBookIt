@@ -227,6 +227,29 @@ public sealed class UBookItPersistenceComposer : IComposer
 
         var value = configured.Trim();
 
+        // CONTROL CHARACTERS AND BACKSLASHES, REFUSED BEFORE ANYTHING ELSE — and this is not
+        // belt-and-braces, it closes a measured bypass of the rule below.
+        //
+        // `Trim()` removes only leading and trailing whitespace, so `/<TAB>/evil.example` reached
+        // the relative branch, satisfied "starts with one slash and not two", and rendered as
+        // `href="/&#x9;/evil.example"`. The HTML parser decodes that back to a raw tab inside the
+        // attribute, and the URL parser then strips every ASCII tab and newline from its input
+        // BEFORE parsing (URL Standard, "Remove all ASCII tab or newline") — leaving
+        // `//evil.example`, which is exactly the protocol-relative value the rule below exists to
+        // refuse. One character defeated it.
+        //
+        // The backslash goes with them for a related reason. `/\evil.example/x` is refused today
+        // on Windows only by accident: .NET parses it as an implicit UNC `file:` URI, so the
+        // scheme allow-list catches it. That parsing is Windows-specific, and Umbraco 17 on
+        // .NET 10 is routinely hosted on Linux, where the value would fall into the relative
+        // branch and be accepted — while a browser resolves `\` as `/` for special schemes and
+        // navigates to https://evil.example/x. Refusing it outright removes the question rather
+        // than relying on a platform's parser to keep answering it the same way.
+        if (value.Any(char.IsControl) || value.Contains('\\', StringComparison.Ordinal))
+        {
+            return null;
+        }
+
         if (Uri.TryCreate(value, UriKind.Absolute, out var absolute))
         {
             return absolute.Scheme == Uri.UriSchemeHttp || absolute.Scheme == Uri.UriSchemeHttps

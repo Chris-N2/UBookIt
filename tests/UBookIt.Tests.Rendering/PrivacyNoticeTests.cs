@@ -51,9 +51,45 @@ public class PrivacyNoticeTests
 
         Assert.Contains("name and email address", html, StringComparison.OrdinalIgnoreCase);
         Assert.Contains("phone number", html, StringComparison.OrdinalIgnoreCase);
-        Assert.Contains("confirm it", html, StringComparison.OrdinalIgnoreCase);
+        Assert.Contains("can contact you about it", html, StringComparison.OrdinalIgnoreCase);
         Assert.Contains("90 days", html, StringComparison.OrdinalIgnoreCase);
         Assert.Contains("only by staff", html, StringComparison.OrdinalIgnoreCase);
+    }
+
+    [Theory]
+    [InlineData(90, "/privacy")]
+    [InlineData(null, null)]
+    public async Task The_notice_promises_no_message(int? retentionDays, string? policyUrl)
+    {
+        // THE ASSERTION THAT REPLACED A TEST PINNING AN UNTRUE CLAIM. The notice used to say the
+        // details were used "to confirm it with you", and this suite asserted it — while
+        // docs/notifications.md says in bold that uBookIt sends nothing itself: no email, no SMS,
+        // no message of any kind. So on a default install the address confirmed nothing with
+        // anybody and the phone number served no stated purpose at all.
+        //
+        // A purpose statement — the details are held so the site is ABLE to make contact — is
+        // true whether or not a site has wired up notifications. A promise that something is sent
+        // is true only for the sites that have, and the package cannot know which those are.
+        var html = await RenderAsync(retentionDays, policyUrl);
+
+        Assert.DoesNotContain("we'll send", html, StringComparison.OrdinalIgnoreCase);
+        Assert.DoesNotContain("we will send", html, StringComparison.OrdinalIgnoreCase);
+        Assert.DoesNotContain("confirm it with you", html, StringComparison.OrdinalIgnoreCase);
+        Assert.DoesNotContain("confirmation email", html, StringComparison.OrdinalIgnoreCase);
+    }
+
+    [Fact]
+    public async Task The_form_does_not_contradict_the_notice_about_contact()
+    {
+        // The email field's own hint sat three lines above the notice and said "We'll send your
+        // booking confirmation here." Fixing the notice while leaving the hint would have left
+        // the package making two contradictory claims about the same field on the same screen —
+        // and the hint was the one a visitor reads first.
+        var details = await _renderer.RenderAsync(ViewInventory.YourDetails, Form(90, "/privacy"));
+
+        Assert.DoesNotContain("we'll send", details, StringComparison.OrdinalIgnoreCase);
+        Assert.DoesNotContain("we will send", details, StringComparison.OrdinalIgnoreCase);
+        Assert.Contains("can contact you about your booking", details, StringComparison.OrdinalIgnoreCase);
     }
 
     [Fact]
