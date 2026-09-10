@@ -211,7 +211,27 @@ build time and wrong afterwards.
 
 **One extra read per direct booking, on the notification path.** After the booking is committed
 and off the caller's thread, so it cannot slow a placement or fail one. It can fail on its own,
-which D5 handles by sending less rather than nothing.
+and D5's answer is to send less rather than nothing — the reference and the time go without the
+name.
+
+*This paragraph originally asserted that as though it were already true, and QA established it was
+not: only a resource that could not be **found** was handled, while one that **threw** propagated
+out and cost both messages. The read is now wrapped, narrowly — one enrichment call, logged with
+the booking id and nothing about the booker — and every other failure on this path still escapes
+to the observer. Recorded rather than quietly corrected, because a design document asserting
+behaviour the code does not have is the more dangerous half of the defect.*
+
+**A failing send costs the other message.** Neither send is wrapped, so whichever runs second is
+lost if the first throws. The site is written to **first** deliberately: the booker's address was
+typed by a member of the public minutes ago and is far likelier to bounce than an internal list
+typed by whoever administers the site, and losing the business's own notification is the worse
+outcome. Ordering costs nothing and removes the worse loss — but it does not remove the other, and
+a failing internal send does cost the booker their confirmation.
+
+Making the two genuinely independent needs a `catch` around each, which this change declined to add
+on its own authority: it is an escape hatch, and this project has shipped that defect repeatedly.
+The remaining loss is pinned by a test rather than left to a comment, so a later change that fixes
+it has to do so deliberately.
 
 **The internal list is flat and 0.7.0 replaces it.** Every site configuring it now will
 reconfigure at 0.7.0. Called out rather than avoided: responsibility routing needs a model of who

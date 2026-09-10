@@ -78,6 +78,16 @@ permissions); and emails on decline, which has no producer in the domain to hang
 validates them; `PrivacyNoticeView` gains the send predicate and `_PrivacyNotice.cshtml` a second
 conditional sentence; the XML docs on `BookingPlacedNotification` and `BookingCancelledNotification`.
 
+**Public surface.** `PrivacyNoticeView` gains a member and its factory a parameter. `ResourceBookingFlow`
+and `ServiceBookingFlow` are public types and each gains a constructor parameter — technically
+breaking, practically not, since both are resolved from the container and a site constructing one
+by hand is reaching past the contract. Called out because the compatibility promise says a breaking
+change must be, and because the package is not yet released, so the cost of taking it now is zero.
+
+**Not part of this change but carried on its branch:** a one-line fix to the TestSite's flow
+harness (`UbookitBookingTest.cshtml`), which could not survive its own GET form. Unrelated to
+emails; rolled in at the repository owner's instruction rather than branched separately.
+
 **Data.** None. No schema change, no migration, no new domain state. A booking already carries
 everything a message needs except a directly-booked resource's display name, which is read from
 the resource store at send time.

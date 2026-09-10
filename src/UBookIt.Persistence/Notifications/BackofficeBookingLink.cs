@@ -47,6 +47,18 @@ public static class BackofficeBookingLink
     {
         var root = hostingEnvironment.ApplicationMainUrl;
 
-        return root is null ? null : new Uri(root, BookingsPath);
+        if (root is null)
+        {
+            return null;
+        }
+
+        // THE TRAILING SLASH MATTERS AND IS NOT COSMETIC. Uri resolution treats the last segment
+        // of a base without one as a FILE and replaces it, so a site at https://host/booking
+        // would produce https://host/umbraco/... — a link to a backoffice that is not there. A
+        // site hosted in a virtual directory is exactly the case nobody tests locally.
+        var absolute = root.AbsoluteUri;
+        var baseUri = absolute.EndsWith('/') ? root : new Uri(absolute + "/");
+
+        return new Uri(baseUri, BookingsPath);
     }
 }

@@ -278,6 +278,106 @@ public class BookingEmailTests
         Assert.Contains(logger.Entries, e => e.Contains(booking.Id.ToString(), StringComparison.Ordinal));
     }
 
+    /// <summary>
+    /// A store that THROWS has established "what was booked cannot be established" just as surely
+    /// as one that returned nothing, so the requirement's answer is the same: send the reference
+    /// and the time without the name.
+    /// </summary>
+    /// <remarks>
+    /// Found by QA against design.md, which claimed this already worked. It did not — only the
+    /// not-found case was handled, so a transient database fault cost BOTH messages rather than
+    /// one line.
+    /// </remarks>
+    [Fact]
+    public async Task A_throwing_resource_read_still_produces_a_message()
+    {
+        var booking = Booking(direct: true);
+        var message = await Composer(resourceThrows: true).ForBookerAsync(booking, BookingEvent.Placed);
+
+        Assert.Contains(booking.Reference.Display, message.Body, StringComparison.Ordinal);
+        Assert.Contains("15 September 2026", message.Body, StringComparison.Ordinal);
+        Assert.DoesNotContain("What:", message.Body, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public async Task A_throwing_resource_read_does_not_stop_either_message()
+    {
+        var sender = new RecordingEmailSender();
+        var handler = new BookingEmailHandler(
+            new SiteBookingSettings
+            {
+                TimeZoneId = TestData.LondonZoneId,
+                Notifications = Notifications(true, ["desk@example.com"]),
+            },
+            sender,
+            Composer(resourceThrows: true),
+            new StubHostingEnvironment(),
+            NullLogger<BookingEmailHandler>.Instance);
+
+        await handler.HandleAsync(
+            new BookingPlacedNotification(Booking(direct: true)), CancellationToken.None);
+
+        Assert.Equal(2, sender.Sent.Count);
+    }
+
+    /// <summary>
+    /// "Not retried and not queued" is a stated guarantee, and it was previously asserted by
+    /// nothing — the suite could not tell one attempt from five.
+    /// </summary>
+    [Fact]
+    public async Task A_failing_send_is_attempted_once()
+    {
+        var sender = new RecordingEmailSender { ThrowOnSend = true };
+
+        await Assert.ThrowsAsync<InvalidOperationException>(
+            () => Send(Notifications(sendBooker: true), sender));
+
+        Assert.Equal(1, sender.Attempts);
+    }
+
+    [Fact]
+    public async Task A_successful_send_is_attempted_once_per_recipient_list()
+    {
+        var sender = await Send(Notifications(true, ["desk@example.com"]));
+
+        Assert.Equal(2, sender.Attempts);
+    }
+
+    /// <summary>
+    /// PINS THE KNOWN LOSS rather than leaving it to a code comment. Neither send is wrapped, so a
+    /// failing internal send costs the booker their confirmation. The site is written to first
+    /// deliberately — the booker's address is far likelier to bounce, and losing the business's own
+    /// notification is the worse outcome — but this direction of the trade is real and is recorded
+    /// in design.md. If someone later makes the two independent, this test should fail and be
+    /// deleted with intent, not silently keep passing.
+    /// </summary>
+    [Fact]
+    public async Task A_failing_internal_send_costs_the_booker_their_confirmation()
+    {
+        var sender = new RecordingEmailSender { ThrowOnSend = true };
+
+        await Assert.ThrowsAsync<InvalidOperationException>(
+            () => Send(Notifications(true, ["desk@example.com"]), sender));
+
+        Assert.Empty(sender.Sent);
+        Assert.Equal(1, sender.Attempts);
+    }
+
+    // ---- the backoffice link -----------------------------------------------------------------
+
+    [Theory]
+    [InlineData("https://site.example/", "https://site.example/umbraco/section/ubookit/view/bookings")]
+    [InlineData("https://site.example", "https://site.example/umbraco/section/ubookit/view/bookings")]
+    // A site in a virtual directory: the segment must survive. Without a trailing slash Uri
+    // resolution treats "booking" as a file and replaces it, producing a link to a backoffice
+    // that is not there — and it is exactly the deployment nobody reproduces locally.
+    [InlineData("https://site.example/booking/", "https://site.example/booking/umbraco/section/ubookit/view/bookings")]
+    [InlineData("https://site.example/booking", "https://site.example/booking/umbraco/section/ubookit/view/bookings")]
+    public void The_backoffice_link_keeps_the_sites_own_path(string applicationUrl, string expected)
+        => Assert.Equal(
+            expected,
+            BackofficeBookingLink.For(new StubHostingEnvironment(applicationUrl))!.ToString());
+
     // ---- the seam between the promise and the behaviour --------------------------------------
 
     /// <summary>
@@ -389,8 +489,10 @@ public class BookingEmailTests
         return sender;
     }
 
-    private static BookingMessageComposer Composer(bool resourceExists = true)
-        => new(new StubResourceStore(resourceExists));
+    private static BookingMessageComposer Composer(bool resourceExists = true, bool resourceThrows = false)
+        => new(
+            new StubResourceStore(resourceExists, resourceThrows),
+            NullLogger<BookingMessageComposer>.Instance);
 
     private static Booking Booking(
         BookingStatus status = BookingStatus.Confirmed,
@@ -410,13 +512,15 @@ public class BookingEmailTests
             direct ? null : new ServiceAttribution(Guid.NewGuid(), "Initial Consultation"))
             .Value;
 
-    private sealed class StubResourceStore(bool exists) : IResourceStore
+    private sealed class StubResourceStore(bool exists, bool throws = false) : IResourceStore
     {
         public Task<Resource?> GetAsync(Guid resourceId, CancellationToken cancellationToken = default)
-            => Task.FromResult(
-                exists
-                    ? Resource.Create("room", "Treatment Room", directlyBookable: true, id: resourceId).Value
-                    : null);
+            => throws
+                ? throw new InvalidOperationException("The database is unreachable.")
+                : Task.FromResult(
+                    exists
+                        ? Resource.Create("room", "Treatment Room", directlyBookable: true, id: resourceId).Value
+                        : null);
 
         public Task<ResourcePage> ListAsync(int skip, int take, CancellationToken cancellationToken = default)
             => throw new NotSupportedException();
@@ -426,9 +530,10 @@ public class BookingEmailTests
             => throw new NotSupportedException();
     }
 
-    private sealed class StubHostingEnvironment : IHostingEnvironment
+    private sealed class StubHostingEnvironment(string applicationUrl = "https://site.example/")
+        : IHostingEnvironment
     {
-        public Uri ApplicationMainUrl { get; } = new("https://site.example/");
+        public Uri ApplicationMainUrl { get; } = new(applicationUrl);
 
         public string SiteName => "Test";
 
@@ -471,6 +576,9 @@ public class BookingEmailTests
 
         public List<bool> Notified { get; } = [];
 
+        /// <summary>Every call, including the ones that threw.</summary>
+        public int Attempts { get; private set; }
+
         public bool CanSendRequiredEmail()
         {
             Probed = true;
@@ -489,6 +597,8 @@ public class BookingEmailTests
         public Task SendAsync(
             EmailMessage message, string emailType, bool enableNotification = false, TimeSpan? expires = null)
         {
+            Attempts++;
+
             if (ThrowOnSend)
             {
                 throw new InvalidOperationException("The mail server refused the message.");

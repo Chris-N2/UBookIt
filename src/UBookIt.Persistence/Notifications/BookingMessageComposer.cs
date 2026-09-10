@@ -1,5 +1,7 @@
 using System.Globalization;
 using System.Text;
+using Microsoft.Extensions.Logging;
+using UBookIt.Core.Resources;
 using UBookIt.Core.Bookings;
 using UBookIt.Core.Stores;
 
@@ -40,7 +42,9 @@ public sealed record BookingMessage(string Subject, string Body);
 /// read is a line that is not there.
 /// </para>
 /// </remarks>
-public sealed class BookingMessageComposer(IResourceStore resources)
+public sealed class BookingMessageComposer(
+    IResourceStore resources,
+    ILogger<BookingMessageComposer> logger)
 {
     /// <summary>
     /// The formats are invariant and explicit rather than culture-driven. The package ships one
@@ -210,8 +214,31 @@ public sealed class BookingMessageComposer(IResourceStore resources)
 
         foreach (var claim in booking.Claims)
         {
-            var resource = await resources.GetAsync(claim.ResourceId, cancellationToken)
-                .ConfigureAwait(false);
+            Resource? resource;
+
+            try
+            {
+                resource = await resources.GetAsync(claim.ResourceId, cancellationToken)
+                    .ConfigureAwait(false);
+            }
+            catch (Exception exception)
+            {
+                // CAUGHT SO THE MESSAGE STILL GOES. "What was booked cannot be established" is a
+                // requirement with a stated answer — send the reference and the time without the
+                // name — and a store that THREW has established it just as surely as one that
+                // returned nothing. Before this, a transient database fault cost both messages
+                // rather than one line, which is the opposite of the trade the requirement makes.
+                //
+                // Narrow on purpose: this wraps one enrichment read, and every other failure on
+                // this path still escapes to the observer. The booking id only, never the booker.
+                logger.LogWarning(
+                    exception,
+                    "uBookIt could not read a resource while composing a message for booking "
+                    + "{BookingId}. The message is sent without naming what was booked.",
+                    booking.Id);
+
+                continue;
+            }
 
             if (resource is not null)
             {

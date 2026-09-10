@@ -18,10 +18,9 @@ namespace UBookIt.TestSite;
 /// access. A unit test can show that Core reports; only this can show that a site can hear.
 /// </para>
 /// <para>
-/// It logs and nothing more, and the dev site configures no notification settings, so nothing
-/// else is sent either. The package's own emails are a separate, optional path — this stays the
-/// worked example of the seam, which is what a site uses when it wants its own message rather
-/// than the one the package composes.
+/// It logs and nothing more. The package's own emails are a separate, optional path that this
+/// site does not configure; this stays the worked example of the seam, which is what a site uses
+/// when it wants its own message rather than the one the package composes.
 /// </para>
 /// <para>
 /// It is also the worked example in <c>docs/notifications.md</c>, kept as compiling code so

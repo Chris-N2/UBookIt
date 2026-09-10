@@ -287,8 +287,9 @@ and the booking keeps its record. Whether the person who booked hears about it d
 missing, uBookIt sends nothing and telling them is yours to do. Your site can also react
 automatically instead: see [reacting to bookings](notifications.md).
 
-A booking whose booker has been erased has no address left, so cancelling it never writes to
-anybody, whatever you have configured.
+A booking whose booker has been erased has no address left, so **nothing is sent to them** —
+but your own recipients are still told, because the booking is real and you are entitled to know
+it was cancelled.
 
 The view opens on the current week and you change the window with the two date controls.
 It shows the statuses that hold their time — confirmed and requested — so a **cancelled
