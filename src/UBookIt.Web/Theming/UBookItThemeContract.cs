@@ -81,6 +81,7 @@ public static class UBookItThemeContract
     /// </summary>
     public static IReadOnlyList<string> SharedPartials { get; } =
     [
+        "~/Views/Shared/UBookIt/_AvailableDates.cshtml",
         "~/Views/Shared/UBookIt/_DateAndLength.cshtml",
         "~/Views/Shared/UBookIt/_ErrorSummary.cshtml",
         "~/Views/Shared/UBookIt/_PrivacyNotice.cshtml",

@@ -13,6 +13,17 @@ public sealed class ServiceFormModel : IBookingFormView
 {
     /// <inheritdoc />
     public required PrivacyNoticeView PrivacyNotice { get; init; }
+    /// <inheritdoc />
+    public IReadOnlyList<AvailableDate> AvailableDates { get; init; } = [];
+
+    /// <inheritdoc />
+    public bool SelectedDateIsListed { get; init; }
+
+    /// <inheritdoc />
+    public int WindowDays { get; init; }
+
+    /// <inheritdoc />
+    public int? LongestAvailableInWindowMinutes { get; init; }
 
     public required Guid ServiceId { get; init; }
 

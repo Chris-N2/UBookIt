@@ -80,6 +80,29 @@ public static class ViewFixtures
 {
     private static readonly DateOnly Today = new(2026, 8, 20);
 
+    /// <summary>
+    /// The default list: three dates, the first of them the selected one.
+    /// </summary>
+    /// <remarks>
+    /// A LISTED selected date is the ordinary case, so it is the default — the states above
+    /// cover the ones that are not, which is the way round that leaves the common rendering
+    /// exercised by everything rather than by one test.
+    /// </remarks>
+    private static readonly IReadOnlyList<AvailableDate> Dates =
+    [
+        new(Today, true),
+        new(Today.AddDays(1), false),
+        new(Today.AddDays(3), false),
+    ];
+
+    // DECLARED HERE, ABOVE `All`, AND NOT BESIDE THE STATES THAT USE IT.
+    //
+    // Static initialisers run in TEXTUAL order, and `All` is `[.. Build()]` — so a `Dates`
+    // declared further down the file is still null when Build() enumerates FormStates(), and
+    // every fixture in the suite fails with a TypeInitializationException naming none of this.
+    // The same trap `ViewInventory` records for its own exclusion list, met again.
+
+
     private static readonly IReadOnlyList<BookingTimeOption> Times =
     [
         new("2026-08-20T08:00:00.0000000+00:00", "09:00"),
@@ -105,6 +128,7 @@ public static class ViewFixtures
         ViewInventory.Times,
         ViewInventory.YourDetails,
         ViewInventory.PrivacyNotice,
+        ViewInventory.AvailableDates,
     ];
 
     /// <summary>Every single-view case, used by the per-view property rule.</summary>
@@ -161,6 +185,7 @@ public static class ViewFixtures
             ViewInventory.ErrorSummary,
             ViewInventory.YourDetails,
             ViewInventory.PrivacyNotice,
+            ViewInventory.AvailableDates,
         })
         {
             foreach (var (state, model) in FormStates())
@@ -249,6 +274,21 @@ public static class ViewFixtures
     /// </summary>
     private static IEnumerable<(string State, IBookingFormView Model)> FormStates()
     {
+        // THE AVAILABLE-DATES BRANCHES. Every other state below carries the default list, in
+        // which the selected date IS listed — so without these the empty-window wordings and
+        // the outside-the-window statement would never render, and rule 3 would report the
+        // view fully covered while three of its four branches had never been taken.
+        yield return ("service: no dates at this length", Service(
+            availableDates: [], longestInWindow: 30));
+        yield return ("service: no dates at any length", Service(
+            availableDates: [], longestInWindow: null));
+        yield return ("service: selected date outside the window", Service(
+            availableDates: [new AvailableDate(Today.AddDays(1), false)]));
+        yield return ("resource: no dates at this length", Resource(
+            availableDates: [], longestInWindow: 60));
+        yield return ("resource: selected date outside the window", Resource(
+            availableDates: [new AvailableDate(Today.AddDays(2), false)]));
+
         // THE PRIVACY NOTICE'S FOUR COMBINATIONS, first because they are the ones most
         // easily left unexercised: every other state below leaves the notice in its default
         // shape, so without these the configured-period and policy-link branches would never
@@ -418,13 +458,19 @@ public static class ViewFixtures
         string? phone = null,
         string? selectedTimeIso = null,
         string? flowToken = null,
-        PrivacyNoticeView? privacyNotice = null)
+        PrivacyNoticeView? privacyNotice = null,
+        IReadOnlyList<AvailableDate>? availableDates = null,
+        int? longestInWindow = null)
         => new()
         {
             // Defaults to the DEFAULT INSTALL: no retention period and no policy link. A
             // fixture that defaulted to a configured period would exercise the branch most
             // sites never see and leave the common one untested.
             PrivacyNotice = privacyNotice ?? new PrivacyNoticeView(null, null),
+            AvailableDates = availableDates ?? Dates,
+            SelectedDateIsListed = (availableDates ?? Dates).Any(date => date.IsSelected),
+            WindowDays = 30,
+            LongestAvailableInWindowMinutes = longestInWindow,
             ServiceId = new Guid("00000000-0000-0000-0000-000000000900"),
             ServiceName = "Massage",
             FlowToken = flowToken,
@@ -456,11 +502,17 @@ public static class ViewFixtures
         string? phone = null,
         string? selectedTimeIso = null,
         string? flowToken = null,
-        PrivacyNoticeView? privacyNotice = null)
+        PrivacyNoticeView? privacyNotice = null,
+        IReadOnlyList<AvailableDate>? availableDates = null,
+        int? longestInWindow = null)
         => new()
         {
             /// <inheritdoc cref="Service" />
             PrivacyNotice = privacyNotice ?? new PrivacyNoticeView(null, null),
+            AvailableDates = availableDates ?? Dates,
+            SelectedDateIsListed = (availableDates ?? Dates).Any(date => date.IsSelected),
+            WindowDays = 30,
+            LongestAvailableInWindowMinutes = longestInWindow,
             ResourceId = new Guid("00000000-0000-0000-0000-000000000001"),
             ResourceName = "Meeting Room A",
             FlowToken = flowToken,

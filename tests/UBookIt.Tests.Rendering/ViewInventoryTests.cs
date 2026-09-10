@@ -27,8 +27,8 @@ public class ViewInventoryTests
         // Both sets are counted. Counting only the governed set would let a view be
         // added AND excluded in one change without anything failing, which is the
         // decay this guard exists to prevent.
-        Assert.Equal(16, ViewInventory.Shipped.Count);
-        Assert.Equal(15, ViewInventory.All.Count);
+        Assert.Equal(17, ViewInventory.Shipped.Count);
+        Assert.Equal(16, ViewInventory.All.Count);
     }
 
     [Fact]

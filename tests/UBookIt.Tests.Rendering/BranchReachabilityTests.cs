@@ -136,6 +136,15 @@ public class BranchReachabilityTests
 
         Assert.Equal(
             [
+                // `ubookit-no-dates` is emitted by BOTH empty-window branches — the one that
+                // names a shorter length that would work, and the one for a window with nothing
+                // at any length. They are deliberately the same hook because they are the same
+                // kind of statement to a site styling them; what distinguishes them is their
+                // TEXT, which rule 3 does not read. Safe here because each is separately
+                // asserted by wording in PrivacyNoticeTests' sibling, AvailableDatesTests, where
+                // the two sentences are pinned apart.
+                "_AvailableDates.cshtml:ubookit-no-dates",
+
                 // Listed in ordinal order, which is the order the scan produces.
                 //
                 // _DateAndLength: both length branches render the same rejection

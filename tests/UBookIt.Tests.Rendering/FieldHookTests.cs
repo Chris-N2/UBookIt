@@ -35,11 +35,19 @@ public class FieldHookTests
     /// <summary>
     /// The groups that are deliberately not fields: a radio group's own options. Those
     /// are items inside a group that has its own hooks (`ubookit-times-option`,
-    /// `ubookit-catalogue-choice`), and treating each radio as a field would stack them
-    /// vertically — the opposite of what the layout rule for start times exists to do.
+    /// `ubookit-catalogue-choice`, `ubookit-dates-option`), and treating each radio as a
+    /// field would stack them vertically — the opposite of what the layout rule for start
+    /// times exists to do.
+    /// <para>
+    /// <b>Enumerated rather than matched by a `-option` suffix.</b> A pattern would exempt
+    /// anything somebody happened to name that way, including a genuine field; naming each
+    /// group means adding one is a decision that shows up in a diff. The list grew by one
+    /// for the available-dates list, which is a choice group on exactly the same terms as
+    /// the start times it sits above.
+    /// </para>
     /// </summary>
     private static bool IsInsideAChoiceGroup(IElement label)
-        => label.Closest(".ubookit-times-option, .ubookit-catalogue-choice") is not null;
+        => label.Closest(".ubookit-times-option, .ubookit-catalogue-choice, .ubookit-dates-option") is not null;
 
     [Theory]
     [MemberData(nameof(Cases))]

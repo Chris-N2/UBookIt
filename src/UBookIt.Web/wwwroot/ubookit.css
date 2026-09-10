@@ -179,6 +179,35 @@
     padding-inline: 0.25rem;
 }
 
+/* ---------------------------------------------------------------- dates ---- */
+
+/*
+    The available dates are a STACKED COLUMN, on the same side of the rule as the
+    catalogue rather than the start times — and this was measured by trying the
+    other thing and looking at it, not reasoned from the outside.
+
+    The rule above is that a wrapping run suits labels of uniform length and a
+    stacked column suits labels of unpredictable length. Dates LOOK uniform: every
+    one is "Weekday D Month YYYY". They are not. "Wednesday 23 September 2026" is
+    26 characters and "Friday 2 October 2026" is 21, because both the weekday and
+    the month vary by half their own length — so a wrapping run fits one September
+    date per row and two October ones, and the columns appear and disappear down
+    the list. Ragged in exactly the way the catalogue comment predicts.
+
+    THE WALL IS THE BENIGN CASE, which is what makes the column acceptable. Thirty
+    stacked dates only happens when nearly every date is free — and a visitor
+    looking at a month where everything is available does not need help choosing.
+    The list earns its place when availability is sparse, and then it is three or
+    four rows and immediately readable.
+
+    So the spacing here is the catalogue's, not the start times': the 2.5.8 floor,
+    and nothing that tries to make a run of it.
+*/
+.ubookit-dates-option {
+    margin-block-end: var(--ubookit-field-gap, 0.35rem);
+    min-height: 24px;
+}
+
 /* ------------------------------------------------------------ catalogue ---- */
 
 /*
@@ -234,6 +263,8 @@
 .ubookit-notice,
 .ubookit-no-times,
 .ubookit-no-choices,
+.ubookit-no-dates,
+.ubookit-dates-showing,
 .ubookit-fixed-length,
 .ubookit-privacy {
     max-width: var(--ubookit-measure, 34rem);

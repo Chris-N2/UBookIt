@@ -15,8 +15,31 @@ namespace UBookIt.Web.Rendering;
 /// </summary>
 internal static class BookingHostExtensions
 {
+    /// <summary>
+    /// The chosen date: the "another date" field where one was filled in, otherwise the date
+    /// selected from the list.
+    /// </summary>
+    /// <remarks>
+    /// <para>
+    /// <b>Two parameters, and the precedence is decided here rather than by model binding.</b>
+    /// The list and the field both set "which date", and they deliberately do not share a query
+    /// parameter: a form submitting one name from two controls sends both values, and which one
+    /// wins is then an accident of how the binder happens to read a duplicated key.
+    /// </para>
+    /// <para>
+    /// <b>The typed date wins.</b> It is the more deliberate act — a visitor who selects from the
+    /// list and then types is correcting themselves, and the opposite rule would silently discard
+    /// what they typed in favour of the radio they had already moved past. An unparseable typed
+    /// value falls through to the list rather than blanking the choice, because a malformed date
+    /// is not an instruction to forget the one already made.
+    /// </para>
+    /// </remarks>
     public static DateOnly? ReadDateQuery(this HttpRequest request)
-        => DateOnly.TryParse(request.Query[BookingKeys.DateQuery], out var date) ? date : null;
+        => DateOnly.TryParse(request.Query[BookingKeys.OtherDateQuery], out var typed)
+            ? typed
+            : DateOnly.TryParse(request.Query[BookingKeys.DateQuery], out var listed)
+                ? listed
+                : null;
 
     public static int? ReadDurationQuery(this HttpRequest request)
         => int.TryParse(request.Query[BookingKeys.DurationQuery], out var minutes) ? minutes : null;

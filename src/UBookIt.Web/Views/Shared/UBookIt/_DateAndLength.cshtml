@@ -34,15 +34,11 @@
            linkable and the back button lands on a page that agrees with itself. *@
         <input type="hidden" name="@BookingKeys.SubjectQuery" value="@token" />
     }
-    <div class="ubookit-field">
-        <label for="ubookit-date">Choose a date</label>
-        <input type="date"
-               id="ubookit-date"
-               name="@BookingKeys.DateQuery"
-               value="@Model.SelectedDate.ToString("yyyy-MM-dd")"
-               min="@Model.MinDate.ToString("yyyy-MM-dd")"
-               max="@Model.MaxDate.ToString("yyyy-MM-dd")" />
-    </div>
+    @* The date is chosen from what is actually bookable, with a field beneath for anything
+       beyond the listed window. Both live in the partial, because the relationship between
+       them — different questions, different parameters, defined precedence — is the part
+       most easily got wrong by rendering them apart. *@
+    @await Html.PartialAsync("~/Views/Shared/UBookIt/_AvailableDates.cshtml", Model)
     @if (Model.LengthIsFixed)
     {
         @* A settled length is stated, not offered: a labelled control with one

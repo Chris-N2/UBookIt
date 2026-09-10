@@ -91,21 +91,57 @@ public static class BookingFormBuilder
     public static int? LongestAvailableMinutes(IReadOnlyList<BookableStart> starts)
         => starts.Count == 0 ? null : (int)starts.Max(s => s.MaxDuration).TotalMinutes;
 
+    /// <summary>
+    /// The starts falling on one date, in the site zone.
+    /// </summary>
+    /// <remarks>
+    /// <b>The selected day's times are a FILTER of the window, never a second read.</b> Two reads
+    /// would let a booking land between them and produce a page whose date list says a day is
+    /// free while its times say it is not — an ordinary outcome rather than a bug. One reading
+    /// cannot contradict itself, and this is where that property is actually delivered.
+    /// <para>
+    /// Compared in the SITE ZONE. A start at 23:30 UTC belongs to the next day in
+    /// <c>Europe/London</c> in summer, and filtering on the UTC date would show it under the
+    /// wrong heading — for every site that is not itself UTC.
+    /// </para>
+    /// </remarks>
+    internal static List<BookableStart> OnDate(
+        IReadOnlyList<BookableStart> windowStarts, TimeZoneInfo zone, DateOnly date)
+        => [.. windowStarts.Where(start =>
+            DateOnly.FromDateTime(TimeZoneInfo.ConvertTime(start.StartUtc, zone).DateTime) == date)];
+
     public static BookingFormModel Build(
         Resource resource,
         DateOnly selectedDate,
         DateOnly today,
-        IReadOnlyList<BookableStart> starts,
+        IReadOnlyList<BookableStart> windowStarts,
+        IReadOnlyList<BookableStart> dayStarts,
         TimeSpan duration,
         TimeZoneInfo zone,
         PrivacyNoticeView privacyNotice,
+        int windowDays,
         FailedSubmission? failed = null,
         string? flowToken = null)
     {
         var constraints = resource.Availability.Constraints;
 
+        // The day's starts are the WINDOW filtered, whenever the selected date is in the
+        // window — the caller does that filtering so the "one read" property is visible where the
+        // reads happen. Where the selected date is outside the window they come from a second,
+        // DISJOINT read; see the flows for why that is safe and why one read cannot serve both.
+        var starts = dayStarts;
+
+        var dates = AvailableDateProjection.Dates(
+            windowStarts.Select(start => (start.StartUtc, start.Admits(duration))),
+            zone,
+            selectedDate);
+
         return new BookingFormModel
         {
+            AvailableDates = dates,
+            SelectedDateIsListed = dates.Any(date => date.IsSelected),
+            WindowDays = windowDays,
+            LongestAvailableInWindowMinutes = LongestAvailableMinutes(windowStarts),
             PrivacyNotice = privacyNotice,
             FlowToken = flowToken,
             ResourceId = resource.Id,

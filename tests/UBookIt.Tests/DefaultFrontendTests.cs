@@ -23,6 +23,15 @@ public class DefaultFrontendTests
     /// are different claims, and only one of them is true here.
     /// </remarks>
     private static readonly PrivacyNoticeView NoRetention = new(null, null);
+
+    /// <summary>The default window, for tests that are not about the window.</summary>
+    /// <remarks>
+    /// Named so these tests state which window they are building a form for. They are about
+    /// times and lengths; the window's own derivation is tested in AvailableDatesTests, against
+    /// CONFIGURED bounds rather than defaults, because the default configuration is the one
+    /// arrangement in which a wrong window looks correct.
+    /// </remarks>
+    private const int WindowDays = AvailableDateWindow.PreferredDays;
     private static readonly DateOnly Date = TestData.BaseDate;
 
     // --- which unavailable answer the flow gives (services spec / default-frontend) ---
@@ -182,8 +191,8 @@ public class DefaultFrontendTests
         var today = BookingFormBuilder.TodayIn(TestData.Now, TestData.London);
 
         var model = BookingFormBuilder.Build(
-            room, Date, today, Starts(("09:00", 60), ("09:30", 30)),
-            TimeSpan.FromMinutes(30), TestData.London, NoRetention);
+            room, Date, today, Starts(("09:00", 60), ("09:30", 30)), Starts(("09:00", 60), ("09:30", 30)),
+            TimeSpan.FromMinutes(30), TestData.London, NoRetention, WindowDays);
 
         Assert.True(model.HasTimes);
         Assert.Equal(2, model.Times.Count);
@@ -198,7 +207,7 @@ public class DefaultFrontendTests
         var room = TestData.Room();
         var today = BookingFormBuilder.TodayIn(TestData.Now, TestData.London);
 
-        var model = BookingFormBuilder.Build(room, Date, today, [], TimeSpan.FromMinutes(30), TestData.London, NoRetention);
+        var model = BookingFormBuilder.Build(room, Date, today, [], [], TimeSpan.FromMinutes(30), TestData.London, NoRetention, WindowDays);
 
         Assert.False(model.HasTimes);
         Assert.Empty(model.Times);
@@ -329,8 +338,8 @@ public class DefaultFrontendTests
         var today = BookingFormBuilder.TodayIn(TestData.Now, TestData.London);
 
         var model = BookingFormBuilder.Build(
-            room, Date, today, Starts(("09:00", 120), ("11:00", 30)),
-            TimeSpan.FromMinutes(60), TestData.London, NoRetention);
+            room, Date, today, Starts(("09:00", 120), ("11:00", 30)), Starts(("09:00", 120), ("11:00", 30)),
+            TimeSpan.FromMinutes(60), TestData.London, NoRetention, WindowDays);
 
         var only = Assert.Single(model.Times);
         Assert.Equal(
@@ -345,8 +354,8 @@ public class DefaultFrontendTests
         var today = BookingFormBuilder.TodayIn(TestData.Now, TestData.London);
 
         var model = BookingFormBuilder.Build(
-            room, Date, today, Starts(("09:00", 90), ("11:00", 30)),
-            TimeSpan.FromMinutes(180), TestData.London, NoRetention);
+            room, Date, today, Starts(("09:00", 90), ("11:00", 30)), Starts(("09:00", 90), ("11:00", 30)),
+            TimeSpan.FromMinutes(180), TestData.London, NoRetention, WindowDays);
 
         Assert.False(model.HasTimes);
         Assert.True(model.LengthIsTheProblem);
@@ -372,8 +381,8 @@ public class DefaultFrontendTests
         };
 
         var model = BookingFormBuilder.Build(
-            room, Date, today, [], BookingFormBuilder.ResolveDisplayDuration(room, failed.DurationMinutes),
-            TestData.London, NoRetention, failed);
+            room, Date, today, [], [], BookingFormBuilder.ResolveDisplayDuration(room, failed.DurationMinutes),
+            TestData.London, NoRetention, WindowDays, failed);
 
         // The chosen length survives a failed submission alongside the details.
         Assert.Equal(60, model.DurationMinutes);

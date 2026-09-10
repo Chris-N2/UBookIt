@@ -12,6 +12,17 @@ public sealed class BookingFormModel : IBookingFormView
 {
     /// <inheritdoc />
     public required PrivacyNoticeView PrivacyNotice { get; init; }
+    /// <inheritdoc />
+    public IReadOnlyList<AvailableDate> AvailableDates { get; init; } = [];
+
+    /// <inheritdoc />
+    public bool SelectedDateIsListed { get; init; }
+
+    /// <inheritdoc />
+    public int WindowDays { get; init; }
+
+    /// <inheritdoc />
+    public int? LongestAvailableInWindowMinutes { get; init; }
 
     public required Guid ResourceId { get; init; }
 
@@ -128,6 +139,8 @@ public static class BookingFieldIds
     public const string Email = "ubookit-email";
     public const string Times = "ubookit-times";
     public const string Duration = "ubookit-duration";
+    public const string Dates = "ubookit-dates";
+    public const string OtherDate = "ubookit-other-date";
 
     /// <summary>
     /// The control choosing who fulfils a service. Rendered only where a service
