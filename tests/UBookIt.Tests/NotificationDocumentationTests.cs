@@ -120,14 +120,19 @@ public class NotificationDocumentationTests
         // A guard for a claim that must not be made has to look for the claim, not only for its
         // replacement. PrivacyNoticeTests.A_site_that_sends_nothing_promises_nothing pairs its
         // positive assertions with a DoesNotContain for exactly this reason.
+        // Through DocumentationAssert, NOT Assert.DoesNotContain. A raw substring check here
+        // survived re-adding the forbidden sentence WRAPPED — which is the only form it could take
+        // if reintroduced at its original location, since this repository wraps prose at about 100
+        // columns. The positive assertions above were already wrap-safe; having one matcher for
+        // each direction in the same test is what let the negative half rot unnoticed.
         foreach (var overclaim in new[]
         {
             "nothing logs them",
             "The log records the id and nothing else about the booker",
-            "no booker name, address or telephone number is ever logged",
+            "No booker name, address or telephone number is ever logged",
         })
         {
-            Assert.DoesNotContain(overclaim, docs, StringComparison.OrdinalIgnoreCase);
+            DocumentationAssert.DoesNotSay(docs, overclaim);
         }
     }
 
@@ -140,12 +145,17 @@ public class NotificationDocumentationTests
     {
         var source = RepoFiles.Read("src/UBookIt.Persistence/Notifications/BookingEmailHandler.cs");
 
-        Assert.DoesNotContain(
-            "No booker name, address or telephone number is ever logged",
-            source,
-            StringComparison.OrdinalIgnoreCase);
-        Assert.Contains("never writes a booker name", source, StringComparison.Ordinal);
-        Assert.Contains("cannot promise", source, StringComparison.Ordinal);
+        // Same matcher as the markdown guards. XML documentation wraps across `///` prefixes,
+        // which a raw substring check cannot see through — QA re-added the absolute immediately
+        // below its own correction, wrapped, and this test passed 10/10.
+        //
+        // And note the shape of the regression that gets through: a real one ADDS rather than
+        // REPLACES. Replacing the corrected wording fails on the positive assertion below, which
+        // is why an earlier attempt looked like a pass while the absence check never fired at all.
+        DocumentationAssert.DoesNotSay(
+            source, "No booker name, address or telephone number is ever logged");
+        DocumentationAssert.Says(source, "never writes a booker name");
+        DocumentationAssert.Says(source, "cannot promise");
     }
 
     [Fact]

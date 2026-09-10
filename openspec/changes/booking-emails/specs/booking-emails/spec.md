@@ -156,7 +156,7 @@ the message SHALL still be sent without one.
 - **WHEN** the site's own address cannot be established
 - **THEN** the message is still sent, carrying the reference, the time and what was booked, and no link
 
-### Requirement: Sending cannot harm a booking, and reporting it cannot expose a booker
+### Requirement: Sending cannot harm a booking, and the package exposes no booker in reporting it
 
 A failure to send SHALL NOT affect the booking it concerns, SHALL NOT be reported to the person
 who placed or cancelled it, and SHALL NOT be retried or queued.

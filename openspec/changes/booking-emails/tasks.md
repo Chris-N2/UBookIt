@@ -126,22 +126,6 @@
         address a mail server quoted into the host's log — required **where an operator performing
         an erasure will meet it**, which is `docs/backoffice.md`, not only where sending is
         described.
-- [ ] 6.7 **AT SYNC: edit `booker-erasure`'s Purpose paragraph by hand.** A delta replaces
-      requirements; it cannot express a change to a capability's Purpose, and that paragraph
-      repeats **both** claims this change narrows — *"contact details have exactly one durable
-      home, so erasing that home erases the data"* and *"the **two** boundaries the documentation
-      has to state"*. Synced as-is, the capability would ship a summary contradicting the
-      requirements beneath it, in the one file that is the source of truth after archiving.
-
-      Replace with: contact details have exactly one durable home **among the stores the package
-      owns**; and **the boundaries** the documentation has to state — one erasure reaches one
-      booking, it may be performed on a booking that has not yet happened, and it does not reach a
-      message already sent or an address a mail server quoted into the host's log.
-
-      *Found by sweeping for the CLASS of absolute claims about logs, copies and contact details
-      rather than for the sentences QA had already named — the same enumerate-the-population move
-      that rounds 4 and 5 were both about, applied one level up. QA did not name this one.*
-
 - [x] 6.3 `ChangeDeltaIntegrityTests` green — it is the authority on delta correctness, not
       `openspec validate --strict`.
 - [x] 6.4 Full suite green, clean Release build, **zero** warnings.
@@ -184,3 +168,19 @@
       `<text>` block wraps it across lines, so it only matches once whitespace is normalised.
       Worth recording — the same trap would make a careless guard pass while the sentence was
       missing.)
+
+- [ ] 6.7 **AT SYNC: edit `booker-erasure`'s Purpose paragraph by hand.** A delta replaces
+      requirements; it cannot express a change to a capability's Purpose, and that paragraph
+      repeats **both** claims this change narrows — *"contact details have exactly one durable
+      home, so erasing that home erases the data"* and *"the **two** boundaries the documentation
+      has to state"*. Synced as-is, the capability would ship a summary contradicting the
+      requirements beneath it, in the one file that is the source of truth after archiving.
+
+      Replace with: contact details have exactly one durable home **among the stores the package
+      owns**; and **the boundaries** the documentation has to state — one erasure reaches one
+      booking, it may be performed on a booking that has not yet happened, and it does not reach a
+      message already sent or an address a mail server quoted into the host's log.
+
+      *Found by sweeping for the CLASS of absolute claims about logs, copies and contact details
+      rather than for the sentences QA had already named — the same enumerate-the-population move
+      that rounds 4 and 5 were both about, applied one level up. QA did not name this one.*

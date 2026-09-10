@@ -323,10 +323,26 @@ public class BackofficeDocumentationTests
 
         // And the durable-home claim: if the requirement has been narrowed to the package's own
         // stores, the summary may not go on asserting the absolute.
-        if (requirements.Contains("among the stores it owns", StringComparison.OrdinalIgnoreCase)
-            && purpose.Contains("durable home", StringComparison.OrdinalIgnoreCase))
+        //
+        // THE TRIGGER IS STRUCTURAL, NOT A VERBATIM PHRASE, and that is the second attempt. The
+        // first gated on `Contains("among the stores it owns")` — a literal lifted from the delta,
+        // guarding a HAND EDIT AT SYNC, which is the operation most likely to reword it. Rewording
+        // the narrowing to "among the stores the package owns" turned the guard off silently while
+        // the Purpose went on promising the absolute. Both phrasings are already live in this
+        // change: the delta uses one and `tasks.md` 6.7 prescribes the other.
+        //
+        // So it asks whether the requirement's durable-location sentence carries ANY ownership
+        // qualifier, and then requires the summary to carry one too.
+        var narrowed = Regex.IsMatch(
+            requirements, @"durable location[^.]*\bowns\b", RegexOptions.IgnoreCase);
+
+        if (narrowed && purpose.Contains("durable home", StringComparison.OrdinalIgnoreCase))
         {
-            Assert.Contains("the package owns", purpose, StringComparison.OrdinalIgnoreCase);
+            Assert.True(
+                purpose.Contains("owns", StringComparison.OrdinalIgnoreCase),
+                "The requirement scopes the durable home to stores the package owns, but the "
+                + "capability's Purpose still claims it without that qualifier. A summary is what "
+                + "a reader derives the capability from after archiving.");
         }
     }
 
