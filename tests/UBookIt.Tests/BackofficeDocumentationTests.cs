@@ -109,9 +109,15 @@ public class BackofficeDocumentationTests
         //
         // What it says now is the pair of verbs v1 actually has, which is stable in a way
         // "read-only" was not: see and cancel.
+        // THROUGH THE SAME MATCHER AS THE ASSERTION ABOVE. These were raw substring checks
+        // sitting directly beneath a wrap-safe `Says` — one test, two matchers, which is precisely
+        // the asymmetry that let an over-claim walk back into `docs/notifications.md` unnoticed.
+        // Re-adding "Bookings do not yet\nhave a screen of their own." here left the whole suite
+        // green. Since this guard has already had to move with the behaviour twice, that is a live
+        // regression guard that could not see the regression.
         DocumentationAssert.Says(docs, "you can see bookings and cancel them");
-        Assert.DoesNotContain("do not yet have a screen", docs, StringComparison.OrdinalIgnoreCase);
-        Assert.DoesNotContain("view is read-only", docs, StringComparison.OrdinalIgnoreCase);
+        DocumentationAssert.DoesNotSay(docs, "do not yet have a screen");
+        DocumentationAssert.DoesNotSay(docs, "view is read-only");
 
         // And the status default is disclosed, because the endpoint hides cancelled
         // bookings by default and an operator who cannot find one must be able to learn
@@ -122,7 +128,7 @@ public class BackofficeDocumentationTests
         // already said "ticking". An operator reading a page that contradicts itself hunts
         // for a control that does not exist.
         DocumentationAssert.Says(docs, "cancelled booking is one tick away rather than missing");
-        Assert.DoesNotContain("one toggle away", docs, StringComparison.OrdinalIgnoreCase);
+        DocumentationAssert.DoesNotSay(docs, "one toggle away");
 
         // And that ticking REPLACES rather than adds. The screen's own hint said
         // "include others" until operating it showed that ticking Cancelled makes the
@@ -152,6 +158,13 @@ public class BackofficeDocumentationTests
         var strings = Support.RepoFiles.Read(
             "src/UBookIt.Backoffice/Client/src/localization/en-us.ts");
 
+        // LEFT AS RAW SUBSTRING CHECKS, deliberately, unlike the prose guards above.
+        //
+        // This document is TypeScript, and the pair is symmetric — both directions are raw, so
+        // there is no matcher asymmetry to correct. More to the point, a long string here wraps by
+        // concatenation or a template literal, and `DocumentationAssert`'s separator bridges
+        // neither; converting would buy the appearance of wrap-safety without the substance, which
+        // is worse than a raw check that is honest about what it does.
         Assert.Contains("show only those instead", strings, StringComparison.Ordinal);
         Assert.DoesNotContain("Tick a status to include others", strings, StringComparison.Ordinal);
     }
@@ -415,7 +428,7 @@ public class BackofficeDocumentationTests
             DocumentationAssert.Says(purpose, phrase);
         }
 
-        Assert.DoesNotContain("about those two verbs", purpose, StringComparison.Ordinal);
+        DocumentationAssert.DoesNotSay(purpose, "about those two verbs");
     }
 
     [Fact]

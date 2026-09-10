@@ -55,6 +55,16 @@ public static class DocumentationAssert
     /// <c>DoesNotContain</c> at each call site: one implementation, so the two directions cannot
     /// come to disagree about what counts as a match.
     /// </para>
+    /// <para>
+    /// <b>Two properties are inherited from <see cref="Says"/> and they have opposite signs — know
+    /// which is which before relying on this.</b> The separator's generosity (whitespace, wrapping,
+    /// emphasis, blockquote markers) is <i>safe</i> here: it makes the guard stricter, catching a
+    /// forbidden sentence however it is dressed. The refusal to cross a blank line or a list
+    /// boundary is <i>not</i>: for <see cref="Says"/> it prevents a false pass, but here it is a
+    /// blind spot, and a forbidden sentence split across two paragraphs goes undetected. Nobody
+    /// writes a sentence that way, which is why this is documented rather than fixed — but it is
+    /// the half of the inheritance that does not protect you.
+    /// </para>
     /// </remarks>
     public static void DoesNotSay(string document, string sentence)
         => Assert.False(
@@ -80,10 +90,20 @@ public static class DocumentationAssert
     /// is, so the no-crossing-a-blank-line rule keeps working there too. Markdown has no such
     /// prefix, so nothing about existing callers changes.
     /// </para>
+    /// <para>
+    /// <b>Two claims here are currently unfalsifiable, and saying so is cheaper than pretending
+    /// otherwise.</b> No document these helpers are given contains a <c>///</c>-prefixed line
+    /// except the five C# sources, and none of those contains a <b>bare</b> <c>///</c> line — so
+    /// the paragraph-break argument above is reasoning, not something the suite can check. For
+    /// markdown, specs and TypeScript this is provably an identity transform for the same reason:
+    /// the prefix does not occur in them at all.
+    /// </para>
     /// </remarks>
     private static string Normalise(string document)
-        => Regex.Replace(document, @"^[^\S
-]*///[^\S
+        => Regex.Replace(document, @"^[^\S
+
+]*///[^\S
+
 ]?", string.Empty, RegexOptions.Multiline);
 
     private static string PatternFor(string sentence)
