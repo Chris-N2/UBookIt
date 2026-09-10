@@ -21,6 +21,16 @@ The default front-end SHALL provide a complete booking flow for a single resourc
 - **WHEN** a visitor chooses a date on which the resource has no free time
 - **THEN** the page shows an explicit "no times available" message rather than an empty list
 
+**The date is chosen from the dates that actually have availability.** The step SHALL list the
+dates within a bounded window that can be booked at the chosen length, so a visitor selects a
+date knowing it is bookable rather than discovering afterwards that it is not. What the window
+is, and how a date outside it is reached, are stated in the requirements that follow — they are
+the same for every flow the package ships and are stated once rather than per flow.
+
+#### Scenario: The step lists dates that have availability
+- **WHEN** a visitor reaches the step that chooses a date, and the resource has availability within the window at the chosen length
+- **THEN** those dates are offered as a choice, and a date with no availability at that length is not among them
+
 ### Requirement: Visitor-chosen booking length
 The default front-end SHALL let a visitor choose the booking length rather than fixing it at the resource's minimum duration. The length control SHALL be presented alongside the date control in the same date-selection step, so that the start times subsequently listed are only those that admit the chosen length and no invalid start-and-length combination can be submitted.
 
@@ -681,6 +691,14 @@ collection of one.
 - **WHEN** a visitor chooses a date on which the service has no available starts
 - **THEN** the page shows an explicit "no times available" message rather than an empty list
 
+**The date is chosen from the dates that actually have availability**, on the same terms as the
+single-resource flow: the step lists the bookable dates within the window at the chosen length,
+narrowed by the visitor's choice of who where one has been made.
+
+#### Scenario: The service step lists dates that have availability
+- **WHEN** a visitor reaches the step that chooses a date for a service, and the service can be fulfilled within the window at the chosen length
+- **THEN** those dates are offered as a choice, and a date the service cannot be fulfilled on at that length is not among them
+
 ### Requirement: The confirmation reports every resource a service resolved to
 The confirmation for a placed service booking SHALL report the booking's **quotable
 reference — the identifier a person can quote, not its machine identifier** — the
@@ -1122,3 +1140,130 @@ guarantee about screen-reader behaviour at the mercy of a restyle.
 #### Scenario: A theme is not held to the vocabulary
 - **WHEN** a theme renders markup of its own
 - **THEN** no rule requires it to carry the package's classes, and the vocabulary continues to hold for every view the package itself renders
+
+### Requirement: The listed window is derived from the site's own bounds, never fixed
+
+The window of dates offered SHALL be derived from the subject's **horizon** and the site's
+**maximum query range**, and SHALL NOT be a fixed number of days the code assumes it may read.
+
+- No date beyond the horizon SHALL be listed.
+- **No date SHALL be listed that the lead time leaves nothing bookable on.** This is a guarantee
+  about the **list**, not about the window's bounds, and the distinction is a correction: a lead
+  time is a duration rather than a number of days, so a two-hour one does not make today
+  unbookable — it makes this morning unbookable. Shifting the window's start by it would skip
+  whole days a site is still willing to sell. What is required is that a date with no remaining
+  bookable start does not appear, which follows from listing only dates that have one.
+- **The window SHALL NOT exceed the configured maximum query range.** A site may set that
+  guardrail below the package's preferred window, and a read wider than it is **refused** — so a
+  fixed window would not merely list too much, it would fail the availability read on every
+  render and leave that site with no flow at all.
+
+**A site whose bounds are narrower than the preferred window SHALL get a shorter list, never an
+error and never an empty step.** This is the failure that a default configuration cannot show:
+every bound above is generous by default, so a window that ignores them looks correct until
+somebody tightens one.
+
+#### Scenario: A tight query-range guardrail shortens the list
+- **WHEN** the site's maximum query range is configured below the package's preferred window and a visitor reaches the date step
+- **THEN** the dates listed span no more than that maximum, the availability read succeeds, and the step renders normally
+
+#### Scenario: A short horizon shortens the list
+- **WHEN** a resource's horizon is shorter than the preferred window
+- **THEN** no date beyond the horizon is listed
+
+#### Scenario: Lead time is respected in the list
+- **WHEN** a resource's lead time leaves no bookable start on a date within the window
+- **THEN** that date is not listed, and dates the lead time still leaves bookable are
+
+### Requirement: A listed date and the times for that date agree
+
+The dates listed and the start times shown for the selected date SHALL be derived from **one
+reading of availability**, so that the two cannot disagree about the same day.
+
+**The times shown SHALL be exactly those a read of that single date would produce.** Widening the
+read must change how much is asked for and nothing about what is answered; a start that would
+have been offered before SHALL be offered still, and none SHALL be added.
+
+Two reads **of a range containing the same date** would make a page that lists a date as bookable
+while showing no times for it an ordinary outcome of a booking landing between them, rather than a
+defect. One reading cannot contradict itself.
+
+**Where the chosen date lies outside the window, the step MAY read it separately** — and SHALL
+then read ranges that do not overlap. The hazard above is one date being answered twice; disjoint
+ranges answer each date once, so there is nothing for them to disagree about. This is not an
+optimisation but a necessity: a window and an arbitrary far date cannot both fit inside the
+maximum query range, so a single read spanning them is refused, and a step that attempted one
+would offer no times at all for the dates the window exists alongside.
+
+*Disjoint **dates** imply disjoint **instants** only because a resource's open hours cannot cross
+midnight — the `availability` capability requires a window's start to precede its end, so every
+open interval lies wholly within its own local date and local dates partition the timeline. That
+is what makes the clause above safe rather than merely stipulated, and it is written down here
+because it is a coupling between two capabilities that would otherwise break in silence: were
+overnight opening hours ever permitted — a venue open 20:00–02:00 is an entirely reasonable thing
+to want — a single date's availability would straddle two calendar days, two "disjoint" reads
+could then answer about the same instants, and nothing in this capability would look wrong. A
+change to `availability` that allows it must revisit this requirement.*
+
+#### Scenario: The times are unchanged by the wider read
+- **WHEN** the start times for a date are produced from the window and from a read of that date alone, for the same subject and length
+- **THEN** they are the same times
+
+#### Scenario: A listed date has times
+- **WHEN** a visitor selects a date the step listed as available, without the stored state changing
+- **THEN** start times are shown for it
+
+#### Scenario: Every date the subject offers can be reached
+- **WHEN** a visitor chooses any date within the subject's horizon, at any configured maximum query range
+- **THEN** that date's start times are shown, and the read the step issues is within that maximum
+
+### Requirement: A date beyond the listed window is still reachable
+
+The step SHALL provide a way to choose a date outside the listed window, for any date the
+subject's own bounds allow.
+
+**Because the window is smaller than what a site offers.** A horizon is commonly months and a
+window is at most weeks, so a step offering only the list would put most of a site's own
+availability out of reach — a change to booking policy wearing the clothes of a change to layout.
+
+**The two controls SHALL NOT submit the same parameter, and which one wins SHALL be defined.** A
+form submitting one parameter from two controls sends both values, and which is bound is an
+accident rather than a decision.
+
+**Where the chosen date lies outside the listed window, the step SHALL state which date it is
+showing.** Otherwise a page presents a list with nothing selected beside times for a date the
+list does not contain, and contradicts itself.
+
+#### Scenario: A date beyond the window can be chosen
+- **WHEN** a visitor chooses a date later than the listed window but within the subject's horizon
+- **THEN** the flow shows that date's start times
+
+#### Scenario: The controls do not collide
+- **WHEN** the date step's controls are inspected
+- **THEN** the list and the means of choosing another date submit different parameters, and the precedence between them is defined rather than left to binding order
+
+#### Scenario: A date outside the window is named
+- **WHEN** the selected date is not among those listed
+- **THEN** the step states which date it is showing
+
+### Requirement: A window with no availability explains itself
+
+Where no date in the listed window has availability at the chosen length, the step SHALL say so,
+and SHALL say what would change the answer.
+
+**It is a different statement from an empty day.** *"No times are available on Tuesday"* tells a
+visitor to try another date; *"no date in the next few weeks can take two hours"* tells them
+something about every date, and leaving them to discover that one day at a time is the failure
+this whole change removes.
+
+**Where the length is the reason, that SHALL be said.** A window with nothing at two hours may be
+full of half-hour gaps, and a visitor told only that there is nothing has no next move — while a
+visitor told the length is the obstacle has two.
+
+#### Scenario: An empty window is stated once, not discovered daily
+- **WHEN** no date in the listed window has availability at the chosen length
+- **THEN** the step states that no date in the window is available at that length, rather than rendering an empty list
+
+#### Scenario: The empty window names a way forward
+- **WHEN** the window is empty at the chosen length but has availability at a shorter one
+- **THEN** the statement says that a shorter length would find availability
