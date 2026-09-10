@@ -169,7 +169,7 @@
       Worth recording — the same trap would make a careless guard pass while the sentence was
       missing.)
 
-- [ ] 6.7 **AT SYNC: edit `booker-erasure`'s Purpose paragraph by hand.** A delta replaces
+- [x] 6.7 **AT SYNC (done): edit `booker-erasure`'s Purpose paragraph by hand.** A delta replaces
       requirements; it cannot express a change to a capability's Purpose, and that paragraph
       repeats **both** claims this change narrows — *"contact details have exactly one durable
       home, so erasing that home erases the data"* and *"the **two** boundaries the documentation
@@ -184,3 +184,8 @@
       *Found by sweeping for the CLASS of absolute claims about logs, copies and contact details
       rather than for the sentences QA had already named — the same enumerate-the-population move
       that rounds 4 and 5 were both about, applied one level up. QA did not name this one.*
+
+      **The guard did its job on the real sync.** Immediately after the deltas landed and before
+      this edit, `The_erasure_capabilitys_summary_does_not_outrun_its_requirements` failed — the
+      requirements had moved and the summary had not, which is the one state it exists to catch and
+      the state a checklist entry alone has already failed to prevent once in this repository.
