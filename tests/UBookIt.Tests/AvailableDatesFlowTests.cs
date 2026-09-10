@@ -105,11 +105,24 @@ public class AvailableDatesFlowTests
 
         var flow = new ServiceBookingFlow(serviceStore, core, settings, time);
 
+        // THE HORIZON READ FROM WHAT THE FLOW COMPUTED, not from the room's own constraints.
+        //
+        // They coincide for a single-role, single-room service, so taking the room's would be
+        // honest today — and would diverge silently the moment a fixture had several pools,
+        // because the flow uses ServiceBookingFormBuilder.HorizonDays(pools). A sweep whose
+        // stated reach and whose subject's real horizon disagree is one that stops short without
+        // saying so. MaxDate is exactly `today + horizon`, so this is the flow's own answer
+        // rather than a second derivation of it.
+        var today = BookingFormBuilder.TodayIn(TestData.Now, TestData.London);
+        var probe = flow.BuildAsync(
+            service.Id, new BookingFlowInput { Date = today, DurationMinutes = 60 })
+            .GetAwaiter().GetResult().Form;
+
         return new Subject(
             "service",
             async (date, minutes) => (await flow.BuildAsync(
                 service.Id, new BookingFlowInput { Date = date, DurationMinutes = minutes })).Form,
-            room.Availability.Constraints.HorizonDays);
+            probe!.MaxDate.DayNumber - today.DayNumber);
     }
 
     public static TheoryData<string> Flows() => new() { "resource", "service" };

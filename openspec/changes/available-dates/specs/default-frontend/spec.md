@@ -125,6 +125,16 @@ optimisation but a necessity: a window and an arbitrary far date cannot both fit
 maximum query range, so a single read spanning them is refused, and a step that attempted one
 would offer no times at all for the dates the window exists alongside.
 
+*Disjoint **dates** imply disjoint **instants** only because a resource's open hours cannot cross
+midnight — the `availability` capability requires a window's start to precede its end, so every
+open interval lies wholly within its own local date and local dates partition the timeline. That
+is what makes the clause above safe rather than merely stipulated, and it is written down here
+because it is a coupling between two capabilities that would otherwise break in silence: were
+overnight opening hours ever permitted — a venue open 20:00–02:00 is an entirely reasonable thing
+to want — a single date's availability would straddle two calendar days, two "disjoint" reads
+could then answer about the same instants, and nothing in this capability would look wrong. A
+change to `availability` that allows it must revisit this requirement.*
+
 #### Scenario: The times are unchanged by the wider read
 - **WHEN** the start times for a date are produced from the window and from a read of that date alone, for the same subject and length
 - **THEN** they are the same times

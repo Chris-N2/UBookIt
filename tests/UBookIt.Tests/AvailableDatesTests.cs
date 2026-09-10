@@ -1,4 +1,5 @@
 using UBookIt.Core.Availability;
+using UBookIt.Core.Services;
 using UBookIt.Tests.Support;
 using UBookIt.Web.Rendering;
 
@@ -221,6 +222,28 @@ public class AvailableDatesTests
 
         Assert.Empty(BookingFormBuilder.OnDate([start], TestData.London, new DateOnly(2026, 9, 10)));
         Assert.Single(BookingFormBuilder.OnDate([start], TestData.London, new DateOnly(2026, 9, 11)));
+    }
+
+    [Fact]
+    public void The_SERVICE_day_filter_uses_the_site_zone_too()
+    {
+        // THE SECOND IMPLEMENTATION, which had this property proven for its twin and not for
+        // itself — the same shape as the coverage gap QA had just found in the flows.
+        //
+        // Measured rather than assumed: switching `ServiceBookingFormBuilder.OnDate` to group by
+        // the UTC date left the whole suite green, because no service fixture has a start
+        // straddling midnight in London. Switching it to the WRONG DAY failed eight tests. So the
+        // day selection was well covered and the ZONE was covered by nothing — and the zone is
+        // the dimension task 2.2 names as the subtle one, precisely because a UTC-configured
+        // suite reports it perfectly correct.
+        var start = new ServiceBookableStart(
+            DateTimeOffset.Parse("2026-09-10T23:30:00Z", null, System.Globalization.DateTimeStyles.RoundtripKind),
+            [new LengthRun(TimeSpan.FromMinutes(30), TimeSpan.FromHours(1), TimeSpan.FromMinutes(30))]);
+
+        Assert.Empty(
+            ServiceBookingFormBuilder.OnDate([start], TestData.London, new DateOnly(2026, 9, 10)));
+        Assert.Single(
+            ServiceBookingFormBuilder.OnDate([start], TestData.London, new DateOnly(2026, 9, 11)));
     }
 
     [Fact]
