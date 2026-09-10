@@ -13,10 +13,19 @@ namespace UBookIt.Tests;
 /// page cannot send someone to subscribe to something that has been renamed.
 /// </para>
 /// <para>
-/// Two sentences are load-bearing rather than informative, and both are pinned: that the
-/// package sends nothing itself, and that a handler which throws is a notification nobody
-/// receives. Each is the kind of thing discovered the expensive way — the first by a customer
-/// arriving for a booking that was cancelled, the second during an incident.
+/// Several sentences are load-bearing rather than informative, and each is pinned: what the
+/// package sends and under what configuration, that a mail server alone enables nothing, that
+/// internal messages withhold contact details, and that a handler which throws is a notification
+/// nobody receives. Each is the kind of thing discovered the expensive way — by a customer
+/// arriving for a booking that was cancelled, by a customer receiving a message the site did not
+/// know it sent, or during an incident.
+/// </para>
+/// <para>
+/// <b>The claim these guard changed shape in 0.5.0 and the guard had to change with it.</b> It
+/// used to pin "uBookIt sends nothing itself", which was true of every install. Now the honest
+/// claim is conditional, so pinning the old sentence would have held the documentation to
+/// something the package no longer does — and pinning nothing would have let the page go quiet
+/// about a behaviour that writes to a site's customers.
 /// </para>
 /// </remarks>
 public class NotificationDocumentationTests
@@ -37,15 +46,44 @@ public class NotificationDocumentationTests
     }
 
     [Fact]
-    public void The_package_sending_nothing_is_stated_rather_than_implied()
+    public void What_the_package_sends_is_stated_rather_than_implied()
     {
-        // The sentence that stops "uBookIt notified them" being assumed. An operator who
-        // believes the package emails the customer finds out when somebody arrives for a
-        // booking that no longer exists.
+        // BOTH directions of the assumption have to be closed. An operator who believes the
+        // package emails the customer finds out when somebody arrives for a booking that no
+        // longer exists; a site owner who does NOT believe it finds out when a customer replies
+        // to a message they did not know was going out.
         var docs = Docs();
 
-        DocumentationAssert.Says(docs, "uBookIt sends nothing itself");
+        DocumentationAssert.Says(docs, "Out of the box: nothing");
         DocumentationAssert.Says(docs, "the customer will turn up");
+
+        // The settings that turn each direction on, by the names a site actually types.
+        Assert.Contains("SendBookerEmails", docs, StringComparison.Ordinal);
+        Assert.Contains("InternalRecipients", docs, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public void That_a_mail_server_alone_enables_nothing_is_stated()
+    {
+        // The assumption this closes is the one most likely to be made, because on most sites
+        // SMTP is already configured for password resets and invites long before uBookIt is
+        // installed. Upgrading must not read as consent to write to that site's customers.
+        DocumentationAssert.Says(
+            Docs(), "Configuring your site's mail server does not change that");
+    }
+
+    [Fact]
+    public void What_internal_messages_withhold_is_stated()
+    {
+        // Otherwise a site adds an address to InternalRecipients expecting to be able to reply
+        // to the customer from it, finds it cannot, and works around the package. Saying what
+        // the message withholds AND why is what makes the design followable rather than annoying.
+        var docs = Docs();
+
+        // Pinned as a single-line fragment: the sentence wraps in the source, and an
+        // assertion carrying the line break would be pinning the layout as much as the claim.
+        DocumentationAssert.Says(docs, "deliberately carry no booker name");
+        Assert.Contains("Sensitive data", docs, StringComparison.Ordinal);
     }
 
     [Fact]
@@ -77,13 +115,13 @@ public class NotificationDocumentationTests
     }
 
     [Fact]
-    public void The_backoffice_documentation_says_cancelling_tells_nobody()
+    public void The_backoffice_documentation_says_what_cancelling_tells_the_booker()
     {
         // Said where the consequence lands, not only on the notifications page. An operator
         // reading about cancelling is the person who needs to know.
         var docs = RepoFiles.Read("docs/backoffice.md");
 
-        DocumentationAssert.Says(docs, "Cancelling tells nobody");
+        DocumentationAssert.Says(docs, "Cancelling tells nobody unless you have configured it to");
         Assert.Contains("notifications.md", docs, StringComparison.Ordinal);
     }
 }

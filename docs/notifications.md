@@ -3,19 +3,71 @@
 uBookIt raises an Umbraco notification when a booking is placed and when one is cancelled, so
 your site can do whatever it needs to.
 
-## uBookIt sends nothing itself
+## What uBookIt sends, and what it does not
 
-**No email. No SMS. No message of any kind, to the booker or to anyone else.** Placing a
-booking shows a confirmation on screen and stores it; cancelling one from the backoffice
-releases the time. Neither tells the person who booked.
+**Out of the box: nothing.** No email, no SMS, no message of any kind, to the booker or to
+anyone else. Placing a booking shows a confirmation on screen and stores it; cancelling one from
+the backoffice releases the time. Until you configure the settings below, neither tells anybody.
 
-That is deliberate. Mail is your site's — your templates, your wording, your sending
-infrastructure, your deliverability — and a package that owned that channel would own a
-support burden it cannot test on your servers. What uBookIt gives you is the moment; what you
-send is yours.
+**Configuring your site's mail server does not change that.** uBookIt will not send anything just
+because Umbraco can — SMTP is configured on most sites for password resets and backoffice
+invites, and that is not the same as wanting a booking package to write to your customers.
+Sending needs both: a uBookIt setting *and* a working mail configuration.
 
-**The practical consequence is worth stating plainly:** if an operator cancels a booking and
-nothing on your site is listening, the customer will turn up.
+### Turning it on
+
+```json
+{
+  "UBookIt": {
+    "Notifications": {
+      "SendBookerEmails": true,
+      "InternalRecipients": [ "bookings@example.com", "reception@example.com" ]
+    }
+  }
+}
+```
+
+| Setting | What it does |
+|---|---|
+| `SendBookerEmails` | Sends the person who booked a plain-text confirmation when their booking is placed, and a notice when it is cancelled. Off unless set to `true`. |
+| `InternalRecipients` | Sends your own people a message when a booking is placed or cancelled. **The list being non-empty is the switch** — there is no separate on/off. |
+
+The two are independent: you can be told about bookings without anything being sent to your
+customers, and the other way round. Both also require Umbraco to be able to send mail — an SMTP
+`Host`, or a `PickupDirectoryLocation`, under `Umbraco:CMS:Global:Smtp`, plus a `From` address.
+uBookIt does not supply a sender of its own; your site's `From` is used.
+
+If you turn sending on and your site has no usable mail configuration, uBookIt says so in the log
+once at startup rather than failing quietly.
+
+### What the messages contain
+
+Both messages carry the booking reference, when the booking is — in the time zone it was booked
+against — and what was booked.
+
+**Messages to `InternalRecipients` deliberately carry no booker name, email address or telephone
+number.** They carry a link to the bookings screen instead. Who may see a booker's contact details
+is decided by the **Sensitive data** user group in the backoffice, and a list of addresses in a
+configuration file is not that decision — so the message takes you to where that control still
+applies rather than carrying the details past it.
+
+A booking whose booker has been erased (see [privacy](privacy.md)) has no address, so nothing is
+sent to them. Your own recipients are still told.
+
+### Replacing what uBookIt sends
+
+uBookIt sends through Umbraco's own `IEmailSender` with notifications enabled, so you can
+intercept `SendEmailNotification`, check `EmailType` for `"UBookItBooking"`, and substitute your
+own message entirely — different wording, HTML, your own branding — without waiting for the
+package to make it configurable.
+
+If you would rather build the whole thing yourself, ignore the settings above and handle the
+notifications directly. That is what they are for.
+
+**Two things to know, whichever route you take:** uBookIt sends each message once — nothing is
+retried or queued, and a message that fails to send is not reported to the person who booked. And
+if an operator cancels a booking while nothing is configured and nothing is listening, the
+customer will turn up.
 
 ## The notifications
 

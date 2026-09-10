@@ -66,23 +66,30 @@
 
 ## 5. Documentation
 
-- [ ] 5.1 Rewrite `docs/notifications.md` around the new claim: nothing by default, what each
+- [x] 5.1 Rewrite `docs/notifications.md` around the new claim: nothing by default, what each
       setting enables, that SMTP alone enables nothing, what internal messages withhold, and the
       unchanged delivery limits.
-- [ ] 5.2 Fix both statements in `docs/backoffice.md` — they are load-bearing instructions telling
+- [x] 5.2 Fix both statements in `docs/backoffice.md` — they are load-bearing instructions telling
       an operator to contact a booker themselves, so they need rewriting under a configuration
       that may or may not be on, not deleting.
-- [ ] 5.3 Update the XML docs on `BookingPlacedNotification` and `BookingCancelledNotification`,
+- [x] 5.3 Update the XML docs on `BookingPlacedNotification` and `BookingCancelledNotification`,
       which both currently state the package sends nothing.
-- [ ] 5.4 Document the new settings wherever `RetentionDays` and `PrivacyPolicyUrl` are documented.
-- [ ] 5.5 `docs/mvp.md` says the package sends no email "and will not in v1" — that was true of the
+- [x] 5.4 Document the new settings wherever `RetentionDays` and `PrivacyPolicyUrl` are documented.
+- [x] 5.5 `docs/mvp.md` says the package sends no email "and will not in v1" — that was true of the
       MVP and is a historical statement; check whether it reads as current and adjust only if it does.
 
 ## 6. Sweep and verify
 
-- [ ] 6.1 Re-run the falsified-sentence grep **outward** across `openspec/specs/` and `docs/` for
+- [x] 6.1 Re-run the falsified-sentence grep **outward** across `openspec/specs/` and `docs/` for
       any sibling requirement this change makes untrue, beyond the two already modified.
-- [ ] 6.2 Re-run it **inward**: diff the guarantees of each wholesale replacement against the
+      **Result: nothing further.** Two candidates were considered and both stand:
+      `default-frontend`'s "No message derived from a placement failure may assert it" is about a
+      permanent-refusal message, not email; and `sensitive-data`'s requirement is scoped to what a
+      **backoffice user** is shown in a **response**, which an email is not — and the internal
+      message deliberately carries no contact details, so it opens no hole in that control either.
+      In `docs/`, `notifications.md`, `backoffice.md` (twice), `mvp.md` and the TestSite's worked
+      example all carried the old claim and are corrected.
+- [x] 6.2 Re-run it **inward**: diff the guarantees of each wholesale replacement against the
       version in `openspec/specs/`, confirming every SHALL and every scenario is carried forward,
       deliberately dropped, or superseded by something stronger. The two being replaced are:
       - `privacy-notice` — **The package states only what it can keep true, and the site links its own policy**.
@@ -96,9 +103,9 @@
         Superseded: *states plainly that the package sends nothing itself* becomes *states what it
         sends, to whom, and under what configuration*. Extended: the delivery limits now also
         cover the package's own messages.
-- [ ] 6.3 `ChangeDeltaIntegrityTests` green — it is the authority on delta correctness, not
+- [x] 6.3 `ChangeDeltaIntegrityTests` green — it is the authority on delta correctness, not
       `openspec validate --strict`.
-- [ ] 6.4 Full suite green, clean Release build, **zero** warnings.
+- [x] 6.4 Full suite green, clean Release build, **zero** warnings.
 - [ ] 6.5 **Prove it live using a pickup directory** rather than an SMTP server: set
       `Umbraco:CMS:Global:Smtp:PickupDirectoryLocation` and `From`, place and cancel a booking,
       and read the `.eml` files. This also dodges the invite/SMTP blocker that made the

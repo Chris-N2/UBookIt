@@ -15,8 +15,11 @@ namespace UBookIt.Persistence.Notifications;
 /// Umbraco notification.
 /// </para>
 /// <para>
-/// <b>The package sends nothing itself</b> — no email, no message of any kind, to the booker
-/// or to anyone else. This notification exists so a site can send whatever it wants to.
+/// <b>The package sends nothing unless a site has configured it to.</b> Out of the box it sends
+/// no email and no message of any kind, to the booker or to anyone else — and configuring the
+/// site's mail server does not change that on its own. See
+/// <c>UBookIt:Notifications</c> and <see cref="BookingEmailHandler"/>. This notification exists
+/// independently of all that, so a site can send whatever it wants to instead, or as well.
 /// </para>
 /// <para>
 /// <b>A handler that throws is a notification nobody receives.</b> The booking is already
@@ -40,8 +43,9 @@ public sealed class BookingPlacedNotification(Booking booking) : INotification
 /// nothing.
 /// </para>
 /// <para>
-/// The same two caveats apply as for placement: the package tells the booker nothing, and a
-/// handler that throws is a notification nobody receives.
+/// The same two caveats apply as for placement: what the package tells the booker depends
+/// entirely on configuration and is nothing by default, and a handler that throws is a
+/// notification nobody receives.
 /// </para>
 /// </remarks>
 public sealed class BookingCancelledNotification(Booking booking) : INotification
