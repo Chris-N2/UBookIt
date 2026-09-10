@@ -1,16 +1,16 @@
 ## 1. Settings
 
-- [ ] 1.1 Add `BookingNotificationSettings` to `UBookIt.Core` — `SendBookerEmails` (bool) and
+- [x] 1.1 Add `BookingNotificationSettings` to `UBookIt.Core` — `SendBookerEmails` (bool) and
       `InternalRecipients` (`IReadOnlyList<string>`) — and hang it off `SiteBookingSettings`.
       Core takes no dependency to do this; it is a record.
-- [ ] 1.2 Resolve the settings in `UBookItPersistenceComposer` alongside `ResolveRetentionDays`
+- [x] 1.2 Resolve the settings in `UBookItPersistenceComposer` alongside `ResolveRetentionDays`
       and `ResolvePrivacyPolicyUrl`: absent, blank or unusable resolves to *not configured* and
       never to a default that enables anything.
-- [ ] 1.3 Validate recipient addresses. An unusable address is **dropped and reported**, the
+- [x] 1.3 Validate recipient addresses. An unusable address is **dropped and reported**, the
       usable ones kept; a list of only unusable addresses configures nothing.
-- [ ] 1.4 Report once, at resolution, when sending to the booker is enabled and the host cannot
+- [x] 1.4 Report once, at resolution, when sending to the booker is enabled and the host cannot
       send mail — the moment the mismatch is diagnosable.
-- [ ] 1.5 Tests: absent / blank / non-boolean / mixed-validity list / all-invalid list, and that
+- [x] 1.5 Tests: absent / blank / non-boolean / mixed-validity list / all-invalid list, and that
       no resolution path produces an enabling default.
 
 ## 2. Composing a message

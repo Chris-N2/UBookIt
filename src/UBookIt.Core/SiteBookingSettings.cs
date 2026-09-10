@@ -63,4 +63,16 @@ public sealed record SiteBookingSettings
     /// </para>
     /// </remarks>
     public string? PrivacyPolicyUrl { get; init; }
+
+    /// <summary>
+    /// What the package sends when a booking is placed or cancelled. Nothing, unless the site
+    /// has said otherwise.
+    /// </summary>
+    /// <remarks>
+    /// Defaulted to an instance rather than left nullable: "no notifications configured" and
+    /// "notifications configured to send nothing" are the same state and there is no reader who
+    /// would treat them differently, so a null would be a second way of spelling the default and
+    /// a question every caller would have to answer again.
+    /// </remarks>
+    public BookingNotificationSettings Notifications { get; init; } = new();
 }
