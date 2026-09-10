@@ -142,6 +142,47 @@ public interface IBookingFormView
     /// </summary>
     bool LengthIsTheProblem { get; }
 
+    /// <summary>
+    /// The dates in the listed window that can be booked at the chosen length, ascending.
+    /// </summary>
+    /// <remarks>
+    /// <para>
+    /// <b>Filtered to the chosen length, deliberately.</b> A date offering only half-hour gaps is
+    /// not offered to somebody who asked for two hours: the whole point is that selecting a
+    /// listed date leads to times, and a list that ignored the length would move the blind pick
+    /// one step later rather than removing it.
+    /// </para>
+    /// <para>
+    /// Empty means the window holds nothing at this length — which is a statement to render, not
+    /// a list to render emptily. See <see cref="LongestAvailableInWindowMinutes"/>.
+    /// </para>
+    /// </remarks>
+    IReadOnlyList<AvailableDate> AvailableDates { get; }
+
+    /// <summary>Whether the selected date is one of <see cref="AvailableDates"/>.</summary>
+    /// <remarks>
+    /// False when a visitor has jumped past the window, or picked a date the window lists as
+    /// unavailable. Either way the step must say which date it is showing, or it presents a list
+    /// with nothing selected beside times for a date the list does not contain — a page
+    /// disagreeing with itself.
+    /// </remarks>
+    bool SelectedDateIsListed { get; }
+
+    /// <summary>How many days the listed window spans, for wording that names it.</summary>
+    int WindowDays { get; }
+
+    /// <summary>
+    /// The longest length, in whole minutes, bookable anywhere in the window — or null when the
+    /// window holds no availability at all.
+    /// </summary>
+    /// <remarks>
+    /// What turns "nothing is available" into a next move. A window empty at two hours may be
+    /// full of half-hour gaps, and the difference between telling somebody that and telling them
+    /// only that there is nothing is the difference between a choice and a dead end. The same
+    /// idea as <see cref="LongestAvailableMinutes"/>, at window scale rather than for one day.
+    /// </remarks>
+    int? LongestAvailableInWindowMinutes { get; }
+
     /// <summary>The error message associated with a field id, if any (for aria wiring).</summary>
     string? ErrorFor(string fieldId);
 
@@ -221,3 +262,14 @@ public sealed record PrivacyNoticeView(int? RetentionDays, string? PolicyUrl)
         return new PrivacyNoticeView(settings.RetentionDays, settings.PrivacyPolicyUrl);
     }
 }
+
+
+/// <summary>One date the first step offers.</summary>
+/// <param name="Date">The date, in the site's zone.</param>
+/// <param name="IsSelected">Whether it is the date the step is currently showing times for.</param>
+/// <remarks>
+/// A value rather than pre-rendered markup, on the same terms as everything else a theme
+/// receives: what the package publishes is data, and turning a date into a label belongs to the
+/// view that renders it — including a view that wants to write it in another language.
+/// </remarks>
+public readonly record struct AvailableDate(DateOnly Date, bool IsSelected);

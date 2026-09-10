@@ -1,0 +1,98 @@
+@using System.Globalization
+@using UBookIt.Web.Rendering
+@model IBookingFormView
+@{
+    var hasDates = Model.AvailableDates.Count > 0;
+    var lengthLabel = BookingDurations.Label(Model.DurationMinutes);
+}
+@*
+    Which dates can actually be booked, so a visitor chooses one knowing it is bookable
+    rather than finding out after a page load. The list and the start times below come
+    from ONE reading of availability, so they cannot disagree about the same day.
+
+    FILTERED TO THE CHOSEN LENGTH. A date offering only half-hour gaps is not offered to
+    somebody who asked for two hours — a list that ignored the length would move the blind
+    pick one step later instead of removing it.
+
+    RADIOS IN A FIELDSET, which is the shape `_Times` already uses for "choose one of
+    these". One idiom on the page rather than two, and it inherits an accessible pattern
+    instead of inventing one.
+*@
+@if (hasDates)
+{
+    <fieldset id="@BookingFieldIds.Dates" class="ubookit-dates">
+        <legend>Dates with availability for @lengthLabel in the next @Model.WindowDays days</legend>
+        @foreach (var (available, index) in Model.AvailableDates.Select((available, index) => (available, index)))
+        {
+            var id = $"ubookit-date-{index}";
+            <div class="ubookit-dates-option">
+                <input type="radio"
+                       id="@id"
+                       name="@BookingKeys.DateQuery"
+                       value="@available.Date.ToString("yyyy-MM-dd")"
+                       @(available.IsSelected ? "checked" : null) />
+                <label for="@id">@available.Date.ToString("dddd d MMMM yyyy", CultureInfo.InvariantCulture)</label>
+            </div>
+        }
+    </fieldset>
+}
+else if (Model.LongestAvailableInWindowMinutes is { } longest)
+{
+    @* The window has availability, just not this much of it. Saying which length WOULD find
+       something turns "nothing" into a choice — and this is the case where the difference
+       matters most, because a window empty at two hours may be full of half-hour gaps. *@
+    <p class="ubookit-no-dates" id="ubookit-window-unavailable">
+        No date in the next @Model.WindowDays days has @lengthLabel available.
+        The longest available in that time is @BookingDurations.Label(longest).
+        Please choose a shorter length, or a date further ahead.
+    </p>
+}
+else
+{
+    @* Nothing at any length. A shorter length would not help, so it is not suggested —
+       offering a next move that leads nowhere is worse than naming the one that remains. *@
+    <p class="ubookit-no-dates">
+        No date in the next @Model.WindowDays days has any availability.
+        Please choose a date further ahead.
+    </p>
+}
+
+@if (!Model.SelectedDateIsListed)
+{
+    @* THE PAGE WOULD OTHERWISE CONTRADICT ITSELF: a list with nothing selected, beside start
+       times for a date the list does not contain. Says which date is being shown rather than
+       leaving the visitor to reconcile the two. *@
+    <p class="ubookit-dates-showing">
+        Showing @Model.SelectedDate.ToString("dddd d MMMM yyyy", CultureInfo.InvariantCulture),
+        which is not in the list above.
+    </p>
+}
+
+<div class="ubookit-field">
+    @* A DIFFERENT QUESTION, not a second way to ask the same one — and labelled to say so.
+       The list answers "when can I come soon?"; this answers "I want this particular date".
+
+       Its own query parameter, because two controls sharing one name submit BOTH values and
+       the winner is whatever model binding happens to pick. This one wins when it is filled
+       in: typing a date is the more deliberate act, and a visitor who picks from the list and
+       then types is correcting themselves. *@
+    @* DELIBERATELY NOT REPOPULATED, and this is load-bearing rather than an oversight.
+
+       Adding `value="@Model.SelectedDate..."` here looks like an obvious improvement — the
+       control it replaced did exactly that — and it would break the list entirely: the typed
+       date wins over the list by design, so a field that kept resubmitting a date the visitor
+       chose three renders ago would make every subsequent click on the list do nothing at all.
+
+       Left empty, it submits an empty value, which fails to parse and falls through to the
+       list. The visitor's actual choice is not lost — it is stated above, in "Showing …". *@
+    <label for="@BookingFieldIds.OtherDate">Or choose another date</label>
+    <input type="date"
+           id="@BookingFieldIds.OtherDate"
+           name="@BookingKeys.OtherDateQuery"
+           min="@Model.MinDate.ToString("yyyy-MM-dd")"
+           max="@Model.MaxDate.ToString("yyyy-MM-dd")"
+           aria-describedby="ubookit-other-date-hint" />
+    <span id="ubookit-other-date-hint" class="ubookit-hint">
+        For a date beyond the next @Model.WindowDays days. Availability is shown once you choose.
+    </span>
+</div>

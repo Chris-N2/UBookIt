@@ -127,6 +127,7 @@ changing one is a breaking change and will be called out as such in a release no
 
 | Partial | Model |
 |---|---|
+| `~/Views/Shared/UBookIt/_AvailableDates.cshtml` | `IBookingFormView` |
 | `~/Views/Shared/UBookIt/_DateAndLength.cshtml` | `IBookingFormView` |
 | `~/Views/Shared/UBookIt/_ErrorSummary.cshtml` | `IBookingFormView` |
 | `~/Views/Shared/UBookIt/_PrivacyNotice.cshtml` | `IBookingFormView` |

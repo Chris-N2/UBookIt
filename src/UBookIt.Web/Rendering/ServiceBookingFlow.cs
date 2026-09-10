@@ -84,8 +84,23 @@ public sealed class ServiceBookingFlow(
         // are the times that choice can actually be honoured rather than the
         // service's own — offering a start only somebody else could serve would be
         // a promise the pinned placement then refuses.
+        // THE WINDOW, and it is derived rather than assumed. `MaxQueryRangeDays` is a guardrail
+        // the availability read ENFORCES: a span wider than it is refused outright, so a fixed
+        // 30-day read would fail on every render for a site that tightened it — no times, no
+        // dates, no flow. Clamped here, once, from the site's own bounds.
+        //
+        // The selected date may lie outside this window (a visitor typed a date further ahead),
+        // so the read covers the window AND that date. Reading them separately would be two
+        // readings of availability, which is the one thing this must not be.
+        var (windowFrom, windowTo) = AvailableDateWindow.Compute(
+            today, ServiceBookingFormBuilder.HorizonDays(pools), settings.MaxQueryRangeDays);
+
+        var readFrom = selectedDate < windowFrom ? selectedDate : windowFrom;
+        var readTo = selectedDate > windowTo ? selectedDate : windowTo;
+        var windowDays = windowTo.DayNumber - windowFrom.DayNumber + 1;
+
         var startsResult = await serviceBooking
-            .GetBookableStartsAsync(serviceId, selectedDate, selectedDate, choice.Chosen, cancellationToken)
+            .GetBookableStartsAsync(serviceId, readFrom, readTo, choice.Chosen, cancellationToken)
             .ConfigureAwait(false);
 
         IReadOnlyList<ServiceBookableStart> starts = startsResult.Succeeded ? startsResult.Value : [];
@@ -93,7 +108,7 @@ public sealed class ServiceBookingFlow(
         return new ServiceFlowOutcome(
             ServiceBookingFormBuilder.Build(
                 service, pools, selectedDate, today, starts, duration, zone,
-                PrivacyNoticeView.From(settings), failed, input.FlowToken, choice),
+                PrivacyNoticeView.From(settings), windowDays, failed, input.FlowToken, choice),
             null);
     }
 }

@@ -36,6 +36,8 @@ public static class ViewInventory
 
     public const string PrivacyNotice = "~/Views/Shared/UBookIt/_PrivacyNotice.cshtml";
 
+    public const string AvailableDates = "~/Views/Shared/UBookIt/_AvailableDates.cshtml";
+
     public const string Catalogue = "~/Views/Shared/Components/BookingFlow/Catalogue.cshtml";
 
     /// <summary>

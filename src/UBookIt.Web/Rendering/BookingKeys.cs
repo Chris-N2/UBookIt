@@ -11,7 +11,32 @@ public static class BookingKeys
     public const string SubjectQuery = "ubBook";
 
     /// <summary>Query parameter carrying the chosen date (yyyy-MM-dd).</summary>
+    /// <remarks>
+    /// Submitted by the list of available dates. <b>Not shared with
+    /// <see cref="OtherDateQuery"/></b>, and the separation is not tidiness: a form containing
+    /// two controls with one name submits BOTH values, and which one binds is an accident of
+    /// model binding rather than a decision anybody made.
+    /// </remarks>
     public const string DateQuery = "ubDate";
+
+    /// <summary>
+    /// Query parameter carrying a date typed into the "another date" field, for dates beyond the
+    /// listed window.
+    /// </summary>
+    /// <remarks>
+    /// <para>
+    /// <b>It wins over <see cref="DateQuery"/> when present and parseable.</b> Typing a date is
+    /// the more deliberate act: a visitor who selects a date from the list and then types one is
+    /// correcting themselves, and the opposite precedence would silently discard what they typed
+    /// in favour of what they had already moved on from.
+    /// </para>
+    /// <para>
+    /// A separate parameter exists because the window is smaller than what a site offers — a
+    /// horizon is commonly months and a window is at most weeks — so the list alone would put
+    /// most of a site's own availability out of reach.
+    /// </para>
+    /// </remarks>
+    public const string OtherDateQuery = "ubDateOther";
 
     /// <summary>Query parameter carrying the chosen booking length in whole minutes.</summary>
     public const string DurationQuery = "ubMins";

@@ -234,6 +234,8 @@
 .ubookit-notice,
 .ubookit-no-times,
 .ubookit-no-choices,
+.ubookit-no-dates,
+.ubookit-dates-showing,
 .ubookit-fixed-length,
 .ubookit-privacy {
     max-width: var(--ubookit-measure, 34rem);

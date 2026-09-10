@@ -250,23 +250,43 @@ public static class ServiceBookingFormBuilder
         };
     }
 
+    /// <inheritdoc cref="BookingFormBuilder.OnDate" />
+    internal static List<ServiceBookableStart> OnDate(
+        IReadOnlyList<ServiceBookableStart> windowStarts, TimeZoneInfo zone, DateOnly date)
+        => [.. windowStarts.Where(start =>
+            DateOnly.FromDateTime(TimeZoneInfo.ConvertTime(start.StartUtc, zone).DateTime) == date)];
+
     public static ServiceFormModel Build(
         Service service,
         IReadOnlyList<RoleCandidates> pools,
         DateOnly selectedDate,
         DateOnly today,
-        IReadOnlyList<ServiceBookableStart> starts,
+        IReadOnlyList<ServiceBookableStart> windowStarts,
         int durationMinutes,
         TimeZoneInfo zone,
         PrivacyNoticeView privacyNotice,
+        int windowDays,
         FailedSubmission? failed = null,
         string? flowToken = null,
         ResourceChoiceState choice = default)
     {
         var duration = TimeSpan.FromMinutes(durationMinutes);
 
+        // One reading of availability: the day's times and longest run by filtering it, the date
+        // list by grouping it. See BookingFormBuilder.OnDate for why two reads would be wrong.
+        var starts = OnDate(windowStarts, zone, selectedDate);
+
+        var dates = AvailableDateProjection.Dates(
+            windowStarts.Select(start => (start.StartUtc, start.Admits(duration))),
+            zone,
+            selectedDate);
+
         return new ServiceFormModel
         {
+            AvailableDates = dates,
+            SelectedDateIsListed = dates.Any(date => date.IsSelected),
+            WindowDays = windowDays,
+            LongestAvailableInWindowMinutes = LongestAvailableMinutes(windowStarts),
             PrivacyNotice = privacyNotice,
             ResourceChoices = choice.Choices ?? [],
             ChosenResourceId = choice.Chosen,

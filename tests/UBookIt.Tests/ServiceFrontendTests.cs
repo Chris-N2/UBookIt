@@ -1789,7 +1789,10 @@ public class ServiceFrontendTests
             .Order()
             .ToArray();
 
-        Assert.Equal(["ubBook", "ubDate", "ubMins", "ubWho"], keys);
+        // Grew by one again, for the available-dates list. A date in a URL discloses nothing a
+        // public availability read does not already carry, and it is what keeps a date beyond
+        // the listed window linkable — which is the whole reason that control exists.
+        Assert.Equal(["ubBook", "ubDate", "ubDateOther", "ubMins", "ubWho"], keys);
     }
 
     // ---------------------------------------------------------------------
@@ -1962,7 +1965,7 @@ public class ServiceFrontendTests
             .ToList();
 
         Assert.Equal(
-            ["_DateAndLength", "_ErrorSummary", "_PrivacyNotice", "_Times", "_YourDetails"],
+            ["_AvailableDates", "_DateAndLength", "_ErrorSummary", "_PrivacyNotice", "_Times", "_YourDetails"],
             covered);
     }
 
@@ -1995,8 +1998,22 @@ public class ServiceFrontendTests
 
         var dateAndLength = RepoFiles.Read("src/UBookIt.Web/Views/Shared/UBookIt/_DateAndLength.cshtml");
 
-        Assert.Contains("<label for=\"ubookit-date\">", dateAndLength, StringComparison.Ordinal);
         Assert.Contains("<label for=\"@BookingFieldIds.Duration\">", dateAndLength, StringComparison.Ordinal);
+
+        // The date control moved into its own partial when it became a list of what is actually
+        // available, and the bar moved with it — STRENGTHENED rather than relocated, because a
+        // labelled input became a grouped choice and so owes the same clauses the start times do:
+        // a fieldset, a legend naming what is being chosen, and a label per option.
+        var dates = RepoFiles.Read("src/UBookIt.Web/Views/Shared/UBookIt/_AvailableDates.cshtml");
+
+        Assert.Contains("<fieldset", dates, StringComparison.Ordinal);
+        Assert.Contains("<legend>", dates, StringComparison.Ordinal);
+        Assert.Contains("type=\"radio\"", dates, StringComparison.Ordinal);
+        Assert.Contains("<label for=\"@id\">", dates, StringComparison.Ordinal);
+
+        // And the field for a date beyond the window keeps its own label: it is a second control
+        // answering a different question, not a decoration on the group above.
+        Assert.Contains("<label for=\"@BookingFieldIds.OtherDate\">", dates, StringComparison.Ordinal);
     }
 
     [Fact]

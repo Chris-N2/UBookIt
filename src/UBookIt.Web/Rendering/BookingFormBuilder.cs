@@ -91,21 +91,54 @@ public static class BookingFormBuilder
     public static int? LongestAvailableMinutes(IReadOnlyList<BookableStart> starts)
         => starts.Count == 0 ? null : (int)starts.Max(s => s.MaxDuration).TotalMinutes;
 
+    /// <summary>
+    /// The starts falling on one date, in the site zone.
+    /// </summary>
+    /// <remarks>
+    /// <b>The selected day's times are a FILTER of the window, never a second read.</b> Two reads
+    /// would let a booking land between them and produce a page whose date list says a day is
+    /// free while its times say it is not — an ordinary outcome rather than a bug. One reading
+    /// cannot contradict itself, and this is where that property is actually delivered.
+    /// <para>
+    /// Compared in the SITE ZONE. A start at 23:30 UTC belongs to the next day in
+    /// <c>Europe/London</c> in summer, and filtering on the UTC date would show it under the
+    /// wrong heading — for every site that is not itself UTC.
+    /// </para>
+    /// </remarks>
+    internal static List<BookableStart> OnDate(
+        IReadOnlyList<BookableStart> windowStarts, TimeZoneInfo zone, DateOnly date)
+        => [.. windowStarts.Where(start =>
+            DateOnly.FromDateTime(TimeZoneInfo.ConvertTime(start.StartUtc, zone).DateTime) == date)];
+
     public static BookingFormModel Build(
         Resource resource,
         DateOnly selectedDate,
         DateOnly today,
-        IReadOnlyList<BookableStart> starts,
+        IReadOnlyList<BookableStart> windowStarts,
         TimeSpan duration,
         TimeZoneInfo zone,
         PrivacyNoticeView privacyNotice,
+        int windowDays,
         FailedSubmission? failed = null,
         string? flowToken = null)
     {
         var constraints = resource.Availability.Constraints;
 
+        // Everything below comes from ONE reading of availability: the day's times and longest
+        // run by filtering it, the date list by grouping it.
+        var starts = OnDate(windowStarts, zone, selectedDate);
+
+        var dates = AvailableDateProjection.Dates(
+            windowStarts.Select(start => (start.StartUtc, start.Admits(duration))),
+            zone,
+            selectedDate);
+
         return new BookingFormModel
         {
+            AvailableDates = dates,
+            SelectedDateIsListed = dates.Any(date => date.IsSelected),
+            WindowDays = windowDays,
+            LongestAvailableInWindowMinutes = LongestAvailableMinutes(windowStarts),
             PrivacyNotice = privacyNotice,
             FlowToken = flowToken,
             ResourceId = resource.Id,

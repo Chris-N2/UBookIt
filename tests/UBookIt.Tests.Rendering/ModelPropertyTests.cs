@@ -248,6 +248,12 @@ public class ModelPropertyTests
                 "Service.cshtml:FlowToken",
                 "Service.cshtml:HasTimes",
                 "Service.cshtml:SelectedDate",
+
+                // `_DateAndLength` names DurationMinutes in the settled-length branch, and now
+                // also hands its whole model to `_AvailableDates`, which names it in the
+                // legend — so within that partial the member is masked exactly as the flow
+                // pages' members are. Judged where it is not masked: in `_AvailableDates`.
+                "_DateAndLength.cshtml:DurationMinutes",
             ],
             masked);
 
@@ -304,6 +310,12 @@ public class ModelPropertyTests
         // package — 11 conditionals — and the one ⑩-1's defect was in. If the
         // extraction silently stops finding references, this fails; without it, a
         // pattern that matched nothing would make the whole rule vacuous.
+        //
+        // MinDate and MaxDate left this list when the date control moved into
+        // `_AvailableDates` — they bound the "another date" field, which went with it. That
+        // this guard noticed is the point of it: a snapshot that had quietly kept naming two
+        // members the view no longer touches would still have passed while measuring less.
+        // SelectedDate went the same way: it was the date input's `value`.
         Assert.Equal(
             [
                 "ChosenResourceId",
@@ -313,13 +325,10 @@ public class ModelPropertyTests
                 "FlowToken",
                 "LengthIsFixed",
                 "LengthIsTheProblem",
-                "MaxDate",
-                "MinDate",
                 "OffersResourceChoice",
                 "ResourceChoiceCount",
                 "ResourceChoiceWasReset",
                 "ResourceChoices",
-                "SelectedDate",
             ],
             ModelReferences.Of(ViewInventory.DateAndLength));
     }
