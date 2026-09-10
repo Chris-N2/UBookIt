@@ -503,3 +503,5 @@ ref/
 # installed one too would put a second, silently-diverging copy beside it.
 src/UBookIt.TestSite/Views/uBookItBookingPage.cshtml
 
+# The dev site writes mail here when a pickup directory is configured.
+src/UBookIt.TestSite/App_Data/

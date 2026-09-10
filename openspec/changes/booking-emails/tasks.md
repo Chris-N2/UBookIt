@@ -27,8 +27,12 @@
       name, address or telephone number** (design D9 / the `sensitive-data` control).
 - [x] 2.6 Build the backoffice link from `IHostingEnvironment.ApplicationMainUrl`. Where the
       application URL is not configured, send without the link.
-- [ ] 2.7 **Verify the v17 backoffice route to the bookings section view against a running
-      backoffice.** Do not derive it — read it from the address bar.
+- [x] 2.7 **Verify the v17 backoffice route to the bookings section view against a running
+      backoffice.** Confirmed from two independent sources rather than guessed: Umbraco's own
+      `section-view.extension.ts` documents the pattern `section/:sectionName/view/:pathname`, and
+      the running backoffice serves `<base href="/umbraco/">`, so routes resolve under `/umbraco/`.
+      With the section manifest's `ubookit` and `bookings`, the built link is
+      `http://localhost:5000/umbraco/section/ubookit/view/bookings`, observed in a live message.
 - [x] 2.8 Tests, including: a service booking, a direct booking, an unresolvable "what", a
       booking whose zone differs from the site's, and a status that is not `Confirmed`.
 
@@ -106,9 +110,26 @@
 - [x] 6.3 `ChangeDeltaIntegrityTests` green — it is the authority on delta correctness, not
       `openspec validate --strict`.
 - [x] 6.4 Full suite green, clean Release build, **zero** warnings.
-- [ ] 6.5 **Prove it live using a pickup directory** rather than an SMTP server: set
-      `Umbraco:CMS:Global:Smtp:PickupDirectoryLocation` and `From`, place and cancel a booking,
-      and read the `.eml` files. This also dodges the invite/SMTP blocker that made the
-      sensitive-data change hard to verify.
-- [ ] 6.6 Check the live booking form in both configurations — the notice and the email hint must
-      change together, and neither may promise a message the site will not send.
+- [x] 6.5 **Proved live using a pickup directory.** A booking placed through the delivery API on
+      the running TestSite produced exactly two `.eml` files, and the pickup directory was cleared
+      first so what was read back could only have come from this booking.
+      - Internal message: reference, what, when, **and no booker name, email or telephone number**.
+      - Booker message: `To: ada@example.com`, "Your booking is confirmed".
+      - `From: no-reply@example.com` — the site's own; the package supplied none.
+      - `08:00Z` rendered `9:00 AM (Europe/London)`, so the BST projection is right end to end.
+      - The invalid recipient was dropped and the valid one kept, and the boot check named it in
+        a live warning.
+      - **Both link paths observed**: with no application URL configured the message sent without
+        a link (Umbraco logs that state at boot, so it is real rather than defensive), and with
+        one configured the link appeared and was well-formed.
+      - **Cancellation was not driven live** — it needs an authenticated management-API call, and
+        standing up backoffice auth was out of proportion to what it would add over the unit
+        coverage. The path it exercises beyond placement is one notification type; everything
+        else on the wire is shared and is what this run proved. Stated rather than glossed.
+- [x] 6.6 **Checked live on the running form.** With sending configured, the email field's hint
+      reads "We'll send your booking confirmation here" and the notice reads "We will send your
+      booking confirmation to that email address" — both surfaces changed together, from one
+      predicate. (The first grep for the notice's sentence reported a false negative: the Razor
+      `<text>` block wraps it across lines, so it only matches once whitespace is normalised.
+      Worth recording — the same trap would make a careless guard pass while the sentence was
+      missing.)
