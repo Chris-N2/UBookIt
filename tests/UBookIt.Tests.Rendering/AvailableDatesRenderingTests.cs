@@ -63,16 +63,37 @@ public class AvailableDatesRenderingTests
         // Left empty it submits an empty value, which falls through to the list. Nothing else in
         // the suite could see this: the freeze spans two requests, and every single-request
         // assertion passes either way.
-        var document = await RenderAsync();
+        // THE GUARANTEE IS ABOUT THE PARAMETER, NOT ABOUT ONE ELEMENT — and the first version of
+        // this guarded an element. It used QuerySelector, which returns the FIRST match, so QA
+        // broke it by adding a hidden input carrying the same name AFTER the date field: a
+        // plausible "preserve the typed date across steps" change that reinstates the permanent
+        // freeze, and all 2219 tests passed. Placed before the field the same mutation was
+        // caught — meaning the guard had been passing on document order rather than on anything
+        // it asserted.
+        //
+        // So: EVERY element submitting that parameter, in EVERY state, must carry no value.
+        foreach (var (state, document) in new[]
+        {
+            ("default", await RenderAsync()),
+            ("empty window", await RenderAsync(dates: [], longestInWindow: 30)),
+            ("outside the window", await RenderAsync(
+                dates: [new AvailableDate(Day.AddDays(1), false)], selected: Day.AddDays(40))),
+        })
+        {
+            var submitters = document.QuerySelectorAll($"[name='{BookingKeys.OtherDateQuery}']");
 
-        var field = document.QuerySelector($"input[name='{BookingKeys.OtherDateQuery}']");
+            Assert.NotEmpty(submitters);
 
-        Assert.NotNull(field);
-        Assert.False(
-            field!.HasAttribute("value"),
-            "The 'another date' field carries a value attribute. It must not: the typed date "
-            + "beats the list, so a repopulated field resubmits a stale date on every request "
-            + "and the list of available dates stops working entirely.");
+            foreach (var element in submitters)
+            {
+                Assert.False(
+                    element.HasAttribute("value"),
+                    $"In state '{state}', a <{element.LocalName}> submitting "
+                    + $"'{BookingKeys.OtherDateQuery}' carries a value attribute. Nothing may: the "
+                    + "typed date beats the list, so any element resubmitting a stale one makes "
+                    + "every later click on the list do nothing, for ever.");
+            }
+        }
     }
 
     [Fact]

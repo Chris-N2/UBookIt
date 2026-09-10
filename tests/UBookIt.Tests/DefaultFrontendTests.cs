@@ -191,7 +191,7 @@ public class DefaultFrontendTests
         var today = BookingFormBuilder.TodayIn(TestData.Now, TestData.London);
 
         var model = BookingFormBuilder.Build(
-            room, Date, today, Starts(("09:00", 60), ("09:30", 30)),
+            room, Date, today, Starts(("09:00", 60), ("09:30", 30)), Starts(("09:00", 60), ("09:30", 30)),
             TimeSpan.FromMinutes(30), TestData.London, NoRetention, WindowDays);
 
         Assert.True(model.HasTimes);
@@ -207,7 +207,7 @@ public class DefaultFrontendTests
         var room = TestData.Room();
         var today = BookingFormBuilder.TodayIn(TestData.Now, TestData.London);
 
-        var model = BookingFormBuilder.Build(room, Date, today, [], TimeSpan.FromMinutes(30), TestData.London, NoRetention, WindowDays);
+        var model = BookingFormBuilder.Build(room, Date, today, [], [], TimeSpan.FromMinutes(30), TestData.London, NoRetention, WindowDays);
 
         Assert.False(model.HasTimes);
         Assert.Empty(model.Times);
@@ -338,7 +338,7 @@ public class DefaultFrontendTests
         var today = BookingFormBuilder.TodayIn(TestData.Now, TestData.London);
 
         var model = BookingFormBuilder.Build(
-            room, Date, today, Starts(("09:00", 120), ("11:00", 30)),
+            room, Date, today, Starts(("09:00", 120), ("11:00", 30)), Starts(("09:00", 120), ("11:00", 30)),
             TimeSpan.FromMinutes(60), TestData.London, NoRetention, WindowDays);
 
         var only = Assert.Single(model.Times);
@@ -354,7 +354,7 @@ public class DefaultFrontendTests
         var today = BookingFormBuilder.TodayIn(TestData.Now, TestData.London);
 
         var model = BookingFormBuilder.Build(
-            room, Date, today, Starts(("09:00", 90), ("11:00", 30)),
+            room, Date, today, Starts(("09:00", 90), ("11:00", 30)), Starts(("09:00", 90), ("11:00", 30)),
             TimeSpan.FromMinutes(180), TestData.London, NoRetention, WindowDays);
 
         Assert.False(model.HasTimes);
@@ -381,7 +381,7 @@ public class DefaultFrontendTests
         };
 
         var model = BookingFormBuilder.Build(
-            room, Date, today, [], BookingFormBuilder.ResolveDisplayDuration(room, failed.DurationMinutes),
+            room, Date, today, [], [], BookingFormBuilder.ResolveDisplayDuration(room, failed.DurationMinutes),
             TestData.London, NoRetention, WindowDays, failed);
 
         // The chosen length survives a failed submission alongside the details.

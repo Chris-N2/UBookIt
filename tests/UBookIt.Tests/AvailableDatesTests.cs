@@ -200,31 +200,13 @@ public class AvailableDatesTests
     // The differential property — the load-bearing claim of the change
     // ---------------------------------------------------------------------
 
-    [Fact]
-    public void Filtering_the_window_to_one_date_yields_exactly_that_date_s_starts()
-    {
-        // WIDENING THE READ MUST CHANGE HOW MUCH IS ASKED FOR AND NOTHING ABOUT WHAT IS
-        // ANSWERED. Every start the flow used to offer must still be offered and none added.
-        //
-        // A test asserting only "some times render" would pass while the filter silently
-        // dropped one — which is the failure mode of a change that replaces a narrow read with
-        // a wide one and then reduces it again.
-        var day = new DateOnly(2026, 9, 11);
-
-        var window = new List<BookableStart>
-        {
-            new(DateTimeOffset.Parse("2026-09-10T09:00:00Z", null, System.Globalization.DateTimeStyles.RoundtripKind), TimeSpan.FromMinutes(30), TimeSpan.FromHours(2)),
-            new(DateTimeOffset.Parse("2026-09-11T09:00:00Z", null, System.Globalization.DateTimeStyles.RoundtripKind), TimeSpan.FromMinutes(30), TimeSpan.FromHours(2)),
-            new(DateTimeOffset.Parse("2026-09-11T14:00:00Z", null, System.Globalization.DateTimeStyles.RoundtripKind), TimeSpan.FromMinutes(30), TimeSpan.FromHours(1)),
-            new(DateTimeOffset.Parse("2026-09-12T09:00:00Z", null, System.Globalization.DateTimeStyles.RoundtripKind), TimeSpan.FromMinutes(30), TimeSpan.FromHours(2)),
-        };
-
-        var onDay = BookingFormBuilder.OnDate(window, TimeZoneInfo.Utc, day);
-
-        Assert.Equal(
-            window.Where(start => start.StartUtc.UtcDateTime.Date == day.ToDateTime(TimeOnly.MinValue)),
-            onDay);
-    }
+    // The differential itself — window read versus single-day read, both genuinely issued —
+    // lives in AvailableDatesFlowTests. It was here, comparing a hand-built list against the
+    // same predicate re-typed over that same list, and calling nothing. A guard watching a
+    // reconstruction of the thing it guards watches nothing; QA said so and was right.
+    //
+    // What remains below is about the FILTER's own semantics, which is a different and smaller
+    // claim, and is honestly testable without a read.
 
     [Fact]
     public void The_day_filter_uses_the_site_zone()

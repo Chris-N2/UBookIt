@@ -73,13 +73,16 @@ narrowed by the visitor's choice of who where one has been made.
 
 ### Requirement: The listed window is derived from the site's own bounds, never fixed
 
-The window of dates offered SHALL be derived from the subject's **lead time**, its **horizon**,
-and the site's **maximum query range**, and SHALL NOT be a fixed number of days the code assumes
-it may read.
+The window of dates offered SHALL be derived from the subject's **horizon** and the site's
+**maximum query range**, and SHALL NOT be a fixed number of days the code assumes it may read.
 
-- No date before the lead time allows SHALL be listed. Offering a date the domain will refuse is
-  the guessing game this requirement exists to end, reintroduced one step earlier.
 - No date beyond the horizon SHALL be listed.
+- **No date SHALL be listed that the lead time leaves nothing bookable on.** This is a guarantee
+  about the **list**, not about the window's bounds, and the distinction is a correction: a lead
+  time is a duration rather than a number of days, so a two-hour one does not make today
+  unbookable — it makes this morning unbookable. Shifting the window's start by it would skip
+  whole days a site is still willing to sell. What is required is that a date with no remaining
+  bookable start does not appear, which follows from listing only dates that have one.
 - **The window SHALL NOT exceed the configured maximum query range.** A site may set that
   guardrail below the package's preferred window, and a read wider than it is **refused** — so a
   fixed window would not merely list too much, it would fail the availability read on every
@@ -99,8 +102,8 @@ somebody tightens one.
 - **THEN** no date beyond the horizon is listed
 
 #### Scenario: Lead time is respected in the list
-- **WHEN** a resource has a lead time
-- **THEN** no date earlier than the lead time allows is listed, whatever availability those days hold
+- **WHEN** a resource's lead time leaves no bookable start on a date within the window
+- **THEN** that date is not listed, and dates the lead time still leaves bookable are
 
 ### Requirement: A listed date and the times for that date agree
 
@@ -111,9 +114,16 @@ reading of availability**, so that the two cannot disagree about the same day.
 read must change how much is asked for and nothing about what is answered; a start that would
 have been offered before SHALL be offered still, and none SHALL be added.
 
-Two separate reads would make a page that lists a date as bookable while showing no times for it
-an ordinary outcome of a booking landing between them, rather than a defect. One reading cannot
-contradict itself.
+Two reads **of a range containing the same date** would make a page that lists a date as bookable
+while showing no times for it an ordinary outcome of a booking landing between them, rather than a
+defect. One reading cannot contradict itself.
+
+**Where the chosen date lies outside the window, the step MAY read it separately** — and SHALL
+then read ranges that do not overlap. The hazard above is one date being answered twice; disjoint
+ranges answer each date once, so there is nothing for them to disagree about. This is not an
+optimisation but a necessity: a window and an arbitrary far date cannot both fit inside the
+maximum query range, so a single read spanning them is refused, and a step that attempted one
+would offer no times at all for the dates the window exists alongside.
 
 #### Scenario: The times are unchanged by the wider read
 - **WHEN** the start times for a date are produced from the window and from a read of that date alone, for the same subject and length
@@ -122,6 +132,10 @@ contradict itself.
 #### Scenario: A listed date has times
 - **WHEN** a visitor selects a date the step listed as available, without the stored state changing
 - **THEN** start times are shown for it
+
+#### Scenario: Every date the subject offers can be reached
+- **WHEN** a visitor chooses any date within the subject's horizon, at any configured maximum query range
+- **THEN** that date's start times are shown, and the read the step issues is within that maximum
 
 ### Requirement: A date beyond the listed window is still reachable
 

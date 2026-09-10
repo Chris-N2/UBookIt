@@ -115,6 +115,7 @@ public static class BookingFormBuilder
         DateOnly selectedDate,
         DateOnly today,
         IReadOnlyList<BookableStart> windowStarts,
+        IReadOnlyList<BookableStart> dayStarts,
         TimeSpan duration,
         TimeZoneInfo zone,
         PrivacyNoticeView privacyNotice,
@@ -124,9 +125,11 @@ public static class BookingFormBuilder
     {
         var constraints = resource.Availability.Constraints;
 
-        // Everything below comes from ONE reading of availability: the day's times and longest
-        // run by filtering it, the date list by grouping it.
-        var starts = OnDate(windowStarts, zone, selectedDate);
+        // The day's starts are the WINDOW filtered, whenever the selected date is in the
+        // window — the caller does that filtering so the "one read" property is visible where the
+        // reads happen. Where the selected date is outside the window they come from a second,
+        // DISJOINT read; see the flows for why that is safe and why one read cannot serve both.
+        var starts = dayStarts;
 
         var dates = AvailableDateProjection.Dates(
             windowStarts.Select(start => (start.StartUtc, start.Admits(duration))),

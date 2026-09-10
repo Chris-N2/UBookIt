@@ -20,7 +20,11 @@ namespace UBookIt.Web.Rendering;
 /// that ignored the guardrail would look perfectly correct until somebody tightened one.
 /// </para>
 /// <para>
-/// <b>Lead time needs no term here, and that is worth stating so nobody adds one.</b> Lead time is
+/// <b>Lead time needs no term here, and that is worth stating so nobody adds one.</b> The
+/// requirement said for a while that the window was derived from it; that was wrong, and it
+/// now says what is actually guaranteed — that a date the lead time leaves nothing bookable
+/// on is not LISTED, which is a property of the list rather than of the window's bounds.
+/// Lead time is
 /// a <c>TimeSpan</c>, not a number of days: a two-hour lead time does not make today unbookable,
 /// it makes this morning unbookable. The projection already drops starts inside it, so a date with
 /// nothing left simply has no admitting start and is not listed. Shifting the window's start by a

@@ -262,6 +262,7 @@ public static class ServiceBookingFormBuilder
         DateOnly selectedDate,
         DateOnly today,
         IReadOnlyList<ServiceBookableStart> windowStarts,
+        IReadOnlyList<ServiceBookableStart> dayStarts,
         int durationMinutes,
         TimeZoneInfo zone,
         PrivacyNoticeView privacyNotice,
@@ -272,9 +273,9 @@ public static class ServiceBookingFormBuilder
     {
         var duration = TimeSpan.FromMinutes(durationMinutes);
 
-        // One reading of availability: the day's times and longest run by filtering it, the date
-        // list by grouping it. See BookingFormBuilder.OnDate for why two reads would be wrong.
-        var starts = OnDate(windowStarts, zone, selectedDate);
+        // See BookingFormBuilder.Build: the day's starts are the window filtered when the
+        // selected date is in it, and a disjoint second read when it is not.
+        var starts = dayStarts;
 
         var dates = AvailableDateProjection.Dates(
             windowStarts.Select(start => (start.StartUtc, start.Admits(duration))),

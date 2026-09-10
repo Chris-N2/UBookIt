@@ -82,30 +82,55 @@ public sealed class ResourceBookingFlow(
         // One query answers every length: the form filters these starts for the
         // chosen length and reads the longest available off the same result, so
         // an unavailable length can explain itself instead of rendering blank.
-        // THE WINDOW, and it is derived rather than assumed. `MaxQueryRangeDays` is a guardrail
-        // the availability read ENFORCES: a span wider than it is refused outright, so a fixed
-        // 30-day read would fail on every render for a site that tightened it — no times, no
-        // dates, no flow. Clamped here, once, from the site's own bounds.
+        // THE WINDOW, derived rather than assumed. `MaxQueryRangeDays` is a guardrail the
+        // availability read ENFORCES: a span wider than it is refused outright.
         //
-        // The selected date may lie outside this window (a visitor typed a date further ahead),
-        // so the read covers the window AND that date. Reading them separately would be two
-        // readings of availability, which is the one thing this must not be.
+        // TWO READS WHEN — AND ONLY WHEN — THE SELECTED DATE LIES OUTSIDE THE WINDOW, and the
+        // reason it is safe is that they cannot overlap.
+        //
+        // This first widened one read to span both, which was a regression QA measured: a
+        // guardrail of 31 cannot contain a 30-day window AND a date 89 days out, so the read was
+        // refused and a visitor typing any date more than 30 days ahead got "no times available"
+        // for an empty diary — on a stock install, using the very field that exists to reach
+        // those dates. A single contiguous read simply cannot cover both; something had to give.
+        //
+        // D1 forbids two reads because "the day's times would come from one query and the list
+        // from another, so a booking landing between them could produce a page whose list says
+        // Tuesday is free and whose times say it is not". That reasoning is about ONE DAY
+        // appearing in both. Here the ranges are disjoint by construction — the second read is
+        // for a date the window does not contain — so no day is in both and there is nothing
+        // for them to disagree about. Inside the window, where the risk is real, it stays one
+        // read exactly as D1 requires.
         var (windowFrom, windowTo) = AvailableDateWindow.Compute(
             today, resource.Availability.Constraints.HorizonDays, settings.MaxQueryRangeDays);
 
-        var readFrom = selectedDate < windowFrom ? selectedDate : windowFrom;
-        var readTo = selectedDate > windowTo ? selectedDate : windowTo;
         var windowDays = windowTo.DayNumber - windowFrom.DayNumber + 1;
+        var selectedIsInWindow = selectedDate >= windowFrom && selectedDate <= windowTo;
 
-        var startsResult = await availability
-            .GetBookableStartsAsync(resourceId, readFrom, readTo, cancellationToken)
+        var windowResult = await availability
+            .GetBookableStartsAsync(resourceId, windowFrom, windowTo, cancellationToken)
             .ConfigureAwait(false);
 
-        IReadOnlyList<BookableStart> starts = startsResult.Succeeded ? startsResult.Value : [];
+        IReadOnlyList<BookableStart> windowStarts = windowResult.Succeeded ? windowResult.Value : [];
+
+        IReadOnlyList<BookableStart> dayStarts;
+
+        if (selectedIsInWindow)
+        {
+            dayStarts = BookingFormBuilder.OnDate(windowStarts, zone, selectedDate);
+        }
+        else
+        {
+            var dayResult = await availability
+                .GetBookableStartsAsync(resourceId, selectedDate, selectedDate, cancellationToken)
+                .ConfigureAwait(false);
+
+            dayStarts = dayResult.Succeeded ? dayResult.Value : [];
+        }
 
         return new ResourceFlowOutcome(
             BookingFormBuilder.Build(
-                resource, selectedDate, today, starts, duration, zone,
+                resource, selectedDate, today, windowStarts, dayStarts, duration, zone,
                 PrivacyNoticeView.From(settings), windowDays, failed, input.FlowToken),
             null);
     }
