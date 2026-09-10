@@ -249,6 +249,14 @@ public class BookingEmailTests
     /// provider captures everything, and every logger every participant is handed comes from it —
     /// including a participant added later, so long as it is resolved rather than newed.
     /// </para>
+    /// <para>
+    /// <b>Where the boundary actually falls.</b> "Resolved rather than newed" is a real
+    /// precondition and nothing enforces it. The concrete instance today is
+    /// <see cref="BackofficeBookingLink"/>: it is a static class called from the handler, so it can
+    /// never take a logger from the container, and a diagnostic added there — the obvious one being
+    /// "no application URL configured" — would be invisible here. It logs nothing today. A better
+    /// guard cannot fix that; a reader knowing where the edge is can.
+    /// </para>
     /// </remarks>
     [Theory]
     [InlineData(false, false)]
@@ -279,10 +287,28 @@ public class BookingEmailTests
 
         foreach (var entry in logs.Entries)
         {
-            Assert.DoesNotContain("Ada", entry.Message, StringComparison.OrdinalIgnoreCase);
-            Assert.DoesNotContain("Lovelace", entry.Message, StringComparison.OrdinalIgnoreCase);
-            Assert.DoesNotContain("ada@example.com", entry.Message, StringComparison.OrdinalIgnoreCase);
-            Assert.DoesNotContain("07700", entry.Message, StringComparison.Ordinal);
+            // THE BOOKING ID IS REMOVED FROM THE HAYSTACK BEFORE MATCHING, and that is a
+            // correctness fix rather than a convenience.
+            //
+            // "Ada" is three hex digits, so it occurs in a random 32-hex-digit GUID roughly 0.7%
+            // of the time — and the anti-vacuity assertion below REQUIRES the booking id to be in
+            // these entries. So the guard reported a PII leak in a booking id, at random, across
+            // four theory rows. "07700" has the same shape.
+            //
+            // The weaker fix is to match "Ada Lovelace" instead; it was rejected because a log
+            // line carrying only a first name is a real leak this must still catch. Redacting the
+            // one token that is legitimately present keeps the needles granular AND deterministic.
+            //
+            // This is not hypothetical: EraseBookerEndpointTests has the same collision and has
+            // been failing intermittently in this repository for some time, misdiagnosed once as a
+            // build race. See the deferred obligations note.
+            var haystack = (entry.Message + " " + entry.Exception)
+                .Replace(booking.Id.ToString(), "{booking-id}", StringComparison.Ordinal);
+
+            Assert.DoesNotContain("Ada", haystack, StringComparison.OrdinalIgnoreCase);
+            Assert.DoesNotContain("Lovelace", haystack, StringComparison.OrdinalIgnoreCase);
+            Assert.DoesNotContain("ada@example.com", haystack, StringComparison.OrdinalIgnoreCase);
+            Assert.DoesNotContain("07700", haystack, StringComparison.Ordinal);
         }
 
         // Anti-vacuity: the loop passes trivially against a log saying nothing about this booking,
@@ -719,18 +745,53 @@ public class BookingEmailTests
 
 internal sealed class CapturingLoggerProvider : ILoggerProvider
 {
-    private readonly List<(string Category, string Message)> _entries = [];
+    private readonly Lock _gate = new();
+
+    private readonly List<(string Category, string Message, string? Exception)> _entries = [];
 
     private readonly List<string> _categories = [];
 
-    public IReadOnlyList<(string Category, string Message)> Entries => _entries;
+    /// <summary>
+    /// Every captured line, with the exception it carried rendered separately.
+    /// </summary>
+    /// <remarks>
+    /// <b>The exception is captured because the default formatter drops it.</b>
+    /// <c>formatter(state, exception)</c> returns the formatted message template ONLY — while
+    /// every real provider (Serilog, console, Umbraco's own) renders the exception alongside it.
+    /// A guard reading only the formatter's output therefore has "message templates" for its
+    /// extension while claiming "no report of a sending failure contains a booker's details", and
+    /// QA moved a booker's address into the exception of a line whose template it had just fixed,
+    /// with the whole suite green.
+    /// </remarks>
+    public IReadOnlyList<(string Category, string Message, string? Exception)> Entries
+    {
+        get
+        {
+            lock (_gate)
+            {
+                return [.. _entries];
+            }
+        }
+    }
 
     /// <summary>Every category a logger was asked for, whether or not it wrote anything.</summary>
-    public IReadOnlyList<string> Categories => _categories;
+    public IReadOnlyList<string> Categories
+    {
+        get
+        {
+            lock (_gate)
+            {
+                return [.. _categories];
+            }
+        }
+    }
 
     public ILogger CreateLogger(string categoryName)
     {
-        _categories.Add(categoryName);
+        lock (_gate)
+        {
+            _categories.Add(categoryName);
+        }
 
         return new CapturingLogger(this, categoryName);
     }
@@ -748,7 +809,15 @@ internal sealed class CapturingLoggerProvider : ILoggerProvider
         public void Log<TState>(
             LogLevel logLevel, EventId eventId, TState state, Exception? exception,
             Func<TState, Exception?, string> formatter)
-            => provider._entries.Add((category, formatter(state, exception)));
+        {
+            // Locked because a capture that silently drops entries is the one thing a PII guard
+            // cannot afford. Nothing on the send path logs from parallel continuations today; this
+            // costs nothing and removes the day it does.
+            lock (provider._gate)
+            {
+                provider._entries.Add((category, formatter(state, exception), exception?.ToString()));
+            }
+        }
     }
 }
 

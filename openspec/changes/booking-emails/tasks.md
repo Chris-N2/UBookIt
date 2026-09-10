@@ -110,6 +110,22 @@
 - [x] 6.3 `ChangeDeltaIntegrityTests` green — it is the authority on delta correctness, not
       `openspec validate --strict`.
 - [x] 6.4 Full suite green, clean Release build, **zero** warnings.
+
+      **A correction to this change's own record.** One full-suite run during apply showed a
+      single failure that did not print its name and did not reproduce; I hypothesised a packaging
+      test racing the Release build. **That was wrong, and QA identified the real cause in round
+      3**: `EraseBookerEndpointTests.The_response_echoes_nothing_that_was_erased` asserts
+      `DoesNotContain("Ada", ...)` against a payload containing a random booking id. `A` and `D`
+      are hex digits, so "ada" appears in a 32-hex-digit GUID roughly 0.7% of the time and the
+      test reports a PII leak in an identifier that is not personal data. It is **pre-existing and
+      outside this change**, and it is recorded as a deferred obligation rather than fixed here —
+      but the wrong diagnosis is removed, because "intermittent, probably environmental" is
+      exactly how a guard like this gets re-run until green and waved through, which is what
+      happened to it once already.
+
+      The same collision existed in this change's own new PII guard and is fixed there, by
+      redacting the booking id from the haystack rather than by weakening the needle to a full
+      name — a log line carrying only a first name is a real leak the guard must still catch.
 - [x] 6.5 **Proved live using a pickup directory.** A booking placed through the delivery API on
       the running TestSite produced exactly two `.eml` files, and the pickup directory was cleared
       first so what was read back could only have come from this booking.
