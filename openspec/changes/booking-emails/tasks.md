@@ -15,38 +15,38 @@
 
 ## 2. Composing a message
 
-- [ ] 2.1 Add a message composer in `UBookIt.Persistence` (design D1 — **not** `UBookIt.Web`; a
+- [x] 2.1 Add a message composer in `UBookIt.Persistence` (design D1 — **not** `UBookIt.Web`; a
       headless site must get emails without referencing the Razor front end).
-- [ ] 2.2 Booker message: reference via `Reference.Display`, start projected into
+- [x] 2.2 Booker message: reference via `Reference.Display`, start projected into
       `Interval.TimeZoneId` — the booking's own zone, not the site's current setting — and the
       "what" line.
-- [ ] 2.3 Derive the wording from `Booking.Status` rather than assuming `Confirmed` (design D7).
-- [ ] 2.4 Resolve the "what" line: `Service.DisplayName` where present, otherwise one
+- [x] 2.3 Derive the wording from `Booking.Status` rather than assuming `Confirmed` (design D7).
+- [x] 2.4 Resolve the "what" line: `Service.DisplayName` where present, otherwise one
       `IResourceStore` read. Where neither resolves, **omit the line and still send**.
-- [ ] 2.5 Internal message: reference, time, what was booked, and a backoffice link. **No booker
+- [x] 2.5 Internal message: reference, time, what was booked, and a backoffice link. **No booker
       name, address or telephone number** (design D9 / the `sensitive-data` control).
-- [ ] 2.6 Build the backoffice link from `IHostingEnvironment.ApplicationMainUrl`. Where the
+- [x] 2.6 Build the backoffice link from `IHostingEnvironment.ApplicationMainUrl`. Where the
       application URL is not configured, send without the link.
 - [ ] 2.7 **Verify the v17 backoffice route to the bookings section view against a running
       backoffice.** Do not derive it — read it from the address bar.
-- [ ] 2.8 Tests, including: a service booking, a direct booking, an unresolvable "what", a
+- [x] 2.8 Tests, including: a service booking, a direct booking, an unresolvable "what", a
       booking whose zone differs from the site's, and a status that is not `Confirmed`.
 
 ## 3. Sending
 
-- [ ] 3.1 Handlers for `BookingPlacedNotification` and `BookingCancelledNotification`, registered
+- [x] 3.1 Handlers for `BookingPlacedNotification` and `BookingCancelledNotification`, registered
       from the existing composer.
-- [ ] 3.2 Gate each direction on its own condition (design D2). Ask
+- [x] 3.2 Gate each direction on its own condition (design D2). Ask
       `CanSendRequiredEmail()` **per message**, never cached.
-- [ ] 3.3 Do **not** catch a throwing `CanSendRequiredEmail()` — let it reach
+- [x] 3.3 Do **not** catch a throwing `CanSendRequiredEmail()` — let it reach
       `UmbracoBookingObserver`, which swallows it away from the booker and logs it. Catching would
       convert a misconfiguration into permanent silence.
-- [ ] 3.4 An erased booker is sent nothing; internal recipients are still told. Establish absence
+- [x] 3.4 An erased booker is sent nothing; internal recipients are still told. Establish absence
       by `Booker.Contact is null`, never by inspecting contents.
-- [ ] 3.5 `From: null` (design D3), `IsBodyHtml: false` (design D10), `enableNotification: true`
+- [x] 3.5 `From: null` (design D3), `IsBodyHtml: false` (design D10), `enableNotification: true`
       (design D4), and a `emailType` string that identifies the package's booking mail.
-- [ ] 3.6 No booker name, address or telephone number in any log line, including failure paths.
-- [ ] 3.7 Tests: both directions independently; neither; erased booker; a failing send leaving the
+- [x] 3.6 No booker name, address or telephone number in any log line, including failure paths.
+- [x] 3.7 Tests: both directions independently; neither; erased booker; a failing send leaving the
       booking untouched and unreported; nothing retried.
 - [ ] 3.8 **Mutation-check the PII-in-logs guard and the erased-booker guard one at a time** — a
       pair checked together can carry a passenger that could never have failed.

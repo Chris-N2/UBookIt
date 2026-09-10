@@ -93,6 +93,14 @@ public sealed class UBookItPersistenceComposer : IComposer
         // correction existed.
         builder.AddNotificationHandler<UmbracoApplicationStartedNotification, UBookItNotificationBootCheck>();
 
+        // Registered UNCONDITIONALLY for the same reason as the retention job and the boot check:
+        // the handler reads the settings itself and returns immediately when a site has asked for
+        // nothing. Registering it only when sending is configured would make the setting's effect
+        // depend on the state of configuration at startup in a second, invisible way.
+        builder.Services.AddScoped<BookingMessageComposer>();
+        builder.AddNotificationAsyncHandler<BookingPlacedNotification, BookingEmailHandler>();
+        builder.AddNotificationAsyncHandler<BookingCancelledNotification, BookingEmailHandler>();
+
         builder.AddNotificationAsyncHandler<UmbracoApplicationStartedNotification, RunUBookItMigrations>();
     }
 

@@ -110,6 +110,30 @@ And it is a *second* query on a page that currently only lists times.
 
 Wanted, and currently on no version. Recorded so they are decisions rather than omissions.
 
+- **Approval, and with it decline — wanted in the first release or very early after it (Chris,
+  2026-09-10).** *"Not everybody will want auto-confirm, although some will."* Shipping a booking
+  system that can only ever accept instantly is a strange constraint to launch with.
+
+  **The shape is an `AutoConfirm` option defaulting to ON**, which makes the whole thing additive:
+  the default is exactly today's behaviour, so it breaks nobody and is allowed by the release
+  policy whenever it lands.
+
+  **Most of the domain is already built and unreachable.** `Booking.Confirm()` and
+  `Booking.Decline()` exist, are covered by `StatusMachineTests`, and both transition **from
+  `Requested`** — but nothing produces `Requested`, because `BookingService` hard-codes
+  `Confirmed` at placement. The status machine is done; every route into it is missing. What the
+  change actually needs: the setting, placement branching on it, service operations, management
+  API endpoints, a backoffice affordance, and a third message.
+
+  **It pairs with 0.5.0 and 0.7.0 in both directions.** A decline the customer is never told about
+  is useless, so it wants emails first; and 0.7.0's "who is responsible for what" is about who
+  gets emailed, which is the same question as who needs to *act* on a pending booking. So the
+  natural slot is immediately after 0.5.0. **Version not yet chosen.**
+
+  *0.5.0 already anticipates it: the confirmation email's wording is derived from
+  `Booking.Status` rather than hard-coded, precisely so that adding `Requested` as a reachable
+  state cannot silently turn "your booking is confirmed" into a lie in a customer's inbox.*
+
 - **Decline a booking.** `BookingStatus.Declined` exists in the domain with **no code path that
   produces it** — verified. Cheap, and it pairs with 0.5.0: confirm and cancel both get an
   email, and decline is the third thing a customer needs telling about.
