@@ -132,16 +132,29 @@ public class PrivacyNoticeSourceTests
     /// so the claim was unproven in both halves: that the page survives, and that the sentence
     /// errs towards promising nothing rather than towards promising wrongly.
     /// </summary>
-    [Fact]
-    public async Task A_host_that_cannot_be_asked_does_not_break_the_form_and_promises_nothing()
+    /// <remarks>
+    /// <b>Theory over the exception TYPE, because the claim is about any refusal.</b> QA narrowed
+    /// the production <c>catch (Exception)</c> to <c>catch (NotImplementedException)</c> and the
+    /// whole suite stayed green — the fixture threw only the type Umbraco's own default sender
+    /// throws, so the guard proved the catch handled *that*, while the guarantee is "a host that
+    /// refuses to answer". A decorated or custom <c>IEmailSender</c> throwing anything else would
+    /// have put an unhandled exception on the public booking page, which is the single outcome
+    /// this type exists to prevent.
+    /// </remarks>
+    [Theory]
+    [InlineData(typeof(NotImplementedException))]
+    [InlineData(typeof(InvalidOperationException))]
+    [InlineData(typeof(TimeoutException))]
+    public async Task A_host_that_cannot_be_asked_does_not_break_the_form_and_promises_nothing(
+        Type exceptionType)
     {
         var settings = TestData.Settings with
         {
             Notifications = new BookingNotificationSettings { SendBookerEmails = true },
         };
 
-        var resourceNotice = await ResourceNoticeAsync(settings, new ThrowingEmailSender());
-        var serviceNotice = await ServiceNoticeAsync(settings, new ThrowingEmailSender());
+        var resourceNotice = await ResourceNoticeAsync(settings, new ThrowingEmailSender(exceptionType));
+        var serviceNotice = await ServiceNoticeAsync(settings, new ThrowingEmailSender(exceptionType));
 
         Assert.False(resourceNotice.SendsBookerEmail);
         Assert.False(serviceNotice.SendsBookerEmail);
@@ -191,11 +204,15 @@ public class PrivacyNoticeSourceTests
         return outcome.Form!.PrivacyNotice;
     }
 
-    /// <summary>Stands in for Umbraco's default sender, which throws from every member.</summary>
-    private sealed class ThrowingEmailSender : IEmailSender
+    /// <summary>
+    /// A host that refuses to answer. The exception type is a parameter on purpose: Umbraco's own
+    /// default sender throws <see cref="NotImplementedException"/>, but a site may decorate or
+    /// replace <c>IEmailSender</c> with anything, and "refuses to answer" is the guarantee.
+    /// </summary>
+    private sealed class ThrowingEmailSender(Type exceptionType) : IEmailSender
     {
         public bool CanSendRequiredEmail()
-            => throw new NotImplementedException("To send an Email ensure IEmailSender is implemented");
+            => throw (Exception)Activator.CreateInstance(exceptionType)!;
 
         public Task SendAsync(EmailMessage message, string emailType) => Task.CompletedTask;
 

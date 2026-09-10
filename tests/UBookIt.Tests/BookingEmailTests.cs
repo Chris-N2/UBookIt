@@ -8,6 +8,8 @@ using UBookIt.Tests.Support;
 using Umbraco.Cms.Core.Hosting;
 using Umbraco.Cms.Core.Mail;
 using Umbraco.Cms.Core.Models.Email;
+using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Logging;
 
 namespace UBookIt.Tests;
 
@@ -230,28 +232,38 @@ public class BookingEmailTests
 
     /// <summary>
     /// A failure to send is not a reason to write into a log the very details the rest of the
-    /// package takes care to govern. Asserted over EVERY entry rather than over the one line the
-    /// handler is known to write, so a line added later is covered by this without being noticed.
+    /// package takes care to govern.
     /// </summary>
+    /// <remarks>
+    /// <para>
+    /// <b>Built from a container, and that shape is the finding rather than a flourish.</b> The
+    /// first version captured the HANDLER's logger and gave the composer a null one, while its own
+    /// comment claimed it covered "every entry... so a line added later is covered by this without
+    /// being noticed". A line WAS added later, in the collaborator the handler calls, and QA put a
+    /// booker's name and address into it with the whole suite still green.
+    /// </para>
+    /// <para>
+    /// Naming a second logger would have closed that instance and left the same hole one
+    /// collaborator further out: the guard's extension would still be a hand-written list while its
+    /// intension is "every line". So the send path is resolved from a container whose only logging
+    /// provider captures everything, and every logger every participant is handed comes from it —
+    /// including a participant added later, so long as it is resolved rather than newed.
+    /// </para>
+    /// </remarks>
     [Theory]
-    [InlineData(false)]
-    [InlineData(true)]
-    public async Task No_log_line_carries_a_booker(bool sendFails)
+    [InlineData(false, false)]
+    [InlineData(true, false)]
+    [InlineData(false, true)]
+    [InlineData(true, true)]
+    public async Task No_log_line_carries_a_booker(bool sendFails, bool resourceReadFails)
     {
-        var logger = new CapturingLogger();
-        var sender = new RecordingEmailSender { ThrowOnSend = sendFails };
-        var handler = new BookingEmailHandler(
-            new SiteBookingSettings
-            {
-                TimeZoneId = TestData.LondonZoneId,
-                Notifications = Notifications(true, ["desk@example.com"]),
-            },
-            sender,
-            Composer(),
-            new StubHostingEnvironment(),
-            logger);
+        var (handler, logs, _) = SendPath(
+            Notifications(true, ["desk@example.com"]),
+            sendFails: sendFails,
+            resourceReadFails: resourceReadFails);
 
-        var booking = Booking();
+        // A DIRECT booking, so the resource read really happens and its failure path is live.
+        var booking = Booking(direct: true);
 
         try
         {
@@ -259,23 +271,51 @@ public class BookingEmailTests
         }
         catch (InvalidOperationException)
         {
-            // The handler does not catch: the observer above it does. What is under test here is
+            // The handler does not catch; the observer above it does. What is under test here is
             // what was written to the log on the way past, not who catches it.
         }
 
-        Assert.NotEmpty(logger.Entries);
+        Assert.NotEmpty(logs.Entries);
 
-        foreach (var entry in logger.Entries)
+        foreach (var entry in logs.Entries)
         {
-            Assert.DoesNotContain("Ada", entry, StringComparison.OrdinalIgnoreCase);
-            Assert.DoesNotContain("Lovelace", entry, StringComparison.OrdinalIgnoreCase);
-            Assert.DoesNotContain("ada@example.com", entry, StringComparison.OrdinalIgnoreCase);
-            Assert.DoesNotContain("07700", entry, StringComparison.Ordinal);
+            Assert.DoesNotContain("Ada", entry.Message, StringComparison.OrdinalIgnoreCase);
+            Assert.DoesNotContain("Lovelace", entry.Message, StringComparison.OrdinalIgnoreCase);
+            Assert.DoesNotContain("ada@example.com", entry.Message, StringComparison.OrdinalIgnoreCase);
+            Assert.DoesNotContain("07700", entry.Message, StringComparison.Ordinal);
         }
 
-        // Anti-vacuity: the assertions above pass trivially against a log that says nothing about
-        // the booking at all, so prove the entries are actually about THIS booking.
-        Assert.Contains(logger.Entries, e => e.Contains(booking.Id.ToString(), StringComparison.Ordinal));
+        // Anti-vacuity: the loop passes trivially against a log saying nothing about this booking,
+        // and against a capture that wired up nothing at all.
+        Assert.Contains(
+            logs.Entries, e => e.Message.Contains(booking.Id.ToString(), StringComparison.Ordinal));
+
+        // And specifically that the COMPOSER's line is observed — the one the first version of this
+        // test could not see. Only reachable when the read fails.
+        if (resourceReadFails)
+        {
+            Assert.Contains(
+                logs.Entries,
+                e => e.Category.Contains(nameof(BookingMessageComposer), StringComparison.Ordinal));
+        }
+    }
+
+    /// <summary>
+    /// The population rather than the sample. The test above can only inspect lines that were
+    /// actually written; this asserts every participant takes its logger from the captured factory
+    /// in the first place, so one that logs only on a path no fixture reaches is still covered
+    /// rather than silently exempt.
+    /// </summary>
+    [Fact]
+    public void Every_logger_on_the_send_path_is_captured()
+    {
+        var (handler, logs, _) = SendPath(Notifications(true, ["desk@example.com"]));
+
+        Assert.NotNull(handler);
+        Assert.Contains(
+            logs.Categories, c => c.Contains(nameof(BookingEmailHandler), StringComparison.Ordinal));
+        Assert.Contains(
+            logs.Categories, c => c.Contains(nameof(BookingMessageComposer), StringComparison.Ordinal));
     }
 
     /// <summary>
@@ -318,6 +358,27 @@ public class BookingEmailTests
             new BookingPlacedNotification(Booking(direct: true)), CancellationToken.None);
 
         Assert.Equal(2, sender.Sent.Count);
+    }
+
+    /// <summary>
+    /// Cancellation is NOT "what was booked cannot be established". A real token reaches this call
+    /// from Umbraco's notification publisher, so an unfiltered catch would log a warning per claim
+    /// on shutdown and then carry on composing and sending a message nobody asked for any more —
+    /// turning "stop" into "do it anyway, noisily".
+    /// </summary>
+    /// <remarks>
+    /// Added because removing the filter was a mutant the suite could not see: no test cancelled
+    /// anything, so the filter was decoration. The same fault as the one QA had just found one
+    /// layer up, in the fix for it.
+    /// </remarks>
+    [Fact]
+    public async Task Cancellation_is_not_mistaken_for_an_unreadable_resource()
+    {
+        using var cancelled = new CancellationTokenSource();
+        await cancelled.CancelAsync();
+
+        await Assert.ThrowsAnyAsync<OperationCanceledException>(
+            () => Composer().ForBookerAsync(Booking(direct: true), BookingEvent.Placed, cancelled.Token));
     }
 
     /// <summary>
@@ -489,6 +550,42 @@ public class BookingEmailTests
         return sender;
     }
 
+    /// <summary>
+    /// The whole send path, resolved from a container whose only logging provider captures every
+    /// line every participant writes.
+    /// </summary>
+    private static (BookingEmailHandler Handler, CapturingLoggerProvider Logs, RecordingEmailSender Sender) SendPath(
+        BookingNotificationSettings notifications,
+        bool sendFails = false,
+        bool resourceReadFails = false)
+    {
+        var logs = new CapturingLoggerProvider();
+        var sender = new RecordingEmailSender { ThrowOnSend = sendFails };
+
+        var services = new ServiceCollection();
+
+        services.AddLogging(builder =>
+        {
+            builder.SetMinimumLevel(LogLevel.Trace);
+            builder.AddProvider(logs);
+        });
+
+        services.AddSingleton(new SiteBookingSettings
+        {
+            TimeZoneId = TestData.LondonZoneId,
+            Notifications = notifications,
+        });
+        services.AddSingleton<IResourceStore>(new StubResourceStore(true, resourceReadFails));
+        services.AddSingleton<IEmailSender>(sender);
+        services.AddSingleton<IHostingEnvironment>(new StubHostingEnvironment());
+        services.AddSingleton<BookingMessageComposer>();
+        services.AddSingleton<BookingEmailHandler>();
+
+        var provider = services.BuildServiceProvider();
+
+        return (provider.GetRequiredService<BookingEmailHandler>(), logs, sender);
+    }
+
     private static BookingMessageComposer Composer(bool resourceExists = true, bool resourceThrows = false)
         => new(
             new StubResourceStore(resourceExists, resourceThrows),
@@ -515,12 +612,19 @@ public class BookingEmailTests
     private sealed class StubResourceStore(bool exists, bool throws = false) : IResourceStore
     {
         public Task<Resource?> GetAsync(Guid resourceId, CancellationToken cancellationToken = default)
-            => throws
+        {
+            // Honoured rather than ignored, because a stub that swallows the token makes every
+            // question about cancellation unanswerable — and the composer's catch has a filter
+            // whose whole purpose is to let this through.
+            cancellationToken.ThrowIfCancellationRequested();
+
+            return throws
                 ? throw new InvalidOperationException("The database is unreachable.")
                 : Task.FromResult(
                     exists
                         ? Resource.Create("room", "Treatment Room", directlyBookable: true, id: resourceId).Value
                         : null);
+        }
 
         public Task<ResourcePage> ListAsync(int skip, int take, CancellationToken cancellationToken = default)
             => throw new NotSupportedException();
@@ -613,21 +717,39 @@ public class BookingEmailTests
     }
 }
 
-file sealed class CapturingLogger : Microsoft.Extensions.Logging.ILogger<BookingEmailHandler>
+internal sealed class CapturingLoggerProvider : ILoggerProvider
 {
-    public List<string> Entries { get; } = [];
+    private readonly List<(string Category, string Message)> _entries = [];
 
-    public IDisposable? BeginScope<TState>(TState state) where TState : notnull => null;
+    private readonly List<string> _categories = [];
 
-    public bool IsEnabled(Microsoft.Extensions.Logging.LogLevel logLevel) => true;
+    public IReadOnlyList<(string Category, string Message)> Entries => _entries;
 
-    public void Log<TState>(
-        Microsoft.Extensions.Logging.LogLevel logLevel,
-        Microsoft.Extensions.Logging.EventId eventId,
-        TState state,
-        Exception? exception,
-        Func<TState, Exception?, string> formatter)
-        => Entries.Add(formatter(state, exception));
+    /// <summary>Every category a logger was asked for, whether or not it wrote anything.</summary>
+    public IReadOnlyList<string> Categories => _categories;
+
+    public ILogger CreateLogger(string categoryName)
+    {
+        _categories.Add(categoryName);
+
+        return new CapturingLogger(this, categoryName);
+    }
+
+    public void Dispose()
+    {
+    }
+
+    private sealed class CapturingLogger(CapturingLoggerProvider provider, string category) : ILogger
+    {
+        public IDisposable? BeginScope<TState>(TState state) where TState : notnull => null;
+
+        public bool IsEnabled(LogLevel logLevel) => true;
+
+        public void Log<TState>(
+            LogLevel logLevel, EventId eventId, TState state, Exception? exception,
+            Func<TState, Exception?, string> formatter)
+            => provider._entries.Add((category, formatter(state, exception)));
+    }
 }
 
 internal static class BookingTapExtensions

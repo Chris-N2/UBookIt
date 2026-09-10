@@ -221,8 +221,13 @@ public sealed class BookingMessageComposer(
                 resource = await resources.GetAsync(claim.ResourceId, cancellationToken)
                     .ConfigureAwait(false);
             }
-            catch (Exception exception)
+            catch (Exception exception) when (exception is not OperationCanceledException)
             {
+                // CANCELLATION IS EXCLUDED, matching the filtered catch two methods below.
+                // A real token reaches this call, so on shutdown an unfiltered catch would log
+                // a warning per claim and then carry on composing and sending a message nobody
+                // asked for any more — turning "stop" into "do it anyway, noisily".
+                //
                 // CAUGHT SO THE MESSAGE STILL GOES. "What was booked cannot be established" is a
                 // requirement with a stated answer — send the reference and the time without the
                 // name — and a store that THREW has established it just as surely as one that
