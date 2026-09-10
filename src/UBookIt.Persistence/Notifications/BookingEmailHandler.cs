@@ -27,9 +27,19 @@ namespace UBookIt.Persistence.Notifications;
 /// the same token nothing is retried or queued: a message is not a booking.
 /// </para>
 /// <para>
-/// <b>No booker name, address or telephone number is ever logged</b>, including on failure paths.
-/// A failure to send is not a reason to write into a log the very details the rest of the package
-/// takes care to govern. The booking id identifies the message uniquely and identifies nobody.
+/// <b>This package never writes a booker name, address or telephone number into a log</b>,
+/// including on failure paths. A failure to send is not a reason to write the very details the
+/// rest of the package takes care to govern; the booking id identifies the message uniquely and
+/// identifies nobody.
+/// </para>
+/// <para>
+/// <b>What it cannot promise is that no such detail ever reaches a log</b>, and the difference
+/// arrived with this type. A mail server rejecting an address commonly quotes it back — <c>550
+/// 5.1.1 &lt;someone@example.com&gt;: Recipient address rejected</c> — and that exception escapes
+/// to <see cref="UmbracoBookingObserver"/> and is logged with the error attached. Redacting text a
+/// third party wrote would as likely destroy the diagnostic that makes a failed send findable, so
+/// the package discloses the boundary instead of claiming one it cannot keep. See
+/// <c>docs/notifications.md</c>.
 /// </para>
 /// </remarks>
 public sealed class BookingEmailHandler(

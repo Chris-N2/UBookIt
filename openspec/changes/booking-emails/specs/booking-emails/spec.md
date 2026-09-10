@@ -164,9 +164,18 @@ who placed or cancelled it, and SHALL NOT be retried or queued.
 **The booking is already stored by the time anything is sent.** A message is not a booking, and a
 mail server's fault must not become the booker's problem.
 
-**No report of a sending failure SHALL contain a booker's name, address or telephone number.** A
-failure to send is not a reason to write into a log the very details the rest of the package takes
-care to govern — the same rule the notification adapter already applies to a failing handler.
+**No report of a sending failure that the package composes SHALL contain a booker's name, address
+or telephone number.** A failure to send is not a reason to write into a log the very details the
+rest of the package takes care to govern — the same rule the notification adapter already applies
+to a failing handler.
+
+**The package SHALL NOT claim more than that, and SHALL disclose the difference.** A mail server
+rejecting an address commonly quotes it back, and that text arrives inside an exception the host
+logs. It is not text the package wrote and not text it can reliably redact — an attempt would as
+readily destroy the diagnostic that makes a failed send findable at all. So the documentation
+SHALL state that on a site which sends messages, contact details can appear in the application
+log by that route. An absolute promise here would be the more dangerous failure: it is the kind
+a site repeats to a data subject.
 
 A recipient address a **site** configured MAY be reported, and reporting one SHALL NOT be read as
 licence to report a booker's. They are different populations: one is a staff address typed into
@@ -180,9 +189,13 @@ configuration by whoever administers the site, the other is a customer's persona
 - **WHEN** sending fails
 - **THEN** it is not retried and not queued for a later attempt
 
-#### Scenario: A failure report carries no booker
-- **WHEN** a sending failure is reported
-- **THEN** the report contains no booker name, address or telephone number
+#### Scenario: A failure report the package composes carries no booker
+- **WHEN** the package reports a sending failure
+- **THEN** the text the package composes contains no booker name, address or telephone number
+
+#### Scenario: What the package cannot keep out of a log is documented
+- **WHEN** a site author reads what the package promises about personal data in logs
+- **THEN** it states both that the package writes no contact details itself and that a mail server's error may quote an address into the site's own logging
 
 ### Requirement: A site can replace what the package sends
 

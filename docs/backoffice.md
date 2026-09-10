@@ -82,9 +82,16 @@ it is not something a site can agree to on their behalf.
 details also decides who may erase them, on top of access to the uBookIt section. A user your
 site has decided may not so much as see a booker's name cannot destroy it.
 
-**It cannot be undone.** There is no restore. Once the details are gone, no permission, no
-group and no support call brings them back — which is the whole point, and the reason the
-next two limits matter.
+**It cannot be undone.** There is no restore. Once the details are gone from the booking, no
+permission, no group and no support call brings them back — which is the whole point, and the
+reason the next three limits matter.
+
+**On a site that sends email, erasure does not reach what has already left.** A confirmation or
+cancellation message delivered before the erasure is in somebody's mailbox, and if a mail server
+rejected the address it may have quoted it into this site's own error log. Neither is a store
+uBookIt can reach, so neither is erased — see [reacting to bookings](notifications.md). If you are
+honouring a right-to-be-forgotten request, that is the boundary to know about **before** you tell
+somebody their details are gone.
 
 **Running it twice is safe.** Erasing an already-erased booking succeeds and changes nothing,
 keeping the *first* erasure's timestamp. That is deliberately unlike cancelling, which refuses

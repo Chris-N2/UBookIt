@@ -107,6 +107,41 @@
         Superseded: *states plainly that the package sends nothing itself* becomes *states what it
         sends, to whom, and under what configuration*. Extended: the delivery limits now also
         cover the package's own messages.
+      - `booker-erasure` — **Booker contact details SHALL have exactly one durable home**.
+        **Opened at QA round 5, having been missed by the outward sweep entirely** — it names
+        "confirmation emails" in its own prose as a feature that must be reconciled with it, which
+        is as close to a written-in-advance trap as this repository has. Carried: one durable
+        location; no second durable copy without erasing it; an erasure record naming the booking
+        and not the person; all three original scenarios. Narrowed: "durable home" is scoped to
+        **stores the package owns**, because both alternative readings fail — "no copy anywhere"
+        forbids sending email at all, which is not what a requirement naming confirmation emails
+        as a feature was written to do, and silence ships the reduction with nothing looking like
+        a decision. Added: a hand-off outside the package is **disclosed rather than claimed**,
+        and carries no more than its purpose requires.
+      - `booker-erasure` — **What erasure does not reach is documented**. Carried: what erasure
+        does, irreversibility, who may perform it, that it may happen without an actor, the
+        one-booking boundary with its search direction, the future-booking boundary, the timer
+        statement, all three original scenarios. Modified: "**the two** boundaries" becomes "the
+        boundaries", with a third — erasure reaches neither a message already delivered nor an
+        address a mail server quoted into the host's log — required **where an operator performing
+        an erasure will meet it**, which is `docs/backoffice.md`, not only where sending is
+        described.
+- [ ] 6.7 **AT SYNC: edit `booker-erasure`'s Purpose paragraph by hand.** A delta replaces
+      requirements; it cannot express a change to a capability's Purpose, and that paragraph
+      repeats **both** claims this change narrows — *"contact details have exactly one durable
+      home, so erasing that home erases the data"* and *"the **two** boundaries the documentation
+      has to state"*. Synced as-is, the capability would ship a summary contradicting the
+      requirements beneath it, in the one file that is the source of truth after archiving.
+
+      Replace with: contact details have exactly one durable home **among the stores the package
+      owns**; and **the boundaries** the documentation has to state — one erasure reaches one
+      booking, it may be performed on a booking that has not yet happened, and it does not reach a
+      message already sent or an address a mail server quoted into the host's log.
+
+      *Found by sweeping for the CLASS of absolute claims about logs, copies and contact details
+      rather than for the sentences QA had already named — the same enumerate-the-population move
+      that rounds 4 and 5 were both about, applied one level up. QA did not name this one.*
+
 - [x] 6.3 `ChangeDeltaIntegrityTests` green — it is the authority on delta correctness, not
       `openspec validate --strict`.
 - [x] 6.4 Full suite green, clean Release build, **zero** warnings.

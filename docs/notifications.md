@@ -51,7 +51,7 @@ is decided by the **Sensitive data** user group in the backoffice, and a list of
 configuration file is not that decision — so the message takes you to where that control still
 applies rather than carrying the details past it.
 
-A booking whose booker has been erased (see [privacy](privacy.md)) has no address, so nothing is
+A booking whose booker has been erased (see [the backoffice guide](backoffice.md)) has no address, so nothing is
 sent to them. Your own recipients are still told.
 
 ### Replacing what uBookIt sends
@@ -146,7 +146,7 @@ If the message matters — a confirmation somebody is relying on — put the rel
 handler: write to a queue you control, and let that fail and retry on its own terms.
 
 Failures are logged, so a handler that throws leaves a trace naming the booking id rather
-than vanishing. The log records the id and nothing else about the booker.
+than vanishing. uBookIt writes the id and nothing else about the booker into that line — though a mail server's error text, if one is attached, is not uBookIt's to control; see below.
 
 ## If you store what a notification hands you, erasure will not reach it
 

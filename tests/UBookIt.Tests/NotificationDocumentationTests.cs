@@ -111,6 +111,41 @@ public class NotificationDocumentationTests
         DocumentationAssert.Says(docs, "a mail server's error can quote the address back at you");
         DocumentationAssert.Says(
             docs, "treat your application log as somewhere contact details can appear");
+
+        // AND THAT THE ABSOLUTE IS ABSENT, which is the half the first version of this guard
+        // could not see. It asserted three fragments were PRESENT, so it stayed green while a
+        // sibling sentence four sections above went on promising the opposite — the over-claim
+        // survived by ADDITION, and only deletion of the correction would have failed.
+        //
+        // A guard for a claim that must not be made has to look for the claim, not only for its
+        // replacement. PrivacyNoticeTests.A_site_that_sends_nothing_promises_nothing pairs its
+        // positive assertions with a DoesNotContain for exactly this reason.
+        foreach (var overclaim in new[]
+        {
+            "nothing logs them",
+            "The log records the id and nothing else about the booker",
+            "no booker name, address or telephone number is ever logged",
+        })
+        {
+            Assert.DoesNotContain(overclaim, docs, StringComparison.OrdinalIgnoreCase);
+        }
+    }
+
+    /// <summary>
+    /// The same absolute, in the XML documentation that ships with the assembly. A site author
+    /// reading IntelliSense meets this before they meet the markdown.
+    /// </summary>
+    [Fact]
+    public void The_handlers_own_documentation_does_not_over_claim()
+    {
+        var source = RepoFiles.Read("src/UBookIt.Persistence/Notifications/BookingEmailHandler.cs");
+
+        Assert.DoesNotContain(
+            "No booker name, address or telephone number is ever logged",
+            source,
+            StringComparison.OrdinalIgnoreCase);
+        Assert.Contains("never writes a booker name", source, StringComparison.Ordinal);
+        Assert.Contains("cannot promise", source, StringComparison.Ordinal);
     }
 
     [Fact]
