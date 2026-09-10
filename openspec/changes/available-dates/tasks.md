@@ -1,78 +1,86 @@
 ## 1. The window
 
-- [ ] 1.1 Add a pure function computing the window from `today`, the subject's **lead time**, its **horizon**, and `SiteBookingSettings.MaxQueryRangeDays`. Pure so it is testable without a flow, like `BookingFormBuilder.TodayIn` and `LongestAvailableMinutes` already are.
-- [ ] 1.2 **The preferred span (~30 days) is a preference, clamped — never a constant the read trusts.** A site may set `MaxQueryRangeDays` to 7; a 30-day read would then be refused with `date-range-too-large` on **every** step-1 render and that site would have no flow at all. This is the highest-severity failure in the change and it is invisible on a default configuration.
-- [ ] 1.3 Use the same saturating arithmetic `CalendarBounds.AddDaysSaturating` already uses for `MaxDate` — a large horizon must not throw while rendering a form.
-- [ ] 1.4 The window's start respects lead time. Listing a date the domain will refuse is the guessing game this change removes, moved one step earlier.
+- [x] 1.1 Add a pure function computing the window from `today`, the subject's **lead time**, its **horizon**, and `SiteBookingSettings.MaxQueryRangeDays`. Pure so it is testable without a flow, like `BookingFormBuilder.TodayIn` and `LongestAvailableMinutes` already are.
+- [x] 1.2 **The preferred span (~30 days) is a preference, clamped — never a constant the read trusts.** A site may set `MaxQueryRangeDays` to 7; a 30-day read would then be refused with `date-range-too-large` on **every** step-1 render and that site would have no flow at all. This is the highest-severity failure in the change and it is invisible on a default configuration.
+- [x] 1.3 Use the same saturating arithmetic `CalendarBounds.AddDaysSaturating` already uses for `MaxDate` — a large horizon must not throw while rendering a form.
+- [x] 1.4 The window's start respects lead time. Listing a date the domain will refuse is the guessing game this change removes, moved one step earlier.
 
 ## 2. The read
 
-- [ ] 2.1 Widen both flows' `GetBookableStartsAsync` call from `(selectedDate, selectedDate)` to the window. **One read, not two** — the date list and the selected day's times both come out of it.
-- [ ] 2.2 Derive the selected day's times by filtering that result to the selected date, in the site time zone. **Group by LOCAL date, not by UTC date** — a start at 23:30 UTC is the next day in `Europe/London` in summer, and grouping in the wrong zone would put a date in the list that the times below disagree with.
-- [ ] 2.3 The service flow passes the same `choice.Chosen` it passes today, so the list narrows to the chosen who exactly as the times do.
-- [ ] 2.4 A date is in the list when at least one of its starts `Admits` the chosen duration — **the same predicate step 2 uses**, not a second one. Two answers to "does this fit?" would eventually disagree, and the disagreement would show as a date you can pick and then find empty.
+- [x] 2.1 Widen both flows' `GetBookableStartsAsync` call from `(selectedDate, selectedDate)` to the window. **One read, not two** — the date list and the selected day's times both come out of it.
+- [x] 2.2 Derive the selected day's times by filtering that result to the selected date, in the site time zone. **Group by LOCAL date, not by UTC date** — a start at 23:30 UTC is the next day in `Europe/London` in summer, and grouping in the wrong zone would put a date in the list that the times below disagree with.
+- [x] 2.3 The service flow passes the same `choice.Chosen` it passes today, so the list narrows to the chosen who exactly as the times do.
+- [x] 2.4 A date is in the list when at least one of its starts `Admits` the chosen duration — **the same predicate step 2 uses**, not a second one. Two answers to "does this fit?" would eventually disagree, and the disagreement would show as a date you can pick and then find empty.
 
 ## 3. The view model
 
-- [ ] 3.1 Add the window's dates to `IBookingFormView` as a list of values — the date, and whether it is the selected one. Not pre-rendered markup: `theming` makes the model a published contract and a theme must be able to render it its own way.
-- [ ] 3.2 **BREAKING — published contract.** `IBookingFormView` gains members; declare it, as `privacy-notice` did. A theme consumes the model rather than implementing it, so the practical impact is nil, but the promise is about the type.
-- [ ] 3.3 Carry whether the selected date is **outside** the window, so the view can state which date it is showing without recomputing the window.
-- [ ] 3.4 Carry enough to explain an empty window: that it is empty, and the longest length that *would* find something. The single-day case already does this via `LongestAvailableMinutes`; this is the same idea at window scale.
+- [x] 3.1 Add the window's dates to `IBookingFormView` as a list of values — the date, and whether it is the selected one. Not pre-rendered markup: `theming` makes the model a published contract and a theme must be able to render it its own way.
+- [x] 3.2 **BREAKING — published contract.** `IBookingFormView` gains members; declare it, as `privacy-notice` did. A theme consumes the model rather than implementing it, so the practical impact is nil, but the promise is about the type.
+- [x] 3.3 Carry whether the selected date is **outside** the window, so the view can state which date it is showing without recomputing the window.
+- [x] 3.4 Carry enough to explain an empty window: that it is empty, and the longest length that *would* find something. The single-day case already does this via `LongestAvailableMinutes`; this is the same idea at window scale.
 
 ## 4. Rendering
 
-- [ ] 4.1 New shared partial for the date list. Not into `_DateAndLength`, which already renders three controls and their aria wiring.
-- [ ] 4.2 A `fieldset` with a `legend`, radios with associated labels — **the same shape `_Times` uses**, so the page has one idiom for "choose one of these" rather than two.
-- [ ] 4.3 The list submits the existing date query parameter.
-- [ ] 4.4 The "another date" field submits a **different** parameter and **wins when present and parseable**. Two controls on one parameter means the browser sends both values and binding picks arbitrarily — this is the concrete form of "two ways to do one thing".
-- [ ] 4.5 Label both so they read as different questions — "when can I come soon?" versus "I want this specific date" — rather than as two ways to do the same job.
-- [ ] 4.6 When the selected date is outside the window, state which date is being shown. Otherwise the page shows a list with nothing selected beside times for a date the list does not contain.
-- [ ] 4.7 The empty-window state: say no date in the window is available at that length, and name what would change it. **Distinct wording from the empty-day state** — the two are different facts and a reader must be able to tell which they are being told.
-- [ ] 4.8 Add the new class(es) to the published vocabulary deliberately — `default-frontend` makes the class names a stable contract, so this is a contract addition and both the vocabulary list and the block list need it.
-- [ ] 4.9 Add the partial to `UBookItThemeContract.SharedPartials` and to the theming guide's table.
-- [ ] 4.10 **No JavaScript.** Standing invariant. And no colour-only distinction: a date's state is conveyed in text.
+- [x] 4.1 New shared partial for the date list. Not into `_DateAndLength`, which already renders three controls and their aria wiring.
+- [x] 4.2 A `fieldset` with a `legend`, radios with associated labels — **the same shape `_Times` uses**, so the page has one idiom for "choose one of these" rather than two.
+- [x] 4.3 The list submits the existing date query parameter.
+- [x] 4.4 The "another date" field submits a **different** parameter and **wins when present and parseable**. Two controls on one parameter means the browser sends both values and binding picks arbitrarily — this is the concrete form of "two ways to do one thing".
+- [x] 4.5 Label both so they read as different questions — "when can I come soon?" versus "I want this specific date" — rather than as two ways to do the same job.
+- [x] 4.6 When the selected date is outside the window, state which date is being shown. Otherwise the page shows a list with nothing selected beside times for a date the list does not contain.
+- [x] 4.7 The empty-window state: say no date in the window is available at that length, and name what would change it. **Distinct wording from the empty-day state** — the two are different facts and a reader must be able to tell which they are being told.
+- [x] 4.8 Add the new class(es) to the published vocabulary deliberately — `default-frontend` makes the class names a stable contract, so this is a contract addition and both the vocabulary list and the block list need it.
+- [x] 4.9 Add the partial to `UBookItThemeContract.SharedPartials` and to the theming guide's table.
+- [x] 4.10 **No JavaScript.** Standing invariant. And no colour-only distinction: a date's state is conveyed in text.
 
 ## 5. Verification
 
-- [ ] 5.1 **The differential test, and it is the important one.** For the same subject, date and length, the times derived from the window equal the times a single-date read returns. Widening the read must change how much is asked for and nothing about what is answered. A test asserting only "some times render" would pass while the filter dropped one.
-- [ ] 5.2 Window derivation, tested against **configured** bounds and not just defaults: a `MaxQueryRangeDays` of 7 shortens the list and the read still succeeds; a short horizon shortens it; a lead time moves the start. **The default configuration cannot show any of these**, which is exactly why they are the tests that matter.
-- [ ] 5.3 Length coupling: a date with only 30-minute gaps is absent at 2 hours and present at 30 minutes. Both directions, or the filter could be inverted and still pass one of them.
-- [ ] 5.4 **Local-date grouping**, with a fixture whose start is on the far side of midnight in the site zone. A UTC-grouped implementation passes every test with a UTC site and fails only for the sites that actually have this problem.
-- [ ] 5.5 The two controls submit different parameters, and the precedence holds when both are present.
-- [ ] 5.6 A date beyond the window is reachable and renders its times.
-- [ ] 5.7 The outside-window statement appears exactly when the selected date is not listed.
-- [ ] 5.8 Empty-window state, and that its wording differs from the empty-day state.
-- [ ] 5.9 Rendering tests for every state the model can now express — listed/empty, inside/outside window, length-limited. `default-frontend` requires a view render every state its model can express, and this model gains several.
-- [ ] 5.10 **Mutation-check the ones that could be vacuous**, one at a time and asserting the mutation applied: invert the `Admits` filter; group by UTC date; drop the `MaxQueryRangeDays` clamp; make the field lose to the list. Each must fail something. **Verify each restore recompiled** — restoring a file with an older timestamp leaves the mutant binary in place and the re-run green.
+- [x] 5.1 DONE — the differential property, asserted three ways: filtering the window to one date equals that date's starts; the day filter uses the site zone; and the grouping and the filter agree about every start in a window, with nothing stranded.
+- [x] 5.2 DONE against CONFIGURED bounds — a guardrail of 7, a horizon of 3, a horizon of 0, and a property test over every guardrail from 1 to 40 asserting the span never exceeds it. Plus calendar saturation at DateOnly.MaxValue.
+- [x] 5.3 DONE, both directions in one test — the same start admitted and not admitted — so an inverted predicate cannot pass half of it.
+- [x] 5.4 DONE. 23:30 UTC on the 10th is 00:30 on the 11th in Europe/London, asserted on the grouping AND on the day filter. A UTC-configured suite cannot see this at all, which is why the fixture names a zone.
+- [x] 5.5 DONE — **written because mutation proved it missing**, not before. Six cases including the empty-typed-value fall-through, which is the one the whole design rests on and looks like nothing.
+- [x] 5.6 DONE — covered by the outside-window rendering state and the precedence tests together.
+- [x] 5.7 DONE, both directions, plus the empty-list case from 7.6.
+- [x] 5.8 DONE — the two empty states are asserted to differ in wording, not merely to exist. They deliberately share a class, so the wording is the only thing that distinguishes them.
+- [x] 5.9 DONE — five new fixture states drive the branches, and the suite's own inventory rules confirmed the view was exercised.
+- [x] 5.10 DONE, six mutations, each asserting it applied and each verifying the RESTORE recompiled. **Five caught first time; one did not** — reversing the precedence between the two date parameters left the whole suite green, because task 5.5 was still unwritten. Written, and it now fails. A seventh was added after the fact and is the one that mattered most: see 7.5.
 
 ## 6. The measurement
 
-- [ ] 6.1 **Measure the step-1 render cost** — today's single-day read against the window read — on a resource with a full year of open hours and a realistic booking density, at the widest window the guardrail allows.
-- [ ] 6.2 **Write the number into this task list**, whatever it is. A measurement nobody records is an impression.
-- [ ] 6.3 If it is bad enough to want a cache, that is the **next change**, starting from this number. Do not add caching here: availability is the worst thing in this domain to serve stale, and the package has no caching anywhere to model an invalidation story on.
+- [x] 6.1 DONE. Against a resource open 08:00–18:00 seven days a week, twenty runs each, warmed first.
+- [x] 6.2 **THE NUMBER: one day 0.020 ms, 30 days 0.260 ms — a ratio of 12.9x, which is SUB-linear** (per-day cost falls from 0.020 ms to 0.009 ms as the range amortises). Recorded as a test that prints it and asserts only the SHAPE (ratio < days x 4), never a millisecond threshold — a timing assertion on a shared agent is a flaky test wearing a performance badge, and it would be the first thing anyone weakened.
+
+  **What the number does and does not cover, because it would be easy to over-read.** It measures the projection over an in-memory store, so it excludes the database. That is less of a gap than it looks: the claims read takes a from/to range and is **one query whichever width it is**, so widening the window returns more rows rather than issuing more queries. The part that scales with the window is the day-by-day projection, and that is exactly what is measured here.
+- [x] 6.3 **No cache, and the number says so rather than my instinct.** 0.26 ms of projection for a whole window is not a problem worth an invalidation story. Recorded so a future change that wants one starts from this figure rather than re-deriving it.
 
 ## 7. Look at it in a browser
 
-- [ ] 7.1 **Render both flows and actually look.** This change is judged by whether a page is clearer, and no assertion in the suite can tell me that. Two of this project's front-end changes had defects only the browser found.
-- [ ] 7.2 Check the long case — a window where nearly every date is available — reads as a usable list rather than a wall.
-- [ ] 7.3 Check it with **no author stylesheet at all**, per the standing invariant: the flow must stay operable, and a 30-item radio group is where that is most likely to strain.
-- [ ] 7.4 Check keyboard order through list → length → who → submit, and that the list's legend says what the group is for.
+- [x] 7.1 DONE — rendered all four states with the shipped stylesheet and looked at each in a browser. **Two findings, and neither was reachable from the suite.** See 7.5 and 7.6.
+- [x] 7.2 DONE, and this is finding one. Thirty stacked dates IS a wall — it pushes the length and who controls off the screen entirely.
+
+  I tried the obvious fix and it was wrong: making the options a wrapping run, as the start times are. The result was **ragged** — "Wednesday 23 September 2026" is 26 characters and "Friday 2 October 2026" is 21, so September fits one per row and October two, and the columns appear and disappear down the list. The stylesheet already states the rule ("a wrapping run suits labels of uniform length, a stacked column suits labels of unpredictable length") and I had put dates on the wrong side of it by reasoning about their *shape* rather than their *width*.
+
+  **Reverted, and the wall is accepted, because the wall is the benign case.** Thirty stacked dates only happens when nearly every date is free — and a visitor looking at a month where everything is available does not need help choosing. The list earns its place when availability is sparse, and then it is three or four rows and immediately readable. Confirmed by rendering exactly that case.
+- [x] 7.3 DONE — the states render as plain fieldsets, labels and paragraphs, so with no author stylesheet the step degrades to an ordinary list. The 2.5.8 spacing floor is kept from the catalogue rule rather than invented.
+- [x] 7.4 DONE — the list precedes the length and who controls in document order, its legend names the group AND the length it is filtered to ("Dates with availability for 1 hour in the next 30 days"), and the "another date" field follows with its own label and hint.
+- [x] 7.5 **FINDING, and only mutation found it: the "another date" field must never be repopulated.** Adding `value="…"` to it looks like an obvious improvement — the control it replaced did exactly that — and it breaks the list permanently: the typed date beats the list by design, so a field resubmitting a date chosen three renders ago makes every later click on the list do nothing at all. The freeze spans two requests, so every single-request assertion passed either way. Now guarded by an attribute assertion, with the reasoning on it.
+- [x] 7.6 **FINDING, and only looking found it: the empty window referred to a list that was not there.** With no dates, the page rendered "Showing Tuesday 15 September 2026, which is not in the list above" directly beneath a paragraph saying there is no list. Every test passed. The statement exists to resolve a contradiction between a list and the times below it; with no list there is nothing to contradict. Now conditioned on there being a list, and guarded.
 
 ## 8. Modified requirements — the guarantee diff
 
-- [ ] 8.1 `default-frontend` → *No-JavaScript single-resource booking flow*. Carried forward: the whole body and all three scenarios. Added: one paragraph and one scenario. **Dropped: nothing** — verified mechanically (3 → 4 scenarios, 3 → 4 SHALLs, 0 dropped), not by eye.
-- [ ] 8.2 `default-frontend` → *No-JavaScript service booking flow*. Carried forward: the whole body and all four scenarios. Added: one paragraph and one scenario. **Dropped: nothing** — verified mechanically (4 → 5 scenarios, 5 SHALLs unchanged, 0 dropped).
-- [ ] 8.3 The cross-flow behaviour is in **ADDED** requirements rather than duplicated into both flows — "one bar, stated once", the principle `theming` already uses. Confirm at apply time that neither flow requirement needs it restated to stay comprehensible.
-- [ ] 8.4 `ChangeDeltaIntegrityTests` is the authority on delta correctness, not `openspec validate --strict`.
+- [x] 8.1 `default-frontend` → *No-JavaScript single-resource booking flow*. Carried forward: the whole body and all three scenarios. Added: one paragraph and one scenario. **Dropped: nothing** — verified mechanically (3 → 4 scenarios, 3 → 4 SHALLs, 0 dropped), not by eye.
+- [x] 8.2 `default-frontend` → *No-JavaScript service booking flow*. Carried forward: the whole body and all four scenarios. Added: one paragraph and one scenario. **Dropped: nothing** — verified mechanically (4 → 5 scenarios, 5 SHALLs unchanged, 0 dropped).
+- [x] 8.3 The cross-flow behaviour is in **ADDED** requirements rather than duplicated into both flows — "one bar, stated once", the principle `theming` already uses. Confirm at apply time that neither flow requirement needs it restated to stay comprehensible.
+- [x] 8.4 `ChangeDeltaIntegrityTests` is the authority on delta correctness, not `openspec validate --strict`.
 
 ## 9. Sweep — sibling specs this change falsifies
 
-- [ ] 9.1 `default-frontend` → *Accessible, semantic markup (WCAG 2.2 AA)*. A third grouped control joins the step. Satisfied by using the existing pattern — confirm rather than assume, and check nothing there enumerates the step's controls.
-- [ ] 9.2 `default-frontend` → *Rendered markup resolves its own references* and *A view renders every state its model can express*. Both now cover more states.
-- [ ] 9.3 `default-frontend` → *The styling contract is a stable class vocabulary*. New classes are contract additions.
-- [ ] 9.4 `default-frontend` → *Flow state is carried in the URL* and *A site may enter the flow at any point*. A second date parameter is new flow state — does either constrain what the URL may carry?
-- [ ] 9.5 `availability` — nothing should change, but confirm no requirement constrains who may issue a ranged read or how wide.
-- [ ] 9.6 `delivery-api` — untouched. Confirm the ranged endpoint's contract is unaffected by a Razor consumer using it differently.
-- [ ] 9.7 `theming` → *The building blocks a theme may call are a promised contract*. A new partial joins the list.
-- [ ] 9.8 `service-booking` — the service flow's availability semantics, particularly around the who choice narrowing the pool.
-- [ ] 9.9 **Find the one not already on this list.** The capability this change makes a difference to is the one most certain to be affected, and it is not always the one being modified.
+- [x] 9.1 CHECKED — the accessible-markup requirement enumerates no control list, and the new group uses the pattern `_Times` established. Its clause assertion moved to the new partial and was STRENGTHENED: a labelled input became a grouped choice, so it now owes a fieldset, a legend and a label per option.
+- [x] 9.2 CHECKED — both fired during apply and named the new view explicitly, which is the rules working rather than a chore.
+- [x] 9.3 CHECKED — four new classes added deliberately to the published set, and three to the block list, which are separate assertions.
+- [x] 9.4 CHECKED, **and it fired.** The URL flow-state enumeration grew by one for `ubDateOther`. A date in a URL discloses nothing a public availability read does not already carry, and it is what keeps a date beyond the window linkable.
+- [x] 9.5 CHECKED — `availability` constrains the width of a read (`MaxQueryRangeDays`) and nothing about who issues one. The change honours that guardrail rather than altering it.
+- [x] 9.6 CHECKED — `delivery-api` untouched. The Razor front end reads from Core in-process, which `default-frontend` requires of it, so no delivery endpoint is involved at all.
+- [x] 9.7 CHECKED — the new partial joins `UBookItThemeContract.SharedPartials` and the theming guide's table, which a test ties together.
+- [x] 9.8 CHECKED — the service flow passes the same `choice.Chosen` to the window read that it passes for the times, so the list narrows to the chosen who exactly as the times do. Nothing in `service-booking` changes.
+- [x] 9.9 **The one not on the list: `FieldHookTests`' choice-group exemption.** It enumerates which containers are options rather than fields, and the new date options were neither — so every flow document failed with "the label … is not inside a .ubookit-field". Added by name rather than by matching a `-option` suffix, because a pattern would exempt anything somebody happened to name that way, including a genuine field.

@@ -41,6 +41,23 @@ public class ModelPropertyTests
         + "The visitor is told either way.";
 
     /// <summary>
+    /// Why <c>SelectedDateIsListed</c> is legitimately silent when no dates are listed: the
+    /// statement it controls refers to "the list above", and with no list there is nothing for
+    /// it to refer to.
+    /// </summary>
+    /// <remarks>
+    /// This is a suppression added because the view was CORRECTED, not because the rule was
+    /// inconvenient. The statement used to render unconditionally, so on an empty window the
+    /// page read "…which is not in the list above" directly beneath a paragraph saying there is
+    /// no list — found by looking at the rendered page, not by any assertion. Conditioning it on
+    /// there being a list is the fix, and this entry is the honest consequence: in those states
+    /// the flag genuinely changes nothing, because the empty-window message already accounts for
+    /// the whole step.
+    /// </remarks>
+    private const string NoListToBeAbsentFrom =
+        "the statement this flag controls names 'the list above', and these states render no list";
+
+    /// <summary>
     /// Which control each flag speaks about, so a suppression can be checked to be
     /// of the shape it claims rather than taken on trust.
     /// </summary>
@@ -76,6 +93,15 @@ public class ModelPropertyTests
 
             [(ViewInventory.DateAndLength, "ResourceChoiceWasReset", "service: refused choice and none left")] =
                 SupersededByAnError,
+
+            [(ViewInventory.AvailableDates, "SelectedDateIsListed", "service: no dates at this length")] =
+                NoListToBeAbsentFrom,
+
+            [(ViewInventory.AvailableDates, "SelectedDateIsListed", "service: no dates at any length")] =
+                NoListToBeAbsentFrom,
+
+            [(ViewInventory.AvailableDates, "SelectedDateIsListed", "resource: no dates at this length")] =
+                NoListToBeAbsentFrom,
         };
 
     public static TheoryData<string> ShippedViews()
@@ -367,23 +393,46 @@ public class ModelPropertyTests
     [Fact]
     public void Every_suppression_is_of_the_shape_it_claims()
     {
-        // The exemptions all claim one shape: a flag silenced by an error against
-        // the control it speaks about. Claimed in prose until now. This checks it —
-        // so an exemption cannot be added for a different reason under cover of the
-        // shared wording, which is exactly what a shared reason makes easy.
+        // Every exemption's own claim is checked, and each SHAPE is checked its own way.
+        //
+        // This asserted a single shape — a flag silenced by an error against the control it
+        // speaks about — because until now there was only one. A second shape arrived with the
+        // available-dates list, and the choice at that moment mattered: relaxing this to "any
+        // non-empty reason" would have turned a guarded exemption list into an unguarded one,
+        // which is the defect this project has now produced three times in other guards.
+        //
+        // So the shapes are enumerated instead. An exemption whose reason is neither is not
+        // merely unverified — it fails, and says so.
         foreach (var ((view, member, state), reason) in Suppressed)
         {
-            Assert.Equal(SupersededByAnError, reason);
-
-            var field = Assert.Contains(member, FlagSpeaksAbout);
             var model = (IBookingFormView)Assert.Single(
                 ViewFixtures.For(view), c => c.State == state).Model;
 
-            Assert.True(
-                model.ErrorFor(field) is not null,
-                $"{view}: the suppression for '{member}' in state '{state}' claims an error "
-                + $"against '{field}' takes precedence, but that state carries no such error. "
-                + "Either the reason is wrong or the entry is.");
+            if (reason == SupersededByAnError)
+            {
+                var field = Assert.Contains(member, FlagSpeaksAbout);
+
+                Assert.True(
+                    model.ErrorFor(field) is not null,
+                    $"{view}: the suppression for '{member}' in state '{state}' claims an error "
+                    + $"against '{field}' takes precedence, but that state carries no such error. "
+                    + "Either the reason is wrong or the entry is.");
+            }
+            else if (reason == NoListToBeAbsentFrom)
+            {
+                Assert.True(
+                    model.AvailableDates.Count == 0,
+                    $"{view}: the suppression for '{member}' in state '{state}' claims there is "
+                    + "no list of dates for the statement to refer to, but that state lists "
+                    + $"{model.AvailableDates.Count}. Either the reason is wrong or the entry is.");
+            }
+            else
+            {
+                Assert.Fail(
+                    $"{view}: the suppression for '{member}' in state '{state}' gives a reason "
+                    + "this guard does not know how to check. Every exemption must claim a shape "
+                    + "that is verified here — an unverifiable reason is an unguarded hole.");
+            }
         }
     }
 

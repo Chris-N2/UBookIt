@@ -57,11 +57,17 @@ else
     </p>
 }
 
-@if (!Model.SelectedDateIsListed)
+@if (hasDates && !Model.SelectedDateIsListed)
 {
     @* THE PAGE WOULD OTHERWISE CONTRADICT ITSELF: a list with nothing selected, beside start
        times for a date the list does not contain. Says which date is being shown rather than
-       leaving the visitor to reconcile the two. *@
+       leaving the visitor to reconcile the two.
+
+       ONLY WHEN THERE IS A LIST. Found by looking at it: with no dates to show, this rendered
+       "…which is not in the list above" underneath a paragraph saying there is no list — a
+       sentence referring to something the page had just said does not exist. The contradiction
+       it resolves needs two things to contradict, and the empty-window message above already
+       accounts for the whole step. *@
     <p class="ubookit-dates-showing">
         Showing @Model.SelectedDate.ToString("dddd d MMMM yyyy", CultureInfo.InvariantCulture),
         which is not in the list above.
