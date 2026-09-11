@@ -344,7 +344,9 @@ details and link to a screen that applies its own access control when followed.
 **A party that stops existing stays visible.** Delete a user or group and its assignment shows
 in the editor marked as no longer resolving, rather than vanishing — so you can see that Studio
 2's contact went away and pick a replacement. Until you do, that assignment simply sends
-nothing. Users the mail path skips — disabled accounts, invitations never accepted — are marked
+nothing. Saving replaces the whole set with what the pickers hold, so the first time you change
+who is responsible and save, stale entries go with the change — which is the natural moment for
+them to. Users the mail path skips — disabled accounts, invitations never accepted — are marked
 with their state in the same box.
 
 ## The service shown against a booking

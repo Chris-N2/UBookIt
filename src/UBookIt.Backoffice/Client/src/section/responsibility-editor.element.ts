@@ -161,6 +161,14 @@ export class UBookItResponsibilityEditorElement extends UmbLitElement {
 
         ${this._error ? html`<p class="error" role="alert">${this._error}</p>` : nothing}
 
+        <!-- INTENDED, both halves (QA round 1 named the tension): an untouched save
+             keeps a dangling assignment, because the state below was seeded from the
+             loaded set — but the moment an operator CHANGES a picker, its selection
+             replaces that state, and a deleted party's key cannot be in a picker's
+             selection, so the next save drops it. The write is wholesale by spec
+             ("what is saved is what was seen"), the marks list is display rather than
+             state, and a dangling assignment sends nothing either way — an operator
+             editing who is responsible is exactly the moment stale entries should go. -->
         <h3 class="picker-heading">${this.#term("users")}</h3>
         <umb-user-input
           .selection=${this._users}

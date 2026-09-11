@@ -74,7 +74,11 @@ on a pending booking under 0.6.0's approval flow.
 - `UBookIt.Web`: no delivery API or rendering changes.
 - Docs: `docs/notifications.md` (recipient resolution) and `docs/backoffice.md` (assignment UI).
 - No breaking changes to public API surface; migration is additive; upgrading with no
-  assignments configured behaves exactly as today.
+  assignments configured behaves exactly as today. One deliberate exception, stated as the
+  decision it has so far only been by habit: `BookingEmailHandler`'s public constructor gains
+  a required resolver parameter. The handler is constructed by DI, its constructor has been
+  extended by prior changes on the same reasoning, and nothing published before 17.0.0 is
+  frozen — but a site constructing it directly would need the new argument.
 
 ## Non-goals
 

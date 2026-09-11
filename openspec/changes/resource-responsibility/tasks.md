@@ -123,8 +123,15 @@ double-quoted shell string.
 - [x] 6.2 `openspec validate --strict` across all specs (19 items pass); the base
       `booking-emails` spec has not moved since the deltas were copied from it this session
       (`git log` confirms head `9b01663` for that file), so the guarantee-diff done at
-      spec-writing stands: both wholesale replacements carry every SHALL and scenario,
-      none dropped.
+      spec-writing stands for both wholesale replacements, one per line so the
+      delta-integrity guard's ordinal substring match can see them however this item is
+      later reworded:
+      - The package sends nothing until a site asks it to
+      - The booker and the site are told independently
+      Every SHALL and scenario carried or superseded, none dropped. QA round 1 re-ran the
+      diff independently and confirmed it clean. *(These two titles were in this item, were
+      lost when the item's text was itself replaced wholesale at tick time — the exact
+      fault the guard watches for, one level up — and the delta-integrity guard caught it.)*
 - [x] 6.3 Live check on the TestSite: assign a user to a resource in the backoffice, place a
       booking, confirm the `.eml` set in the pickup directory (clear it first; the `Date:`
       header is authoritative, not mtime): user's address present, flat list still present,
@@ -148,7 +155,10 @@ double-quoted shell string.
       falsifies — candidates known now: any statement that internal recipients are "the
       configured list", that configuration alone decides sending, or counts of
       customisation tiers; also `booking-emails` Purpose lines 19/422 region re-read in
-      full.
+      full. QA round 1's answer sheet, to be verified not assumed at sync:
+      `booking-emails/spec.md:106` ("the configured recipients are told"), `:182` ("A
+      message sent to a site's configured recipients SHALL…"), `email-templates/spec.md:135`,
+      `privacy-notice/spec.md:190`.
 - [ ] 7.2 Falsified-claims sweep over `README.md`, `docs/*.md` and XML doc comments —
       including `BookingNotificationSettings.InternalRecipients`' remark that a flat list
       is "knowingly the wrong shape", which this change answers and should now say so.
