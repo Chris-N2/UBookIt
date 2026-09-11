@@ -36,9 +36,9 @@ namespace UBookIt.Web.Emails;
 /// <para>
 /// <b><see cref="RazorPage{TModel}"/>, deliberately not <c>UmbracoViewPage&lt;T&gt;</c>.</b>
 /// Umbraco's page brings <c>IUmbracoContextAccessor</c>, <c>IPublishedUrlProvider</c> and the rest
-/// of a request's worth of services with it. Messages are composed from work that has no request
-/// — the retention sweep already runs that way, and a reminder would — so inheriting it would
-/// make templates render in a controller and fail in a job. What a template loses is Umbraco's
+/// of a request's worth of services with it. Messages must be composable from work that has no
+/// request — nothing sends that way today, but a reminder would — so inheriting it would make
+/// templates render in a controller and fail in the first job that sends one. What a template loses is Umbraco's
 /// helpers, which have no business in an email body anyway.
 /// </para>
 /// </remarks>

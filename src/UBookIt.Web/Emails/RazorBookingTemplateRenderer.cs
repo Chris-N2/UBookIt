@@ -19,9 +19,10 @@ namespace UBookIt.Web.Emails;
 /// <para>
 /// <b>It builds its own <see cref="DefaultHttpContext"/> from the root service provider rather
 /// than using an ambient one</b>, and that is the whole reason this type can be used at all.
-/// Messages are composed from work that has no request — the retention sweep already runs that
-/// way, and a reminder would — so a renderer that reached for <c>IHttpContextAccessor</c> would
-/// work in a controller and fail in a job, which is the least observable place to fail. Umbraco's
+/// Nothing sends from outside a request today — the retention sweep
+/// erases bookers and sends nothing — but a reminder would, so a renderer reaching for
+/// <c>IHttpContextAccessor</c> would work everywhere it is used now and fail in the first job
+/// that sends one, which is the least observable place to fail. Umbraco's
 /// own view-to-string recipe (<c>PartialViewBlockEngine</c>) resolves its services from
 /// <c>httpContext.RequestServices</c>; that is that type's choice, not a framework requirement.
 /// </para>

@@ -107,7 +107,7 @@ public sealed class BookingMessageComposer(
         var body = new StringBuilder()
             .AppendLine(subject)
             .AppendLine()
-            .Append(Details(booking, what))
+            .Append(Details(booking, what.Text))
             .AppendLine()
             .AppendLine(ClosingLineFor(booking, bookingEvent))
             .ToString();
@@ -131,8 +131,6 @@ public sealed class BookingMessageComposer(
         {
             return fallback;
         }
-        var (serviceName, resourceNames) =
-            await DescribeStructuredAsync(booking, what, cancellationToken).ConfigureAwait(false);
         var (localStart, localEnd) = LocalInterval(booking.Interval);
 
         var model = new BookerMessageModel
@@ -140,8 +138,8 @@ public sealed class BookingMessageComposer(
             Kind = BookerKindFor(bookingEvent),
             Status = booking.Status,
             Reference = booking.Reference.Display,
-            ServiceName = serviceName,
-            ResourceNames = resourceNames,
+            ServiceName = what.ServiceName,
+            ResourceNames = what.ResourceNames,
             LocalStart = localStart,
             LocalEnd = localEnd,
             TimeZoneId = booking.Interval.TimeZoneId,
@@ -188,7 +186,7 @@ public sealed class BookingMessageComposer(
         var body = new StringBuilder()
             .AppendLine(subject)
             .AppendLine()
-            .Append(Details(booking, what));
+            .Append(Details(booking, what.Text));
 
         if (awaitsApproval)
         {
@@ -212,8 +210,6 @@ public sealed class BookingMessageComposer(
             return fallback;
         }
 
-        var (serviceName, resourceNames) =
-            await DescribeStructuredAsync(booking, what, cancellationToken).ConfigureAwait(false);
         var (localStart, localEnd) = LocalInterval(booking.Interval);
 
         // THE MODEL WITH NO BOOKER ON IT. Not a shared model with the contact details left out
@@ -226,8 +222,8 @@ public sealed class BookingMessageComposer(
                 : BookingMessageKind.InternalPlaced,
             Status = booking.Status,
             Reference = booking.Reference.Display,
-            ServiceName = serviceName,
-            ResourceNames = resourceNames,
+            ServiceName = what.ServiceName,
+            ResourceNames = what.ResourceNames,
             LocalStart = localStart,
             LocalEnd = localEnd,
             TimeZoneId = booking.Interval.TimeZoneId,
@@ -405,44 +401,6 @@ public sealed class BookingMessageComposer(
         return new BookingMessage(result.Subject ?? fallback.Subject, result.Body, result.IsHtml);
     }
 
-    /// <summary>
-    /// What was booked, as the parts rather than a sentence: the service's snapshot name, and every
-    /// claimed resource's name.
-    /// </summary>
-    /// <remarks>
-    /// <para>
-    /// <b>This reads resources even when the booking carries a service, which
-    /// <see cref="DescribeAsync"/> does not.</b> The plain-text message says what was booked in one
-    /// line and a service name is the better answer there; supplied content may want to list the
-    /// resources the service resolved to, which is exactly the case a joined string cannot serve.
-    /// </para>
-    /// <para>
-    /// <b>Called only when a renderer is registered</b>, so a site that supplies nothing pays for
-    /// none of those reads and its messages take the same store round trips they always have.
-    /// </para>
-    /// </remarks>
-    private async Task<(string? ServiceName, IReadOnlyList<string> ResourceNames)> DescribeStructuredAsync(
-        Booking booking,
-        string? alreadyDescribed,
-        CancellationToken cancellationToken)
-    {
-        // A DIRECTLY-BOOKED booking has already had its resources read, by DescribeAsync, to
-        // build the plain-text fallback — and that joined string is exactly those names. Reading
-        // them again would double the round trips per claim for every message on a
-        // template-enabled site, which is a cost nobody asked for and nothing would have
-        // reported.
-        if (booking.Service is not { } service)
-        {
-            return (
-                null,
-                alreadyDescribed is null ? [] : [.. alreadyDescribed.Split(", ")]);
-        }
-
-        // A SERVICE booking has not: the plain-text message names the service and stops, so this
-        // is the one case that genuinely needs the extra reads — and the case content most wants
-        // them for, since a service resolves to several resources.
-        return (service.DisplayName, await ResourceNamesAsync(booking, cancellationToken).ConfigureAwait(false));
-    }
 
     /// <summary>
     /// The booking's interval, expressed in the zone it was placed against.
@@ -474,18 +432,57 @@ public sealed class BookingMessageComposer(
     /// What was booked: the service's snapshot name where there is one, otherwise the names of the
     /// resources claimed. <c>null</c> where nothing could be established.
     /// </summary>
-    private async Task<string?> DescribeAsync(Booking booking, CancellationToken cancellationToken)
+    /// <summary>
+    /// What was booked, in both the shapes this class needs: the one line the plain-text message
+    /// prints, and the parts a model publishes.
+    /// </summary>
+    /// <param name="Text">
+    /// The single line, or <c>null</c> where nothing could be established.
+    /// </param>
+    /// <param name="ServiceName">The service's recorded name, or <c>null</c> for a direct booking.</param>
+    /// <param name="ResourceNames">Every claimed resource's name that could be read.</param>
+    private sealed record Described(string? Text, string? ServiceName, IReadOnlyList<string> ResourceNames);
+
+    /// <summary>
+    /// What was booked: the service's snapshot name where there is one, otherwise the names of the
+    /// resources claimed.
+    /// </summary>
+    /// <remarks>
+    /// <para>
+    /// <b>Computed once, in both shapes, and the list is NEVER reconstituted from the text.</b>
+    /// An earlier version saved a store read by splitting the joined line back apart on ", " —
+    /// which turned a resource named "Studio 2, Ground Floor" into two resources and handed a
+    /// template a booking that does not exist. Caught in QA. The line is derived from the list;
+    /// the list is never derived from the line, because joining is lossy and no amount of care
+    /// about the separator makes it otherwise.
+    /// </para>
+    /// <para>
+    /// The resource read happens once per message either way, which is what the saving was
+    /// reaching for — it is just taken by sharing the result rather than by parsing it.
+    /// </para>
+    /// </remarks>
+    private async Task<Described> DescribeAsync(Booking booking, CancellationToken cancellationToken)
     {
         // The snapshot the booking already carries, which says what was SOLD rather than what the
-        // service happens to be called now. No read, and nothing to fail.
+        // service happens to be called now.
+        //
+        // A SERVICE booking still reads its resources, because supplied content may want to name
+        // every resource the service resolved to and the one-line text cannot carry them. A site
+        // that supplies nothing never reaches this method's caller on that path.
         if (booking.Service is { } service)
         {
-            return service.DisplayName;
+            return new Described(
+                service.DisplayName,
+                service.DisplayName,
+                await ResourceNamesAsync(booking, cancellationToken).ConfigureAwait(false));
         }
 
         var names = await ResourceNamesAsync(booking, cancellationToken).ConfigureAwait(false);
 
-        return names.Count > 0 ? string.Join(", ", names) : null;
+        return new Described(
+            names.Count > 0 ? string.Join(", ", names) : null,
+            null,
+            names);
     }
 
     /// <summary>

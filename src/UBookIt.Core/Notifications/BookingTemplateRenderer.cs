@@ -82,9 +82,10 @@ public sealed record BookingTemplateResult(
 /// entirely — the opposite of the trade every failure path in this package makes.
 /// </para>
 /// <para>
-/// <b>Implementations SHALL NOT require an ambient web request.</b> Messages are composed from
-/// work that has none — the retention sweep already runs that way — so a renderer that reached
-/// for a request would fail exactly where it is least observable.
+/// <b>Implementations SHALL NOT require an ambient web request.</b> No sender outside a request exists yet — the retention
+/// sweep erases bookers and sends nothing — so this is anticipatory: a renderer that reached for
+/// a request would work everywhere it is used today and fail in the first thing that sends from
+/// a timer, which is the least observable place to fail.
 /// </para>
 /// </remarks>
 public interface IBookingTemplateRenderer

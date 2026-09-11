@@ -137,6 +137,42 @@ public class BookingTemplateCompositionTests
     }
 
     [Fact]
+    public async Task Rendered_content_replaces_an_internal_message_too()
+    {
+        // The internal audience had NO test that supplied content is actually used — every
+        // internal test passed NotSupplied and asserted only that the renderer was asked, so
+        // rendering the template and discarding it passed the whole suite. That matters more
+        // since round 2, which added two requirements and four scenarios about what a supplied
+        // INTERNAL view owns.
+        var renderer = new StubRenderer(new BookingTemplateResult(
+            BookingTemplateOutcome.Rendered, Body: "Internal words of our own.", Subject: "Ours"));
+
+        var message = await Composer(renderer)
+            .ForSiteAsync(Booking(), BookingEvent.Placed, new Uri("https://site.example/umbraco"));
+
+        Assert.Equal("Internal words of our own.", message.Body);
+        Assert.Equal("Ours", message.Subject);
+    }
+
+    [Fact]
+    public async Task A_supplied_internal_view_owns_its_own_wording()
+    {
+        // The spec says so in as many words: a site may supply an internal message that mentions
+        // no approval and no reference, and the package adds nothing of its own to it.
+        var renderer = new StubRenderer(new BookingTemplateResult(
+            BookingTemplateOutcome.Rendered, Body: "Nothing but this."));
+
+        var message = await Composer(renderer).ForSiteAsync(
+            Booking(status: BookingStatus.Requested),
+            BookingEvent.Placed,
+            new Uri("https://site.example/umbraco"));
+
+        Assert.Equal("Nothing but this.", message.Body);
+        Assert.DoesNotContain("awaits approval", message.Body, StringComparison.OrdinalIgnoreCase);
+        Assert.DoesNotContain("umbraco", message.Body, StringComparison.OrdinalIgnoreCase);
+    }
+
+    [Fact]
     public async Task Content_that_is_not_supplied_leaves_the_package_message_alone()
     {
         var renderer = new StubRenderer(BookingTemplateResult.NotSupplied);
@@ -343,6 +379,58 @@ public class BookingTemplateCompositionTests
     }
 
     [Fact]
+    public async Task A_resource_name_containing_the_joining_separator_stays_one_resource()
+    {
+        // THE ROUND-2 CRITICAL, and it was caused by a round-1 performance fix: ResourceNames
+        // was reconstituted by splitting the joined "What:" line on ", ", so a resource an
+        // editor named "Studio 2, Ground Floor" reached content as TWO resources — a booking
+        // that does not exist, in a model frozen at 17.0.0, and the exact thing the design says
+        // a collection exists to prevent.
+        //
+        // The fixture name carries the separator deliberately. The previous guard used
+        // "Treatment Room" and could not have failed: a sample, not the class.
+        var store = new NamedResourceStore("Studio 2, Ground Floor");
+        var renderer = new StubRenderer(BookingTemplateResult.NotSupplied);
+        var composer = new BookingMessageComposer(
+            store, NullLogger<BookingMessageComposer>.Instance, renderer);
+
+        await composer.ForBookerAsync(Booking(direct: true), BookingEvent.Placed);
+
+        var model = Assert.Single(renderer.Asked).Model;
+
+        Assert.Equal("Studio 2, Ground Floor", Assert.Single(model.ResourceNames));
+    }
+
+    [Fact]
+    public async Task A_service_bookings_resources_also_survive_the_separator()
+    {
+        // The other path into the same member, so the fix is asserted for both rather than for
+        // the one that happened to break.
+        var store = new NamedResourceStore("Smith, Ada");
+        var renderer = new StubRenderer(BookingTemplateResult.NotSupplied);
+        var composer = new BookingMessageComposer(
+            store, NullLogger<BookingMessageComposer>.Instance, renderer);
+
+        await composer.ForBookerAsync(Booking(direct: false), BookingEvent.Placed);
+
+        Assert.Equal("Smith, Ada", Assert.Single(Assert.Single(renderer.Asked).Model.ResourceNames));
+    }
+
+    private sealed class NamedResourceStore(string displayName) : IResourceStore
+    {
+        public Task<Resource?> GetAsync(Guid resourceId, CancellationToken cancellationToken = default)
+            => Task.FromResult<Resource?>(
+                Resource.Create("room", displayName, directlyBookable: true, id: resourceId).Value);
+
+        public Task<ResourcePage> ListAsync(int skip, int take, CancellationToken cancellationToken = default)
+            => throw new NotSupportedException();
+
+        public Task<IReadOnlyList<Resource>> ListByTypeAsync(
+            string type, CancellationToken cancellationToken = default)
+            => throw new NotSupportedException();
+    }
+
+    [Fact]
     public async Task A_directly_booked_booking_is_not_read_twice()
     {
         // The plain-text path already reads every claim to build its "What:" line, and the
@@ -469,39 +557,54 @@ public class BookingTemplateCompositionTests
 public class BookingMessageModelContractTests
 {
     /// <summary>
-    /// Whether a member's name suggests it carries the BOOKER's contact details.
+    /// Every member <see cref="InternalMessageModel"/> is permitted to expose.
     /// </summary>
     /// <remarks>
     /// <para>
-    /// Matched by name rather than against a list of today's members, so a member added later is
-    /// caught by the rule instead of needing somebody to remember this file exists.
+    /// <b>An allow-list, because a deny-list cannot cover a class it has to guess at.</b> The
+    /// first version of this guard listed words that look like contact details, and QA added
+    /// <c>Address</c>, <c>Mobile</c>, <c>CustomerName</c> and <c>PlacedBy</c> in one go with all
+    /// 1356 tests passing — <c>Address</c> being the sharp one, since the guarded sentence in
+    /// three specs is "no booker name, <b>address</b> or telephone number". Narrowing the rule to
+    /// stop it firing on <c>ServiceName</c> was right; doing it without re-checking what the
+    /// narrower rule still reached was not.
     /// </para>
     /// <para>
-    /// <b>Precise rather than broad, and that is deliberate.</b> The first version matched any
-    /// name containing "name" and flagged <c>ServiceName</c> and <c>ResourceNames</c> — neither
-    /// of which is personal data. A guard that fires on legitimate members is a guard somebody
-    /// relaxes, which is how this project has lost guards before. So: anything about the
-    /// <i>booker</i>, anything that is an address or a number whatever it is attached to, and a
-    /// bare <c>Name</c> or <c>Contact</c>, which unqualified can only mean the person.
+    /// Inverted, the guess disappears: anything not on this list fails, whatever it is called.
+    /// Adding a legitimate member means adding it here, which is a deliberate act with this
+    /// comment in front of it — and that is the point, because the question "could this carry
+    /// something about the person?" is exactly the one worth forcing.
     /// </para>
     /// </remarks>
-    private static bool LooksLikeBookerContact(PropertyInfo property)
-    {
-        var name = property.Name;
+    private static readonly string[] PermittedInternalMembers =
+    [
+        nameof(InternalMessageModel.Kind),
+        nameof(InternalMessageModel.Status),
+        nameof(InternalMessageModel.Reference),
+        nameof(InternalMessageModel.ServiceName),
+        nameof(InternalMessageModel.ResourceNames),
+        nameof(InternalMessageModel.LocalStart),
+        nameof(InternalMessageModel.LocalEnd),
+        nameof(InternalMessageModel.TimeZoneId),
+        nameof(InternalMessageModel.AwaitsApproval),
+        nameof(InternalMessageModel.BackofficeUrl),
 
-        return name.Contains("Booker", StringComparison.OrdinalIgnoreCase)
-            || name.Contains("Email", StringComparison.OrdinalIgnoreCase)
-            || name.Contains("Phone", StringComparison.OrdinalIgnoreCase)
-            || name.Contains("Telephone", StringComparison.OrdinalIgnoreCase)
-            || name.Equals("Name", StringComparison.OrdinalIgnoreCase)
-            || name.Equals("Contact", StringComparison.OrdinalIgnoreCase);
-    }
+        // Compiler-generated on every record. Not data.
+        "EqualityContract",
+    ];
 
-    private static IReadOnlyList<string> ContactLookingMembersOf(Type type)
-        => [.. type
-            .GetProperties(BindingFlags.Public | BindingFlags.Instance)
-            .Where(LooksLikeBookerContact)
-            .Select(p => p.Name)];
+    /// <summary>
+    /// Everything a type exposes publicly — properties AND fields, inherited included.
+    /// </summary>
+    /// <remarks>
+    /// Fields as well as properties because the rule is about what content can reach, and a
+    /// public field is just as reachable. Records make one unlikely; "unlikely" is not the
+    /// standard this particular guarantee is held to.
+    /// </remarks>
+    private static IReadOnlyList<string> PublicSurfaceOf(Type type)
+        => [.. type.GetProperties(BindingFlags.Public | BindingFlags.Instance).Select(m => m.Name)
+            .Concat(type.GetFields(BindingFlags.Public | BindingFlags.Instance).Select(m => m.Name))
+            .Order(StringComparer.Ordinal)];
 
     [Fact]
     public void The_internal_model_exposes_no_contact_detail_member()
@@ -509,13 +612,18 @@ public class BookingMessageModelContractTests
         // THE WHOLE PUBLIC SURFACE, inherited members included. Declared-only would miss a
         // member added to the shared base — which is exactly where a careless "just put it on
         // the base, both need it" change would put one.
-        var offending = ContactLookingMembersOf(typeof(InternalMessageModel));
+        var offending = PublicSurfaceOf(typeof(InternalMessageModel))
+            .Except(PermittedInternalMembers, StringComparer.Ordinal)
+            .ToList();
 
         Assert.True(
             offending.Count == 0,
-            "InternalMessageModel must expose nothing that could carry a booker's contact "
-            + "details — the absence IS the guarantee that a message to a configuration-file "
-            + "address list cannot leak them. Found: " + string.Join(", ", offending));
+            "InternalMessageModel exposes a member this guard does not know about: "
+            + string.Join(", ", offending)
+            + ". The absence of anything about the booker IS the guarantee that a message to a "
+            + "configuration-file address list cannot leak their details. If the new member "
+            + "genuinely carries nothing about the person, add it to PermittedInternalMembers "
+            + "— deliberately, having asked that question.");
     }
 
     [Fact]
@@ -524,7 +632,13 @@ public class BookingMessageModelContractTests
         // ANTI-VACUITY, and it is the half that matters: the test above passes trivially if the
         // word list stops matching anything. The booker's own model carries exactly these
         // members legitimately, so finding them there proves the predicate still bites.
-        var onBooker = ContactLookingMembersOf(typeof(BookerMessageModel));
+        // ANTI-VACUITY for the allow-list: the booker's own model legitimately carries exactly
+        // the members the internal one may not, so running the same comparison over it must
+        // report them. If this came back empty the rule above would be passing by inspecting
+        // nothing.
+        var onBooker = PublicSurfaceOf(typeof(BookerMessageModel))
+            .Except(PermittedInternalMembers, StringComparer.Ordinal)
+            .ToList();
 
         Assert.Contains(nameof(BookerMessageModel.BookerName), onBooker);
         Assert.Contains(nameof(BookerMessageModel.BookerEmail), onBooker);
@@ -536,12 +650,21 @@ public class BookingMessageModelContractTests
     {
         // Stated separately from the internal model's own rule, because the base is the place a
         // future change would most plausibly add one "since both audiences need it".
-        Assert.Empty(ContactLookingMembersOf(typeof(BookingMessageModel)));
+        // The base is where a careless "both audiences need it" change would put one, so it is
+        // held to the same allow-list rather than to a looser rule.
+        Assert.Empty(
+            PublicSurfaceOf(typeof(BookingMessageModel))
+                .Except(PermittedInternalMembers, StringComparer.Ordinal));
     }
 
     [Fact]
     public void The_web_composer_registers_the_renderer_and_the_boot_check()
     {
+        // NAMED FOR WHAT IT ASSERTS, and it now asserts both. The first version checked two
+        // renderer descriptors and nothing about the boot check, while its own comment claimed
+        // the check was the mitigation — deleting the AddNotificationHandler line passed the
+        // whole suite. A test whose name promises more than its body is the shape this project
+        // keeps paying for.
         // Deleting either registration disables the entire feature — every message silently
         // reverts to the package's wording and no test anywhere noticed. design.md names the
         // boot check as the mitigation for "registration silently does nothing", but the boot
@@ -552,6 +675,13 @@ public class BookingMessageModelContractTests
 
         Assert.Contains(registrations, d => d.ServiceType == typeof(IBookingTemplateRenderer));
         Assert.Contains(registrations, d => d.ServiceType == typeof(RazorBookingTemplateRenderer));
+
+        // The boot check, registered as a handler for Umbraco's application-started
+        // notification — which is how it runs at all.
+        Assert.Contains(
+            registrations,
+            d => d.ImplementationType == typeof(UBookItEmailTemplateBootCheck)
+                || d.ServiceType == typeof(UBookItEmailTemplateBootCheck));
     }
 
     [Fact]
@@ -565,7 +695,8 @@ public class BookingMessageModelContractTests
             .Compose(new ServicesOnlyUmbracoBuilder(registrations));
 
         var port = Assert.Single(
-            registrations.Where(d => d.ServiceType == typeof(IBookingTemplateRenderer)));
+            (IEnumerable<ServiceDescriptor>)registrations,
+            d => d.ServiceType == typeof(IBookingTemplateRenderer));
 
         // Registered by factory rather than by implementation type — which is what makes it
         // resolve the concrete registration instead of constructing a second one.

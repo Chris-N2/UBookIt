@@ -339,15 +339,27 @@ public class NotificationDocumentationTests
         {
             var text = RepoFiles.Read(doc);
 
+            // FIRST AND SECOND PERSON, uBookIt-named.
             DocumentationAssert.DoesNotSay(text, "uBookIt still checks");
             DocumentationAssert.DoesNotSay(text, "uBookIt will still ensure");
             DocumentationAssert.DoesNotSay(text, "your wording is still checked");
             DocumentationAssert.DoesNotSay(
                 text, "supplied content still describes the booking's state correctly");
-
-            // And the positive form of the same over-claim: a document may not promise that a
-            // template inherits the derived-from-state guarantee.
             DocumentationAssert.DoesNotSay(text, "your template will derive");
+
+            // THIRD PERSON, which the first version missed entirely — the same reassurance
+            // written about "the package" rather than to "you" passed every needle above.
+            DocumentationAssert.DoesNotSay(text, "the package still validates");
+            DocumentationAssert.DoesNotSay(text, "the package still checks");
+            DocumentationAssert.DoesNotSay(text, "the subject is still derived");
+
+            // AND THE INTERNAL OVER-CLAIM, which round 2's own new requirements made narrowable
+            // and which nothing was watching. A document telling an author that a supplied
+            // internal message still carries the reference, or still links to the backoffice,
+            // now contradicts the spec — those became the site's to include or omit.
+            DocumentationAssert.DoesNotSay(text, "still carries the reference");
+            DocumentationAssert.DoesNotSay(text, "still links to the backoffice");
+            DocumentationAssert.DoesNotSay(text, "will still identify the booking");
         }
     }
 

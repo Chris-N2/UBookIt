@@ -241,4 +241,68 @@ below is mutation-proved against QA's own attack where QA supplied one.
       transport, which apply had measured false; both corrected in place with the reason.
       `BookingMessage`'s new positional parameter is called out as BREAKING in Impact (the 2-arity
       `Deconstruct` is gone). The proposal's claim that "the retention job already runs that way"
-      implied it sends mail; it does not, and the sentence is removed.
+      implied it sends mail; it does not. **Round 2 correction: it was removed from
+      `proposal.md` only** — it stood in `design.md` §6 and in two XML doc comments, in the very
+      commit recording its removal. Now gone from all four, each replaced with the accurate
+      statement that no sender outside a request exists yet and the requirement is anticipatory.
+
+## 11. QA round 2 — REJECT (one CRITICAL, four MAJOR, two MINOR, one NIT)
+
+**A round-1 fix caused the round-2 CRITICAL** — the pattern this project has now hit on four
+consecutive changes, and one I explicitly warned the reviewer about in the round-2 handover
+before doing it myself.
+
+- [x] 11.1 **CRITICAL — the 10.9 performance fix corrupted the published model.**
+      `DescribeStructuredAsync` reconstituted `ResourceNames` by splitting the joined "What:" line
+      on `", "`, so a resource an editor named `"Studio 2, Ground Floor"` reached content as TWO
+      resources — a booking that does not exist, in a member frozen at 17.0.0, and precisely what
+      design.md §3 and the member's own doc comment forbid in as many words. The round-2 guard
+      could not see it: its fixture was `"Treatment Room"`, a sample rather than the class.
+
+      **Fixed by carrying the list, never re-deriving it.** `DescribeAsync` now returns one
+      `Described` record holding the text AND the parts, computed once; the line is derived from
+      the list and the list is never derived from the line, because joining is lossy and no
+      separator makes it otherwise. Tests on both paths use names containing the separator.
+      *The saving 10.9 was reaching for is still taken — by sharing the read, not by parsing it.*
+- [x] 11.2 **MAJOR — the round-2 predicate did not cover the class it named.** Its own remarks
+      claimed it matched "an address or a number"; it matched neither word, and QA added
+      `Address`, `Mobile`, `CustomerName` and `PlacedBy` with 1356 tests passing. **Inverted to an
+      allow-list**, so the guess disappears: anything not explicitly permitted fails, whatever it
+      is called, and adding a legitimate member is a deliberate act with the reasoning in front of
+      it. Now covers fields as well as properties. Mutation: all four caught, by name.
+- [x] 11.3 **MAJOR — nothing observed that `ForSiteAsync` uses supplied content.** Rendering the
+      internal template and discarding it passed everything, which mattered more after round 2
+      added four scenarios about what a supplied internal view owns. Two tests added.
+- [x] 11.4 **MAJOR — task 8.1 was ticked against an unread result, and the build was NOT
+      warning-free.** An `xUnit2031` warning was introduced by the round-1 commit whose headline
+      was that very lesson. **How it happened is worth recording**: the `--no-incremental` build
+      was piped to `tail -3`, which cut the warnings line off, and the follow-up `grep` ran an
+      INCREMENTAL build that did not rebuild the test project — the stale-build trap, in the
+      verification step itself. Fixed, and re-verified with `--no-incremental`.
+- [x] 11.5 **MAJOR — the boot-check registration test did not test the boot check.** Its body
+      asserted two renderer descriptors; deleting the `AddNotificationHandler` line passed.
+      Now asserted. Mutation: fails.
+- [x] 11.6 **MINOR — the retention-job sentence stood in three more places.** See 10.12.
+- [x] 11.7 **MINOR — the absence needles were first/second person only**, so the same
+      reassurance written about "the package" passed, and nothing guarded the INTERNAL over-claim
+      that round 2's own new requirements had just made narrowable. Both classes added.
+- [x] 11.9 **Live check re-run for the CRITICAL, and it passed end to end.** QA asked
+      specifically for a directly-booked booking whose resource name contains the separator,
+      rendered through a template that loops `ResourceNames`. Done on the TestSite: a resource
+      renamed to `Studio 2, Ground Floor`, a booking placed against it, and the internal
+      template's `@foreach` printed **one** line — `- Studio 2, Ground Floor`. Before the fix it
+      would have printed two. Composer → model → real Razor loop → `.eml`, not a unit rig.
+
+      *Two things learned while staging it, neither a product defect.* The dev harness picks the
+      **first resource by list order**, so renaming a resource moves it in the sort and the
+      harness silently selects a different one — which cost several minutes looking for a defect
+      that was not there; use `?resourceId=` to target one. And updating a resource through the
+      management API requires sending `directlyBookable` explicitly, since a PUT built from the
+      read model drops it. The TestSite was restored to its original state afterwards.
+
+- [x] 11.8 **NIT accepted, not fixed.** The structural no-request test checks constructor
+      parameter types — the mechanism rather than the guarantee, since a request dependency could
+      arrive through the injected `IServiceProvider`. It is deliberately paired with
+      `It_renders_with_no_ambient_request`, whose rig registers no accessor at all, so a lazy
+      resolve would fail there. The pair carries the claim; neither does alone. Recorded rather
+      than papered over.
