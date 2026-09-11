@@ -8,37 +8,46 @@ double-quoted shell string.
 
 ## 1. Persistence: table, store, resolver
 
-- [ ] 1.1 Add `ResponsibilityRow` to `Entities/Rows.cs` and map it in `UBookItDbContext` as
+- [x] 1.1 Add `ResponsibilityRow` to `Entities/Rows.cs` and map it in `UBookItDbContext` as
       `uBookItResponsibility` — four-column compound PK (`SubjectType`, `SubjectId`,
       `PartyType`, `PartyKey`), index on (`SubjectType`, `SubjectId`); discriminators are
       short normalized strings (`resource`/`service`, `user`/`group`).
-- [ ] 1.2 Add the `AddResponsibility` migration; confirm it is additive and the snapshot
+- [x] 1.2 Add the `AddResponsibility` migration; confirm it is additive and the snapshot
       matches; integration-test the fresh-database and re-run scenarios per the persistence
-      delta.
-- [ ] 1.3 Responsibility assignment store (internal, Persistence): read by subject; wholesale
-      replace by subject (idempotent — writing the same assignment twice stores once);
-      subject-must-exist enforced here so the API and any future caller share it.
-- [ ] 1.4 Extend the resource and service delete paths to remove assignment rows in the same
+      delta. *(Migration is one CreateTable + one CreateIndex; the table joined
+      `MigrationTests.Fresh_database_has_all_tables`, and the re-run test covers it by
+      construction.)*
+- [x] 1.3 Responsibility assignment store (public port in Persistence, `SqlResponsibilityStore`
+      internal): read by subject; wholesale replace by subject (idempotent — writing the same
+      assignment twice stores once); subject-must-exist enforced here so the API and any
+      future caller share it. Replace takes the subject's own config app lock, so a replace
+      racing the owner's delete serializes — the lock does the job the missing FK would have.
+- [x] 1.4 Extend the resource and service delete paths to remove assignment rows in the same
       operation; integration tests per the "do not outlive their subject" requirement,
-      including that a recycled id inherits nothing.
-- [ ] 1.5 `ResponsibleRecipientResolver`: one query for the booking's subjects (service
-      attribution + all claims), user resolution via `IUserService.GetAsync`, group members
-      via `FilterAsync` with `IncludedUserGroups` + allowed states, **paged to exhaustion**;
-      state rule Active/Inactive/LockedOut in, Disabled/Invited out; skip empty addresses;
-      case-insensitive dedup. Unit-test with a fake user service, including a page-size-1
-      fake proving the paging loop, and a mutation check on the state rule (each excluded
-      state individually — enumerate the class, not one sample).
+      including that a recycled id inherits nothing (`Subject_types_do_not_cross_match` covers
+      the discriminator half).
+- [x] 1.5 `ResponsibleRecipientResolver`: one query for the booking's subjects (service
+      attribution + all claims); state rule Active/Inactive/LockedOut in, Disabled/Invited
+      out; skip empty addresses; case-insensitive dedup. **Implementation diverged from the
+      planned `IUserService.FilterAsync`, deliberately**: FilterAsync requires a requesting
+      user (none exists in a background send), applies that user's visibility rules, and
+      fails the whole call when any group key is dangling — so groups resolve one by one via
+      `IUserGroupService.GetAsync` + `GetAllInGroup`, behind a logic-free
+      `IUmbracoUserDirectory` seam (no paging loop exists any more; the planned page-size-1
+      test went with it). Unit tests give every state-rule arm its own test with its own
+      direction, so flipping any single arm fails a named test; handler mutations (union
+      dropped, event gate widened) were run live and caught (3 and 8 failures).
 
 ## 2. Sending: the union in BookingEmailHandler
 
-- [ ] 2.1 Rework the `toSite` gate: flat list presence OR any assignment rows exist for the
+- [x] 2.1 Rework the `toSite` gate: flat list presence OR any assignment rows exist for the
       booking's subjects (cheap indexed existence check), full resolution only after the
       host-can-send check. Preserve and re-state the load-bearing ordering comments
       ("asked before the host is"; a site with nothing configured must not touch the
       database or the mail host).
-- [ ] 2.2 Send the internal message to `InternalRecipients ∪ resolved`, deduplicated
+- [x] 2.2 Send the internal message to `InternalRecipients ∪ resolved`, deduplicated
       case-insensitively; booker direction untouched; events untouched.
-- [ ] 2.3 Handler-level tests for the delta scenarios: responsibility alone enables the site
+- [x] 2.3 Handler-level tests for the delta scenarios: responsibility alone enables the site
       direction; union not precedence; one-person-many-routes gets one message; nothing
       assigned + no list + booker off sends nothing; erased-booker behaviour unchanged with
       resolved recipients. Vary fixtures so no two scenarios pass for the same reason.

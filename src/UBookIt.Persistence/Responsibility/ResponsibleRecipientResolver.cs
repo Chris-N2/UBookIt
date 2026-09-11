@@ -1,6 +1,5 @@
 using UBookIt.Core.Bookings;
 using Umbraco.Cms.Core.Models.Membership;
-using Umbraco.Cms.Core.Services;
 
 namespace UBookIt.Persistence.Responsibility;
 
@@ -15,9 +14,8 @@ namespace UBookIt.Persistence.Responsibility;
 /// requesting user (there is none in a background send), applies that user's visibility
 /// rules to the answer, and fails the whole call when any group key does not resolve —
 /// each of which is wrong here. A dangling group must resolve to nothing, silently,
-/// while every other assignment still resolves; so groups are walked one by one via
-/// <see cref="IUserGroupService.GetAsync(Guid)"/> and
-/// <see cref="IUserService.GetAllInGroup(int?)"/>.
+/// while every other assignment still resolves; so groups are walked one by one through
+/// <see cref="IUmbracoUserDirectory"/>.
 /// </para>
 /// <para>
 /// <b>The state rule</b> (spec: "Resolution skips who cannot or will not act, silently"):
@@ -29,8 +27,7 @@ namespace UBookIt.Persistence.Responsibility;
 /// </remarks>
 internal sealed class ResponsibleRecipientResolver(
     IResponsibilityStore store,
-    IUserService userService,
-    IUserGroupService userGroupService)
+    IUmbracoUserDirectory directory)
     : IResponsibleRecipientResolver
 {
     public Task<bool> HasAssignmentsAsync(Booking booking, CancellationToken cancellationToken = default)
@@ -50,7 +47,7 @@ internal sealed class ResponsibleRecipientResolver(
                 case ResponsibilityPartyKind.User:
                     // A miss is a dangling assignment: expected, silent, and nobody
                     // else's message is affected.
-                    var user = await userService.GetAsync(assignment.Key).ConfigureAwait(false);
+                    var user = await directory.GetUserAsync(assignment.Key).ConfigureAwait(false);
                     AddIfReceives(addresses, user);
                     break;
 
@@ -78,12 +75,12 @@ internal sealed class ResponsibleRecipientResolver(
             statuses.Add(assignment.Kind switch
             {
                 ResponsibilityPartyKind.User =>
-                    await userService.GetAsync(assignment.Key).ConfigureAwait(false) is { } user
+                    await directory.GetUserAsync(assignment.Key).ConfigureAwait(false) is { } user
                         ? new ResponsibilityPartyStatus(
                             assignment, Exists: true, user.Name, user.UserState.ToString())
                         : Missing(assignment),
                 _ =>
-                    await userGroupService.GetAsync(assignment.Key).ConfigureAwait(false) is { } group
+                    await directory.GetGroupAsync(assignment.Key).ConfigureAwait(false) is { } group
                         ? new ResponsibilityPartyStatus(
                             assignment, Exists: true, group.Name, UserState: null)
                         : Missing(assignment),
@@ -98,12 +95,11 @@ internal sealed class ResponsibleRecipientResolver(
 
     private async Task<IEnumerable<IUser>> MembersAsync(Guid groupKey)
     {
-        // Key to int id first: the group-membership read is only published against the
-        // integer id. A missing group resolves to no members, on the same silent terms
-        // as a missing user.
-        var group = await userGroupService.GetAsync(groupKey).ConfigureAwait(false);
+        // A missing group resolves to no members, on the same silent terms as a
+        // missing user.
+        var group = await directory.GetGroupAsync(groupKey).ConfigureAwait(false);
 
-        return group is null ? [] : userService.GetAllInGroup(group.Id);
+        return group is null ? [] : directory.GetMembers(group);
     }
 
     private static void AddIfReceives(HashSet<string> addresses, IUser? user)
