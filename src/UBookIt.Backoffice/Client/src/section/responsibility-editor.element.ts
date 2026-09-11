@@ -153,22 +153,24 @@ export class UBookItResponsibilityEditorElement extends UmbLitElement {
   }
 
   override render() {
+    // INTENDED, both halves (QA round 1 named the tension): an untouched save keeps a
+    // dangling assignment, because the picker state was seeded from the loaded set — but
+    // the moment an operator CHANGES a picker, its selection replaces that state, and a
+    // deleted party's key cannot be in a picker's selection, so the next save drops it
+    // FROM THAT PICKER (the other picker's state is untouched and keeps its entries).
+    // The write is wholesale by spec ("what is saved is what was seen"), the marks list
+    // is display rather than state, and a dangling assignment sends nothing either way —
+    // editing a picker is exactly the moment its stale entries should go. A JS comment,
+    // not an HTML one, so it stays out of the rendered DOM and the bundle.
+    //
+    // The hint paragraph below is the not-permissions boundary, stated where the
+    // assignment happens — the copy lives in ubookitResponsibility_hint.
     return html`
       <uui-box headline=${this.#term("headline")}>
-        <!-- The boundary, stated where the assignment happens: this is who is
-             emailed, and it is not permissions. -->
         <p class="hint">${this.#term("hint")}</p>
 
         ${this._error ? html`<p class="error" role="alert">${this._error}</p>` : nothing}
 
-        <!-- INTENDED, both halves (QA round 1 named the tension): an untouched save
-             keeps a dangling assignment, because the state below was seeded from the
-             loaded set — but the moment an operator CHANGES a picker, its selection
-             replaces that state, and a deleted party's key cannot be in a picker's
-             selection, so the next save drops it. The write is wholesale by spec
-             ("what is saved is what was seen"), the marks list is display rather than
-             state, and a dangling assignment sends nothing either way — an operator
-             editing who is responsible is exactly the moment stale entries should go. -->
         <h3 class="picker-heading">${this.#term("users")}</h3>
         <umb-user-input
           .selection=${this._users}
