@@ -1,10 +1,29 @@
 @using UBookIt.Web.Rendering
 @model BookingConfirmationModel
 
-<section class="ubookit-confirmation" aria-label="Booking confirmed">
-    <h2>Booking confirmed</h2>
+@{
+    @* Derived from the placed booking's status, never assumed: a heading saying "confirmed"
+       over a booking stored as Requested would be false at the moment it renders. The same
+       string feeds the heading and the region's accessible name so the two cannot drift. *@
+    var heading = Model.IsPending ? "Booking request received" : "Booking confirmed";
+}
+<section class="ubookit-confirmation" aria-label="@heading">
+    <h2>@heading</h2>
 
-    <p>Thank you, @Model.BookerName. Your booking is confirmed.</p>
+    @if (Model.IsPending)
+    {
+        @* No promise of an email: whether one arrives depends on configuration this page
+           cannot see. The reference is what the visitor holds either way. *@
+        <p>
+            Thank you, @Model.BookerName. We have received your booking request — it is not
+            confirmed yet. The site will confirm or decline it; please quote the reference
+            below if you contact them about it.
+        </p>
+    }
+    else
+    {
+        <p>Thank you, @Model.BookerName. Your booking is confirmed.</p>
+    }
 
     <dl>
         <dt>Reference</dt>

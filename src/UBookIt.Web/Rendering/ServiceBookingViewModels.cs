@@ -238,6 +238,13 @@ public sealed class ServiceConfirmationModel
     /// </summary>
     public required string Reference { get; init; }
 
+    /// <summary>
+    /// Whether the placed booking awaits the site's confirmation — see
+    /// <c>BookingConfirmationModel.IsPending</c>; a service booking needs it for exactly the
+    /// same reason a direct one does.
+    /// </summary>
+    public bool IsPending { get; init; }
+
     public required string ServiceName { get; init; }
 
     /// <summary>Every resource the service resolved to, in the order the booking claims them.</summary>

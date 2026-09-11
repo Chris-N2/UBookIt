@@ -242,6 +242,10 @@ public static class ViewFixtures
         {
             yield return new ViewCase(view, "with phone", Confirmation("07700 900123"));
             yield return new ViewCase(view, "no phone", Confirmation(null));
+
+            // Placement under AutoConfirm off: the booking is stored as Requested and the
+            // page must say received-not-confirmed rather than confirmed.
+            yield return new ViewCase(view, "pending", Confirmation("07700 900123", isPending: true));
         }
 
         foreach (var view in new[]
@@ -260,6 +264,9 @@ public static class ViewFixtures
         yield return new ViewCase(
             ViewInventory.ServiceConfirmation, "several resources, no phone",
             ServiceConfirmation(["Treatment Room", "Ada"], null));
+        yield return new ViewCase(
+            ViewInventory.ServiceConfirmation, "pending",
+            ServiceConfirmation(["Treatment Room", "Ada"], "07700 900123", isPending: true));
 
         yield return new ViewCase(
             ViewInventory.ServiceUnavailable, "not fulfillable",
@@ -547,11 +554,12 @@ public static class ViewFixtures
     public static ServiceConfirmationModel ServiceConfirmationModel()
         => ServiceConfirmation(["Treatment Room", "Ada"], "07700 900123");
 
-    private static BookingConfirmationModel Confirmation(string? phone)
+    private static BookingConfirmationModel Confirmation(string? phone, bool isPending = false)
         => new()
         {
             BookingId = new Guid("00000000-0000-0000-0000-0000000000b1"),
             Reference = "7QX4-M2NP",
+            IsPending = isPending,
             ResourceName = "Meeting Room A",
             LocalStart = "Thursday 20 August 2026, 09:00",
             LocalEnd = "10:00",
@@ -560,12 +568,14 @@ public static class ViewFixtures
             BookerPhone = phone,
         };
 
-    private static ServiceConfirmationModel ServiceConfirmation(string[] resources, string? phone)
+    private static ServiceConfirmationModel ServiceConfirmation(
+        string[] resources, string? phone, bool isPending = false)
         => new()
         {
             BookingId = new Guid("00000000-0000-0000-0000-0000000000b2"),
             Reference = "5KGT-BW9D",
             ServiceName = "Massage",
+            IsPending = isPending,
             ResourceNames = resources,
             LocalStart = "Thursday 20 August 2026, 09:00",
             LocalEnd = "10:00",

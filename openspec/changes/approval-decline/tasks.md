@@ -92,12 +92,12 @@
 
 ## 7. Front end
 
-- [ ] 7.1 Add the placed booking's status to `BookingConfirmationModel` and the service
+- [x] 7.1 Add the placed booking's status to `BookingConfirmationModel` and the service
       confirmation model (additive members; theme contract note updated in
       `UBookItThemeContract` remarks if any).
-- [ ] 7.2 Branch `Confirmation.cshtml` and `ServiceConfirmation.cshtml`: heading, `aria-label`,
+- [x] 7.2 Branch `Confirmation.cshtml` and `ServiceConfirmation.cshtml`: heading, `aria-label`,
       and lead sentence derive from status; everything else identical in both states.
-- [ ] 7.3 Tests: both views in both states (the "every branch a view carries can be taken" and
+- [x] 7.3 Tests: both views in both states (the "every branch a view carries can be taken" and
       "a view renders every state its model can express" requirements now bind these views);
       the pending render contains no "confirmed" claim — wrap-safe absence assertion; the
       pending render still shows reference, interval, what was booked, booker details.
