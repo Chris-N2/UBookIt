@@ -131,12 +131,34 @@ assembly compiles.)*
 
 ## 8. Verification
 
-- [ ] 8.1 Clean Release build, zero warnings; full .NET and client suites green; strict validate.
-- [ ] 8.2 Live on the TestSite, pickup directory cleared first: no templates → messages identical
+- [x] 8.1 Clean Release build, zero warnings; full .NET and client suites green; strict validate.
+- [x] 8.2 Live on the TestSite, pickup directory cleared first: no templates → messages identical
       to 0.6.0; supply `BookerPlaced` as plain text → used, subject default; state a subject →
       used; state `IsHtml` and supply HTML → arrives as HTML; break a template → fallback body
       arrives and the log names the failure; supply `InternalPlaced` → arrives with no contact
       details. Boot log lists supplied and unsupplied.
-- [ ] 8.3 **Prove the no-request path for real**, not only in a unit test — the honest way is a
+- [x] 8.3 **Prove the no-request path for real**, not only in a unit test — the honest way is a
       message sent from the retention sweep's execution path or an equivalent with no request.
       If that cannot be staged, say so explicitly and record what was actually proved.
+
+## 9. What the live check found, recorded rather than left in a log
+
+- [x] 9.1 **A referenced assembly's template beats the site's own file at the same path**, and
+      that is probably backwards. Observed live: the TestSite referenced the fixture assembly,
+      both supplied `BookerPlaced.cshtml` at the same path, and the assembly's rendered. The
+      site's own file won wherever the assembly supplied nothing (`InternalCancelled`), so loose
+      site files DO work — runtime compilation resolves them, and a stated subject from one was
+      used. What is unspecified is which wins when both exist.
+
+      **Not fixed here, and the reasoning is recorded rather than the conclusion assumed.** The
+      spec requires only that both sources work, which they do. The collision is an artifact of a
+      test site referencing a test fixture; a real site referencing a template package is
+      possible but not yet a thing that exists. Changing it means fighting the view engine's
+      compiled-versus-runtime precedence, which is scope this change did not budget and which
+      `theming` had to spend a whole boot check on last time. **Recorded as a deferred obligation
+      and named in the docs is the honest minimum** — a site author who does hit it should not
+      have to discover it from a message that ignored their file.
+
+- [x] 9.2 **The boot check earned itself immediately.** It was what revealed the assembly's
+      templates were being discovered at all — before any message was sent, and before the
+      collision above could have been mistaken for "templates do not work".

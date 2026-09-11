@@ -180,6 +180,16 @@ says which time zone it is quoting. What it gives you is everything needed to be
   but because `InternalMessageModel` has no member for them. If you want them there, send that
   message yourself from the notifications below; uBookIt will not do it for you.
 
+#### Templates supplied by a package
+
+A referenced assembly can supply templates too — a Razor class library with the same
+`Views/Partials/UBookIt/Emails/` folder, precompiled, works without the site copying anything.
+
+**One caveat worth knowing before you rely on it:** if both a referenced assembly and your own
+site supply the same file name, the assembly's currently wins. Your own file is used wherever the
+assembly supplies none. If you need to override one a package gave you, the reliable route today
+is to ask the package not to supply it rather than to shadow it.
+
 #### When something is wrong
 
 At startup uBookIt logs which messages have content supplied and which are using its own wording,
