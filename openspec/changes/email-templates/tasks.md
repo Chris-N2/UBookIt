@@ -41,17 +41,17 @@ requirement destroys guarantees silently").
       `BookingMessageKind` and the models carry `Kind`. No move, no breaking change, one concept
       instead of two, and each enum member is literally the file name a template is saved under.
       `BookingEvent` stays where it is as Persistence's internal wiring.
-- [ ] 1.4 Tests: the internal model exposes no contact-detail member **by reflection over its
+- [x] 1.4 Tests: the internal model exposes no contact-detail member **by reflection over its
       public surface**, not by inspecting a hand-written list — the guard must see a member added
       later. The name set matches the events × audiences the package actually sends.
 
 ## 2. Persistence: build the models, ask the renderer, keep every policy
 
-- [ ] 2.1 `BookingMessageComposer` takes `IBookingTemplateRenderer?` and builds the models. All
+- [x] 2.1 `BookingMessageComposer` takes `IBookingTemplateRenderer?` and builds the models. All
       existing decisions stay here: audience, erased booker, `DescribeAsync` and its catch, PII.
-- [ ] 2.2 Ask the renderer; on "no template" **or** "failed", fall back to today's plain text. A
+- [x] 2.2 Ask the renderer; on "no template" **or** "failed", fall back to today's plain text. A
       failure is logged distinguishably from an absence, and the booking id only — never a booker.
-- [ ] 2.3 A stated subject wins; no stated subject keeps the package's. `IsHtml` defaults false.
+- [x] 2.3 A stated subject wins; no stated subject keeps the package's. `IsHtml` defaults false.
 - [ ] 2.4 Tests: **with no renderer registered, every message is byte-identical to today** (this
       is the migration guarantee and it is a test, not an aspiration — assert against the current
       expected strings). Renderer returning no-template → same. Renderer throwing → fallback
