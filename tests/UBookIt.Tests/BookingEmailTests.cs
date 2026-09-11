@@ -220,6 +220,130 @@ public class BookingEmailTests
         Assert.Equal("desk@example.com", Assert.Single(message.To));
     }
 
+    // ---- confirmation and decline (approval-decline) ------------------------------------------
+
+    /// <summary>
+    /// Confirm and decline are told to the booker only: the site's own people — or a colleague —
+    /// performed the action, and the bookings screen is where its state lives. Both directions are
+    /// enabled here precisely so that an internal message, if one were wrongly sent, had every
+    /// opportunity to appear.
+    /// </summary>
+    [Theory]
+    [InlineData(BookingEvent.Confirmed, BookingStatus.Confirmed, "Your booking is confirmed")]
+    [InlineData(BookingEvent.Declined, BookingStatus.Declined, "Your booking could not be accepted")]
+    public async Task Confirm_and_decline_write_to_the_booker_only(
+        BookingEvent bookingEvent, BookingStatus status, string subject)
+    {
+        var sent = (await Send(
+            Notifications(true, ["desk@example.com"]),
+            booking: Booking(status: status),
+            bookingEvent: bookingEvent)).Sent;
+
+        var message = Assert.Single(sent);
+        Assert.Equal("ada@example.com", Assert.Single(message.To));
+        Assert.Equal(subject, message.Subject);
+    }
+
+    [Theory]
+    [InlineData(BookingEvent.Confirmed, BookingStatus.Confirmed)]
+    [InlineData(BookingEvent.Declined, BookingStatus.Declined)]
+    public async Task Confirm_and_decline_on_a_site_without_booker_emails_send_nothing_at_all(
+        BookingEvent bookingEvent, BookingStatus status)
+    {
+        // Recipients ARE configured — the direction that must stay silent is the one that is on.
+        var sent = (await Send(
+            Notifications(sendBooker: false, recipients: ["desk@example.com"]),
+            booking: Booking(status: status),
+            bookingEvent: bookingEvent)).Sent;
+
+        Assert.Empty(sent);
+    }
+
+    [Theory]
+    [InlineData(BookingEvent.Confirmed, BookingStatus.Confirmed)]
+    [InlineData(BookingEvent.Declined, BookingStatus.Declined)]
+    public async Task Confirming_or_declining_an_erased_booker_sends_nothing_to_anyone(
+        BookingEvent bookingEvent, BookingStatus status)
+    {
+        // Reachable: retention erases a booker after the booking's END, and a Requested booking
+        // can outlive its end untouched, then be resolved. No address, and no internal message
+        // is due for these events — so nothing at all.
+        var erased = Booking(status: status).Tap(b => b.EraseBooker(TestData.Now));
+
+        var sent = (await Send(
+            Notifications(true, ["desk@example.com"]), booking: erased, bookingEvent: bookingEvent)).Sent;
+
+        Assert.Empty(sent);
+    }
+
+    [Fact]
+    public async Task An_auto_confirmed_placement_is_one_booker_message_not_two()
+    {
+        // Auto-confirmation is not an event; it is what placement produced, and the placement
+        // message already says so. A second "confirmed" mail would train customers to skim.
+        var sent = (await Send(Notifications(sendBooker: true))).Sent;
+
+        var message = Assert.Single(sent);
+        Assert.Equal("Your booking is confirmed", message.Subject);
+    }
+
+    [Fact]
+    public async Task A_received_booking_promises_the_next_message()
+    {
+        var message = await Composer().ForBookerAsync(Booking(status: BookingStatus.Requested), BookingEvent.Placed);
+
+        Assert.Contains("confirms or declines", message.Body, StringComparison.Ordinal);
+        // And nothing in the message claims the booking IS confirmed — the subject says
+        // received, and the body must not contradict it. The needle is the claim ("is
+        // confirmed"), which the pending wording is written to avoid entirely — "not
+        // confirmed yet" and "confirms or declines" both stay out of its way, so any hit
+        // here is a genuine contradiction rather than a phrasing accident.
+        Assert.DoesNotContain("is confirmed", message.Body, StringComparison.OrdinalIgnoreCase);
+    }
+
+    [Fact]
+    public async Task The_internal_message_flags_a_booking_awaiting_approval()
+    {
+        var booking = Booking(status: BookingStatus.Requested);
+        var message = await Composer()
+            .ForSiteAsync(booking, BookingEvent.Placed, new Uri("https://site.example/umbraco"));
+
+        Assert.Contains("awaiting approval", message.Subject, StringComparison.Ordinal);
+        Assert.Contains("awaits approval", message.Body, StringComparison.Ordinal);
+        // The link rides with the flag: the message says act, and where.
+        Assert.Contains("https://site.example/umbraco", message.Body, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public async Task A_confirmed_placement_does_not_claim_an_approval_is_awaited()
+    {
+        var message = await Composer()
+            .ForSiteAsync(Booking(), BookingEvent.Placed, new Uri("https://site.example/umbraco"));
+
+        // The broad needle, deliberately: any wording about approval on a confirmed placement
+        // is wrong, not just the exact sentence the requested branch emits today.
+        Assert.DoesNotContain("approval", message.Subject, StringComparison.OrdinalIgnoreCase);
+        Assert.DoesNotContain("approval", message.Body, StringComparison.OrdinalIgnoreCase);
+    }
+
+    [Fact]
+    public async Task The_awaiting_approval_message_still_carries_no_booker()
+    {
+        var booking = Booking(status: BookingStatus.Requested);
+        var message = await Composer()
+            .ForSiteAsync(booking, BookingEvent.Placed, new Uri("https://site.example/umbraco"));
+
+        // GUIDs out of the haystack before names are looked for in it — "Ada" is three hex
+        // digits, and the reference display is alphanumeric too. Same fix, same reason, as the
+        // log-line guard below.
+        var haystack = AnyGuid.Replace(message.Subject + "\n" + message.Body, "{guid}");
+
+        Assert.DoesNotContain("Ada", haystack.Replace(booking.Reference.Display, "{ref}"), StringComparison.OrdinalIgnoreCase);
+        Assert.DoesNotContain("Lovelace", haystack, StringComparison.OrdinalIgnoreCase);
+        Assert.DoesNotContain("ada@example.com", haystack, StringComparison.OrdinalIgnoreCase);
+        Assert.DoesNotContain("07700", haystack, StringComparison.Ordinal);
+    }
+
     [Fact]
     public async Task Messages_are_plain_text_with_no_sender_of_our_own()
     {
@@ -578,13 +702,20 @@ public class BookingEmailTests
 
         booking ??= Booking();
 
-        if (bookingEvent == BookingEvent.Cancelled)
+        switch (bookingEvent)
         {
-            await handler.HandleAsync(new BookingCancelledNotification(booking), CancellationToken.None);
-        }
-        else
-        {
-            await handler.HandleAsync(new BookingPlacedNotification(booking), CancellationToken.None);
+            case BookingEvent.Cancelled:
+                await handler.HandleAsync(new BookingCancelledNotification(booking), CancellationToken.None);
+                break;
+            case BookingEvent.Confirmed:
+                await handler.HandleAsync(new BookingConfirmedNotification(booking), CancellationToken.None);
+                break;
+            case BookingEvent.Declined:
+                await handler.HandleAsync(new BookingDeclinedNotification(booking), CancellationToken.None);
+                break;
+            default:
+                await handler.HandleAsync(new BookingPlacedNotification(booking), CancellationToken.None);
+                break;
         }
 
         return sender;

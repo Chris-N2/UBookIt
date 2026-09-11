@@ -30,7 +30,7 @@
 
 ## 3. Persistence: settings resolution, notifications, observer
 
-- [ ] 3.1 Bind `UBookIt:AutoConfirm` in `UBookItPersistenceComposer.ResolveSettings`: absent →
+- [x] 3.1 Bind `UBookIt:AutoConfirm` in `UBookItPersistenceComposer.ResolveSettings`: absent →
       `true` silently; written-but-unreadable → `true` + error logged naming the setting
       (retention-period precedent); readable `false` → off. Tests for all three, including
       that the absent case logs nothing.
@@ -39,7 +39,7 @@
       handler-throws caveat; package-sends-nothing caveat).
 - [x] 3.3 Extend `UmbracoBookingObserver` with the two new publications through the existing
       swallow-and-log path (booking id only in the log line — the PII rule is unchanged).
-- [ ] 3.4 Tests: each notification published once on success, not on failure; the observer's
+- [x] 3.4 Tests: each notification published once on success, not on failure; the observer's
       catch still logs id-only.
 
 ## 4. Emails
@@ -52,7 +52,7 @@
 - [x] 4.3 Internal placement message: when the announced booking is `Requested`, state that it
       awaits approval — derived from `Booking.Status`, never from the setting; still no booker
       name/address/phone; the backoffice link unchanged.
-- [ ] 4.4 Tests: confirm → booker message with confirmed wording, zero internal messages;
+- [x] 4.4 Tests: confirm → booker message with confirmed wording, zero internal messages;
       decline → declined wording, zero internal; decline with booker emails disabled → zero
       messages total; auto-confirmed placement → exactly one booker message; erased booker on
       confirm/decline → nothing sent to anyone; requested placement's internal message states
@@ -64,9 +64,12 @@
 
 - [x] 5.1 Add `POST /bookings/{id}/confirm` and `POST /bookings/{id}/decline` to the backoffice
       `BookingsController`: same authorization policy and swagger group as cancel, same
-      failure mapping (`booking-not-found` → 404, `invalid-status-transition` → 409),
+      failure mapping (`booking-not-found` → 404; `invalid-status-transition` → 400 with the
+      stable code, as ApiResults.ToProblemResult maps it for cancel — 409 is reserved for
+      resource-in-use),
       purpose-built response models carrying identity + new status (no list-row imitation).
-- [ ] 5.2 Endpoint tests: success both verbs; wrong-status 409; unknown-id 404 distinct;
+- [x] 5.2 Endpoint tests: success both verbs; wrong-status 400 carrying the stable
+      invalid-status-transition code; unknown-id 404, distinct;
       unauthenticated 401 with no change; declined booking still enumerable by the list and
       its booker still erasable.
 

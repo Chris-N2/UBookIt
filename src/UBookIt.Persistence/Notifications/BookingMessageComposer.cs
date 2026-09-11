@@ -183,9 +183,9 @@ public sealed class BookingMessageComposer(
             : booking.Status switch
             {
                 BookingStatus.Requested =>
-                    "This booking is not confirmed yet. You will receive another message when it "
-                    + "is confirmed or declined. Please quote the reference above if you need to "
-                    + "get in touch about this booking.",
+                    "This booking is not confirmed yet. You will receive another message when "
+                    + "the site confirms or declines it. Please quote the reference above if you "
+                    + "need to get in touch about this booking.",
                 BookingStatus.Declined =>
                     "The time has not been reserved. If that is unexpected, quote the reference "
                     + "above when you get in touch.",

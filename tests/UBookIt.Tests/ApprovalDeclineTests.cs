@@ -311,6 +311,23 @@ public class ApprovalDeclineTests
     }
 
     [Fact]
+    public async Task A_declined_bookings_booker_is_still_erasable()
+    {
+        // A person the site turned away holds their details exactly as firmly as one it
+        // served — decline must not put a booking beyond the reach of erasure.
+        var (bookings, store, _) = Wire(autoConfirm: false);
+        var booking = await PlaceRequestedAsync(bookings);
+        Assert.True((await bookings.DeclineAsync(booking.Id)).Succeeded);
+
+        var erased = await bookings.EraseBookerAsync(booking.Id);
+
+        Assert.True(erased.Succeeded);
+        var stored = await store.GetBookingAsync(booking.Id);
+        Assert.Null(stored!.Booker.Contact);
+        Assert.Equal(BookingStatus.Declined, stored.Status);
+    }
+
+    [Fact]
     public async Task A_requested_booking_can_be_cancelled_without_being_confirmed_first()
     {
         // The booker-withdrew path: the status machine has always permitted it, and this pins
