@@ -29,6 +29,9 @@ an owner:
       truthful conditional (the correction rider).
 - [x] 0.7 `persistence` / "Package composition registers persistence and Core services" —
       carried verbatim; gains the `AutoConfirm` resolution rule and its three scenarios.
+- [x] 0.8 `delivery-api` / "Booking placement" and "Service booking placement" — carried
+      verbatim; each gains the status-values contract statement and a pending-placement
+      scenario, and the success scenarios name the setting they assume.
 - [x] 0.9 `privacy-notice` / "The package states only what it can keep true, and the site links its own policy" — added in QA round 1. Carried verbatim: the policy-link rules, the
       division-by-who-can-know, the say-it-where-sent / say-nothing-where-not pair, the
       condition-governs-both rule, the binds-every-surface clause and the historical note. Added:
@@ -36,9 +39,6 @@ an owner:
       single one. One scenario's THEN changes from "the booking will be confirmed to that
       address" to messages-about-the-booking, and a scenario for the approval case is added; no
       other scenario is touched.
-- [x] 0.8 `delivery-api` / "Booking placement" and "Service booking placement" — carried
-      verbatim; each gains the status-values contract statement and a pending-placement
-      scenario, and the success scenarios name the setting they assume.
 
 ## 1. Core: the setting and the placement branch
 
@@ -207,11 +207,21 @@ in ㉘ firing exactly as intended, one change later. 9.2 below still stands for 
       three claims above. Mutation-checked: README + wrapped + by addition → fails.
 - [x] 9a.5 **MAJOR** — `BookingsController`'s XML doc still said cancellation was "the second
       and last of v1's management verbs" and that approving and declining were "not here", in
-      the class that had just gained both endpoints, shipped in the package's `.xml`.
+      the class that had just gained both endpoints. *(Round 2 correction: this task and its
+      commit message said that doc "ships in the package's `.xml`". It does not — no project
+      sets `GenerateDocumentationFile`, so no XML doc file is produced or packed, and nothing
+      feeds these comments to Swashbuckle. The sentence was wrong in the same way in QA's own
+      round-1 finding. It was still worth fixing: it is read by anyone opening the file, which
+      is how the next change inherits a false premise. Recorded rather than quietly edited,
+      because an unexamined assumption about what reaches consumers is exactly the kind of
+      thing this project keeps paying for.)*
 - [x] 9a.6 **MAJOR** — the `delivery-api` delta's only deliverable was documentation and none
       landed. Both `Status` members now carry XML docs stating that `Requested` is a value a
       successful placement returns and what a consumer must do about it, and
-      `docs/notifications.md` addresses headless consumers directly.
+      `docs/notifications.md` addresses headless consumers directly. **Given 9a.5's correction,
+      the markdown paragraph is what actually reaches a headless consumer** — the XML docs are
+      source-only and serve the next reader of this repository. The delta is discharged by the
+      paragraph; the XML docs are belt and braces, not the mechanism.
 - [x] 9a.7 **MINOR** — the three-outcome prompt rule (`proceed` / `abort` / `report-failure`)
       is extracted as `actionFor`, shared by cancel and decline, and tested — including
       extensionally, that no two outcomes collapse. The element could not be tested (no DOM in

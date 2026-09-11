@@ -237,19 +237,6 @@ public class NotificationDocumentationTests
     }
 
     /// <summary>
-    /// The claims this change falsified must not survive as claims. An over-claim survives by
-    /// ADDITION — only deleting the correction fails a positive assertion — so each needle
-    /// here is the false sentence itself, matched wrap-safely.
-    /// </summary>
-    /// <remarks>
-    /// The needles are chosen to miss the corrections: "tells nobody unless you have
-    /// configured it to" is the truthful conditional and must stay, so the needle for the
-    /// false form is the unconditional phrasing that nothing correct contains.
-    /// <c>docs/mvp.md</c> is swept too — its historical account was deliberately worded to
-    /// paraphrase rather than quote the retired sentence, precisely so this guard could
-    /// cover it without an exemption.
-    /// </remarks>
-    /// <summary>
     /// Every markdown file the repository ships, discovered rather than listed.
     /// </summary>
     /// <remarks>
@@ -261,23 +248,47 @@ public class NotificationDocumentationTests
     /// consumer. Discovery closes the class: a markdown file added later is swept without
     /// anybody remembering to add it.
     /// <para>
-    /// <c>openspec/</c> is excluded deliberately — archived changes are a historical record and
-    /// are SUPPOSED to contain sentences that were true when written. Live specs are covered by
-    /// their own capability guards.
+    /// <b>Scoped to what a consumer can actually read</b>, on one stated principle rather than a
+    /// list of exclusions. <c>openspec/</c> is out because archived changes are a historical
+    /// record and are SUPPOSED to contain sentences that were true when written; live specs are
+    /// covered by their own capability guards. <c>CLAUDE.md</c> and <c>.claude/</c> are out for
+    /// the same reason and a sharper one: they are agent tooling that ships nowhere, and
+    /// CLAUDE.md is this project's record of retired wordings, which it QUOTES on purpose.
+    /// Sweeping it would fail this guard for a false reason the first time a lesson was written
+    /// down — and a guard that cries wolf gets weakened rather than fixed.
     /// </para>
     /// </remarks>
     private static IEnumerable<string> ShippedMarkdown()
     {
         var root = RepoFiles.Root;
 
+        // The roots a CONSUMER can read: the package readme, the documentation set, and any
+        // per-project readme that goes into a .nupkg. Enumerated as roots rather than as a
+        // whole-tree walk with exclusions, which is what the first version did — 973 files
+        // visited to keep 23, through `ref/` (two full Umbraco checkouts) and `node_modules`,
+        // the two places likeliest to hold a path this cannot open or one too long to walk.
+        // SearchOption.AllDirectories implies IgnoreInaccessible = false, so either would have
+        // failed the test for a reason with nothing to do with documentation.
+        var options = new EnumerationOptions { RecurseSubdirectories = true, IgnoreInaccessible = true };
+
+        IEnumerable<string> Under(string relative, string pattern = "*.md")
+        {
+            var directory = Path.Combine(root, relative);
+
+            return Directory.Exists(directory)
+                ? Directory.EnumerateFiles(directory, pattern, options)
+                : [];
+        }
+
         return Directory
-            .EnumerateFiles(root, "*.md", SearchOption.AllDirectories)
-            .Where(path => !path.Contains($"{Path.DirectorySeparatorChar}openspec{Path.DirectorySeparatorChar}", StringComparison.Ordinal))
+            .EnumerateFiles(root, "README.md", new EnumerationOptions { IgnoreInaccessible = true })
+            .Concat(Under("docs"))
+            .Concat(Under("src", "README.md"))
             .Where(path => !path.Contains($"{Path.DirectorySeparatorChar}node_modules{Path.DirectorySeparatorChar}", StringComparison.Ordinal))
-            .Where(path => !path.Contains($"{Path.DirectorySeparatorChar}ref{Path.DirectorySeparatorChar}", StringComparison.Ordinal))
             .Where(path => !path.Contains($"{Path.DirectorySeparatorChar}bin{Path.DirectorySeparatorChar}", StringComparison.Ordinal))
             .Where(path => !path.Contains($"{Path.DirectorySeparatorChar}obj{Path.DirectorySeparatorChar}", StringComparison.Ordinal))
-            .Select(path => Path.GetRelativePath(root, path).Replace('\\', '/'));
+            .Select(path => Path.GetRelativePath(root, path).Replace(Path.DirectorySeparatorChar, '/'))
+            .Distinct(StringComparer.Ordinal);
     }
 
     [Fact]
@@ -294,6 +305,19 @@ public class NotificationDocumentationTests
         Assert.True(swept.Count >= 5, $"Only {swept.Count} markdown files found; the sweep is not reading the repository.");
     }
 
+    /// <summary>
+    /// The claims this change falsified must not survive as claims. An over-claim survives by
+    /// ADDITION — only deleting the correction fails a positive assertion — so each needle
+    /// here is the false sentence itself, matched wrap-safely.
+    /// </summary>
+    /// <remarks>
+    /// The needles are chosen to miss the corrections: "tells nobody unless you have
+    /// configured it to" is the truthful conditional and must stay, so the needle for the
+    /// false form is the unconditional phrasing that nothing correct contains.
+    /// <c>docs/mvp.md</c> is swept too — its historical account was deliberately worded to
+    /// paraphrase rather than quote the retired sentence, precisely so this guard could
+    /// cover it without an exemption.
+    /// </remarks>
     [Fact]
     public void The_claims_this_change_falsified_are_not_made_anywhere_in_the_docs()
     {

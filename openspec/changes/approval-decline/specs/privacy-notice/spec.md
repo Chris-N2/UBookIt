@@ -26,8 +26,8 @@ so neither silence nor a promise is correct everywhere:
 - Where a message **will** be sent to the booker, the notice SHALL say so. Withholding it would
   understate the processing being performed on the very page collecting the address.
 - Where a message **will not** be sent to the booker, the notice SHALL NOT state that one will,
-  and SHALL state only that the site is **able** to make contact. A notice promising a
-  confirmation on a site that sends none would assert processing the package does not perform.
+  and SHALL state only that the site is **able** to make contact. A notice promising a message
+  on a site that sends none would assert processing the package does not perform.
 
 **What it promises SHALL be that messages about the booking are sent, and SHALL NOT name a
 confirmation specifically.** A form's statement is made before placement, and what the booker
