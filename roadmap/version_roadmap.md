@@ -24,7 +24,7 @@ the reorder cost nothing.
 | 0.4.0 | **Show which dates have availability** | **A front-end feature — the API is already built.** Today the flow is `<input type="date">` with a min/max range: a visitor picks a date blind and only then learns whether anything is free. Instead, show the days that actually have availability over the next ~30 days. A date picker cannot express this; it wants a list of dates. Brought forward because it depends on nothing else and is the most visible improvement on the list. |
 | 0.5.0 | Confirmation / cancellation emails | Via `IEmailSender`, Umbraco's own mail abstraction (confirmed present in 17). To the booker and to an internal list. The notifications this hangs off already exist and already carry the whole `Booking`, reference included — nothing new is needed in the domain. **Configured in `appsettings` at this stage, deliberately**: a settings *screen* should be admin-only, which needs permissions we do not have yet, so config-file settings keep this change small and remove the dependency. |
 | 0.6.0 | Approval and decline | An `AutoConfirm` option **defaulting to on**, so the default is exactly today's behaviour. When off, placement produces `Requested`; an operator confirms or declines from the backoffice, and the booker is told either way through 0.5.0's email path — which already derives its wording from `Booking.Status` in anticipation of exactly this. `Booking.Confirm()` and `Decline()` exist and are tested; the change builds the routes into them. **Slotted before templates deliberately**: approval adds new message types, and the template scheme should be designed against the complete catalogue rather than retrofitted. *(Decided 2026-09-11 — previously "Not yet slotted".)* |
-| 0.7.0 | Email templates | Let a site define email content; partial views rather than an RTE with field tokens. **Caveat: email HTML is not web HTML** (inline styles, tables, no external stylesheet), so this is a separate rendering path, not a reuse of the theming mechanism. **This is the row that most justifies a separate package** — see "Open decisions". |
+| 0.7.0 | Email templates — **developer-facing** | A site supplies its own message content as **Razor partials at a convention path**, with an RCL able to supply them too, following Umbraco Forms' shape rather than core's (core has no email templating at all — see below). **Built into this package, not a separate one** (decided 2026-09-11). **Caveat: email HTML is not web HTML** (inline styles, tables, no external stylesheet), so this is a separate rendering path, not a reuse of the theming mechanism. **Editors editing wording in the backoffice is explicitly NOT in this row** — see "Not yet slotted". |
 | 0.8.0 | Resource / service responsibility | Who is responsible for which resource or service, by backoffice user or group — or by groups a site defines itself, as Umbraco Workflow does. **Not permissions: this decides who gets emailed** about what, and supersedes 0.5.0's flat list. Pairs with 0.6.0: who gets emailed about a pending booking is the same question as who must act on it. |
 | 0.9.0 | Control the delivery API's exposure | **Reframed from "throttling"** — see "On the public API" below. Chiefly: let a site turn the delivery API **off**, since it is currently registered on every install whether used or not; document that it is anonymous and belongs behind the host's own rate limiting; and consider a per-caller cap on the expensive availability queries. **API keys are out of scope.** |
 | 0.10.0 | Permissions model *(gated on a spike)* | Who may create resources and services, who may view and cancel bookings — via Umbraco user groups. **Partly shipped already**: the whole section can be hidden by group today; what is missing is granularity *within* it. **Do a spike first** against the Umbraco source in `ref/` to establish what the backoffice actually permits. If it proves impractical, this waits until after 17.0.0, where it would be purely additive and so allowed by the release policy. The admin-only **settings screen** rides with this. |
@@ -123,6 +123,21 @@ adding `Requested` as a reachable state cannot silently turn "your booking is co
 lie in a customer's inbox. Decline — previously its own bullet here — rides with it: confirm and
 cancel both get an email, and decline is the third thing a customer needs telling about.)*
 
+- **Editors editing email wording in the backoffice.** Deliberately **after 17.0.0**, decided
+  with the 0.7.0 scope on 2026-09-11. Two reasons: it needs the admin-only settings screen and
+  the permissions work that is itself gated on a spike (0.10.0); and **styling is not catered
+  for by the editor route at all** — email HTML wants inline styles and table layout, which an
+  RTE cannot produce sanely, so the developer route is the primary one rather than the fallback.
+  Most people installing this are developers.
+
+  **One constraint it places on 0.7.0, though.** 17.0.0 starts the compatibility promise, and
+  the developer-facing feature publishes a model type, a discovery convention and a registration
+  API that the promise then freezes. So 0.7.0 should design its **model as a token vocabulary a
+  later editor UI could expose**, rather than as whatever the shipped Razor views happen to
+  need — and should not hard-code "a template is the only possible source of content", so that a
+  stored body could later take precedence the way a theme takes precedence over a shipped view.
+  That is a design constraint on 0.7.0, not scope added to it.
+
 - **Move / amend a booking's time.** Currently a cancellation and a new booking, which loses the
   reference the customer is holding.
 - **Descriptions in the UI.** `Resource` has a `Description` and the delivery API returns it;
@@ -133,17 +148,25 @@ cancel both get an email, and decline is the third thing a customer needs tellin
 
 ## Open decisions
 
-1. **Does the email work ship as a separate package?** **Correcting myself: I cited DevExpress
-   as the precedent and that was wrong.** DevExpress is separate because its licence forbids
-   redistribution in an open-source package — a legal constraint, not an architectural
-   principle. The architectural principle does exist, but independently, and it is stated in
-   `docs/mvp.md`: *"publish the data and the seam, never the widget or the channel"*. On that
-   footing: **emails alone are probably not worth a package**, since `IEmailSender` is Umbraco's
-   own and the notification seam already exists. **Templates are the stronger case** — a
-   template editor, a rendering path and its own settings is a feature in its own right, and
-   `docs/notifications.md` currently states plainly that uBookIt sends nothing itself. Deciding
-   when templates are proposed (now 0.7.0) rather than earlier is fine; the seam means either
-   choice stays possible.
+1. ~~**Does the email work ship as a separate package?**~~ **CLOSED, 2026-09-11: no. It ships
+   in this package.** The DevExpress precedent was cited for this and was wrong — DevExpress is
+   separate because its licence forbids redistribution, a legal constraint rather than an
+   architectural principle, and no licence constrains email HTML.
+
+   What settled it, researched rather than assumed: **Umbraco Forms ships both its email
+   templates and its themes inside the Forms package**, and it is the closest comparable in the
+   ecosystem. The umbrella `UBookIt` package already references `UBookIt.Web`, so a renderer
+   living there is present on every ordinary install. And "install one thing and it works" is a
+   real adoption feature for an open-source package.
+
+   **The architectural decision underneath it matters more and is settled too**: `UBookIt.Persistence`
+   references Core only and must not gain Razor, since the email path lives there so a headless
+   consumer gets emails without the front end. So templating goes behind a **Core-defined port with
+   an optional substitute registered elsewhere**, exactly as `IBookingObserver` does — which means
+   the renderer is a separately-registered implementation either way, and packaging was never the
+   load-bearing question. Full research, including what core actually does and why
+   `SendEmailNotification` cannot change wording, is in the agent memory
+   `ubookit-email-templates-research`.
 2. **Does the permissions spike come back feasible?** Run it against the Umbraco source in
    `ref/` before committing 0.10.0 to a release. If the backoffice cannot express granularity
    within a section without fighting it, say so and defer — it is additive, so it is allowed
