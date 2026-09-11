@@ -381,6 +381,7 @@ public class BookingEmailTests
             },
             sender,
             Composer(renderer: new HtmlDeclaringRenderer()),
+            NoResponsibility.Instance,
             new StubHostingEnvironment(),
             NullLogger<BookingEmailHandler>.Instance);
 
@@ -563,6 +564,7 @@ public class BookingEmailTests
             },
             sender,
             Composer(resourceThrows: true),
+            NoResponsibility.Instance,
             new StubHostingEnvironment(),
             NullLogger<BookingEmailHandler>.Instance);
 
@@ -688,7 +690,7 @@ public class BookingEmailTests
         // What actually happens when they book.
         var sender = new RecordingEmailSender { CanSend = hostCanSendMail };
         var handler = new BookingEmailHandler(
-            settings, sender, Composer(), new StubHostingEnvironment(), NullLogger<BookingEmailHandler>.Instance);
+            settings, sender, Composer(), NoResponsibility.Instance, new StubHostingEnvironment(), NullLogger<BookingEmailHandler>.Instance);
 
         await handler.HandleAsync(new BookingPlacedNotification(Booking()), CancellationToken.None);
 
@@ -716,7 +718,7 @@ public class BookingEmailTests
 
         var sender = new RecordingEmailSender();
         var handler = new BookingEmailHandler(
-            settings, sender, Composer(), new StubHostingEnvironment(), NullLogger<BookingEmailHandler>.Instance);
+            settings, sender, Composer(), NoResponsibility.Instance, new StubHostingEnvironment(), NullLogger<BookingEmailHandler>.Instance);
 
         await handler.HandleAsync(new BookingPlacedNotification(Booking()), CancellationToken.None);
 
@@ -745,6 +747,7 @@ public class BookingEmailTests
             new SiteBookingSettings { TimeZoneId = TestData.LondonZoneId, Notifications = notifications },
             sender,
             Composer(),
+            NoResponsibility.Instance,
             new StubHostingEnvironment(),
             NullLogger<BookingEmailHandler>.Instance);
 
@@ -796,6 +799,7 @@ public class BookingEmailTests
         });
         services.AddSingleton<IResourceStore>(new StubResourceStore(true, resourceReadFails));
         services.AddSingleton<IEmailSender>(sender);
+        services.AddSingleton<UBookIt.Persistence.Responsibility.IResponsibleRecipientResolver>(NoResponsibility.Instance);
         services.AddSingleton<IHostingEnvironment>(new StubHostingEnvironment());
         services.AddSingleton<BookingMessageComposer>();
         services.AddSingleton<BookingEmailHandler>();

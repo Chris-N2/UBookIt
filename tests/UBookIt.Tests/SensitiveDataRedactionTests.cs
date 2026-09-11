@@ -445,6 +445,13 @@ public class SensitiveDataRedactionTests
             "OpenHoursRow: DayOfWeek,EndTime,Id,ResourceId,StartTime",
             "ResourceCapabilityRow: Key,ResourceId",
             "ResourceRow: Capabilities,Description,DirectlyBookable,DisplayName,Exceptions,GranularityMinutes,HorizonDays,Id,LeadTimeMinutes,MaxDurationMinutes,MinDurationMinutes,OpenHours,Type",
+
+            // Decision, resource-responsibility (roadmap 0.8.0): four keys and nothing
+            // else. The party columns reference an Umbraco user or group BY KEY — no
+            // name, no email address, nothing personal — so no booker or staff detail
+            // gains a second durable home here; the people behind the keys are resolved
+            // from Umbraco's own store at the moment they are needed.
+            "ResponsibilityRow: PartyKey,PartyType,SubjectId,SubjectType",
             "ServiceRoleCapabilityRow: Key,ServiceRoleId",
             "ServiceRoleRow: Capabilities,Count,Id,ResourceType,ServiceId,VisitorSelectable",
             "ServiceRow: DurationKind,Id,MaxDurationMinutes,MinDurationMinutes,Name,Roles",

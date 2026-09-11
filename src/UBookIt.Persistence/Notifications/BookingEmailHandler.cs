@@ -1,6 +1,7 @@
 using Microsoft.Extensions.Logging;
 using UBookIt.Core;
 using UBookIt.Core.Bookings;
+using UBookIt.Persistence.Responsibility;
 using Umbraco.Cms.Core.Events;
 using Umbraco.Cms.Core.Hosting;
 using Umbraco.Cms.Core.Mail;
@@ -47,6 +48,7 @@ public sealed class BookingEmailHandler(
     SiteBookingSettings settings,
     IEmailSender emailSender,
     BookingMessageComposer composer,
+    IResponsibleRecipientResolver responsibleRecipients,
     IHostingEnvironment hostingEnvironment,
     ILogger<BookingEmailHandler> logger)
     : INotificationAsyncHandler<BookingPlacedNotification>,
@@ -81,13 +83,24 @@ public sealed class BookingEmailHandler(
         // CONFIRM AND DECLINE ARE TOLD TO THE BOOKER ONLY. The site's own people — or a
         // colleague — performed the action, and the bookings screen is where its state lives;
         // a message telling the site what it just did would be noise that trains recipients to
-        // skim. Placement and cancellation keep both directions, as they always have.
-        var toSite = notifications.HasInternalRecipients
-            && bookingEvent is BookingEvent.Placed or BookingEvent.Cancelled;
+        // skim. Placement and cancellation keep both directions, as they always have —
+        // responsibility changes WHO the site's direction reaches, never WHEN it applies.
+        var siteEventApplies = bookingEvent is BookingEvent.Placed or BookingEvent.Cancelled;
+
+        // The site's direction is asked for through EITHER tier: the configured list, or a
+        // responsibility assignment on something this booking touches. The tiers are a union —
+        // neither switches the other off — so the gate is their disjunction. The flat list is
+        // read first because it is free; the assignment check is one indexed query against the
+        // package's own database, and runs only when the list alone says nothing.
+        var toSite = siteEventApplies
+            && (notifications.HasInternalRecipients
+                || await responsibleRecipients.HasAssignmentsAsync(booking, cancellationToken).ConfigureAwait(false));
 
         // ASKED BEFORE THE HOST IS, and that order is load-bearing. A site that has asked for
         // nothing must not be affected by its mail configuration at all — including by a host
-        // whose CanSendRequiredEmail() throws, which Umbraco's own default sender does.
+        // whose CanSendRequiredEmail() throws, which Umbraco's own default sender does. "Asked"
+        // now includes the assignment check above: our own database may be consulted before the
+        // host is, the host is never consulted for a site that asked for nothing.
         if (!notifications.SendBookerEmails && !toSite)
         {
             return;
@@ -134,11 +147,26 @@ public sealed class BookingEmailHandler(
         // an escape hatch this change declined to add on its own authority.
         if (toSite)
         {
-            var message = await composer
-                .ForSiteAsync(booking, bookingEvent, BackofficeBookingLink.For(hostingEnvironment), cancellationToken)
-                .ConfigureAwait(false);
+            // The union of the two tiers, deduplicated case-insensitively: a person in the
+            // configured list who is also a responsible party is one recipient. User lookups
+            // happen HERE, after the host check — the gate above established only that the
+            // site asked, from the package's own tables.
+            var recipients = new HashSet<string>(notifications.InternalRecipients, StringComparer.OrdinalIgnoreCase);
 
-            await SendAsync(message, [.. notifications.InternalRecipients], booking).ConfigureAwait(false);
+            recipients.UnionWith(
+                await responsibleRecipients.ResolveAddressesAsync(booking, cancellationToken).ConfigureAwait(false));
+
+            // Reachable when every assignment the gate saw resolves to nobody — a deleted or
+            // disabled user, say — and no list is configured. Nothing to send is not a fault;
+            // staleness is the editing surface's concern.
+            if (recipients.Count > 0)
+            {
+                var message = await composer
+                    .ForSiteAsync(booking, bookingEvent, BackofficeBookingLink.For(hostingEnvironment), cancellationToken)
+                    .ConfigureAwait(false);
+
+                await SendAsync(message, [.. recipients], booking).ConfigureAwait(false);
+            }
         }
 
         // `Contact is { } contact` establishes the booker is not erased, and it is the only way to
