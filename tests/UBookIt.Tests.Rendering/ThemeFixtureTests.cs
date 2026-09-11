@@ -50,6 +50,15 @@ public class ThemeFixtureTests
         expected.Add($"{UBookItThemeContract.RootFor(ThemeFixture.ThemeFixture.WrongModel)}/Components/Booking/Default.cshtml");
         expected.Add($"{UBookItThemeContract.RootFor(ThemeFixture.ThemeFixture.BaseModel)}/Components/Booking/Default.cshtml");
 
+        // The fixture assembly carries EMAIL templates as well as theme views — see its csproj,
+        // which explains why one assembly holds both. They are enumerated here rather than
+        // filtered out, so this stays an EXACT inventory: a stray file of either kind fails, and
+        // so does a deleted one. Filtering by path prefix would have let the email fixtures grow
+        // or vanish unwatched, which is precisely what this test exists to prevent.
+        expected.AddRange(
+            new[] { "BookerPlaced", "BookerConfirmed", "BookerCancelled", "InternalPlaced" }
+                .Select(name => $"/Views/Partials/UBookIt/Emails/{name}.cshtml"));
+
         var actual = DescriptorsOf(Fixture).Select(d => d.RelativePath);
 
         Assert.Equal(

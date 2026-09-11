@@ -1,6 +1,14 @@
 <Project Sdk="Microsoft.NET.Sdk.Razor">
 
   <!--
+    TWO KINDS OF FIXTURE LIVE HERE, both for the same reason: each is markup that must be
+    PRECOMPILED INTO A SEPARATE ASSEMBLY to prove anything, and one assembly is cheaper than two.
+
+      Views/Shared/UBookIt/Themes/...   theme views (below)
+      Views/Partials/UBookIt/Emails/... email content, at the path a real site would use, so the
+                                        renderer is measured discovering a template rather than
+                                        being handed one
+
     A theme, as a theme really is: an ordinary Razor class library whose views are
     precompiled into its own assembly and discovered as an application part. It
     mirrors UBookIt.Web's csproj shape (Sdk.Razor + AddRazorSupportForMvc) so the

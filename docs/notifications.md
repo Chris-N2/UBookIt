@@ -83,12 +83,134 @@ and correct, while a site accidentally requiring approval parks customers' booki
 nobody is watching for. If you meant to require approval, the value must be a readable
 `false`.
 
-### Replacing what uBookIt sends
+### Writing your own message content
+
+**Put a Razor view in `~/Views/Partials/UBookIt/Emails/`, named for the message.** uBookIt finds
+it and uses it in place of its own wording. Nothing else changes: whether a message is sent, who
+receives it, and under what configuration are still decided by the settings above.
+
+There are six messages, and each file is optional — supply one and the other five keep uBookIt's
+wording:
+
+| File | Sent to | When |
+|---|---|---|
+| `BookerPlaced.cshtml` | the booker | their booking has been placed |
+| `BookerConfirmed.cshtml` | the booker | you confirmed their requested booking |
+| `BookerDeclined.cshtml` | the booker | you declined their requested booking |
+| `BookerCancelled.cshtml` | the booker | their booking has been cancelled |
+| `InternalPlaced.cshtml` | your recipients | a booking has been placed |
+| `InternalCancelled.cshtml` | your recipients | a booking has been cancelled |
+
+There is no `InternalConfirmed` or `InternalDeclined` because no such message exists — you
+confirmed or declined it yourself, and the bookings screen is where its state lives.
+
+A template inherits uBookIt's email page, which gives it the model and two properties it may
+set:
+
+```cshtml
+@inherits UBookIt.Web.Emails.UBookItEmailPage<UBookIt.Core.Notifications.BookerMessageModel>
+@{
+    Subject = $"Your appointment at Acme — {Model.Reference}";
+}
+Hello @Model.BookerName,
+
+We are looking forward to seeing you at @Model.LocalStart.ToString("h:mm tt") on
+@Model.LocalStart.ToString("dddd d MMMM") (@Model.TimeZoneId).
+
+Quote @Model.Reference if you need to get in touch.
+```
+
+**This example is not what uBookIt sends** — it is deliberately somebody else's wording, so that
+you can see the mechanism rather than copy a duplicate of the default. uBookIt's own messages are
+built in code, and there is no `.cshtml` shipped for you to start from, precisely so there is
+never a second copy of them to drift out of step.
+
+`Subject` is optional: leave it unset and uBookIt's own subject is used, which is derived from
+the booking's state. `IsHtml` defaults to `false`; set it to `true` if your content is HTML.
+
+#### What your template is given
+
+Both models carry the booking's `Kind` (which message this is), `Status`, `Reference` in the form
+a person quotes, `ServiceName`, `ResourceNames`, `LocalStart`, `LocalEnd` and `TimeZoneId`. The
+times arrive **already converted to the zone the booking was placed against** — format them
+however you like, and use `TimeZoneId` to say which clock you are quoting.
+
+`ResourceNames` is a collection rather than a sentence, so a service booking that resolved to
+several resources can list them:
+
+```cshtml
+@foreach (var name in Model.ResourceNames)
+{
+    @:- @name
+}
+```
+
+`Kind` and `Status` answer different questions and can disagree, which is often what you want to
+branch on: a `BookerPlaced` message describes a **confirmed** booking on a site that confirms on
+placement, and a **requested** one on a site that requires approval.
+
+`BookerMessageModel` adds `BookerName`, `BookerEmail` and `BookerPhone`.
+`InternalMessageModel` adds `AwaitsApproval` and `BackofficeUrl` — and **carries no booker name,
+address or telephone number at all**, deliberately. See below.
+
+#### HTML means no plain-text alternative
+
+If you set `IsHtml = true`, the message is sent as HTML **and nothing else**. There is no
+plain-text part alongside it.
+
+That is a limit of Umbraco's mail abstraction rather than a choice uBookIt made: `EmailMessage`
+carries one body and a flag saying what it is, and sending a multipart message would mean
+bypassing your site's own mail configuration — costing you your transport and your ability to
+intercept what the package sends. Worth knowing before you decide, because recipients who read
+mail as text would get nothing.
+
+#### What becomes yours, and what does not
+
+**The words become yours, including whether they are accurate.** uBookIt will not check that your
+content describes the booking's state correctly, presents the reference in the quotable form, or
+says which time zone it is quoting. What it gives you is everything needed to be correct —
+`Status`, the reference as displayed, and instants already in the booking's own zone.
+
+**These do not change, whatever you write:**
+
+- Sending still needs both a uBookIt setting and a working mail configuration.
+- Supplying content for a message uBookIt does not send to an audience does not create one.
+- A booking whose booker has been erased is still never written to.
+- **A message to your recipients still carries no booker contact details** — not by convention,
+  but because `InternalMessageModel` has no member for them. If you want them there, send that
+  message yourself from the notifications below; uBookIt will not do it for you.
+
+#### Templates supplied by a package
+
+A referenced assembly can supply templates too — a Razor class library with the same
+`Views/Partials/UBookIt/Emails/` folder, precompiled, works without the site copying anything.
+
+**One caveat worth knowing before you rely on it:** if both a referenced assembly and your own
+site supply the same file name, the assembly's currently wins. Your own file is used wherever the
+assembly supplies none. If you need to override one a package gave you, the reliable route today
+is to ask the package not to supply it rather than to shadow it.
+
+#### When something is wrong
+
+At startup uBookIt logs which messages have content supplied and which are using its own wording,
+so a misspelled file name shows up when you start the site rather than when a customer does not
+get what you intended.
+
+If a template throws while rendering, uBookIt logs the failure and **sends its own wording
+instead** — the message still goes out. A broken template is never silently treated as an absent
+one.
+
+### Replacing the whole message, delivery included
 
 uBookIt sends through Umbraco's own `IEmailSender` with notifications enabled, so you can
-intercept `SendEmailNotification`, check `EmailType` for `"UBookItBooking"`, and substitute your
-own message entirely — different wording, HTML, your own branding — without waiting for the
-package to make it configurable.
+intercept `SendEmailNotification` and check `EmailType` for `"UBookItBooking"`.
+
+**This is a bigger step than writing a template, and worth understanding before you take it.**
+The message you receive there is an immutable copy — you cannot rewrite its subject or body. What
+you can do is call `HandleEmail()` and send your own, which means you also take on delivery: the
+sending conditions, retries, and the rules uBookIt applies about erased bookers and contact
+details become yours to reproduce. Reach for it when you want a different **channel** or
+transport; reach for a template when you want different **words**.
 
 If you would rather build the whole thing yourself, ignore the settings above and handle the
 notifications directly. That is what they are for.

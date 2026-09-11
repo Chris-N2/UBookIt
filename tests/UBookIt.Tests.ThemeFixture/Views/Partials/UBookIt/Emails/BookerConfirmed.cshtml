@@ -1,0 +1,6 @@
+@inherits UBookIt.Web.Emails.UBookItEmailPage<UBookIt.Core.Notifications.BookerMessageModel>
+@{
+    Subject = "Your appointment at Acme";
+    IsHtml = true;
+}
+<p>Confirmed for @Model.LocalStart.ToString("HH:mm") (@Model.TimeZoneId).</p>

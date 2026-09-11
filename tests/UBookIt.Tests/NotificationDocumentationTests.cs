@@ -1,5 +1,7 @@
+using UBookIt.Core.Notifications;
 using UBookIt.Persistence.Notifications;
 using UBookIt.Tests.Support;
+using UBookIt.Web.Emails;
 
 namespace UBookIt.Tests;
 
@@ -234,6 +236,131 @@ public class NotificationDocumentationTests
         // question every subscriber will ask.
         DocumentationAssert.Says(
             docs, "A booking placed under auto-confirm raises `BookingPlacedNotification` and nothing else");
+    }
+
+    // ---- email templates -------------------------------------------------------------------
+
+    /// <summary>
+    /// An author must be able to supply content from the documentation alone — the alternative to
+    /// finding this is worse than going without, because a site that wants different wording and
+    /// cannot find it will take over sending instead, and thereby inherit the sending conditions,
+    /// the erased-booker rule and the contact-detail rules that this package is tested for and
+    /// their handler will not be.
+    /// </summary>
+    [Fact]
+    public void An_author_can_supply_content_from_the_documentation_alone()
+    {
+        var docs = Docs();
+
+        // The path, and every message name — asserted against the enum, so a name added or
+        // renamed in code fails here rather than leaving the documentation quietly incomplete.
+        DocumentationAssert.Says(docs, RazorBookingTemplateRenderer.TemplateFolder.TrimStart('~', '/'));
+
+        foreach (var kind in Enum.GetValues<BookingMessageKind>())
+        {
+            Assert.Contains($"{kind}.cshtml", docs, StringComparison.Ordinal);
+        }
+
+        // How to state the two things a template may state, and the base page it needs.
+        //
+        // Asserted as the ASSIGNMENTS an author writes rather than as the bare words: "Subject"
+        // and "IsHtml" both occur in unrelated prose on this page, so checking for them alone
+        // was very nearly vacuous — it would have passed against a document that never showed
+        // how to set either.
+        Assert.Contains(nameof(UBookItEmailPage<BookingMessageModel>), docs, StringComparison.Ordinal);
+        Assert.Contains("Subject = ", docs, StringComparison.Ordinal);
+        Assert.Contains("IsHtml = true", docs, StringComparison.Ordinal);
+        Assert.Contains("@inherits", docs, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public void The_single_body_limit_is_stated_with_its_reason()
+    {
+        var docs = Docs();
+
+        // Wrap-safe through DocumentationAssert, so the fragment is written on one line here
+        // regardless of how the sentence wraps in the document.
+        DocumentationAssert.Says(docs, "There is no plain-text part alongside it");
+        // And WHY, so it does not read as an arbitrary restriction somebody could ask us to lift.
+        DocumentationAssert.Says(docs, "limit of Umbraco's mail abstraction rather than a choice");
+    }
+
+    [Fact]
+    public void What_becomes_the_authors_and_what_does_not_is_stated()
+    {
+        var docs = Docs();
+
+        DocumentationAssert.Says(docs, "The words become yours, including whether they are accurate");
+
+        // The four that do NOT narrow. An author who assumed any of these had become theirs
+        // would be reproducing a rule the package still enforces — or worse, assuming it had
+        // stopped applying.
+        DocumentationAssert.Says(docs, "Sending still needs both a uBookIt setting");
+        DocumentationAssert.Says(docs, "is still never written to");
+        DocumentationAssert.Says(docs, "still carries no booker contact details");
+    }
+
+    /// <summary>
+    /// The documented example must not present itself as the package's own wording.
+    /// </summary>
+    /// <remarks>
+    /// The change deliberately ships no example template, because one that reproduced the
+    /// default would be a second copy of three pieces of composer logic, free to drift. The
+    /// documentation's example is a site's own wording for the same reason — there is nothing
+    /// for it to drift from. This guards that framing, since an example quietly rewritten to
+    /// "here is what uBookIt sends" would reintroduce the duplicate in prose.
+    /// </remarks>
+    [Fact]
+    public void The_documented_example_does_not_claim_to_be_what_the_package_sends()
+        => DocumentationAssert.Says(Docs(), "This example is not what uBookIt sends");
+
+    /// <summary>
+    /// No document tells an author that content they supply is still subject to the package's
+    /// wording guarantees.
+    /// </summary>
+    /// <remarks>
+    /// <b>The absence half, which the first version of these guards simply did not have.</b>
+    /// Every other check here is a presence check, and this file's own remarks already record
+    /// why that is not enough: an over-claim survives by ADDITION, so only a
+    /// <c>DoesNotSay</c> can see one. The specific over-claim to fear is a sentence reassuring
+    /// an author that uBookIt still ensures their wording is accurate — which is exactly what
+    /// the `booking-emails` narrowing says it does not, and exactly the comforting thing
+    /// somebody would add to documentation about a feature that hands words over.
+    /// <para>
+    /// Swept across every shipped document rather than `notifications.md` alone, because the
+    /// reassurance is likelier to be written where templates are being sold than where they are
+    /// specified.
+    /// </para>
+    /// </remarks>
+    [Fact]
+    public void No_document_claims_supplied_content_is_still_subject_to_the_packages_wording_guarantees()
+    {
+        foreach (var doc in ShippedMarkdown())
+        {
+            var text = RepoFiles.Read(doc);
+
+            // FIRST AND SECOND PERSON, uBookIt-named.
+            DocumentationAssert.DoesNotSay(text, "uBookIt still checks");
+            DocumentationAssert.DoesNotSay(text, "uBookIt will still ensure");
+            DocumentationAssert.DoesNotSay(text, "your wording is still checked");
+            DocumentationAssert.DoesNotSay(
+                text, "supplied content still describes the booking's state correctly");
+            DocumentationAssert.DoesNotSay(text, "your template will derive");
+
+            // THIRD PERSON, which the first version missed entirely — the same reassurance
+            // written about "the package" rather than to "you" passed every needle above.
+            DocumentationAssert.DoesNotSay(text, "the package still validates");
+            DocumentationAssert.DoesNotSay(text, "the package still checks");
+            DocumentationAssert.DoesNotSay(text, "the subject is still derived");
+
+            // AND THE INTERNAL OVER-CLAIM, which round 2's own new requirements made narrowable
+            // and which nothing was watching. A document telling an author that a supplied
+            // internal message still carries the reference, or still links to the backoffice,
+            // now contradicts the spec — those became the site's to include or omit.
+            DocumentationAssert.DoesNotSay(text, "still carries the reference");
+            DocumentationAssert.DoesNotSay(text, "still links to the backoffice");
+            DocumentationAssert.DoesNotSay(text, "will still identify the booking");
+        }
     }
 
     /// <summary>

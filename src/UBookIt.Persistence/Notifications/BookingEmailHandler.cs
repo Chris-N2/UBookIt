@@ -174,7 +174,10 @@ public sealed class BookingEmailHandler(
             replyTo: null,
             subject: message.Subject,
             body: message.Body,
-            isBodyHtml: false,
+            // From the message, not fixed: the package's own content is plain text and says so,
+            // and site-supplied content declares what it produced. Never inferred by inspecting
+            // the body — a wrong guess is wrong silently, in somebody's inbox.
+            isBodyHtml: message.IsHtml,
             attachments: null);
 
         logger.LogDebug(

@@ -3,6 +3,7 @@ using System.Text;
 using Microsoft.Extensions.Logging;
 using UBookIt.Core.Resources;
 using UBookIt.Core.Bookings;
+using UBookIt.Core.Notifications;
 using UBookIt.Core.Stores;
 
 namespace UBookIt.Persistence.Notifications;
@@ -28,8 +29,20 @@ public enum BookingEvent
     Cancelled,
 }
 
-/// <summary>A composed message: a subject and a plain-text body.</summary>
-public sealed record BookingMessage(string Subject, string Body);
+/// <summary>A composed message: a subject, a body, and what kind of body it is.</summary>
+/// <param name="Subject">The subject line.</param>
+/// <param name="Body">The body.</param>
+/// <param name="IsHtml">
+/// Whether <paramref name="Body"/> is HTML. <b>Defaults to false, which is what the package's own
+/// messages are</b>, so only site-supplied content that says otherwise changes it.
+/// <para>
+/// A message is one or the other and never both: Umbraco's <c>EmailMessage</c> carries a single
+/// body and a flag, and its MimeKit conversion sets an HTML body OR a text body. Producing a
+/// multipart message would mean bypassing the site's own mail configuration, which would cost it
+/// both its transport and its ability to intercept what this package sends.
+/// </para>
+/// </param>
+public sealed record BookingMessage(string Subject, string Body, bool IsHtml = false);
 
 /// <summary>
 /// Turns a booking into the messages the package sends.
@@ -55,8 +68,21 @@ public sealed record BookingMessage(string Subject, string Body);
 /// </remarks>
 public sealed class BookingMessageComposer(
     IResourceStore resources,
-    ILogger<BookingMessageComposer> logger)
+    ILogger<BookingMessageComposer> logger,
+    IBookingTemplateRenderer? templates = null)
 {
+    /// <summary>
+    /// Whether this site supplies any content of its own.
+    /// </summary>
+    /// <remarks>
+    /// <b>Presence is the entire mechanism.</b> Nothing registers a default renderer, so a host
+    /// that supports supplied content registers one and a host that does not registers nothing.
+    /// Because nothing is ever replaced, no composer ordering can get this wrong — which is the
+    /// point, given that an ordering assumption in this package has already silently disabled a
+    /// feature once. Umbraco's own <c>EmailSender</c> detects a registered handler the same way.
+    /// </remarks>
+    private bool SupportsTemplates => templates is not null;
+
     /// <summary>
     /// The formats are invariant and explicit rather than culture-driven. The package ships one
     /// culture today, so a culture-sensitive format would vary with whatever thread the
@@ -75,18 +101,54 @@ public sealed class BookingMessageComposer(
     public async Task<BookingMessage> ForBookerAsync(
         Booking booking, BookingEvent bookingEvent, CancellationToken cancellationToken = default)
     {
-        var what = await DescribeAsync(booking, cancellationToken).ConfigureAwait(false);
+        var what = await DescribeAsync(booking, SupportsTemplates, cancellationToken).ConfigureAwait(false);
         var subject = SubjectFor(booking, bookingEvent);
 
         var body = new StringBuilder()
             .AppendLine(subject)
             .AppendLine()
-            .Append(Details(booking, what))
+            .Append(Details(booking, what.Text))
             .AppendLine()
             .AppendLine(ClosingLineFor(booking, bookingEvent))
             .ToString();
 
-        return new BookingMessage(subject, body);
+        var fallback = new BookingMessage(subject, body);
+
+        if (!SupportsTemplates)
+        {
+            return fallback;
+        }
+
+        // The booker's own message, so the model carrying contact details is the right one.
+        //
+        // ESTABLISHED HERE RATHER THAN ASSUMED. The send path only reaches this method once it
+        // has an address, so an erased booker cannot arrive in practice — but this used to be a
+        // bare `Contact!`, which would have turned "somebody called the composer directly" into
+        // a NullReferenceException several layers from the mistake. There is a defined answer
+        // for a booker with no details: compose nothing of the site's and let the package's own
+        // wording stand, exactly as it does when no content is supplied.
+        if (booking.Booker.Contact is not { } contact)
+        {
+            return fallback;
+        }
+        var (localStart, localEnd) = LocalInterval(booking.Interval);
+
+        var model = new BookerMessageModel
+        {
+            Kind = BookerKindFor(bookingEvent),
+            Status = booking.Status,
+            Reference = booking.Reference.Display,
+            ServiceName = what.ServiceName,
+            ResourceNames = what.ResourceNames,
+            LocalStart = localStart,
+            LocalEnd = localEnd,
+            TimeZoneId = booking.Interval.TimeZoneId,
+            BookerName = contact.Name,
+            BookerEmail = contact.Email,
+            BookerPhone = contact.Phone,
+        };
+
+        return await ApplyTemplateAsync(model, fallback, booking, cancellationToken).ConfigureAwait(false);
     }
 
     /// <summary>
@@ -106,7 +168,7 @@ public sealed class BookingMessageComposer(
         Uri? backofficeUrl,
         CancellationToken cancellationToken = default)
     {
-        var what = await DescribeAsync(booking, cancellationToken).ConfigureAwait(false);
+        var what = await DescribeAsync(booking, SupportsTemplates, cancellationToken).ConfigureAwait(false);
 
         // DERIVED FROM THE BOOKING'S STATUS, not from the AutoConfirm setting. The message
         // describes the booking it announces; reading the setting instead would let the two
@@ -124,7 +186,7 @@ public sealed class BookingMessageComposer(
         var body = new StringBuilder()
             .AppendLine(subject)
             .AppendLine()
-            .Append(Details(booking, what));
+            .Append(Details(booking, what.Text));
 
         if (awaitsApproval)
         {
@@ -141,7 +203,35 @@ public sealed class BookingMessageComposer(
                 .AppendLine(backofficeUrl.ToString());
         }
 
-        return new BookingMessage(subject, body.ToString());
+        var fallback = new BookingMessage(subject, body.ToString());
+
+        if (!SupportsTemplates)
+        {
+            return fallback;
+        }
+
+        var (localStart, localEnd) = LocalInterval(booking.Interval);
+
+        // THE MODEL WITH NO BOOKER ON IT. Not a shared model with the contact details left out
+        // — a type that has no member for them, so content cannot render what the package has
+        // promised not to route here. See InternalMessageModel.
+        var model = new InternalMessageModel
+        {
+            Kind = bookingEvent == BookingEvent.Cancelled
+                ? BookingMessageKind.InternalCancelled
+                : BookingMessageKind.InternalPlaced,
+            Status = booking.Status,
+            Reference = booking.Reference.Display,
+            ServiceName = what.ServiceName,
+            ResourceNames = what.ResourceNames,
+            LocalStart = localStart,
+            LocalEnd = localEnd,
+            TimeZoneId = booking.Interval.TimeZoneId,
+            AwaitsApproval = awaitsApproval,
+            BackofficeUrl = backofficeUrl,
+        };
+
+        return await ApplyTemplateAsync(model, fallback, booking, cancellationToken).ConfigureAwait(false);
     }
 
     /// <summary>
@@ -248,18 +338,172 @@ public sealed class BookingMessageComposer(
     }
 
     /// <summary>
-    /// What was booked: the service's snapshot name where there is one, otherwise the names of the
-    /// resources claimed. <c>null</c> where nothing could be established.
+    /// Which message a booker-facing event is.
     /// </summary>
-    private async Task<string?> DescribeAsync(Booking booking, CancellationToken cancellationToken)
+    /// <remarks>
+    /// From the EVENT, not the status. A placement that auto-confirmed and a booking an operator
+    /// has just confirmed both read <c>Confirmed</c>; they are different messages, and content
+    /// supplied for one must not render for the other.
+    /// </remarks>
+    private static BookingMessageKind BookerKindFor(BookingEvent bookingEvent) => bookingEvent switch
     {
-        // The snapshot the booking already carries, which says what was SOLD rather than what the
-        // service happens to be called now. No read, and nothing to fail.
-        if (booking.Service is { } service)
+        BookingEvent.Confirmed => BookingMessageKind.BookerConfirmed,
+        BookingEvent.Declined => BookingMessageKind.BookerDeclined,
+        BookingEvent.Cancelled => BookingMessageKind.BookerCancelled,
+        _ => BookingMessageKind.BookerPlaced,
+    };
+
+    /// <summary>
+    /// Asks for site-supplied content and uses it where there is any; otherwise the package's own
+    /// message stands.
+    /// </summary>
+    /// <remarks>
+    /// <para>
+    /// <b>Both "not supplied" and "failed" fall back, and only one of them is silent about it.</b>
+    /// Absence is an ordinary state — it is what every site is in until it supplies something — so
+    /// it says nothing. A failure is logged, because otherwise an author's broken content is
+    /// indistinguishable from content they never wrote, and the only symptom is that their
+    /// customisation appears not to exist.
+    /// </para>
+    /// <para>
+    /// <b>The booking id only, never the booker.</b> A rendering fault is not a reason to write
+    /// the details the rest of this package takes care to govern.
+    /// </para>
+    /// <para>
+    /// <b>A stated subject wins; silence keeps ours.</b> Supplying a body is not the same as
+    /// taking responsibility for the whole message.
+    /// </para>
+    /// </remarks>
+    private async Task<BookingMessage> ApplyTemplateAsync(
+        BookingMessageModel model,
+        BookingMessage fallback,
+        Booking booking,
+        CancellationToken cancellationToken)
+    {
+        var result = await templates!.RenderAsync(model.Kind, model, cancellationToken).ConfigureAwait(false);
+
+        if (result.Outcome == BookingTemplateOutcome.Failed)
         {
-            return service.DisplayName;
+            logger.LogError(
+                "uBookIt could not render the site's own content for {MessageKind} on booking "
+                + "{BookingId}. The package's own wording was sent instead.",
+                model.Kind,
+                booking.Id);
+
+            return fallback;
         }
 
+        if (result.Outcome != BookingTemplateOutcome.Rendered || result.Body is null)
+        {
+            return fallback;
+        }
+
+        return new BookingMessage(result.Subject ?? fallback.Subject, result.Body, result.IsHtml);
+    }
+
+
+    /// <summary>
+    /// The booking's interval, expressed in the zone it was placed against.
+    /// </summary>
+    /// <remarks>
+    /// Falls back to UTC on a zone id the host can no longer resolve, exactly as
+    /// <see cref="LocalParts"/> does — the id was valid when the booking was placed, so this means
+    /// the host's zone database has moved underneath it, and that is not a reason to withhold a
+    /// message whose reference and date are still perfectly good. Content is told which zone it
+    /// got through the model's own <c>TimeZoneId</c>.
+    /// </remarks>
+    private static (DateTimeOffset Start, DateTimeOffset End) LocalInterval(BookingInterval interval)
+    {
+        try
+        {
+            var zone = TimeZoneInfo.FindSystemTimeZoneById(interval.TimeZoneId);
+
+            return (
+                TimeZoneInfo.ConvertTime(interval.StartUtc, zone),
+                TimeZoneInfo.ConvertTime(interval.EndUtc, zone));
+        }
+        catch (Exception exception) when (exception is TimeZoneNotFoundException or InvalidTimeZoneException)
+        {
+            return (interval.StartUtc.ToUniversalTime(), interval.EndUtc.ToUniversalTime());
+        }
+    }
+
+    /// <summary>
+    /// What was booked, in the shapes this class needs: the one line the plain-text message
+    /// prints, and the parts a model publishes.
+    /// </summary>
+    /// <param name="Text">The single line, or <c>null</c> where nothing could be established.</param>
+    /// <param name="ServiceName">The service's recorded name, or <c>null</c> for a direct booking.</param>
+    /// <param name="ResourceNames">
+    /// Every claimed resource's name that could be read — empty for a service booking described
+    /// without parts, which is what a site supplying no content asks for.
+    /// </param>
+    private sealed record Described(string? Text, string? ServiceName, IReadOnlyList<string> ResourceNames);
+
+    /// <summary>
+    /// What was booked: the one line the plain-text message prints, and — when asked for — the
+    /// parts a model publishes.
+    /// </summary>
+    /// <remarks>
+    /// <para>
+    /// <b>The list is NEVER reconstituted from the text.</b> An earlier version saved a read by
+    /// splitting the joined line back apart on ", ", which turned a resource named
+    /// "Studio 2, Ground Floor" into two resources and handed a template a booking that does not
+    /// exist. The line is derived from the list; the list is never derived from the line, because
+    /// joining is lossy and no choice of separator makes it otherwise.
+    /// </para>
+    /// <para>
+    /// <b><paramref name="withParts"/> exists because this read has now produced a defect in four
+    /// consecutive reviews, and the shape was the problem rather than any one of them.</b> The
+    /// plain-text message names a SERVICE and stops, so it needs no resource read at all;
+    /// supplied content may want to list what the service resolved to, so it does. Making the
+    /// caller say which it is puts the cost where somebody can see it, instead of leaving a site
+    /// that supplies nothing quietly paying for data only a template would use.
+    /// </para>
+    /// <para>
+    /// A DIRECTLY-booked booking reads either way — the plain-text line is built from those very
+    /// names, so there is nothing to save and nothing to decide.
+    /// </para>
+    /// </remarks>
+    /// <param name="withParts">
+    /// Whether the caller needs <see cref="Described.ResourceNames"/> populated for a service
+    /// booking. <c>false</c> performs no read for one.
+    /// </param>
+    private async Task<Described> DescribeAsync(
+        Booking booking, bool withParts, CancellationToken cancellationToken)
+    {
+        // The snapshot the booking already carries, which says what was SOLD rather than what the
+        // service happens to be called now.
+        if (booking.Service is { } service)
+        {
+            return new Described(
+                service.DisplayName,
+                service.DisplayName,
+                withParts
+                    ? await ResourceNamesAsync(booking, cancellationToken).ConfigureAwait(false)
+                    : []);
+        }
+
+        var names = await ResourceNamesAsync(booking, cancellationToken).ConfigureAwait(false);
+
+        return new Described(
+            names.Count > 0 ? string.Join(", ", names) : null,
+            null,
+            names);
+    }
+
+    /// <summary>
+    /// Every claimed resource's name, in the booking's own claim order, skipping any that could
+    /// not be read.
+    /// </summary>
+    /// <remarks>
+    /// Factored out of <see cref="DescribeAsync"/> so the plain-text message and a structured
+    /// model read resources the same way — including the catch below. Two copies of this loop
+    /// would be two chances to handle a failing read differently.
+    /// </remarks>
+    private async Task<IReadOnlyList<string>> ResourceNamesAsync(
+        Booking booking, CancellationToken cancellationToken)
+    {
         var names = new List<string>();
 
         foreach (var claim in booking.Claims)
@@ -301,6 +545,6 @@ public sealed class BookingMessageComposer(
             }
         }
 
-        return names.Count > 0 ? string.Join(", ", names) : null;
+        return names;
     }
 }
