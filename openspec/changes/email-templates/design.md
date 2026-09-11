@@ -144,7 +144,8 @@ fallback.
 
 A background send has no `HttpContext`. **No such sender exists yet** — the retention sweep
 runs unattended but erases bookers and sends nothing — so this requirement is anticipatory:
-it exists so the first thing that does send from a timer does not discover it in production. Core's only view-to-string recipe (`PartialViewBlockEngine`) resolves the view engine from
+it exists so the first thing that does send from a timer does not discover it in production.
+Core's only view-to-string recipe (`PartialViewBlockEngine`) resolves the view engine from
 `httpContext.RequestServices`, which is that implementation's choice rather than a framework
 limit — `tests/UBookIt.Tests.Rendering/Support/ViewRenderer.cs` in this repository already
 renders precompiled views from a plain `ServiceCollection`. Templates therefore inherit

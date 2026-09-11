@@ -85,7 +85,9 @@ public class BookingTemplateCompositionTests
     }
 
     private static Booking Booking(
-        BookingStatus status = BookingStatus.Confirmed, bool direct = false)
+        BookingStatus status = BookingStatus.Confirmed,
+        bool direct = false,
+        int claims = 1)
         => Core.Bookings.Booking.Rehydrate(
             Guid.NewGuid(),
             References.Any(),
@@ -94,7 +96,7 @@ public class BookingTemplateCompositionTests
                 TestData.Utc(TestData.BaseDate, "10:00"),
                 TestData.LondonZoneId).Value,
             Booker.Create(null, "Ada Lovelace", "ada@example.com", "07700 900123").Value,
-            [new ResourceClaim(ResourceId)],
+            [.. Enumerable.Range(0, claims).Select(_ => new ResourceClaim(Guid.NewGuid()))],
             status,
             TestData.Now,
             direct ? null : new ServiceAttribution(Guid.NewGuid(), "Initial Consultation"))
@@ -440,17 +442,34 @@ public class BookingTemplateCompositionTests
     /// started paying a read per claim for every service booking — invisible, because message
     /// content stayed byte-identical and content is all the other tests look at.
     /// <para>
-    /// Asserted as a TABLE over both booking shapes and both renderer states, because the defect
-    /// each time was a cost moving between cells rather than a wrong message. A single-cell test
-    /// would have passed in three of these four rounds.
+    /// Asserted as a TABLE over both booking shapes, both renderer states AND both composer
+    /// methods, because the defect each time was a cost moving between cells rather than a wrong
+    /// message. A single-cell test would have passed in three of these four rounds.
+    /// </para>
+    /// <para>
+    /// <b>The audience dimension was missing from the first version and is the reason this
+    /// paragraph exists.</b> It measured <c>ForBookerAsync</c> only, so reverting
+    /// <c>ForSiteAsync</c> alone reinstated half the defect with everything green — and the
+    /// argument for leaving it out ("both call the same method with the same flag") was an
+    /// argument about how today's code happens to be written, which is exactly the kind of
+    /// reasoning this test exists to stop accepting. The regression it stands for was measured
+    /// at TWO reads per service booking, one per message; a guard watching one message could
+    /// only ever see half of it.
     /// </para>
     /// </remarks>
     [Theory]
-    [InlineData(false, false, 0)]  // service booking, no renderer  → the plain-text line names the service; nothing to read
-    [InlineData(false, true, 1)]   // service booking, renderer     → content may list what it resolved to
-    [InlineData(true, false, 1)]   // direct booking,  no renderer  → the line IS the resource names
-    [InlineData(true, true, 1)]    // direct booking,  renderer     → the same read, shared
-    public async Task What_a_message_costs_in_store_reads(bool direct, bool withRenderer, int expectedReads)
+    // booker's message                                    service/no-renderer reads nothing
+    [InlineData("booker", false, false, 0)]
+    [InlineData("booker", false, true, 1)]
+    [InlineData("booker", true, false, 1)]
+    [InlineData("booker", true, true, 1)]
+    // the site's own message — the half the first version of this theory could not see
+    [InlineData("site", false, false, 0)]
+    [InlineData("site", false, true, 1)]
+    [InlineData("site", true, false, 1)]
+    [InlineData("site", true, true, 1)]
+    public async Task What_a_message_costs_in_store_reads(
+        string audience, bool direct, bool withRenderer, int expectedReads)
     {
         var store = new CountingResourceStore();
         var composer = new BookingMessageComposer(
@@ -458,7 +477,16 @@ public class BookingTemplateCompositionTests
             NullLogger<BookingMessageComposer>.Instance,
             withRenderer ? new StubRenderer(BookingTemplateResult.NotSupplied) : null);
 
-        await composer.ForBookerAsync(Booking(direct: direct), BookingEvent.Placed);
+        var booking = Booking(direct: direct);
+
+        if (audience == "booker")
+        {
+            await composer.ForBookerAsync(booking, BookingEvent.Placed);
+        }
+        else
+        {
+            await composer.ForSiteAsync(booking, BookingEvent.Placed, backofficeUrl: null);
+        }
 
         Assert.Equal(expectedReads, store.Reads);
     }
@@ -500,6 +528,32 @@ public class BookingTemplateCompositionTests
         public Task<IReadOnlyList<Resource>> ListByTypeAsync(
             string type, CancellationToken cancellationToken = default)
             => throw new NotSupportedException();
+    }
+
+    [Fact]
+    public async Task A_multi_resource_service_booking_reaches_content_as_several_resources()
+    {
+        // THE CASE THE COLLECTION EXISTS FOR, asserted at the COMPOSER for the first time. Every
+        // fixture here claimed exactly one resource, so the composer half of "a booker who
+        // booked a room and a therapist was given both" was unobserved — it was only ever shown
+        // in the rendering suite, against a model built by hand rather than composed.
+        //
+        // It also makes the read-count cells mean what they say: with one claim they could not
+        // distinguish "reads each claim" from "reads one claim and stops".
+        var store = new CountingResourceStore();
+        var renderer = new StubRenderer(BookingTemplateResult.NotSupplied);
+        var composer = new BookingMessageComposer(
+            store, NullLogger<BookingMessageComposer>.Instance, renderer);
+
+        await composer.ForBookerAsync(Booking(direct: false, claims: 3), BookingEvent.Placed);
+
+        var model = Assert.Single(renderer.Asked).Model;
+
+        Assert.Equal(3, model.ResourceNames.Count);
+        Assert.Equal(3, store.Reads);
+
+        // And the service name is still what was SOLD, alongside them rather than instead.
+        Assert.Equal("Initial Consultation", model.ServiceName);
     }
 
     [Fact]

@@ -14,7 +14,8 @@ requirement destroys guarantees silently").
       sentence updated for accuracy rather than scope — "Placement produces a confirmed booking
       today" became true-of-both-settings after 0.6.0 and is corrected here.
 
-- [x] 0.2 `booking-emails` / "The internal message says when a booking awaits action" — added in QA
+- [x] 0.2 `booking-emails` / "The internal message says when a booking awaits action" — added in
+QA
       round 1. Carried verbatim: the state-not-setting rule and all three scenarios. Added: the
       wording narrowing, and the explicit statement that the no-personal-data sentence does NOT
       narrow with it.
@@ -132,7 +133,8 @@ assembly compiles.)*
       "the package composes", "what the message says", "plain text", "derived from that state",
       "no booker name". Known candidates to open: `booker-erasure`, `sensitive-data`,
       `privacy-notice` (it describes what a booker is told and was the CRITICAL last change),
-      `theming` (states what a theme covers — must not read as covering email), `default-frontend`.
+      `theming` (states what a theme covers — must not read as covering email),
+      `default-frontend`.
 - [ ] 7.2 Purpose prose check on `booking-emails` — its Purpose says "what that message carries,
       and — more of the point — what it must never carry or promise", which must still be true
       once content can come from a site.
@@ -147,7 +149,8 @@ assembly compiles.)*
       details. Boot log lists supplied and unsupplied.
 - [x] 8.3 **The no-request path could NOT be staged live, and here is exactly what was proved.**
       This task's own terms were "if that cannot be staged, say so explicitly and record what was
-      actually proved" — it was ticked in round 1 with nothing recorded, which QA caught. Honestly:
+      actually proved" — it was ticked in round 1 with nothing recorded, which QA caught.
+      Honestly:
 
       **There is no production code path today that composes a message outside a request.** Every
       send is placement (delivery API or Razor POST) or a backoffice confirm/decline/cancel. The
@@ -349,3 +352,34 @@ at the shape* — and it took a reviewer to say so.
       request model disagree about it. Hit while staging 11.9's live check. A site author
       round-tripping a resource through the management API would silently un-publish it from the
       front end. Not this change's to fix — recorded in agent memory.
+
+## 13. QA round 4 — REJECT (one MAJOR, two MINOR, one NIT)
+
+**The residual finding for three rounds running has been the same one**, and QA named it as the
+lesson worth carrying: *apply the correction to the class, not to the instance the reviewer
+named.* It happened again in this very commit — the rewrap fixed three of four lines. So each
+item below was fixed as a class and then swept.
+
+- [x] 13.1 **MAJOR — the cost theory measured one of the two callers.** Reverting `ForSiteAsync`
+      alone reinstated half the round-3 defect with everything green; the regression was measured
+      at TWO reads per service booking, one per message, and the guard watched one. **My argument
+      for leaving it — "both call the same method with the same flag" — was an argument about how
+      today's code happens to be written**, which is precisely the reasoning 12.1 exists to
+      retire. Accepting it would have re-adopted it in the commit that retires it. The theory now
+      has an audience dimension: eight cells. Mutation — QA's exact half-revert — fails.
+- [x] 13.2 **MINOR — task 12.4 was ticked and was not done.** The rewrap fixed three lines of a
+      four-line paragraph and left one at 183 columns. Fixed properly by reflowing whole
+      paragraphs, then **swept**: every prose line in every artifact of this change is now under
+      100 characters. *(Measured in characters, not bytes — `awk length` counts bytes and reports
+      false positives on lines containing `—` or `㉓`, which is what three of the "remaining"
+      lines turned out to be.)* Scenario `WHEN`/`THEN` bullets are deliberately left long: the
+      main specs do the same, so that is the house style rather than a violation.
+- [x] 13.3 **MINOR — no composer fixture claimed more than one resource.** So the composer half
+      of the guarantee the collection exists for was unobserved: it was shown only in the
+      rendering suite against a hand-built model. The fixture takes a claim count, and a new test
+      composes a three-resource service booking. It also makes the read-count cells mean what
+      they say — with one claim they could not distinguish "reads each claim" from "reads one and
+      stops".
+- [x] 13.4 **NIT — the `Described` record carried two `<summary>` blocks**, the first an orphan
+      from round 3 describing the old contract, which was now wrong as well as duplicated.
+      Removed, and the other `.cs` files this change touches swept for the same shape.

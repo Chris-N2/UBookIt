@@ -429,10 +429,6 @@ public sealed class BookingMessageComposer(
     }
 
     /// <summary>
-    /// What was booked: the service's snapshot name where there is one, otherwise the names of the
-    /// resources claimed. <c>null</c> where nothing could be established.
-    /// </summary>
-    /// <summary>
     /// What was booked, in the shapes this class needs: the one line the plain-text message
     /// prints, and the parts a model publishes.
     /// </summary>
