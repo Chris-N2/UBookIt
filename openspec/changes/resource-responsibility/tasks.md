@@ -180,6 +180,14 @@ double-quoted shell string.
       `booking-emails:106` erased-booker scenario (configured recipients ARE still told —
       non-exclusive claim); `theming` "third and last tier" (already scoped by ㉚ to the
       booking flow's rendering; responsibility is not a rendering customisation).
+      **QA round 3 found two members the sweep missed**, both inside "Which events produce
+      messages, and for whom" — the body already being replaced: "the site's configured
+      recipients" survived because the phrase WRAPPED across a line and the patch matched
+      raw strings (the wrapped-sentence trap, in the sweep's own tooling), and "the
+      direction enabled in configuration" was a class member the patterns never listed.
+      Both fixed by amending that requirement's delta entry and re-syncing; a
+      wrap-normalised re-sweep of all three touched specs then found only legitimate
+      tier-naming mentions, matching QA's own enumeration.
 - [x] 7.2 Falsified-claims sweep over `README.md`, `docs/*.md` and XML doc comments —
       including `BookingNotificationSettings.InternalRecipients`' remark that a flat list
       is "knowingly the wrong shape", which this change answers and should now say so.

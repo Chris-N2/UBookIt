@@ -186,13 +186,13 @@ receiving, and it would be far harder to diagnose. Each dropped address SHALL be
 ### Requirement: Which events produce messages, and for whom
 Four booking events SHALL be able to produce messages: placement, confirmation, decline, and
 cancellation. Placement and cancellation SHALL address both directions — the booker and the
-site's configured recipients — as they always have. **Confirmation and decline SHALL address
+site's own recipients — as they always have. **Confirmation and decline SHALL address
 the booker only**: the site's own people, or a colleague, performed the action, and the
 bookings screen is where its state lives; a message telling the site what it just did would
 be noise that trains recipients to skim.
 
 Every message SHALL remain subject to the existing gating without exception: the direction
-enabled in configuration AND the host able to send. A confirmation or decline on a site that
+asked for AND the host able to send. A confirmation or decline on a site that
 has not enabled writing to the booker SHALL send nothing at all.
 
 **A booking placed under auto-confirm SHALL produce one message to the booker, not two.**
