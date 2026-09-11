@@ -163,6 +163,11 @@ an owner:
       `booker-erasure` (erasure vs pending bookings), `booking-retention` (sweep has no status
       filter — should stay true), `service-booking`, `theming` (confirmation view contract),
       `sensitive-data`.
+*(Note for whoever syncs: `booking-management`'s Purpose was ALREADY corrected during apply —
+`BackofficeDocumentationTests` demands parity between it and the controller's routes, so adding
+the endpoints failed until the Purpose named confirm and decline. That is the guard designed
+in ㉘ firing exactly as intended, one change later. 9.2 below still stands for the other two.)*
+
 - [ ] 9.2 Capability Purpose prose check: `bookings` and `booking-emails` Purposes summarize
       auto-confirm-era behaviour — verify each Purpose still matches its requirements as the
       file stands after sync (consistency check, green pre-sync).
