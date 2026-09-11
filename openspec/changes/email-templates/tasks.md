@@ -6,7 +6,7 @@ One `## MODIFIED Requirements` entry. A MODIFIED entry replaces its requirement 
 was diffed guarantee-by-guarantee before the delta was written (CLAUDE.md, "Rewriting a
 requirement destroys guarantees silently").
 
-- [ ] 0.1 `booking-emails` / "What a message tells the booker" — carried forward verbatim: the
+- [x] 0.1 `booking-emails` / "What a message tells the booker" — carried forward verbatim: the
       reference-in-quotable-form rule, the times-in-the-booking's-own-zone rule, the
       derived-from-state rule, the send-even-without-what-was-booked rule, and all five original
       scenarios. Added: the narrowing to supplied content, the reach-clause limiting it, and two
@@ -52,7 +52,7 @@ requirement destroys guarantees silently").
 - [x] 2.2 Ask the renderer; on "no template" **or** "failed", fall back to today's plain text. A
       failure is logged distinguishably from an absence, and the booking id only — never a booker.
 - [x] 2.3 A stated subject wins; no stated subject keeps the package's. `IsHtml` defaults false.
-- [ ] 2.4 Tests: **with no renderer registered, every message is byte-identical to today** (this
+- [x] 2.4 Tests: **with no renderer registered, every message is byte-identical to today** (this
       is the migration guarantee and it is a test, not an aspiration — assert against the current
       expected strings). Renderer returning no-template → same. Renderer throwing → fallback
       body, message still sent, failure logged, id-only. Subject override and default. `IsHtml`
