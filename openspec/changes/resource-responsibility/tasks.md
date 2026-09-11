@@ -113,18 +113,30 @@ double-quoted shell string.
 
 ## 6. Verification
 
-- [ ] 6.1 Full .NET suite + client tests green; `--no-incremental` Release build read
+- [x] 6.1 Full .NET suite + client tests green; `--no-incremental` Release build read
       against the ZERO-warning baseline, output not piped through anything that can eat the
-      warnings line.
-- [ ] 6.2 `openspec validate --strict` across all specs; delta guarantee-diff re-checked
-      against `openspec/specs/booking-emails/spec.md` as it stands at apply time, for both
-      wholesale replacements — "The package sends nothing until a site asks it to" and
-      "The booker and the site are told independently" — every SHALL and scenario carried
-      or superseded, none dropped.
+      warnings line. **2570 .NET tests** (1406 + 127 + 1037), 159 client, Release 0 warnings
+      (warnings grepped from the full captured output, not a tail). The migration-list
+      prompt-guard (`Multi_claim_placement_needed_no_schema_change`) fired and
+      `AddResponsibility` was reviewed and appended: one new table, no claim or booking
+      table referenced or altered.
+- [x] 6.2 `openspec validate --strict` across all specs (19 items pass); the base
+      `booking-emails` spec has not moved since the deltas were copied from it this session
+      (`git log` confirms head `9b01663` for that file), so the guarantee-diff done at
+      spec-writing stands: both wholesale replacements carry every SHALL and scenario,
+      none dropped.
 - [ ] 6.3 Live check on the TestSite: assign a user to a resource in the backoffice, place a
       booking, confirm the `.eml` set in the pickup directory (clear it first; the `Date:`
       header is authoritative, not mtime): user's address present, flat list still present,
       dedup correct. Repeat with the user disabled → address absent.
+      **Send-path half DONE (2026-09-11), API-level**: assignment row written directly,
+      booking placed through the anonymous delivery API — internal message arrived at
+      `bookings@example.com` AND the responsible admin's address in one message, booker told
+      separately; with the assigned second user disabled, their address was absent and
+      everyone else unaffected; user re-enabled and test assignments removed afterwards.
+      **Remaining: the backoffice UI half** — assign through the Responsibility panel itself
+      (pickers, marks, save-after-save) — blocked on the Chrome extension being connected;
+      not ticked until that ran.
 
 ## 7. Sync-time greps (run at sync, not before; do not tick until executed)
 
