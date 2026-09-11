@@ -23,10 +23,11 @@ the reorder cost nothing.
 | 0.3.0 | Data protection: retention, erasure, privacy notice | **Model-affecting, so it belongs early** — erasure must mean *anonymise*, not delete, because an erased booking still occupies its slot and still has to be discussable. That is exactly why the booking reference was built to outlive the person (see the archived `booking-reference` change). Plus a retention policy, and a privacy notice on the booking form. **Not a consent tickbox** — see "On consent" below. |
 | 0.4.0 | **Show which dates have availability** | **A front-end feature — the API is already built.** Today the flow is `<input type="date">` with a min/max range: a visitor picks a date blind and only then learns whether anything is free. Instead, show the days that actually have availability over the next ~30 days. A date picker cannot express this; it wants a list of dates. Brought forward because it depends on nothing else and is the most visible improvement on the list. |
 | 0.5.0 | Confirmation / cancellation emails | Via `IEmailSender`, Umbraco's own mail abstraction (confirmed present in 17). To the booker and to an internal list. The notifications this hangs off already exist and already carry the whole `Booking`, reference included — nothing new is needed in the domain. **Configured in `appsettings` at this stage, deliberately**: a settings *screen* should be admin-only, which needs permissions we do not have yet, so config-file settings keep this change small and remove the dependency. |
-| 0.6.0 | Email templates | Let a site define email content; partial views rather than an RTE with field tokens. **Caveat: email HTML is not web HTML** (inline styles, tables, no external stylesheet), so this is a separate rendering path, not a reuse of the theming mechanism. **This is the row that most justifies a separate package** — see "Open decisions". |
-| 0.7.0 | Resource / service responsibility | Who is responsible for which resource or service, by backoffice user or group — or by groups a site defines itself, as Umbraco Workflow does. **Not permissions: this decides who gets emailed** about what, and supersedes 0.5.0's flat list. |
-| 0.8.0 | Control the delivery API's exposure | **Reframed from "throttling"** — see "On the public API" below. Chiefly: let a site turn the delivery API **off**, since it is currently registered on every install whether used or not; document that it is anonymous and belongs behind the host's own rate limiting; and consider a per-caller cap on the expensive availability queries. **API keys are out of scope.** |
-| 0.9.0 | Permissions model *(gated on a spike)* | Who may create resources and services, who may view and cancel bookings — via Umbraco user groups. **Partly shipped already**: the whole section can be hidden by group today; what is missing is granularity *within* it. **Do a spike first** against the Umbraco source in `ref/` to establish what the backoffice actually permits. If it proves impractical, this waits until after 17.0.0, where it would be purely additive and so allowed by the release policy. The admin-only **settings screen** rides with this. |
+| 0.6.0 | Approval and decline | An `AutoConfirm` option **defaulting to on**, so the default is exactly today's behaviour. When off, placement produces `Requested`; an operator confirms or declines from the backoffice, and the booker is told either way through 0.5.0's email path — which already derives its wording from `Booking.Status` in anticipation of exactly this. `Booking.Confirm()` and `Decline()` exist and are tested; the change builds the routes into them. **Slotted before templates deliberately**: approval adds new message types, and the template scheme should be designed against the complete catalogue rather than retrofitted. *(Decided 2026-09-11 — previously "Not yet slotted".)* |
+| 0.7.0 | Email templates | Let a site define email content; partial views rather than an RTE with field tokens. **Caveat: email HTML is not web HTML** (inline styles, tables, no external stylesheet), so this is a separate rendering path, not a reuse of the theming mechanism. **This is the row that most justifies a separate package** — see "Open decisions". |
+| 0.8.0 | Resource / service responsibility | Who is responsible for which resource or service, by backoffice user or group — or by groups a site defines itself, as Umbraco Workflow does. **Not permissions: this decides who gets emailed** about what, and supersedes 0.5.0's flat list. Pairs with 0.6.0: who gets emailed about a pending booking is the same question as who must act on it. |
+| 0.9.0 | Control the delivery API's exposure | **Reframed from "throttling"** — see "On the public API" below. Chiefly: let a site turn the delivery API **off**, since it is currently registered on every install whether used or not; document that it is anonymous and belongs behind the host's own rate limiting; and consider a per-caller cap on the expensive availability queries. **API keys are out of scope.** |
+| 0.10.0 | Permissions model *(gated on a spike)* | Who may create resources and services, who may view and cancel bookings — via Umbraco user groups. **Partly shipped already**: the whole section can be hidden by group today; what is missing is granularity *within* it. **Do a spike first** against the Umbraco source in `ref/` to establish what the backoffice actually permits. If it proves impractical, this waits until after 17.0.0, where it would be purely additive and so allowed by the release policy. The admin-only **settings screen** rides with this. |
 | 17.0.0 | First full release | No breaking API changes after this within the Umbraco 17 line, except where genuinely necessary — Umbraco's own policy, e.g. an urgent security fix. |
 
 ## On consent
@@ -71,7 +72,7 @@ default.** `UBookItDeliveryApiComposer` registers it unconditionally, so a site 
 Razor front end still exposes anonymous availability and placement endpoints it never asked for
 and gains nothing from. **An opt-out removes the surface entirely** for those sites, which no
 amount of rate limiting can match. That, plus documenting the API as anonymous and expecting the
-host's rate limiter in front of it, is the honest shape of 0.8.0.
+host's rate limiter in front of it, is the honest shape of 0.9.0.
 
 ## What is already built
 
@@ -82,7 +83,7 @@ Checked against the code, so nobody rebuilds it.
   the list is empty — a structural reason why. Equivalents exist for a single resource
   (`/resources/{id}/bookable-starts`, `/free-time`, `/slots`). **0.4.0 is the Razor front end
   consuming what is already there.**
-- **Section-level access control (part of 0.9.0).** A user group is granted the **uBookIt
+- **Section-level access control (part of 0.10.0).** A user group is granted the **uBookIt
   Section**, and that single grant governs both whether the section appears *and* whether that
   user may call the management API. Access to another section does not grant uBookIt. Documented
   in `docs/backoffice.md`. What remains is finer grain — e.g. view bookings but not configure
@@ -110,33 +111,18 @@ And it is a *second* query on a page that currently only lists times.
 
 Wanted, and currently on no version. Recorded so they are decisions rather than omissions.
 
-- **Approval, and with it decline — wanted in the first release or very early after it (Chris,
-  2026-09-10).** *"Not everybody will want auto-confirm, although some will."* Shipping a booking
-  system that can only ever accept instantly is a strange constraint to launch with.
+*(Approval/decline was here until 2026-09-11; it is now slotted as **0.6.0** — see the table.
+The working notes that lived in this section, kept because the change will need them:
+`Booking.Confirm()` and `Booking.Decline()` exist, are covered by `StatusMachineTests`, and both
+transition **from `Requested`** — but nothing produces `Requested`, because `BookingService`
+hard-codes `Confirmed` at placement. The status machine is done; every route into it is missing.
+What the change actually needs: the setting, placement branching on it, service operations,
+management API endpoints, a backoffice affordance, and the messages. 0.5.0 already anticipates
+it: the email wording is derived from `Booking.Status` rather than hard-coded, precisely so that
+adding `Requested` as a reachable state cannot silently turn "your booking is confirmed" into a
+lie in a customer's inbox. Decline — previously its own bullet here — rides with it: confirm and
+cancel both get an email, and decline is the third thing a customer needs telling about.)*
 
-  **The shape is an `AutoConfirm` option defaulting to ON**, which makes the whole thing additive:
-  the default is exactly today's behaviour, so it breaks nobody and is allowed by the release
-  policy whenever it lands.
-
-  **Most of the domain is already built and unreachable.** `Booking.Confirm()` and
-  `Booking.Decline()` exist, are covered by `StatusMachineTests`, and both transition **from
-  `Requested`** — but nothing produces `Requested`, because `BookingService` hard-codes
-  `Confirmed` at placement. The status machine is done; every route into it is missing. What the
-  change actually needs: the setting, placement branching on it, service operations, management
-  API endpoints, a backoffice affordance, and a third message.
-
-  **It pairs with 0.5.0 and 0.7.0 in both directions.** A decline the customer is never told about
-  is useless, so it wants emails first; and 0.7.0's "who is responsible for what" is about who
-  gets emailed, which is the same question as who needs to *act* on a pending booking. So the
-  natural slot is immediately after 0.5.0. **Version not yet chosen.**
-
-  *0.5.0 already anticipates it: the confirmation email's wording is derived from
-  `Booking.Status` rather than hard-coded, precisely so that adding `Requested` as a reachable
-  state cannot silently turn "your booking is confirmed" into a lie in a customer's inbox.*
-
-- **Decline a booking.** `BookingStatus.Declined` exists in the domain with **no code path that
-  produces it** — verified. Cheap, and it pairs with 0.5.0: confirm and cancel both get an
-  email, and decline is the third thing a customer needs telling about.
 - **Move / amend a booking's time.** Currently a cancellation and a new booking, which loses the
   reference the customer is holding.
 - **Descriptions in the UI.** `Resource` has a `Description` and the delivery API returns it;
@@ -156,8 +142,9 @@ Wanted, and currently on no version. Recorded so they are decisions rather than 
    own and the notification seam already exists. **Templates are the stronger case** — a
    template editor, a rendering path and its own settings is a feature in its own right, and
    `docs/notifications.md` currently states plainly that uBookIt sends nothing itself. Deciding
-   at 0.6.0 rather than 0.5.0 is fine; the seam means either choice stays possible.
+   when templates are proposed (now 0.7.0) rather than earlier is fine; the seam means either
+   choice stays possible.
 2. **Does the permissions spike come back feasible?** Run it against the Umbraco source in
-   `ref/` before committing 0.9.0 to a release. If the backoffice cannot express granularity
+   `ref/` before committing 0.10.0 to a release. If the backoffice cannot express granularity
    within a section without fighting it, say so and defer — it is additive, so it is allowed
    after 17.0.0.
