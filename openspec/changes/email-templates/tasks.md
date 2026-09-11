@@ -95,22 +95,27 @@ assembly compiles.)*
 
 ## 5. Shipped default templates — decide, then act
 
-- [ ] 5.1 **Decide whether the package ships example templates.** Forms ships one as a worked
-      example. Against: the six defaults are plain text built in code, so a shipped `.cshtml`
-      would be a second copy of the same wording, free to drift — the exact fault this project
-      keeps finding. For: an author has nothing to copy from. **Lean: ship none, and put a worked
-      example in the documentation instead**, where it cannot be mistaken for the thing that
-      renders. Record the decision either way.
+- [x] 5.1 **Decided: the package ships NO example templates.** Forms ships one; we do not, and
+      the fixtures written in task 3.4 turned the lean into evidence. An example that reproduced
+      the default wording would be a second copy of `SubjectFor`, `Details` and `ClosingLineFor`
+      — three pieces of logic restated in markup, free to drift from the code that actually runs
+      whenever no template exists. That is the two-copies-of-one-truth fault this project keeps
+      finding, and shipping it into every install is the worst place to put it.
+
+      **The worked example goes in the documentation instead, and is deliberately NOT a
+      reproduction of the default.** It is short and obviously a site's own wording, so there is
+      nothing for it to drift *from*: an illustration of the mechanism rather than a copy of the
+      content. Guarded in 6.4 — the docs must not claim the example is what the package sends.
 
 ## 6. Documentation
 
-- [ ] 6.1 `docs/notifications.md`: the mechanism, the six names, the path, what each model
+- [x] 6.1 `docs/notifications.md`: the mechanism, the six names, the path, what each model
       carries, how to state subject and content type, and the worked example.
-- [ ] 6.2 **The single-body limit**, with its reason (bypassing `IEmailSender` would cost the
+- [x] 6.2 **The single-body limit**, with its reason (bypassing `IEmailSender` would cost the
       site its transport and its interception seam).
-- [ ] 6.3 **What narrows and what does not**, as an explicit list — wording becomes the author's;
+- [x] 6.3 **What narrows and what does not**, as an explicit list — wording becomes the author's;
       gating, audiences, erased-booker and the internal-message exclusion do not.
-- [ ] 6.4 Documentation guards, wrap-safe in both directions. Include an absence check that no
+- [x] 6.4 Documentation guards, wrap-safe in both directions. Include an absence check that no
       document tells an author supplied content is subject to the package's wording guarantees.
 
 ## 7. Sync obligations recorded now (executed at sync)

@@ -1,5 +1,7 @@
+using UBookIt.Core.Notifications;
 using UBookIt.Persistence.Notifications;
 using UBookIt.Tests.Support;
+using UBookIt.Web.Emails;
 
 namespace UBookIt.Tests;
 
@@ -235,6 +237,76 @@ public class NotificationDocumentationTests
         DocumentationAssert.Says(
             docs, "A booking placed under auto-confirm raises `BookingPlacedNotification` and nothing else");
     }
+
+    // ---- email templates -------------------------------------------------------------------
+
+    /// <summary>
+    /// An author must be able to supply content from the documentation alone — the alternative to
+    /// finding this is worse than going without, because a site that wants different wording and
+    /// cannot find it will take over sending instead, and thereby inherit the sending conditions,
+    /// the erased-booker rule and the contact-detail rules that this package is tested for and
+    /// their handler will not be.
+    /// </summary>
+    [Fact]
+    public void An_author_can_supply_content_from_the_documentation_alone()
+    {
+        var docs = Docs();
+
+        // The path, and every message name — asserted against the enum, so a name added or
+        // renamed in code fails here rather than leaving the documentation quietly incomplete.
+        DocumentationAssert.Says(docs, RazorBookingTemplateRenderer.TemplateFolder.TrimStart('~', '/'));
+
+        foreach (var kind in Enum.GetValues<BookingMessageKind>())
+        {
+            Assert.Contains($"{kind}.cshtml", docs, StringComparison.Ordinal);
+        }
+
+        // How to state the two things a template may state, and the base page it needs.
+        Assert.Contains(nameof(UBookItEmailPage<BookingMessageModel>), docs, StringComparison.Ordinal);
+        Assert.Contains("Subject", docs, StringComparison.Ordinal);
+        Assert.Contains("IsHtml", docs, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public void The_single_body_limit_is_stated_with_its_reason()
+    {
+        var docs = Docs();
+
+        // Wrap-safe through DocumentationAssert, so the fragment is written on one line here
+        // regardless of how the sentence wraps in the document.
+        DocumentationAssert.Says(docs, "There is no plain-text part alongside it");
+        // And WHY, so it does not read as an arbitrary restriction somebody could ask us to lift.
+        DocumentationAssert.Says(docs, "limit of Umbraco's mail abstraction rather than a choice");
+    }
+
+    [Fact]
+    public void What_becomes_the_authors_and_what_does_not_is_stated()
+    {
+        var docs = Docs();
+
+        DocumentationAssert.Says(docs, "The words become yours, including whether they are accurate");
+
+        // The four that do NOT narrow. An author who assumed any of these had become theirs
+        // would be reproducing a rule the package still enforces — or worse, assuming it had
+        // stopped applying.
+        DocumentationAssert.Says(docs, "Sending still needs both a uBookIt setting");
+        DocumentationAssert.Says(docs, "is still never written to");
+        DocumentationAssert.Says(docs, "still carries no booker contact details");
+    }
+
+    /// <summary>
+    /// The documented example must not present itself as the package's own wording.
+    /// </summary>
+    /// <remarks>
+    /// The change deliberately ships no example template, because one that reproduced the
+    /// default would be a second copy of three pieces of composer logic, free to drift. The
+    /// documentation's example is a site's own wording for the same reason — there is nothing
+    /// for it to drift from. This guards that framing, since an example quietly rewritten to
+    /// "here is what uBookIt sends" would reintroduce the duplicate in prose.
+    /// </remarks>
+    [Fact]
+    public void The_documented_example_does_not_claim_to_be_what_the_package_sends()
+        => DocumentationAssert.Says(Docs(), "This example is not what uBookIt sends");
 
     /// <summary>
     /// Every markdown file the repository ships, discovered rather than listed.
