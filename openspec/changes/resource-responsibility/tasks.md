@@ -125,7 +125,7 @@ double-quoted shell string.
       (`git log` confirms head `9b01663` for that file), so the guarantee-diff done at
       spec-writing stands: both wholesale replacements carry every SHALL and scenario,
       none dropped.
-- [ ] 6.3 Live check on the TestSite: assign a user to a resource in the backoffice, place a
+- [x] 6.3 Live check on the TestSite: assign a user to a resource in the backoffice, place a
       booking, confirm the `.eml` set in the pickup directory (clear it first; the `Date:`
       header is authoritative, not mtime): user's address present, flat list still present,
       dedup correct. Repeat with the user disabled → address absent.
@@ -134,9 +134,13 @@ double-quoted shell string.
       `bookings@example.com` AND the responsible admin's address in one message, booker told
       separately; with the assigned second user disabled, their address was absent and
       everyone else unaffected; user re-enabled and test assignments removed afterwards.
-      **Remaining: the backoffice UI half** — assign through the Responsibility panel itself
-      (pickers, marks, save-after-save) — blocked on the Chrome extension being connected;
-      not ticked until that ran.
+      **UI half DONE (2026-09-11, Chrome)**: the Responsibility box renders in the resource
+      editor with the not-permissions hint; the user picker opened, uBookIt Admin was chosen
+      and saved; the row appeared in `uBookItResponsibility`; a booking placed while it stood
+      produced the union internal message (`bookings@example.com` + `admin@example.com`, one
+      message, booker separate); reopening the editor loaded the assignment back into the
+      picker; removing it and saving deleted the row. Test bookings SR8K-RQSP, 7S72-4P2K,
+      VHT6-D5V8 remain on the dev site.
 
 ## 7. Sync-time greps (run at sync, not before; do not tick until executed)
 
