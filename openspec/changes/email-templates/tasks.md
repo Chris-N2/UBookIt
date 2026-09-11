@@ -263,7 +263,9 @@ before doing it myself.
       `Described` record holding the text AND the parts, computed once; the line is derived from
       the list and the list is never derived from the line, because joining is lossy and no
       separator makes it otherwise. Tests on both paths use names containing the separator.
-      *The saving 10.9 was reaching for is still taken — by sharing the read, not by parsing it.*
+      *Round 3 correction: the parenthetical here originally claimed "the saving 10.9 was
+      reaching for is still taken". That was true of the direct path and INVERTED for the service
+      path — see 12.1.*
 - [x] 11.2 **MAJOR — the round-2 predicate did not cover the class it named.** Its own remarks
       claimed it matched "an address or a number"; it matched neither word, and QA added
       `Address`, `Mobile`, `CustomerName` and `PlacedBy` with 1356 tests passing. **Inverted to an
@@ -286,6 +288,13 @@ before doing it myself.
 - [x] 11.7 **MINOR — the absence needles were first/second person only**, so the same
       reassurance written about "the package" passed, and nothing guarded the INTERNAL over-claim
       that round 2's own new requirements had just made narrowable. Both classes added.
+- [x] 11.8 **NIT accepted, not fixed.** The structural no-request test checks constructor
+      parameter types — the mechanism rather than the guarantee, since a request dependency could
+      arrive through the injected `IServiceProvider`. It is deliberately paired with
+      `It_renders_with_no_ambient_request`, whose rig registers no accessor at all, so a lazy
+      resolve would fail there. The pair carries the claim; neither does alone. Recorded rather
+      than papered over.
+
 - [x] 11.9 **Live check re-run for the CRITICAL, and it passed end to end.** QA asked
       specifically for a directly-booked booking whose resource name contains the separator,
       rendered through a template that loops `ResourceNames`. Done on the TestSite: a resource
@@ -300,9 +309,43 @@ before doing it myself.
       management API requires sending `directlyBookable` explicitly, since a PUT built from the
       read model drops it. The TestSite was restored to its original state afterwards.
 
-- [x] 11.8 **NIT accepted, not fixed.** The structural no-request test checks constructor
-      parameter types — the mechanism rather than the guarantee, since a request dependency could
-      arrive through the injected `IServiceProvider`. It is deliberately paired with
-      `It_renders_with_no_ambient_request`, whose rig registers no accessor at all, so a lazy
-      resolve would fail there. The pair carries the claim; neither does alone. Recorded rather
-      than papered over.
+
+## 12. QA round 3 — REJECT (one MAJOR, two MINOR, two NIT)
+
+**Fourth consecutive round in which the same resource-read optimisation produced the next
+finding.** ㉓'s lesson applies exactly — *when a fix produces a defect twice, stop fixing and look
+at the shape* — and it took a reviewer to say so.
+
+- [x] 12.1 **MAJOR — the round-2 fix moved the cost onto the no-renderer path.** `DescribeAsync`
+      began reading resources for a SERVICE booking, and it is called before the
+      `if (!SupportsTemplates)` gate — so a site supplying nothing started paying a read per
+      claim per message on every service booking, where it had paid none. Content stayed
+      byte-identical, which is why nothing noticed: every other test looks at content.
+      **The method's own comment claimed the opposite**, and design.md still listed "invisible —
+      in behaviour and in cost" as a goal.
+
+      **Fixed by making the cost a decision the caller states**, not a side effect of how the
+      description happens to be built: `DescribeAsync(booking, withParts, ct)`. A service booking
+      reads only when parts are wanted; a direct booking reads either way, because the plain-text
+      line IS those names and there is nothing to save. Comment and goal both corrected to what
+      the code does.
+
+      **And the guard that was missing through all four rounds now exists**: a four-cell theory
+      over booking shape × renderer presence, asserting the READ COUNT. Each round justified a
+      cost with an argument and none measured it; a single-cell test would have passed in three
+      of the four. Mutation — reinstating the unconditional read — fails the no-renderer service
+      cell.
+- [x] 12.2 **MINOR — the allow-list inspects properties and fields, not methods.** Its remarks
+      said "everything a type exposes publicly", which was wider than the mechanism. Methods are
+      deliberately out: a record generates seven, and permitting them would turn the list into
+      compiler output nobody reads — an unread allow-list stops being a decision. Residue now
+      stated in the remarks rather than implied.
+- [x] 12.3 **MINOR — the `EqualityContract` allow-list entry was dead.** QA showed it comes back
+      only under `NonPublic`, so the entry documented a defence never exercised. Removed.
+- [x] 12.4 **NITs** — design.md §6's correction rewrapped to the file's ~100 columns (this
+      repository's doc guards are wrap-sensitive by design); tasks 11.8 and 11.9 reordered.
+- [x] 12.5 **Banked as a deferred obligation, per QA's suggestion:** a management-API PUT built
+      from the resource read model **drops `directlyBookable`**, because the read model and the
+      request model disagree about it. Hit while staging 11.9's live check. A site author
+      round-tripping a resource through the management API would silently un-publish it from the
+      front end. Not this change's to fix — recorded in agent memory.

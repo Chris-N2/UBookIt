@@ -430,6 +430,39 @@ public class BookingTemplateCompositionTests
             => throw new NotSupportedException();
     }
 
+    /// <summary>
+    /// What a site that supplies nothing pays, per message, per booking shape.
+    /// </summary>
+    /// <remarks>
+    /// <b>The guard that was missing through four reviews of the same optimisation.</b> Each
+    /// round changed how resources are read and each change was justified by an argument about
+    /// cost; none of them measured it, so round 3 found that a site supplying nothing had
+    /// started paying a read per claim for every service booking — invisible, because message
+    /// content stayed byte-identical and content is all the other tests look at.
+    /// <para>
+    /// Asserted as a TABLE over both booking shapes and both renderer states, because the defect
+    /// each time was a cost moving between cells rather than a wrong message. A single-cell test
+    /// would have passed in three of these four rounds.
+    /// </para>
+    /// </remarks>
+    [Theory]
+    [InlineData(false, false, 0)]  // service booking, no renderer  → the plain-text line names the service; nothing to read
+    [InlineData(false, true, 1)]   // service booking, renderer     → content may list what it resolved to
+    [InlineData(true, false, 1)]   // direct booking,  no renderer  → the line IS the resource names
+    [InlineData(true, true, 1)]    // direct booking,  renderer     → the same read, shared
+    public async Task What_a_message_costs_in_store_reads(bool direct, bool withRenderer, int expectedReads)
+    {
+        var store = new CountingResourceStore();
+        var composer = new BookingMessageComposer(
+            store,
+            NullLogger<BookingMessageComposer>.Instance,
+            withRenderer ? new StubRenderer(BookingTemplateResult.NotSupplied) : null);
+
+        await composer.ForBookerAsync(Booking(direct: direct), BookingEvent.Placed);
+
+        Assert.Equal(expectedReads, store.Reads);
+    }
+
     [Fact]
     public async Task A_directly_booked_booking_is_not_read_twice()
     {
@@ -588,18 +621,26 @@ public class BookingMessageModelContractTests
         nameof(InternalMessageModel.TimeZoneId),
         nameof(InternalMessageModel.AwaitsApproval),
         nameof(InternalMessageModel.BackofficeUrl),
-
-        // Compiler-generated on every record. Not data.
-        "EqualityContract",
     ];
 
     /// <summary>
-    /// Everything a type exposes publicly — properties AND fields, inherited included.
+    /// The public properties and fields a type exposes, inherited included.
     /// </summary>
     /// <remarks>
+    /// <para>
     /// Fields as well as properties because the rule is about what content can reach, and a
     /// public field is just as reachable. Records make one unlikely; "unlikely" is not the
     /// standard this particular guarantee is held to.
+    /// </para>
+    /// <para>
+    /// <b>Methods are NOT inspected, and the name says properties and fields rather than
+    /// "everything public" for that reason.</b> A hand-written <c>public string FormatBooker()</c>
+    /// would be callable from a template and invisible here. It is left out because a record
+    /// generates seven public methods and every one would need permitting, which would turn this
+    /// allow-list into a list of compiler output that nobody reads — and an unread allow-list
+    /// stops being a decision. The residue is stated rather than implied: the guarantee is about
+    /// members that carry data, and a method that fabricated some would slip past.
+    /// </para>
     /// </remarks>
     private static IReadOnlyList<string> PublicSurfaceOf(Type type)
         => [.. type.GetProperties(BindingFlags.Public | BindingFlags.Instance).Select(m => m.Name)

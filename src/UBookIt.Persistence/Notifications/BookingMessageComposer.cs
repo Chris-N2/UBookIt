@@ -101,7 +101,7 @@ public sealed class BookingMessageComposer(
     public async Task<BookingMessage> ForBookerAsync(
         Booking booking, BookingEvent bookingEvent, CancellationToken cancellationToken = default)
     {
-        var what = await DescribeAsync(booking, cancellationToken).ConfigureAwait(false);
+        var what = await DescribeAsync(booking, SupportsTemplates, cancellationToken).ConfigureAwait(false);
         var subject = SubjectFor(booking, bookingEvent);
 
         var body = new StringBuilder()
@@ -168,7 +168,7 @@ public sealed class BookingMessageComposer(
         Uri? backofficeUrl,
         CancellationToken cancellationToken = default)
     {
-        var what = await DescribeAsync(booking, cancellationToken).ConfigureAwait(false);
+        var what = await DescribeAsync(booking, SupportsTemplates, cancellationToken).ConfigureAwait(false);
 
         // DERIVED FROM THE BOOKING'S STATUS, not from the AutoConfirm setting. The message
         // describes the booking it announces; reading the setting instead would let the two
@@ -433,48 +433,59 @@ public sealed class BookingMessageComposer(
     /// resources claimed. <c>null</c> where nothing could be established.
     /// </summary>
     /// <summary>
-    /// What was booked, in both the shapes this class needs: the one line the plain-text message
+    /// What was booked, in the shapes this class needs: the one line the plain-text message
     /// prints, and the parts a model publishes.
     /// </summary>
-    /// <param name="Text">
-    /// The single line, or <c>null</c> where nothing could be established.
-    /// </param>
+    /// <param name="Text">The single line, or <c>null</c> where nothing could be established.</param>
     /// <param name="ServiceName">The service's recorded name, or <c>null</c> for a direct booking.</param>
-    /// <param name="ResourceNames">Every claimed resource's name that could be read.</param>
+    /// <param name="ResourceNames">
+    /// Every claimed resource's name that could be read — empty for a service booking described
+    /// without parts, which is what a site supplying no content asks for.
+    /// </param>
     private sealed record Described(string? Text, string? ServiceName, IReadOnlyList<string> ResourceNames);
 
     /// <summary>
-    /// What was booked: the service's snapshot name where there is one, otherwise the names of the
-    /// resources claimed.
+    /// What was booked: the one line the plain-text message prints, and — when asked for — the
+    /// parts a model publishes.
     /// </summary>
     /// <remarks>
     /// <para>
-    /// <b>Computed once, in both shapes, and the list is NEVER reconstituted from the text.</b>
-    /// An earlier version saved a store read by splitting the joined line back apart on ", " —
-    /// which turned a resource named "Studio 2, Ground Floor" into two resources and handed a
-    /// template a booking that does not exist. Caught in QA. The line is derived from the list;
-    /// the list is never derived from the line, because joining is lossy and no amount of care
-    /// about the separator makes it otherwise.
+    /// <b>The list is NEVER reconstituted from the text.</b> An earlier version saved a read by
+    /// splitting the joined line back apart on ", ", which turned a resource named
+    /// "Studio 2, Ground Floor" into two resources and handed a template a booking that does not
+    /// exist. The line is derived from the list; the list is never derived from the line, because
+    /// joining is lossy and no choice of separator makes it otherwise.
     /// </para>
     /// <para>
-    /// The resource read happens once per message either way, which is what the saving was
-    /// reaching for — it is just taken by sharing the result rather than by parsing it.
+    /// <b><paramref name="withParts"/> exists because this read has now produced a defect in four
+    /// consecutive reviews, and the shape was the problem rather than any one of them.</b> The
+    /// plain-text message names a SERVICE and stops, so it needs no resource read at all;
+    /// supplied content may want to list what the service resolved to, so it does. Making the
+    /// caller say which it is puts the cost where somebody can see it, instead of leaving a site
+    /// that supplies nothing quietly paying for data only a template would use.
+    /// </para>
+    /// <para>
+    /// A DIRECTLY-booked booking reads either way — the plain-text line is built from those very
+    /// names, so there is nothing to save and nothing to decide.
     /// </para>
     /// </remarks>
-    private async Task<Described> DescribeAsync(Booking booking, CancellationToken cancellationToken)
+    /// <param name="withParts">
+    /// Whether the caller needs <see cref="Described.ResourceNames"/> populated for a service
+    /// booking. <c>false</c> performs no read for one.
+    /// </param>
+    private async Task<Described> DescribeAsync(
+        Booking booking, bool withParts, CancellationToken cancellationToken)
     {
         // The snapshot the booking already carries, which says what was SOLD rather than what the
         // service happens to be called now.
-        //
-        // A SERVICE booking still reads its resources, because supplied content may want to name
-        // every resource the service resolved to and the one-line text cannot carry them. A site
-        // that supplies nothing never reaches this method's caller on that path.
         if (booking.Service is { } service)
         {
             return new Described(
                 service.DisplayName,
                 service.DisplayName,
-                await ResourceNamesAsync(booking, cancellationToken).ConfigureAwait(false));
+                withParts
+                    ? await ResourceNamesAsync(booking, cancellationToken).ConfigureAwait(false)
+                    : []);
         }
 
         var names = await ResourceNamesAsync(booking, cancellationToken).ConfigureAwait(false);

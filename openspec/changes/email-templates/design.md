@@ -33,8 +33,9 @@ Two constraints from this repository:
 
 **Goals:** a site replaces any of six message bodies with a Razor partial, without inheriting
 delivery; the package's data-protection guarantees survive that; the published contract is fit
-to be frozen at 17.0.0; and the feature is invisible — in behaviour and in cost — to a site that
-uses no templates.
+to be frozen at 17.0.0; and the feature is invisible to a site that uses no templates — in
+message content byte-for-byte, and in store reads, which is stated separately because a review
+found the second quietly untrue while the first held.
 
 **Non-Goals:** editor-facing content, theme integration, multipart bodies, attachments,
 per-recipient culture, layouts/sections as a promise, any change to when or to whom messages go.
@@ -141,9 +142,9 @@ fallback.
 
 ### 6. Rendering with no ambient request
 
-A background send has no `HttpContext`. **No such sender exists yet** — the retention sweep runs
-unattended but erases bookers and sends nothing — so this requirement is anticipatory: it exists
-so that the first thing which does send from a timer does not discover it in production. Core's only view-to-string recipe (`PartialViewBlockEngine`) resolves the view engine from
+A background send has no `HttpContext`. **No such sender exists yet** — the retention sweep
+runs unattended but erases bookers and sends nothing — so this requirement is anticipatory:
+it exists so the first thing that does send from a timer does not discover it in production. Core's only view-to-string recipe (`PartialViewBlockEngine`) resolves the view engine from
 `httpContext.RequestServices`, which is that implementation's choice rather than a framework
 limit — `tests/UBookIt.Tests.Rendering/Support/ViewRenderer.cs` in this repository already
 renders precompiled views from a plain `ServiceCollection`. Templates therefore inherit
