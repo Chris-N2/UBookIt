@@ -1,4 +1,5 @@
 ﻿@using UBookIt.Core.Stores
+@using UBookIt.Web.Rendering
 @inject IResourceStore ResourceStore
 @inherits Umbraco.Cms.Web.Common.Views.UmbracoViewPage
 @{
@@ -32,7 +33,19 @@
     // `ubBook` from the query and shows the catalogue when it says nothing;
     // `?flow=<serviceId>` renders that service directly, which is the "entry at
     // any point" case a site author with one service would use.
-    var flow = Context.Request.Query.ContainsKey("flow");
+    // ALSO WHEN `ubBook` IS PRESENT, and this is a fix rather than a convenience.
+    //
+    // A GET form REPLACES the query string rather than merging with it, so the catalogue's
+    // Continue button submits `?ubBook=s:<id>` and `?flow` is gone. Keying the branch on `flow`
+    // alone therefore dropped the visitor out of the dispatcher on the first click and into the
+    // plain `Booking` component for the FIRST resource — so every catalogue choice appeared to
+    // lead to the same thing, and editing the URL by hand did not help either.
+    //
+    // The shipped Booking Page does not have this problem: it is a path-routed content page that
+    // carries no query state of its own, so there is nothing for the form to wipe. It is this
+    // harness's own switch that could not survive its own form.
+    var flow = Context.Request.Query.ContainsKey("flow")
+        || Context.Request.Query.ContainsKey(BookingKeys.SubjectQuery);
     var namedService = Guid.TryParse(Context.Request.Query["flow"], out var svc) ? svc : (Guid?)null;
 }
 <!doctype html>

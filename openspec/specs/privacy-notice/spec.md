@@ -103,15 +103,30 @@ be putting words a site never wrote onto its public pages.
 rendered as a broken link on a public page. The notice renders without a link in that case, on
 the same terms as a site that configured none.
 
-**The notice SHALL NOT state that any message is sent.** The package sends nothing — no email,
-no SMS, no message of any kind — so a notice promising a confirmation would assert processing the
-package does not perform, on the very page where it is asking for the address. Whether a site
-contacts a booker is the site's own arrangement, built on the notifications it may subscribe to.
-What the notice may say is why the details are held: that the site is **able** to make contact.
+**What the notice says about being contacted SHALL be true of the site rendering it.** The
+package now sends messages on sites that configure it to and sends nothing on sites that do not,
+so neither silence nor a promise is correct everywhere:
+
+- Where a message **will** be sent to the booker, the notice SHALL say so. Withholding it would
+  understate the processing being performed on the very page collecting the address.
+- Where a message **will not** be sent to the booker, the notice SHALL NOT state that one will,
+  and SHALL state only that the site is **able** to make contact. A notice promising a
+  confirmation on a site that sends none would assert processing the package does not perform.
+
+**The condition governing the sentence SHALL be the condition governing the sending**, and not
+merely the setting that requests it. A site that has asked for messages on a host that cannot send
+mail sends nothing, and its notice SHALL say nothing about messages — so the sentence and the
+behaviour cannot diverge, because they are decided by the same thing.
+
+**This binds every surface of the same form that mentions contact**, not the notice alone. The
+email field's own hint states why the address is wanted, and it SHALL be governed by this
+requirement on the same terms as the notice.
 
 *Recorded as a requirement rather than left to the wording, because it is a mistake the package
-had already made elsewhere and would make again: the form's email field carried the hint "We'll
-send your booking confirmation here" from long before this capability existed.*
+had already made and would make again: the form's email field carried the hint "We'll send your
+booking confirmation here" from long before anything could send one. That hint was untrue when it
+was written. What has changed is that it is now untrue only on some sites, which is harder to
+notice and no less wrong.*
 
 **The notice is not a privacy policy and the documentation SHALL say so** — it is a factual
 statement about one package's handling of the data one form collects, and a site that needs a
@@ -133,9 +148,21 @@ policy still needs a policy.
 - **WHEN** the notice's statements are inspected
 - **THEN** each is a statement about what this package collects, why, for how long, or who can see it, and none asserts a lawful basis, a controller identity, a jurisdiction, or any processing the package does not perform
 
-#### Scenario: No message is promised
-- **WHEN** the notice renders, in any configuration
-- **THEN** it states no message that will be sent to the booker, and any surface of the same form that mentions contact states only that the site is able to make contact
+#### Scenario: No message is promised where none is sent
+- **WHEN** the notice renders on a site where no message will be sent to the booker
+- **THEN** it states no message that will be sent, and any surface of the same form that mentions contact states only that the site is able to make contact
+
+#### Scenario: The message is stated where one is sent
+- **WHEN** the notice renders on a site where a message will be sent to the booker
+- **THEN** it states that the booking will be confirmed to that address
+
+#### Scenario: Requesting messages the host cannot send promises nothing
+- **WHEN** the notice renders on a site that has asked for messages to the booker while the host is unable to send mail
+- **THEN** it states no message that will be sent, on the same terms as a site that asked for none
+
+#### Scenario: Internal recipients do not change what the booker is told
+- **WHEN** the notice renders on a site that notifies its own people but sends nothing to the booker
+- **THEN** it states no message that will be sent to the booker
 
 ### Requirement: The notice is data on the view model, not markup alone
 

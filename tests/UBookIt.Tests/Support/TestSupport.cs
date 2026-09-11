@@ -5,6 +5,8 @@ using UBookIt.Core.Common;
 using UBookIt.Core.Resources;
 using UBookIt.Core.Services;
 using UBookIt.Core.Stores;
+using Umbraco.Cms.Core.Mail;
+using Umbraco.Cms.Core.Models.Email;
 
 namespace UBookIt.Tests.Support;
 
@@ -495,5 +497,34 @@ public static class TestData
             new BookingService(resources, store, time, Settings),
             new AvailabilityService(resources, store, time, Settings),
             store);
+    }
+}
+
+/// <summary>
+/// An <see cref="IEmailSender"/> for tests that only need the flows to be constructible.
+/// </summary>
+/// <remarks>
+/// <b>Defaults to a host that CANNOT send</b>, which is the default install: no SMTP host and no
+/// pickup directory. A stub defaulting to "can send" would put every existing flow test on the
+/// sending branch of the privacy notice, which is the branch most sites never see.
+/// </remarks>
+public sealed class TestEmailSender(bool canSend = false) : IEmailSender
+{
+    public List<EmailMessage> Sent { get; } = [];
+
+    public bool CanSendRequiredEmail() => canSend;
+
+    public Task SendAsync(EmailMessage message, string emailType)
+        => SendAsync(message, emailType, false, null);
+
+    public Task SendAsync(EmailMessage message, string emailType, bool enableNotification)
+        => SendAsync(message, emailType, enableNotification, null);
+
+    public Task SendAsync(
+        EmailMessage message, string emailType, bool enableNotification = false, TimeSpan? expires = null)
+    {
+        Sent.Add(message);
+
+        return Task.CompletedTask;
     }
 }

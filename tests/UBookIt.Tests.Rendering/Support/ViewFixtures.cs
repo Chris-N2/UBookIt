@@ -298,15 +298,25 @@ public static class ViewFixtures
         // special case: it is what every other state in this method already renders, which is
         // correct, because it is what every site renders until somebody configures something.
         yield return ("service: retention period stated", Service(
-            privacyNotice: new PrivacyNoticeView(90, null)));
+            privacyNotice: new PrivacyNoticeView(90, null, false)));
         yield return ("service: retention of one day", Service(
-            privacyNotice: new PrivacyNoticeView(1, null)));
+            privacyNotice: new PrivacyNoticeView(1, null, false)));
         yield return ("service: policy link, no period", Service(
-            privacyNotice: new PrivacyNoticeView(null, "/privacy")));
+            privacyNotice: new PrivacyNoticeView(null, "/privacy", false)));
         yield return ("service: period and policy link", Service(
-            privacyNotice: new PrivacyNoticeView(90, "https://example.com/privacy")));
+            privacyNotice: new PrivacyNoticeView(90, "https://example.com/privacy", false)));
         yield return ("resource: period and policy link", Resource(
-            privacyNotice: new PrivacyNoticeView(30, "/privacy")));
+            privacyNotice: new PrivacyNoticeView(30, "/privacy", false)));
+
+        // THE SENDING STATE, in both flows. The purpose sentence and the email field's hint both
+        // change with it, and they are separate views — so a fixture for one would leave the other
+        // rendering only its silent branch while rule 3 reported the view fully covered.
+        yield return ("service: a confirmation will be sent", Service(
+            privacyNotice: new PrivacyNoticeView(null, null, true)));
+        yield return ("resource: a confirmation will be sent", Resource(
+            privacyNotice: new PrivacyNoticeView(null, null, true)));
+        yield return ("service: sends, with a period and a link", Service(
+            privacyNotice: new PrivacyNoticeView(90, "/privacy", true)));
 
         yield return ("service: times, no errors", Service());
         yield return ("service: no times", Service(times: []));
@@ -466,7 +476,7 @@ public static class ViewFixtures
             // Defaults to the DEFAULT INSTALL: no retention period and no policy link. A
             // fixture that defaulted to a configured period would exercise the branch most
             // sites never see and leave the common one untested.
-            PrivacyNotice = privacyNotice ?? new PrivacyNoticeView(null, null),
+            PrivacyNotice = privacyNotice ?? new PrivacyNoticeView(null, null, false),
             AvailableDates = availableDates ?? Dates,
             SelectedDateIsListed = (availableDates ?? Dates).Any(date => date.IsSelected),
             WindowDays = 30,
@@ -508,7 +518,7 @@ public static class ViewFixtures
         => new()
         {
             /// <inheritdoc cref="Service" />
-            PrivacyNotice = privacyNotice ?? new PrivacyNoticeView(null, null),
+            PrivacyNotice = privacyNotice ?? new PrivacyNoticeView(null, null, false),
             AvailableDates = availableDates ?? Dates,
             SelectedDateIsListed = (availableDates ?? Dates).Any(date => date.IsSelected),
             WindowDays = 30,

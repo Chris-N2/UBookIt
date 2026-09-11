@@ -74,7 +74,8 @@ public class AvailableDatesFlowTests
             resources,
             new AvailabilityService(resources, new InMemoryBookingStore(), time, settings),
             settings,
-            time);
+            time,
+            new TestEmailSender());
 
         return new Subject(
             "resource",
@@ -103,7 +104,7 @@ public class AvailableDatesFlowTests
         var (core, _, _) = TestData.ServiceBookingWith(serviceStore, resourceStore);
         var time = new FixedTimeProvider(TestData.Now);
 
-        var flow = new ServiceBookingFlow(serviceStore, core, settings, time);
+        var flow = new ServiceBookingFlow(serviceStore, core, settings, time, new TestEmailSender());
 
         // THE HORIZON READ FROM WHAT THE FLOW COMPUTED, not from the room's own constraints.
         //
@@ -360,7 +361,8 @@ public class AvailableDatesFlowTests
             resources,
             new AvailabilityService(resources, new InMemoryBookingStore(), time, settings),
             settings,
-            time);
+            time,
+            new TestEmailSender());
 
         var today = BookingFormBuilder.TodayIn(TestData.Now, TestData.London);
 

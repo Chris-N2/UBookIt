@@ -47,7 +47,10 @@ installation itself is **not** automated; that remains a recorded obligation.
 
 ### Why 8 is in v1 rather than after it
 
-The package sends no email and will not in v1 — the site owns its own mail. But an operator
+The package sent no email in the MVP and the site owned its own mail entirely. (That changed in
+0.5.0, which added optional confirmation and cancellation emails — still off by default, and still
+built on the hook this section is about. The argument below is why the hook shipped when it did.)
+But an operator
 cancelling a booking is a customer who will otherwise **turn up anyway**: the row changes in
 the backoffice and nothing reaches the person who booked. A cancel button with no way for the
 site to tell anyone is worse than no cancel button, so the hook ships with the verb that

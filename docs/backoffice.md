@@ -82,9 +82,16 @@ it is not something a site can agree to on their behalf.
 details also decides who may erase them, on top of access to the uBookIt section. A user your
 site has decided may not so much as see a booker's name cannot destroy it.
 
-**It cannot be undone.** There is no restore. Once the details are gone, no permission, no
-group and no support call brings them back — which is the whole point, and the reason the
-next two limits matter.
+**It cannot be undone.** There is no restore. Once the details are gone from the booking, no
+permission, no group and no support call brings them back — which is the whole point, and the
+reason the next three limits matter.
+
+**On a site that sends email, erasure does not reach what has already left.** A confirmation or
+cancellation message delivered before the erasure is in somebody's mailbox, and if a mail server
+rejected the address it may have quoted it into this site's own error log. Neither is a store
+uBookIt can reach, so neither is erased — see [reacting to bookings](notifications.md). If you are
+honouring a right-to-be-forgotten request, that is the boundary to know about **before** you tell
+somebody their details are gone.
 
 **Running it twice is safe.** Erasing an already-erased booking succeeds and changes nothing,
 keeping the *first* erasure's timestamp. That is deliberately unlike cancelling, which refuses
@@ -216,9 +223,10 @@ somebody wrote:
 - **What is collected** — the booker's name and email address, and their phone number if
   they give one.
 - **Why** — to hold and identify the booking, and so the site is able to contact the booker
-  about it. **It does not say a confirmation will be sent**, because uBookIt sends nothing:
-  whether your site emails or rings anybody is your own arrangement, built on the
-  notifications described in `docs/notifications.md`.
+  about it. **Whether it says a confirmation will be sent depends on your configuration**: it
+  says so only on a site where uBookIt will actually send one, and says only that the site is
+  able to make contact everywhere else. It is never a promise your site does not keep. See
+  [reacting to bookings](notifications.md) for what turns sending on.
 - **How long it is kept** — read from `RetentionDays`. If you have set a period, the notice
   states it. If you have not, it says so plainly rather than going quiet.
 - **Who can see it** — that contact details are visible in the backoffice only to staff with
@@ -227,6 +235,13 @@ somebody wrote:
 **You cannot mistype the retention period into it.** There is no wording to keep in step with
 your configuration, because the sentence is generated from the same value the retention job
 acts on. Change the period, restart, and the notice changes with it.
+
+The same is true of what the notice says about being contacted. If you turn on
+`UBookIt:Notifications:SendBookerEmails` and your site can send mail, the notice says a
+confirmation will be sent — because one will. If either is missing it says only that the site is
+able to contact the booker. It is decided by the same condition the sending itself is, so the
+notice cannot promise a message your site does not send. See
+[reacting to bookings](notifications.md).
 
 ### Linking your own privacy policy
 
@@ -273,10 +288,15 @@ assigned when the booking is placed and never changes.
 From the Bookings view **you can see bookings and cancel them**. Those are the two things v1
 does: it does not approve, decline, amend or take a booking on someone's behalf.
 
-**Cancelling tells nobody.** The time is released immediately and the booking keeps its
-record, but uBookIt sends no email or message to the person who booked — so if they should
-know, that is yours to do. Your site can react automatically: see
-[reacting to bookings](notifications.md).
+**Cancelling tells nobody unless you have configured it to.** The time is released immediately
+and the booking keeps its record. Whether the person who booked hears about it depends on
+`UBookIt:Notifications:SendBookerEmails` and on your site being able to send mail — if either is
+missing, uBookIt sends nothing and telling them is yours to do. Your site can also react
+automatically instead: see [reacting to bookings](notifications.md).
+
+A booking whose booker has been erased has no address left, so **nothing is sent to them** —
+but your own recipients are still told, because the booking is real and you are entitled to know
+it was cancelled.
 
 The view opens on the current week and you change the window with the two date controls.
 It shows the statuses that hold their time — confirmed and requested — so a **cancelled

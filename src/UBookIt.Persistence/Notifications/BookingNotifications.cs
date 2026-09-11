@@ -15,8 +15,11 @@ namespace UBookIt.Persistence.Notifications;
 /// Umbraco notification.
 /// </para>
 /// <para>
-/// <b>The package sends nothing itself</b> — no email, no message of any kind, to the booker
-/// or to anyone else. This notification exists so a site can send whatever it wants to.
+/// <b>The package sends nothing unless a site has configured it to.</b> Out of the box it sends
+/// no email and no message of any kind, to the booker or to anyone else — and configuring the
+/// site's mail server does not change that on its own. See
+/// <c>UBookIt:Notifications</c> and <see cref="BookingEmailHandler"/>. This notification exists
+/// independently of all that, so a site can send whatever it wants to instead, or as well.
 /// </para>
 /// <para>
 /// <b>A handler that throws is a notification nobody receives.</b> The booking is already
@@ -40,8 +43,9 @@ public sealed class BookingPlacedNotification(Booking booking) : INotification
 /// nothing.
 /// </para>
 /// <para>
-/// The same two caveats apply as for placement: the package tells the booker nothing, and a
-/// handler that throws is a notification nobody receives.
+/// The same two caveats apply as for placement: what the package tells the booker depends
+/// entirely on configuration and is nothing by default, and a handler that throws is a
+/// notification nobody receives.
 /// </para>
 /// </remarks>
 public sealed class BookingCancelledNotification(Booking booking) : INotification
@@ -94,8 +98,17 @@ public sealed class UmbracoBookingObserver(
             // that can. The booking is committed; a subscriber's fault must not become the
             // booker's problem.
             //
-            // The booking id only — a notification failure is not a reason to write a
-            // booker's name or email into a log.
+            // THE BOOKING ID ONLY — a notification failure is not a reason to write a booker's
+            // name or email into a log. That governs what THIS package writes, and it is the
+            // whole of what it can govern.
+            //
+            // It does not govern the exception, and since 0.5.0 that distinction is reachable
+            // rather than academic: the package can now hand a booker's address to a mail client,
+            // and an SMTP rejection commonly echoes the recipient into its own message. Such an
+            // exception arrives here and is logged with the error, as it must be — redacting text
+            // a third party wrote would as likely destroy the diagnostic that makes a failed send
+            // findable. `docs/notifications.md` says so rather than implying a guarantee this
+            // cannot keep.
             logger.LogError(
                 exception,
                 "A handler for the booking-{What} notification threw. Booking {BookingId} is "

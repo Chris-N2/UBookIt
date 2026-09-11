@@ -1,3 +1,4 @@
+using System.Net.Mail;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using UBookIt.Core;
@@ -30,6 +31,8 @@ public sealed class UBookItPersistenceComposer : IComposer
     public const int DefaultMaxQueryRangeDays = 31;
     public const string RetentionDaysSettingKey = "UBookIt:RetentionDays";
     public const string PrivacyPolicyUrlSettingKey = "UBookIt:PrivacyPolicyUrl";
+    public const string SendBookerEmailsSettingKey = "UBookIt:Notifications:SendBookerEmails";
+    public const string InternalRecipientsSettingKey = "UBookIt:Notifications:InternalRecipients";
 
     public void Compose(IUmbracoBuilder builder)
     {
@@ -84,6 +87,20 @@ public sealed class UBookItPersistenceComposer : IComposer
         // helper and registers its own the same way.
         builder.Services.AddSingleton<IDistributedBackgroundJob, BookerRetentionJob>();
 
+        // Registered UNCONDITIONALLY, like the retention job and for the same reason: the check
+        // reads the configuration itself, so a site that corrects a mistyped setting is told about
+        // it on the next boot rather than waiting on a registration decision made before the
+        // correction existed.
+        builder.AddNotificationHandler<UmbracoApplicationStartedNotification, UBookItNotificationBootCheck>();
+
+        // Registered UNCONDITIONALLY for the same reason as the retention job and the boot check:
+        // the handler reads the settings itself and returns immediately when a site has asked for
+        // nothing. Registering it only when sending is configured would make the setting's effect
+        // depend on the state of configuration at startup in a second, invisible way.
+        builder.Services.AddScoped<BookingMessageComposer>();
+        builder.AddNotificationAsyncHandler<BookingPlacedNotification, BookingEmailHandler>();
+        builder.AddNotificationAsyncHandler<BookingCancelledNotification, BookingEmailHandler>();
+
         builder.AddNotificationAsyncHandler<UmbracoApplicationStartedNotification, RunUBookItMigrations>();
     }
 
@@ -99,6 +116,7 @@ public sealed class UBookItPersistenceComposer : IComposer
         MaxQueryRangeDays = ResolveMaxQueryRangeDays(configuration),
         RetentionDays = ResolveRetentionDays(configuration),
         PrivacyPolicyUrl = ResolvePrivacyPolicyUrl(configuration),
+        Notifications = ResolveNotifications(configuration).Settings,
     };
 
     internal static bool IsTimeZoneConfigured(IConfiguration configuration)
@@ -263,5 +281,73 @@ public sealed class UBookItPersistenceComposer : IComposer
         return value.StartsWith('/') && !value.StartsWith("//", StringComparison.Ordinal)
             ? value
             : null;
+    }
+
+    /// <summary>
+    /// What a resolution of the notification settings produced: the settings themselves, and the
+    /// configured recipient addresses that were refused.
+    /// </summary>
+    /// <remarks>
+    /// The refusals travel back to the caller rather than being logged here so that the
+    /// resolution stays a pure function of configuration — testable by calling it, with no
+    /// logger to stand up and no captured output to read back. Reporting them is the startup
+    /// handler's job, which is where a logger already exists.
+    /// </remarks>
+    internal readonly record struct NotificationResolution(
+        BookingNotificationSettings Settings,
+        IReadOnlyList<string> RejectedRecipients);
+
+    /// <summary>
+    /// The site's notification settings, and any recipient addresses refused while resolving them.
+    /// </summary>
+    /// <remarks>
+    /// <b>Nothing here falls back to a value that enables anything.</b> Absent, blank and
+    /// unusable all resolve to off, in the direction established by
+    /// <see cref="ResolveRetentionDays"/> — a setting whose failure destroys data fails towards
+    /// keeping it, and a setting whose failure writes to a site's customers fails towards
+    /// silence. A typo must never start sending mail.
+    /// </remarks>
+    internal static NotificationResolution ResolveNotifications(IConfiguration configuration)
+    {
+        // bool.TryParse and not a truthiness test: "yes", "1" and "on" are not values this
+        // accepts, and treating them as true would mean guessing at what a site meant while
+        // starting to write to its customers on the strength of the guess.
+        var sendBookerEmails =
+            bool.TryParse(configuration[SendBookerEmailsSettingKey], out var send) && send;
+
+        var kept = new List<string>();
+        var rejected = new List<string>();
+
+        foreach (var child in configuration.GetSection(InternalRecipientsSettingKey).GetChildren())
+        {
+            var configured = child.Value;
+
+            // A blank entry is a hole in the list rather than a mistyped address — an array slot
+            // whose environment variable resolved to nothing. There is nothing to report and
+            // nobody to report it about, so it is skipped rather than counted as a refusal.
+            if (string.IsNullOrWhiteSpace(configured))
+            {
+                continue;
+            }
+
+            var value = configured.Trim();
+
+            if (MailAddress.TryCreate(value, out _))
+            {
+                kept.Add(value);
+            }
+            else
+            {
+                rejected.Add(value);
+            }
+        }
+
+        return new NotificationResolution(
+            new BookingNotificationSettings
+            {
+                SendBookerEmails = sendBookerEmails,
+                InternalRecipients = kept,
+            },
+            rejected);
     }
 }

@@ -3,6 +3,8 @@ using UBookIt.Core;
 using UBookIt.Core.Availability;
 using UBookIt.Tests.Support;
 using UBookIt.Web.Rendering;
+using Umbraco.Cms.Core.Mail;
+using Umbraco.Cms.Core.Models.Email;
 
 namespace UBookIt.Tests;
 
@@ -58,7 +60,7 @@ public class PrivacyNoticeSourceTests
             resources,
             new AvailabilityService(resources, bookings, time, settings),
             settings,
-            time);
+            time, new TestEmailSender());
 
         var outcome = await flow.BuildAsync(
             room.Id,
@@ -72,6 +74,156 @@ public class PrivacyNoticeSourceTests
         Assert.Equal(settings.PrivacyPolicyUrl, outcome.Form.PrivacyNotice.PolicyUrl);
     }
 
+    /// <summary>
+    /// THE SEAM, over BOTH flows. What the notice says about being contacted is decided by asking
+    /// the host, live, from the flow — and until QA mutated it, nothing drove that path: replacing
+    /// <c>HostMailAvailability.CanSend(emailSender)</c> with the literal <c>false</c> in both flows
+    /// left all 2343 tests green.
+    /// </summary>
+    /// <remarks>
+    /// <para>
+    /// That mutant ships a site with sending configured and working mail whose form says only "so
+    /// this site can contact you" — understating the processing on the very page collecting the
+    /// address, which is the failure the privacy-notice requirement forbids in its other direction.
+    /// </para>
+    /// <para>
+    /// <b>The predicate was tested pure and the views were tested from fixtures; the three lines
+    /// joining them lived in neither.</b> Which is this project's recurring shape, and the reason
+    /// this is a theory over both flows rather than a test of one: the previous change fixed both
+    /// flows, tested one, and claimed both.
+    /// </para>
+    /// </remarks>
+    [Theory]
+    [InlineData(true)]
+    [InlineData(false)]
+    public async Task What_the_flow_tells_the_visitor_comes_from_asking_the_host(bool hostCanSendMail)
+    {
+        var settings = TestData.Settings with
+        {
+            Notifications = new BookingNotificationSettings { SendBookerEmails = true },
+        };
+
+        var resourceNotice = await ResourceNoticeAsync(settings, new TestEmailSender(hostCanSendMail));
+        var serviceNotice = await ServiceNoticeAsync(settings, new TestEmailSender(hostCanSendMail));
+
+        // The SETTING is on in both cases, so anything that reads the setting alone passes both
+        // rows. Only a flow that actually asks the host distinguishes them.
+        Assert.Equal(hostCanSendMail, resourceNotice.SendsBookerEmail);
+        Assert.Equal(hostCanSendMail, serviceNotice.SendsBookerEmail);
+    }
+
+    /// <summary>
+    /// And the other conjunct, from the flow: a host that can send does not make a notice promise
+    /// anything on a site that never asked for it.
+    /// </summary>
+    [Fact]
+    public async Task A_host_that_can_send_does_not_promise_for_a_site_that_did_not_ask()
+    {
+        var settings = TestData.Settings;  // no notification settings at all
+
+        Assert.False((await ResourceNoticeAsync(settings, new TestEmailSender(true))).SendsBookerEmail);
+        Assert.False((await ServiceNoticeAsync(settings, new TestEmailSender(true))).SendsBookerEmail);
+    }
+
+    /// <summary>
+    /// A host that throws when asked must not take the booking page down with it — the opposite
+    /// choice from the sending path, and made deliberately because here the answer decides a
+    /// sentence rather than a message. Until now the <c>catch</c> was executed by no test at all,
+    /// so the claim was unproven in both halves: that the page survives, and that the sentence
+    /// errs towards promising nothing rather than towards promising wrongly.
+    /// </summary>
+    /// <remarks>
+    /// <b>Theory over the exception TYPE, because the claim is about any refusal.</b> QA narrowed
+    /// the production <c>catch (Exception)</c> to <c>catch (NotImplementedException)</c> and the
+    /// whole suite stayed green — the fixture threw only the type Umbraco's own default sender
+    /// throws, so the guard proved the catch handled *that*, while the guarantee is "a host that
+    /// refuses to answer". A decorated or custom <c>IEmailSender</c> throwing anything else would
+    /// have put an unhandled exception on the public booking page, which is the single outcome
+    /// this type exists to prevent.
+    /// </remarks>
+    [Theory]
+    [InlineData(typeof(NotImplementedException))]
+    [InlineData(typeof(InvalidOperationException))]
+    [InlineData(typeof(TimeoutException))]
+    public async Task A_host_that_cannot_be_asked_does_not_break_the_form_and_promises_nothing(
+        Type exceptionType)
+    {
+        var settings = TestData.Settings with
+        {
+            Notifications = new BookingNotificationSettings { SendBookerEmails = true },
+        };
+
+        var resourceNotice = await ResourceNoticeAsync(settings, new ThrowingEmailSender(exceptionType));
+        var serviceNotice = await ServiceNoticeAsync(settings, new ThrowingEmailSender(exceptionType));
+
+        Assert.False(resourceNotice.SendsBookerEmail);
+        Assert.False(serviceNotice.SendsBookerEmail);
+    }
+
+    private static async Task<PrivacyNoticeView> ResourceNoticeAsync(
+        SiteBookingSettings settings, IEmailSender emailSender)
+    {
+        var room = TestData.Room();
+        var resources = new InMemoryResourceStore().Add(room);
+        var time = new FixedTimeProvider(TestData.Now);
+
+        var flow = new ResourceBookingFlow(
+            resources,
+            new AvailabilityService(resources, new InMemoryBookingStore(), time, settings),
+            settings,
+            time,
+            emailSender);
+
+        var outcome = await flow.BuildAsync(
+            room.Id, new BookingFlowInput { Date = Date, DurationMinutes = 60 });
+
+        Assert.NotNull(outcome.Form);
+
+        return outcome.Form!.PrivacyNotice;
+    }
+
+    private static async Task<PrivacyNoticeView> ServiceNoticeAsync(
+        SiteBookingSettings settings, IEmailSender emailSender)
+    {
+        var service = UBookIt.Core.Services.Service.Create(
+            "Massage",
+            duration: null,
+            roles: [new UBookIt.Core.Services.ServiceRole("room", 1)]).Value;
+        var serviceStore = new InMemoryServiceStore().Add(service);
+        var resourceStore = new InMemoryResourceStore().Add(TestData.Room());
+        var (core, _, _) = TestData.ServiceBookingWith(serviceStore, resourceStore);
+
+        var flow = new ServiceBookingFlow(
+            serviceStore, core, settings, new FixedTimeProvider(TestData.Now), emailSender);
+
+        var outcome = await flow.BuildAsync(
+            service.Id, new BookingFlowInput { Date = Date, DurationMinutes = 60 });
+
+        Assert.NotNull(outcome.Form);
+
+        return outcome.Form!.PrivacyNotice;
+    }
+
+    /// <summary>
+    /// A host that refuses to answer. The exception type is a parameter on purpose: Umbraco's own
+    /// default sender throws <see cref="NotImplementedException"/>, but a site may decorate or
+    /// replace <c>IEmailSender</c> with anything, and "refuses to answer" is the guarantee.
+    /// </summary>
+    private sealed class ThrowingEmailSender(Type exceptionType) : IEmailSender
+    {
+        public bool CanSendRequiredEmail()
+            => throw (Exception)Activator.CreateInstance(exceptionType)!;
+
+        public Task SendAsync(EmailMessage message, string emailType) => Task.CompletedTask;
+
+        public Task SendAsync(EmailMessage message, string emailType, bool enableNotification)
+            => Task.CompletedTask;
+
+        public Task SendAsync(
+            EmailMessage message, string emailType, bool enableNotification = false, TimeSpan? expires = null)
+            => Task.CompletedTask;
+    }
+
     [Fact]
     public void Retention_off_reaches_the_form_as_off_rather_than_as_a_number()
     {
@@ -80,7 +232,7 @@ public class PrivacyNoticeSourceTests
         // which is a promise no site has made.
         var settings = TestData.Settings with { RetentionDays = null };
 
-        var notice = PrivacyNoticeView.From(settings);
+        var notice = PrivacyNoticeView.From(settings, hostCanSendMail: false);
 
         Assert.Null(notice.RetentionDays);
         Assert.False(notice.HasRetentionPeriod);

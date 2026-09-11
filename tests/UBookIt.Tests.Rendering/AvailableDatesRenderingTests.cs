@@ -24,7 +24,7 @@ public class AvailableDatesRenderingTests
 
         return new BookingFormModel
         {
-            PrivacyNotice = new PrivacyNoticeView(null, null),
+            PrivacyNotice = new PrivacyNoticeView(null, null, false),
             AvailableDates = list,
             SelectedDateIsListed = list.Any(date => date.IsSelected),
             WindowDays = 30,

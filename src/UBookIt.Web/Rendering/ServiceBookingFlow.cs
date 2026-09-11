@@ -1,6 +1,7 @@
 using UBookIt.Core;
 using UBookIt.Core.Services;
 using UBookIt.Core.Stores;
+using Umbraco.Cms.Core.Mail;
 
 namespace UBookIt.Web.Rendering;
 
@@ -25,7 +26,8 @@ public sealed class ServiceBookingFlow(
     IServiceStore serviceStore,
     IServiceBookingService serviceBooking,
     SiteBookingSettings settings,
-    TimeProvider timeProvider)
+    TimeProvider timeProvider,
+    IEmailSender emailSender)
 {
     public async Task<ServiceFlowOutcome> BuildAsync(
         Guid serviceId, BookingFlowInput input, CancellationToken cancellationToken = default)
@@ -135,7 +137,7 @@ public sealed class ServiceBookingFlow(
         return new ServiceFlowOutcome(
             ServiceBookingFormBuilder.Build(
                 service, pools, selectedDate, today, windowStarts, dayStarts, duration, zone,
-                PrivacyNoticeView.From(settings), windowDays, failed, input.FlowToken, choice),
+                PrivacyNoticeView.From(settings, HostMailAvailability.CanSend(emailSender)), windowDays, failed, input.FlowToken, choice),
             null);
     }
 }

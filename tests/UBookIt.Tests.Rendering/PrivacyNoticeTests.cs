@@ -23,13 +23,16 @@ public class PrivacyNoticeTests
 {
     private readonly ViewRenderer _renderer = new();
 
-    private Task<string> RenderAsync(int? retentionDays, string? policyUrl)
-        => _renderer.RenderAsync(ViewInventory.PrivacyNotice, Form(retentionDays, policyUrl));
+    private Task<string> RenderAsync(
+        int? retentionDays, string? policyUrl, bool sendsBookerEmail = false)
+        => _renderer.RenderAsync(
+            ViewInventory.PrivacyNotice, Form(retentionDays, policyUrl, sendsBookerEmail));
 
-    private static IBookingFormView Form(int? retentionDays, string? policyUrl)
+    private static IBookingFormView Form(
+        int? retentionDays, string? policyUrl, bool sendsBookerEmail = false)
         => new BookingFormModel
         {
-            PrivacyNotice = new PrivacyNoticeView(retentionDays, policyUrl),
+            PrivacyNotice = new PrivacyNoticeView(retentionDays, policyUrl, sendsBookerEmail),
             ResourceId = Guid.NewGuid(),
             ResourceName = "Meeting Room A",
             SelectedDate = new DateOnly(2026, 9, 15),
@@ -226,7 +229,7 @@ public class PrivacyNoticeTests
             PrivacyPolicyUrl = "/privacy",
         };
 
-        var notice = PrivacyNoticeView.From(settings);
+        var notice = PrivacyNoticeView.From(settings, hostCanSendMail: false);
 
         Assert.Equal(settings.RetentionDays, notice.RetentionDays);
         Assert.Equal(settings.PrivacyPolicyUrl, notice.PolicyUrl);
@@ -239,9 +242,102 @@ public class PrivacyNoticeTests
         // would miss: null must survive the journey as null rather than becoming a zero.
         var settings = new SiteBookingSettings { TimeZoneId = "Europe/London", RetentionDays = null };
 
-        var notice = PrivacyNoticeView.From(settings);
+        var notice = PrivacyNoticeView.From(settings, hostCanSendMail: false);
 
         Assert.Null(notice.RetentionDays);
         Assert.False(notice.HasRetentionPeriod);
+    }
+
+    // ---- what the notice says about being contacted -----------------------------------------
+
+    /// <summary>
+    /// Both directions in one test, because the guarantee is that the notice describes THIS site
+    /// — and a pair of one-way tests would each pass against a notice that always said its own
+    /// thing. The two renders differ only in the send predicate.
+    /// </summary>
+    [Fact]
+    public async Task What_the_notice_says_about_messages_follows_the_site()
+    {
+        var sends = await RenderAsync(null, null, sendsBookerEmail: true);
+        var silent = await RenderAsync(null, null, sendsBookerEmail: false);
+
+        Assert.Contains("send your booking confirmation", sends, StringComparison.OrdinalIgnoreCase);
+        Assert.DoesNotContain("send your booking confirmation", silent, StringComparison.OrdinalIgnoreCase);
+
+        // And the silent rendering still says why the address is wanted, rather than saying
+        // nothing — the purpose statement is one of the four the notice exists to make.
+        Assert.Contains("can contact you about it", silent, StringComparison.OrdinalIgnoreCase);
+    }
+
+    /// <summary>
+    /// A site that sends nothing must not have a notice that merely omits the promise while
+    /// implying it some other way. Asserted against the words a promise would have to use.
+    /// </summary>
+    [Fact]
+    public async Task A_site_that_sends_nothing_promises_nothing()
+    {
+        var html = await RenderAsync(90, "/privacy", sendsBookerEmail: false);
+
+        Assert.DoesNotContain("we will send", html, StringComparison.OrdinalIgnoreCase);
+        Assert.DoesNotContain("confirmation", html, StringComparison.OrdinalIgnoreCase);
+    }
+
+    /// <summary>
+    /// The two conditional sentences are independent: retention and sending are different settings
+    /// and a site can be in any combination of them.
+    /// </summary>
+    [Theory]
+    [InlineData(true, 90)]
+    [InlineData(true, null)]
+    [InlineData(false, 90)]
+    [InlineData(false, null)]
+    public async Task Retention_and_sending_do_not_interfere(bool sends, int? retentionDays)
+    {
+        var html = await RenderAsync(retentionDays, null, sendsBookerEmail: sends);
+
+        Assert.Equal(
+            sends,
+            html.Contains("send your booking confirmation", StringComparison.OrdinalIgnoreCase));
+        Assert.Equal(
+            retentionDays is not null,
+            html.Contains("90 days", StringComparison.OrdinalIgnoreCase));
+    }
+
+    // ---- the email field's hint, bound by the same requirement -------------------------------
+
+    /// <summary>
+    /// The notice's requirement governs "any surface of the same form that mentions contact", and
+    /// the email field's hint is one. A site where the notice promises a confirmation and the hint
+    /// does not — or the reverse — is contradicting itself about the same address, a few lines
+    /// apart on the same screen.
+    /// </summary>
+    [Fact]
+    public async Task The_email_hint_follows_the_same_predicate_as_the_notice()
+    {
+        var sends = await _renderer.RenderAsync(
+            ViewInventory.YourDetails, Form(null, null, sendsBookerEmail: true));
+        var silent = await _renderer.RenderAsync(
+            ViewInventory.YourDetails, Form(null, null, sendsBookerEmail: false));
+
+        Assert.Contains("send your booking confirmation here", sends, StringComparison.OrdinalIgnoreCase);
+        Assert.DoesNotContain("send your booking confirmation here", silent, StringComparison.OrdinalIgnoreCase);
+        Assert.Contains("can contact you about your booking", silent, StringComparison.OrdinalIgnoreCase);
+    }
+
+    /// <summary>
+    /// The hint's id is referenced by the input's `aria-describedby`, so it must be the same in
+    /// both branches — which is exactly why the branch-reachability inventory lists it as unable
+    /// to distinguish them, and why this test has to do that job instead.
+    /// </summary>
+    [Theory]
+    [InlineData(true)]
+    [InlineData(false)]
+    public async Task The_email_hint_keeps_its_id_whichever_it_says(bool sendsBookerEmail)
+    {
+        var html = await _renderer.RenderAsync(
+            ViewInventory.YourDetails, Form(null, null, sendsBookerEmail));
+
+        Assert.Contains("id=\"ubookit-email-hint\"", html, StringComparison.Ordinal);
+        Assert.Contains("aria-describedby=\"ubookit-email-hint\"", html, StringComparison.Ordinal);
     }
 }

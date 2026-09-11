@@ -280,6 +280,14 @@ public class ModelPropertyTests
                 // legend — so within that partial the member is masked exactly as the flow
                 // pages' members are. Judged where it is not masked: in `_AvailableDates`.
                 "_DateAndLength.cshtml:DurationMinutes",
+                // `_YourDetails` now reads `PrivacyNotice` to decide what the email field's hint
+                // says. Its flow page hands over the whole model and renders the notice itself
+                // through `_PrivacyNotice`, so the member is kept alive by that sibling whatever
+                // this partial does with it — which is exactly the masking this list bounds.
+                //
+                // What it masks is only the READ, not the behaviour: the hint's two wordings are
+                // asserted directly in PrivacyNoticeTests, against a view model built for each.
+                "_YourDetails.cshtml:PrivacyNotice",
             ],
             masked);
 

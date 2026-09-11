@@ -33,6 +33,80 @@ public static class DocumentationAssert
     /// is wrapped, emphasised or quoted.
     /// </summary>
     public static void Says(string document, string sentence)
+        => Assert.True(
+            Regex.IsMatch(Normalise(document), PatternFor(sentence)),
+            $"The documentation no longer says: \"{sentence}\"");
+
+    /// <summary>
+    /// Asserts <paramref name="document"/> does <b>not</b> contain <paramref name="sentence"/>,
+    /// however it is wrapped, emphasised or quoted.
+    /// </summary>
+    /// <remarks>
+    /// <para>
+    /// <b>Built on the same pattern as <see cref="Says"/>, because the alternative was measured
+    /// and it fails silently.</b> A guard for a claim that must NOT be made was written with a raw
+    /// <c>Assert.DoesNotContain</c> beside a wrap-safe <c>Says</c> in the same test — so the
+    /// positive half survived rewrapping and the negative half did not. Re-adding the forbidden
+    /// sentence **wrapped at the column this repository writes prose at** left the whole suite
+    /// green.
+    /// </para>
+    /// <para>
+    /// That asymmetry is the tell, and it is why this lives here rather than as a
+    /// <c>DoesNotContain</c> at each call site: one implementation, so the two directions cannot
+    /// come to disagree about what counts as a match.
+    /// </para>
+    /// <para>
+    /// <b>Two properties are inherited from <see cref="Says"/> and they have opposite signs — know
+    /// which is which before relying on this.</b> The separator's generosity (whitespace, wrapping,
+    /// emphasis, blockquote markers) is <i>safe</i> here: it makes the guard stricter, catching a
+    /// forbidden sentence however it is dressed. The refusal to cross a blank line or a list
+    /// boundary is <i>not</i>: for <see cref="Says"/> it prevents a false pass, but here it is a
+    /// blind spot, and a forbidden sentence split across two paragraphs goes undetected. Nobody
+    /// writes a sentence that way, which is why this is documented rather than fixed — but it is
+    /// the half of the inheritance that does not protect you.
+    /// </para>
+    /// </remarks>
+    public static void DoesNotSay(string document, string sentence)
+        => Assert.False(
+            Regex.IsMatch(Normalise(document), PatternFor(sentence)),
+            $"The documentation still says, or says again: \"{sentence}\"");
+
+    /// <summary>
+    /// Strips the <c>///</c> prefix from each line, so a sentence that wraps inside an XML
+    /// documentation comment reads as one sentence.
+    /// </summary>
+    /// <remarks>
+    /// <para>
+    /// <b>Because these guards are asked about source files as well as markdown</b>, and a claim
+    /// in a public type's <c>&lt;remarks&gt;</c> is the one a site author meets first, in
+    /// IntelliSense. The separator below tolerates whitespace and markdown decoration between
+    /// words but not a comment prefix, so an over-claim re-added across two <c>///</c> lines went
+    /// undetected with the whole suite green.
+    /// </para>
+    /// <para>
+    /// Done to the DOCUMENT rather than by widening the pattern, deliberately: adding <c>/</c> to
+    /// the separator would let a sentence match across a URL or a path. Stripping the prefix is
+    /// also what makes a bare <c>///</c> line — an XML paragraph break — read as the blank line it
+    /// is, so the no-crossing-a-blank-line rule keeps working there too. Markdown has no such
+    /// prefix, so nothing about existing callers changes.
+    /// </para>
+    /// <para>
+    /// <b>Two claims here are currently unfalsifiable, and saying so is cheaper than pretending
+    /// otherwise.</b> No document these helpers are given contains a <c>///</c>-prefixed line
+    /// except the five C# sources, and none of those contains a <b>bare</b> <c>///</c> line — so
+    /// the paragraph-break argument above is reasoning, not something the suite can check. For
+    /// markdown, specs and TypeScript this is provably an identity transform for the same reason:
+    /// the prefix does not occur in them at all.
+    /// </para>
+    /// </remarks>
+    private static string Normalise(string document)
+        => Regex.Replace(document, @"^[^\S
+
+]*///[^\S
+
+]?", string.Empty, RegexOptions.Multiline);
+
+    private static string PatternFor(string sentence)
     {
         // Horizontal whitespace, markdown decoration, or a single line break — but never a
         // blank line, and never a line break into a new list item. Both are places where one
@@ -51,8 +125,6 @@ public static class DocumentationAssert
                 .Split(' ', StringSplitOptions.RemoveEmptyEntries)
                 .Select(word => Regex.Escape(word.Trim('*', '_')))) + @"(?!\w)";
 
-        Assert.True(
-            Regex.IsMatch(document, pattern),
-            $"The documentation no longer says: \"{sentence}\"");
+        return pattern;
     }
 }

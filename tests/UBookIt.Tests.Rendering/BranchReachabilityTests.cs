@@ -182,8 +182,22 @@ public class BranchReachabilityTests
                 // field. Both are one-per-field rather than branch-dependent: all three
                 // wrappers are unconditional, so neither can die while a sibling keeps
                 // the literal alive on a path the fixtures do not reach.
+                // `ubookit-email-hint` is emitted by BOTH branches of the email field's hint —
+                // the one promising a confirmation and the one saying only that the site can make
+                // contact — and it MUST be, because `aria-describedby` on the input names that id
+                // unconditionally. Making the two branches emit different ids to satisfy this rule
+                // would break the programmatic relationship between the field and its description,
+                // trading a real accessibility guarantee for a proxy's convenience.
+                //
+                // The branches are distinguished by their TEXT instead, which PrivacyNoticeTests
+                // asserts in both directions, so nothing here is going untested — only untested
+                // BY THIS RULE, which is what this list is for.
+                "_YourDetails.cshtml:ubookit-email-hint",
                 "_YourDetails.cshtml:ubookit-field",
                 "_YourDetails.cshtml:ubookit-field-error",
+                // The hint's CLASS, duplicated for the same reason as its id and with even less
+                // choice about it: both wordings are the same kind of thing and must look the same.
+                "_YourDetails.cshtml:ubookit-hint",
             ],
             shared);
     }

@@ -1,3 +1,4 @@
+using System.Text.RegularExpressions;
 using UBookIt.Backoffice;
 using UBookIt.Persistence.Composing;
 using UBookIt.Tests.Support;
@@ -108,9 +109,15 @@ public class BackofficeDocumentationTests
         //
         // What it says now is the pair of verbs v1 actually has, which is stable in a way
         // "read-only" was not: see and cancel.
+        // THROUGH THE SAME MATCHER AS THE ASSERTION ABOVE. These were raw substring checks
+        // sitting directly beneath a wrap-safe `Says` — one test, two matchers, which is precisely
+        // the asymmetry that let an over-claim walk back into `docs/notifications.md` unnoticed.
+        // Re-adding "Bookings do not yet\nhave a screen of their own." here left the whole suite
+        // green. Since this guard has already had to move with the behaviour twice, that is a live
+        // regression guard that could not see the regression.
         DocumentationAssert.Says(docs, "you can see bookings and cancel them");
-        Assert.DoesNotContain("do not yet have a screen", docs, StringComparison.OrdinalIgnoreCase);
-        Assert.DoesNotContain("view is read-only", docs, StringComparison.OrdinalIgnoreCase);
+        DocumentationAssert.DoesNotSay(docs, "do not yet have a screen");
+        DocumentationAssert.DoesNotSay(docs, "view is read-only");
 
         // And the status default is disclosed, because the endpoint hides cancelled
         // bookings by default and an operator who cannot find one must be able to learn
@@ -121,7 +128,7 @@ public class BackofficeDocumentationTests
         // already said "ticking". An operator reading a page that contradicts itself hunts
         // for a control that does not exist.
         DocumentationAssert.Says(docs, "cancelled booking is one tick away rather than missing");
-        Assert.DoesNotContain("one toggle away", docs, StringComparison.OrdinalIgnoreCase);
+        DocumentationAssert.DoesNotSay(docs, "one toggle away");
 
         // And that ticking REPLACES rather than adds. The screen's own hint said
         // "include others" until operating it showed that ticking Cancelled makes the
@@ -151,6 +158,13 @@ public class BackofficeDocumentationTests
         var strings = Support.RepoFiles.Read(
             "src/UBookIt.Backoffice/Client/src/localization/en-us.ts");
 
+        // LEFT AS RAW SUBSTRING CHECKS, deliberately, unlike the prose guards above.
+        //
+        // This document is TypeScript, and the pair is symmetric — both directions are raw, so
+        // there is no matcher asymmetry to correct. More to the point, a long string here wraps by
+        // concatenation or a template literal, and `DocumentationAssert`'s separator bridges
+        // neither; converting would buy the appearance of wrap-safety without the substance, which
+        // is worse than a raw check that is honest about what it does.
         Assert.Contains("show only those instead", strings, StringComparison.Ordinal);
         Assert.DoesNotContain("Tick a status to include others", strings, StringComparison.Ordinal);
     }
@@ -235,6 +249,116 @@ public class BackofficeDocumentationTests
         DocumentationAssert.Says(docs, "anonymising the booking, not deleting it");
     }
 
+    /// <summary>
+    /// The third boundary of erasure, stated where an operator performing one will meet it.
+    /// </summary>
+    /// <remarks>
+    /// <b>Here rather than only in the notifications guide, because that is where the requirement
+    /// puts it.</b> Somebody honouring a right-to-be-forgotten request is reading about erasure,
+    /// not about email — and being told there that erasure is complete, when a message is already
+    /// in a mailbox and a mail server may have quoted the address into the site's log, is an
+    /// answer given in good faith that turns out to be untrue to a data subject.
+    /// </remarks>
+    [Fact]
+    public void The_documentation_says_what_erasure_cannot_reach_on_a_sending_site()
+    {
+        var docs = Docs();
+
+        DocumentationAssert.Says(
+            docs, "erasure does not reach what has already left");
+        DocumentationAssert.Says(docs, "is in somebody's mailbox");
+        Assert.Contains("notifications.md", docs, StringComparison.Ordinal);
+    }
+
+    /// <summary>
+    /// `booker-erasure`'s Purpose paragraph must not claim more than the requirements beneath it.
+    /// </summary>
+    /// <remarks>
+    /// <b>A CONSISTENCY guard, not a "must say three" guard, and the distinction is the whole
+    /// design.</b> A Purpose is prose and OpenSpec deltas carry requirements, so it is edited by
+    /// hand at sync time — the sibling test below exists because recording that edit in `tasks.md`
+    /// was demonstrably not enough once already.
+    /// <para>
+    /// Asserting the post-sync wording directly would fail from the moment the delta is written
+    /// until the moment it is synced, which is most of a change's life and exactly when the suite
+    /// has to be green for QA. So this compares the summary to the requirements **as the file
+    /// currently stands**: self-consistent before the sync, self-consistent after it, and red only
+    /// in the state that actually matters — requirements updated, summary left behind.
+    /// </para>
+    /// <para>
+    /// `booking-emails` narrows both of this paragraph's claims: erasing the one durable home
+    /// erases the data, and there are <b>two</b> boundaries the documentation must state.
+    /// </para>
+    /// </remarks>
+    [Fact]
+    public void The_erasure_capabilitys_summary_does_not_outrun_its_requirements()
+    {
+        var spec = Support.RepoFiles.Read("openspec/specs/booker-erasure/spec.md");
+
+        var purposeStart = spec.IndexOf("## Purpose", StringComparison.Ordinal);
+        Assert.True(purposeStart >= 0, "The capability spec has no ## Purpose section to check.");
+
+        var nextSection = spec.IndexOf("\n## ", purposeStart + 1, StringComparison.Ordinal);
+        Assert.True(nextSection > purposeStart, "The Purpose section has no following section.");
+
+        // WHITESPACE COLLAPSED BEFORE MATCHING, and this is not tidiness. Markdown wraps at column
+        // 100 in this repository, so "among the stores it owns" is written across a line break in
+        // the very delta that introduces it — and a Contains() over the raw text would therefore be
+        // false after the sync, silently skipping the durable-home check in exactly the state it
+        // exists to catch. Found because a mutation that ought to have failed did not: the mutant
+        // and the guard disagreed about a newline, not about the claim.
+        var purpose = Collapse(spec[purposeStart..nextSection]);
+        var requirements = Collapse(spec[nextSection..]);
+
+        // The boundaries as the REQUIREMENTS enumerate them, counted rather than assumed.
+        // Counted from the RAW text, because this one is anchored to line starts.
+        var boundaries = Regex.Matches(spec[nextSection..], @"^- \*\*It ", RegexOptions.Multiline).Count;
+        Assert.True(boundaries >= 2, $"Expected the erasure boundaries to be enumerated; found {boundaries}.");
+
+        // If the summary commits to a COUNT, it has to be that count. A summary that says "the
+        // boundaries" commits to nothing and is always safe — which is the wording to prefer.
+        var claimed = Regex.Match(purpose, @"the (two|three|four) boundaries", RegexOptions.IgnoreCase);
+
+        if (claimed.Success)
+        {
+            var words = new Dictionary<string, int>(StringComparer.OrdinalIgnoreCase)
+            {
+                ["two"] = 2,
+                ["three"] = 3,
+                ["four"] = 4,
+            };
+
+            Assert.True(
+                words[claimed.Groups[1].Value] == boundaries,
+                $"The Purpose claims '{claimed.Value}' while the requirements enumerate {boundaries}. "
+                + "A capability's summary is what a reader derives the capability from after archiving.");
+        }
+
+        // And the durable-home claim: if the requirement has been narrowed to the package's own
+        // stores, the summary may not go on asserting the absolute.
+        //
+        // THE TRIGGER IS STRUCTURAL, NOT A VERBATIM PHRASE, and that is the second attempt. The
+        // first gated on `Contains("among the stores it owns")` — a literal lifted from the delta,
+        // guarding a HAND EDIT AT SYNC, which is the operation most likely to reword it. Rewording
+        // the narrowing to "among the stores the package owns" turned the guard off silently while
+        // the Purpose went on promising the absolute. Both phrasings are already live in this
+        // change: the delta uses one and `tasks.md` 6.7 prescribes the other.
+        //
+        // So it asks whether the requirement's durable-location sentence carries ANY ownership
+        // qualifier, and then requires the summary to carry one too.
+        var narrowed = Regex.IsMatch(
+            requirements, @"durable location[^.]*\bowns\b", RegexOptions.IgnoreCase);
+
+        if (narrowed && purpose.Contains("durable home", StringComparison.OrdinalIgnoreCase))
+        {
+            Assert.True(
+                purpose.Contains("owns", StringComparison.OrdinalIgnoreCase),
+                "The requirement scopes the durable home to stores the package owns, but the "
+                + "capability's Purpose still claims it without that qualifier. A summary is what "
+                + "a reader derives the capability from after archiving.");
+        }
+    }
+
     [Fact]
     public void The_capabilitys_own_summary_names_every_verb_the_capability_has()
     {
@@ -304,7 +428,7 @@ public class BackofficeDocumentationTests
             DocumentationAssert.Says(purpose, phrase);
         }
 
-        Assert.DoesNotContain("about those two verbs", purpose, StringComparison.Ordinal);
+        DocumentationAssert.DoesNotSay(purpose, "about those two verbs");
     }
 
     [Fact]
@@ -457,4 +581,11 @@ public class BackofficeDocumentationTests
         DocumentationAssert.Says(docs, "A booking with no service was booked directly");
         DocumentationAssert.Says(docs, "not a booking whose service failed to be recorded");
     }
+
+    /// <summary>
+    /// One line, single-spaced — so a claim that wraps in the source still matches the phrase a
+    /// test looks for.
+    /// </summary>
+    private static string Collapse(string text)
+        => Regex.Replace(text, @"\s+", " ");
 }
