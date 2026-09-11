@@ -164,21 +164,29 @@ an owner:
 
 ## 9. Sync obligations recorded now (executed at sync/archive)
 
-- [ ] 9.1 Sibling-spec grep at sync: `Confirmed` / `no v1 pathway` / "placed or cancelled" /
-      "notifies nobody" across every spec **not** touched by this change's deltas — the
-      outward sweep that has fired on four consecutive changes. Known candidates to open:
-      `booker-erasure` (erasure vs pending bookings), `booking-retention` (sweep has no status
-      filter — should stay true), `service-booking`, `theming` (confirmation view contract),
-      `sensitive-data`, and **`privacy-notice`** — added after QA found the CRITICAL there: its
-      omission from this list is the reason the outward sweep would not have caught it either.
-*(Note for whoever syncs: `booking-management`'s Purpose was ALREADY corrected during apply —
-`BackofficeDocumentationTests` demands parity between it and the controller's routes, so adding
-the endpoints failed until the Purpose named confirm and decline. That is the guard designed
-in ㉘ firing exactly as intended, one change later. 9.2 below still stands for the other two.)*
+- [x] 9.1 Sibling-spec grep, run at sync over every capability this change does NOT touch.
+      Needles: `no v1 pathway`, `auto-confirm`, `placement auto`, `notifies nobody`,
+      `placed or cancelled`, `no pathway produces`, `approving`, `declining`. **One hit, in
+      `packaging`**, and it is examined-and-left rather than unnoticed: the scenario *"What the
+      package sends is stated, not implied"* has a WHEN reading *"when a booking is placed or
+      cancelled"*. That enumeration is now two events short — but it describes a reading
+      occasion rather than asserting behaviour, its THEN is satisfied (the documentation does
+      state what is sent for all four events, to whom, and what enables it), and the scenario
+      passes as written. Widening it would mean replacing a requirement wholesale, with the
+      guarantee-dropping risk that carries, to correct nothing false. Recorded here as a
+      decision, per "silence is not a decision".
 
-- [ ] 9.2 Capability Purpose prose check: `bookings` and `booking-emails` Purposes summarize
-      auto-confirm-era behaviour — verify each Purpose still matches its requirements as the
-      file stands after sync (consistency check, green pre-sync).
+      *(`privacy-notice` was added to this list in QA round 1, after it turned out to hold the
+      change's CRITICAL. It is no longer swept here because it is now one of the change's own
+      deltas — which is the outcome the list was meant to produce.)*
+- [x] 9.2 Capability Purpose prose check. `bookings` describes "the status machine" and "the
+      service/store ports" generically and stays true; `booking-emails` says "when the package
+      sends a message about a booking", likewise. Neither over- nor under-claims after this
+      change, so neither needed a delta. **`booking-management`'s Purpose was corrected during
+      apply, not here** — `BackofficeDocumentationTests` demands parity between it and the
+      controller's routes, so adding the endpoints failed until the Purpose named confirm and
+      decline. That is the ㉘ guard firing one change later, exactly as designed, and it is why
+      this task found less than it might have.
 
 ## 9a. QA round 1 — REJECT (one CRITICAL, four MAJOR, two MINOR, two NIT)
 
