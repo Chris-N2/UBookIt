@@ -198,6 +198,79 @@ public class BookingsController(
     }
 
     /// <summary>
+    /// Confirms a requested booking.
+    /// </summary>
+    /// <remarks>
+    /// <para>
+    /// <b>The status machine is the rule, not the screen</b>, on exactly the terms
+    /// <see cref="CancelBooking"/> records: no judgement of its own, so a stale list cannot
+    /// talk this into confirming a booking that is not <c>Requested</c>, and a second attempt
+    /// is refused rather than reported as success.
+    /// </para>
+    /// <para>
+    /// Returns identity and new status only, for the reason
+    /// <see cref="CancelledBookingModel"/> states — this path cannot honestly fill a list row.
+    /// </para>
+    /// </remarks>
+    /// <param name="id">The booking to confirm.</param>
+    [HttpPost("bookings/{id:guid}/confirm")]
+    [ProducesResponseType<ConfirmedBookingModel>(StatusCodes.Status200OK)]
+    [ProducesResponseType(StatusCodes.Status400BadRequest)]
+    [ProducesResponseType(StatusCodes.Status404NotFound)]
+    public async Task<IActionResult> ConfirmBooking(Guid id, CancellationToken cancellationToken = default)
+    {
+        var confirmed = await bookingService.ConfirmAsync(id, cancellationToken);
+
+        if (!confirmed.Succeeded)
+        {
+            return confirmed.Failures.ToProblemResult();
+        }
+
+        return Ok(new ConfirmedBookingModel
+        {
+            BookingId = confirmed.Value.Id,
+            Status = confirmed.Value.Status.ToString(),
+        });
+    }
+
+    /// <summary>
+    /// Declines a requested booking.
+    /// </summary>
+    /// <remarks>
+    /// <para>
+    /// <b>POST rather than DELETE, because a declined booking is not gone.</b> It keeps its
+    /// row, its interval, its booker and the service it was placed for; it stops holding its
+    /// time; the management list still returns it when declined bookings are asked for; and
+    /// its booker is still erasable — a person the site turned away holds their details
+    /// exactly as firmly as one it served.
+    /// </para>
+    /// <para>
+    /// Otherwise on <see cref="ConfirmBooking"/>'s terms: the status machine is the rule, and
+    /// the response is identity and new status only.
+    /// </para>
+    /// </remarks>
+    /// <param name="id">The booking to decline.</param>
+    [HttpPost("bookings/{id:guid}/decline")]
+    [ProducesResponseType<DeclinedBookingModel>(StatusCodes.Status200OK)]
+    [ProducesResponseType(StatusCodes.Status400BadRequest)]
+    [ProducesResponseType(StatusCodes.Status404NotFound)]
+    public async Task<IActionResult> DeclineBooking(Guid id, CancellationToken cancellationToken = default)
+    {
+        var declined = await bookingService.DeclineAsync(id, cancellationToken);
+
+        if (!declined.Succeeded)
+        {
+            return declined.Failures.ToProblemResult();
+        }
+
+        return Ok(new DeclinedBookingModel
+        {
+            BookingId = declined.Value.Id,
+            Status = declined.Value.Status.ToString(),
+        });
+    }
+
+    /// <summary>
     /// Finds every booking whose booker holds a given email address.
     /// </summary>
     /// <remarks>

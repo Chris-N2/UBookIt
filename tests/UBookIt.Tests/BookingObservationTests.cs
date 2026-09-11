@@ -41,6 +41,18 @@ public class BookingObservationTests
             return Task.CompletedTask;
         }
 
+        public Task BookingConfirmedAsync(Booking booking, CancellationToken cancellationToken = default)
+        {
+            Told.Add(("confirmed", booking));
+            return Task.CompletedTask;
+        }
+
+        public Task BookingDeclinedAsync(Booking booking, CancellationToken cancellationToken = default)
+        {
+            Told.Add(("declined", booking));
+            return Task.CompletedTask;
+        }
+
         public Task BookingCancelledAsync(Booking booking, CancellationToken cancellationToken = default)
         {
             Told.Add(("cancelled", booking));
@@ -52,6 +64,12 @@ public class BookingObservationTests
     private sealed class ThrowingObserver : IBookingObserver
     {
         public Task BookingPlacedAsync(Booking booking, CancellationToken cancellationToken = default)
+            => throw new InvalidOperationException("The site's handler is broken.");
+
+        public Task BookingConfirmedAsync(Booking booking, CancellationToken cancellationToken = default)
+            => throw new InvalidOperationException("The site's handler is broken.");
+
+        public Task BookingDeclinedAsync(Booking booking, CancellationToken cancellationToken = default)
             => throw new InvalidOperationException("The site's handler is broken.");
 
         public Task BookingCancelledAsync(Booking booking, CancellationToken cancellationToken = default)
@@ -85,6 +103,12 @@ public class BookingObservationTests
         public List<int> UpdatesWhenTold { get; } = [];
 
         public Task BookingPlacedAsync(Booking booking, CancellationToken cancellationToken = default)
+            => RecordAsync(booking.Id, cancellationToken);
+
+        public Task BookingConfirmedAsync(Booking booking, CancellationToken cancellationToken = default)
+            => RecordAsync(booking.Id, cancellationToken);
+
+        public Task BookingDeclinedAsync(Booking booking, CancellationToken cancellationToken = default)
             => RecordAsync(booking.Id, cancellationToken);
 
         public Task BookingCancelledAsync(Booking booking, CancellationToken cancellationToken = default)

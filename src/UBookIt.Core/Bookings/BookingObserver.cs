@@ -36,6 +36,28 @@ public interface IBookingObserver
     Task BookingPlacedAsync(Booking booking, CancellationToken cancellationToken = default);
 
     /// <summary>
+    /// Called after a booking has been confirmed and the change stored. Never on failure.
+    /// </summary>
+    /// <remarks>
+    /// <b>This does not need to describe what changed.</b> Confirmation succeeds only from
+    /// <see cref="BookingStatus.Requested"/>, so being told at all means the booking has just
+    /// become confirmed. A booking placed as confirmed under auto-confirm reports a
+    /// <em>placement</em>, not a confirmation — auto-confirmation is not an event, it is what
+    /// placement produced.
+    /// </remarks>
+    Task BookingConfirmedAsync(Booking booking, CancellationToken cancellationToken = default);
+
+    /// <summary>
+    /// Called after a booking has been declined and the change stored. Never on failure.
+    /// </summary>
+    /// <remarks>
+    /// <b>This does not need to describe what changed</b>, on the same reasoning as
+    /// <see cref="BookingConfirmedAsync"/>: decline succeeds only from
+    /// <see cref="BookingStatus.Requested"/>.
+    /// </remarks>
+    Task BookingDeclinedAsync(Booking booking, CancellationToken cancellationToken = default);
+
+    /// <summary>
     /// Called after a booking has been cancelled and the change stored. Never on failure.
     /// </summary>
     /// <remarks>
@@ -46,6 +68,11 @@ public interface IBookingObserver
     /// </remarks>
     Task BookingCancelledAsync(Booking booking, CancellationToken cancellationToken = default);
 }
+
+// BREAKING (pre-17.0.0, called out in the spec): the port gained a confirmed and a declined
+// member, and there are deliberately no default implementations — an external observer
+// silently deaf to declines would be a worse outcome than a compile error, on a port whose
+// entire purpose is that a host hears what happened.
 
 /// <summary>
 /// The default: hears everything, does nothing.
@@ -59,6 +86,12 @@ public interface IBookingObserver
 public sealed class NullBookingObserver : IBookingObserver
 {
     public Task BookingPlacedAsync(Booking booking, CancellationToken cancellationToken = default)
+        => Task.CompletedTask;
+
+    public Task BookingConfirmedAsync(Booking booking, CancellationToken cancellationToken = default)
+        => Task.CompletedTask;
+
+    public Task BookingDeclinedAsync(Booking booking, CancellationToken cancellationToken = default)
         => Task.CompletedTask;
 
     public Task BookingCancelledAsync(Booking booking, CancellationToken cancellationToken = default)

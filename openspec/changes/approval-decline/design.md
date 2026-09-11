@@ -113,7 +113,10 @@ cancellation already handles — no address, nothing sent, internal recipients u
 `UBookIt.Backoffice` `BookingsController` gains `POST …/{id}/confirm` and
 `…/{id}/decline` beside the existing cancel endpoint: same authorization policy, same
 `DomainResult` → problem-details mapping (`BookingNotFound` → 404,
-`InvalidStatusTransition` → 409, as cancel maps them), purpose-built response models. The
+`InvalidStatusTransition` → 400 with the stable code in the body — verified against
+`ApiResults.ToProblemResult`, which reserves 409 for `resource-in-use`; cancel already
+returns 400 here and the spec requires only that the two failures be distinct),
+purpose-built response models. The
 client bookings screen shows Confirm/Decline for `Requested` bookings only (the list
 already carries and filters by status), with localization entries following the existing
 pattern. Decline requires the accessible in-page modal (terminal and outward-facing, like

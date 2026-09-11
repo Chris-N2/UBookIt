@@ -267,6 +267,12 @@ public class EraseBookerEndpointTests
         public Task<DomainResult<Booking>> CancelAsync(
             Guid bookingId, CancellationToken cancellationToken = default) => throw Unexpected();
 
+        public Task<DomainResult<Booking>> ConfirmAsync(
+            Guid bookingId, CancellationToken cancellationToken = default) => throw Unexpected();
+
+        public Task<DomainResult<Booking>> DeclineAsync(
+            Guid bookingId, CancellationToken cancellationToken = default) => throw Unexpected();
+
         public Task<DomainResult<Booking>> PlaceAsync(
             BookingRequest request, CancellationToken cancellationToken = default) => throw Unexpected();
 

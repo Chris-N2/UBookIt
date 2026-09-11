@@ -2,27 +2,27 @@
 
 ## 1. Core: the setting and the placement branch
 
-- [ ] 1.1 Add `AutoConfirm` (bool, init, default `true`) to `SiteBookingSettings` with XML docs
+- [x] 1.1 Add `AutoConfirm` (bool, init, default `true`) to `SiteBookingSettings` with XML docs
       stating the default, the fallback direction, and why (silent-failure asymmetry — see
       design decision 1).
-- [ ] 1.2 Branch `BookingService.PlaceAsync` (the private core both public overloads and
+- [x] 1.2 Branch `BookingService.PlaceAsync` (the private core both public overloads and
       `PlaceForServiceAsync` funnel through) on `settings.AutoConfirm`:
       `Confirmed` when on, `Requested` when off. No other placement behaviour changes.
-- [ ] 1.3 Tests: placement under on → `Confirmed`; under off → `Requested`; service placement
+- [x] 1.3 Tests: placement under on → `Confirmed`; under off → `Requested`; service placement
       agrees with direct placement under the same setting; a `Requested` placement's claims
       block a second placement over the same interval (restates conflict semantics on the
       newly reachable path).
 
 ## 2. Core: confirm and decline operations
 
-- [ ] 2.1 Add `ConfirmAsync(Guid, CancellationToken)` and `DeclineAsync(Guid, CancellationToken)`
+- [x] 2.1 Add `ConfirmAsync(Guid, CancellationToken)` and `DeclineAsync(Guid, CancellationToken)`
       to `IBookingService` and `BookingService`, mirroring `CancelAsync` exactly:
       load → `booking.Confirm()`/`Decline()` → `UpdateAsync` → observe → return. Reuse
       `booking-not-found` / `invalid-status-transition`; no new failure codes.
-- [ ] 2.2 Add `BookingConfirmedAsync`/`BookingDeclinedAsync` to `IBookingObserver`,
+- [x] 2.2 Add `BookingConfirmedAsync`/`BookingDeclinedAsync` to `IBookingObserver`,
       `NullBookingObserver`, and every test double. **No default interface implementations**
       (spec: an observer silently deaf to declines is worse than a compile error).
-- [ ] 2.3 Tests: confirm/decline from `Requested` succeed, store, and are observed exactly once,
+- [x] 2.3 Tests: confirm/decline from `Requested` succeed, store, and are observed exactly once,
       after the store call; from any other status fail with `invalid-status-transition`, touch
       the store not at all, and observe nothing; unknown id → `booking-not-found`, nothing
       observed; a throwing observer does not change the caller's result or the stored status;
@@ -34,22 +34,22 @@
       `true` silently; written-but-unreadable → `true` + error logged naming the setting
       (retention-period precedent); readable `false` → off. Tests for all three, including
       that the absent case logs nothing.
-- [ ] 3.2 Add `BookingConfirmedNotification` and `BookingDeclinedNotification` beside the
+- [x] 3.2 Add `BookingConfirmedNotification` and `BookingDeclinedNotification` beside the
       existing pair, with remarks following the house pattern (no before-and-after needed;
       handler-throws caveat; package-sends-nothing caveat).
-- [ ] 3.3 Extend `UmbracoBookingObserver` with the two new publications through the existing
+- [x] 3.3 Extend `UmbracoBookingObserver` with the two new publications through the existing
       swallow-and-log path (booking id only in the log line — the PII rule is unchanged).
 - [ ] 3.4 Tests: each notification published once on success, not on failure; the observer's
       catch still logs id-only.
 
 ## 4. Emails
 
-- [ ] 4.1 Add `BookingEvent.Confirmed` and `BookingEvent.Declined`; subscribe
+- [x] 4.1 Add `BookingEvent.Confirmed` and `BookingEvent.Declined`; subscribe
       `BookingEmailHandler` to both new notifications in the composer.
-- [ ] 4.2 Route the new events through `SendAsync` under the existing gating. **Booker only**:
+- [x] 4.2 Route the new events through `SendAsync` under the existing gating. **Booker only**:
       confirmed/declined events send nothing to `InternalRecipients` (spec: "Which events
       produce messages, and for whom").
-- [ ] 4.3 Internal placement message: when the announced booking is `Requested`, state that it
+- [x] 4.3 Internal placement message: when the announced booking is `Requested`, state that it
       awaits approval — derived from `Booking.Status`, never from the setting; still no booker
       name/address/phone; the backoffice link unchanged.
 - [ ] 4.4 Tests: confirm → booker message with confirmed wording, zero internal messages;
@@ -62,7 +62,7 @@
 
 ## 5. Management API
 
-- [ ] 5.1 Add `POST /bookings/{id}/confirm` and `POST /bookings/{id}/decline` to the backoffice
+- [x] 5.1 Add `POST /bookings/{id}/confirm` and `POST /bookings/{id}/decline` to the backoffice
       `BookingsController`: same authorization policy and swagger group as cancel, same
       failure mapping (`booking-not-found` → 404, `invalid-status-transition` → 409),
       purpose-built response models carrying identity + new status (no list-row imitation).

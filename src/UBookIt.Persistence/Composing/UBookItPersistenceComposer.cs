@@ -30,6 +30,7 @@ public sealed class UBookItPersistenceComposer : IComposer
     public const string MaxQueryRangeDaysSettingKey = "UBookIt:MaxQueryRangeDays";
     public const int DefaultMaxQueryRangeDays = 31;
     public const string RetentionDaysSettingKey = "UBookIt:RetentionDays";
+    public const string AutoConfirmSettingKey = "UBookIt:AutoConfirm";
     public const string PrivacyPolicyUrlSettingKey = "UBookIt:PrivacyPolicyUrl";
     public const string SendBookerEmailsSettingKey = "UBookIt:Notifications:SendBookerEmails";
     public const string InternalRecipientsSettingKey = "UBookIt:Notifications:InternalRecipients";
@@ -99,6 +100,8 @@ public sealed class UBookItPersistenceComposer : IComposer
         // depend on the state of configuration at startup in a second, invisible way.
         builder.Services.AddScoped<BookingMessageComposer>();
         builder.AddNotificationAsyncHandler<BookingPlacedNotification, BookingEmailHandler>();
+        builder.AddNotificationAsyncHandler<BookingConfirmedNotification, BookingEmailHandler>();
+        builder.AddNotificationAsyncHandler<BookingDeclinedNotification, BookingEmailHandler>();
         builder.AddNotificationAsyncHandler<BookingCancelledNotification, BookingEmailHandler>();
 
         builder.AddNotificationAsyncHandler<UmbracoApplicationStartedNotification, RunUBookItMigrations>();
@@ -115,6 +118,7 @@ public sealed class UBookItPersistenceComposer : IComposer
             : DefaultTimeZoneId,
         MaxQueryRangeDays = ResolveMaxQueryRangeDays(configuration),
         RetentionDays = ResolveRetentionDays(configuration),
+        AutoConfirm = ResolveAutoConfirm(configuration),
         PrivacyPolicyUrl = ResolvePrivacyPolicyUrl(configuration),
         Notifications = ResolveNotifications(configuration).Settings,
     };
@@ -154,6 +158,31 @@ public sealed class UBookItPersistenceComposer : IComposer
     /// </remarks>
     internal static bool IsRetentionConfigured(IConfiguration configuration)
         => configuration[RetentionDaysSettingKey] is not null;
+
+    /// <summary>
+    /// Whether the site wrote anything at all for <c>UBookIt:AutoConfirm</c>, readable or not.
+    /// Separate from <see cref="ResolveAutoConfirm"/> for the same reason the retention pair is
+    /// split: the startup report complains only about a value that was written and could not be
+    /// read, never about an ordinary absence.
+    /// </summary>
+    internal static bool IsAutoConfirmConfigured(IConfiguration configuration)
+        => configuration[AutoConfirmSettingKey] is not null;
+
+    /// <summary>
+    /// A missing or unreadable <c>UBookIt:AutoConfirm</c> resolves to <c>true</c> — the
+    /// default, and every prior version's behaviour.
+    /// </summary>
+    /// <remarks>
+    /// The fallback direction is chosen for which failure is silent rather than which is safe,
+    /// because neither is safe: a site accidentally auto-confirming sends confirmations it can
+    /// see arriving and correct, while a site accidentally requiring approval parks customers'
+    /// bookings in a state nobody is watching for. So "off" must be explicit and readable, and
+    /// a written value that cannot be read is reported at startup — see
+    /// <see cref="RunUBookItMigrations.ErrorIfAutoConfirmUnreadable"/> — rather than silently
+    /// standing in for either intention.
+    /// </remarks>
+    internal static bool ResolveAutoConfirm(IConfiguration configuration)
+        => !bool.TryParse(configuration[AutoConfirmSettingKey], out var autoConfirm) || autoConfirm;
 
     /// <summary>
     /// The configured retention period in days, or <c>null</c> for no retention.

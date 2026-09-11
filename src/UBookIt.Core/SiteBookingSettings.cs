@@ -65,6 +65,28 @@ public sealed record SiteBookingSettings
     public string? PrivacyPolicyUrl { get; init; }
 
     /// <summary>
+    /// Whether a successful placement yields a <c>Confirmed</c> booking immediately, or a
+    /// <c>Requested</c> one awaiting an operator's confirmation. Defaults to <c>true</c> —
+    /// auto-confirm, exactly the behaviour every version before this setting shipped.
+    /// </summary>
+    /// <remarks>
+    /// <para>
+    /// <b>The fallback direction is on, and it is chosen for which failure is silent rather
+    /// than which is safe — neither is.</b> A site accidentally <i>on</i> sends confirmations
+    /// it can see arriving and correct; a site accidentally <i>off</i> parks customers'
+    /// bookings in a state nobody is watching for, and finds out when somebody chases. So
+    /// "off" must be explicit and readable: an absent value resolves to on silently, and a
+    /// written value that cannot be read as a boolean resolves to on with an error logged
+    /// naming the setting — see the resolution in the persistence composer.
+    /// </para>
+    /// <para>
+    /// Site-wide deliberately. A per-service override is a later, additive feature: this
+    /// value would become its default, so nothing here forecloses it.
+    /// </para>
+    /// </remarks>
+    public bool AutoConfirm { get; init; } = true;
+
+    /// <summary>
     /// What the package sends when a booking is placed or cancelled. Nothing, unless the site
     /// has said otherwise.
     /// </summary>
