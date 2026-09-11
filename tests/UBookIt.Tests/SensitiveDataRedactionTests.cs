@@ -636,6 +636,11 @@ public class SensitiveDataRedactionTests
         string[] KnownWrites =
         [
             "BookingsController.CancelBooking",
+            // Confirm and decline are genuine writes — each drives a status transition
+            // through the domain and persists it (approval-decline change). Neither takes a
+            // free-text or contact-detail parameter; each takes a booking id alone.
+            "BookingsController.ConfirmBooking",
+            "BookingsController.DeclineBooking",
             "BookingsController.EraseBooker",
             "ResourcesController.CreateResource",
             "ResourcesController.UpdateResource",
@@ -820,6 +825,8 @@ public class SensitiveDataRedactionTests
         string[] recordedActions =
         [
             "BookingsController.CancelBooking = write",
+            "BookingsController.ConfirmBooking = write",
+            "BookingsController.DeclineBooking = write",
             "BookingsController.EraseBooker = write",
             "BookingsController.FindBookingsByBooker = read",
             "BookingsController.ListBookings = read",

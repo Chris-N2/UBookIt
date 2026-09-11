@@ -237,6 +237,7 @@ public static class ServiceBookingFormBuilder
         {
             BookingId = booking.Id,
             Reference = booking.Reference.Display,
+            IsPending = booking.Status == BookingStatus.Requested,
             ServiceName = serviceName,
             ResourceNames = [.. booking.Claims.Select(claim =>
                 resourceNames.TryGetValue(claim.ResourceId, out var name)

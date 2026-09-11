@@ -47,12 +47,14 @@ public sealed record MultiClaimBookingRequest
     public required Booker Booker { get; init; }
 }
 
-/// <summary>Places and cancels bookings.</summary>
+/// <summary>Places, confirms, declines and cancels bookings.</summary>
 public interface IBookingService
 {
     /// <summary>
     /// Runs the placement validation pipeline (bookings spec order) and, when
-    /// valid, atomically places an auto-confirmed booking via the store.
+    /// valid, atomically places a booking via the store — <c>Confirmed</c> under
+    /// <see cref="SiteBookingSettings.AutoConfirm"/>, <c>Requested</c> when the
+    /// site requires approval.
     /// </summary>
     Task<DomainResult<Booking>> PlaceAsync(BookingRequest request, CancellationToken cancellationToken = default);
 
@@ -116,6 +118,28 @@ public interface IBookingService
     DomainResult CheckPlacementRules(Resource resource, DateTimeOffset start, TimeSpan duration);
 
     Task<DomainResult<Booking>> CancelAsync(Guid bookingId, CancellationToken cancellationToken = default);
+
+    /// <summary>
+    /// Confirms a <see cref="BookingStatus.Requested"/> booking.
+    /// </summary>
+    /// <remarks>
+    /// Succeeds only from <c>Requested</c>; any other status fails with
+    /// <see cref="FailureCodes.InvalidStatusTransition"/> and touches the store not at all.
+    /// Fails with <see cref="FailureCodes.BookingNotFound"/> when no booking has the id.
+    /// There is deliberately no general "set status" operation — one operation per verb, so
+    /// the transitions the status machine refuses have no door to knock on.
+    /// </remarks>
+    Task<DomainResult<Booking>> ConfirmAsync(Guid bookingId, CancellationToken cancellationToken = default);
+
+    /// <summary>
+    /// Declines a <see cref="BookingStatus.Requested"/> booking.
+    /// </summary>
+    /// <remarks>
+    /// Succeeds only from <c>Requested</c>, on the same terms as
+    /// <see cref="ConfirmAsync"/>. A declined booking remains — row, interval, booker,
+    /// service — but stops blocking, so the slot it held is immediately bookable again.
+    /// </remarks>
+    Task<DomainResult<Booking>> DeclineAsync(Guid bookingId, CancellationToken cancellationToken = default);
 
     /// <summary>
     /// Erases a booking's booker contact details and member key, keeping the booking.
@@ -360,8 +384,7 @@ public sealed class BookingService(
         }
 
         // Rule 8: conflict — checked atomically by the store across every claimed
-        // resource (bookings spec, "Atomic placement contract"). v1 auto-confirms
-        // on placement.
+        // resource (bookings spec, "Atomic placement contract").
         //
         // The loop is for reference collisions and nothing else: a booking is immutable, so a
         // taken reference cannot be swapped in place — a new booking has to be built. Every
@@ -378,7 +401,9 @@ public sealed class BookingService(
                 interval,
                 request.Booker,
                 [.. resources.Select(r => new ResourceClaim(r.Id))],
-                BookingStatus.Confirmed,
+                // The one site that decides what a new booking IS, for the direct and the
+                // service path alike — both funnel through here, so they cannot disagree.
+                settings.AutoConfirm ? BookingStatus.Confirmed : BookingStatus.Requested,
                 window.NowUtc,
                 service);
 
@@ -436,6 +461,56 @@ public sealed class BookingService(
         // just become cancelled, and a second attempt fails above and tells nobody.
         await TellAsync(() => _observer.BookingCancelledAsync(booking, cancellationToken))
             .ConfigureAwait(false);
+
+        return DomainResult<Booking>.Success(booking);
+    }
+
+    public Task<DomainResult<Booking>> ConfirmAsync(
+        Guid bookingId, CancellationToken cancellationToken = default)
+        => TransitionAsync(
+            bookingId,
+            booking => booking.Confirm(),
+            booking => _observer.BookingConfirmedAsync(booking, cancellationToken),
+            cancellationToken);
+
+    public Task<DomainResult<Booking>> DeclineAsync(
+        Guid bookingId, CancellationToken cancellationToken = default)
+        => TransitionAsync(
+            bookingId,
+            booking => booking.Decline(),
+            booking => _observer.BookingDeclinedAsync(booking, cancellationToken),
+            cancellationToken);
+
+    /// <remarks>
+    /// The same shape as <see cref="CancelAsync"/>, shared by confirm and decline: load,
+    /// transition, store, observe. The observation runs only where the status machine allowed
+    /// the transition AND the update was written — both transitions succeed only from
+    /// <see cref="BookingStatus.Requested"/>, so being told at all means the booking has just
+    /// become what its status says, and a second attempt fails above the store and tells
+    /// nobody.
+    /// </remarks>
+    private async Task<DomainResult<Booking>> TransitionAsync(
+        Guid bookingId,
+        Func<Booking, DomainResult> transition,
+        Func<Booking, Task> observe,
+        CancellationToken cancellationToken)
+    {
+        var booking = await bookingStore.GetBookingAsync(bookingId, cancellationToken).ConfigureAwait(false);
+        if (booking is null)
+        {
+            return DomainResult<Booking>.Failure(
+                FailureCodes.BookingNotFound, $"No booking exists with id {bookingId}.");
+        }
+
+        var result = transition(booking);
+        if (!result.Succeeded)
+        {
+            return DomainResult<Booking>.Failure(result.Failures);
+        }
+
+        await bookingStore.UpdateAsync(booking, cancellationToken).ConfigureAwait(false);
+
+        await TellAsync(() => observe(booking)).ConfigureAwait(false);
 
         return DomainResult<Booking>.Success(booking);
     }

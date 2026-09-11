@@ -4,6 +4,10 @@
 booking page, take bookings from visitors, and see and cancel those bookings in the
 backoffice — with their own site able to react when a booking is placed or cancelled.**
 
+*(That sentence describes v1. Later versions widened it: 0.5.0 added optional emails the
+package sends itself, and 0.6.0 added approval, so a site can also confirm or decline. Both are
+off or on-by-default respectively, so what an unconfigured site does is still exactly this.)*
+
 That sentence is the whole test. Everything below either serves it or is deliberately not in
 it.
 
@@ -65,8 +69,11 @@ publish the data and the seam, never the widget or the channel.
 Named so that "the package cannot do X" is a decision on the record rather than a gap
 somebody discovers.
 
-- **Approving or declining a booking.** Placement auto-confirms. The statuses exist in the
-  model so this can be added without a breaking change, but no pathway produces them.
+- **Approving or declining a booking.** In v1, placement auto-confirmed; the statuses
+  existed in the model so this could be added without a breaking change, but no pathway
+  produced them. (That changed in 0.6.0, which added an `UBookIt:AutoConfirm` setting — on
+  by default, so the v1 behaviour is still what an unconfigured site gets — and the
+  confirm/decline routes into the statuses that were waiting for them.)
 - **Amending a booking's time.** The shape of that operation is a cancellation and a new
   booking.
 - **Taking a booking on someone's behalf** — a phone booking. Bookings arrive through the
@@ -88,8 +95,11 @@ somebody discovers.
 ~~**Cancel and notify**~~ — done. An operator can cancel a booking they can see; the status
 becomes `Cancelled` and it stops holding its time; the site receives a notification for both
 placement and cancellation carrying the booking; and both the backoffice documentation and the
-confirmation dialog say plainly that the package notifies nobody by itself. See
-[reacting to bookings](notifications.md).
+confirmation dialog say plainly what the package sends. (At the time that statement was an
+unconditional one — that the package sends nothing on its own behalf — which 0.5.0's optional
+emails made conditional. The documentation was corrected then; the dialog's flat wording was
+missed and corrected in 0.6.0, and both now state that the booker is told only where booking
+emails are configured.) See [reacting to bookings](notifications.md).
 
 **Packaging** — the package installs into a clean Umbraco 17 site from a local feed and the
 booking flow works there, proven by doing it rather than by inspecting a `.nupkg`; every

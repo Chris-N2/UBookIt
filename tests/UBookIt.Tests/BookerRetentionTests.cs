@@ -812,6 +812,12 @@ public class BookerRetentionTests
         public Task<DomainResult<Booking>> CancelAsync(Guid bookingId, CancellationToken cancellationToken = default)
             => throw new NotSupportedException();
 
+        public Task<DomainResult<Booking>> ConfirmAsync(Guid bookingId, CancellationToken cancellationToken = default)
+            => throw new NotSupportedException();
+
+        public Task<DomainResult<Booking>> DeclineAsync(Guid bookingId, CancellationToken cancellationToken = default)
+            => throw new NotSupportedException();
+
         public Task<DomainResult<Booking>> EraseBookerAsync(Guid bookingId, CancellationToken cancellationToken = default)
             => Task.FromResult(DomainResult<Booking>.Failure(FailureCodes.BookingNotFound, "no"));
 
@@ -839,6 +845,12 @@ public class BookerRetentionTests
 
         public Task<DomainResult<Booking>> CancelAsync(Guid bookingId, CancellationToken cancellationToken = default)
             => inner.CancelAsync(bookingId, cancellationToken);
+
+        public Task<DomainResult<Booking>> ConfirmAsync(Guid bookingId, CancellationToken cancellationToken = default)
+            => inner.ConfirmAsync(bookingId, cancellationToken);
+
+        public Task<DomainResult<Booking>> DeclineAsync(Guid bookingId, CancellationToken cancellationToken = default)
+            => inner.DeclineAsync(bookingId, cancellationToken);
 
         public async Task<DomainResult<Booking>> EraseBookerAsync(Guid bookingId, CancellationToken cancellationToken = default)
         {
@@ -890,6 +902,12 @@ public class BookerRetentionTests
         public Task<DomainResult<Booking>> CancelAsync(Guid bookingId, CancellationToken cancellationToken = default)
             => inner.CancelAsync(bookingId, cancellationToken);
 
+        public Task<DomainResult<Booking>> ConfirmAsync(Guid bookingId, CancellationToken cancellationToken = default)
+            => inner.ConfirmAsync(bookingId, cancellationToken);
+
+        public Task<DomainResult<Booking>> DeclineAsync(Guid bookingId, CancellationToken cancellationToken = default)
+            => inner.DeclineAsync(bookingId, cancellationToken);
+
         public Task<DomainResult<Booking>> EraseBookerAsync(Guid bookingId, CancellationToken cancellationToken = default)
         {
             if (bookingId == throwsFor)
@@ -919,6 +937,12 @@ public class BookerRetentionTests
 
         public Task<DomainResult<Booking>> CancelAsync(Guid bookingId, CancellationToken cancellationToken = default)
             => inner.CancelAsync(bookingId, cancellationToken);
+
+        public Task<DomainResult<Booking>> ConfirmAsync(Guid bookingId, CancellationToken cancellationToken = default)
+            => inner.ConfirmAsync(bookingId, cancellationToken);
+
+        public Task<DomainResult<Booking>> DeclineAsync(Guid bookingId, CancellationToken cancellationToken = default)
+            => inner.DeclineAsync(bookingId, cancellationToken);
 
         public Task<DomainResult<Booking>> EraseBookerAsync(Guid bookingId, CancellationToken cancellationToken = default)
             => bookingId == throwsFor

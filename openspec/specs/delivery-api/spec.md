@@ -115,9 +115,20 @@ reference is what a person quotes. The sentence corrected here is the same false
 `default-frontend` carried, and it is what made a Guid appear on a confirmation under the
 label "Reference".
 
+**The status member SHALL report the stored booking's status, and `Requested` is a value a
+consumer can receive.** On a site whose `AutoConfirm` setting is off, a successful placement
+yields a `Requested` booking, and the response says so. A consumer SHALL be able to
+distinguish the two from the response alone; presenting a `Requested` placement to a customer
+as confirmed is the consumer's misstatement, not this API's. The member's shape is unchanged —
+this is a contract statement about its values, not its type.
+
 #### Scenario: Valid placement succeeds
-- **WHEN** a valid placement request is posted for a free, correctly sized, aligned interval
+- **WHEN** a valid placement request is posted for a free, correctly sized, aligned interval on a site whose `AutoConfirm` setting is on
 - **THEN** the response carries the new booking id, its reference, a `Confirmed` status, the resource id, and the booked interval
+
+#### Scenario: Placement under approval reports the pending status
+- **WHEN** a valid placement request is posted on a site whose `AutoConfirm` setting is off
+- **THEN** the response carries a `Requested` status, and every other member exactly as a confirmed placement carries it
 
 #### Scenario: Request model carries no member key
 - **WHEN** the placement request model's public shape is inspected
@@ -432,9 +443,17 @@ it invites a consumer to offer the resources that were free, and there were none
 
 The existing `POST /bookings` endpoint SHALL remain unchanged in route, request model, and semantics: direct placement claims exactly one resource and continues to report it as it always has. **Its response model gains the booking's quotable reference, and nothing else.** This sentence used to say the response model was unchanged as well, and that stopped being true when both placement responses gained the reference — but what it was guarding is untouched: service placement introduces nothing into the direct endpoint, which still reports a single resource id rather than a collection.
 
+**The status member SHALL report the stored booking's status on the same terms as direct
+placement**: on a site whose `AutoConfirm` setting is off, a successful service placement
+reports `Requested`, with every other member as it would otherwise be.
+
 #### Scenario: Valid service placement succeeds
-- **WHEN** a valid service placement is posted for a start and length taken from the service availability response
+- **WHEN** a valid service placement is posted for a start and length taken from the service availability response, on a site whose `AutoConfirm` setting is on
 - **THEN** the response carries the new booking id, its reference, a `Confirmed` status, the resolved resources, and the booked interval
+
+#### Scenario: Service placement under approval reports the pending status
+- **WHEN** a valid service placement is posted on a site whose `AutoConfirm` setting is off
+- **THEN** the response carries a `Requested` status, and every other member exactly as a confirmed placement carries it
 
 #### Scenario: The resolved resources are reported
 - **WHEN** a service requiring a `room` and a `therapist` is placed

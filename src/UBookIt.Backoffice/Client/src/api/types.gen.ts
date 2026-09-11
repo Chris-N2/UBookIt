@@ -53,6 +53,11 @@ export type CapabilityUsageModel = {
     count: number;
 };
 
+export type ConfirmedBookingModel = {
+    bookingId: string;
+    status: string;
+};
+
 export type ConstraintsModel = {
     granularityMinutes: number;
     minDurationMinutes: number;
@@ -63,11 +68,27 @@ export type ConstraintsModel = {
 
 export type DayOfWeek = 'Sunday' | 'Monday' | 'Tuesday' | 'Wednesday' | 'Thursday' | 'Friday' | 'Saturday';
 
+export type DeclinedBookingModel = {
+    bookingId: string;
+    status: string;
+};
+
 export type DurationExclusionModel = {
     id: string;
     displayName: string;
     reason: string;
     boundMinutes: number;
+};
+
+export type ErasedBookerModel = {
+    bookingId: string;
+    erasedUtc: string;
+};
+
+export type FindBookingsByBookerModel = {
+    email: string;
+    skip?: number | null;
+    take?: number | null;
 };
 
 export type MisalignedRoleModel = {
@@ -288,6 +309,136 @@ export type CancelBookingResponses = {
 };
 
 export type CancelBookingResponse = CancelBookingResponses[keyof CancelBookingResponses];
+
+export type ConfirmBookingData = {
+    body?: never;
+    path: {
+        id: string;
+    };
+    query?: never;
+    url: '/umbraco/ubookitbackoffice/api/v1/bookings/{id}/confirm';
+};
+
+export type ConfirmBookingErrors = {
+    /**
+     * Bad Request
+     */
+    400: unknown;
+    /**
+     * The resource is protected and requires an authentication token
+     */
+    401: unknown;
+    /**
+     * Not Found
+     */
+    404: unknown;
+};
+
+export type ConfirmBookingResponses = {
+    /**
+     * OK
+     */
+    200: ConfirmedBookingModel;
+};
+
+export type ConfirmBookingResponse = ConfirmBookingResponses[keyof ConfirmBookingResponses];
+
+export type DeclineBookingData = {
+    body?: never;
+    path: {
+        id: string;
+    };
+    query?: never;
+    url: '/umbraco/ubookitbackoffice/api/v1/bookings/{id}/decline';
+};
+
+export type DeclineBookingErrors = {
+    /**
+     * Bad Request
+     */
+    400: unknown;
+    /**
+     * The resource is protected and requires an authentication token
+     */
+    401: unknown;
+    /**
+     * Not Found
+     */
+    404: unknown;
+};
+
+export type DeclineBookingResponses = {
+    /**
+     * OK
+     */
+    200: DeclinedBookingModel;
+};
+
+export type DeclineBookingResponse = DeclineBookingResponses[keyof DeclineBookingResponses];
+
+export type EraseBookerData = {
+    body?: never;
+    path: {
+        id: string;
+    };
+    query?: never;
+    url: '/umbraco/ubookitbackoffice/api/v1/bookings/{id}/erase-booker';
+};
+
+export type EraseBookerErrors = {
+    /**
+     * The resource is protected and requires an authentication token
+     */
+    401: unknown;
+    /**
+     * Forbidden
+     */
+    403: unknown;
+    /**
+     * Not Found
+     */
+    404: unknown;
+};
+
+export type EraseBookerResponses = {
+    /**
+     * OK
+     */
+    200: ErasedBookerModel;
+};
+
+export type EraseBookerResponse = EraseBookerResponses[keyof EraseBookerResponses];
+
+export type FindBookingsByBookerData = {
+    body?: FindBookingsByBookerModel;
+    path?: never;
+    query?: never;
+    url: '/umbraco/ubookitbackoffice/api/v1/bookings/find-by-booker';
+};
+
+export type FindBookingsByBookerErrors = {
+    /**
+     * Bad Request
+     */
+    400: unknown;
+    /**
+     * The resource is protected and requires an authentication token
+     */
+    401: unknown;
+    /**
+     * Forbidden
+     */
+    403: unknown;
+};
+
+export type FindBookingsByBookerResponses = {
+    /**
+     * OK
+     */
+    200: PagedBookingsModel;
+};
+
+export type FindBookingsByBookerResponse = FindBookingsByBookerResponses[keyof FindBookingsByBookerResponses];
 
 export type ListResourcesData = {
     body?: never;

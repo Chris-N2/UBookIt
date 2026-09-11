@@ -250,6 +250,16 @@ irreversible destruction of personal data. A value that was written and could no
 be logged as an **error** at startup; an absent value SHALL NOT be complained about, being an
 ordinary choice. See the `booking-retention` capability, which owns the meaning of the setting.
 
+**`UBookIt:AutoConfirm` SHALL resolve to on unless a readable value turns it off.** An absent
+value SHALL resolve to on, silently — it is the default and an ordinary choice. A value that
+was written and cannot be read as a boolean SHALL resolve to on **and** be logged as an error
+identifying the setting, on the retention period's precedent: the site wrote something and is
+not getting what it wrote, so it is told. The fallback direction is on — today's behaviour —
+because neither misreading is safe and only one of them is silent: a site accidentally *on*
+sends confirmations it can see and correct, while a site accidentally *off* parks customers'
+bookings in a state nobody is watching for. See the `bookings` capability, which owns the
+setting's meaning.
+
 **The job SHALL obtain the scoped services it needs per unit of work**, rather than holding them.
 Umbraco's background jobs are singletons resolved from the root container while the package's
 stores, services and DbContext are scoped; a singleton capturing a scoped dependency would hold
@@ -282,6 +292,18 @@ capability, which owns the meaning of the setting.
 #### Scenario: An absent retention period is silent
 - **WHEN** the site configuration carries no retention period
 - **THEN** the settings report no retention period and nothing is logged about it
+
+#### Scenario: An absent AutoConfirm setting is on and silent
+- **WHEN** the site configuration carries no `UBookIt:AutoConfirm` value
+- **THEN** the settings report auto-confirm on and nothing is logged about it
+
+#### Scenario: A malformed AutoConfirm value resolves to on and is reported
+- **WHEN** the site configuration carries an `UBookIt:AutoConfirm` value that cannot be read as a boolean
+- **THEN** the settings report auto-confirm on and an error is logged identifying the setting
+
+#### Scenario: An explicit off is honoured
+- **WHEN** the site configuration carries `UBookIt:AutoConfirm` readable as false
+- **THEN** the settings report auto-confirm off
 
 #### Scenario: The job does not capture a scoped dependency
 - **WHEN** the retention job's construction is inspected

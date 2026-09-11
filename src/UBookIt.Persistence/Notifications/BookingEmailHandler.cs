@@ -9,7 +9,8 @@ using Umbraco.Cms.Core.Models.Email;
 namespace UBookIt.Persistence.Notifications;
 
 /// <summary>
-/// Sends what a site has asked to be sent when a booking is placed or cancelled.
+/// Sends what a site has asked to be sent when a booking is placed, confirmed, declined or
+/// cancelled.
 /// </summary>
 /// <remarks>
 /// <para>
@@ -49,6 +50,8 @@ public sealed class BookingEmailHandler(
     IHostingEnvironment hostingEnvironment,
     ILogger<BookingEmailHandler> logger)
     : INotificationAsyncHandler<BookingPlacedNotification>,
+      INotificationAsyncHandler<BookingConfirmedNotification>,
+      INotificationAsyncHandler<BookingDeclinedNotification>,
       INotificationAsyncHandler<BookingCancelledNotification>
 {
     /// <summary>
@@ -61,6 +64,12 @@ public sealed class BookingEmailHandler(
     public Task HandleAsync(BookingPlacedNotification notification, CancellationToken cancellationToken)
         => SendAsync(notification.Booking, BookingEvent.Placed, cancellationToken);
 
+    public Task HandleAsync(BookingConfirmedNotification notification, CancellationToken cancellationToken)
+        => SendAsync(notification.Booking, BookingEvent.Confirmed, cancellationToken);
+
+    public Task HandleAsync(BookingDeclinedNotification notification, CancellationToken cancellationToken)
+        => SendAsync(notification.Booking, BookingEvent.Declined, cancellationToken);
+
     public Task HandleAsync(BookingCancelledNotification notification, CancellationToken cancellationToken)
         => SendAsync(notification.Booking, BookingEvent.Cancelled, cancellationToken);
 
@@ -68,7 +77,13 @@ public sealed class BookingEmailHandler(
         Booking booking, BookingEvent bookingEvent, CancellationToken cancellationToken)
     {
         var notifications = settings.Notifications;
-        var toSite = notifications.HasInternalRecipients;
+
+        // CONFIRM AND DECLINE ARE TOLD TO THE BOOKER ONLY. The site's own people — or a
+        // colleague — performed the action, and the bookings screen is where its state lives;
+        // a message telling the site what it just did would be noise that trains recipients to
+        // skim. Placement and cancellation keep both directions, as they always have.
+        var toSite = notifications.HasInternalRecipients
+            && bookingEvent is BookingEvent.Placed or BookingEvent.Cancelled;
 
         // ASKED BEFORE THE HOST IS, and that order is load-bearing. A site that has asked for
         // nothing must not be affected by its mail configuration at all — including by a host

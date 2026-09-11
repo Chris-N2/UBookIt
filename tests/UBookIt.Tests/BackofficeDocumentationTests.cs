@@ -102,22 +102,24 @@ public class BackofficeDocumentationTests
     {
         var docs = Docs();
 
-        // Twice now this assertion has had to move with the behaviour, which is the point of
-        // it. First it said bookings "do not yet have a screen"; the screen arrived. Then it
-        // said the view was "read-only"; cancelling arrived. Each sentence was true when
-        // written and each was made false by the very change that had to update it.
-        //
-        // What it says now is the pair of verbs v1 actually has, which is stable in a way
-        // "read-only" was not: see and cancel.
+        // Three times now this assertion has had to move with the behaviour, which is the
+        // point of it. First it said bookings "do not yet have a screen"; the screen arrived.
+        // Then it said the view was "read-only"; cancelling arrived. Then it said "see and
+        // cancel" were the two things the view does; approval arrived, and with it confirm
+        // and decline on a requested row. Each sentence was true when written and each was
+        // made false by the very change that had to update it.
         // THROUGH THE SAME MATCHER AS THE ASSERTION ABOVE. These were raw substring checks
         // sitting directly beneath a wrap-safe `Says` — one test, two matchers, which is precisely
         // the asymmetry that let an over-claim walk back into `docs/notifications.md` unnoticed.
         // Re-adding "Bookings do not yet\nhave a screen of their own." here left the whole suite
         // green. Since this guard has already had to move with the behaviour twice, that is a live
         // regression guard that could not see the regression.
-        DocumentationAssert.Says(docs, "you can see bookings and cancel them");
+        DocumentationAssert.Says(
+            docs,
+            "you can see bookings, cancel them, and — where a booking awaits approval — confirm or decline it");
         DocumentationAssert.DoesNotSay(docs, "do not yet have a screen");
         DocumentationAssert.DoesNotSay(docs, "view is read-only");
+        DocumentationAssert.DoesNotSay(docs, "see bookings and cancel them");
 
         // And the status default is disclosed, because the endpoint hides cancelled
         // bookings by default and an operator who cannot find one must be able to learn
@@ -127,7 +129,8 @@ public class BackofficeDocumentationTests
         // a switch that is no longer on the screen — while the paragraph four lines below it
         // already said "ticking". An operator reading a page that contradicts itself hunts
         // for a control that does not exist.
-        DocumentationAssert.Says(docs, "cancelled booking is one tick away rather than missing");
+        DocumentationAssert.Says(
+            docs, "cancelled or declined booking is one tick away rather than missing");
         DocumentationAssert.DoesNotSay(docs, "one toggle away");
 
         // And that ticking REPLACES rather than adds. The screen's own hint said
@@ -137,10 +140,12 @@ public class BackofficeDocumentationTests
         // the filter is broken.
         DocumentationAssert.Says(docs, "Ticking statuses shows only those");
 
-        // And the three verbs the section genuinely lacks are named, because "management
-        // section" invites the assumption that it manages everything.
+        // And the verbs the section genuinely lacks are named, because "management
+        // section" invites the assumption that it manages everything. Approve/decline left
+        // this list with the approval-decline change — the section does both now — and the
+        // falsified-claims sweep in NotificationDocumentationTests holds the retired
+        // sentence out.
         DocumentationAssert.Says(docs, "It does not place bookings");
-        DocumentationAssert.Says(docs, "It does not approve or decline");
         DocumentationAssert.Says(docs, "It does not amend a booking's time");
     }
 
@@ -413,6 +418,8 @@ public class BackofficeDocumentationTests
         var described = new Dictionary<string, string>
         {
             ["bookings/find-by-booker"] = "find a subject's bookings by their email address",
+            ["bookings/{id:guid}/confirm"] = "confirm",
+            ["bookings/{id:guid}/decline"] = "decline",
             ["bookings/{id:guid}/cancel"] = "cancel",
             ["bookings/{id:guid}/erase-booker"] = "erase a booker's contact details",
         };

@@ -203,6 +203,12 @@ public class BookingsEndpointTests
         public Task<DomainResult<Booking>> CancelAsync(
             Guid bookingId, CancellationToken cancellationToken = default) => throw Unexpected();
 
+        public Task<DomainResult<Booking>> ConfirmAsync(
+            Guid bookingId, CancellationToken cancellationToken = default) => throw Unexpected();
+
+        public Task<DomainResult<Booking>> DeclineAsync(
+            Guid bookingId, CancellationToken cancellationToken = default) => throw Unexpected();
+
         public Task<DomainResult<Booking>> EraseBookerAsync(
             Guid bookingId, CancellationToken cancellationToken = default) => throw Unexpected();
     }
@@ -224,6 +230,12 @@ public class BookingsEndpointTests
             CancelledId = bookingId;
             return Task.FromResult(answer);
         }
+
+        public Task<DomainResult<Booking>> ConfirmAsync(
+            Guid bookingId, CancellationToken cancellationToken = default) => throw new NotSupportedException();
+
+        public Task<DomainResult<Booking>> DeclineAsync(
+            Guid bookingId, CancellationToken cancellationToken = default) => throw new NotSupportedException();
 
         public Task<DomainResult<Booking>> EraseBookerAsync(
             Guid bookingId, CancellationToken cancellationToken = default) => throw new NotSupportedException();
@@ -327,6 +339,146 @@ public class BookingsEndpointTests
         return errors.Select(e => e.Code);
     }
 
+    // ---- confirm and decline (approval-decline) ------------------------------------------------
+    //
+    // The "endpoints are not anonymous" scenario is discharged structurally rather than here:
+    // `UBookItSectionAccessTests.Every_management_controller_inherits_the_shared_authorized_base`
+    // covers every action on this controller, the two new ones included.
+
+    /// <summary>Answers confirm and decline with whatever the test needs, recording the id.</summary>
+    private sealed class TransitioningBookingService(DomainResult<Booking> answer) : IBookingService
+    {
+        public Guid? ConfirmedId { get; private set; }
+
+        public Guid? DeclinedId { get; private set; }
+
+        public Task<DomainResult<Booking>> ConfirmAsync(
+            Guid bookingId, CancellationToken cancellationToken = default)
+        {
+            ConfirmedId = bookingId;
+            return Task.FromResult(answer);
+        }
+
+        public Task<DomainResult<Booking>> DeclineAsync(
+            Guid bookingId, CancellationToken cancellationToken = default)
+        {
+            DeclinedId = bookingId;
+            return Task.FromResult(answer);
+        }
+
+        public Task<DomainResult<Booking>> CancelAsync(
+            Guid bookingId, CancellationToken cancellationToken = default) => throw new NotSupportedException();
+
+        public Task<DomainResult<Booking>> EraseBookerAsync(
+            Guid bookingId, CancellationToken cancellationToken = default) => throw new NotSupportedException();
+
+        public Task<DomainResult<Booking>> PlaceAsync(
+            BookingRequest request, CancellationToken cancellationToken = default) => throw new NotSupportedException();
+
+        public Task<DomainResult<Booking>> PlaceAsync(
+            MultiClaimBookingRequest request, CancellationToken cancellationToken = default)
+            => throw new NotSupportedException();
+
+        public Task<DomainResult<Booking>> PlaceForServiceAsync(
+            ServiceAttribution service,
+            MultiClaimBookingRequest request,
+            CancellationToken cancellationToken = default) => throw new NotSupportedException();
+
+        public DomainResult CheckPlacementRules(Resource resource, DateTimeOffset start, TimeSpan duration)
+            => throw new NotSupportedException();
+    }
+
+    private static Booking WithStatus(BookingStatus status)
+        => Booking.Rehydrate(
+            Guid.NewGuid(),
+            References.Any(),
+            BookingInterval.Create(
+                new DateTimeOffset(2026, 6, 2, 9, 0, 0, TimeSpan.Zero),
+                new DateTimeOffset(2026, 6, 2, 10, 0, 0, TimeSpan.Zero),
+                "Europe/London").Value,
+            Booker.Create(null, "Ada Lovelace", "ada@example.com", null).Value,
+            [new ResourceClaim(Guid.NewGuid())],
+            status,
+            new DateTimeOffset(2026, 5, 1, 0, 0, 0, TimeSpan.Zero)).Value;
+
+    [Fact]
+    public async Task Confirming_returns_the_bookings_new_status()
+    {
+        var booking = WithStatus(BookingStatus.Confirmed);
+        var service = new TransitioningBookingService(DomainResult<Booking>.Success(booking));
+        var (controller, _) = Endpoint(bookingService: service);
+
+        var model = Payload<ConfirmedBookingModel>(await controller.ConfirmBooking(booking.Id));
+
+        Assert.Equal(booking.Id, service.ConfirmedId);
+        Assert.Equal(booking.Id, model.BookingId);
+        Assert.Equal("Confirmed", model.Status);
+    }
+
+    [Fact]
+    public async Task Declining_returns_the_bookings_new_status()
+    {
+        var booking = WithStatus(BookingStatus.Declined);
+        var service = new TransitioningBookingService(DomainResult<Booking>.Success(booking));
+        var (controller, _) = Endpoint(bookingService: service);
+
+        var model = Payload<DeclinedBookingModel>(await controller.DeclineBooking(booking.Id));
+
+        Assert.Equal(booking.Id, service.DeclinedId);
+        Assert.Equal(booking.Id, model.BookingId);
+        Assert.Equal("Declined", model.Status);
+    }
+
+    [Fact]
+    public void The_transition_responses_do_not_imitate_a_list_row()
+    {
+        // Same reasoning as the cancellation response: this path has the domain's booking,
+        // which knows resource ids only, so a row-shaped response would carry blank names.
+        Assert.Equal(
+            ["BookingId", "Status"],
+            typeof(ConfirmedBookingModel).GetProperties().Select(p => p.Name).Order());
+        Assert.Equal(
+            ["BookingId", "Status"],
+            typeof(DeclinedBookingModel).GetProperties().Select(p => p.Name).Order());
+    }
+
+    [Theory]
+    [InlineData("confirm")]
+    [InlineData("decline")]
+    public async Task A_transition_the_domain_refuses_is_a_400_carrying_the_stable_code(string verb)
+    {
+        // Refused rather than quietly reported as done, and 400 rather than 404 — the two
+        // failures call for different actions from the operator, and this is the "somebody
+        // already dealt with it" one.
+        var service = new TransitioningBookingService(DomainResult<Booking>.Failure(
+            FailureCodes.InvalidStatusTransition, "A booking cannot move from Confirmed to Confirmed."));
+        var (controller, _) = Endpoint(bookingService: service);
+
+        var result = Assert.IsType<ObjectResult>(verb == "confirm"
+            ? await controller.ConfirmBooking(Guid.NewGuid())
+            : await controller.DeclineBooking(Guid.NewGuid()));
+
+        Assert.Equal(StatusCodes.Status400BadRequest, result.StatusCode);
+        Assert.Contains(FailureCodes.InvalidStatusTransition, Codes(result));
+    }
+
+    [Theory]
+    [InlineData("confirm")]
+    [InlineData("decline")]
+    public async Task A_transition_on_an_unknown_booking_is_a_404(string verb)
+    {
+        var service = new TransitioningBookingService(DomainResult<Booking>.Failure(
+            FailureCodes.BookingNotFound, "No booking exists with that id."));
+        var (controller, _) = Endpoint(bookingService: service);
+
+        var result = Assert.IsType<ObjectResult>(verb == "confirm"
+            ? await controller.ConfirmBooking(Guid.NewGuid())
+            : await controller.DeclineBooking(Guid.NewGuid()));
+
+        Assert.Equal(StatusCodes.Status404NotFound, result.StatusCode);
+        Assert.Contains(FailureCodes.BookingNotFound, Codes(result));
+    }
+
     [Fact]
     public async Task A_page_is_returned_with_its_unpaged_total()
     {
@@ -404,6 +556,20 @@ public class BookingsEndpointTests
         await controller.ListBookings(From, To, statuses: ["Cancelled"]);
 
         Assert.Equal([BookingStatus.Cancelled], store.LastQuery!.Statuses);
+    }
+
+    [Fact]
+    public async Task Declined_bookings_are_reachable_over_http()
+    {
+        // "Declining is not deleting" — the booking keeps its row and the list still returns it
+        // when asked for. Declined was an unreachable status until approval-decline made it
+        // producible, so the filter that had always accepted the NAME had never been asked for
+        // a status any booking could actually hold.
+        var (controller, store) = Endpoint();
+
+        await controller.ListBookings(From, To, statuses: ["Declined"]);
+
+        Assert.Equal([BookingStatus.Declined], store.LastQuery!.Statuses);
     }
 
     [Fact]

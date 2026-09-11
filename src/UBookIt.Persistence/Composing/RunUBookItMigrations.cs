@@ -29,6 +29,7 @@ internal sealed class RunUBookItMigrations(
         WarnIfTimeZoneNotConfigured(configuration, logger);
         ErrorIfRetentionUnreadable(configuration, logger);
         ErrorIfPrivacyPolicyUrlUnusable(configuration, logger);
+        ErrorIfAutoConfirmUnreadable(configuration, logger);
 
         try
         {
@@ -89,6 +90,37 @@ internal sealed class RunUBookItMigrations(
                 + "Retention is OFF and no booking's personal data will be erased automatically. "
                 + "No default period has been substituted, because erasure cannot be undone.",
                 UBookItPersistenceComposer.RetentionDaysSettingKey);
+        }
+    }
+
+    /// <summary>
+    /// Reports an AutoConfirm value that was written and could not be read as a boolean. Says
+    /// nothing when none was written.
+    /// </summary>
+    /// <remarks>
+    /// <para>
+    /// <b>An error, on the retention precedent</b>: the site wrote something and is not getting
+    /// what it wrote. The fallback is auto-confirm ON — today's behaviour — because neither
+    /// misreading is safe and only one of them is silent: accidental auto-confirm sends
+    /// confirmations somebody can see and correct, while accidental approval parks customers'
+    /// bookings in a state nobody is watching for. A site that wrote an unreadable "false" is
+    /// therefore confirming bookings it meant to vet, and this line is how it finds out.
+    /// </para>
+    /// <para>
+    /// <b>Silent when the setting is absent</b>, like every other setting here: not configuring
+    /// approval is the default and an ordinary choice.
+    /// </para>
+    /// </remarks>
+    internal static void ErrorIfAutoConfirmUnreadable(IConfiguration configuration, ILogger logger)
+    {
+        if (UBookItPersistenceComposer.IsAutoConfirmConfigured(configuration)
+            && !bool.TryParse(configuration[UBookItPersistenceComposer.AutoConfirmSettingKey], out _))
+        {
+            logger.LogError(
+                "uBookIt could not read '{SettingKey}' as a boolean. Auto-confirm is ON — every "
+                + "placed booking is confirmed immediately, today's default behaviour. If this "
+                + "site meant to require approval, set the value to false.",
+                UBookItPersistenceComposer.AutoConfirmSettingKey);
         }
     }
 

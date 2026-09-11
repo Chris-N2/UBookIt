@@ -34,15 +34,37 @@ permanently on any site. A booking placed directly has no service and never will
 - **THEN** the resulting booking carries no service attribution, and that absence is the recorded fact rather than a missing value
 
 ### Requirement: Booking status machine
-Booking status SHALL be one of `Requested`, `Confirmed`, `Declined`, `Cancelled`. Permitted transitions SHALL be exactly: `Requested → Confirmed`, `Requested → Declined`, `Requested → Cancelled`, and `Confirmed → Cancelled`. Any other transition SHALL be rejected with a stable failure code `invalid-status-transition`. In v1, successful placement SHALL yield a `Confirmed` booking (auto-confirm); no v1 pathway SHALL produce `Requested` or `Declined`, but both statuses and their transitions SHALL exist so approval behaviour can be added without breaking changes.
+Booking status SHALL be one of `Requested`, `Confirmed`, `Declined`, `Cancelled`. Permitted transitions SHALL be exactly: `Requested → Confirmed`, `Requested → Declined`, `Requested → Cancelled`, and `Confirmed → Cancelled`. Any other transition SHALL be rejected with a stable failure code `invalid-status-transition`.
 
-#### Scenario: v1 placement auto-confirms
-- **WHEN** a booking is successfully placed
+The status a successful placement yields SHALL be derived from the site's `AutoConfirm`
+setting: `Confirmed` when it is on, `Requested` when it is off. `AutoConfirm` SHALL default to
+**on**, so a site that has configured nothing gets exactly the auto-confirm behaviour every
+prior version shipped. The derivation SHALL happen at the single placement site both the
+direct and the service paths run through, so the two cannot disagree about what a new booking
+is.
+
+`Declined` SHALL be produced only by the decline operation. `Requested` SHALL be produced only
+by placement under `AutoConfirm` off. No other pathway SHALL produce either status.
+
+#### Scenario: Placement under auto-confirm
+- **WHEN** a booking is successfully placed while `AutoConfirm` is on
 - **THEN** its status is `Confirmed`
+
+#### Scenario: Placement under approval
+- **WHEN** a booking is successfully placed while `AutoConfirm` is off
+- **THEN** its status is `Requested`, and it holds its slot exactly as a `Confirmed` booking would
+
+#### Scenario: Service placement agrees with direct placement
+- **WHEN** a booking is successfully placed for a service while `AutoConfirm` is off
+- **THEN** its status is `Requested`, the same status a direct placement yields under the same setting
 
 #### Scenario: Cancelling a confirmed booking
 - **WHEN** a `Confirmed` booking is cancelled
 - **THEN** its status becomes `Cancelled`
+
+#### Scenario: Cancelling a requested booking
+- **WHEN** a `Requested` booking is cancelled
+- **THEN** its status becomes `Cancelled` — a booker who withdraws does not need the request approved first
 
 #### Scenario: Cancelling twice is rejected
 - **WHEN** a `Cancelled` booking is cancelled again
@@ -115,7 +137,7 @@ When placement runs over a service's candidate pool, an `interval-invalid` failu
 
 #### Scenario: Valid request succeeds with structured result
 - **WHEN** placement is requested for an aligned, correctly sized interval in free open time
-- **THEN** the result is success and carries the created `Confirmed` booking
+- **THEN** the result is success and carries the created booking, in the status the *Booking status machine* requirement derives from the site's `AutoConfirm` setting
 
 #### Scenario: An interval that would overflow is rejected
 - **WHEN** placement is requested with a start close enough to the last representable instant that adding the duration would exceed it
@@ -184,9 +206,9 @@ Core defines this contract and SHALL honour it in its in-memory test double, inc
 - **THEN** both complete — one succeeding and one failing with `conflict` — and neither blocks indefinitely
 
 ### Requirement: Availability and placement service ports
-`UBookIt.Core` SHALL expose an availability query service (free-time and slot projection for a resource and date range, per `availability`) and a booking service (placement running the validation pipeline, cancellation applying the status machine, and **erasure of a booking's booker contact details**).
+`UBookIt.Core` SHALL expose an availability query service (free-time and slot projection for a resource and date range, per `availability`) and a booking service (placement running the validation pipeline, cancellation, **confirmation and decline** applying the status machine, and **erasure of a booking's booker contact details**).
 
-**Both SHALL depend only on ports `UBookIt.Core` itself defines**, so implementations can be swapped without changing Core and `UBookIt.Core` continues to carry **no package reference of any kind**. The availability service SHALL depend only on the two store ports (`IResourceStore`, `IBookingStore`). The booking service SHALL depend on those two and, additionally, on the **observation port** through which it reports what it has done — see *Placement and cancellation are observable* — and on the **reference-generation port** from which it draws the quotable reference it assigns at placement.
+**Both SHALL depend only on ports `UBookIt.Core` itself defines**, so implementations can be swapped without changing Core and `UBookIt.Core` continues to carry **no package reference of any kind**. The availability service SHALL depend only on the two store ports (`IResourceStore`, `IBookingStore`). The booking service SHALL depend on those two and, additionally, on the **observation port** through which it reports what it has done — see *Placement and status changes are observable* — and on the **reference-generation port** from which it draws the quotable reference it assigns at placement.
 
 **The generation port SHALL be a Core-defined port a host may substitute**, and it SHALL NOT be the thing that makes a reference unique — the store guarantees that, so the port promises only a well-formed reference drawn unpredictably. It exists as a port rather than as a helper so that a caller can hand placement a reference already in use and observe what it does; at 27⁸ values, waiting for a real collision is not a test strategy. Core MAY ship a default implementation, since drawing a random value needs no package reference and Core already generates identity inline.
 
@@ -204,7 +226,7 @@ Only one such member SHALL be added. An additional overload taking the resource 
 
 #### Scenario: Services are testable with in-memory stores
 - **WHEN** the availability and booking services are constructed with in-memory store implementations
-- **THEN** all placement, cancellation, free-time, and slot-projection behaviour in these specs is exercisable without a database
+- **THEN** all placement, cancellation, confirmation, decline, free-time, and slot-projection behaviour in these specs is exercisable without a database
 
 #### Scenario: A host can substitute reference generation
 - **WHEN** a caller constructs the booking service with its own implementation of the generation port
@@ -269,10 +291,17 @@ dependency to Core and no verb to the booking service — retention erases throu
 operation that already exists, so what is new here is only a way to find what the clock has
 caught.*
 
-### Requirement: Placement and cancellation are observable
+*The booking service's enumeration is widened a **fourth** time, and the recorded reasoning
+still holds: the constraint was never about how many verbs there are. Confirmation and decline
+are domain operations on a booking — each drives a transition the status machine has declared
+since v1 and persists through the store port Core already defines — so they belong to this
+service rather than beside it, and they drag nothing new into Core.*
+
+### Requirement: Placement and status changes are observable
 `UBookIt.Core` SHALL report, through a port it declares itself, that a booking has been
-**placed** and that a booking has been **cancelled**. A host SHALL be able to observe both
-without the package sending anything on its behalf.
+**placed**, that one has been **confirmed**, that one has been **declined**, and that one has
+been **cancelled**. A host SHALL be able to observe all four without the package sending
+anything on its behalf.
 
 **Each SHALL be reported only after storage has agreed, and only on success.** An event means
 *this happened*; raising one before the store has committed would announce a booking that may
@@ -291,14 +320,27 @@ notification nobody receives, and the package neither retries nor queues it.
 A report SHALL carry the booking and nothing derived from it, so there is one source of truth
 and no computed value to keep in step.
 
-**The cancellation report SHALL NOT need to describe what changed.** The status machine
-permits cancellation only from `Requested` or `Confirmed`, so a report is by construction "this
-booking has just become cancelled"; cancelling an already-cancelled booking fails and reports
-nothing.
+**No status-change report SHALL need to describe what changed.** The status machine permits
+cancellation only from `Requested` or `Confirmed`, and confirmation and decline only from
+`Requested`, so every report is by construction "this booking has just become what its status
+says"; an attempt from any other status fails and reports nothing.
+
+**BREAKING — published port.** The observation port gains a confirmed and a declined member. A
+host supplying its own observer must add both. There SHALL be no default implementations: an
+observer silently deaf to declines would be a worse outcome than a compile error, on a port
+whose entire purpose is that a host hears what happened.
 
 #### Scenario: A placed booking is reported
 - **WHEN** a booking is placed successfully
 - **THEN** the placement is reported once, after the booking is stored, carrying that booking
+
+#### Scenario: A confirmed booking is reported
+- **WHEN** a booking is confirmed successfully
+- **THEN** the confirmation is reported once, after the status is stored, carrying that booking
+
+#### Scenario: A declined booking is reported
+- **WHEN** a booking is declined successfully
+- **THEN** the decline is reported once, after the status is stored, carrying that booking
 
 #### Scenario: A cancelled booking is reported
 - **WHEN** a booking is cancelled successfully
@@ -308,6 +350,10 @@ nothing.
 - **WHEN** placement fails for any reason
 - **THEN** nothing is reported
 
+#### Scenario: A refused transition reports nothing
+- **WHEN** confirmation, decline, or cancellation is attempted on a booking whose status does not permit it
+- **THEN** it fails with `invalid-status-transition` and nothing is reported
+
 #### Scenario: Cancelling an already-cancelled booking reports nothing
 - **WHEN** cancellation is attempted on a booking that is already cancelled
 - **THEN** it fails with `invalid-status-transition` and nothing is reported
@@ -316,9 +362,13 @@ nothing.
 - **WHEN** an observer throws while being told a booking was placed
 - **THEN** the placement still reports success to its caller, and the booking remains stored and unchanged
 
+#### Scenario: A throwing observer does not break a confirmation
+- **WHEN** an observer throws while being told a booking was confirmed
+- **THEN** the confirmation still reports success to its caller, and the stored status remains `Confirmed`
+
 #### Scenario: Observation is substitutable
 - **WHEN** the booking service is constructed with an observer that only records what it was told
-- **THEN** placement and cancellation behaviour is unchanged and every report is exercisable without a database
+- **THEN** placement, confirmation, decline, and cancellation behaviour is unchanged and every report is exercisable without a database
 
 ### Requirement: Booking rehydration
 `UBookIt.Core` SHALL expose a public, additive rehydration factory (`Booking.Rehydrate`) that materializes a `Booking` from stored state: id, **reference**, interval, booker, claims, status, created timestamp, and **the optional service attribution**. The reference is **required**, not optional: a booking without one cannot be quoted, and accepting a default here would let storage produce one silently. Rehydration SHALL enforce structural invariants (at least one claim; no duplicate resource per booking) and SHALL accept any `BookingStatus` without applying transition rules — the stored status is historical fact, not a transition. Rehydration SHALL NOT be usable to bypass placement validation: it is documented as a persistence-boundary API, and placement remains the only pathway that creates new bookings. (Discharges the deferred obligation recorded at core-domain archive, per design decision D9: downstream changes add Core surface via their own specs.)
@@ -536,3 +586,49 @@ SHALL NOT become a route to producing an erased booker for a booking that was no
 #### Scenario: Erasing a booking that does not exist fails
 - **WHEN** the erase verb is called with an id no booking has
 - **THEN** it fails with a stable failure code and nothing is changed
+### Requirement: Confirming and declining a booking are service operations
+The booking service SHALL expose an operation that confirms a booking and an operation that
+declines one. Each SHALL load the booking, apply the domain transition, persist the change,
+and report it through the observation port — the same shape as cancellation, and for the same
+reasons.
+
+An unknown booking SHALL fail with `booking-not-found`. A booking whose status does not permit
+the transition SHALL fail with `invalid-status-transition`, and the store SHALL NOT be touched.
+No new failure codes are introduced: both outcomes already have stable codes, and a caller
+distinguishes them because they call for different actions.
+
+**Being observed at all means the transition just happened.** Both operations succeed only from
+`Requested`, so — like cancellation — a report needs no before-and-after: a second attempt
+fails above the store and reports nothing.
+
+A declined booking SHALL stop blocking, per *Conflict semantics*: its claims no longer
+participate in conflicts and no longer reduce free time, so the slot a decline releases is
+immediately bookable again.
+
+There SHALL NOT be a general "set status" operation. Publishing one would invite exactly the
+transitions the status machine exists to refuse; one operation per verb is the precedent
+cancellation set, and confirm and decline follow it.
+
+#### Scenario: A requested booking is confirmed
+- **WHEN** the confirm operation is called for a `Requested` booking
+- **THEN** the result is success, the stored booking is `Confirmed`, and the confirmation is reported once, after the status is stored, carrying that booking
+
+#### Scenario: A requested booking is declined
+- **WHEN** the decline operation is called for a `Requested` booking
+- **THEN** the result is success, the stored booking is `Declined`, and the decline is reported once, after the status is stored, carrying that booking
+
+#### Scenario: Confirming a booking that is not requested is refused
+- **WHEN** the confirm operation is called for a booking that is `Confirmed`, `Declined` or `Cancelled`
+- **THEN** it fails with `invalid-status-transition`, the stored status is unchanged, and nothing is reported
+
+#### Scenario: Declining a booking that is not requested is refused
+- **WHEN** the decline operation is called for a booking that is `Confirmed`, `Declined` or `Cancelled`
+- **THEN** it fails with `invalid-status-transition`, the stored status is unchanged, and nothing is reported
+
+#### Scenario: An unknown booking is reported as not found
+- **WHEN** the confirm or decline operation is called with an id no booking has
+- **THEN** it fails with `booking-not-found` and nothing is reported
+
+#### Scenario: A decline releases the slot
+- **WHEN** a `Requested` booking is declined and availability is then computed over its interval
+- **THEN** the interval it held is free again, exactly as if the booking had been cancelled

@@ -13,6 +13,17 @@ public enum BookingEvent
     /// <summary>The booking has just been placed and stored.</summary>
     Placed,
 
+    /// <summary>The booking has just been confirmed by an operator.</summary>
+    /// <remarks>
+    /// Only an operator's confirmation of a <c>Requested</c> booking. A booking placed as
+    /// confirmed under auto-confirm is a <see cref="Placed"/> event whose booking happens to
+    /// be confirmed — auto-confirmation is not an event, it is what placement produced.
+    /// </remarks>
+    Confirmed,
+
+    /// <summary>The booking has just been declined by an operator.</summary>
+    Declined,
+
     /// <summary>The booking has just been cancelled.</summary>
     Cancelled,
 }
@@ -72,10 +83,7 @@ public sealed class BookingMessageComposer(
             .AppendLine()
             .Append(Details(booking, what))
             .AppendLine()
-            .AppendLine(
-                bookingEvent == BookingEvent.Cancelled
-                    ? "This booking has been cancelled. If that is unexpected, quote the reference above."
-                    : "Please quote the reference above if you need to get in touch about this booking.")
+            .AppendLine(ClosingLineFor(booking, bookingEvent))
             .ToString();
 
         return new BookingMessage(subject, body);
@@ -100,14 +108,31 @@ public sealed class BookingMessageComposer(
     {
         var what = await DescribeAsync(booking, cancellationToken).ConfigureAwait(false);
 
+        // DERIVED FROM THE BOOKING'S STATUS, not from the AutoConfirm setting. The message
+        // describes the booking it announces; reading the setting instead would let the two
+        // drift the day anything else decides a placement's status. "Awaits approval" is a
+        // fact about the booking, not about the person — no contact detail rides with it.
+        var awaitsApproval = bookingEvent == BookingEvent.Placed
+            && booking.Status == BookingStatus.Requested;
+
         var subject = bookingEvent == BookingEvent.Cancelled
             ? $"Booking cancelled — {booking.Reference.Display}"
-            : $"New booking — {booking.Reference.Display}";
+            : awaitsApproval
+                ? $"New booking awaiting approval — {booking.Reference.Display}"
+                : $"New booking — {booking.Reference.Display}";
 
         var body = new StringBuilder()
             .AppendLine(subject)
             .AppendLine()
             .Append(Details(booking, what));
+
+        if (awaitsApproval)
+        {
+            body.AppendLine()
+                .AppendLine(
+                    "This booking awaits approval. It holds its time until somebody confirms "
+                    + "or declines it in the backoffice.");
+        }
 
         if (backofficeUrl is not null)
         {
@@ -123,12 +148,11 @@ public sealed class BookingMessageComposer(
     /// What the message says about the booking's state, derived from that state.
     /// </summary>
     /// <remarks>
-    /// <b>Not written on the assumption that a placed booking is confirmed.</b> Placement produces
-    /// a confirmed booking today — it is the only status literal in <c>BookingService</c> — so
-    /// today this is a branch with one reachable arm. That is the point: approval is a named future
-    /// feature, and a subject line hard-coded to "confirmed" would become false the day it ships,
-    /// silently, in a message already in a customer's inbox, from a change that never touched this
-    /// file.
+    /// <b>Not written on the assumption that a placed booking is confirmed.</b> This switch was
+    /// written when placement could only produce a confirmed booking, precisely so that the day
+    /// approval shipped could not silently turn "your booking is confirmed" into a lie in a
+    /// message already in a customer's inbox. That day was the <c>approval-decline</c> change:
+    /// every arm is now reachable, and nothing here had to move.
     /// </remarks>
     private static string SubjectFor(Booking booking, BookingEvent bookingEvent)
         => bookingEvent == BookingEvent.Cancelled
@@ -140,6 +164,32 @@ public sealed class BookingMessageComposer(
                 BookingStatus.Declined => "Your booking could not be accepted",
                 BookingStatus.Cancelled => "Your booking has been cancelled",
                 _ => "Your booking",
+            };
+
+    /// <summary>
+    /// The sentence after the details, derived from the booking's state on the same terms as
+    /// <see cref="SubjectFor"/>.
+    /// </summary>
+    /// <remarks>
+    /// The <c>Requested</c> arm promises another message, and that promise is kept by the same
+    /// configuration that sent this one: this line is only ever composed for a booker email, so
+    /// booker emails are on, and the confirm and decline events send through the identical
+    /// gate. It says "confirmed or declined" rather than guessing which, because that is the
+    /// one thing this message cannot know.
+    /// </remarks>
+    private static string ClosingLineFor(Booking booking, BookingEvent bookingEvent)
+        => bookingEvent == BookingEvent.Cancelled
+            ? "This booking has been cancelled. If that is unexpected, quote the reference above."
+            : booking.Status switch
+            {
+                BookingStatus.Requested =>
+                    "This booking is not confirmed yet. You will receive another message when "
+                    + "the site confirms or declines it. Please quote the reference above if you "
+                    + "need to get in touch about this booking.",
+                BookingStatus.Declined =>
+                    "The time has not been reserved. If that is unexpected, quote the reference "
+                    + "above when you get in touch.",
+                _ => "Please quote the reference above if you need to get in touch about this booking.",
             };
 
     private static string Details(Booking booking, string? what)

@@ -322,6 +322,81 @@ public class SiteSettingsTests
         Assert.Empty(logger.Entries);
     }
 
+    private static IConfiguration AutoConfirmConfig(string? value)
+    {
+        var values = new Dictionary<string, string?>();
+        if (value is not null)
+        {
+            values[UBookItPersistenceComposer.AutoConfirmSettingKey] = value;
+        }
+
+        return new ConfigurationBuilder().AddInMemoryCollection(values).Build();
+    }
+
+    [Fact]
+    public void An_absent_auto_confirm_setting_is_on()
+        => Assert.True(UBookItPersistenceComposer.ResolveSettings(AutoConfirmConfig(null)).AutoConfirm);
+
+    [Fact]
+    public void An_explicit_off_is_honoured()
+        => Assert.False(UBookItPersistenceComposer.ResolveSettings(AutoConfirmConfig("false")).AutoConfirm);
+
+    [Fact]
+    public void An_explicit_on_is_honoured()
+        => Assert.True(UBookItPersistenceComposer.ResolveSettings(AutoConfirmConfig("true")).AutoConfirm);
+
+    [Theory]
+    [InlineData("")]
+    [InlineData("   ")]
+    [InlineData("no")]
+    [InlineData("0")]
+    public void An_unreadable_auto_confirm_value_resolves_to_on(string configured)
+    {
+        // THE FALLBACK DIRECTION IS ON — today's behaviour — because neither misreading is
+        // safe and only one is silent: accidental auto-confirm sends confirmations somebody
+        // can see and correct, while accidental approval parks bookings in a state nobody is
+        // watching for. "0" and "no" are in the class deliberately: a site owner who writes
+        // either has plainly tried to turn approval on, and gets auto-confirm plus the error
+        // below rather than a silent guess at their intent.
+        Assert.True(UBookItPersistenceComposer.ResolveSettings(AutoConfirmConfig(configured)).AutoConfirm);
+    }
+
+    [Theory]
+    [InlineData("")]
+    [InlineData("   ")]
+    [InlineData("no")]
+    [InlineData("0")]
+    public void An_auto_confirm_value_that_was_written_and_cannot_be_read_logs_an_error(string configured)
+    {
+        var logger = new CapturingLogger();
+
+        RunUBookItMigrations.ErrorIfAutoConfirmUnreadable(AutoConfirmConfig(configured), logger);
+
+        var entry = Assert.Single(logger.Entries);
+        Assert.Equal(LogLevel.Error, entry.Level);
+        Assert.Contains(UBookItPersistenceComposer.AutoConfirmSettingKey, entry.Message);
+    }
+
+    [Fact]
+    public void An_absent_auto_confirm_setting_logs_nothing()
+    {
+        var logger = new CapturingLogger();
+
+        RunUBookItMigrations.ErrorIfAutoConfirmUnreadable(AutoConfirmConfig(null), logger);
+
+        Assert.Empty(logger.Entries);
+    }
+
+    [Fact]
+    public void A_readable_auto_confirm_setting_logs_nothing()
+    {
+        var logger = new CapturingLogger();
+
+        RunUBookItMigrations.ErrorIfAutoConfirmUnreadable(AutoConfirmConfig("false"), logger);
+
+        Assert.Empty(logger.Entries);
+    }
+
     private sealed class CapturingLogger : ILogger
     {
         public List<(LogLevel Level, string Message)> Entries { get; } = [];

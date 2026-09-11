@@ -675,6 +675,12 @@ public class MultiRolePlacementTests
             return Task.CompletedTask;
         }
 
+        public Task BookingConfirmedAsync(Booking booking, CancellationToken cancellationToken = default)
+            => Task.CompletedTask;
+
+        public Task BookingDeclinedAsync(Booking booking, CancellationToken cancellationToken = default)
+            => Task.CompletedTask;
+
         public Task BookingCancelledAsync(Booking booking, CancellationToken cancellationToken = default)
             => Task.CompletedTask;
     }
@@ -758,6 +764,14 @@ public class MultiRolePlacementTests
             Guid bookingId, CancellationToken cancellationToken = default)
             => inner.CancelAsync(bookingId, cancellationToken);
 
+        public Task<DomainResult<Booking>> ConfirmAsync(
+            Guid bookingId, CancellationToken cancellationToken = default)
+            => inner.ConfirmAsync(bookingId, cancellationToken);
+
+        public Task<DomainResult<Booking>> DeclineAsync(
+            Guid bookingId, CancellationToken cancellationToken = default)
+            => inner.DeclineAsync(bookingId, cancellationToken);
+
         public Task<DomainResult<Booking>> EraseBookerAsync(
             Guid bookingId, CancellationToken cancellationToken = default)
             => inner.EraseBookerAsync(bookingId, cancellationToken);
@@ -796,6 +810,14 @@ public class MultiRolePlacementTests
         public Task<DomainResult<Booking>> CancelAsync(
             Guid bookingId, CancellationToken cancellationToken = default)
             => inner.CancelAsync(bookingId, cancellationToken);
+
+        public Task<DomainResult<Booking>> ConfirmAsync(
+            Guid bookingId, CancellationToken cancellationToken = default)
+            => inner.ConfirmAsync(bookingId, cancellationToken);
+
+        public Task<DomainResult<Booking>> DeclineAsync(
+            Guid bookingId, CancellationToken cancellationToken = default)
+            => inner.DeclineAsync(bookingId, cancellationToken);
 
         public Task<DomainResult<Booking>> EraseBookerAsync(
             Guid bookingId, CancellationToken cancellationToken = default)

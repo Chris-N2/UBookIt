@@ -279,6 +279,19 @@ public sealed class BookingConfirmationModel
     /// </summary>
     public required string Reference { get; init; }
 
+    /// <summary>
+    /// Whether the placed booking awaits the site's confirmation — <c>true</c> when it was
+    /// stored as <c>Requested</c>, which placement produces when the site's
+    /// <c>AutoConfirm</c> setting is off.
+    /// </summary>
+    /// <remarks>
+    /// The view derives its heading, accessible name and lead sentence from this, because a
+    /// page saying "Booking confirmed" over a requested booking would be false at the moment
+    /// it renders. Additive to the theme contract; a theme that ignores it renders whatever
+    /// its author wrote, which is the theming capability's stated position.
+    /// </remarks>
+    public bool IsPending { get; init; }
+
     public required string ResourceName { get; init; }
 
     public required string LocalStart { get; init; }

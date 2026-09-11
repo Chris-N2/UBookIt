@@ -2,7 +2,7 @@
 
 import type { Client, Options as Options2, TDataShape } from './client';
 import { client } from './client.gen';
-import type { CancelBookingData, CancelBookingErrors, CancelBookingResponses, CreateResourceData, CreateResourceErrors, CreateResourceResponses, CreateServiceData, CreateServiceErrors, CreateServiceResponses, DeleteResourceData, DeleteResourceErrors, DeleteResourceResponses, DeleteServiceData, DeleteServiceErrors, DeleteServiceResponses, GetResourceData, GetResourceErrors, GetResourceResponses, GetServiceData, GetServiceErrors, GetServiceResponses, ListBookingsData, ListBookingsErrors, ListBookingsResponses, ListCapabilitiesData, ListCapabilitiesErrors, ListCapabilitiesResponses, ListResourcesData, ListResourcesErrors, ListResourcesResponses, ListResourceTypesData, ListResourceTypesErrors, ListResourceTypesResponses, ListServicesData, ListServicesErrors, ListServicesResponses, PreviewServiceConfigurationData, PreviewServiceConfigurationErrors, PreviewServiceConfigurationResponses, UpdateResourceData, UpdateResourceErrors, UpdateResourceResponses, UpdateServiceData, UpdateServiceErrors, UpdateServiceResponses } from './types.gen';
+import type { CancelBookingData, CancelBookingErrors, CancelBookingResponses, ConfirmBookingData, ConfirmBookingErrors, ConfirmBookingResponses, CreateResourceData, CreateResourceErrors, CreateResourceResponses, CreateServiceData, CreateServiceErrors, CreateServiceResponses, DeclineBookingData, DeclineBookingErrors, DeclineBookingResponses, DeleteResourceData, DeleteResourceErrors, DeleteResourceResponses, DeleteServiceData, DeleteServiceErrors, DeleteServiceResponses, EraseBookerData, EraseBookerErrors, EraseBookerResponses, FindBookingsByBookerData, FindBookingsByBookerErrors, FindBookingsByBookerResponses, GetResourceData, GetResourceErrors, GetResourceResponses, GetServiceData, GetServiceErrors, GetServiceResponses, ListBookingsData, ListBookingsErrors, ListBookingsResponses, ListCapabilitiesData, ListCapabilitiesErrors, ListCapabilitiesResponses, ListResourcesData, ListResourcesErrors, ListResourcesResponses, ListResourceTypesData, ListResourceTypesErrors, ListResourceTypesResponses, ListServicesData, ListServicesErrors, ListServicesResponses, PreviewServiceConfigurationData, PreviewServiceConfigurationErrors, PreviewServiceConfigurationResponses, UpdateResourceData, UpdateResourceErrors, UpdateResourceResponses, UpdateServiceData, UpdateServiceErrors, UpdateServiceResponses } from './types.gen';
 
 export type Options<TData extends TDataShape = TDataShape, ThrowOnError extends boolean = boolean> = Options2<TData, ThrowOnError> & {
     /**
@@ -42,6 +42,62 @@ export class UBookItBackofficeService {
             ],
             url: '/umbraco/ubookitbackoffice/api/v1/bookings/{id}/cancel',
             ...options
+        });
+    }
+    
+    public static confirmBooking<ThrowOnError extends boolean = false>(options: Options<ConfirmBookingData, ThrowOnError>) {
+        return (options.client ?? client).post<ConfirmBookingResponses, ConfirmBookingErrors, ThrowOnError>({
+            security: [
+                {
+                    scheme: 'bearer',
+                    type: 'http'
+                }
+            ],
+            url: '/umbraco/ubookitbackoffice/api/v1/bookings/{id}/confirm',
+            ...options
+        });
+    }
+    
+    public static declineBooking<ThrowOnError extends boolean = false>(options: Options<DeclineBookingData, ThrowOnError>) {
+        return (options.client ?? client).post<DeclineBookingResponses, DeclineBookingErrors, ThrowOnError>({
+            security: [
+                {
+                    scheme: 'bearer',
+                    type: 'http'
+                }
+            ],
+            url: '/umbraco/ubookitbackoffice/api/v1/bookings/{id}/decline',
+            ...options
+        });
+    }
+    
+    public static eraseBooker<ThrowOnError extends boolean = false>(options: Options<EraseBookerData, ThrowOnError>) {
+        return (options.client ?? client).post<EraseBookerResponses, EraseBookerErrors, ThrowOnError>({
+            security: [
+                {
+                    scheme: 'bearer',
+                    type: 'http'
+                }
+            ],
+            url: '/umbraco/ubookitbackoffice/api/v1/bookings/{id}/erase-booker',
+            ...options
+        });
+    }
+    
+    public static findBookingsByBooker<ThrowOnError extends boolean = false>(options?: Options<FindBookingsByBookerData, ThrowOnError>) {
+        return (options?.client ?? client).post<FindBookingsByBookerResponses, FindBookingsByBookerErrors, ThrowOnError>({
+            security: [
+                {
+                    scheme: 'bearer',
+                    type: 'http'
+                }
+            ],
+            url: '/umbraco/ubookitbackoffice/api/v1/bookings/find-by-booker',
+            ...options,
+            headers: {
+                'Content-Type': 'application/json',
+                ...options?.headers
+            }
         });
     }
     

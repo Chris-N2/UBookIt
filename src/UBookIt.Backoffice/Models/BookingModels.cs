@@ -242,6 +242,30 @@ public class CancelledBookingModel
 }
 
 /// <summary>
+/// What a confirmation returns: identity and new status, on
+/// <see cref="CancelledBookingModel"/>'s terms — this path reaches the booking through the
+/// domain and cannot honestly fill a list row.
+/// </summary>
+public class ConfirmedBookingModel
+{
+    public Guid BookingId { get; set; }
+
+    /// <summary>The booking's status by name — <c>Confirmed</c>, on success.</summary>
+    public string Status { get; set; } = string.Empty;
+}
+
+/// <summary>
+/// What a decline returns, on the same terms as <see cref="ConfirmedBookingModel"/>.
+/// </summary>
+public class DeclinedBookingModel
+{
+    public Guid BookingId { get; set; }
+
+    /// <summary>The booking's status by name — <c>Declined</c>, on success.</summary>
+    public string Status { get; set; } = string.Empty;
+}
+
+/// <summary>
 /// What an erasure returns: the booking's identity and when its booker was erased.
 /// </summary>
 /// <remarks>

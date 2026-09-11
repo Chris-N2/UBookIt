@@ -33,6 +33,51 @@ public sealed class BookingPlacedNotification(Booking booking) : INotification
 }
 
 /// <summary>
+/// Raised after a booking has been confirmed and the change stored.
+/// </summary>
+/// <remarks>
+/// <para>
+/// <b>Being told at all means the booking has just become confirmed.</b> The status machine
+/// permits confirmation only from <c>Requested</c>, so there is no before-and-after to carry.
+/// A booking placed as confirmed under auto-confirm raises
+/// <see cref="BookingPlacedNotification"/> and not this — auto-confirmation is not an event,
+/// it is what placement produced.
+/// </para>
+/// <para>
+/// The same two caveats apply as for placement: what the package tells the booker depends
+/// entirely on configuration and is nothing by default, and a handler that throws is a
+/// notification nobody receives.
+/// </para>
+/// </remarks>
+public sealed class BookingConfirmedNotification(Booking booking) : INotification
+{
+    /// <summary>The booking as it now stands, confirmed.</summary>
+    public Booking Booking { get; } = booking;
+}
+
+/// <summary>
+/// Raised after a booking has been declined and the change stored.
+/// </summary>
+/// <remarks>
+/// <para>
+/// <b>Being told at all means the booking has just become declined.</b> Decline succeeds only
+/// from <c>Requested</c>, on the same reasoning as
+/// <see cref="BookingConfirmedNotification"/>. A declined booking remains stored but stops
+/// holding its time.
+/// </para>
+/// <para>
+/// The same two caveats apply as for placement: what the package tells the booker depends
+/// entirely on configuration and is nothing by default, and a handler that throws is a
+/// notification nobody receives.
+/// </para>
+/// </remarks>
+public sealed class BookingDeclinedNotification(Booking booking) : INotification
+{
+    /// <summary>The booking as it now stands, declined.</summary>
+    public Booking Booking { get; } = booking;
+}
+
+/// <summary>
 /// Raised after a booking has been cancelled and the change stored.
 /// </summary>
 /// <remarks>
@@ -78,12 +123,18 @@ public sealed class UmbracoBookingObserver(
     public Task BookingPlacedAsync(Booking booking, CancellationToken cancellationToken = default)
         => PublishAsync(new BookingPlacedNotification(booking), booking, "placed");
 
+    public Task BookingConfirmedAsync(Booking booking, CancellationToken cancellationToken = default)
+        => PublishAsync(new BookingConfirmedNotification(booking), booking, "confirmed");
+
+    public Task BookingDeclinedAsync(Booking booking, CancellationToken cancellationToken = default)
+        => PublishAsync(new BookingDeclinedNotification(booking), booking, "declined");
+
     public Task BookingCancelledAsync(Booking booking, CancellationToken cancellationToken = default)
         => PublishAsync(new BookingCancelledNotification(booking), booking, "cancelled");
 
     /// <remarks>
     /// The caller's <c>CancellationToken</c> is deliberately not forwarded. It belongs to the
-    /// request that placed or cancelled the booking, and that work is already committed — a
+    /// request that placed the booking or changed its status, and that work is already committed — a
     /// visitor closing their browser must not stop a site being told what happened.
     /// </remarks>
     private async Task PublishAsync(INotification notification, Booking booking, string what)

@@ -1,10 +1,25 @@
 @using UBookIt.Web.Rendering
 @model ServiceConfirmationModel
 
-<section class="ubookit-confirmation" aria-label="Booking confirmed">
-    <h2>Booking confirmed</h2>
+@{
+    @* Same derivation as the direct flow's Confirmation.cshtml, for the same reason. *@
+    var heading = Model.IsPending ? "Booking request received" : "Booking confirmed";
+}
+<section class="ubookit-confirmation" aria-label="@heading">
+    <h2>@heading</h2>
 
-    <p>Thank you, @Model.BookerName. Your booking is confirmed.</p>
+    @if (Model.IsPending)
+    {
+        <p>
+            Thank you, @Model.BookerName. We have received your booking request — it is not
+            confirmed yet. The site will confirm or decline it; please quote the reference
+            below if you contact them about it.
+        </p>
+    }
+    else
+    {
+        <p>Thank you, @Model.BookerName. Your booking is confirmed.</p>
+    }
 
     <dl>
         <dt>Reference</dt>

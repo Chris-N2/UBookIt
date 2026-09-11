@@ -209,6 +209,9 @@ public sealed class BookingSurfaceController : SurfaceController
         {
             BookingId = booking.Id,
             Reference = booking.Reference.Display,
+            // From the stored booking's status, never from the setting: the page describes
+            // the booking it announces, exactly as the email wording does.
+            IsPending = booking.Status == BookingStatus.Requested,
             ResourceName = resourceName,
             LocalStart = start.ToString("dddd d MMMM yyyy, HH:mm", CultureInfo.InvariantCulture),
             LocalEnd = end.ToString("HH:mm", CultureInfo.InvariantCulture),

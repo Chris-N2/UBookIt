@@ -51,6 +51,7 @@ public class ChangeDeltaIntegrityTests
         IReadOnlyList<string> Retired,
         IReadOnlyList<string> Sections,
         IReadOnlyList<string> Unattributed,
+        IReadOnlyList<(string From, string To)> Renames,
         bool HasTasks);
 
     [Fact]
@@ -86,11 +87,21 @@ public class ChangeDeltaIntegrityTests
 
             foreach (var name in delta.Modified)
             {
+                // A MODIFIED entry under a name being introduced by this delta's own RENAMED
+                // section is the shape the OpenSpec CLI prescribes — the rename applies first,
+                // so the replacement must carry the NEW header. It resolves through the pair:
+                // the FROM must exist upstream, or the rename itself is renaming nothing and
+                // the modification would still land beside rather than on its target.
+                var renamedFrom = delta.Renames
+                    .Where(pair => pair.To == name)
+                    .Select(pair => pair.From)
+                    .FirstOrDefault();
+
                 Assert.True(
-                    headings.Contains(name),
+                    headings.Contains(name) || (renamedFrom is not null && headings.Contains(renamedFrom)),
                     $"{delta.Change}/{delta.Capability} modifies \"{name}\", which is not a requirement in "
-                    + $"openspec/specs/{delta.Capability}/spec.md. It would sync as a new requirement beside "
-                    + "the one it meant to replace.");
+                    + $"openspec/specs/{delta.Capability}/spec.md and is not the TO of a RENAMED entry whose "
+                    + "FROM is. It would sync as a new requirement beside the one it meant to replace.");
             }
         }
     }
@@ -309,6 +320,7 @@ public class ChangeDeltaIntegrityTests
                      .. RequirementsUnder(text, "RENAMED Requirements")],
                     SectionsIn(text),
                     UnattributedIn(text),
+                    RenamesIn(text),
                     hasTasks));
             }
         }
@@ -424,6 +436,40 @@ public class ChangeDeltaIntegrityTests
 
     private static IReadOnlyList<string> RequirementsUnder(string delta, string heading)
         => RequirementsIn(delta).Where(r => r.Section == heading).Select(r => r.Requirement).ToList();
+
+    /// <summary>
+    /// The FROM/TO pairs a delta's RENAMED section declares, in document order.
+    /// </summary>
+    /// <remarks>
+    /// Parsed as adjacent bullet pairs, which is the shape OpenSpec prescribes and the archive
+    /// contains. A FROM with no TO, or the reverse, yields no pair — and that is the safe
+    /// direction here: an unpaired bullet gives the exists-check nothing to resolve through, so
+    /// a malformed rename fails as an unknown name rather than silently licensing one.
+    /// </remarks>
+    private static IReadOnlyList<(string From, string To)> RenamesIn(string delta)
+    {
+        var pairs = new List<(string From, string To)>();
+        string? from = null;
+
+        foreach (var line in Lines(delta))
+        {
+            var fromMatch = Regex.Match(line, @"^-\s*FROM:\s*`###\s+Requirement:\s*(?<name>.+?)\s*`\s*$");
+            if (fromMatch.Success)
+            {
+                from = fromMatch.Groups["name"].Value;
+                continue;
+            }
+
+            var toMatch = Regex.Match(line, @"^-\s*TO:\s*`###\s+Requirement:\s*(?<name>.+?)\s*`\s*$");
+            if (toMatch.Success && from is not null)
+            {
+                pairs.Add((from, toMatch.Groups["name"].Value));
+                from = null;
+            }
+        }
+
+        return pairs;
+    }
 
     /// <summary>Requirement headings sitting under no section this guard recognises.</summary>
     private static IReadOnlyList<string> UnattributedIn(string delta)
