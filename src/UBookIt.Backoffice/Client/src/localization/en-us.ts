@@ -4,6 +4,7 @@ export default {
   },
   ubookitResources: {
     label: "Resources",
+    responsibilityNotSaved: "The resource was saved. See the Responsibility box for what was not.",
     create: "Create resource",
     edit: "Edit",
     delete: "Delete",
@@ -88,6 +89,7 @@ export default {
   },
   ubookitServices: {
     label: "Services",
+    responsibilityNotSaved: "The service was saved. See the Responsibility box for what was not.",
     create: "Create service",
     edit: "Edit",
     delete: "Delete",
@@ -437,5 +439,19 @@ export default {
     declineConfirmFailed: "The confirmation could not be shown, so nothing was declined.",
     confirmBookingFailed: "The booking could not be confirmed.",
     declineBookingFailed: "The booking could not be declined.",
+  },
+  ubookitResponsibility: {
+    headline: "Responsibility",
+    hint: "Who is emailed about this item's bookings — being responsible does not grant or restrict access to anything.",
+    users: "Responsible users",
+    groups: "Responsible groups",
+    marksHeading: "Assignments needing attention",
+    markMissing: "no longer exists and will not be emailed",
+    markDisabled: "disabled and will not be emailed",
+    markInvited: "invitation not accepted, so they will not be emailed",
+    unnamedParty: "A user or group that no longer exists",
+    loadFailed: "The responsible users and groups could not be loaded.",
+    saveFailed: "The item was saved, but its responsible users and groups were not. They are unchanged; try saving again.",
+    saveRefusedAfterLoadFailure: "The item was saved, but its responsible users and groups were left unchanged: they could not be loaded, so saving would have replaced them with an empty list. Close and reopen this item to try again.",
   },
 };

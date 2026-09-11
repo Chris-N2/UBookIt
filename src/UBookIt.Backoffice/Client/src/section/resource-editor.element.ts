@@ -4,6 +4,8 @@ import { UBookItBackofficeService } from "../api/index.js";
 import type { CapabilityUsageModel, DayOfWeek, ResourceRequestModel } from "../api/index.js";
 import { toApiErrors, type ApiError } from "./api-errors.js";
 import "./capability-input.element.js";
+import "./responsibility-editor.element.js";
+import type { UBookItResponsibilityEditorElement } from "./responsibility-editor.element.js";
 
 interface WindowForm {
   start: string;
@@ -223,6 +225,20 @@ export class UBookItResourceEditorElement extends UmbLitElement {
         this._errors = toApiErrors(result.error, this.#term("resourceSaveFailed"));
         return;
       }
+
+      // The responsibility panel saves through its own endpoint, and only once the
+      // resource save has succeeded — on create, the id exists only now. A failed
+      // panel save keeps the editor open: the resource itself IS saved, and the
+      // panel's own message says exactly that.
+      const savedId = this.resourceId ?? result.data?.id;
+      const responsibility = this.shadowRoot?.querySelector<UBookItResponsibilityEditorElement>(
+        "ubookit-responsibility-editor",
+      );
+
+      if (savedId && responsibility && !(await responsibility.save(savedId))) {
+        this._errors = [{ message: this.#term("responsibilityNotSaved") }];
+        return;
+      }
     } catch (thrown) {
       this._errors = toApiErrors(thrown, this.#term("resourceSaveFailed"));
       return;
@@ -266,8 +282,8 @@ export class UBookItResourceEditorElement extends UmbLitElement {
       ${this.#renderErrorSummary()}
 
       <form @submit=${this.#save} novalidate>
-        ${this.#renderDetails()} ${this.#renderCapabilities()} ${this.#renderOpeningHours()}
-        ${this.#renderExceptions()} ${this.#renderConstraints()}
+        ${this.#renderDetails()} ${this.#renderCapabilities()} ${this.#renderResponsibility()}
+        ${this.#renderOpeningHours()} ${this.#renderExceptions()} ${this.#renderConstraints()}
 
         <div class="actions">
           <uui-button
@@ -334,6 +350,15 @@ export class UBookItResourceEditorElement extends UmbLitElement {
             (this._capabilities = e.detail.capabilities)}
         ></ubookit-capability-input>
       </uui-box>
+    `;
+  }
+
+  #renderResponsibility() {
+    return html`
+      <ubookit-responsibility-editor
+        subjectType="resource"
+        .subjectId=${this.resourceId}
+      ></ubookit-responsibility-editor>
     `;
   }
 

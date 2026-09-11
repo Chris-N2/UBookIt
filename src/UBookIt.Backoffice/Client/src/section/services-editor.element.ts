@@ -9,6 +9,8 @@ import type {
   ServiceRequestModel,
 } from "../api/index.js";
 import { toApiErrors, type ApiError } from "./api-errors.js";
+import "./responsibility-editor.element.js";
+import type { UBookItResponsibilityEditorElement } from "./responsibility-editor.element.js";
 import { resolutionGroups, type ResolutionSnapshot } from "./resolution-summary.js";
 import { alignmentReport, type AlignmentSnapshot } from "./alignment-report.js";
 import { sufficiencyReport, type ShortfallSnapshot } from "./sufficiency-report.js";
@@ -517,6 +519,20 @@ export class UBookItServiceEditorElement extends UmbLitElement {
         this._errors = toApiErrors(result.error, this.#term("serviceSaveFailed"));
         return;
       }
+
+      // The responsibility panel saves through its own endpoint, and only once the
+      // service save has succeeded — on create, the id exists only now. A failed
+      // panel save keeps the editor open: the service itself IS saved, and the
+      // panel's own message says exactly that.
+      const savedId = this.serviceId ?? result.data?.id;
+      const responsibility = this.shadowRoot?.querySelector<UBookItResponsibilityEditorElement>(
+        "ubookit-responsibility-editor",
+      );
+
+      if (savedId && responsibility && !(await responsibility.save(savedId))) {
+        this._errors = [{ message: this.#term("responsibilityNotSaved") }];
+        return;
+      }
     } catch (thrown) {
       this._errors = toApiErrors(thrown, this.#term("serviceSaveFailed"));
       return;
@@ -554,6 +570,7 @@ export class UBookItServiceEditorElement extends UmbLitElement {
       <form @submit=${this.#save} novalidate>
         ${this.#renderResolutionSummary()} ${this.#renderSufficiencyReport()}
         ${this.#renderAlignmentReport()} ${this.#renderDetails()}
+        ${this.#renderResponsibility()}
         ${this.#renderRequirements()}
         ${this.#renderDuration()}
 
@@ -597,6 +614,15 @@ export class UBookItServiceEditorElement extends UmbLitElement {
     return errors.length === 0
       ? nothing
       : html`<p class="group-error" id=${groupId}>${errors.map((e) => e.message).join(" ")}</p>`;
+  }
+
+  #renderResponsibility() {
+    return html`
+      <ubookit-responsibility-editor
+        subjectType="service"
+        .subjectId=${this.serviceId}
+      ></ubookit-responsibility-editor>
+    `;
   }
 
   #renderDetails() {

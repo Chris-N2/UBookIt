@@ -72,17 +72,28 @@ double-quoted shell string.
 
 ## 4. Backoffice client
 
-- [ ] 4.1 Responsibility panel in `resource-editor.element.ts` and
+- [x] 4.1 Responsibility panel in `resource-editor.element.ts` and
       `services-editor.element.ts` (dashboard views, not workspaces): `<umb-user-input>` +
       `<umb-user-group-input>` bound to the assignment set, loaded on open, saved with the
-      editor's save. Shared element if the two editors can host one cleanly; duplication is
-      acceptable over a premature abstraction.
-- [ ] 4.2 Mark dangling/skipped-state assignments visibly (deleted, disabled, invited) using
-      the GET annotations; they must not silently vanish from the display.
-- [ ] 4.3 The not-permissions sentence in the panel copy, localized like the section's other
-      strings. Labelling around the pickers uses real labels (uui-label is not a label; no
-      uui-* control carries aria-describedby — see the bookings-screen handover).
-- [ ] 4.4 Client tests for the panel's states; full client build + test run.
+      editor's save. Shared element (`ubookit-responsibility-editor`) — the two hosts wire it
+      identically. The host calls the panel's save AFTER its own succeeds (on create the id
+      exists only then); a failed panel save keeps the editor open with "the item was saved,
+      but…". **Added at apply time: a failed LOAD makes the panel refuse to save** — the
+      pickers would be empty for the wrong reason, and a wholesale replace from them would
+      erase assignments the operator never saw. The picker packages are imported for side
+      effects and resolved through the host's import map (the bundle externalizes
+      `@umbraco/*`), because the backoffice loads the user packages lazily per section.
+- [x] 4.2 Mark dangling/skipped-state assignments visibly (deleted, disabled, invited) using
+      the GET annotations; they must not silently vanish from the display. Logic lives in
+      `responsibility-fields.ts` (`marksFor`) so it is tested as claims, per the client's
+      established pure-module test pattern.
+- [x] 4.3 The not-permissions sentence in the panel copy, localized like the section's other
+      strings (`ubookitResponsibility_hint`). The pickers are CMS shadow composites that no
+      outside label or aria-describedby can pierce (the bookings-screen trap), so each is
+      introduced by a visible heading immediately before it and the condition list is
+      ordinary text.
+- [x] 4.4 Client tests for the panel's states (`responsibility-fields.test.ts`, 7 tests);
+      full client build green, 159 client tests passing.
 
 ## 5. Docs
 
