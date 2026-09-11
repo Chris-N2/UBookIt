@@ -134,8 +134,34 @@ live in `.claude/skills/`, slash commands under `/opsx:*`.
    approved spec.
 4. `qa-review` — **new session or subagent**, adversarial review against
    the spec. Findings go back through apply; QA never fixes code itself.
+   See *How QA actually runs* below.
 5. `openspec-archive-change` (`/opsx:archive`) — after QA approval,
    archive the change and sync main specs.
+
+### How QA actually runs
+
+**One subagent per change, reused across that change's rounds.** Spawn it for round 1
+and send every later round back to the *same* agent, so it still holds what it
+already found, what it accepted, and what it told you to fix. A fresh agent per
+round re-derives the change from nothing and re-litigates settled findings.
+
+The reuse is **per change and within a session**. Subagents do not survive a session
+ending, so a change picked up in a new session gets a new reviewer — which is a cost,
+not a feature, and a reason to finish a change's QA rounds in one sitting where you
+can.
+
+**A REJECT is a gate.** Findings go back through apply; QA never edits code. Only QA
+may decide that further rounds are unwarranted.
+
+**Treat each round's fixes as new code, not as corrections.** On this project a fix
+has caused the next round's defect three changes running — and in `approval-decline`
+the fix for a CRITICAL shipped a guard that could not see the thing it guarded. Tell
+the reviewer that explicitly when you hand a round back.
+
+**Report to the reviewer what you claim, and ask it to verify rather than trust.**
+Build state, test counts, live checks. Twice now the reviewer has found a claim in
+the handover itself to be false — including one it had made in its own previous
+round, and corrected against itself.
 
 ### Rewriting a requirement destroys guarantees silently
 
