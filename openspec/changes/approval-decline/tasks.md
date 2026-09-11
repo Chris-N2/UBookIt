@@ -29,6 +29,13 @@ an owner:
       truthful conditional (the correction rider).
 - [x] 0.7 `persistence` / "Package composition registers persistence and Core services" —
       carried verbatim; gains the `AutoConfirm` resolution rule and its three scenarios.
+- [x] 0.9 `privacy-notice` / "The package states only what it can keep true, and the site links its own policy" — added in QA round 1. Carried verbatim: the policy-link rules, the
+      division-by-who-can-know, the say-it-where-sent / say-nothing-where-not pair, the
+      condition-governs-both rule, the binds-every-surface clause and the historical note. Added:
+      what it promises is messages rather than a confirmation, and that the condition stays a
+      single one. One scenario's THEN changes from "the booking will be confirmed to that
+      address" to messages-about-the-booking, and a scenario for the approval case is added; no
+      other scenario is touched.
 - [x] 0.8 `delivery-api` / "Booking placement" and "Service booking placement" — carried
       verbatim; each gains the status-values contract statement and a pending-placement
       scenario, and the success scenarios name the setting they assume.
@@ -162,7 +169,8 @@ an owner:
       outward sweep that has fired on four consecutive changes. Known candidates to open:
       `booker-erasure` (erasure vs pending bookings), `booking-retention` (sweep has no status
       filter — should stay true), `service-booking`, `theming` (confirmation view contract),
-      `sensitive-data`.
+      `sensitive-data`, and **`privacy-notice`** — added after QA found the CRITICAL there: its
+      omission from this list is the reason the outward sweep would not have caught it either.
 *(Note for whoever syncs: `booking-management`'s Purpose was ALREADY corrected during apply —
 `BackofficeDocumentationTests` demands parity between it and the controller's routes, so adding
 the endpoints failed until the Purpose named confirm and decline. That is the guard designed
@@ -171,6 +179,49 @@ in ㉘ firing exactly as intended, one change later. 9.2 below still stands for 
 - [ ] 9.2 Capability Purpose prose check: `bookings` and `booking-emails` Purposes summarize
       auto-confirm-era behaviour — verify each Purpose still matches its requirements as the
       file stands after sync (consistency check, green pre-sync).
+
+## 9a. QA round 1 — REJECT (one CRITICAL, four MAJOR, two MINOR, two NIT)
+
+- [x] 9a.1 **CRITICAL** — the booking form promised a confirmation the package may not send.
+      `_PrivacyNotice.cshtml` and `_YourDetails.cshtml` were gated on `SendsBookerEmail` alone
+      and said "we will send your booking confirmation"; under `AutoConfirm` off the message is
+      "we have received your booking", and a declined booking is never confirmed at all. Both
+      now promise **messages about the booking**, true under every combination. The
+      `privacy-notice` requirement is MODIFIED by delta, because its own scenario mandated the
+      false noun — editing only the strings would have left the spec demanding a lie. The
+      proposal's non-goal claiming "the form today promises nothing about confirmation timing"
+      was simply wrong and is corrected there.
+- [x] 9a.2 **CRITICAL follow-on** — the first absence guard for it was defeated by wrapping.
+      Mutation-checked by ADDITION, wrapped across two source lines: it **passed**. Every
+      assertion in `PrivacyNoticeTests` now flattens whitespace first, both directions, so one
+      test cannot again carry two matchers. Re-mutated: fails. *(That mutation also re-taught
+      the stale-build trap — restoring a file with `mv` preserves its mtime, MSBuild skips the
+      view, and the run measures the mutant. Revert with a copy and `touch`.)*
+- [x] 9a.3 **MAJOR** — `README.md` said "placement auto-confirms", "Nothing is sent by the
+      package" and "no search by name, email or reference": three claims falsified by 0.6.0,
+      0.5.0 and 0.3.0 respectively, in the file packed into every NuGet package, guarded by
+      nothing. Corrected, and the README now states approval and the optional emails.
+- [x] 9a.4 **MAJOR** — the falsified-claims sweep enumerated four files by hand. It now
+      **discovers** every shipped `.md` (excluding `openspec/`, which is meant to be
+      historical), with an anti-vacuity test asserting README is among them, and carries the
+      three claims above. Mutation-checked: README + wrapped + by addition → fails.
+- [x] 9a.5 **MAJOR** — `BookingsController`'s XML doc still said cancellation was "the second
+      and last of v1's management verbs" and that approving and declining were "not here", in
+      the class that had just gained both endpoints, shipped in the package's `.xml`.
+- [x] 9a.6 **MAJOR** — the `delivery-api` delta's only deliverable was documentation and none
+      landed. Both `Status` members now carry XML docs stating that `Requested` is a value a
+      successful placement returns and what a consumer must do about it, and
+      `docs/notifications.md` addresses headless consumers directly.
+- [x] 9a.7 **MINOR** — the three-outcome prompt rule (`proceed` / `abort` / `report-failure`)
+      is extracted as `actionFor`, shared by cancel and decline, and tested — including
+      extensionally, that no two outcomes collapse. The element could not be tested (no DOM in
+      the client suite); the rule now can.
+- [x] 9a.8 **MINOR** — added `Declined_bookings_are_reachable_over_http`: "declining is not
+      deleting" had no test naming the status that had only just become producible.
+- [x] 9a.9 **NIT** — `"   "` added to the AutoConfirm error-log theory, matching its resolution
+      theory.
+- [x] 9a.10 **NIT** — `docs/mvp.md`'s opening sentence now scopes itself to v1 and names what
+      0.5.0 and 0.6.0 widened.
 
 ## 10. Verification
 

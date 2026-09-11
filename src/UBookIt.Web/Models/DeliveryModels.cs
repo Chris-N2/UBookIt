@@ -406,6 +406,23 @@ public sealed class PlacementResponseModel
     /// </summary>
     public string Reference { get; set; } = string.Empty;
 
+    /// <summary>
+    /// The stored booking's status by name — <c>Confirmed</c> on a site that confirms on
+    /// placement, or <c>Requested</c> on one whose <c>UBookIt:AutoConfirm</c> setting is off.
+    /// </summary>
+    /// <remarks>
+    /// <para>
+    /// <b><c>Requested</c> is a value a successful placement can return, and a consumer must
+    /// distinguish it.</b> A booking in that state holds its time exactly as a confirmed one
+    /// does, but nobody has accepted it yet: an operator confirms or declines it in the
+    /// backoffice, and only then is it settled. Presenting it to a customer as confirmed is a
+    /// misstatement this API gives you everything you need to avoid.
+    /// </para>
+    /// <para>
+    /// A NAME, never the enum's ordinal — the same contract every other status on the wire
+    /// follows, so a consumer is not coupled to the order of a C# declaration.
+    /// </para>
+    /// </remarks>
     public string Status { get; set; } = string.Empty;
 
     public Guid ResourceId { get; set; }
@@ -439,6 +456,23 @@ public sealed class ServicePlacementResponseModel
     /// </summary>
     public string Reference { get; set; } = string.Empty;
 
+    /// <summary>
+    /// The stored booking's status by name — <c>Confirmed</c> on a site that confirms on
+    /// placement, or <c>Requested</c> on one whose <c>UBookIt:AutoConfirm</c> setting is off.
+    /// </summary>
+    /// <remarks>
+    /// <para>
+    /// <b><c>Requested</c> is a value a successful placement can return, and a consumer must
+    /// distinguish it.</b> A booking in that state holds its time exactly as a confirmed one
+    /// does, but nobody has accepted it yet: an operator confirms or declines it in the
+    /// backoffice, and only then is it settled. Presenting it to a customer as confirmed is a
+    /// misstatement this API gives you everything you need to avoid.
+    /// </para>
+    /// <para>
+    /// A NAME, never the enum's ordinal — the same contract every other status on the wire
+    /// follows, so a consumer is not coupled to the order of a C# declaration.
+    /// </para>
+    /// </remarks>
     public string Status { get; set; } = string.Empty;
 
     /// <summary>

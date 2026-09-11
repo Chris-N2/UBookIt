@@ -25,9 +25,11 @@ namespace UBookIt.Backoffice.Controllers;
 /// requirement. Authorization comes from the shared base controller.
 /// </para>
 /// <para>
-/// Reads through the management port and cancels through the Core booking service. Cancelling
-/// is the second and last of v1's management verbs; approving, declining and amending are
-/// each domain changes rather than endpoints, and none of them is here.
+/// Reads through the management port and changes a booking's status through the Core booking
+/// service. The status verbs are <b>cancel</b>, and — for a booking placed while the site's
+/// <c>AutoConfirm</c> setting is off, so that it awaits a decision — <b>confirm</b> and
+/// <b>decline</b>. Amending a booking's time is a domain change rather than an endpoint and is
+/// not here; its shape is a cancellation and a new booking.
 /// </para>
 /// <para>
 /// <b>Two gates, answering different questions.</b> The base controller's section policy

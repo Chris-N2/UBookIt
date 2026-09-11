@@ -249,13 +249,55 @@ public class NotificationDocumentationTests
     /// paraphrase rather than quote the retired sentence, precisely so this guard could
     /// cover it without an exemption.
     /// </remarks>
+    /// <summary>
+    /// Every markdown file the repository ships, discovered rather than listed.
+    /// </summary>
+    /// <remarks>
+    /// <b>The enumerated list was the sample, and QA found the population.</b> The first version
+    /// of the sweep below named four files under <c>docs/</c>. <c>README.md</c> was in no guard
+    /// in this repository at all — and it is the file <c>Directory.Build.props</c> packs into
+    /// every NuGet package, so its "placement auto-confirms" and "nothing is sent by the
+    /// package" outlived two changes that falsified them and would have shipped to every
+    /// consumer. Discovery closes the class: a markdown file added later is swept without
+    /// anybody remembering to add it.
+    /// <para>
+    /// <c>openspec/</c> is excluded deliberately — archived changes are a historical record and
+    /// are SUPPOSED to contain sentences that were true when written. Live specs are covered by
+    /// their own capability guards.
+    /// </para>
+    /// </remarks>
+    private static IEnumerable<string> ShippedMarkdown()
+    {
+        var root = RepoFiles.Root;
+
+        return Directory
+            .EnumerateFiles(root, "*.md", SearchOption.AllDirectories)
+            .Where(path => !path.Contains($"{Path.DirectorySeparatorChar}openspec{Path.DirectorySeparatorChar}", StringComparison.Ordinal))
+            .Where(path => !path.Contains($"{Path.DirectorySeparatorChar}node_modules{Path.DirectorySeparatorChar}", StringComparison.Ordinal))
+            .Where(path => !path.Contains($"{Path.DirectorySeparatorChar}ref{Path.DirectorySeparatorChar}", StringComparison.Ordinal))
+            .Where(path => !path.Contains($"{Path.DirectorySeparatorChar}bin{Path.DirectorySeparatorChar}", StringComparison.Ordinal))
+            .Where(path => !path.Contains($"{Path.DirectorySeparatorChar}obj{Path.DirectorySeparatorChar}", StringComparison.Ordinal))
+            .Select(path => Path.GetRelativePath(root, path).Replace('\\', '/'));
+    }
+
+    [Fact]
+    public void The_sweep_reads_the_files_it_claims_to()
+    {
+        // Anti-vacuity, and specifically for the file whose absence was the finding: a glob
+        // that silently matched nothing would make the sweep below pass over an empty set.
+        var swept = ShippedMarkdown().ToList();
+
+        Assert.Contains("README.md", swept);
+        Assert.Contains("docs/notifications.md", swept);
+        Assert.Contains("docs/backoffice.md", swept);
+        Assert.Contains("docs/mvp.md", swept);
+        Assert.True(swept.Count >= 5, $"Only {swept.Count} markdown files found; the sweep is not reading the repository.");
+    }
+
     [Fact]
     public void The_claims_this_change_falsified_are_not_made_anywhere_in_the_docs()
     {
-        foreach (var doc in new[]
-        {
-            "docs/notifications.md", "docs/backoffice.md", "docs/mvp.md", "docs/booking-page.md",
-        })
+        foreach (var doc in ShippedMarkdown())
         {
             var text = RepoFiles.Read(doc);
 
@@ -264,6 +306,39 @@ public class NotificationDocumentationTests
             DocumentationAssert.DoesNotSay(text, "notifies nobody by itself");
             DocumentationAssert.DoesNotSay(text, "does not tell the person who booked");
             DocumentationAssert.DoesNotSay(text, "It does not approve or decline");
+
+            // Falsified by 0.5.0, not by this change — found by QA in README, which no guard
+            // read. Swept here rather than left for the next change to trip over: the class is
+            // "an unconditional claim that the package sends nothing", and 0.5.0's own sweep
+            // demonstrably could not enumerate it.
+            DocumentationAssert.DoesNotSay(text, "Nothing is sent by the package");
+            DocumentationAssert.DoesNotSay(text, "placement auto-confirms");
+
+            // Falsified by 0.3.0's find-by-booker, same class, same reason it survived: README
+            // was in no guard.
+            DocumentationAssert.DoesNotSay(text, "there is no search by name, email or reference");
+        }
+    }
+
+    /// <summary>
+    /// The booking form must not promise a confirmation it may not send — the CRITICAL this
+    /// change shipped into QA.
+    /// </summary>
+    /// <remarks>
+    /// The rendered surfaces are guarded in <c>PrivacyNoticeTests</c>, wrap-safely and in both
+    /// directions. This is the DOCUMENTATION half of the same claim: a doc telling a site owner
+    /// that visitors are promised a confirmation would be the identical over-claim, one file
+    /// further out, and nothing else here would see it.
+    /// </remarks>
+    [Fact]
+    public void No_document_promises_the_booker_a_confirmation_the_package_may_not_send()
+    {
+        foreach (var doc in ShippedMarkdown())
+        {
+            var text = RepoFiles.Read(doc);
+
+            DocumentationAssert.DoesNotSay(text, "send your booking confirmation");
+            DocumentationAssert.DoesNotSay(text, "we will send a confirmation");
         }
     }
 }

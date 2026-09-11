@@ -363,6 +363,7 @@ public class SiteSettingsTests
 
     [Theory]
     [InlineData("")]
+    [InlineData("   ")]
     [InlineData("no")]
     [InlineData("0")]
     public void An_auto_confirm_value_that_was_written_and_cannot_be_read_logs_an_error(string configured)

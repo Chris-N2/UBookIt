@@ -5,6 +5,7 @@ import type { BookingModel } from "../api/index.js";
 import { toApiErrors } from "./api-errors.js";
 import { confirmDestructive } from "./confirm.js";
 import {
+  actionFor,
   bookerCell,
   bookerNote,
   bookingReference,
@@ -485,13 +486,16 @@ export class UBookItBookingsListElement extends UmbLitElement {
     // Three outcomes, not two. A confirmation that failed to appear is not the
     // operator declining — treating it as one turns a broken dialog into a silent
     // no-op, where they press Cancel, confirm nothing, and see no request, message
-    // or trace.
-    if (outcome === "failed") {
+    // or trace. The rule itself lives in `actionFor`, where it is testable and
+    // shared with decline; this branch only supplies the message.
+    const action = actionFor(outcome);
+
+    if (action === "report-failure") {
       this._error = this.#term("confirmFailed");
       return;
     }
 
-    if (outcome === "cancelled") {
+    if (action === "abort") {
       return;
     }
 
@@ -525,13 +529,15 @@ export class UBookItBookingsListElement extends UmbLitElement {
     });
 
     // Three outcomes, not two — a confirmation that failed to appear is not the
-    // operator declining the dialog. Same rule as cancel's.
-    if (outcome === "failed") {
+    // operator declining the dialog. Same rule as cancel's, from the same function.
+    const action = actionFor(outcome);
+
+    if (action === "report-failure") {
       this._error = this.#term("declineConfirmFailed");
       return;
     }
 
-    if (outcome === "cancelled") {
+    if (action === "abort") {
       return;
     }
 

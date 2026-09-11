@@ -559,6 +559,20 @@ public class BookingsEndpointTests
     }
 
     [Fact]
+    public async Task Declined_bookings_are_reachable_over_http()
+    {
+        // "Declining is not deleting" — the booking keeps its row and the list still returns it
+        // when asked for. Declined was an unreachable status until approval-decline made it
+        // producible, so the filter that had always accepted the NAME had never been asked for
+        // a status any booking could actually hold.
+        var (controller, store) = Endpoint();
+
+        await controller.ListBookings(From, To, statuses: ["Declined"]);
+
+        Assert.Equal([BookingStatus.Declined], store.LastQuery!.Statuses);
+    }
+
+    [Fact]
     public async Task A_comma_joined_status_list_is_refused_rather_than_silently_collapsing()
     {
         // The defect this test exists for. Enum.TryParse accepts comma-separated lists and

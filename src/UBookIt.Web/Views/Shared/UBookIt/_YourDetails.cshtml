@@ -40,14 +40,20 @@
             is a site contradicting itself about what it does with an address it is asking for.
 
             "We'll send your booking confirmation here" was the original wording and was simply
-            untrue: the package sent nothing at all, on any site. It is true again now, but only
-            where a site has turned booker messages on AND the host can send them — which is
-            exactly what SendsBookerEmail is, read from the same value the notice reads and the
-            sending path is gated on.
+            untrue: the package sent nothing at all, on any site. It became true where a site had
+            turned booker messages on AND the host could send them — and then untrue AGAIN when
+            approval shipped, because a site with AutoConfirm off sends "we have received your
+            booking" at placement, and a booking it declines is never confirmed to anybody.
+
+            So the hint now promises MESSAGES rather than a confirmation, which is true under
+            every combination of the two settings. See the note in _PrivacyNotice.cshtml for why
+            the alternative — branching on AutoConfirm here as well — was rejected. The condition
+            is still SendsBookerEmail, read from the same value the notice reads and the sending
+            path is gated on.
         *@
         @if (Model.PrivacyNotice.SendsBookerEmail)
         {
-            <span id="ubookit-email-hint" class="ubookit-hint">We'll send your booking confirmation here.</span>
+            <span id="ubookit-email-hint" class="ubookit-hint">We'll email you about your booking.</span>
         }
         else
         {

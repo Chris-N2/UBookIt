@@ -23,10 +23,27 @@ public class PrivacyNoticeTests
 {
     private readonly ViewRenderer _renderer = new();
 
-    private Task<string> RenderAsync(
+    private async Task<string> RenderAsync(
         int? retentionDays, string? policyUrl, bool sendsBookerEmail = false)
-        => _renderer.RenderAsync(
-            ViewInventory.PrivacyNotice, Form(retentionDays, policyUrl, sendsBookerEmail));
+        => Flat(await _renderer.RenderAsync(
+            ViewInventory.PrivacyNotice, Form(retentionDays, policyUrl, sendsBookerEmail)));
+
+    /// <summary>
+    /// Whitespace runs collapsed to single spaces, so a phrase can be matched however Razor
+    /// happened to wrap it.
+    /// </summary>
+    /// <remarks>
+    /// <b>Added because an absence guard here was defeated by exactly that, and the mutation
+    /// proved it.</b> Re-adding "We will send your booking confirmation to that address" to the
+    /// notice — by ADDITION, beside the correct sentence, wrapped across two source lines as the
+    /// file's own 100-column style forces — left the guard green: the needle spans the break, and
+    /// a raw substring check cannot see it. Every assertion in this file now goes through this,
+    /// the positive halves included, so the two directions cannot use different matchers. That
+    /// asymmetry — one test, two matchers — is what let an over-claim walk back into the
+    /// documentation one change ago.
+    /// </remarks>
+    private static string Flat(string html)
+        => System.Text.RegularExpressions.Regex.Replace(html, @"\s+", " ");
 
     private static IBookingFormView Form(
         int? retentionDays, string? policyUrl, bool sendsBookerEmail = false)
@@ -261,8 +278,18 @@ public class PrivacyNoticeTests
         var sends = await RenderAsync(null, null, sendsBookerEmail: true);
         var silent = await RenderAsync(null, null, sendsBookerEmail: false);
 
-        Assert.Contains("send your booking confirmation", sends, StringComparison.OrdinalIgnoreCase);
-        Assert.DoesNotContain("send your booking confirmation", silent, StringComparison.OrdinalIgnoreCase);
+        Assert.Contains("send messages about your booking", sends, StringComparison.OrdinalIgnoreCase);
+        Assert.DoesNotContain("send messages about your booking", silent, StringComparison.OrdinalIgnoreCase);
+
+        // MESSAGES, NEVER A CONFIRMATION — on the SENDING rendering, which is the one that can
+        // over-promise. A form speaks before placement, and what arrives afterwards depends on
+        // AutoConfirm and on the operator: an approval site sends "we have received your
+        // booking", and a declined booking is never confirmed to anybody. The notice promised a
+        // confirmation until QA caught it. This is the guard that keeps the noun honest, and it
+        // is on the positive branch precisely because the negative branch already forbids every
+        // promise (see A_site_that_sends_nothing_promises_nothing).
+        Assert.DoesNotContain("your booking confirmation", sends, StringComparison.OrdinalIgnoreCase);
+        Assert.DoesNotContain("will be confirmed", sends, StringComparison.OrdinalIgnoreCase);
 
         // And the silent rendering still says why the address is wanted, rather than saying
         // nothing — the purpose statement is one of the four the notice exists to make.
@@ -297,7 +324,7 @@ public class PrivacyNoticeTests
 
         Assert.Equal(
             sends,
-            html.Contains("send your booking confirmation", StringComparison.OrdinalIgnoreCase));
+            html.Contains("send messages about your booking", StringComparison.OrdinalIgnoreCase));
         Assert.Equal(
             retentionDays is not null,
             html.Contains("90 days", StringComparison.OrdinalIgnoreCase));
@@ -314,14 +341,18 @@ public class PrivacyNoticeTests
     [Fact]
     public async Task The_email_hint_follows_the_same_predicate_as_the_notice()
     {
-        var sends = await _renderer.RenderAsync(
-            ViewInventory.YourDetails, Form(null, null, sendsBookerEmail: true));
-        var silent = await _renderer.RenderAsync(
-            ViewInventory.YourDetails, Form(null, null, sendsBookerEmail: false));
+        var sends = Flat(await _renderer.RenderAsync(
+            ViewInventory.YourDetails, Form(null, null, sendsBookerEmail: true)));
+        var silent = Flat(await _renderer.RenderAsync(
+            ViewInventory.YourDetails, Form(null, null, sendsBookerEmail: false)));
 
-        Assert.Contains("send your booking confirmation here", sends, StringComparison.OrdinalIgnoreCase);
-        Assert.DoesNotContain("send your booking confirmation here", silent, StringComparison.OrdinalIgnoreCase);
+        Assert.Contains("email you about your booking", sends, StringComparison.OrdinalIgnoreCase);
+        Assert.DoesNotContain("email you about your booking", silent, StringComparison.OrdinalIgnoreCase);
         Assert.Contains("can contact you about your booking", silent, StringComparison.OrdinalIgnoreCase);
+
+        // The hint is bound by the notice's requirement, so the same no-confirmation rule
+        // applies to it — and it is the surface that carried this exact false promise twice.
+        Assert.DoesNotContain("confirmation", sends, StringComparison.OrdinalIgnoreCase);
     }
 
     /// <summary>

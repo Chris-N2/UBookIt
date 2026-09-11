@@ -46,9 +46,16 @@ migration time rather than quietly misbehave.
   one service or resource. It uses your site's layout.
 - **A booking flow** that works without JavaScript, and a JSON delivery API if you would
   rather build your own front end.
-- **A Bookings section** in the backoffice for seeing and cancelling bookings.
-- **Notifications** when a booking is placed or cancelled, so your site can email, log,
-  push to a CRM, or anything else.
+- **A Bookings section** in the backoffice for seeing bookings, cancelling them, and — where
+  you have asked for bookings to be approved rather than confirmed on the spot — confirming
+  or declining them.
+- **Approval, if you want it.** `UBookIt:AutoConfirm` is on by default, so bookings confirm
+  immediately; turn it off and each one waits for somebody to confirm or decline it, holding
+  its time meanwhile.
+- **Optional emails** to the person who booked and to your own people — **off until you
+  configure them**, because a mail server is not permission to write to your customers.
+- **Notifications** when a booking is placed, confirmed, declined or cancelled, so your site
+  can send its own messages, log, push to a CRM, or anything else.
 - **Restyling** through CSS custom properties, or **theming** by replacing the views
   entirely with your own Razor class library.
 
@@ -70,12 +77,10 @@ yours the moment you override a token or supply a theme, is in
 
 On the record as decisions, not gaps somebody discovers:
 
-- **Approving or declining** a booking — placement auto-confirms.
 - **Amending** a booking's time, or **taking a booking on someone's behalf**.
 - **Finding a booking without knowing roughly when it is.** The backoffice list is windowed
-  by date; there is no search by name, email or reference.
-- **Emails.** uBookIt raises a notification; your site owns the channel and the wording.
-  Nothing is sent by the package, including to somebody whose booking you cancel.
+  by date — but you can find every booking holding a given email address, which is how an
+  erasure request is honoured. There is no search by name or reference.
 - **More than one booking at a time for the same resource.** A resource is claimed
   exclusively for its interval — a room that seats twenty is one bookable thing, not twenty.
 - **Recurring bookings, payment, cancellation windows**, and any language beyond `en-US`.

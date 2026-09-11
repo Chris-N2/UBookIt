@@ -11,6 +11,7 @@ import {
   bookerWithheld,
   bookingReference,
   canCancel,
+  actionFor,
   canConfirmOrDecline,
   currentWeek,
   formatInterval,
@@ -765,5 +766,34 @@ describe("the strings an erased booker is explained with", () => {
     expect(bookings.bookerErased.toLowerCase()).toContain("erased");
     expect(bookings.bookerErased.toLowerCase()).not.toContain("hidden");
     expect(bookings.bookerErased).not.toBe(bookings.bookerHidden);
+  });
+});
+
+describe("what a confirmation prompt's outcome means", () => {
+  it("proceeds only when the operator confirmed", () => {
+    expect(actionFor("confirmed")).toBe("proceed");
+  });
+
+  it("aborts silently when the operator backed out", () => {
+    // Dismissing the modal must issue no request and say nothing: the operator
+    // chose this, and an error message would report a fault that did not happen.
+    expect(actionFor("cancelled")).toBe("abort");
+  });
+
+  it("reports a confirmation that never appeared, rather than treating it as a refusal", () => {
+    // THE DISTINCTION THE WHOLE THREE-OUTCOME SHAPE EXISTS FOR. Collapsing this into
+    // "cancelled" turns a broken dialog into a silent no-op — the operator presses the
+    // button, confirms nothing, and sees no request, no message and no trace. Both the
+    // cancel and the decline flows read this function, so this covers both.
+    expect(actionFor("failed")).toBe("report-failure");
+  });
+
+  it("gives the three outcomes three distinct actions", () => {
+    // Extensionally: any two collapsing into one is the defect, whichever pair it is.
+    const actions = ["confirmed", "cancelled", "failed"].map((o) =>
+      actionFor(o as "confirmed" | "cancelled" | "failed"),
+    );
+
+    expect(new Set(actions).size).toBe(3);
   });
 });

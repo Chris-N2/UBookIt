@@ -37,7 +37,7 @@
 
         Now that the package CAN send, "can contact you" is the weaker half of a pair rather than
         the whole answer. A site that has turned booker messages on and can actually send them will
-        send a confirmation to this address, and a notice that declined to say so would understate
+        send messages to this address, and a notice that declined to say so would understate
         the processing being performed on the very page collecting the address — the same fault as
         overstating it, in the other direction.
 
@@ -46,13 +46,27 @@
         on. That is deliberate and load-bearing. A site that asks for messages on a host with no
         mail configuration sends nothing, and this must promise nothing there — writing the
         conjunction out again here is exactly how the sentence and the behaviour would drift apart.
+
+        IT PROMISES MESSAGES, NOT A CONFIRMATION, and that generality is the fix for a defect
+        rather than vagueness. It said "we will send your booking confirmation" until approval
+        shipped; on a site with AutoConfirm off, placement sends "we have received your booking"
+        and a booking that is then DECLINED never receives a confirmation at all — so the
+        specific noun was a promise the package could not keep, on the very page collecting the
+        address.
+
+        The rejected alternative was to branch on AutoConfirm as well. That would put TWO
+        conditions on a sentence whose design note above is that one condition governs both the
+        saying and the sending — a second is a second way for them to drift, and it would still
+        be wrong for the declined case. "Messages about your booking" is true under every
+        combination, so the sentence cannot become false again without the sending itself
+        changing.
     *@
     <p>
         @if (notice.SendsBookerEmail)
         {
             <text>
                 We use your name and email address — and your phone number, if you give one — to hold
-                and identify your booking. We will send your booking confirmation to that email
+                and identify your booking. We will send messages about your booking to that email
                 address, and use it to contact you about your booking.
             </text>
         }

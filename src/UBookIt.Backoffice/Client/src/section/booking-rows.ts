@@ -511,3 +511,28 @@ export function bookingReference(booking: { reference?: string }): string {
     ? `${value.slice(0, REFERENCE_GROUP)}-${value.slice(REFERENCE_GROUP)}`
     : value;
 }
+
+/**
+ * What a caller must do with a confirmation prompt's outcome.
+ *
+ * Three outcomes, never two, and the difference between two of them is the whole
+ * reason this exists: `cancelled` is the operator backing out, and `failed` is a
+ * confirmation that never appeared. Collapsing the second into the first turns a
+ * broken dialog into a silent no-op — the operator presses the button, confirms
+ * nothing, and sees no request, no message and no trace.
+ *
+ * **Out here as a pure function because the element cannot be exercised.** Every
+ * client suite in this package is pure-module; reproducing the branch in the element
+ * needs a DOM that is not installed. The rule itself is testable the moment it is not
+ * an `if` inside an event handler — and it is shared by cancel and decline, so a
+ * regression in one is a regression in both.
+ */
+export type PromptAction = "proceed" | "abort" | "report-failure";
+
+export function actionFor(outcome: "confirmed" | "cancelled" | "failed"): PromptAction {
+  if (outcome === "failed") {
+    return "report-failure";
+  }
+
+  return outcome === "confirmed" ? "proceed" : "abort";
+}

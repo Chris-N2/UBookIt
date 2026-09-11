@@ -67,9 +67,18 @@ the complete message catalogue rather than retrofitted.
 - **No changes to who may confirm/decline beyond existing section access.** The
   permissions model is 0.10.0.
 - **No pre-submission "this booking will require approval" wording on the booking form.**
-  The form today promises nothing about confirmation timing, so nothing it says becomes
-  false; the status-derived confirmation page and emails carry the truth. A form-side
-  notice can ride with a later change if wanted.
+  The status-derived confirmation page and emails carry the truth about what happened; a
+  form-side notice announcing the *timing* can ride with a later change if wanted.
+
+  **This bullet originally justified itself by claiming "the form today promises nothing
+  about confirmation timing, so nothing it says becomes false". That was wrong, and QA caught
+  it as a CRITICAL.** The privacy notice and the email field's hint both promised *"your
+  booking confirmation"* whenever booker emails were on — a promise an approval site does not
+  keep at placement and a declined booking never keeps at all. Both now promise messages
+  about the booking rather than a confirmation, which is true under every combination of the
+  settings, and the `privacy-notice` capability is modified accordingly. What remains out of
+  scope is only the *timing* notice: saying nothing about when is honest, saying something
+  false was not.
 
 ## Capabilities
 
@@ -92,6 +101,9 @@ None — approval is a mode of placement plus an operator action, and both homes
 - `delivery-api`: placement response `Status` may now be `Requested`; consumer guidance.
 - `default-frontend`: the confirmation views' wording derives from the placed booking's
   status.
+- `privacy-notice`: what the booking form promises about being contacted narrows from a
+  confirmation to messages about the booking — the only statement that stays true when the
+  site requires approval, or declines.
 - `persistence`: the composer binds `UBookIt:AutoConfirm`; resolution falls back to on
   (today's behaviour), with a written-but-unreadable value logged as an error on the
   retention-period precedent.

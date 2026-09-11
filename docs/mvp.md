@@ -4,6 +4,10 @@
 booking page, take bookings from visitors, and see and cancel those bookings in the
 backoffice — with their own site able to react when a booking is placed or cancelled.**
 
+*(That sentence describes v1. Later versions widened it: 0.5.0 added optional emails the
+package sends itself, and 0.6.0 added approval, so a site can also confirm or decline. Both are
+off or on-by-default respectively, so what an unconfigured site does is still exactly this.)*
+
 That sentence is the whole test. Everything below either serves it or is deliberately not in
 it.
 

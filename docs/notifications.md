@@ -69,6 +69,13 @@ The messages follow the booking rather than the setting:
   backoffice link it already carries. Confirming or declining sends this list nothing — you
   just did it, from the screen where its state lives.
 
+**If you have built your own front end against the delivery API, read this one.** A successful
+`POST /bookings` or `POST /services/{id}/bookings` returns the booking's `status`, and on a site
+requiring approval that value is `Requested` rather than `Confirmed`. The response shape has not
+changed — but a client that ignores `status` and tells the visitor "confirmed" is now making a
+statement the booking does not support, and the same visitor may later be declined. The shipped
+Razor front end derives its confirmation page from this value; yours should too.
+
 `AutoConfirm` reads as **on** when it is absent, and as on — with an error in the log naming
 the setting — when a value was written that cannot be read as a boolean. The fallback
 direction is deliberate: a site accidentally auto-confirming sends confirmations it can see
