@@ -138,6 +138,28 @@ cancel both get an email, and decline is the third thing a customer needs tellin
   stored body could later take precedence the way a theme takes precedence over a shipped view.
   That is a design constraint on 0.7.0, not scope added to it.
 
+- **Self-service cancellation by booking reference** (raised by Chris, 2026-09-11). A booker
+  cancels their own booking without an operator, identified by the reference they were given.
+  **The reference was built for exactly this** — short, unambiguous read aloud, stable for the
+  life of the booking, and it already survives erasure.
+
+  *The prompt was consumer law requiring cancellation to be as easy as sign-up. Read honestly:
+  in the UK that is the Digital Markets, Competition and Consumers Act 2024, and it is aimed at
+  **subscription contracts** rather than one-off bookings, so this is probably "not obliged,
+  plausibly still wanted" rather than a compliance obligation. Do not let the roadmap imply
+  otherwise — a package claiming to deliver compliance it has not verified is the kind of
+  statement this project has twice had to retract.*
+
+  **The design question is authentication, and it is the whole feature**: a reference alone is a
+  bearer token, and the addressable space is 27⁸. Guessing one and cancelling a stranger's
+  booking must be infeasible — so this needs a rate-limited lookup at minimum, and more likely a
+  link mailed to the address on the booking, which makes it depend on emails being configured.
+  That dependency is the reason it is not trivially cheap.
+
+  Two things it would make better rather than worse: `InternalCancelled` becomes genuinely
+  informative, since the cancellation would no longer be something the site just did; and it
+  pairs with 0.9.0's delivery-API exposure work, because it would be a new anonymous endpoint.
+
 - **Move / amend a booking's time.** Currently a cancellation and a new booking, which loses the
   reference the customer is holding.
 - **Descriptions in the UI.** `Resource` has a `Description` and the delivery API returns it;
