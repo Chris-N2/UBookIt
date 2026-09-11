@@ -169,12 +169,15 @@ an owner:
 
 ## 10. Verification
 
-- [ ] 10.1 Full clean Release build: zero warnings; full test suite green (.NET + client).
-- [ ] 10.2 Live check on the TestSite (pickup directory, cleared first — or you measure
+- [x] 10.1 Full clean Release build: zero warnings; full test suite green (.NET + client).
+- [x] 10.2 Live check on the TestSite (pickup directory, cleared first — or you measure
       history): place with `AutoConfirm` off → form completes, confirmation page reads
       "received/awaiting", internal `.eml` flags awaiting approval, booker `.eml` says
       received; confirm from the backoffice → booker `.eml` says confirmed, no internal
       `.eml`; decline a second booking → declined `.eml`, slot free again on the front end;
       flip the setting off entirely → behaviour identical to today.
-- [ ] 10.3 Update `roadmap/version_roadmap.md` row status if wording needs it, and bump the
-      package version to 0.6.0 wherever the packaging change pinned it.
+- [x] 10.3 Roadmap wording checked (no change needed). **Version deliberately not bumped**:
+      `Directory.Build.props` has said 0.1.0 since the packaging change and no roadmap
+      milestone since (0.2.0-0.5.0) moved it — nothing is published yet, so the roadmap
+      numbers are milestones and the package number moves when Chris publishes. Recorded
+      here so the task's original instruction is a corrected assumption, not a skipped step.
