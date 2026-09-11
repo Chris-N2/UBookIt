@@ -16,10 +16,10 @@ requirement destroys guarantees silently").
 
 ## 1. Core: the port and the published contract
 
-- [ ] 1.1 `IBookingTemplateRenderer` in `UBookIt.Core` — renders a model for a named message and
+- [x] 1.1 `IBookingTemplateRenderer` in `UBookIt.Core` — renders a model for a named message and
       reports **three** outcomes distinctly: rendered, no template, failed. Two would collapse
       "broken" into "absent", which the spec forbids.
-- [ ] 1.2 `BookerMessageModel` and `InternalMessageModel`. **`InternalMessageModel` has no
+- [x] 1.2 `BookerMessageModel` and `InternalMessageModel`. **`InternalMessageModel` has no
       member for the booker's name, email or telephone** — that absence is the guarantee.
       Structure over pre-composed text: `ServiceName` + `ResourceNames` collection;
       `LocalStart`/`LocalEnd` as `DateTimeOffset` already in the booking's zone + `TimeZoneId`;
@@ -29,9 +29,18 @@ requirement destroys guarantees silently").
       confirmed placement and a requested one, distinguished by `Status`, rather than the package
       shipping a seventh name. `AwaitsApproval` and `BackofficeUrl?` are internal-only. Members
       named for a reader — this is the future token vocabulary and 17.0.0 freezes it.
-- [ ] 1.3 The published message-name set (the six), as a Core constant a caller can enumerate —
+- [x] 1.3 The published message-name set (the six), as a Core constant a caller can enumerate —
       not six loose strings. Nothing may name a seventh for an audience that receives no such
       message.
+
+      **Design detail settled during apply, worth recording because the proposal left it
+      implicit.** The tasks above said the models carry "the event", but `BookingEvent` is public
+      and lives in `UBookIt.Persistence`, so Core models could only carry it by moving it — a
+      breaking change the proposal never called out — or by duplicating the concept. Neither was
+      necessary: the six message names ARE the vocabulary, so Core owns them as
+      `BookingMessageKind` and the models carry `Kind`. No move, no breaking change, one concept
+      instead of two, and each enum member is literally the file name a template is saved under.
+      `BookingEvent` stays where it is as Persistence's internal wiring.
 - [ ] 1.4 Tests: the internal model exposes no contact-detail member **by reflection over its
       public surface**, not by inspecting a hand-written list — the guard must see a member added
       later. The name set matches the events × audiences the package actually sends.
