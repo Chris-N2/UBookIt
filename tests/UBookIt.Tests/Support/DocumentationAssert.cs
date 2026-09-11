@@ -112,8 +112,13 @@ public static class DocumentationAssert
         // blank line, and never a line break into a new list item. Both are places where one
         // statement stops and another begins, so crossing either satisfies a sentence
         // assertion out of words the document no longer says in that order.
+        // The backtick joined the decoration class when a sentence asserting a claim about
+        // `InternalRecipients` failed against a document that made the claim verbatim — the
+        // summary above always promised "quoted", and code quoting is how this repository's
+        // prose quotes an identifier. For DoesNotSay the addition is strictly safer: a
+        // forbidden sentence cannot hide by backticking one of its words.
         const string Separator =
-            @"(?:[^\S\r\n]|[>*_]|\r?\n(?!\s*(?:\r?\n|[-*+][^\S\r\n]|\d+\.[^\S\r\n])))+";
+            @"(?:[^\S\r\n]|[>*_`]|\r?\n(?!\s*(?:\r?\n|[-*+][^\S\r\n]|\d+\.[^\S\r\n])))+";
 
         // Anchored so a word cannot match inside a longer one — but with lookarounds rather
         // than `\b`, which asserts a word boundary and therefore FAILS on a sentence whose
@@ -123,7 +128,7 @@ public static class DocumentationAssert
             Separator,
             sentence
                 .Split(' ', StringSplitOptions.RemoveEmptyEntries)
-                .Select(word => Regex.Escape(word.Trim('*', '_')))) + @"(?!\w)";
+                .Select(word => Regex.Escape(word.Trim('*', '_', '`')))) + @"(?!\w)";
 
         return pattern;
     }

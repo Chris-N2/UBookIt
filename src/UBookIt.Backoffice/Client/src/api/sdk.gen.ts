@@ -2,7 +2,7 @@
 
 import type { Client, Options as Options2, TDataShape } from './client';
 import { client } from './client.gen';
-import type { CancelBookingData, CancelBookingErrors, CancelBookingResponses, ConfirmBookingData, ConfirmBookingErrors, ConfirmBookingResponses, CreateResourceData, CreateResourceErrors, CreateResourceResponses, CreateServiceData, CreateServiceErrors, CreateServiceResponses, DeclineBookingData, DeclineBookingErrors, DeclineBookingResponses, DeleteResourceData, DeleteResourceErrors, DeleteResourceResponses, DeleteServiceData, DeleteServiceErrors, DeleteServiceResponses, EraseBookerData, EraseBookerErrors, EraseBookerResponses, FindBookingsByBookerData, FindBookingsByBookerErrors, FindBookingsByBookerResponses, GetResourceData, GetResourceErrors, GetResourceResponses, GetServiceData, GetServiceErrors, GetServiceResponses, ListBookingsData, ListBookingsErrors, ListBookingsResponses, ListCapabilitiesData, ListCapabilitiesErrors, ListCapabilitiesResponses, ListResourcesData, ListResourcesErrors, ListResourcesResponses, ListResourceTypesData, ListResourceTypesErrors, ListResourceTypesResponses, ListServicesData, ListServicesErrors, ListServicesResponses, PreviewServiceConfigurationData, PreviewServiceConfigurationErrors, PreviewServiceConfigurationResponses, UpdateResourceData, UpdateResourceErrors, UpdateResourceResponses, UpdateServiceData, UpdateServiceErrors, UpdateServiceResponses } from './types.gen';
+import type { CancelBookingData, CancelBookingErrors, CancelBookingResponses, ConfirmBookingData, ConfirmBookingErrors, ConfirmBookingResponses, CreateResourceData, CreateResourceErrors, CreateResourceResponses, CreateServiceData, CreateServiceErrors, CreateServiceResponses, DeclineBookingData, DeclineBookingErrors, DeclineBookingResponses, DeleteResourceData, DeleteResourceErrors, DeleteResourceResponses, DeleteServiceData, DeleteServiceErrors, DeleteServiceResponses, EraseBookerData, EraseBookerErrors, EraseBookerResponses, FindBookingsByBookerData, FindBookingsByBookerErrors, FindBookingsByBookerResponses, GetResourceData, GetResourceErrors, GetResourceResponses, GetResourceResponsibilityData, GetResourceResponsibilityErrors, GetResourceResponsibilityResponses, GetServiceData, GetServiceErrors, GetServiceResponses, GetServiceResponsibilityData, GetServiceResponsibilityErrors, GetServiceResponsibilityResponses, ListBookingsData, ListBookingsErrors, ListBookingsResponses, ListCapabilitiesData, ListCapabilitiesErrors, ListCapabilitiesResponses, ListResourcesData, ListResourcesErrors, ListResourcesResponses, ListResourceTypesData, ListResourceTypesErrors, ListResourceTypesResponses, ListServicesData, ListServicesErrors, ListServicesResponses, PreviewServiceConfigurationData, PreviewServiceConfigurationErrors, PreviewServiceConfigurationResponses, PutResourceResponsibilityData, PutResourceResponsibilityErrors, PutResourceResponsibilityResponses, PutServiceResponsibilityData, PutServiceResponsibilityErrors, PutServiceResponsibilityResponses, UpdateResourceData, UpdateResourceErrors, UpdateResourceResponses, UpdateServiceData, UpdateServiceErrors, UpdateServiceResponses } from './types.gen';
 
 export type Options<TData extends TDataShape = TDataShape, ThrowOnError extends boolean = boolean> = Options2<TData, ThrowOnError> & {
     /**
@@ -174,6 +174,36 @@ export class UBookItBackofficeService {
         });
     }
     
+    public static getResourceResponsibility<ThrowOnError extends boolean = false>(options: Options<GetResourceResponsibilityData, ThrowOnError>) {
+        return (options.client ?? client).get<GetResourceResponsibilityResponses, GetResourceResponsibilityErrors, ThrowOnError>({
+            security: [
+                {
+                    scheme: 'bearer',
+                    type: 'http'
+                }
+            ],
+            url: '/umbraco/ubookitbackoffice/api/v1/resources/{id}/responsibility',
+            ...options
+        });
+    }
+    
+    public static putResourceResponsibility<ThrowOnError extends boolean = false>(options: Options<PutResourceResponsibilityData, ThrowOnError>) {
+        return (options.client ?? client).put<PutResourceResponsibilityResponses, PutResourceResponsibilityErrors, ThrowOnError>({
+            security: [
+                {
+                    scheme: 'bearer',
+                    type: 'http'
+                }
+            ],
+            url: '/umbraco/ubookitbackoffice/api/v1/resources/{id}/responsibility',
+            ...options,
+            headers: {
+                'Content-Type': 'application/json',
+                ...options.headers
+            }
+        });
+    }
+    
     public static listCapabilities<ThrowOnError extends boolean = false>(options?: Options<ListCapabilitiesData, ThrowOnError>) {
         return (options?.client ?? client).get<ListCapabilitiesResponses, ListCapabilitiesErrors, ThrowOnError>({
             security: [
@@ -265,6 +295,36 @@ export class UBookItBackofficeService {
                 }
             ],
             url: '/umbraco/ubookitbackoffice/api/v1/services/{id}',
+            ...options,
+            headers: {
+                'Content-Type': 'application/json',
+                ...options.headers
+            }
+        });
+    }
+    
+    public static getServiceResponsibility<ThrowOnError extends boolean = false>(options: Options<GetServiceResponsibilityData, ThrowOnError>) {
+        return (options.client ?? client).get<GetServiceResponsibilityResponses, GetServiceResponsibilityErrors, ThrowOnError>({
+            security: [
+                {
+                    scheme: 'bearer',
+                    type: 'http'
+                }
+            ],
+            url: '/umbraco/ubookitbackoffice/api/v1/services/{id}/responsibility',
+            ...options
+        });
+    }
+    
+    public static putServiceResponsibility<ThrowOnError extends boolean = false>(options: Options<PutServiceResponsibilityData, ThrowOnError>) {
+        return (options.client ?? client).put<PutServiceResponsibilityResponses, PutServiceResponsibilityErrors, ThrowOnError>({
+            security: [
+                {
+                    scheme: 'bearer',
+                    type: 'http'
+                }
+            ],
+            url: '/umbraco/ubookitbackoffice/api/v1/services/{id}/responsibility',
             ...options,
             headers: {
                 'Content-Type': 'application/json',

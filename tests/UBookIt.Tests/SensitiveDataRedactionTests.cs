@@ -652,6 +652,12 @@ public class SensitiveDataRedactionTests
             "ResourcesController.CreateResource",
             "ResourcesController.UpdateResource",
             "ResourcesController.DeleteResource",
+            // Genuine writes: each replaces a subject's responsibility assignment set
+            // (resource-responsibility change). Neither takes free text or contact
+            // details — a party is a kind plus an Umbraco key, and names and addresses
+            // are resolved from Umbraco at read time, never sent in.
+            "ResponsibilityController.PutResourceResponsibility",
+            "ResponsibilityController.PutServiceResponsibility",
             "ServicesController.CreateService",
             "ServicesController.UpdateService",
             "ServicesController.DeleteService",
@@ -844,6 +850,16 @@ public class SensitiveDataRedactionTests
             "ResourcesController.ListResourceTypes = read",
             "ResourcesController.ListResources = read",
             "ResourcesController.UpdateResource = write",
+
+            // Decision, resource-responsibility (roadmap 0.8.0). The reads return
+            // assignments by subject id — no free-text surface, no booking data at all.
+            // The writes replace an assignment set of (kind, Umbraco key) pairs; the
+            // party's name and address never cross this API inbound, and outbound only
+            // as Umbraco's current answer for a key.
+            "ResponsibilityController.GetResourceResponsibility = read",
+            "ResponsibilityController.GetServiceResponsibility = read",
+            "ResponsibilityController.PutResourceResponsibility = write",
+            "ResponsibilityController.PutServiceResponsibility = write",
             "ServicesController.CreateService = write",
             "ServicesController.DeleteService = write",
             "ServicesController.GetService = read",

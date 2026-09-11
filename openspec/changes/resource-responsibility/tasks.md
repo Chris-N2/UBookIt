@@ -54,14 +54,21 @@ double-quoted shell string.
 
 ## 3. Management API
 
-- [ ] 3.1 `ResponsibilityController` on the section-authorized base: GET by subject
+- [x] 3.1 `ResponsibilityController` on the section-authorized base: GET by subject
       (assignments annotated with display name, exists, user state), PUT wholesale replace
       (404 on missing subject; dangling party keys accepted). Models in
-      `Models/ResponsibilityModels.cs`.
-- [ ] 3.2 Endpoint tests: anonymous rejected (same terms as every other endpoint — reuse the
-      existing authorization test pattern), round-trip, dangling-marked GET, missing-subject
-      PUT, replace-not-merge.
-- [ ] 3.3 Regenerate the typed client (hey-api) and commit the generated files.
+      `Models/ResponsibilityModels.cs`. **Route shape diverged from design D5's
+      `/responsibility/{subjectType}/{id}`, deliberately**: nested
+      `resources/{id:guid}/responsibility` and `services/{id:guid}/responsibility` match the
+      API's existing route family and give the generated client per-subject method names;
+      semantics are unchanged. PUT responds with the same annotated read-back a GET returns,
+      so the editor holds exactly what a reload would show.
+- [x] 3.2 Endpoint tests: anonymous rejected (same terms as every other endpoint — the
+      structural base-controller assertion every management controller carries), round-trip,
+      dangling-marked GET, missing-subject PUT (both subjects), replace-not-merge,
+      unknown-kind 400. The sensitive-data action-classification gate fired and both PUTs
+      are recorded as writes in `KnownWrites` and the snapshot, with the decision stated.
+- [x] 3.3 Regenerate the typed client (hey-api) and commit the generated files.
 
 ## 4. Backoffice client
 
@@ -79,15 +86,19 @@ double-quoted shell string.
 
 ## 5. Docs
 
-- [ ] 5.1 `docs/notifications.md`: the two-tier model — flat list unchanged and still the
+- [x] 5.1 `docs/notifications.md`: the two-tier model — flat list unchanged and still the
       full opt-out for its tier, responsibility as the targeted tier, union, dedup, the state
       rule, and that group membership is read at send time (the Workflow-documented
       surprise, stated so it is read about rather than discovered).
-- [ ] 5.2 `docs/backoffice.md`: the assignment UI, and the not-permissions boundary stated
+- [x] 5.2 `docs/backoffice.md`: the assignment UI, and the not-permissions boundary stated
       once, plainly.
-- [ ] 5.3 Guard the not-permissions claim structurally where the docs state it
+- [x] 5.3 Guard the not-permissions claim structurally where the docs state it
       (`DocumentationAssert` on the document as normalised text, not raw substrings — a
-      wrapped sentence must not defeat it).
+      wrapped sentence must not defeat it). Doing so found `DocumentationAssert` narrower
+      than its own contract: it promised "quoted" and did not handle backticks, so a claim
+      about `InternalRecipients` failed against a document making it verbatim. The backtick
+      joined the decoration class and the trim set — stricter for DoesNotSay, and the full
+      suite stayed green.
 
 ## 6. Verification
 
