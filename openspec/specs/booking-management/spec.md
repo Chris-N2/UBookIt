@@ -14,14 +14,19 @@ what they can do to it: recording a booking on a customer's behalf is a differen
 thing from a visitor making one, and belongs here rather than alongside the placement
 pipeline.
 
-**What "management" means in v1 is narrower than the word suggests, and the boundary is
-deliberate.** Placement auto-confirms — `bookings` states that no v1 pathway produces
-`Requested` or `Declined` — so the honest verbs are *see*, *find a subject's bookings by their
-email address*, *cancel* and *erase a booker's contact details*. Approving, declining and
-amending a booking's time are each a change to the domain rather than a screen over an existing
-one. This capability is about those four verbs and the path each takes — the ports, the authorized endpoints over them, and the backoffice
+**What "management" means is narrower than the word suggests, and the boundary is
+deliberate.** The verbs are *see*, *find a subject's bookings by their email address*,
+*confirm* or *decline* a requested booking, *cancel* and *erase a booker's contact details*.
+Amending a booking's time is a change to the domain rather than a screen over an existing
+one, and is still not here. This capability is about those verbs and the path each takes — the ports, the authorized endpoints over them, and the backoffice
 views an operator works in — and the requirements below, not this paragraph, say what
 exists.
+
+*Confirm and decline joined the list with the `approval-decline` change, which made
+`Requested` reachable: placement under `AutoConfirm` off produces a booking that waits for an
+operator, and these are the two ways an operator resolves it. This paragraph previously said
+placement auto-confirms and that no pathway produces `Requested` or `Declined`; that was true
+until the setting existed, and remains the behaviour of an unconfigured site.*
 
 *Finding by address joined the list with the `find-by-booker` change, and is here rather than
 elsewhere for the reason erasure is: the endpoint an operator reaches it through is one of this

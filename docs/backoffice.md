@@ -285,8 +285,28 @@ short reference — `7QX4-M2NP` — which the person who booked was shown on the
 When somebody telephones, that is what they are holding, so it is what you match against. It is
 assigned when the booking is placed and never changes.
 
-From the Bookings view **you can see bookings and cancel them**. Those are the two things v1
-does: it does not approve, decline, amend or take a booking on someone's behalf.
+From the Bookings view **you can see bookings, cancel them, and — where a booking awaits
+approval — confirm or decline it**. It does not amend a booking's time or take a booking on
+someone's behalf.
+
+### Approving bookings
+
+By default nothing here needs approving: placement confirms on the spot. Set
+`UBookIt:AutoConfirm` to `false` and placement produces a **requested** booking instead —
+it holds its time exactly as a confirmed one does, so nobody can book over it while you
+decide, and the confirm and decline controls appear on its row. Confirm keeps the booking
+and its time; decline keeps the record but releases the time immediately, and there is no
+undo — a declined booking cannot be re-confirmed, so decline asks you first.
+
+**A requested booking waits for you, indefinitely.** Nothing expires it and nothing chases
+you: if it is never acted on it simply holds its slot until its time passes. The message to
+your `InternalRecipients` (if configured) flags a booking awaiting approval, and the status
+filter here finds them all — checking for pending requests is part of running a site with
+approval on.
+
+**Confirming or declining tells the person who booked only if booking emails are
+configured** — the same condition as cancelling, below. Declining someone who will not get
+an email means telling them is yours to do.
 
 **Cancelling tells nobody unless you have configured it to.** The time is released immediately
 and the booking keeps its record. Whether the person who booked hears about it depends on
@@ -299,8 +319,8 @@ but your own recipients are still told, because the booking is real and you are 
 it was cancelled.
 
 The view opens on the current week and you change the window with the two date controls.
-It shows the statuses that hold their time — confirmed and requested — so a **cancelled
-booking is one tick away rather than missing**.
+It shows the statuses that hold their time — confirmed and requested — so a **cancelled or
+declined booking is one tick away rather than missing**.
 
 Ticking statuses shows **only** those, rather than adding them to what is already listed:
 tick Cancelled on its own and you get the cancelled bookings, not the confirmed ones with
@@ -325,14 +345,11 @@ one a resource allows is the *booked directly* setting on the resource itself.
 
 - **It does not place bookings.** Recording a booking on someone's behalf — a phone
   booking — is not built. Bookings arrive through the front-end flow.
-- **It does not approve or decline.** Placement confirms immediately. The statuses for an
-  approval workflow exist in the data model so it can be added without a breaking change,
-  but no pathway produces them today.
 - **It does not amend a booking's time.** There is no reschedule; the shape of that
   operation is a cancellation and a new booking.
 - **It does not find a person across bookings.** Erasure works on one booking at a time; see
   above.
 
 These are stated because a management section invites the assumption that it manages
-everything. It configures what can be booked, reads what has been, calls one off, and erases a
-booker's details on request.
+everything. It configures what can be booked, reads what has been, decides a pending request,
+calls a booking off, and erases a booker's details on request.

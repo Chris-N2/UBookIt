@@ -47,12 +47,14 @@ public sealed record MultiClaimBookingRequest
     public required Booker Booker { get; init; }
 }
 
-/// <summary>Places and cancels bookings.</summary>
+/// <summary>Places, confirms, declines and cancels bookings.</summary>
 public interface IBookingService
 {
     /// <summary>
     /// Runs the placement validation pipeline (bookings spec order) and, when
-    /// valid, atomically places an auto-confirmed booking via the store.
+    /// valid, atomically places a booking via the store — <c>Confirmed</c> under
+    /// <see cref="SiteBookingSettings.AutoConfirm"/>, <c>Requested</c> when the
+    /// site requires approval.
     /// </summary>
     Task<DomainResult<Booking>> PlaceAsync(BookingRequest request, CancellationToken cancellationToken = default);
 
@@ -382,8 +384,7 @@ public sealed class BookingService(
         }
 
         // Rule 8: conflict — checked atomically by the store across every claimed
-        // resource (bookings spec, "Atomic placement contract"). v1 auto-confirms
-        // on placement.
+        // resource (bookings spec, "Atomic placement contract").
         //
         // The loop is for reference collisions and nothing else: a booking is immutable, so a
         // taken reference cannot be swapped in place — a new booking has to be built. Every

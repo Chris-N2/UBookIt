@@ -38,6 +38,8 @@ public class NotificationDocumentationTests
         var docs = Docs();
 
         Assert.Contains(nameof(BookingPlacedNotification), docs, StringComparison.Ordinal);
+        Assert.Contains(nameof(BookingConfirmedNotification), docs, StringComparison.Ordinal);
+        Assert.Contains(nameof(BookingDeclinedNotification), docs, StringComparison.Ordinal);
         Assert.Contains(nameof(BookingCancelledNotification), docs, StringComparison.Ordinal);
 
         // And the namespace, because a subscriber needs the using directive as much as the
@@ -195,5 +197,73 @@ public class NotificationDocumentationTests
 
         DocumentationAssert.Says(docs, "Cancelling tells nobody unless you have configured it to");
         Assert.Contains("notifications.md", docs, StringComparison.Ordinal);
+    }
+
+    // ---- approval-decline ----------------------------------------------------------------
+
+    [Fact]
+    public void The_approval_flow_is_documented_where_the_operator_reads()
+    {
+        var docs = RepoFiles.Read("docs/backoffice.md");
+
+        // The consequence of doing nothing, stated rather than implied: no expiry is a
+        // decision this change made, and an operator running approval needs to know the
+        // package will not chase them.
+        DocumentationAssert.Says(docs, "A requested booking waits for you, indefinitely");
+
+        // And the notification conditional for the two new verbs, on cancel's terms.
+        DocumentationAssert.Says(
+            docs,
+            "Confirming or declining tells the person who booked only if booking emails are configured");
+    }
+
+    [Fact]
+    public void The_notifications_documentation_states_the_approval_behaviour()
+    {
+        var docs = Docs();
+
+        DocumentationAssert.Says(docs, "AutoConfirm");
+        DocumentationAssert.Says(docs, "awaits approval");
+
+        // Confirm/decline are booker-only, and the docs must say so where the recipient list
+        // is configured — an internal recipient wondering why they heard nothing is the
+        // predictable reader.
+        DocumentationAssert.Says(docs, "Confirming or declining sends this list nothing");
+
+        // A booking placed under auto-confirm raises placement only — the double-message
+        // question every subscriber will ask.
+        DocumentationAssert.Says(
+            docs, "A booking placed under auto-confirm raises `BookingPlacedNotification` and nothing else");
+    }
+
+    /// <summary>
+    /// The claims this change falsified must not survive as claims. An over-claim survives by
+    /// ADDITION — only deleting the correction fails a positive assertion — so each needle
+    /// here is the false sentence itself, matched wrap-safely.
+    /// </summary>
+    /// <remarks>
+    /// The needles are chosen to miss the corrections: "tells nobody unless you have
+    /// configured it to" is the truthful conditional and must stay, so the needle for the
+    /// false form is the unconditional phrasing that nothing correct contains.
+    /// <c>docs/mvp.md</c> is swept too — its historical account was deliberately worded to
+    /// paraphrase rather than quote the retired sentence, precisely so this guard could
+    /// cover it without an exemption.
+    /// </remarks>
+    [Fact]
+    public void The_claims_this_change_falsified_are_not_made_anywhere_in_the_docs()
+    {
+        foreach (var doc in new[]
+        {
+            "docs/notifications.md", "docs/backoffice.md", "docs/mvp.md", "docs/booking-page.md",
+        })
+        {
+            var text = RepoFiles.Read(doc);
+
+            DocumentationAssert.DoesNotSay(text, "No v1 pathway produces those statuses");
+            DocumentationAssert.DoesNotSay(text, "no pathway produces them");
+            DocumentationAssert.DoesNotSay(text, "notifies nobody by itself");
+            DocumentationAssert.DoesNotSay(text, "does not tell the person who booked");
+            DocumentationAssert.DoesNotSay(text, "It does not approve or decline");
+        }
     }
 }

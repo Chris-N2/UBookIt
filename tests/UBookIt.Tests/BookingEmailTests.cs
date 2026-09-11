@@ -88,10 +88,11 @@ public class BookingEmailTests
     }
 
     /// <summary>
-    /// D7. Placement produces <c>Confirmed</c> today, so the other arms are unreachable — which is
-    /// exactly why they must exist. Approval is a named future feature, and a subject hard-coded to
-    /// "confirmed" would become false in a customer's inbox from a change that never touched the
-    /// composer.
+    /// D7. Written when placement could only produce <c>Confirmed</c>, so that the day approval
+    /// shipped could not turn a hard-coded subject false in a customer's inbox. That day was the
+    /// approval-decline change: every arm is now reachable — placement yields <c>Requested</c>
+    /// under <c>AutoConfirm</c> off, and decline produces <c>Declined</c> — and nothing here had
+    /// to move, which was the point.
     /// </summary>
     [Theory]
     [InlineData(BookingStatus.Confirmed, "Your booking is confirmed")]

@@ -1,7 +1,7 @@
 namespace UBookIt.Core.Bookings;
 
 /// <summary>
-/// Told when a booking has been placed or cancelled, so a host can react.
+/// Told when a booking has been placed, confirmed, declined or cancelled, so a host can react.
 /// </summary>
 /// <remarks>
 /// <para>

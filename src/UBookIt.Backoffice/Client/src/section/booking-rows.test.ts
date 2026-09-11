@@ -11,6 +11,7 @@ import {
   bookerWithheld,
   bookingReference,
   canCancel,
+  canConfirmOrDecline,
   currentWeek,
   formatInterval,
   listQuery,
@@ -255,23 +256,53 @@ describe("where paging lands when a page empties under the operator", () => {
   });
 });
 
-describe("what the cancel confirmation says", () => {
-  it("tells the operator that the person who booked will not be told", async () => {
-    // The sentence the whole notify half of this change exists to make true, said at the
-    // moment of deciding rather than in documentation nobody is reading just then. An
-    // operator who assumes uBookIt emails the customer finds out when somebody arrives for
-    // a booking that no longer exists.
-    //
-    // Pinned here because it is the one view scenario that needs no DOM — it is a string.
-    // The equivalent sentence in docs/backoffice.md is pinned on the .NET side; this is the
-    // one an operator actually reads, and it was the unpinned half.
+describe("what the cancel and decline confirmations say about notification", () => {
+  // These dialogs cannot see whether booking emails are configured, so the only honest
+  // sentence is the conditional — and it must be said in BOTH directions:
+  //
+  // The positive half pins the conditional. The absence half pins that the unconditional
+  // claim is gone: "uBookIt does not tell the person who booked" was true when the cancel
+  // dialog shipped and was falsified by booking-emails — on a site with SendBookerEmails
+  // on, cancelling from this screen sends the booker a notice. The docs were corrected at
+  // the time; this string was missed, and presence of the correction alone would not have
+  // caught its return — an over-claim survives by ADDITION. These are literal JS string
+  // values, so unlike documentation there is no line-wrapping for a re-added claim to
+  // hide behind; a plain substring check is wrap-safe here by construction.
+  it("cancel states the truthful conditional, not the falsified claim", async () => {
     const { default: terms } = await import("../localization/en-us.js");
     const bookings = (terms as Record<string, Record<string, string>>).ubookitBookings;
 
-    expect(bookings.confirmCancelContent).toContain("does not tell the person who booked");
+    expect(bookings.confirmCancelContent).toContain(
+      "only tells the person who booked if booking emails are configured",
+    );
+    expect(bookings.confirmCancelContent).not.toContain("does not tell");
 
-    // And that the consequence is named rather than left to be worked out.
+    // And the consequence is named rather than left to be worked out.
     expect(bookings.confirmCancelContent).toContain("contact them");
+  });
+
+  it("decline states the same conditional on the same terms", async () => {
+    const { default: terms } = await import("../localization/en-us.js");
+    const bookings = (terms as Record<string, Record<string, string>>).ubookitBookings;
+
+    expect(bookings.confirmDeclineContent).toContain(
+      "only tells the person who booked if booking emails are configured",
+    );
+    expect(bookings.confirmDeclineContent).not.toContain("does not tell");
+    expect(bookings.confirmDeclineContent).toContain("contact them");
+  });
+
+  it("no string in the bookings section asserts the falsified claim", async () => {
+    // The class, not the sample: the two dialogs are where the claim lived and would
+    // live, but a new string making the same false assertion anywhere in this section
+    // is the same defect. Swept rather than enumerated.
+    const { default: terms } = await import("../localization/en-us.js");
+    const bookings = (terms as Record<string, Record<string, string>>).ubookitBookings;
+
+    for (const [key, value] of Object.entries(bookings)) {
+      expect(`${key}: ${value}`).not.toContain("does not tell");
+      expect(`${key}: ${value}`).not.toContain("tells nobody");
+    }
   });
 
   it("has a string for every key the cancel flow can emit", async () => {
@@ -292,6 +323,43 @@ describe("what the cancel confirmation says", () => {
       expect(typeof bookings[key]).toBe("string");
       expect(bookings[key].length).toBeGreaterThan(0);
     }
+  });
+
+  it("has a string for every key the confirm and decline flows can emit", async () => {
+    const { default: terms } = await import("../localization/en-us.js");
+    const bookings = (terms as Record<string, Record<string, string>>).ubookitBookings;
+
+    for (const key of [
+      "confirm",
+      "decline",
+      "confirmDeclineHeadline",
+      "confirmDeclineContent",
+      "confirmDecline",
+      "declineConfirmFailed",
+      "confirmBookingFailed",
+      "declineBookingFailed",
+    ]) {
+      expect(typeof bookings[key]).toBe("string");
+      expect(bookings[key].length).toBeGreaterThan(0);
+    }
+  });
+});
+
+describe("which bookings offer confirm and decline", () => {
+  it("offers them only for a requested booking", () => {
+    // The one status the domain permits either transition from. Everything else would
+    // be an always-refused control — the kind that teaches an operator to ignore
+    // failures.
+    expect(canConfirmOrDecline("Requested")).toBe(true);
+    expect(canConfirmOrDecline("Confirmed")).toBe(false);
+    expect(canConfirmOrDecline("Cancelled")).toBe(false);
+    expect(canConfirmOrDecline("Declined")).toBe(false);
+  });
+
+  it("treats anything unrecognised as not offering them", () => {
+    expect(canConfirmOrDecline("Rescheduled")).toBe(false);
+    expect(canConfirmOrDecline("")).toBe(false);
+    expect(canConfirmOrDecline("requested")).toBe(false);
   });
 });
 

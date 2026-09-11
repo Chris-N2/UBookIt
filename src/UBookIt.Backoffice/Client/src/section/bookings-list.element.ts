@@ -9,6 +9,7 @@ import {
   bookerNote,
   bookingReference,
   canCancel,
+  canConfirmOrDecline,
   currentWeek,
   formatInterval,
   listQuery,
@@ -38,11 +39,12 @@ const STATUSES = ["Requested", "Confirmed", "Cancelled", "Declined"] as const;
  * Collection view over the bookings endpoint: a window, a status filter, a
  * semantic table, prev/next paging, and cancellation.
  *
- * Cancelling is the second and last of v1's management verbs, and it is a row
- * action rather than a workspace — there is still nothing to open a booking
- * into, because the list already shows everything the read port carries.
- * Approving, declining and amending are each domain changes and none of them is
- * here.
+ * Every management verb is a row action rather than a workspace — there is
+ * still nothing to open a booking into, because the list already shows
+ * everything the read port carries. Cancel works on anything still holding its
+ * time; confirm and decline appear only on a Requested row, which exists only
+ * on a site that has turned AutoConfirm off. Amending a booking's time remains
+ * not a thing — its shape is a cancellation and a new booking.
  */
 @customElement("ubookit-bookings-list")
 export class UBookItBookingsListElement extends UmbLitElement {
@@ -440,6 +442,20 @@ export class UBookItBookingsListElement extends UmbLitElement {
             refused teaches an operator to ignore failures — and the endpoint refuses
             independently anyway, so this is a convenience rather than the rule.
           -->
+          ${canConfirmOrDecline(booking.status)
+            ? html`<uui-button
+                  look="primary"
+                  color="positive"
+                  label="${this.#term("confirm")} ${bookingReference(booking)}"
+                  @click=${() => this.#confirm(booking)}
+                ></uui-button>
+                <uui-button
+                  look="secondary"
+                  color="danger"
+                  label="${this.#term("decline")} ${bookingReference(booking)}"
+                  @click=${() => this.#decline(booking)}
+                ></uui-button>`
+            : nothing}
           ${canCancel(booking.status)
             ? html`<uui-button
                 look="secondary"
@@ -479,36 +495,90 @@ export class UBookItBookingsListElement extends UmbLitElement {
       return;
     }
 
-    try {
-      const { error } = await UBookItBackofficeService.cancelBooking({
-        path: { id: booking.bookingId },
-      });
+    await this.#applyRowAction(
+      () => UBookItBackofficeService.cancelBooking({ path: { id: booking.bookingId } }),
+      "cancelFailed",
+    );
+  }
 
-      if (error) {
-        // Shown rather than swallowed. The domain refuses a booking somebody else
-        // already cancelled, and an operator whose row simply stopped offering the
-        // button would have no idea why.
-        this._error = toApiErrors(error, this.#term("cancelFailed"))
-          .map((failure) => failure.message)
-          .filter(Boolean)
-          .join(" ") || this.#term("cancelFailed");
-        return;
-      }
-    } catch (thrown) {
-      this._error = toApiErrors(thrown, this.#term("cancelFailed"))
-        .map((failure) => failure.message)
-        .filter(Boolean)
-        .join(" ") || this.#term("cancelFailed");
+  /**
+   * Confirmation of a booking has NO dialog, deliberately: it is the expected
+   * disposition of a request, and a confirmed booking can still be cancelled —
+   * unlike decline and cancel, which are terminal or outward-facing and get one.
+   */
+  async #confirm(booking: BookingModel) {
+    await this.#applyRowAction(
+      () => UBookItBackofficeService.confirmBooking({ path: { id: booking.bookingId } }),
+      "confirmBookingFailed",
+    );
+  }
+
+  async #decline(booking: BookingModel) {
+    const outcome = await confirmDestructive(this, {
+      headline: this.#term("confirmDeclineHeadline"),
+      // By reference, for every operator, on the cancel dialog's reasoning.
+      content: this.localize.term(
+        "ubookitBookings_confirmDeclineContent",
+        bookingReference(booking),
+      ),
+      confirmLabel: this.#term("confirmDecline"),
+    });
+
+    // Three outcomes, not two — a confirmation that failed to appear is not the
+    // operator declining the dialog. Same rule as cancel's.
+    if (outcome === "failed") {
+      this._error = this.#term("declineConfirmFailed");
       return;
     }
 
-    // Reload rather than patch the row in place. Cancelling changes what the query
-    // matches — the default filter excludes cancelled bookings, so the row usually
-    // leaves the view entirely — and the total changes with it. Editing the row
-    // would show a booking the current filter no longer selects.
+    if (outcome === "cancelled") {
+      return;
+    }
+
+    await this.#applyRowAction(
+      () => UBookItBackofficeService.declineBooking({ path: { id: booking.bookingId } }),
+      "declineBookingFailed",
+    );
+  }
+
+  /**
+   * Sends one row-changing request and settles the view afterwards — shared by
+   * cancel, confirm and decline, because every one of them changes what the
+   * current query matches and all three must fail loudly and land the operator
+   * somewhere deliberate.
+   */
+  async #applyRowAction(
+    send: () => Promise<{ error?: unknown }>,
+    failedTerm: string,
+  ) {
+    try {
+      const { error } = await send();
+
+      if (error) {
+        // Shown rather than swallowed. The domain refuses a booking somebody else
+        // already dealt with, and an operator whose row simply stopped offering the
+        // button would have no idea why.
+        this._error = toApiErrors(error, this.#term(failedTerm))
+          .map((failure) => failure.message)
+          .filter(Boolean)
+          .join(" ") || this.#term(failedTerm);
+        return;
+      }
+    } catch (thrown) {
+      this._error = toApiErrors(thrown, this.#term(failedTerm))
+        .map((failure) => failure.message)
+        .filter(Boolean)
+        .join(" ") || this.#term(failedTerm);
+      return;
+    }
+
+    // Reload rather than patch the row in place. The action changes what the query
+    // matches — the default filter excludes cancelled and declined bookings, and a
+    // confirmed one leaves a Requested-only filter — and the total changes with it.
+    // Editing the row would show a booking the current filter no longer selects.
     await this.#load();
 
-    // Cancelling the last row on a page leaves `skip` past the end: the table renders
+    // Removing the last row on a page leaves `skip` past the end: the table renders
     // empty with "showing 21–20 of 20", and the empty message is suppressed because the
     // total is not zero. Step back a page and ask again — once, since the retry only
     // happens when the page came back empty.
@@ -519,9 +589,9 @@ export class UBookItBookingsListElement extends UmbLitElement {
       await this.#load();
     }
 
-    // And put focus somewhere, because the button that had it has just been removed
+    // And put focus somewhere, because the button that had it may have been removed
     // from the DOM along with its row. Left alone, focus falls to <body> and a keyboard
-    // operator cancelling several bookings restarts their traversal every time.
+    // operator working through several bookings restarts their traversal every time.
     //
     // The heading, rather than another row: which row is "next" depends on a filter that
     // just changed under them, and guessing wrong moves them somewhere they did not ask

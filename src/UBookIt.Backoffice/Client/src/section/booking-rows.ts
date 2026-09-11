@@ -203,6 +203,22 @@ export function canCancel(status: string): boolean {
 }
 
 /**
+ * Whether the view offers to confirm or decline this booking.
+ *
+ * Only a `Requested` booking awaits a decision — the status machine permits both
+ * transitions from nothing else, so on any other row the controls would be the
+ * always-refused kind that teaches an operator to ignore failures.
+ *
+ * The same caveat as {@link canCancel}, verbatim: **this is a convenience, not the
+ * rule.** The endpoints refuse an invalid transition independently, so a stale list
+ * cannot talk the domain into one, and if this function and the domain ever disagree
+ * the domain wins and the operator is told.
+ */
+export function canConfirmOrDecline(status: string): boolean {
+  return status === "Requested";
+}
+
+/**
  * Where paging should be after a query changes.
  *
  * Always the first page when the *query* changed — a page number counts into

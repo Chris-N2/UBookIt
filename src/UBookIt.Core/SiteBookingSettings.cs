@@ -87,8 +87,8 @@ public sealed record SiteBookingSettings
     public bool AutoConfirm { get; init; } = true;
 
     /// <summary>
-    /// What the package sends when a booking is placed or cancelled. Nothing, unless the site
-    /// has said otherwise.
+    /// What the package sends when a booking is placed, confirmed, declined or cancelled.
+    /// Nothing, unless the site has said otherwise.
     /// </summary>
     /// <remarks>
     /// Defaulted to an instance rather than left nullable: "no notifications configured" and

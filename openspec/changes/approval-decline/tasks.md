@@ -1,5 +1,38 @@
 # approval-decline — tasks
 
+## 0. Modified requirements — the wholesale-replacement diff
+
+Every `## MODIFIED Requirements` entry replaces its requirement wholesale, so each one below
+was diffed guarantee-by-guarantee before the delta was written (CLAUDE.md, "Rewriting a
+requirement destroys guarantees silently"). Named here so each replacement is a decision with
+an owner:
+
+- [x] 0.1 `bookings` / "Booking status machine" — the "no v1 pathway" sentence is
+      deliberately dropped (that is the change); every transition, code and scenario carried
+      forward, with new scenarios for the routes in.
+- [x] 0.2 `bookings` / "Placement validation pipeline" — carried verbatim except one
+      scenario's THEN, which asserted a `Confirmed` result and now defers to the status
+      machine's derivation.
+- [x] 0.3 `bookings` / "Availability and placement service ports" — carried verbatim
+      including all three BREAKING blocks and widening notes; the service enumeration gains
+      confirm/decline with a fourth widening note.
+- [x] 0.4 `bookings` / "Placement and cancellation are observable" — renamed via the RENAMED
+      entry to "Placement and status changes are observable" (kept on one line here: the
+      guard that forces this list matches the name as a substring, and a wrapped name is the
+      exact defeat the booking-emails rounds proved); every guarantee carried forward and
+      extended to the two new reports; the observer-port widening called out as BREAKING
+      with no default implementations.
+- [x] 0.5 `booking-emails` / "The package sends nothing until a site asks it to" — carried
+      verbatim; one scenario's WHEN widens "placed or cancelled" to all four events.
+- [x] 0.6 `booking-management` / "The bookings view can cancel a booking" — carried verbatim
+      except the notification sentence, corrected from the falsified unconditional to the
+      truthful conditional (the correction rider).
+- [x] 0.7 `persistence` / "Package composition registers persistence and Core services" —
+      carried verbatim; gains the `AutoConfirm` resolution rule and its three scenarios.
+- [x] 0.8 `delivery-api` / "Booking placement" and "Service booking placement" — carried
+      verbatim; each gains the status-values contract statement and a pending-placement
+      scenario, and the success scenarios name the setting they assume.
+
 ## 1. Core: the setting and the placement branch
 
 - [x] 1.1 Add `AutoConfirm` (bool, init, default `true`) to `SiteBookingSettings` with XML docs
@@ -75,17 +108,17 @@
 
 ## 6. Backoffice client
 
-- [ ] 6.1 Regenerate the API client; add Confirm/Decline row actions offered **only** for
+- [x] 6.1 Regenerate the API client; add Confirm/Decline row actions offered **only** for
       `Requested` rows; decline behind the accessible in-page modal, confirm without one;
       refused transitions surfaced, not swallowed; list refreshes in place; last-row paging
       step-back and deliberate focus placement reuse the cancel behaviour where a row leaves
       the current filter.
-- [ ] 6.2 Localization: new entries following the existing commented style. The decline modal
+- [x] 6.2 Localization: new entries following the existing commented style. The decline modal
       states the truthful notification conditional.
-- [ ] 6.3 **Correction rider:** reword `confirmCancelContent` to the truthful conditional (the
+- [x] 6.3 **Correction rider:** reword `confirmCancelContent` to the truthful conditional (the
       package writes to the booker only where booking emails are configured) and update its
       explanatory comment — the current sentence is false on email-configured sites.
-- [ ] 6.4 Client tests: controls offered/withheld by status; modal dismiss issues no request;
+- [x] 6.4 Client tests: controls offered/withheld by status; modal dismiss issues no request;
       the corrected cancel wording and the decline wording each guarded by a wrap-safe
       absence check on the falsified claim ("does not tell" asserted unconditionally), not
       only a presence check on the correction — presence does not assert absence.
@@ -104,21 +137,21 @@
 
 ## 8. Documentation sweep — enumerate the class, not the sample
 
-- [ ] 8.1 `docs/notifications.md`: grep for every sentence the change falsifies before editing —
+- [x] 8.1 `docs/notifications.md`: grep for every sentence the change falsifies before editing —
       known members of the class: "No v1 pathway produces those statuses", the two-row
       notification table, "Approving or declining a booking" under *What does not raise a
       notification*, and any "placed or cancelled" enumeration that is now four events. Then
       grep the whole of `docs/` and all XML doc comments for `Requested`, `Declined`,
       `auto-confirm`, "placed or cancelled", "does not tell", "notifies nobody" and fix every
       hit or record why it stands.
-- [ ] 8.2 `docs/notifications.md` + `docs/backoffice.md`: document `AutoConfirm` (key, default,
+- [x] 8.2 `docs/notifications.md` + `docs/backoffice.md`: document `AutoConfirm` (key, default,
       fallback direction, malformed-value error log), the approval flow, that a pending
       booking holds its slot and is the operator's responsibility (no expiry), and the two
       new notifications with their audiences.
-- [ ] 8.3 Update `BookingNotifications.cs` / `BookingCancelledNotification` remarks if any now
+- [x] 8.3 Update `BookingNotifications.cs` / `BookingCancelledNotification` remarks if any now
       over- or under-claim (the "permits cancellation only from Requested or Confirmed"
       sentence stays true — verify rather than assume).
-- [ ] 8.4 Documentation guards: extend the existing `DocumentationAssert`-based tests — absence
+- [x] 8.4 Documentation guards: extend the existing `DocumentationAssert`-based tests — absence
       checks with `DoesNotSay` (never raw `DoesNotContain`) for the falsified claims; one
       assertion per guard, mutation-checked one at a time.
 

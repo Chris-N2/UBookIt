@@ -134,7 +134,7 @@ public sealed class UmbracoBookingObserver(
 
     /// <remarks>
     /// The caller's <c>CancellationToken</c> is deliberately not forwarded. It belongs to the
-    /// request that placed or cancelled the booking, and that work is already committed — a
+    /// request that placed the booking or changed its status, and that work is already committed — a
     /// visitor closing their browser must not stop a site being told what happened.
     /// </remarks>
     private async Task PublishAsync(INotification notification, Booking booking, string what)

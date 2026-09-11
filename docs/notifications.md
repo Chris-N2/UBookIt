@@ -1,7 +1,7 @@
 # Reacting to bookings
 
-uBookIt raises an Umbraco notification when a booking is placed and when one is cancelled, so
-your site can do whatever it needs to.
+uBookIt raises an Umbraco notification when a booking is placed, when a requested booking is
+confirmed or declined, and when one is cancelled, so your site can do whatever it needs to.
 
 ## What uBookIt sends, and what it does not
 
@@ -29,8 +29,8 @@ Sending needs both: a uBookIt setting *and* a working mail configuration.
 
 | Setting | What it does |
 |---|---|
-| `SendBookerEmails` | Sends the person who booked a plain-text confirmation when their booking is placed, and a notice when it is cancelled. Off unless set to `true`. |
-| `InternalRecipients` | Sends your own people a message when a booking is placed or cancelled. **The list being non-empty is the switch** — there is no separate on/off. |
+| `SendBookerEmails` | Sends the person who booked a plain-text message when their booking is placed, when a requested booking is confirmed or declined, and when one is cancelled. What the placement message says follows the booking's state: confirmed under auto-confirm, received-and-awaiting-confirmation when the site requires approval (see below). Off unless set to `true`. |
+| `InternalRecipients` | Sends your own people a message when a booking is placed or cancelled. **The list being non-empty is the switch** — there is no separate on/off. Confirming or declining sends this list nothing — you, or a colleague, just did it from the bookings screen, which is where its state lives. |
 
 The two are independent: you can be told about bookings without anything being sent to your
 customers, and the other way round. Both also require Umbraco to be able to send mail — an SMTP
@@ -54,6 +54,28 @@ applies rather than carrying the details past it.
 A booking whose booker has been erased (see [the backoffice guide](backoffice.md)) has no address, so nothing is
 sent to them. Your own recipients are still told.
 
+### When bookings need approval
+
+By default every placement is confirmed on the spot. Setting `UBookIt:AutoConfirm` to `false`
+makes placement produce a **requested** booking instead, which an operator confirms or
+declines from the bookings screen — see [the backoffice guide](backoffice.md#approving-bookings).
+The messages follow the booking rather than the setting:
+
+- The booker's placement message says the booking has been **received and is not confirmed
+  yet**, and that they will hear again when the site decides. The confirmation and decline
+  messages are what keep that promise — they go through the same switches above, so a site
+  that sends the first will send the second.
+- The message to `InternalRecipients` says the booking **awaits approval**, alongside the
+  backoffice link it already carries. Confirming or declining sends this list nothing — you
+  just did it, from the screen where its state lives.
+
+`AutoConfirm` reads as **on** when it is absent, and as on — with an error in the log naming
+the setting — when a value was written that cannot be read as a boolean. The fallback
+direction is deliberate: a site accidentally auto-confirming sends confirmations it can see
+and correct, while a site accidentally requiring approval parks customers' bookings in a state
+nobody is watching for. If you meant to require approval, the value must be a readable
+`false`.
+
 ### Replacing what uBookIt sends
 
 uBookIt sends through Umbraco's own `IEmailSender` with notifications enabled, so you can
@@ -74,16 +96,24 @@ customer will turn up.
 | Notification | Raised when | Carries |
 |---|---|---|
 | `BookingPlacedNotification` | A booking has been placed and stored | `Booking` — the booking as stored |
+| `BookingConfirmedNotification` | A requested booking has been confirmed and the change stored | `Booking` — the booking, now confirmed |
+| `BookingDeclinedNotification` | A requested booking has been declined and the change stored | `Booking` — the booking, now declined |
 | `BookingCancelledNotification` | A booking has been cancelled and the change stored | `Booking` — the booking, now cancelled |
 
-Both live in `UBookIt.Persistence.Notifications`.
+All four live in `UBookIt.Persistence.Notifications`.
 
 Each is raised **after** the change is committed and **only** when it succeeded. A failed
-placement raises nothing, and so does an attempt to cancel a booking that is already
-cancelled — so being told at all means it happened.
+placement raises nothing, and so does an attempt at a transition the booking's status does not
+permit — so being told at all means it happened.
 
-`BookingCancelledNotification` needs no before-and-after: a booking can only be cancelled from
-`Requested` or `Confirmed`, so receiving one means the booking has just become cancelled.
+None of the status-change notifications needs a before-and-after: cancellation succeeds only
+from `Requested` or `Confirmed`, and confirmation and decline only from `Requested`, so
+receiving one means the booking has just become what its status says.
+
+**A booking placed under auto-confirm raises `BookingPlacedNotification` and nothing else.**
+Auto-confirmation is not an event; it is what placement produced, and the placed notification's
+booking already says so. `BookingConfirmedNotification` is only ever an operator confirming a
+requested booking.
 
 ### What a booking carries
 
@@ -191,7 +221,6 @@ person who performed it — never the address that was erased.
 ## What does not raise a notification
 
 - Editing resources or services. They are configuration, not events.
-- Approving or declining a booking. No v1 pathway produces those statuses.
 - Amending a booking's time. There is no such operation; the shape of it is a cancellation
   and a new booking.
 - **Erasing a booker's details.** It changes a booking and raises nothing — which matters most

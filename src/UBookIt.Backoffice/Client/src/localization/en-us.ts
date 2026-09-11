@@ -390,17 +390,23 @@ export default {
     // two bookings may share a booker's name, and it is what the customer on the
     // telephone is reading out.
     //
-    // It also says the package tells nobody. That sentence is the whole reason
-    // the notification hook shipped in the same change: an operator who assumes
-    // uBookIt emails the customer will not discover otherwise until somebody
-    // arrives for a booking that no longer exists. It belongs at the moment of
-    // deciding, not in documentation nobody is reading just then.
+    // It also states what the package sends, AS A CONDITIONAL. It said flatly that
+    // uBookIt tells nobody, and that sentence was true when it was written and
+    // falsified by the booking-emails change: on a site with SendBookerEmails on,
+    // cancelling from this screen sends the booker a cancellation notice. The docs
+    // were corrected at the time; this dialog was missed — found and fixed by the
+    // approval-decline change, which adds sibling dialogs to this screen and would
+    // otherwise have shipped a truthful one beside a false one. The conditional is
+    // statically true in both configurations, which matters because this string
+    // cannot see the configuration. It belongs at the moment of deciding, not in
+    // documentation nobody is reading just then.
     actions: "Actions",
     cancel: "Cancel booking",
     confirmCancelHeadline: "Cancel booking",
     confirmCancelContent:
-      "Cancel booking %0%? The time is released immediately. uBookIt does not tell "
-      + "the person who booked — if they should know, you will need to contact them.",
+      "Cancel booking %0%? The time is released immediately. uBookIt only tells the "
+      + "person who booked if booking emails are configured — otherwise, if they "
+      + "should know, you will need to contact them.",
     // NOT "Cancel booking". The modal's own dismiss button says "Cancel", so a confirm
     // button reading "Cancel booking" puts the same word on both — one meaning "do the
     // irreversible thing" and one meaning "back out" — in a dialog whose whole purpose is
@@ -409,5 +415,27 @@ export default {
     confirmCancel: "Yes, cancel it",
     confirmFailed: "The confirmation could not be shown, so nothing was cancelled.",
     cancelFailed: "The booking could not be cancelled.",
+
+    // ------------------------------------------------------- confirm / decline
+    //
+    // Offered only for Requested bookings — the two verbs that resolve a booking
+    // placed while AutoConfirm is off. Confirm has no dialog: it is the expected
+    // disposition of a request, and a confirmed booking can still be cancelled.
+    // Decline gets one on cancel's terms — terminal for the booking and
+    // outward-facing for the customer — and its content carries the same truthful
+    // notification conditional as cancel's, for the same reason: the string cannot
+    // see whether booking emails are configured, so it says the thing that is true
+    // either way.
+    confirm: "Confirm booking",
+    decline: "Decline booking",
+    confirmDeclineHeadline: "Decline booking",
+    confirmDeclineContent:
+      "Decline booking %0%? The time is released immediately. uBookIt only tells the "
+      + "person who booked if booking emails are configured — otherwise, if they "
+      + "should know, you will need to contact them.",
+    confirmDecline: "Yes, decline it",
+    declineConfirmFailed: "The confirmation could not be shown, so nothing was declined.",
+    confirmBookingFailed: "The booking could not be confirmed.",
+    declineBookingFailed: "The booking could not be declined.",
   },
 };

@@ -1,7 +1,8 @@
 namespace UBookIt.Core;
 
 /// <summary>
-/// What, if anything, the package sends when a booking is placed or cancelled.
+/// What, if anything, the package sends when a booking is placed, confirmed, declined or
+/// cancelled.
 /// </summary>
 /// <remarks>
 /// <para>
@@ -26,7 +27,8 @@ namespace UBookIt.Core;
 public sealed record BookingNotificationSettings
 {
     /// <summary>
-    /// Whether the person who booked is sent a message when their booking is placed or cancelled.
+    /// Whether the person who booked is sent a message when their booking is placed, when a
+    /// requested booking is confirmed or declined, and when one is cancelled.
     /// </summary>
     /// <remarks>
     /// <b>This is the setting the booking form's privacy notice is written against</b>, together
