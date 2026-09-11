@@ -193,3 +193,17 @@ cancel both get an email, and decline is the third thing a customer needs tellin
    `ref/` before committing 0.10.0 to a release. If the backoffice cannot express granularity
    within a section without fighting it, say so and defer — it is additive, so it is allowed
    after 17.0.0.
+
+   **There is a fallback, so the spike cannot return "impossible" — only "which shape".**
+   (Chris, 2026-09-11.) If granularity *within* a section proves impractical, split the section:
+   a separate **uBookIt Admin** section with its own dashboard, carrying configuration of
+   resources and services, while the existing section keeps day-to-day booking management. The
+   grant we already have — section access governing both the menu and the management API — then
+   does the work unchanged, at the granularity Umbraco actually supports rather than the one we
+   wanted. **Umbraco Workflow used exactly this model in v13**, including an option to inherit
+   Umbraco user groups, which we probably do not need. Not verified against v17; check when the
+   spike runs.
+
+   This reframes the spike from *feasibility* to *choice of mechanism*, and it means the admin-only
+   settings screen riding with 0.10.0 has a home either way — which matters, because the
+   editor-facing email work deferred past 17.0.0 depends on that screen.
