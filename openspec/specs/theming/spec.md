@@ -6,13 +6,16 @@ What a uBookIt **theme** is, how one is registered so that it actually wins, wha
 complete theme supplies, what happens when one is incomplete, and which of the package's
 guarantees survive a theme and which pass to its author.
 
-A theme is the third and last tier of customisation, and the tiers do not overlap: a
-different page *around* the flow is the site's own template; *making it look like the
-site* is the stylesheet and its tokens; *different controls entirely* is a theme. A theme
-is an ordinary Razor class library whose views are precompiled into its own assembly, so
-it is versionable, testable and distributable like any other package — and it is the seam
-an alternative front end such as a DevExpress-based UI plugs into, which is the reason the
-front-end contract exists at all.
+A theme is the third and last tier of customisation **of the booking flow's rendering**,
+and the tiers do not overlap: a different page *around* the flow is the site's own
+template; *making it look like the site* is the stylesheet and its tokens; *different
+controls entirely* is a theme. The qualification is load-bearing: a site can also supply
+the content of the messages the package emails, and that is a different medium with its
+own renderer rather than a fourth tier of this one — see the `email-templates`
+capability. A theme is an ordinary Razor class library whose views are precompiled into
+its own assembly, so it is versionable, testable and distributable like any other
+package — and it is the seam an alternative front end such as a DevExpress-based UI plugs
+into, which is the reason the front-end contract exists at all.
 
 **The claims in this capability are about resolution, reporting and ownership — never
 about a theme's own markup.** The package renders no theme, tests no theme, and makes no

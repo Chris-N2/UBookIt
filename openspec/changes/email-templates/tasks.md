@@ -128,15 +128,47 @@ assembly compiles.)*
 
 ## 7. Sync obligations recorded now (executed at sync)
 
-- [ ] 7.1 Outward sibling-spec grep over capabilities this change does not touch. Needles:
+- [x] 7.1 Outward sibling-spec grep over capabilities this change does not touch. Needles:
       "the package composes", "what the message says", "plain text", "derived from that state",
       "no booker name". Known candidates to open: `booker-erasure`, `sensitive-data`,
       `privacy-notice` (it describes what a booker is told and was the CRITICAL last change),
       `theming` (states what a theme covers — must not read as covering email),
       `default-frontend`.
-- [ ] 7.2 Purpose prose check on `booking-emails` — its Purpose says "what that message carries,
+- [x] 7.2 Purpose prose check on `booking-emails` — its Purpose says "what that message carries,
       and — more of the point — what it must never carry or promise", which must still be true
       once content can come from a site.
+
+## 7a. What the sync-time greps actually found (executed at sync, 2026-09-11)
+
+- [x] 7a.1 **7.1 outward grep — three hits outside the touched capabilities, two benign.**
+      `booker-erasure` "A hand-off carries no more than its purpose requires" survives and is
+      strengthened: it requires that no message to any *other* recipient carries contact
+      details, which is exactly what the two-model split makes structural. `booking-retention`
+      and `sensitive-data` matched on "no booker name" but are about the sweep report and an
+      API response, neither of which this change touches. `privacy-notice` survives because
+      every sentence it owns is about *whether* a message is sent, and this change enumerates
+      that as not narrowing.
+- [x] 7a.2 **`theming` Purpose falsified, and fixed.** It called a theme "the third and last
+      tier of customisation" — unqualified. Supplying email content is a fourth thing a site
+      can customise, so "last" had quietly become wrong. Qualified to "of the booking flow's
+      rendering", with the reason stated inline rather than left as a bare word, and a pointer
+      to `email-templates`. Its completeness requirement needed nothing: it already scopes
+      itself to "the views of both public view components", so email views cannot be read into
+      it.
+- [x] 7a.3 **7.2 `booking-emails` Purpose over-claimed, and fixed.** "what that message
+      carries" is now true only of the messages the package composes. Added a paragraph
+      splitting the sentence: the *carries* half narrows to composed messages, while the
+      *never carry* half and the whether/to-whom of sending do not narrow at all. This is the
+      same asymmetry the requirements state; the Purpose had summarised only the pre-change
+      version of it.
+- [x] 7a.4 One factual error corrected in the new capability’s Purpose before commit: it
+      said messages "are already sent from unattended work". They are not — design §6 records
+      that no such sender exists yet and the no-request requirement is anticipatory. Reworded
+      so the Purpose does not assert a sender the package does not have.
+- [x] 7a.5 **Both 7.1 and 7.2 were ticked before they were run**, and this section exists
+      because of it. The same fault QA caught at round 2 of this change (four tasks ticked
+      undone) recurred at the last step, on the two tasks whose whole purpose was to be
+      executed later. Ticking is not evidence; this is.
 
 ## 8. Verification
 
