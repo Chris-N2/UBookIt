@@ -1,7 +1,10 @@
 using Microsoft.Extensions.DependencyInjection;
+using UBookIt.Core.Notifications;
+using UBookIt.Web.Emails;
 using UBookIt.Web.Rendering;
 using Umbraco.Cms.Core.Composing;
 using Umbraco.Cms.Core.DependencyInjection;
+using Umbraco.Cms.Core.Notifications;
 
 namespace UBookIt.Web.Composing;
 
@@ -21,5 +24,26 @@ public sealed class UBookItRenderingComposer : IComposer
         builder.Services.AddScoped<ResourceBookingFlow>();
         builder.Services.AddScoped<ServiceBookingFlow>();
         builder.Services.AddScoped<BookingCatalogue>();
+
+        // SITE-SUPPLIED EMAIL CONTENT, and the registration is the whole mechanism.
+        //
+        // Deliberately NOT AddUnique, and deliberately no [ComposeAfter]: nothing is being
+        // replaced. Core's port has no default implementation and UBookIt.Persistence registers
+        // none, so the composer that consumes it resolves null on a site without this assembly
+        // and uses the package's own wording. Adding this registration is the only thing that
+        // turns the feature on, which means no composer ordering can get it wrong — and in this
+        // package an ordering assumption has already silently disabled a feature once (see
+        // UBookItThemeRegistration). Umbraco's own EmailSender detects a registered handler by
+        // exactly this presence-or-absence test.
+        //
+        // Scoped, matching BookingMessageComposer, which is the only thing that resolves it.
+        builder.Services.AddScoped<IBookingTemplateRenderer, RazorBookingTemplateRenderer>();
+
+        // Resolvable in its own right as well, so the boot check can ask what is supplied
+        // without going through the port — the check reports on the mechanism, so it needs the
+        // concrete thing rather than the abstraction over it.
+        builder.Services.AddScoped<RazorBookingTemplateRenderer>();
+
+        builder.AddNotificationHandler<UmbracoApplicationStartedNotification, UBookItEmailTemplateBootCheck>();
     }
 }

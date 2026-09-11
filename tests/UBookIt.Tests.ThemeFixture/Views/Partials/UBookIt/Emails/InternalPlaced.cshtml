@@ -1,0 +1,8 @@
+@inherits UBookIt.Web.Emails.UBookItEmailPage<UBookIt.Core.Notifications.InternalMessageModel>
+@* Loops the resources — the thing a joined string could not do, and the reason
+   content is Razor rather than numbered placeholders. *@
+Booking @Model.Reference@(Model.AwaitsApproval ? " (awaiting approval)" : string.Empty)
+@foreach (var name in Model.ResourceNames)
+{
+    @:- @name
+}

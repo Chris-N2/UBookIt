@@ -61,25 +61,37 @@ requirement destroys guarantees silently").
 
 ## 3. Web: the renderer, the base page, the registration
 
-- [ ] 3.1 `UBookItEmailPage<TModel> : RazorPage<TModel>` with typed `Subject` and `IsHtml` backed
+- [x] 3.1 `UBookItEmailPage<TModel> : RazorPage<TModel>` with typed `Subject` and `IsHtml` backed
       by `ViewData`. **`RazorPage<T>`, not `UmbracoViewPage<T>`** — that is what keeps rendering
       free of `IUmbracoContextAccessor`/`IPublishedUrlProvider` and therefore of a request.
-- [ ] 3.2 `RazorBookingTemplateRenderer`: resolve `~/Views/Partials/UBookIt/Emails/<Name>.cshtml`,
+- [x] 3.2 `RazorBookingTemplateRenderer`: resolve `~/Views/Partials/UBookIt/Emails/<Name>.cshtml`,
       render to a string, read `Subject`/`IsHtml` back off the `ViewDataDictionary` it owns.
       Distinguish not-found from threw.
-- [ ] 3.3 Register in the Web composer. **No `AddUnique`, no `ComposeAfter`** — presence is the
+- [x] 3.3 Register in the Web composer. **No `AddUnique`, no `ComposeAfter`** — presence is the
       whole mechanism, and `UBookItThemeRegistration` records why ordering is not trusted here.
-- [ ] 3.4 Tests: renders a template; **renders with NO ambient `HttpContext`** (the requirement
+- [x] 3.4 Tests: renders a template; **renders with NO ambient `HttpContext`** (the requirement
       that will otherwise fail only in the retention job); missing file → no-template, not an
       exception; throwing template → failed, and the exception does not escape; a template
       supplied by a referenced assembly is found.
 
 ## 4. Boot check
 
-- [ ] 4.1 Report per message whether content will be used, **established the way sending will
+- [x] 4.1 Report per message whether content will be used, **established the way sending will
       establish it** rather than by restating registration — the theming boot check's rule.
-- [ ] 4.2 Tests: a misnamed file reports that message as unsupplied; a mixture reports both
+- [x] 4.2 Tests: a misnamed file reports that message as unsupplied; a mixture reports both
       halves; the check does not throw when no renderer is registered at all.
+
+*(3.1 note, recorded because it was a defect caught only by a round-trip test: the typed
+`Subject`/`IsHtml` properties travel through **`HttpContext.Items`, not `ViewData`**. MVC
+activates a `RazorPage<TModel>` with a **copy** of the supplied `ViewDataDictionary`, so a
+template's writes land in the copy and the renderer read an empty entry — a stated subject
+silently became no subject. The context is one shared instance and the renderer creates a fresh
+one per message, so nothing leaks between renders. The author's surface is unchanged.)*
+
+*(3.4 note: the email fixtures live in the existing `UBookIt.Tests.ThemeFixture` assembly, whose
+exact-inventory guard promptly failed — as designed. It was extended to enumerate both kinds
+rather than filtered by path prefix, so it remains an exact inventory of everything that
+assembly compiles.)*
 
 ## 5. Shipped default templates — decide, then act
 
