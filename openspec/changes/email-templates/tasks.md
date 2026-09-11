@@ -14,9 +14,8 @@ requirement destroys guarantees silently").
       sentence updated for accuracy rather than scope — "Placement produces a confirmed booking
       today" became true-of-both-settings after 0.6.0 and is corrected here.
 
-- [x] 0.2 `booking-emails` / "The internal message says when a booking awaits action" — added in
-QA
-      round 1. Carried verbatim: the state-not-setting rule and all three scenarios. Added: the
+- [x] 0.2 `booking-emails` / "The internal message says when a booking awaits action" — added
+      in QA round 1. Carried verbatim: the state-not-setting rule and all three scenarios. Added: the
       wording narrowing, and the explicit statement that the no-personal-data sentence does NOT
       narrow with it.
 - [x] 0.3 `booking-emails` / "A message to the site's own people carries no personal data" — added
@@ -383,3 +382,24 @@ item below was fixed as a class and then swept.
 - [x] 13.4 **NIT — the `Described` record carried two `<summary>` blocks**, the first an orphan
       from round 3 describing the old contract, which was now wrong as well as duplicated.
       Removed, and the other `.cs` files this change touches swept for the same shape.
+
+## 14. QA round 5 — APPROVE WITH NITS, nits taken
+
+- [x] 14.1 Two mangled fragments the round-4 rewrap left (`QA` alone at column 0; `the` /
+      `difference.` on their own lines) — an earlier single-line break the paragraph reflow then
+      preserved. Fixed, and swept: the only other short lines are legitimate paragraph endings,
+      each terminating in punctuation.
+- [x] 14.2 **The audience dimension was not self-falsifying.** All eight expectations are equal
+      across the two audiences, so collapsing the dispatch so every cell ran `ForBookerAsync`
+      passed 8/8 — silently restoring the half-blindness round 4 found. The dispatch is now
+      total, and each cell asserts the subject its audience produces, so a wrong dispatch fails
+      on its own. Mutation: four cells fail.
+- [x] 14.3 **Nothing pinned the composer's message-producing surface**, so a third method — and
+      design.md §6 anticipates a reminder sender — would be unmeasured by the cost theory with
+      nobody told. Now asserted to be exactly `ForBookerAsync` and `ForSiteAsync`. Mutation:
+      adding a third fails. *This is the one remaining place the recurring failure of this change
+      could recur, which is why a NIT was worth taking.*
+- [x] 14.4 Dead `ResourceId` field removed — the last reference to the single-claim fixture shape.
+- [ ] 14.5 **Out of scope, flagged for whoever touches it:** one adjacent `</summary>`/`<summary>`
+      pair remains in the repository, at `tests/UBookIt.Tests.Rendering/Support/ViewInventory.cs:74`,
+      in a file this change never touches. Recorded so it is not found twice.

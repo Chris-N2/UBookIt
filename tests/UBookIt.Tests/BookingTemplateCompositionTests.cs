@@ -30,8 +30,6 @@ namespace UBookIt.Tests;
 /// </remarks>
 public class BookingTemplateCompositionTests
 {
-    private static readonly Guid ResourceId = Guid.NewGuid();
-
     /// <summary>
     /// Any GUID, in the forms a log line renders one — removed from a haystack before short
     /// alphabetic needles are looked for in it. See BookingEmailTests for the defect this
@@ -479,14 +477,20 @@ public class BookingTemplateCompositionTests
 
         var booking = Booking(direct: direct);
 
-        if (audience == "booker")
+        // TOTAL dispatch, and the result is tied back to the audience — because the expectations
+        // are identical across the two, so collapsing the dispatch so that every cell ran
+        // ForBookerAsync passed all eight. That would silently restore exactly the half-blindness
+        // round 4 found. Now a wrong dispatch fails on the subject alone.
+        var message = audience switch
         {
-            await composer.ForBookerAsync(booking, BookingEvent.Placed);
-        }
-        else
-        {
-            await composer.ForSiteAsync(booking, BookingEvent.Placed, backofficeUrl: null);
-        }
+            "booker" => await composer.ForBookerAsync(booking, BookingEvent.Placed),
+            "site" => await composer.ForSiteAsync(booking, BookingEvent.Placed, backofficeUrl: null),
+            _ => throw new ArgumentOutOfRangeException(nameof(audience), audience, "Unknown audience."),
+        };
+
+        Assert.Equal(
+            audience == "booker" ? "Your booking is confirmed" : $"New booking — {booking.Reference.Display}",
+            message.Subject);
 
         Assert.Equal(expectedReads, store.Reads);
     }
@@ -797,6 +801,26 @@ public class BookingMessageModelContractTests
         // resolve the concrete registration instead of constructing a second one.
         Assert.Null(port.ImplementationType);
         Assert.NotNull(port.ImplementationFactory);
+    }
+
+    [Fact]
+    public void The_composer_produces_messages_through_exactly_two_methods()
+    {
+        // The cost theory measures ForBookerAsync and ForSiteAsync. A THIRD message-producing
+        // method — design.md §6 anticipates a reminder sender — would be unmeasured, and the
+        // recurring failure of this change was precisely a guard that covered the callers
+        // somebody had thought of. This turns "a reviewer must remember" into "the build says
+        // so".
+        var producers = typeof(BookingMessageComposer)
+            .GetMethods(BindingFlags.Public | BindingFlags.Instance | BindingFlags.DeclaredOnly)
+            .Where(m => m.ReturnType == typeof(Task<BookingMessage>))
+            .Select(m => m.Name)
+            .Order(StringComparer.Ordinal)
+            .ToList();
+
+        Assert.Equal(
+            [nameof(BookingMessageComposer.ForBookerAsync), nameof(BookingMessageComposer.ForSiteAsync)],
+            producers);
     }
 
     [Fact]
