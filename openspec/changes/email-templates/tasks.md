@@ -23,9 +23,12 @@ requirement destroys guarantees silently").
       member for the booker's name, email or telephone** — that absence is the guarantee.
       Structure over pre-composed text: `ServiceName` + `ResourceNames` collection;
       `LocalStart`/`LocalEnd` as `DateTimeOffset` already in the booking's zone + `TimeZoneId`;
-      `Status`; the event; `Reference` in quotable form; `AwaitsApproval` and `BackofficeUrl?` on
-      the internal model. Members named for a reader — this is the future token vocabulary and
-      17.0.0 freezes it.
+      `Reference` in quotable form. **`Status` and the event are on BOTH models**, and that is
+      load-bearing rather than incidental: it is what lets one template serve several states, so
+      the set stays at six instead of multiplying. `BookerPlaced` is the live case — it renders a
+      confirmed placement and a requested one, distinguished by `Status`, rather than the package
+      shipping a seventh name. `AwaitsApproval` and `BackofficeUrl?` are internal-only. Members
+      named for a reader — this is the future token vocabulary and 17.0.0 freezes it.
 - [ ] 1.3 The published message-name set (the six), as a Core constant a caller can enumerate —
       not six loose strings. Nothing may name a seventh for an audience that receives no such
       message.
