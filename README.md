@@ -52,8 +52,9 @@ migration time rather than quietly misbehave.
 - **Approval, if you want it.** `UBookIt:AutoConfirm` is on by default, so bookings confirm
   immediately; turn it off and each one waits for somebody to confirm or decline it, holding
   its time meanwhile.
-- **Optional emails** to the person who booked and to your own people — **off until you
-  configure them**, because a mail server is not permission to write to your customers.
+- **Optional emails** to the person who booked and to your own people — a site-wide list,
+  plus the users and groups made **responsible** for each resource or service — **off until
+  you ask for them**, because a mail server is not permission to write to your customers.
 - **Notifications** when a booking is placed, confirmed, declined or cancelled, so your site
   can send its own messages, log, push to a CRM, or anything else.
 - **Restyling** through CSS custom properties, or **theming** by replacing the views

@@ -230,3 +230,44 @@ internal sealed class ServiceRoleCapabilityRow
 
     public required string Key { get; set; }
 }
+
+/// <summary>
+/// Table: uBookItResponsibility. One row per responsible party assigned to a
+/// resource or service. All four columns are the key: an assignment either
+/// exists or does not, carries no payload, and writing it twice is
+/// indistinguishable from writing it once.
+/// <para>
+/// Keys only, on purpose. The party columns reference an Umbraco user or user
+/// group by its key; no name and above all no email address is copied here, so
+/// nothing in this table can go stale except the reference itself — which
+/// resolution skips silently and the editors surface visibly.
+/// </para>
+/// </summary>
+internal sealed class ResponsibilityRow
+{
+    /// <summary><see cref="ResponsibilitySubjectTypes.Resource"/> or <see cref="ResponsibilitySubjectTypes.Service"/>.</summary>
+    public required string SubjectType { get; set; }
+
+    public Guid SubjectId { get; set; }
+
+    /// <summary><see cref="ResponsibilityPartyTypes.User"/> or <see cref="ResponsibilityPartyTypes.Group"/>.</summary>
+    public required string PartyType { get; set; }
+
+    public Guid PartyKey { get; set; }
+}
+
+/// <summary>The stored discriminator values for what a responsibility assignment is on.</summary>
+internal static class ResponsibilitySubjectTypes
+{
+    public const string Resource = "resource";
+
+    public const string Service = "service";
+}
+
+/// <summary>The stored discriminator values for what a responsibility assignment points at.</summary>
+internal static class ResponsibilityPartyTypes
+{
+    public const string User = "user";
+
+    public const string Group = "group";
+}

@@ -8,6 +8,7 @@ using UBookIt.Core.Services;
 using UBookIt.Core.Stores;
 using UBookIt.Persistence.Jobs;
 using UBookIt.Persistence.Notifications;
+using UBookIt.Persistence.Responsibility;
 using UBookIt.Persistence.Stores;
 using Umbraco.Cms.Core.Composing;
 using Umbraco.Cms.Core.DependencyInjection;
@@ -99,6 +100,9 @@ public sealed class UBookItPersistenceComposer : IComposer
         // nothing. Registering it only when sending is configured would make the setting's effect
         // depend on the state of configuration at startup in a second, invisible way.
         builder.Services.AddScoped<BookingMessageComposer>();
+        builder.Services.AddScoped<IResponsibilityStore, SqlResponsibilityStore>();
+        builder.Services.AddScoped<IUmbracoUserDirectory, UmbracoUserDirectory>();
+        builder.Services.AddScoped<IResponsibleRecipientResolver, ResponsibleRecipientResolver>();
         builder.AddNotificationAsyncHandler<BookingPlacedNotification, BookingEmailHandler>();
         builder.AddNotificationAsyncHandler<BookingConfirmedNotification, BookingEmailHandler>();
         builder.AddNotificationAsyncHandler<BookingDeclinedNotification, BookingEmailHandler>();

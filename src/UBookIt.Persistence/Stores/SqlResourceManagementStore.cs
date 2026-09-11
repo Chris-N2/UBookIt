@@ -3,6 +3,7 @@ using Microsoft.EntityFrameworkCore;
 using UBookIt.Core.Common;
 using UBookIt.Core.Resources;
 using UBookIt.Core.Stores;
+using UBookIt.Persistence.Entities;
 
 namespace UBookIt.Persistence.Stores;
 
@@ -112,6 +113,15 @@ internal sealed class SqlResourceManagementStore(UBookItDbContext db) : IResourc
             await db.Exceptions.Where(e => e.ResourceId == resourceId)
                 .ExecuteDeleteAsync(cancellationToken).ConfigureAwait(false);
             await db.ResourceCapabilities.Where(c => c.ResourceId == resourceId)
+                .ExecuteDeleteAsync(cancellationToken).ConfigureAwait(false);
+
+            // Assignments go with their subject, inside the same locked transaction —
+            // the responsibility table has no FK to enforce it, and the shared config
+            // lock is what keeps a concurrent assignment write from re-inserting rows
+            // for a subject that is going away. A later resource given a recycled id
+            // must inherit nobody.
+            await db.Responsibilities
+                .Where(a => a.SubjectType == ResponsibilitySubjectTypes.Resource && a.SubjectId == resourceId)
                 .ExecuteDeleteAsync(cancellationToken).ConfigureAwait(false);
             await db.Resources.Where(r => r.Id == resourceId)
                 .ExecuteDeleteAsync(cancellationToken).ConfigureAwait(false);

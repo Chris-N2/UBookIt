@@ -115,7 +115,8 @@ public sealed record BookerMessageModel : BookingMessageModel
 }
 
 /// <summary>
-/// What a message to the site's own configured recipients is given.
+/// What a message to the site's own recipients is given — the configured list and the
+/// booking's resolved responsible parties alike; one message serves the whole audience.
 /// </summary>
 /// <remarks>
 /// <para>

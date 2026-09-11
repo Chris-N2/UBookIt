@@ -2,6 +2,7 @@ using Microsoft.EntityFrameworkCore;
 using UBookIt.Core.Common;
 using UBookIt.Core.Services;
 using UBookIt.Core.Stores;
+using UBookIt.Persistence.Entities;
 
 namespace UBookIt.Persistence.Stores;
 
@@ -76,6 +77,13 @@ internal sealed class SqlServiceManagementStore(UBookItDbContext db) : IServiceM
         // Roles cascade with the service, but delete explicitly within the
         // locked transaction for clarity and determinism.
         await db.ServiceRoles.Where(r => r.ServiceId == serviceId)
+            .ExecuteDeleteAsync(cancellationToken).ConfigureAwait(false);
+
+        // Assignments go with their subject — no FK enforces this (the responsibility
+        // table has none), so the delete here and the shared config lock do that job.
+        // A later service given a recycled id must inherit nobody.
+        await db.Responsibilities
+            .Where(a => a.SubjectType == ResponsibilitySubjectTypes.Service && a.SubjectId == serviceId)
             .ExecuteDeleteAsync(cancellationToken).ConfigureAwait(false);
         await db.Services.Where(s => s.Id == serviceId)
             .ExecuteDeleteAsync(cancellationToken).ConfigureAwait(false);

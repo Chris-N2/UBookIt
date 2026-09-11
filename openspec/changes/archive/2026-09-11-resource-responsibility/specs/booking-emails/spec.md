@@ -1,27 +1,19 @@
-# Booking Emails Specification
+# Delta for booking-emails
 
-## Purpose
+Guarantee-diff note. For the first two MODIFIED requirements: every SHALL and every
+scenario of the existing requirement is carried forward; the only change is that "the
+site's own people are sent to" gains a second, independent way of being asked for —
+responsibility assignments — whose resolution rules live in the `responsibility`
+capability. Nothing is dropped.
 
-When the package sends a message about a booking, to whom, what that message
-carries, and — more of the point — what it must never carry or promise. Sending is
-off until a site asks for it — in configuration, or by assigning responsibility for a
-resource or service — and configuring the host's mail server is not that asking: an
-Umbraco site has SMTP long before it has any opinion about booking confirmations, so
-upgrading the package must never begin writing to a site's customers.
+The remaining four were added by the sync-time outward sweep (task 7.1): the phrase
+"configured recipients" named the internal audience before responsibility widened it, so
+each is replaced with its body byte-identical except that term — plus one scenario,
+"Absent configuration disables sending", whose claim assignments falsified outright; it
+becomes "Absent configuration enables nothing" with the assignment absence stated in its
+WHEN. Every other SHALL and scenario is carried verbatim.
 
-Stated as its own capability because it is the package's first outbound path for a
-booker's personal data, and it answers to `booker-erasure` and `sensitive-data` as
-much as to the booking flow.
-
-**What a message *carries* describes the messages the package composes.** A site can
-supply its own content for any of them — see the `email-templates` capability — and
-where it does, the words are the site's, accuracy included. What does not narrow is the
-other half of the sentence above: a message to the site's own recipients carries no
-booker name, address or telephone number however that content is written, because the
-model such content receives has no member for them. Nor does whether a message is sent
-at all, or to whom.
-
-## Requirements
+## MODIFIED Requirements
 
 ### Requirement: The package sends nothing until a site asks it to
 
@@ -111,95 +103,6 @@ customers**, and the reverse. Neither direction SHALL be reachable only through 
 - **WHEN** a site enables neither direction — no booker setting, no recipient list, no responsibility assignment the booking resolves
 - **THEN** a booking produces no message at all
 
-### Requirement: An erased booker is never written to, and the site is still told
-
-Where a booking's booker has been erased, the package SHALL send that booker no message, and
-SHALL still send any message the site's own recipients are due.
-
-**This is reachable rather than theoretical.** The retention sweep erases a booker a configured
-period after their booking ends, and the booking can still be cancelled afterwards — so a
-cancellation whose booker has no contact details is an ordinary event, not a corrupt state.
-
-The absence of contact details SHALL be established by their absence and not by inspecting their
-contents, so that a booker carrying an empty or default value can never be mistaken for one
-carrying an address.
-
-#### Scenario: Cancelling a booking whose booker was erased
-- **WHEN** a booking whose booker has been erased is cancelled, with both directions enabled
-- **THEN** no message is addressed to the booker, and the configured recipients are told
-
-#### Scenario: The erased booker is not reconstructed
-- **WHEN** a message is composed for a booking whose booker has been erased
-- **THEN** nothing in it states or implies a name, an address or a telephone number for that booker
-
-### Requirement: What a message tells the booker
-
-A message to a booker SHALL carry the booking's reference, when the booking is, and — where it can
-be established — what was booked.
-
-**The reference SHALL be presented in the form a person is expected to quote**, which is the form
-the confirmation screen shows, so that the message and the screen cannot disagree about what the
-customer is holding.
-
-**Times SHALL be expressed in the time zone the booking was placed against**, which the booking
-carries, and not in whatever the site is configured with when the message is composed. A site that
-changes its time zone SHALL NOT thereby restate when existing bookings are.
-
-**What the message says about the booking's state SHALL be derived from that state**, and SHALL
-NOT be written on the assumption that a placed booking is in any particular one. Placement
-produces a confirmed booking under auto-confirm and a requested one where a site requires
-approval; a message whose wording assumed either would become false, silently, in a message
-already sent to a customer.
-
-**A message SHALL be sent even where what was booked cannot be established**, carrying the
-reference and the time without it. The reference and the time are the parts a person cannot
-reconstruct for themselves; withholding them because a name could not be resolved would be the
-wrong trade.
-
-**Everything above describes the messages the package composes.** Where a site supplies its own
-content for a message — see the `email-templates` capability — the words are the site's, and so is
-their accuracy: the package SHALL NOT claim that supplied content states the booking's state
-correctly, presents the reference in the quotable form, or expresses times in any particular zone.
-
-*This is a narrowing, not a lowering, and it is the same reasoning the accessibility narrowing
-records: we do not take responsibility for text we did not write. It is honest rather than an
-escape hatch because of what the package still supplies — the model a supplied view receives
-carries the booking's state, the reference in its quotable form, and instants already converted
-to the booking's own zone, so a correct message is what an author gets by rendering what they were
-given. The package makes accuracy available; it cannot make it compulsory.*
-
-**The narrowing reaches supplied content and nothing else.** For every message a site has not
-supplied content for — which is all of them until it does — this requirement holds exactly as
-written above.
-
-#### Scenario: A booking placed for a service
-- **WHEN** a message is composed for a booking placed for a service
-- **THEN** it carries the reference as displayed, the booking's start in the booking's own time zone, and the service name recorded on the booking
-
-#### Scenario: A booking placed directly against a resource
-- **WHEN** a message is composed for a booking placed directly against a resource
-- **THEN** it carries the reference as displayed, the booking's start in the booking's own time zone, and that resource's name
-
-#### Scenario: What was booked cannot be established
-- **WHEN** what was booked cannot be established for a message
-- **THEN** the message is still sent, carrying the reference and the time, and states nothing about what was booked
-
-#### Scenario: The site's time zone changed after the booking
-- **WHEN** a message is composed for a booking placed against one time zone while the site is configured with another
-- **THEN** the time is expressed in the zone the booking was placed against
-
-#### Scenario: The wording follows the booking's state
-- **WHEN** a message is composed for a placed booking
-- **THEN** what it says about the booking's state is determined by that state rather than fixed in the message
-
-#### Scenario: An unsupplied message is composed exactly as before
-- **WHEN** a site supplies content for one message and a different message is composed
-- **THEN** that message carries the reference, the time and what was booked exactly as it did before any content was supplied
-
-#### Scenario: What the package still supplies to a supplied view
-- **WHEN** a site supplies content for a message
-- **THEN** what it is given includes the booking's state, the reference in its quotable form, and the interval already expressed in the booking's own time zone
-
 ### Requirement: A message to the site's own people carries no personal data
 
 A message sent to the site's own recipients SHALL identify the booking by its reference, when
@@ -252,74 +155,6 @@ offers.*
 - **WHEN** any content supplied for a message to the site's own recipients is rendered
 - **THEN** it carries no booker name, address or telephone number, because what it was given has no member carrying them
 
-### Requirement: Sending cannot harm a booking, and the package exposes no booker in reporting it
-
-A failure to send SHALL NOT affect the booking it concerns, SHALL NOT be reported to the person
-who placed or cancelled it, and SHALL NOT be retried or queued.
-
-**The booking is already stored by the time anything is sent.** A message is not a booking, and a
-mail server's fault must not become the booker's problem.
-
-**No report of a sending failure that the package composes SHALL contain a booker's name, address
-or telephone number.** A failure to send is not a reason to write into a log the very details the
-rest of the package takes care to govern — the same rule the notification adapter already applies
-to a failing handler.
-
-**The package SHALL NOT claim more than that, and SHALL disclose the difference.** A mail server
-rejecting an address commonly quotes it back, and that text arrives inside an exception the host
-logs. It is not text the package wrote and not text it can reliably redact — an attempt would as
-readily destroy the diagnostic that makes a failed send findable at all. So the documentation
-SHALL state that on a site which sends messages, contact details can appear in the application
-log by that route. An absolute promise here would be the more dangerous failure: it is the kind
-a site repeats to a data subject.
-
-A recipient address a **site** configured MAY be reported, and reporting one SHALL NOT be read as
-licence to report a booker's. They are different populations: one is a staff address typed into
-configuration by whoever administers the site, the other is a customer's personal data.
-
-#### Scenario: A failing send leaves the booking alone
-- **WHEN** sending fails for a booking that has been placed
-- **THEN** the booking remains exactly as stored, and the person who placed it is told nothing about the failure
-
-#### Scenario: A failing send is not retried
-- **WHEN** sending fails
-- **THEN** it is not retried and not queued for a later attempt
-
-#### Scenario: A failure report the package composes carries no booker
-- **WHEN** the package reports a sending failure
-- **THEN** the text the package composes contains no booker name, address or telephone number
-
-#### Scenario: What the package cannot keep out of a log is documented
-- **WHEN** a site author reads what the package promises about personal data in logs
-- **THEN** it states both that the package writes no contact details itself and that a mail server's error may quote an address into the site's own logging
-
-### Requirement: A site can replace what the package sends
-
-The package SHALL send through the host's own mail abstraction in a way that lets a site
-intercept a message and substitute its own, and SHALL identify its messages on that seam so a
-site can act on the package's mail specifically.
-
-**Because the alternative is a site forking the package to change a sentence.** The host already
-publishes this seam; using it costs nothing and means a site can change wording, add its own
-branding or route a message elsewhere without waiting for the package to make it configurable.
-
-The package SHALL NOT supply a sender address of its own, and SHALL let the host apply the address
-the site has already configured for its mail. **A sender address of the package's own would be a
-second source of truth** for a fact the site has already stated once, able to disagree with it and
-able to name an address the configured mail server will not relay for.
-
-#### Scenario: A site substitutes its own message
-- **WHEN** a site handles the host's outgoing-mail seam and marks a booking message as handled
-- **THEN** the package's own message is not sent
-
-#### Scenario: The package's mail is identifiable on the seam
-- **WHEN** a site inspects a booking message on that seam
-- **THEN** it can tell the package's booking mail from the host's other mail
-
-#### Scenario: The sender is the site's
-- **WHEN** a message is sent
-- **THEN** the package supplies no sender address and the host applies the site's configured one
-
 ### Requirement: Configuration is absent, or it is valid
 
 Each of the package's notification settings SHALL resolve to *not configured* when it is absent,
@@ -347,6 +182,7 @@ receiving, and it would be far harder to diagnose. Each dropped address SHALL be
 #### Scenario: A list of only unusable addresses configures nothing
 - **WHEN** every address in a configured recipient list is unusable
 - **THEN** no internal message is sent and each unusable address is reported
+
 ### Requirement: Which events produce messages, and for whom
 Four booking events SHALL be able to produce messages: placement, confirmation, decline, and
 cancellation. Placement and cancellation SHALL address both directions — the booker and the
@@ -438,38 +274,3 @@ made structural.
 #### Scenario: A supplied internal view still cannot carry personal data
 - **WHEN** a site supplies content for an internal message
 - **THEN** that message carries no booker name, no address and no telephone number, whatever the content is written to do
-
-### Requirement: What a site may replace about a message, and what it may not
-A site SHALL be able to replace a message's **body**, and to state its **subject** and whether it
-is HTML. A site SHALL NOT be able, through supplied content, to change **whether** a message is
-sent, **who** receives it, or **what a message to the site's own recipients may carry**.
-
-**The separation is between wording and policy**, and the guarantees on the policy side are
-enumerated here so that the narrowing above cannot be read wider than it is. None of the
-following narrows when content is supplied:
-
-- The conjunction that gates sending — the site's configuration **and** the host's ability to
-  send — governs a supplied message exactly as it governs the package's own.
-- Which audiences each event addresses. Supplying content for a message the package does not send
-  SHALL NOT cause it to be sent.
-- That an erased booker is never written to. Supplied content SHALL NOT be rendered for, or sent
-  to, a booker with no contact details.
-- That a message to the site's own recipients carries no booker name, address or telephone
-  number. The `email-templates` capability makes this structural — the model such a view receives
-  has no member for them — so it holds without depending on what an author writes.
-
-#### Scenario: Supplied content does not bypass the gate
-- **WHEN** a site supplies content for a message and has not enabled that direction of sending
-- **THEN** nothing is sent
-
-#### Scenario: Supplied content does not create a message
-- **WHEN** a site supplies content for a message that this package does not send to that audience
-- **THEN** no message is sent to that audience
-
-#### Scenario: Supplied content is not rendered for an erased booker
-- **WHEN** a booking whose booker has been erased reaches a message the site has supplied content for
-- **THEN** nothing is sent to that booker, on the same terms as for the package's own content
-
-#### Scenario: The internal guarantee survives supplied content
-- **WHEN** a site supplies content for a message to its own recipients
-- **THEN** that message carries no booker name, no address and no telephone number, because the content had no access to them

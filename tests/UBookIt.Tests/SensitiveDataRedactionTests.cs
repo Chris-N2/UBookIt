@@ -445,6 +445,13 @@ public class SensitiveDataRedactionTests
             "OpenHoursRow: DayOfWeek,EndTime,Id,ResourceId,StartTime",
             "ResourceCapabilityRow: Key,ResourceId",
             "ResourceRow: Capabilities,Description,DirectlyBookable,DisplayName,Exceptions,GranularityMinutes,HorizonDays,Id,LeadTimeMinutes,MaxDurationMinutes,MinDurationMinutes,OpenHours,Type",
+
+            // Decision, resource-responsibility (roadmap 0.8.0): four keys and nothing
+            // else. The party columns reference an Umbraco user or group BY KEY — no
+            // name, no email address, nothing personal — so no booker or staff detail
+            // gains a second durable home here; the people behind the keys are resolved
+            // from Umbraco's own store at the moment they are needed.
+            "ResponsibilityRow: PartyKey,PartyType,SubjectId,SubjectType",
             "ServiceRoleCapabilityRow: Key,ServiceRoleId",
             "ServiceRoleRow: Capabilities,Count,Id,ResourceType,ServiceId,VisitorSelectable",
             "ServiceRow: DurationKind,Id,MaxDurationMinutes,MinDurationMinutes,Name,Roles",
@@ -645,6 +652,12 @@ public class SensitiveDataRedactionTests
             "ResourcesController.CreateResource",
             "ResourcesController.UpdateResource",
             "ResourcesController.DeleteResource",
+            // Genuine writes: each replaces a subject's responsibility assignment set
+            // (resource-responsibility change). Neither takes free text or contact
+            // details — a party is a kind plus an Umbraco key, and names and addresses
+            // are resolved from Umbraco at read time, never sent in.
+            "ResponsibilityController.PutResourceResponsibility",
+            "ResponsibilityController.PutServiceResponsibility",
             "ServicesController.CreateService",
             "ServicesController.UpdateService",
             "ServicesController.DeleteService",
@@ -837,6 +850,16 @@ public class SensitiveDataRedactionTests
             "ResourcesController.ListResourceTypes = read",
             "ResourcesController.ListResources = read",
             "ResourcesController.UpdateResource = write",
+
+            // Decision, resource-responsibility (roadmap 0.8.0). The reads return
+            // assignments by subject id — no free-text surface, no booking data at all.
+            // The writes replace an assignment set of (kind, Umbraco key) pairs; the
+            // party's name and address never cross this API inbound, and outbound only
+            // as Umbraco's current answer for a key.
+            "ResponsibilityController.GetResourceResponsibility = read",
+            "ResponsibilityController.GetServiceResponsibility = read",
+            "ResponsibilityController.PutResourceResponsibility = write",
+            "ResponsibilityController.PutServiceResponsibility = write",
             "ServicesController.CreateService = write",
             "ServicesController.DeleteService = write",
             "ServicesController.GetService = read",

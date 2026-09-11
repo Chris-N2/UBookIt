@@ -381,6 +381,7 @@ public class BookingEmailTests
             },
             sender,
             Composer(renderer: new HtmlDeclaringRenderer()),
+            NoResponsibility.Instance,
             new StubHostingEnvironment(),
             NullLogger<BookingEmailHandler>.Instance);
 
@@ -563,6 +564,7 @@ public class BookingEmailTests
             },
             sender,
             Composer(resourceThrows: true),
+            NoResponsibility.Instance,
             new StubHostingEnvironment(),
             NullLogger<BookingEmailHandler>.Instance);
 
@@ -688,7 +690,7 @@ public class BookingEmailTests
         // What actually happens when they book.
         var sender = new RecordingEmailSender { CanSend = hostCanSendMail };
         var handler = new BookingEmailHandler(
-            settings, sender, Composer(), new StubHostingEnvironment(), NullLogger<BookingEmailHandler>.Instance);
+            settings, sender, Composer(), NoResponsibility.Instance, new StubHostingEnvironment(), NullLogger<BookingEmailHandler>.Instance);
 
         await handler.HandleAsync(new BookingPlacedNotification(Booking()), CancellationToken.None);
 
@@ -716,7 +718,7 @@ public class BookingEmailTests
 
         var sender = new RecordingEmailSender();
         var handler = new BookingEmailHandler(
-            settings, sender, Composer(), new StubHostingEnvironment(), NullLogger<BookingEmailHandler>.Instance);
+            settings, sender, Composer(), NoResponsibility.Instance, new StubHostingEnvironment(), NullLogger<BookingEmailHandler>.Instance);
 
         await handler.HandleAsync(new BookingPlacedNotification(Booking()), CancellationToken.None);
 
@@ -745,6 +747,7 @@ public class BookingEmailTests
             new SiteBookingSettings { TimeZoneId = TestData.LondonZoneId, Notifications = notifications },
             sender,
             Composer(),
+            NoResponsibility.Instance,
             new StubHostingEnvironment(),
             NullLogger<BookingEmailHandler>.Instance);
 
@@ -796,6 +799,7 @@ public class BookingEmailTests
         });
         services.AddSingleton<IResourceStore>(new StubResourceStore(true, resourceReadFails));
         services.AddSingleton<IEmailSender>(sender);
+        services.AddSingleton<UBookIt.Persistence.Responsibility.IResponsibleRecipientResolver>(NoResponsibility.Instance);
         services.AddSingleton<IHostingEnvironment>(new StubHostingEnvironment());
         services.AddSingleton<BookingMessageComposer>();
         services.AddSingleton<BookingEmailHandler>();
@@ -857,87 +861,6 @@ public class BookingEmailTests
             => throw new NotSupportedException();
     }
 
-    private sealed class StubHostingEnvironment(string applicationUrl = "https://site.example/")
-        : IHostingEnvironment
-    {
-        public Uri ApplicationMainUrl { get; } = new(applicationUrl);
-
-        public string SiteName => "Test";
-
-        public string ApplicationId => "test";
-
-        public string ApplicationPhysicalPath => ".";
-
-        public string ApplicationVirtualPath => "/";
-
-        public bool IsHosted => true;
-
-        public bool IsDebugMode => false;
-
-        public string LocalTempPath => ".";
-
-        public string MapPathContentRoot(string path) => path;
-
-        public string MapPathWebRoot(string path) => path;
-
-        public string ToAbsolute(string virtualPath) => virtualPath;
-
-        public void EnsureApplicationMainUrl(Uri? currentApplicationUrl)
-        {
-        }
-    }
-
-    private sealed class RecordingEmailSender : IEmailSender
-    {
-        public bool CanSend { get; init; } = true;
-
-        public bool ThrowOnProbe { get; init; }
-
-        public bool ThrowOnSend { get; init; }
-
-        public bool Probed { get; private set; }
-
-        public List<EmailMessage> Sent { get; } = [];
-
-        public List<string> Types { get; } = [];
-
-        public List<bool> Notified { get; } = [];
-
-        /// <summary>Every call, including the ones that threw.</summary>
-        public int Attempts { get; private set; }
-
-        public bool CanSendRequiredEmail()
-        {
-            Probed = true;
-
-            return ThrowOnProbe
-                ? throw new NotImplementedException("To send an Email ensure IEmailSender is implemented")
-                : CanSend;
-        }
-
-        public Task SendAsync(EmailMessage message, string emailType)
-            => SendAsync(message, emailType, false, null);
-
-        public Task SendAsync(EmailMessage message, string emailType, bool enableNotification)
-            => SendAsync(message, emailType, enableNotification, null);
-
-        public Task SendAsync(
-            EmailMessage message, string emailType, bool enableNotification = false, TimeSpan? expires = null)
-        {
-            Attempts++;
-
-            if (ThrowOnSend)
-            {
-                throw new InvalidOperationException("The mail server refused the message.");
-            }
-
-            Sent.Add(message);
-            Types.Add(emailType);
-            Notified.Add(enableNotification);
-
-            return Task.CompletedTask;
-        }
-    }
 }
 
 internal sealed class CapturingLoggerProvider : ILoggerProvider

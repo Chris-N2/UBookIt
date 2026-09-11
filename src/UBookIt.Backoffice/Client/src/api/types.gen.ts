@@ -168,6 +168,27 @@ export type ResourceTypeUsageModel = {
     count: number;
 };
 
+export type ResponsibilityAssignmentModel = {
+    kind: string;
+    key: string;
+};
+
+export type ResponsibilityPartyModel = {
+    kind: string;
+    key: string;
+    exists: boolean;
+    displayName?: string | null;
+    userState?: string | null;
+};
+
+export type ResponsibilityRequestModel = {
+    assignments: Array<ResponsibilityAssignmentModel>;
+};
+
+export type ResponsibilityResponseModel = {
+    assignments: Array<ResponsibilityPartyModel>;
+};
+
 export type ServiceDurationModel = {
     kind: string;
     minutes?: number | null;
@@ -594,6 +615,66 @@ export type UpdateResourceResponses = {
 
 export type UpdateResourceResponse = UpdateResourceResponses[keyof UpdateResourceResponses];
 
+export type GetResourceResponsibilityData = {
+    body?: never;
+    path: {
+        id: string;
+    };
+    query?: never;
+    url: '/umbraco/ubookitbackoffice/api/v1/resources/{id}/responsibility';
+};
+
+export type GetResourceResponsibilityErrors = {
+    /**
+     * The resource is protected and requires an authentication token
+     */
+    401: unknown;
+};
+
+export type GetResourceResponsibilityResponses = {
+    /**
+     * OK
+     */
+    200: ResponsibilityResponseModel;
+};
+
+export type GetResourceResponsibilityResponse = GetResourceResponsibilityResponses[keyof GetResourceResponsibilityResponses];
+
+export type PutResourceResponsibilityData = {
+    body?: ResponsibilityRequestModel;
+    path: {
+        id: string;
+    };
+    query?: never;
+    url: '/umbraco/ubookitbackoffice/api/v1/resources/{id}/responsibility';
+};
+
+export type PutResourceResponsibilityErrors = {
+    /**
+     * Bad Request
+     */
+    400: ProblemDetails;
+    /**
+     * The resource is protected and requires an authentication token
+     */
+    401: unknown;
+    /**
+     * Not Found
+     */
+    404: ProblemDetails;
+};
+
+export type PutResourceResponsibilityError = PutResourceResponsibilityErrors[keyof PutResourceResponsibilityErrors];
+
+export type PutResourceResponsibilityResponses = {
+    /**
+     * OK
+     */
+    200: ResponsibilityResponseModel;
+};
+
+export type PutResourceResponsibilityResponse = PutResourceResponsibilityResponses[keyof PutResourceResponsibilityResponses];
+
 export type ListCapabilitiesData = {
     body?: never;
     path?: never;
@@ -789,6 +870,66 @@ export type UpdateServiceResponses = {
 };
 
 export type UpdateServiceResponse = UpdateServiceResponses[keyof UpdateServiceResponses];
+
+export type GetServiceResponsibilityData = {
+    body?: never;
+    path: {
+        id: string;
+    };
+    query?: never;
+    url: '/umbraco/ubookitbackoffice/api/v1/services/{id}/responsibility';
+};
+
+export type GetServiceResponsibilityErrors = {
+    /**
+     * The resource is protected and requires an authentication token
+     */
+    401: unknown;
+};
+
+export type GetServiceResponsibilityResponses = {
+    /**
+     * OK
+     */
+    200: ResponsibilityResponseModel;
+};
+
+export type GetServiceResponsibilityResponse = GetServiceResponsibilityResponses[keyof GetServiceResponsibilityResponses];
+
+export type PutServiceResponsibilityData = {
+    body?: ResponsibilityRequestModel;
+    path: {
+        id: string;
+    };
+    query?: never;
+    url: '/umbraco/ubookitbackoffice/api/v1/services/{id}/responsibility';
+};
+
+export type PutServiceResponsibilityErrors = {
+    /**
+     * Bad Request
+     */
+    400: ProblemDetails;
+    /**
+     * The resource is protected and requires an authentication token
+     */
+    401: unknown;
+    /**
+     * Not Found
+     */
+    404: ProblemDetails;
+};
+
+export type PutServiceResponsibilityError = PutServiceResponsibilityErrors[keyof PutServiceResponsibilityErrors];
+
+export type PutServiceResponsibilityResponses = {
+    /**
+     * OK
+     */
+    200: ResponsibilityResponseModel;
+};
+
+export type PutServiceResponsibilityResponse = PutServiceResponsibilityResponses[keyof PutServiceResponsibilityResponses];
 
 export type PreviewServiceConfigurationData = {
     body?: ServicePreviewRequestModel;

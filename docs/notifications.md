@@ -30,7 +30,7 @@ Sending needs both: a uBookIt setting *and* a working mail configuration.
 | Setting | What it does |
 |---|---|
 | `SendBookerEmails` | Sends the person who booked a plain-text message when their booking is placed, when a requested booking is confirmed or declined, and when one is cancelled. What the placement message says follows the booking's state: confirmed under auto-confirm, received-and-awaiting-confirmation when the site requires approval (see below). Off unless set to `true`. |
-| `InternalRecipients` | Sends your own people a message when a booking is placed or cancelled. **The list being non-empty is the switch** — there is no separate on/off. Confirming or declining sends this list nothing — you, or a colleague, just did it from the bookings screen, which is where its state lives. |
+| `InternalRecipients` | Sends your own people a message when a booking is placed or cancelled. **The list being non-empty is the switch** — there is no separate on/off. These addresses hear about **every** booking; for different people per resource or service, see [responsibility](#telling-the-people-responsible) below, which adds recipients rather than replacing this list. Confirming or declining sends this list nothing — you, or a colleague, just did it from the bookings screen, which is where its state lives. |
 
 The two are independent: you can be told about bookings without anything being sent to your
 customers, and the other way round. Both also require Umbraco to be able to send mail — an SMTP
@@ -38,7 +38,45 @@ customers, and the other way round. Both also require Umbraco to be able to send
 uBookIt does not supply a sender of its own; your site's `From` is used.
 
 If you turn sending on and your site has no usable mail configuration, uBookIt says so in the log
-once at startup rather than failing quietly.
+once at startup rather than failing quietly. That startup check reads configuration, so it speaks
+for `SendBookerEmails` and `InternalRecipients`; responsibility assignments live in the database
+and can change at any moment while the site runs, so a site relying on assignments alone gets no
+startup line — if mail is broken there, the symptom is the messages not arriving.
+
+### Telling the people responsible
+
+A flat list is the wrong shape for a site where different people look after different things, so
+each **resource** and each **service** can be given responsible parties in the backoffice —
+backoffice **users**, backoffice **user groups**, or both — from the same screen where the
+resource or service is edited (see [the backoffice guide](backoffice.md#responsibility)).
+
+When a booking is placed or cancelled, the internal message goes to **the configured
+`InternalRecipients` list plus everyone responsible for what the booking touches**: the people
+assigned to its service, if it was booked through one, and the people assigned to every resource
+it occupies. It is a union, with no precedence in it —
+
+- assigning your first responsible user does **not** stop the `InternalRecipients` list hearing
+  about that resource's bookings;
+- an empty `InternalRecipients` list with assignments in place gives you purely targeted mail;
+- an empty list and no assignments remains a full opt-out, exactly as before.
+
+One person reachable several ways — in the list, assigned directly, and a member of an assigned
+group — is written to once.
+
+Worth knowing before you lean on it:
+
+- **Group membership is read at the moment of sending.** Adding someone to an assigned group
+  starts emailing them about those bookings with no uBookIt action at all — that is the feature,
+  but it is better read about here than discovered in an inbox.
+- **Users are emailed at their backoffice account address.** A user who is **Disabled**, or
+  **Invited** but has never accepted, is skipped; active users are written to even if they have
+  never logged in, and a temporary lockout does not cost anyone a notification.
+- **An assignment whose user or group has since been deleted sends nothing, silently.** The
+  editing screen marks it so you can see the contact went away; the mail path does not log it.
+- **Responsibility is not permissions.** It decides who is emailed, nothing else: assigning a
+  user grants them no access to the backoffice or to anything in it, and uBookIt only ever
+  *reads* group membership. Messages to responsible people are internal messages like any other —
+  they carry no booker contact details, whoever receives them.
 
 ### What the messages contain
 

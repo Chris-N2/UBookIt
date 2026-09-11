@@ -275,6 +275,13 @@ public class MultiClaimConcurrencyTests(SqlServerFixture fixture)
                 // above. What changes is how quickly a booking's AGE can be found, never what
                 // it claims.
                 "20260909103532_AddRetentionSweepIndex",
+
+                // One new table, `uBookItResponsibility` (subject + party keys,
+                // compound PK, one index), with no foreign key to anything.
+                // Checked: neither `uBookItResourceClaim` nor `uBookItBooking` is
+                // referenced or altered — the guarantee above still holds. Who is
+                // emailed about a booking changes nothing about what it claims.
+                "20260911190750_AddResponsibility",
             ],
             applied.OrderBy(name => name, StringComparer.Ordinal));
 

@@ -31,6 +31,8 @@ public sealed class UBookItDbContext(DbContextOptions<UBookItDbContext> options)
 
     internal DbSet<ServiceRoleCapabilityRow> ServiceRoleCapabilities => Set<ServiceRoleCapabilityRow>();
 
+    internal DbSet<ResponsibilityRow> Responsibilities => Set<ResponsibilityRow>();
+
     /// <summary>
     /// Single place that configures the SQL Server provider (uBookIt requires
     /// SQL Server 2019+) with the package-private migrations history table.
@@ -190,6 +192,28 @@ public sealed class UBookItDbContext(DbContextOptions<UBookItDbContext> options)
             capability.ToTable("uBookItServiceRoleCapability");
             capability.HasKey(c => new { c.ServiceRoleId, c.Key });
             capability.Property(c => c.Key).HasMaxLength(64);
+        });
+
+        modelBuilder.Entity<ResponsibilityRow>(responsibility =>
+        {
+            responsibility.ToTable("uBookItResponsibility");
+
+            // The compound key IS the semantics: an assignment exists or it
+            // does not, so a duplicate is impossible in storage and an
+            // idempotent write needs no application-side uniqueness check.
+            responsibility.HasKey(r => new { r.SubjectType, r.SubjectId, r.PartyType, r.PartyKey });
+            responsibility.Property(r => r.SubjectType).HasMaxLength(16);
+            responsibility.Property(r => r.PartyType).HasMaxLength(16);
+
+            // Lookup by subject is the only query shape the package runs:
+            // the editors read one subject, the resolver reads a handful.
+            responsibility.HasIndex(r => new { r.SubjectType, r.SubjectId });
+
+            // No foreign keys, deliberately. The party side CANNOT have one —
+            // users and groups live in Umbraco's own tables — and giving only
+            // the subject side one would make the two halves behave
+            // differently for no query we run; the stores delete assignment
+            // rows with their owner instead.
         });
     }
 }

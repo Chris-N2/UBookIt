@@ -326,6 +326,29 @@ Ticking statuses shows **only** those, rather than adding them to what is alread
 tick Cancelled on its own and you get the cancelled bookings, not the confirmed ones with
 the cancelled ones added.
 
+## Responsibility
+
+Each resource and each service can name the people **responsible** for it: backoffice users,
+backoffice user groups, or both, picked in a *Responsibility* box on the resource and service
+editors. Being responsible means one thing — **you are emailed about its bookings** when the
+site sends internal messages (see [notifications](notifications.md#telling-the-people-responsible)
+for how the recipients are worked out and how this sits beside the `InternalRecipients` list).
+
+**It is not permissions.** Assigning a user grants them nothing: no section access, no extra
+visibility, no ability to act on anything — and it takes nothing away. uBookIt only ever
+*reads* a group's membership; put people in ordinary Umbraco user groups for access, and use
+responsibility purely to say who cares about what. A responsible user who cannot see the
+bookings screen will still receive the messages, because internal messages carry no booker
+details and link to a screen that applies its own access control when followed.
+
+**A party that stops existing stays visible.** Delete a user or group and its assignment shows
+in the editor marked as no longer resolving, rather than vanishing — so you can see that Studio
+2's contact went away and pick a replacement. Until you do, that assignment simply sends
+nothing. Saving replaces the whole set with what the pickers hold, so changing a picker's
+selection and saving drops that picker's stale entries with the change — which is the natural
+moment for them to go. A stale entry in the picker you did not touch stays, still marked. Users the mail path skips — disabled accounts, invitations never accepted — are marked
+with their state in the same box.
+
 ## The service shown against a booking
 
 A booking records the service it was placed for. Two things about that are worth knowing
