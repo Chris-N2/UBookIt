@@ -59,9 +59,13 @@ public sealed record BookingNotificationSettings
     /// a time, what was booked, and a link to where the booking can be seen under that control.
     /// </para>
     /// <para>
-    /// A flat list is knowingly the wrong shape for a site where different people are responsible
-    /// for different resources or services. That needs a model of who owns what, and inventing
-    /// half of one here to avoid a future migration would cost more than the migration.
+    /// <b>This list is the site-wide tier, not the whole audience.</b> An earlier version of
+    /// this remark said a flat list was knowingly the wrong shape for a site where different
+    /// people are responsible for different resources or services; the model it anticipated
+    /// now exists — responsibility assignments, edited where a resource or service is edited
+    /// and resolved at send time — and the two are a union: this list always hears about
+    /// every booking while it is non-empty, responsible parties hear about theirs, and
+    /// neither switches the other off.
     /// </para>
     /// </remarks>
     public IReadOnlyList<string> InternalRecipients { get; init; } = [];

@@ -132,7 +132,7 @@ The model passed to a view for the **site's own recipients** SHALL have **no mem
 booker's name, email address or telephone number**.
 
 **This makes an existing guarantee structural instead of advisory.** The package already promises
-that a message to a configured recipient list carries no booker contact details, because such a
+that a message to the site's own recipients carries no booker contact details, because such a
 list is not the population the **Sensitive data** control governs. If one model served both
 audiences with the booker merely absent or null, that promise would silently weaken from *what
 the package does* to *what the package does unless a site writes a view* — and nothing would

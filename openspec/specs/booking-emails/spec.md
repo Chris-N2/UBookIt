@@ -4,10 +4,10 @@
 
 When the package sends a message about a booking, to whom, what that message
 carries, and — more of the point — what it must never carry or promise. Sending is
-off until a site configures it, and configuring the host's mail server is not that
-configuration: an Umbraco site has SMTP long before it has any opinion about booking
-confirmations, so upgrading the package must never begin writing to a site's
-customers.
+off until a site asks for it — in configuration, or by assigning responsibility for a
+resource or service — and configuring the host's mail server is not that asking: an
+Umbraco site has SMTP long before it has any opinion about booking confirmations, so
+upgrading the package must never begin writing to a site's customers.
 
 Stated as its own capability because it is the package's first outbound path for a
 booker's personal data, and it answers to `booker-erasure` and `sensitive-data` as
@@ -25,9 +25,14 @@ at all, or to whom.
 
 ### Requirement: The package sends nothing until a site asks it to
 
-The package SHALL send a message only where **both** of the following hold: the site has enabled
-that direction of sending in its own configuration, and the host is able to send mail at all.
-Neither condition SHALL be taken to imply the other.
+The package SHALL send a message only where **both** of the following hold: the site has asked
+for that direction of sending, and the host is able to send mail at all. Neither condition
+SHALL be taken to imply the other.
+
+**How a site asks is defined per direction** by the requirement below: an explicit setting for
+the booker's direction; a configured recipient list **or a responsibility assignment** (see the
+`responsibility` capability) for the site's own. Each is something the site did on purpose;
+none is something an install or upgrade can do on the site's behalf.
 
 **Because an Umbraco site configures SMTP for password resets and backoffice invites long before
 it has any opinion about booking confirmations.** Treating a configured mail server as permission
@@ -36,7 +41,7 @@ with people who booked while it sent nothing — the one change a package must n
 site's behalf.
 
 Sending SHALL therefore be **off by default**, and installing or upgrading the package SHALL send
-nobody anything until a site changes its configuration.
+nobody anything until a site changes its configuration or assigns responsibility.
 
 **Whether the host can send SHALL be established at the time of sending, not at startup**, since a
 site's mail configuration can change while the site runs, and a value read once would answer for a
@@ -48,7 +53,7 @@ unanswerable question into a quiet "no" would turn a misconfiguration into perma
 nothing anywhere to find.
 
 #### Scenario: A site that has not enabled sending is not written to
-- **WHEN** a booking is placed, confirmed, declined or cancelled on a site that has not enabled sending, whatever its mail configuration
+- **WHEN** a booking is placed, confirmed, declined or cancelled on a site that has asked for no direction of sending, whatever its mail configuration
 - **THEN** no message is sent to anyone
 
 #### Scenario: Enabling sending on a host that cannot send mail sends nothing
@@ -69,9 +74,19 @@ The package SHALL treat writing to the booker and writing to the site's own peop
 separately enabled directions, each with its own condition.
 
 Writing to the booker SHALL be enabled by an explicit setting. Writing to the site's own people
-SHALL be enabled by **the presence of a configured recipient list** — a site that supplies
-addresses has said what it wants by supplying them, and a second switch would add a way for the
-two to disagree.
+SHALL be enabled by **the existence of at least one internal recipient**, arrived at through
+either of two independent tiers:
+
+- **the configured recipient list** — site-wide; every internal message goes to it while it is
+  present, and an empty list remains a full opt-out of this tier;
+- **responsibility** — the parties resolved for the booking under the `responsibility`
+  capability's rules.
+
+The two tiers SHALL be a union: neither one's presence or absence SHALL switch the other off,
+so configuring the first responsibility assignment cannot silently stop the site-wide list
+hearing about that subject's bookings. There SHALL be no second on/off switch for the site's
+direction — a site that supplies addresses or assigns responsibility has said what it wants by
+doing so, and a separate switch would add a way for the two to disagree.
 
 **A site SHALL be able to be told about bookings without any message being sent to its
 customers**, and the reverse. Neither direction SHALL be reachable only through the other.
@@ -80,12 +95,20 @@ customers**, and the reverse. Neither direction SHALL be reachable only through 
 - **WHEN** a site configures recipients and does not enable writing to the booker
 - **THEN** a booking produces a message to those recipients and none to the booker
 
+#### Scenario: Responsibility alone enables the site's direction
+- **WHEN** a site configures no recipient list, a booking's resource has a responsible user that resolution reaches, and writing to the booker is not enabled
+- **THEN** the booking produces an internal message to that user and none to the booker
+
+#### Scenario: The tiers are a union, not a precedence
+- **WHEN** a site has both a configured recipient list and a responsibility assignment the booking resolves
+- **THEN** the internal message reaches the configured recipients and the resolved parties, deduplicated by address
+
 #### Scenario: Writing to customers without internal notification
-- **WHEN** a site enables writing to the booker and configures no recipients
+- **WHEN** a site enables writing to the booker, configures no recipients and has no responsibility assignment the booking resolves
 - **THEN** a booking produces a message to the booker and none to anyone else
 
 #### Scenario: Neither is configured
-- **WHEN** a site enables neither direction
+- **WHEN** a site enables neither direction — no booker setting, no recipient list, no responsibility assignment the booking resolves
 - **THEN** a booking produces no message at all
 
 ### Requirement: An erased booker is never written to, and the site is still told
@@ -179,7 +202,7 @@ written above.
 
 ### Requirement: A message to the site's own people carries no personal data
 
-A message sent to a site's configured recipients SHALL identify the booking by its reference, when
+A message sent to the site's own recipients SHALL identify the booking by its reference, when
 it is and what was booked, and SHALL NOT carry the booker's name, address or telephone number.
 
 **Because the package already decides who may see a booker's contact details, and a mailing list
@@ -309,8 +332,8 @@ and the remaining usable ones kept**, rather than the list being refused entirel
 address silencing every internal notification would be a worse failure than one address not
 receiving, and it would be far harder to diagnose. Each dropped address SHALL be reported.
 
-#### Scenario: Absent configuration disables sending
-- **WHEN** no notification configuration is present
+#### Scenario: Absent configuration enables nothing
+- **WHEN** no notification configuration is present and no responsibility assignment resolves for a booking
 - **THEN** neither direction is enabled and no message is sent
 
 #### Scenario: An unusable enabling value does not enable
@@ -345,11 +368,11 @@ anyone — there is no address, and no internal message is due for these events.
 
 #### Scenario: A confirmation is told to the booker only
 - **WHEN** an operator confirms a requested booking, with both directions enabled
-- **THEN** the booker receives a message whose wording derives from the booking's confirmed state, and the configured recipients receive nothing
+- **THEN** the booker receives a message whose wording derives from the booking's confirmed state, and the site's own recipients receive nothing
 
 #### Scenario: A decline is told to the booker only
 - **WHEN** an operator declines a requested booking, with both directions enabled
-- **THEN** the booker receives a message whose wording derives from the booking's declined state, and the configured recipients receive nothing
+- **THEN** the booker receives a message whose wording derives from the booking's declined state, and the site's own recipients receive nothing
 
 #### Scenario: A decline on a site that has not enabled booker emails is silent
 - **WHEN** an operator declines a requested booking on a site that has configured recipients but not enabled writing to the booker
@@ -364,7 +387,7 @@ anyone — there is no address, and no internal message is due for these events.
 - **THEN** no message is sent to anyone
 
 ### Requirement: The internal message says when a booking awaits action
-The message placement sends to the site's configured recipients SHALL state that the booking
+The message placement sends to the site's own recipients SHALL state that the booking
 awaits approval when the booking it announces is `Requested`, and SHALL NOT state it when the
 booking is `Confirmed`.
 
@@ -390,7 +413,7 @@ booked and the backoffice link are all on the model — so a correct message is 
 gets by rendering what they were given.*
 
 **What does NOT narrow is the sentence about personal data**, and the distinction is the point
-of the whole design. That a message to a configured recipient list carries no booker name,
+of the whole design. That a message to the site's own recipients carries no booker name,
 address or telephone number is not a wording obligation an author could fail to honour: the
 model such a view receives has no member for them, so it holds however the content is written.
 A narrowing that swept it up with the rest would give away the one guarantee this capability

@@ -128,7 +128,16 @@ double-quoted shell string.
       later reworded:
       - The package sends nothing until a site asks it to
       - The booker and the site are told independently
-      Every SHALL and scenario carried or superseded, none dropped. QA round 1 re-ran the
+      Every SHALL and scenario carried or superseded, none dropped. The sync-time sweep
+      (7.1) then added five more wholesale replacements — four in booking-emails, one in
+      email-templates — each byte-identical except the audience term ("configured
+      recipients" became "the site's own recipients", which responsibility widened), and
+      one falsified scenario rewritten with its WHEN completed:
+      - A message to the site's own people carries no personal data
+      - Configuration is absent, or it is valid
+      - Which events produce messages, and for whom
+      - The internal message says when a booking awaits action
+      - The model for the site's own recipients cannot express a booker's contact details QA round 1 re-ran the
       diff independently and confirmed it clean. *(These two titles were in this item, were
       lost when the item's text was itself replaced wholesale at tick time — the exact
       fault the guard watches for, one level up — and the delta-integrity guard caught it.)*
@@ -151,7 +160,7 @@ double-quoted shell string.
 
 ## 7. Sync-time greps (run at sync, not before; do not tick until executed)
 
-- [ ] 7.1 Outward sweep: grep sibling specs and Purpose prose for sentences this change
+- [x] 7.1 Outward sweep: grep sibling specs and Purpose prose for sentences this change
       falsifies — candidates known now: any statement that internal recipients are "the
       configured list", that configuration alone decides sending, or counts of
       customisation tiers; also `booking-emails` Purpose lines 19/422 region re-read in
@@ -159,6 +168,26 @@ double-quoted shell string.
       `booking-emails/spec.md:106` ("the configured recipients are told"), `:182` ("A
       message sent to a site's configured recipients SHALL…"), `email-templates/spec.md:135`,
       `privacy-notice/spec.md:190`.
-- [ ] 7.2 Falsified-claims sweep over `README.md`, `docs/*.md` and XML doc comments —
+      **RUN at sync (2026-09-11), findings:** the class was the term "configured
+      recipients" naming the internal audience — five requirement bodies across two specs,
+      fixed by DELTA (per the ⑲ lesson, never by hand-edit), each byte-identical except
+      the term; one scenario ("Absent configuration disables sending") was falsified
+      outright by assignments-without-configuration and is rewritten with its WHEN
+      completed. The booking-emails Purpose ("off until a site configures it") was
+      hand-edited to "asks for it" — Purpose prose is delta-unreachable, the established
+      exception. Checked and NOT falsified: `privacy-notice` "Internal recipients do not
+      change what the booker is told" (tiers are independent, holds for both);
+      `booking-emails:106` erased-booker scenario (configured recipients ARE still told —
+      non-exclusive claim); `theming` "third and last tier" (already scoped by ㉚ to the
+      booking flow's rendering; responsibility is not a rendering customisation).
+- [x] 7.2 Falsified-claims sweep over `README.md`, `docs/*.md` and XML doc comments —
       including `BookingNotificationSettings.InternalRecipients`' remark that a flat list
       is "knowingly the wrong shape", which this change answers and should now say so.
+      **RUN at sync (2026-09-11), findings:** that remark rewritten as the site-wide-tier
+      statement, naming what the old sentence anticipated; `BookingMessageModels`'
+      internal-model summary said "configured recipients" and now names the whole
+      audience; README's optional-emails bullet said "off until you configure them" and
+      now says "ask for them" with the responsible-parties clause. Checked and NOT
+      falsified: `UBookItNotificationBootCheck`'s docs (explicitly configuration-scoped,
+      and the assignments-only boundary is documented in docs/notifications.md);
+      `BookingFormView`'s "Internal recipients do not affect it" (true of both tiers).
