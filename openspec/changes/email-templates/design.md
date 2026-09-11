@@ -104,16 +104,21 @@ invariant-culture formatting the composer does today remains the fallback's busi
 **These members are the token vocabulary a later editor UI would expose.** They are named for a
 reader, not for the shipped views' convenience, and this is why: 17.0.0 freezes them.
 
-### 4. A typed base page over ViewData
+### 4. A typed base page, carried on HttpContext.Items
 
 `UBookItEmailPage<TModel> : RazorPage<TModel>` exposes `Subject` and `IsHtml` as typed
-properties whose accessors read and write `ViewData`. The author writes
-`@{ Subject = "…"; IsHtml = true; }`; the renderer reads the `ViewDataDictionary` it owns.
+properties. The author writes `@{ Subject = "…"; IsHtml = true; }`; the renderer reads the values
+back off the context it created.
 
-Typed properties because a magic-string key is a silent failure and this contract is frozen;
-`ViewData` as transport because the renderer owns the dictionary and reading it back is reliable,
-whereas reaching typed state on the page instance means casting through `RazorView` to
-`IRazorPage`.
+Typed properties because a magic-string key is a silent failure and this contract is frozen.
+
+**The transport is `HttpContext.Items`, and this paragraph originally said `ViewData` — which
+apply proved false.** The reasoning had been that the renderer owns the `ViewDataDictionary` it
+passes in, so reading it back is reliable. It is not: MVC activates a `RazorPage<TModel>` with a
+**copy**, so a template's `Subject = "…"` lands in the copy and never reaches the renderer's
+scope. A stated subject silently became no subject, and only a round-trip test showed it. The
+context is a single shared instance and the renderer creates a fresh one per message, so nothing
+leaks between renders. The author's surface is unchanged — two typed properties either way.
 
 Requiring `@inherits` is precedent-compatible — Forms requires
 `@inherits UmbracoViewPage<FormsHtmlModel>`. A `_ViewImports.cshtml` cannot help: it would have

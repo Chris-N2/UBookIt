@@ -1,3 +1,6 @@
+using System.Reflection;
+using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Logging.Abstractions;
 using UBookIt.Core.Bookings;
 using UBookIt.Core.Notifications;
@@ -5,6 +8,7 @@ using UBookIt.Core.Resources;
 using UBookIt.Core.Stores;
 using UBookIt.Persistence.Notifications;
 using UBookIt.Tests.Support;
+using UBookIt.Web.Emails;
 
 namespace UBookIt.Tests;
 
@@ -27,6 +31,15 @@ namespace UBookIt.Tests;
 public class BookingTemplateCompositionTests
 {
     private static readonly Guid ResourceId = Guid.NewGuid();
+
+    /// <summary>
+    /// Any GUID, in the forms a log line renders one — removed from a haystack before short
+    /// alphabetic needles are looked for in it. See BookingEmailTests for the defect this
+    /// prevents.
+    /// </summary>
+    private static readonly System.Text.RegularExpressions.Regex AnyGuid = new(
+        "[0-9a-fA-F]{8}-?[0-9a-fA-F]{4}-?[0-9a-fA-F]{4}-?[0-9a-fA-F]{4}-?[0-9a-fA-F]{12}",
+        System.Text.RegularExpressions.RegexOptions.Compiled);
 
     /// <summary>Returns whatever the test needs, and records what it was asked for.</summary>
     private sealed class StubRenderer(BookingTemplateResult result) : IBookingTemplateRenderer
@@ -57,6 +70,19 @@ public class BookingTemplateCompositionTests
 
     private static BookingMessageComposer Composer(IBookingTemplateRenderer? renderer)
         => new(new StubResourceStore(), NullLogger<BookingMessageComposer>.Instance, renderer);
+
+    /// <summary>The same composer, with every line it writes captured.</summary>
+    private static (BookingMessageComposer Composer, CapturingLoggerProvider Logs) ComposerWithLogs(
+        IBookingTemplateRenderer? renderer)
+    {
+        var logs = new CapturingLoggerProvider();
+        var factory = LoggerFactory.Create(builder => builder.AddProvider(logs).SetMinimumLevel(LogLevel.Trace));
+
+        return (
+            new BookingMessageComposer(
+                new StubResourceStore(), factory.CreateLogger<BookingMessageComposer>(), renderer),
+            logs);
+    }
 
     private static Booking Booking(
         BookingStatus status = BookingStatus.Confirmed, bool direct = false)
@@ -132,6 +158,64 @@ public class BookingTemplateCompositionTests
 
         Assert.Equal("Your booking is confirmed", message.Subject);
         Assert.Contains("Initial Consultation", message.Body, StringComparison.Ordinal);
+    }
+
+    /// <summary>
+    /// A failure is reported, and an absence is not.
+    /// </summary>
+    /// <remarks>
+    /// <b>The two tests above assert IDENTICAL observable facts, so neither can tell the
+    /// outcomes apart.</b> QA deleted the composer's entire <c>Failed</c> branch — its log line
+    /// included — and all 2379 tests passed: three outcomes collapsed into two with nothing
+    /// failing. The spec requires a failure to be "distinguishable in the report from a message
+    /// for which nothing was supplied", and a report nobody reads cannot be distinguishable.
+    /// <para>
+    /// Asserted as a DIFFERENTIAL between the two outcomes rather than as "a failure logs
+    /// something", because the defect is the two becoming the same, and a one-sided assertion
+    /// would survive a change that logged for both.
+    /// </para>
+    /// </remarks>
+    [Fact]
+    public async Task A_failure_is_logged_and_an_absence_is_not()
+    {
+        var booking = Booking();
+
+        var (failing, failedLogs) = ComposerWithLogs(new StubRenderer(BookingTemplateResult.Failed));
+        await failing.ForBookerAsync(booking, BookingEvent.Placed);
+
+        var (absent, absentLogs) = ComposerWithLogs(new StubRenderer(BookingTemplateResult.NotSupplied));
+        await absent.ForBookerAsync(booking, BookingEvent.Placed);
+
+        Assert.NotEmpty(failedLogs.Entries);
+
+        // The ordinary state says nothing. A line per unsupplied message per send would bury the
+        // failures that matter, which is the whole reason the two are treated differently.
+        Assert.Empty(absentLogs.Entries);
+    }
+
+    [Fact]
+    public async Task The_failure_line_names_the_booking_and_no_booker()
+    {
+        var booking = Booking();
+        var (composer, logs) = ComposerWithLogs(new StubRenderer(BookingTemplateResult.Failed));
+
+        await composer.ForBookerAsync(booking, BookingEvent.Placed);
+
+        var entry = Assert.Single(logs.Entries);
+
+        // Anti-vacuity first: without the id, the assertions below would pass against a line
+        // about nothing in particular.
+        Assert.Contains(booking.Id.ToString(), entry.Message, StringComparison.Ordinal);
+        Assert.Contains(nameof(BookingMessageKind.BookerPlaced), entry.Message, StringComparison.Ordinal);
+
+        // And no booker. GUIDs come out of the haystack first — "Ada" is three hex digits, so a
+        // random id matches it about 0.7% of the time and this guard would fail at random.
+        var haystack = AnyGuid.Replace($"{entry.Message} {entry.Exception}", "{guid}");
+
+        Assert.DoesNotContain("Ada", haystack, StringComparison.OrdinalIgnoreCase);
+        Assert.DoesNotContain("Lovelace", haystack, StringComparison.OrdinalIgnoreCase);
+        Assert.DoesNotContain("ada@example.com", haystack, StringComparison.OrdinalIgnoreCase);
+        Assert.DoesNotContain("07700", haystack, StringComparison.Ordinal);
     }
 
     // ---- subject and content type --------------------------------------------------------
@@ -242,6 +326,62 @@ public class BookingTemplateCompositionTests
     }
 
     [Fact]
+    public async Task An_erased_booker_gets_the_packages_own_message_and_no_template_is_rendered()
+    {
+        // Reachable in principle rather than in the send path — the handler establishes an
+        // address before this is called — but the composer is public and this used to be a bare
+        // `Contact!`, which turned a direct call into a NullReferenceException layers from the
+        // mistake. There is a defined answer, and it is the same one absence gets.
+        var erased = Booking().Tap(b => b.EraseBooker(TestData.Now));
+        var renderer = new StubRenderer(new BookingTemplateResult(
+            BookingTemplateOutcome.Rendered, Body: "should never be used"));
+
+        var message = await Composer(renderer).ForBookerAsync(erased, BookingEvent.Cancelled);
+
+        Assert.Empty(renderer.Asked);
+        Assert.DoesNotContain("should never be used", message.Body, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public async Task A_directly_booked_booking_is_not_read_twice()
+    {
+        // The plain-text path already reads every claim to build its "What:" line, and the
+        // structured model needs the same names. Reading them again would double the round trips
+        // per claim on every message a template-enabled site sends, and nothing would report it.
+        var store = new CountingResourceStore();
+        var renderer = new StubRenderer(BookingTemplateResult.NotSupplied);
+        var composer = new BookingMessageComposer(
+            store, NullLogger<BookingMessageComposer>.Instance, renderer);
+
+        await composer.ForBookerAsync(Booking(direct: true), BookingEvent.Placed);
+
+        Assert.Equal(1, store.Reads);
+
+        // And the names still reach content, so this is not a saving bought by losing the data.
+        Assert.Equal("Treatment Room", Assert.Single(Assert.Single(renderer.Asked).Model.ResourceNames));
+    }
+
+    private sealed class CountingResourceStore : IResourceStore
+    {
+        public int Reads { get; private set; }
+
+        public Task<Resource?> GetAsync(Guid resourceId, CancellationToken cancellationToken = default)
+        {
+            Reads++;
+
+            return Task.FromResult<Resource?>(
+                Resource.Create("room", "Treatment Room", directlyBookable: true, id: resourceId).Value);
+        }
+
+        public Task<ResourcePage> ListAsync(int skip, int take, CancellationToken cancellationToken = default)
+            => throw new NotSupportedException();
+
+        public Task<IReadOnlyList<Resource>> ListByTypeAsync(
+            string type, CancellationToken cancellationToken = default)
+            => throw new NotSupportedException();
+    }
+
+    [Fact]
     public async Task A_service_booking_still_lists_its_resources_to_content()
     {
         // The plain-text message names the SERVICE and stops, so the structured description
@@ -310,5 +450,150 @@ public class BookingTemplateCompositionTests
         // disagree about what the customer is holding.
         Assert.Equal(booking.Reference.Display, Assert.Single(renderer.Asked).Model.Reference);
         Assert.Contains('-', Assert.Single(renderer.Asked).Model.Reference);
+    }
+}
+
+// ---- the model contract, which is where the structural guarantee lives -------------------
+
+/// <summary>
+/// What the published models may and may not expose.
+/// </summary>
+/// <remarks>
+/// <b>This file exists because the guarantee it guards had no guard.</b> The change's headline
+/// claim is that a message to a site's configured recipients cannot carry a booker's contact
+/// details <i>because the model has no member for them</i> — the compiler enforcing what a
+/// reviewer would otherwise have to. QA added <c>BookerEmail</c> to
+/// <c>InternalMessageModel</c> and all 2379 tests passed. A structural guarantee with no test
+/// over the structure is a comment.
+/// </remarks>
+public class BookingMessageModelContractTests
+{
+    /// <summary>
+    /// Whether a member's name suggests it carries the BOOKER's contact details.
+    /// </summary>
+    /// <remarks>
+    /// <para>
+    /// Matched by name rather than against a list of today's members, so a member added later is
+    /// caught by the rule instead of needing somebody to remember this file exists.
+    /// </para>
+    /// <para>
+    /// <b>Precise rather than broad, and that is deliberate.</b> The first version matched any
+    /// name containing "name" and flagged <c>ServiceName</c> and <c>ResourceNames</c> — neither
+    /// of which is personal data. A guard that fires on legitimate members is a guard somebody
+    /// relaxes, which is how this project has lost guards before. So: anything about the
+    /// <i>booker</i>, anything that is an address or a number whatever it is attached to, and a
+    /// bare <c>Name</c> or <c>Contact</c>, which unqualified can only mean the person.
+    /// </para>
+    /// </remarks>
+    private static bool LooksLikeBookerContact(PropertyInfo property)
+    {
+        var name = property.Name;
+
+        return name.Contains("Booker", StringComparison.OrdinalIgnoreCase)
+            || name.Contains("Email", StringComparison.OrdinalIgnoreCase)
+            || name.Contains("Phone", StringComparison.OrdinalIgnoreCase)
+            || name.Contains("Telephone", StringComparison.OrdinalIgnoreCase)
+            || name.Equals("Name", StringComparison.OrdinalIgnoreCase)
+            || name.Equals("Contact", StringComparison.OrdinalIgnoreCase);
+    }
+
+    private static IReadOnlyList<string> ContactLookingMembersOf(Type type)
+        => [.. type
+            .GetProperties(BindingFlags.Public | BindingFlags.Instance)
+            .Where(LooksLikeBookerContact)
+            .Select(p => p.Name)];
+
+    [Fact]
+    public void The_internal_model_exposes_no_contact_detail_member()
+    {
+        // THE WHOLE PUBLIC SURFACE, inherited members included. Declared-only would miss a
+        // member added to the shared base — which is exactly where a careless "just put it on
+        // the base, both need it" change would put one.
+        var offending = ContactLookingMembersOf(typeof(InternalMessageModel));
+
+        Assert.True(
+            offending.Count == 0,
+            "InternalMessageModel must expose nothing that could carry a booker's contact "
+            + "details — the absence IS the guarantee that a message to a configuration-file "
+            + "address list cannot leak them. Found: " + string.Join(", ", offending));
+    }
+
+    [Fact]
+    public void The_rule_would_catch_a_member_added_to_either_type()
+    {
+        // ANTI-VACUITY, and it is the half that matters: the test above passes trivially if the
+        // word list stops matching anything. The booker's own model carries exactly these
+        // members legitimately, so finding them there proves the predicate still bites.
+        var onBooker = ContactLookingMembersOf(typeof(BookerMessageModel));
+
+        Assert.Contains(nameof(BookerMessageModel.BookerName), onBooker);
+        Assert.Contains(nameof(BookerMessageModel.BookerEmail), onBooker);
+        Assert.Contains(nameof(BookerMessageModel.BookerPhone), onBooker);
+    }
+
+    [Fact]
+    public void The_shared_base_carries_no_contact_detail_member_either()
+    {
+        // Stated separately from the internal model's own rule, because the base is the place a
+        // future change would most plausibly add one "since both audiences need it".
+        Assert.Empty(ContactLookingMembersOf(typeof(BookingMessageModel)));
+    }
+
+    [Fact]
+    public void The_web_composer_registers_the_renderer_and_the_boot_check()
+    {
+        // Deleting either registration disables the entire feature — every message silently
+        // reverts to the package's wording and no test anywhere noticed. design.md names the
+        // boot check as the mitigation for "registration silently does nothing", but the boot
+        // check was itself only ever constructed directly.
+        var registrations = new ServiceCollection();
+        new UBookIt.Web.Composing.UBookItRenderingComposer()
+            .Compose(new ServicesOnlyUmbracoBuilder(registrations));
+
+        Assert.Contains(registrations, d => d.ServiceType == typeof(IBookingTemplateRenderer));
+        Assert.Contains(registrations, d => d.ServiceType == typeof(RazorBookingTemplateRenderer));
+    }
+
+    [Fact]
+    public void The_renderer_is_registered_once_and_resolves_to_one_instance_per_scope()
+    {
+        // The port and the concrete type must be the SAME instance, not two. Harmless while the
+        // renderer is stateless, and precisely the kind of harmless that stops being so the day
+        // somebody caches a compiled view on it.
+        var registrations = new ServiceCollection();
+        new UBookIt.Web.Composing.UBookItRenderingComposer()
+            .Compose(new ServicesOnlyUmbracoBuilder(registrations));
+
+        var port = Assert.Single(
+            registrations.Where(d => d.ServiceType == typeof(IBookingTemplateRenderer)));
+
+        // Registered by factory rather than by implementation type — which is what makes it
+        // resolve the concrete registration instead of constructing a second one.
+        Assert.Null(port.ImplementationType);
+        Assert.NotNull(port.ImplementationFactory);
+    }
+
+    [Fact]
+    public void The_published_message_set_is_exactly_what_the_package_sends()
+    {
+        // No name for a message that is never sent: content written against one would never
+        // render, and an author would have no way to find out why.
+        Assert.Equal(
+            new[]
+            {
+                BookingMessageKind.BookerPlaced,
+                BookingMessageKind.BookerConfirmed,
+                BookingMessageKind.BookerDeclined,
+                BookingMessageKind.BookerCancelled,
+                BookingMessageKind.InternalPlaced,
+                BookingMessageKind.InternalCancelled,
+            },
+            Enum.GetValues<BookingMessageKind>());
+
+        // Named explicitly, because these two are the ones somebody will eventually "notice are
+        // missing" and add without checking whether such a message exists. They do not.
+        Assert.DoesNotContain(
+            Enum.GetNames<BookingMessageKind>(),
+            name => name is "InternalConfirmed" or "InternalDeclined");
     }
 }

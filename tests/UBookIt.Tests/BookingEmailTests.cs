@@ -2,6 +2,7 @@ using System.Text.RegularExpressions;
 using Microsoft.Extensions.Logging.Abstractions;
 using UBookIt.Core;
 using UBookIt.Core.Bookings;
+using UBookIt.Core.Notifications;
 using UBookIt.Core.Resources;
 using UBookIt.Core.Stores;
 using UBookIt.Persistence.Notifications;
@@ -352,6 +353,52 @@ public class BookingEmailTests
 
         Assert.False(message.IsBodyHtml);
         Assert.Null(message.From);
+    }
+
+    /// <summary>
+    /// A message declared as HTML actually leaves as HTML.
+    /// </summary>
+    /// <remarks>
+    /// <b>The last hop, and it had no test.</b> Everything upstream — the base page's typed
+    /// property, the renderer reading it back, the composer carrying it on
+    /// <c>BookingMessage</c> — was covered, and then <c>isBodyHtml:</c> was handed to
+    /// <c>EmailMessage</c>. QA replaced that argument with a literal <c>false</c> and all 2379
+    /// tests passed: the entire HTML feature could be switched off at its final line, invisibly.
+    /// The pre-existing assertion above passes under that mutation too, which is why this is a
+    /// second test rather than another line in it — <b>a guard that holds one value can only
+    /// see one direction.</b>
+    /// </remarks>
+    [Fact]
+    public async Task A_message_declared_as_html_is_sent_as_html()
+    {
+        var sender = new RecordingEmailSender();
+
+        var handler = new BookingEmailHandler(
+            new SiteBookingSettings
+            {
+                TimeZoneId = TestData.LondonZoneId,
+                Notifications = Notifications(sendBooker: true),
+            },
+            sender,
+            Composer(renderer: new HtmlDeclaringRenderer()),
+            new StubHostingEnvironment(),
+            NullLogger<BookingEmailHandler>.Instance);
+
+        await handler.HandleAsync(new BookingPlacedNotification(Booking()), CancellationToken.None);
+
+        var message = Assert.Single(sender.Sent);
+
+        Assert.True(message.IsBodyHtml);
+        Assert.Equal("<p>Declared HTML.</p>", message.Body);
+    }
+
+    /// <summary>Renders one HTML body and says so.</summary>
+    private sealed class HtmlDeclaringRenderer : IBookingTemplateRenderer
+    {
+        public Task<BookingTemplateResult> RenderAsync(
+            BookingMessageKind kind, BookingMessageModel model, CancellationToken cancellationToken = default)
+            => Task.FromResult(new BookingTemplateResult(
+                BookingTemplateOutcome.Rendered, Body: "<p>Declared HTML.</p>", IsHtml: true));
     }
 
     [Fact]
@@ -758,10 +805,14 @@ public class BookingEmailTests
         return (provider.GetRequiredService<BookingEmailHandler>(), logs, sender);
     }
 
-    private static BookingMessageComposer Composer(bool resourceExists = true, bool resourceThrows = false)
+    private static BookingMessageComposer Composer(
+        bool resourceExists = true,
+        bool resourceThrows = false,
+        IBookingTemplateRenderer? renderer = null)
         => new(
             new StubResourceStore(resourceExists, resourceThrows),
-            NullLogger<BookingMessageComposer>.Instance);
+            NullLogger<BookingMessageComposer>.Instance,
+            renderer);
 
     private static Booking Booking(
         BookingStatus status = BookingStatus.Confirmed,

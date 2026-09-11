@@ -132,6 +132,51 @@ public class EmailTemplateRenderingTests
         Assert.Contains("7QX4-M2NP", result.Body!, StringComparison.Ordinal);
     }
 
+    [Fact]
+    public void It_declares_no_dependency_that_only_a_request_can_satisfy()
+    {
+        // THE STRUCTURAL HALF, because the behavioural test above can only prove that today's
+        // renderer does not NEED a request — it cannot stop somebody adding the dependency
+        // tomorrow, and the failure would then appear only in whatever background work sends the
+        // first message. Constructor parameters are where that would arrive.
+        var parameters = typeof(RazorBookingTemplateRenderer)
+            .GetConstructors()
+            .Single()
+            .GetParameters()
+            .Select(p => p.ParameterType)
+            .ToList();
+
+        Assert.DoesNotContain(typeof(IHttpContextAccessor), parameters);
+        Assert.DoesNotContain(typeof(HttpContext), parameters);
+
+        // Anti-vacuity: the list is really the constructor's, so the absences above mean
+        // something.
+        Assert.Contains(typeof(IRazorViewEngine), parameters);
+    }
+
+    [Fact]
+    public async Task Two_messages_rendered_by_one_renderer_do_not_bleed_into_each_other()
+    {
+        // The renderer is scoped and ONE placement renders two messages in the same scope, so a
+        // shared context would give the internal message the booker template's subject and HTML
+        // flag. The code creates a context per render; this is what says so.
+        //
+        // BookerConfirmed states a subject and IsHtml; InternalPlaced states neither. Rendering
+        // the stating one FIRST is what makes the test able to fail — the reverse order would
+        // pass against a shared context.
+        var (renderer, _) = Rig();
+
+        var stated = await renderer.RenderAsync(
+            BookingMessageKind.BookerConfirmed, Booker(BookingMessageKind.BookerConfirmed));
+        var silent = await renderer.RenderAsync(BookingMessageKind.InternalPlaced, Internal());
+
+        Assert.Equal("Your appointment at Acme", stated.Subject);
+        Assert.True(stated.IsHtml);
+
+        Assert.Null(silent.Subject);
+        Assert.False(silent.IsHtml);
+    }
+
     // ---- the three outcomes ----------------------------------------------------------------
 
     [Fact]

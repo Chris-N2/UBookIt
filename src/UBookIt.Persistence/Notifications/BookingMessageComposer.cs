@@ -119,12 +119,20 @@ public sealed class BookingMessageComposer(
             return fallback;
         }
 
-        // The booker's own message, so the model carrying contact details is the right one — and
-        // the caller has already established they are present, because reaching a booker's
-        // address requires it. Documented on ForBookerAsync and enforced by the send path.
-        var contact = booking.Booker.Contact!;
+        // The booker's own message, so the model carrying contact details is the right one.
+        //
+        // ESTABLISHED HERE RATHER THAN ASSUMED. The send path only reaches this method once it
+        // has an address, so an erased booker cannot arrive in practice — but this used to be a
+        // bare `Contact!`, which would have turned "somebody called the composer directly" into
+        // a NullReferenceException several layers from the mistake. There is a defined answer
+        // for a booker with no details: compose nothing of the site's and let the package's own
+        // wording stand, exactly as it does when no content is supplied.
+        if (booking.Booker.Contact is not { } contact)
+        {
+            return fallback;
+        }
         var (serviceName, resourceNames) =
-            await DescribeStructuredAsync(booking, cancellationToken).ConfigureAwait(false);
+            await DescribeStructuredAsync(booking, what, cancellationToken).ConfigureAwait(false);
         var (localStart, localEnd) = LocalInterval(booking.Interval);
 
         var model = new BookerMessageModel
@@ -205,7 +213,7 @@ public sealed class BookingMessageComposer(
         }
 
         var (serviceName, resourceNames) =
-            await DescribeStructuredAsync(booking, cancellationToken).ConfigureAwait(false);
+            await DescribeStructuredAsync(booking, what, cancellationToken).ConfigureAwait(false);
         var (localStart, localEnd) = LocalInterval(booking.Interval);
 
         // THE MODEL WITH NO BOOKER ON IT. Not a shared model with the contact details left out
@@ -414,8 +422,27 @@ public sealed class BookingMessageComposer(
     /// </para>
     /// </remarks>
     private async Task<(string? ServiceName, IReadOnlyList<string> ResourceNames)> DescribeStructuredAsync(
-        Booking booking, CancellationToken cancellationToken)
-        => (booking.Service?.DisplayName, await ResourceNamesAsync(booking, cancellationToken).ConfigureAwait(false));
+        Booking booking,
+        string? alreadyDescribed,
+        CancellationToken cancellationToken)
+    {
+        // A DIRECTLY-BOOKED booking has already had its resources read, by DescribeAsync, to
+        // build the plain-text fallback — and that joined string is exactly those names. Reading
+        // them again would double the round trips per claim for every message on a
+        // template-enabled site, which is a cost nobody asked for and nothing would have
+        // reported.
+        if (booking.Service is not { } service)
+        {
+            return (
+                null,
+                alreadyDescribed is null ? [] : [.. alreadyDescribed.Split(", ")]);
+        }
+
+        // A SERVICE booking has not: the plain-text message names the service and stops, so this
+        // is the one case that genuinely needs the extra reads — and the case content most wants
+        // them for, since a service resolves to several resources.
+        return (service.DisplayName, await ResourceNamesAsync(booking, cancellationToken).ConfigureAwait(false));
+    }
 
     /// <summary>
     /// The booking's interval, expressed in the zone it was placed against.

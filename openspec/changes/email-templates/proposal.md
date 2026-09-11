@@ -42,10 +42,11 @@ actually matters. Most people installing this are developers.
   were found. This copies `theming`, including its stated residue: falling back per item is
   what the framework does anyway, and what the check changes is the silence.
 - **A package-supplied typed base page**, `UBookItEmailPage<TModel>`, exposing `Subject` and
-  `IsHtml` as typed properties backed by `ViewData`. A template writes
-  `@{ Subject = "…"; IsHtml = true; }` rather than indexing a dictionary, so a typo is a
-  compile error. `ViewData` remains the transport because the renderer owns the dictionary it
-  passes in and can read it back reliably.
+  `IsHtml` as typed properties. A template writes `@{ Subject = "…"; IsHtml = true; }` rather
+  than indexing a dictionary, so a typo is a compile error. *(This bullet said the transport
+  underneath was `ViewData`; apply proved that cannot work — MVC activates the page with a copy
+  of the dictionary, so a template's writes never reach the renderer. It is `HttpContext.Items`,
+  which is genuinely shared, with a fresh context per message.)*
 - **`IsHtml` defaults to `false` and is never inferred.** The shipped defaults are plain text;
   an author writing HTML sets the flag. Content sniffing — Umbraco's own health check does
   `Contains("<") && Contains("</")` — is rejected: guessing at intent is the failure mode this
@@ -109,9 +110,13 @@ actually matters. Most people installing this are developers.
   models; its existing behaviour is the fallback and must be unchanged when no template
   applies.
 - `UBookIt.Web`: `RazorBookingTemplateRenderer`, `UBookItEmailPage<TModel>`, registration, and
-  the boot check. **The renderer must work with no ambient `HttpContext`** — a background send
-  has none, the retention job already runs that way, and reminders would — stated as a
+  the boot check. **The renderer must work with no ambient `HttpContext`** — stated as a
   requirement with a test rather than left to be discovered in a job.
 - Docs: `docs/notifications.md` gains the template mechanism; a template author needs the model
   reference, the six names and the single-body limitation.
+- **BREAKING (unpublished, pre-17.0.0):** `BookingMessage` gains a third positional parameter,
+  `IsHtml`, defaulted to `false`. Source-compatible for construction and for reading `Subject`
+  and `Body`, but the two-parameter `Deconstruct` is gone, so `var (subject, body) = message`
+  no longer compiles. Called out here because the convention requires it, not because anything
+  outside this repository can yet have taken the dependency.
 - No schema change, no new dependency, no change to the delivery or management APIs.

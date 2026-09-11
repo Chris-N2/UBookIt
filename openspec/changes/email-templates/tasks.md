@@ -14,6 +14,14 @@ requirement destroys guarantees silently").
       sentence updated for accuracy rather than scope — "Placement produces a confirmed booking
       today" became true-of-both-settings after 0.6.0 and is corrected here.
 
+- [x] 0.2 `booking-emails` / "The internal message says when a booking awaits action" — added in QA
+      round 1. Carried verbatim: the state-not-setting rule and all three scenarios. Added: the
+      wording narrowing, and the explicit statement that the no-personal-data sentence does NOT
+      narrow with it.
+- [x] 0.3 `booking-emails` / "A message to the site's own people carries no personal data" — added
+      in QA round 1 for the same reason. Carried verbatim: the reason, the link rule and all three
+      scenarios. Added: the two-halves-narrow-differently paragraph and two scenarios.
+
 ## 1. Core: the port and the published contract
 
 - [x] 1.1 `IBookingTemplateRenderer` in `UBookIt.Core` — renders a model for a named message and
@@ -137,9 +145,28 @@ assembly compiles.)*
       used; state `IsHtml` and supply HTML → arrives as HTML; break a template → fallback body
       arrives and the log names the failure; supply `InternalPlaced` → arrives with no contact
       details. Boot log lists supplied and unsupplied.
-- [x] 8.3 **Prove the no-request path for real**, not only in a unit test — the honest way is a
-      message sent from the retention sweep's execution path or an equivalent with no request.
-      If that cannot be staged, say so explicitly and record what was actually proved.
+- [x] 8.3 **The no-request path could NOT be staged live, and here is exactly what was proved.**
+      This task's own terms were "if that cannot be staged, say so explicitly and record what was
+      actually proved" — it was ticked in round 1 with nothing recorded, which QA caught. Honestly:
+
+      **There is no production code path today that composes a message outside a request.** Every
+      send is placement (delivery API or Razor POST) or a backoffice confirm/decline/cancel. The
+      retention job runs unattended but erases bookers; it sends nothing. So staging a live
+      no-request send would have meant inventing a code path in order to test it, which proves
+      the rig rather than the product.
+
+      **What IS proved**, and it is not nothing:
+      - `EmailTemplateRenderingTests.It_renders_with_no_ambient_request` renders from a provider
+        that has no `IHttpContextAccessor` registered at all, asserted before rendering.
+      - `It_declares_no_dependency_that_only_a_request_can_satisfy` pins it structurally, so the
+        dependency cannot be added later without failing — the behavioural test alone could only
+        speak for today's constructor.
+      - The renderer builds its own `DefaultHttpContext`; nothing reads an ambient one.
+
+      **What is NOT proved:** that a real background sender works, because there is not one yet.
+      The requirement is anticipatory — it exists so that the reminder feature, or anything else
+      that sends from a timer, does not discover this in production. Recorded as the honest
+      residue rather than dressed up.
 
 ## 9. What the live check found, recorded rather than left in a log
 
@@ -162,3 +189,56 @@ assembly compiles.)*
 - [x] 9.2 **The boot check earned itself immediately.** It was what revealed the assembly's
       templates were being discovered at all — before any message was sent, and before the
       collision above could have been mistaken for "templates do not work".
+
+## 10. QA round 1 — REJECT (six MAJOR, four MINOR, four NIT)
+
+**The headline is not any single finding: four tasks were ticked without being done** (1.4, 6.4,
+8.3, and part of 2.4). The tasks file is the record a reviewer reads to know what was verified,
+and ticking unverified work corrupts the one artifact whose job is to be trustworthy. Every fix
+below is mutation-proved against QA's own attack where QA supplied one.
+
+- [x] 10.1 **MAJOR — the headline structural guarantee had no guard.** Task 1.4 claimed a
+      reflection test over `InternalMessageModel`; none existed, and QA added `BookerEmail` to it
+      with 2379 tests passing. Added `BookingMessageModelContractTests` over the whole public
+      surface, inherited members included, plus the base type and an anti-vacuity test that the
+      predicate still bites on `BookerMessageModel`. **The predicate is precise, not broad**: the
+      first version flagged `ServiceName` and `ResourceNames`, and a guard that fires on
+      legitimate members is one somebody relaxes. Mutation: QA's exact attack now fails.
+- [x] 10.2 **MAJOR — `IsHtml` never reached the wire under test.** `isBodyHtml: false` passed
+      2379 tests. Added `A_message_declared_as_html_is_sent_as_html`, a second test rather than
+      another line in the existing one, because a guard that holds one value can only see one
+      direction. Mutation: fails.
+- [x] 10.3 **MAJOR — three outcomes collapsed to two at the composer.** Deleting the whole
+      `Failed` branch passed. The two existing tests asserted identical observable facts, so
+      neither could tell absence from breakage. Added a differential over the LOGS — a failure
+      logs, an absence does not — plus a test that the line names the booking and no booker, with
+      GUIDs redacted first. Mutation: two tests fail.
+- [x] 10.4 **MAJOR — the narrowing was asymmetric.** Only the booker's requirement was narrowed,
+      leaving two internal requirements stating positive wording obligations a supplied template
+      can falsify. Both are now MODIFIED (see 0.2 and 0.3) — and each states explicitly that the
+      **no-personal-data half does NOT narrow**, because that one is structural and sweeping it
+      up would give away the guarantee this change exists to make.
+- [x] 10.5 **MAJOR — task 6.4's absence check did not exist.** Added, swept across every shipped
+      document, aimed at the reassurance somebody would plausibly write ("uBookIt still checks
+      your wording"). Mutation, added and wrapped: fails. Also de-vacuified two presence checks
+      that matched prose rather than the assignments an author writes.
+- [x] 10.6 **MAJOR — task 8.3 ticked with nothing recorded.** Now records what could not be
+      staged and why, and exactly what was proved instead. See 8.3.
+- [x] 10.7 **MINOR — the non-leak claim was unguarded.** Hoisting the context to a field passed.
+      Added a two-render test, stating one first so it can actually fail. Mutation: fails.
+- [x] 10.8 **MINOR — `Contact!` would have thrown for an erased booker.** Unreachable through the
+      send path, which establishes an address first, but the composer is public and a bare `!`
+      turns a direct call into an NRE layers from the mistake. Now falls back, with a test.
+- [x] 10.9 **MINOR — a directly-booked booking was read twice per claim.** The plain-text path
+      already read those names. Now reused; the extra reads happen only for a service booking,
+      which is the case that genuinely needs them. Test counts the reads.
+- [x] 10.10 **MINOR — nothing tested the registrations.** Deleting either line disabled the whole
+      feature silently. Both are now asserted, and the port is registered by factory so it and
+      the concrete type resolve to one instance.
+- [x] 10.11 **MINOR — no test pinned the message set.** Added: exactly six, and explicitly no
+      `InternalConfirmed`/`InternalDeclined`.
+- [x] 10.12 **NITs** — `design.md` §4 and `proposal.md` still described `ViewData` as the
+      transport, which apply had measured false; both corrected in place with the reason.
+      `BookingMessage`'s new positional parameter is called out as BREAKING in Impact (the 2-arity
+      `Deconstruct` is gone). The proposal's claim that "the retention job already runs that way"
+      implied it sends mail; it does not, and the sentence is removed.

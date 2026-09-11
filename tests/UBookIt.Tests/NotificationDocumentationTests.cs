@@ -262,9 +262,15 @@ public class NotificationDocumentationTests
         }
 
         // How to state the two things a template may state, and the base page it needs.
+        //
+        // Asserted as the ASSIGNMENTS an author writes rather than as the bare words: "Subject"
+        // and "IsHtml" both occur in unrelated prose on this page, so checking for them alone
+        // was very nearly vacuous — it would have passed against a document that never showed
+        // how to set either.
         Assert.Contains(nameof(UBookItEmailPage<BookingMessageModel>), docs, StringComparison.Ordinal);
-        Assert.Contains("Subject", docs, StringComparison.Ordinal);
-        Assert.Contains("IsHtml", docs, StringComparison.Ordinal);
+        Assert.Contains("Subject = ", docs, StringComparison.Ordinal);
+        Assert.Contains("IsHtml = true", docs, StringComparison.Ordinal);
+        Assert.Contains("@inherits", docs, StringComparison.Ordinal);
     }
 
     [Fact]
@@ -307,6 +313,43 @@ public class NotificationDocumentationTests
     [Fact]
     public void The_documented_example_does_not_claim_to_be_what_the_package_sends()
         => DocumentationAssert.Says(Docs(), "This example is not what uBookIt sends");
+
+    /// <summary>
+    /// No document tells an author that content they supply is still subject to the package's
+    /// wording guarantees.
+    /// </summary>
+    /// <remarks>
+    /// <b>The absence half, which the first version of these guards simply did not have.</b>
+    /// Every other check here is a presence check, and this file's own remarks already record
+    /// why that is not enough: an over-claim survives by ADDITION, so only a
+    /// <c>DoesNotSay</c> can see one. The specific over-claim to fear is a sentence reassuring
+    /// an author that uBookIt still ensures their wording is accurate — which is exactly what
+    /// the `booking-emails` narrowing says it does not, and exactly the comforting thing
+    /// somebody would add to documentation about a feature that hands words over.
+    /// <para>
+    /// Swept across every shipped document rather than `notifications.md` alone, because the
+    /// reassurance is likelier to be written where templates are being sold than where they are
+    /// specified.
+    /// </para>
+    /// </remarks>
+    [Fact]
+    public void No_document_claims_supplied_content_is_still_subject_to_the_packages_wording_guarantees()
+    {
+        foreach (var doc in ShippedMarkdown())
+        {
+            var text = RepoFiles.Read(doc);
+
+            DocumentationAssert.DoesNotSay(text, "uBookIt still checks");
+            DocumentationAssert.DoesNotSay(text, "uBookIt will still ensure");
+            DocumentationAssert.DoesNotSay(text, "your wording is still checked");
+            DocumentationAssert.DoesNotSay(
+                text, "supplied content still describes the booking's state correctly");
+
+            // And the positive form of the same over-claim: a document may not promise that a
+            // template inherits the derived-from-state guarantee.
+            DocumentationAssert.DoesNotSay(text, "your template will derive");
+        }
+    }
 
     /// <summary>
     /// Every markdown file the repository ships, discovered rather than listed.

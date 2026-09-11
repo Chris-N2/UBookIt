@@ -37,12 +37,14 @@ public sealed class UBookItRenderingComposer : IComposer
         // exactly this presence-or-absence test.
         //
         // Scoped, matching BookingMessageComposer, which is the only thing that resolves it.
-        builder.Services.AddScoped<IBookingTemplateRenderer, RazorBookingTemplateRenderer>();
-
-        // Resolvable in its own right as well, so the boot check can ask what is supplied
-        // without going through the port — the check reports on the mechanism, so it needs the
-        // concrete thing rather than the abstraction over it.
+        // ONE registration, resolvable two ways. The boot check needs the concrete type (it asks
+        // what is supplied, which is not on the port), and the composer needs the port. Two
+        // independent AddScoped calls would build two instances per scope — harmless today
+        // because the renderer is stateless, and exactly the kind of harmless that stops being
+        // so when somebody adds a cache to it.
         builder.Services.AddScoped<RazorBookingTemplateRenderer>();
+        builder.Services.AddScoped<IBookingTemplateRenderer>(
+            sp => sp.GetRequiredService<RazorBookingTemplateRenderer>());
 
         builder.AddNotificationHandler<UmbracoApplicationStartedNotification, UBookItEmailTemplateBootCheck>();
     }
