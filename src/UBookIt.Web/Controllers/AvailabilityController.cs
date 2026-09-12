@@ -22,6 +22,7 @@ public sealed class AvailabilityController(
     IAvailabilityQueryService availability,
     SiteBookingSettings settings) : UBookItDeliveryApiControllerBase
 {
+    [DeliveryRead]
     [HttpGet("resources/{resourceId:guid}/free-time")]
     [ProducesResponseType<FreeTimeResponseModel>(StatusCodes.Status200OK)]
     [ProducesResponseType<ProblemDetails>(StatusCodes.Status400BadRequest)]
@@ -41,6 +42,7 @@ public sealed class AvailabilityController(
             : result.Failures.ToProblemResult();
     }
 
+    [DeliveryRead]
     [HttpGet("resources/{resourceId:guid}/slots")]
     [ProducesResponseType<SlotsResponseModel>(StatusCodes.Status200OK)]
     [ProducesResponseType<ProblemDetails>(StatusCodes.Status400BadRequest)]
@@ -69,6 +71,7 @@ public sealed class AvailabilityController(
     /// whichever length it needs, so one call answers every length and the
     /// longest available is discoverable rather than guessed.
     /// </summary>
+    [DeliveryRead]
     [HttpGet("resources/{resourceId:guid}/bookable-starts")]
     [ProducesResponseType<BookableStartsResponseModel>(StatusCodes.Status200OK)]
     [ProducesResponseType<ProblemDetails>(StatusCodes.Status400BadRequest)]

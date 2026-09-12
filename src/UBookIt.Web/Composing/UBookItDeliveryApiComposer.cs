@@ -1,5 +1,6 @@
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.Mvc.Controllers;
+using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.OpenApi;
 using Swashbuckle.AspNetCore.SwaggerGen;
@@ -21,6 +22,19 @@ public sealed class UBookItDeliveryApiComposer : IComposer
 {
     public void Compose(IUmbracoBuilder builder)
     {
+        // EXPOSURE IS OFF BY DEFAULT, per direction, decided once at startup. Binding
+        // yields the all-off record when the section is absent, so an untouched install
+        // serves no anonymous endpoint — the convention below removes the disabled
+        // directions' selectors and ApiExplorer visibility while the application model
+        // is being built, which is what makes "absent, not refused" structural.
+        var settings = builder.Config
+            .GetSection(DeliveryApiSettings.SectionKey)
+            .Get<DeliveryApiSettings>() ?? new DeliveryApiSettings();
+
+        builder.Services.AddSingleton(settings);
+        builder.Services.Configure<MvcOptions>(options =>
+            options.Conventions.Add(new DeliveryApiExposureConvention(settings)));
+
         builder.Services.Configure<SwaggerGenOptions>(options =>
         {
             options.SwaggerDoc(Constants.DeliveryApiName, new OpenApiInfo

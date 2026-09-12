@@ -23,6 +23,7 @@ public sealed class ServicesController(
     IServiceBookingService serviceBooking,
     SiteBookingSettings settings) : UBookItDeliveryApiControllerBase
 {
+    [DeliveryRead]
     [HttpGet("services")]
     [ProducesResponseType<PagedServicesModel>(StatusCodes.Status200OK)]
     public async Task<IActionResult> ListServices(
@@ -37,6 +38,7 @@ public sealed class ServicesController(
         });
     }
 
+    [DeliveryRead]
     [HttpGet("services/{id:guid}")]
     [ProducesResponseType<ServiceReadModel>(StatusCodes.Status200OK)]
     [ProducesResponseType<ProblemDetails>(StatusCodes.Status404NotFound)]
@@ -68,6 +70,7 @@ public sealed class ServicesController(
     /// placement endpoint already applies.
     /// </para>
     /// </summary>
+    [DeliveryRead]
     [HttpGet("services/{id:guid}/bookable-starts")]
     [ProducesResponseType<ServiceBookableStartsResponseModel>(StatusCodes.Status200OK)]
     [ProducesResponseType<ProblemDetails>(StatusCodes.Status400BadRequest)]
@@ -132,6 +135,7 @@ public sealed class ServicesController(
     /// length is required and is never substituted; the response reports every
     /// resource the booking landed on.
     /// </summary>
+    [DeliveryPlacement]
     [HttpPost("services/{id:guid}/bookings")]
     [ProducesResponseType<ServicePlacementResponseModel>(StatusCodes.Status200OK)]
     [ProducesResponseType<ProblemDetails>(StatusCodes.Status400BadRequest)]
