@@ -31,6 +31,14 @@ own pages. Neither — the default — is right for a site using only the shippe
 page, which does not use this API at all: it renders on the server, and it works
 identically whatever these settings say.
 
+`EnablePlacement` without reads is legal but has one property to accept knowingly: a
+failed placement still says *why* it failed — a resource not eligible for a service, a
+slot already taken — so a caller holding resource ids can learn eligibility and occupancy
+facts from failures even though the reads that would publish those facts are off. Bounded
+in practice (with reads off there is no way to enumerate the ids to ask about), and
+stable failure codes are worth more than hiding them — but if that trade reads wrong for
+your site, enable both directions or neither.
+
 Settings are read at startup, so changing them needs an application restart.
 
 > **Not the same thing as Umbraco's Delivery API.** Umbraco ships its own content

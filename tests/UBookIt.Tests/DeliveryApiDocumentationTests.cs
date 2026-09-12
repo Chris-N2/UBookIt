@@ -70,6 +70,21 @@ public class DeliveryApiDocumentationTests
         DocumentationAssert.Says(DocsPage(), "neither switches the other");
     }
 
+    /// <summary>
+    /// QA round 3's nit: the spec accepts the placement-only disclosure asymmetry as
+    /// the site's own knowing choice, so the docs — the only place a site owner can
+    /// come to know it — must state it. If this goes, "knowingly" in the spec becomes
+    /// a claim about knowledge nobody was offered.
+    /// </summary>
+    [Fact]
+    public void The_placement_only_asymmetry_is_stated()
+    {
+        DocumentationAssert.Says(DocsPage(), "one property to accept knowingly");
+        DocumentationAssert.Says(
+            DocsPage(),
+            "can learn eligibility and occupancy facts from failures even though the reads that would publish those facts are off");
+    }
+
     /// <summary>The flip is breaking for existing consumers, and the docs must say so where the fix is.</summary>
     [Fact]
     public void The_breaking_default_flip_is_called_out()
