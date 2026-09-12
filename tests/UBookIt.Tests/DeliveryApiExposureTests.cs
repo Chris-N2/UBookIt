@@ -248,8 +248,7 @@ public class DeliveryApiExposureTests
     {
         var method = DeliveryActions().Single(m => m.Name == actionName);
         var controller = new Microsoft.AspNetCore.Mvc.ApplicationModels.ControllerModel(
-            method.DeclaringType!.GetTypeInfo(), [])
-        { };
+            method.DeclaringType!.GetTypeInfo(), []);
         var action = new Microsoft.AspNetCore.Mvc.ApplicationModels.ActionModel(method, []);
         action.Selectors.Add(new Microsoft.AspNetCore.Mvc.ApplicationModels.SelectorModel());
         controller.Actions.Add(action);
