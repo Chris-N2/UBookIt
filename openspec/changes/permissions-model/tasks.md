@@ -106,7 +106,7 @@ enforced by a composer registration needs a test that runs the composer.
       or superseded per each delta's guarantee-diff note. Counts at HEAD: 2609 .NET
       (1442 + 130 + 1037), 167 client, Release --no-incremental 0 warnings with the
       TestSite stopped.
-- [ ] 6.3 Live check on the TestSite: (a) fresh state — seed runs, admin group (holds
+- [x] 6.3 Live check on the TestSite: (a) fresh state — seed runs, admin group (holds
       the section) gains the three verbs, everything works as before; (b) create a
       second group with section + Read only, log in as a user in it (or verify via the
       API with that user's context): bookings visible, cancel refused, resources
@@ -116,8 +116,28 @@ enforced by a composer registration needs a test that runs the composer.
       **(a) DONE + one-shot proven headless (2026-09-12):** first boot seeded the admin
       group's three verbs into `umbracoUserGroup2Permission` with the log line and the
       flag; a restart granted nothing further (verb count still 3, flag count 1, no
-      grant line). **(b)(c)(d) await the browser** — Chrome disconnected while Chris is
-      out; paused here at his instruction.
+      grant line).
+      **(b)(c)(d) DONE in the browser (2026-09-12, Chris reconnected Chrome):**
+      (d) the three toggles render in the group editor under a "uBookIt" heading with
+      our labels/descriptions, TICKED for the seeded admin group, and persist through
+      save and reopen — **one defect found and fixed live**: the entity-type group
+      heading rendered as the raw key `user_permissionsEntityGroup_ubookit` until the
+      localization entry (extending Umbraco's own `user` section) was added.
+      (b) a "Perm Test" group (section + See bookings only) and a "Perm Tester" user in
+      it were created through the UI; logged in as that user: the nav shows only
+      uBookIt, the section opens straight into Bookings (Resources/Services views
+      hidden — no Configure), the table has NO Actions column (no Manage), the booker
+      column reads "Contact details hidden" (SD intact on top of Read), and the list
+      itself loaded (the server's Read policy admitted it). A new group's toggles
+      default OFF — the shell steady state observed.
+      (c) Perm Test's verbs were emptied via the UI and the site restarted: it stayed
+      at zero verbs while holding the section — the seedable shape — because the flag
+      held; emptied stays emptied, observed live. Admin session restored afterwards;
+      Perm Tester/Perm Test remain on the dev site as evidence.
+      **Browser-driving trap for the record: the group editor resets scroll on save, so
+      a coordinate-based click after saving hits whatever now sits at those
+      coordinates — one stray toggle was flipped and immediately undone. Screenshot
+      before every post-save click.**
 
 ## 7. Sync-time greps (run at sync, not before; do not tick until executed)
 

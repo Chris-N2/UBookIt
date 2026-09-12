@@ -440,6 +440,12 @@ export default {
     confirmBookingFailed: "The booking could not be confirmed.",
     declineBookingFailed: "The booking could not be declined.",
   },
+  // Extends Umbraco's own "user" localization section: the group editor derives the
+  // heading for each entity type's permission group as user_permissionsEntityGroup_<type>,
+  // and without this entry the RAW KEY renders as the heading (observed live).
+  user: {
+    permissionsEntityGroup_ubookit: "uBookIt",
+  },
   ubookitPermissions: {
     bookingsReadLabel: "See bookings",
     bookingsReadDescription:
