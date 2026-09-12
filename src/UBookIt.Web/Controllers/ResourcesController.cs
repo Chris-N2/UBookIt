@@ -20,6 +20,7 @@ public sealed class ResourcesController(
     IResourceStore resourceStore,
     SiteBookingSettings settings) : UBookItDeliveryApiControllerBase
 {
+    [DeliveryRead]
     [HttpGet("resources")]
     [ProducesResponseType<PagedResourcesModel>(StatusCodes.Status200OK)]
     public async Task<IActionResult> ListResources(
@@ -34,6 +35,7 @@ public sealed class ResourcesController(
         });
     }
 
+    [DeliveryRead]
     [HttpGet("resources/{id:guid}")]
     [ProducesResponseType<ResourceReadModel>(StatusCodes.Status200OK)]
     [ProducesResponseType<ProblemDetails>(StatusCodes.Status404NotFound)]

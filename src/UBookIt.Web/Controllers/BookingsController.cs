@@ -17,6 +17,7 @@ namespace UBookIt.Web.Controllers;
 [ApiExplorerSettings(GroupName = "UBookIt.Delivery")]
 public sealed class BookingsController(IBookingService bookingService) : UBookItDeliveryApiControllerBase
 {
+    [DeliveryPlacement]
     [HttpPost("bookings")]
     [ProducesResponseType<PlacementResponseModel>(StatusCodes.Status200OK)]
     [ProducesResponseType<ProblemDetails>(StatusCodes.Status400BadRequest)]

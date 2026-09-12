@@ -45,7 +45,13 @@ migration time rather than quietly misbehave.
 - **A booking page** you create like any other page. Point it at the whole catalogue, or at
   one service or resource. It uses your site's layout.
 - **A booking flow** that works without JavaScript, and a JSON delivery API if you would
-  rather build your own front end.
+  rather build your own front end. **The API is off by default** — an untouched install
+  exposes no anonymous endpoint, and each half (reads and booking placement) is enabled by
+  its own setting. When you do turn it on it is anonymous by design, it cannot know who is
+  calling (no header check or CORS policy can make an anonymous API know that), and volume
+  protection belongs to your host's rate limiting or edge — uBookIt makes no
+  DDoS-protection claim. The details, including the breaking change if you were already
+  using the API, are in [the delivery API](docs/delivery-api.md).
 - **A Bookings section** in the backoffice for seeing bookings, cancelling them, and — where
   you have asked for bookings to be approved rather than confirmed on the spot — confirming
   or declining them.
@@ -91,6 +97,8 @@ On the record as decisions, not gaps somebody discovers:
 - [The booking page](docs/booking-page.md) — creating it, the URL parameters, styling, the
   deployment note about committing the installed template, and the accessibility statement
 - [The backoffice](docs/backoffice.md) — resources, availability, services and bookings
+- [The delivery API](docs/delivery-api.md) — turning it on, what anonymous means, and
+  where volume protection belongs
 - [Reacting to bookings](docs/notifications.md) — the notifications and how to handle them
 - [Writing a theme](docs/theming.md) — replacing the rendering with your own views
 

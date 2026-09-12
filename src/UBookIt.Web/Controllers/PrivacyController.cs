@@ -34,6 +34,7 @@ namespace UBookIt.Web.Controllers;
 [ApiExplorerSettings(GroupName = "UBookIt.Delivery")]
 public sealed class PrivacyController(SiteBookingSettings settings) : UBookItDeliveryApiControllerBase
 {
+    [DeliveryRead]
     [HttpGet("privacy")]
     [ProducesResponseType<PrivacyModel>(StatusCodes.Status200OK)]
     public IActionResult GetPrivacy()

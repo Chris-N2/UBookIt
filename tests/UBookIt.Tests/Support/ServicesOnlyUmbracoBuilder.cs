@@ -14,9 +14,11 @@ namespace UBookIt.Tests.Support;
 /// </summary>
 /// <remarks>
 /// <para>
-/// Everything but <see cref="Services"/> throws. A composer that started reading
-/// configuration or the type loader says so here rather than being handed an invented answer
-/// — the same discipline the rendering suite's Umbraco context uses.
+/// Everything but <see cref="Services"/> throws — unless the test supplies a real answer. A
+/// composer that started reading configuration says so here rather than being handed an
+/// invented one, and the delivery-exposure composer did: callers that exercise it pass a
+/// real <see cref="IConfiguration"/> (in-memory is real — it is the binding that matters),
+/// while every other member keeps throwing.
 /// </para>
 /// <para>
 /// One implementation, deliberately, and extracted the moment a second caller appeared. The
@@ -24,11 +26,12 @@ namespace UBookIt.Tests.Support;
 /// a false failure, and the original stood defective beside it for a change and a half.
 /// </para>
 /// </remarks>
-public sealed class ServicesOnlyUmbracoBuilder(IServiceCollection services) : IUmbracoBuilder
+public sealed class ServicesOnlyUmbracoBuilder(
+    IServiceCollection services, IConfiguration? configuration = null) : IUmbracoBuilder
 {
     public IServiceCollection Services { get; } = services;
 
-    public IConfiguration Config => throw new NotSupportedException(Explanation);
+    public IConfiguration Config => configuration ?? throw new NotSupportedException(Explanation);
 
     public TypeLoader TypeLoader => throw new NotSupportedException(Explanation);
 
