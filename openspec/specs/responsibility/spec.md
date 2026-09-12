@@ -117,8 +117,9 @@ where assignments are edited — not a sending concern.
 ### Requirement: Assignments are managed through section-authorized endpoints
 
 The management API SHALL expose reading and writing of a subject's assignments under the same
-backoffice authorization every other management endpoint uses: access to the package's section,
-and nothing weaker. The read SHALL annotate each assignment with what its party currently
+backoffice authorization every other management endpoint uses — the section grant as the outer
+gate, refined since the `permissions` capability by its verbs, and for these endpoints the
+configuration verb, responsibility being configuration — and nothing weaker. The read SHALL annotate each assignment with what its party currently
 resolves to — a display name, whether it still exists, and its state where the party is a user —
 so an editor can show a stale or disabled assignment rather than hide it.
 

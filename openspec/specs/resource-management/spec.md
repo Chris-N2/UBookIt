@@ -23,6 +23,11 @@ booking carries the booker's name and email — and an endpoint that inherits it
 authorization from whichever policy was nearest to hand is how such data becomes reachable
 by people the site never granted it to.
 
+**The section is the outer gate, not the whole answer.** The `permissions` capability
+refines access within it by verb, so section access alone no longer reaches every
+endpoint — but no endpoint SHALL require access to any *other* section, and the section
+requirement SHALL never be removable by any verb.
+
 #### Scenario: Anonymous request is rejected
 - **WHEN** any management endpoint is called without backoffice authentication
 - **THEN** the response is 401 and no handler logic executes
@@ -31,8 +36,8 @@ by people the site never granted it to.
 - **WHEN** an authenticated backoffice user without access to the package's section calls a management endpoint
 - **THEN** the request is refused, whatever other sections they hold
 
-#### Scenario: Access to the package's section is sufficient
-- **WHEN** an authenticated backoffice user with access to the package's section calls a management endpoint
+#### Scenario: No other section is required
+- **WHEN** an authenticated backoffice user with access to the package's section and the endpoint's verb calls a management endpoint
 - **THEN** the request is authorized, without requiring access to any other section
 
 ### Requirement: Resource CRUD endpoints

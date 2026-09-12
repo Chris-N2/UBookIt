@@ -10,7 +10,10 @@ namespace UBookIt.Backoffice.Controllers
     /// applied in one place rather than per controller.
     /// </summary>
     /// <remarks>
-    /// The policy grants access on the basis of <b>uBookIt's own section</b>. It previously
+    /// The policy grants access on the basis of <b>uBookIt's own section</b> — the outer
+    /// gate; since the permissions model, each action additionally names a verb policy
+    /// (see <see cref="Constants.VerbPolicies"/>), and the totality guard fails any
+    /// action that names none. It previously
     /// used Umbraco's <c>SectionAccessContent</c>, which was wrong in both directions: a
     /// user granted uBookIt but not Content was refused an API for a section they could
     /// see, and a user granted Content but not uBookIt could call every uBookIt endpoint

@@ -32,10 +32,12 @@ carries contact details to a client which then declines to render them has discl
 the values are in the payload, readable in the browser's network tools by the very user the
 site meant to exclude. Withholding SHALL therefore remove the values, not hide them.
 
-**This is a second gate, not a replacement for the first.** Section access decides whether a
-user may reach uBookIt's management endpoints at all and SHALL continue to be required;
-sensitive-data access decides what those endpoints tell them. A user with neither reaches
-nothing; a user with section access alone reaches the bookings list without contact details.
+**This is a second gate, not a replacement for the first.** Section access — and, since the
+`permissions` capability, the booking read verb it requires — decides whether a user may
+reach uBookIt's booking endpoints at all and SHALL continue to be required; sensitive-data
+access decides what those endpoints tell them. A user with neither reaches nothing; a user
+who may reach the bookings list without sensitive-data access reaches it without contact
+details.
 
 #### Scenario: A permitted user sees contact details
 - **WHEN** a backoffice user with sensitive-data access reads bookings whose details have not been erased
@@ -46,7 +48,7 @@ nothing; a user with section access alone reaches the bookings list without cont
 - **THEN** no name or email is present, and the response reports the booking as erased rather than as withheld
 
 #### Scenario: A user without sensitive-data access does not
-- **WHEN** a backoffice user with section access but without sensitive-data access reads bookings
+- **WHEN** a backoffice user permitted to read bookings but without sensitive-data access reads them
 - **THEN** no booker name or email appears anywhere in the response, in any field, whether the details exist and are withheld or have been erased
 
 #### Scenario: The package uses Umbraco's own group

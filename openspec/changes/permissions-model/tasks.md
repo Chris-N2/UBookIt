@@ -141,7 +141,7 @@ enforced by a composer registration needs a test that runs the composer.
 
 ## 7. Sync-time greps (run at sync, not before; do not tick until executed)
 
-- [ ] 7.1 Outward sweep, wrap-normalised: sibling specs and Purpose prose for sentences
+- [x] 7.1 Outward sweep, wrap-normalised: sibling specs and Purpose prose for sentences
       the verbs falsify — candidates known now: `booking-management`'s "same terms as
       every other management endpoint" phrasing (check it survives), `backoffice.md`'s
       "one grant governs both halves" claim and the sensitive-data Purpose, any
@@ -149,9 +149,29 @@ enforced by a composer registration needs a test that runs the composer.
       management-endpoints requirement ("the same backoffice authorization every other
       management endpoint uses" — verify it reads correctly once endpoints differ by
       verb).
-- [ ] 7.2 Falsified-claims sweep over `README.md`, `docs/*.md`, XML doc comments —
+      **RUN at sync (2026-09-12), findings:** ONE falsification, fixed by delta with the
+      body verbatim except the sentence — its title unwrapped for the guard:
+      - Assignments are managed through section-authorized endpoints
+      (the colon-enumeration "access to the package's section, and nothing weaker"
+      described the whole authorization; it now names the outer gate refined by the
+      configuration verb.) Checked and NOT falsified, wrap-normalised: `services`' own
+      authorization requirement (necessary conditions only — 401, never anonymous — all
+      still true); `booking-management`'s "same terms as every other management
+      endpoint" (the terms moved together); `booker-erasure` and `booking-management`'s
+      "section access alone is not enough/cannot erase/search" scenarios (a fortiori);
+      `sensitive-data`'s "no endpoint gated on section access alone accepts one" (now
+      vacuously stronger); `delivery-api` (explicitly NOT backoffice-authorized).
+- [x] 7.2 Falsified-claims sweep over `README.md`, `docs/*.md`, XML doc comments —
       candidates known now: `UBookItBackofficeApiControllerBase` remarks ("that single
       grant governs both"), `docs/backoffice.md` "Who can use it" section (rewritten in
       5.1 but sweep the rest), `UBookItSectionHandler` docs, the responsibility docs'
       "will still receive the messages" claim about users who cannot see the bookings
       screen (still true — verify).
+      **RUN at sync (2026-09-12), findings:** `docs/backoffice.md`'s "Who can use it"
+      was already rewritten in 5.1 (the "one grant governs both halves / nothing else to
+      configure" claims died there); the base controller's remark gains the
+      verbs-refine-the-gate sentence; `UBookItSectionHandler` docs describe the section
+      handler only (accurate); `notifications.md`'s "does not apply here" (no signed-in
+      user in a handler) still true; the responsibility docs' "will still receive the
+      messages" claim still true — resolution reads verbs never. The only "nothing else
+      to configure" left in the repo is the TestSite README's, about databases.
