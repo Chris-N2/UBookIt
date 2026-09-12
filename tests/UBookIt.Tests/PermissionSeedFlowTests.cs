@@ -63,27 +63,30 @@ public class PermissionSeedFlowTests
     [Fact]
     public async Task A_failed_update_leaves_the_flag_unwritten_and_does_not_throw()
     {
+        // The FIRST group fails (QA round 2's nit): this pins that the loop continues
+        // past a failure and still grants the later group — abort-on-first-failure
+        // would leave `second` ungranted and this test red.
         var first = SectionGroupWithoutVerbs();
         var second = SectionGroupWithoutVerbs();
-        var groups = new StubUserGroupService(first, second) { FailUpdateFor = second };
+        var groups = new StubUserGroupService(first, second) { FailUpdateFor = first };
         var flags = new StubFlagStore();
 
         await RunAsync(flags, groups);
 
         Assert.False(flags.SetCalled);
-        Assert.Same(first, Assert.Single(groups.Updated));
+        Assert.Same(second, Assert.Single(groups.Updated));
 
         // The retry, as the next boot would see it: the granted group's PERSISTED state
         // holds the verbs (it was updated), so the selection rule skips it; the failed
         // group's persisted state holds none — the in-memory mutation the seed made
         // before the failed update is discarded with the boot — so it is retried. The
         // fresh instance below is that re-read, made explicit rather than assumed.
-        Assert.Contains(Constants.Verbs.Configure, first.Permissions);
-        Assert.False(UBookItPermissionSeed.ShouldSeed(first.AllowedSections, first.Permissions));
+        Assert.Contains(Constants.Verbs.Configure, second.Permissions);
+        Assert.False(UBookItPermissionSeed.ShouldSeed(second.AllowedSections, second.Permissions));
 
-        var secondAsPersisted = SectionGroupWithoutVerbs();
+        var firstAsPersisted = SectionGroupWithoutVerbs();
         Assert.True(UBookItPermissionSeed.ShouldSeed(
-            secondAsPersisted.AllowedSections, secondAsPersisted.Permissions));
+            firstAsPersisted.AllowedSections, firstAsPersisted.Permissions));
     }
 
     [Fact]
