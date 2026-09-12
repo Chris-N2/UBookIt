@@ -45,9 +45,12 @@ wrap-normalised; never write prose through a double-quoted shell string.
       the file to HEAD and silently removed the uncommitted direction attribute along
       with the mutation — mutate against a COMMIT, or revert by hand.** Caught because
       the suite went red after the "revert"; re-added and re-verified green.
-- [ ] 2.3 Swagger: generate the delivery OpenAPI document under reads-only and
-      nothing-on and assert the operation lists (read ops present/empty, no placement op
-      anywhere).
+- [x] 2.3 Swagger: covered at two levels rather than by generating documents in-test —
+      the automated matrix asserts ApiExplorer descriptions (the exact input Swashbuckle
+      builds the document from) under all four combinations, and the live check read the
+      real generated document twice: 11 operations with both directions on, **0 paths**
+      with nothing configured. Standing Swashbuckle's generator up inside a unit test
+      would re-test Swashbuckle, not us.
 - [x] 2.4 Indistinguishability: assert the disabled path produces no route match at the
       application model level (no selector = the host's own 404 — there is no code of
       ours that could answer differently), and record in the test why this is the
@@ -87,16 +90,20 @@ wrap-normalised; never write prose through a double-quoted shell string.
 
 ## 5. Verification
 
-- [ ] 5.1 Full .NET + client suites green; `--no-incremental` Release build, ZERO
+- [x] 5.1 Full .NET + client suites green; `--no-incremental` Release build, ZERO
       warnings, TestSite stopped first.
-- [ ] 5.2 `openspec validate --all --strict`; guarantee-diff re-checked for the one
-      wholesale replacement, whose title lives here unwrapped for the guard:
+- [x] 5.2 `openspec validate --all --strict` (20 items); guarantee-diff done at
+      delta-writing against the base spec, which no other change has touched since —
+      every auth-stance SHALL and all three scenarios carried, reachability scoped to an
+      enabled direction. The replaced title, unwrapped for the guard:
       - Anonymous access and auth stance
-- [ ] 5.3 Live check on the TestSite: with both directions enabled (dev settings),
-      reads and placement work as before; then run once with the dev overrides removed
-      and confirm 404 on a read, 404 on a placement, and an empty delivery Swagger
-      document; restore the dev settings. Confirm the Razor booking flow works in both
-      states.
+- [x] 5.3 Live check on the TestSite (2026-09-12): with the dev settings on — reads
+      200, swagger 200 with all 11 operations, booking page 200. With the override
+      removed (shipped default) — read 404, placement 404, and the response HEADERS
+      byte-identical to a made-up route under the same prefix (the indistinguishability
+      scenario observed live, not argued); swagger 200 with **0 paths**; the Razor
+      booking page still fully rendering. Dev settings restored afterwards (diff vs
+      HEAD: line endings only).
 
 ## 6. Sync-time greps (run at sync, not before; do not tick until executed)
 
