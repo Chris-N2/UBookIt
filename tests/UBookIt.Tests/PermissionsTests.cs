@@ -134,9 +134,11 @@ public class PermissionsTests
         var module = RepoFiles.Read("src/UBookIt.Backoffice/Client/src/section/permission-verbs.ts");
         var manifest = RepoFiles.Read("src/UBookIt.Backoffice/Client/src/section/manifest.ts");
 
-        Assert.Contains($"\"{Constants.Verbs.BookingsRead}\"", module, StringComparison.Ordinal);
-        Assert.Contains($"\"{Constants.Verbs.BookingsManage}\"", module, StringComparison.Ordinal);
-        Assert.Contains($"\"{Constants.Verbs.Configure}\"", module, StringComparison.Ordinal);
+        // Anchored on the CONSTANT BINDINGS, not mere presence: a comment quoting a verb
+        // string could otherwise mask a typo'd constant (QA round 1's nit).
+        Assert.Contains($"BOOKINGS_READ_VERB = \"{Constants.Verbs.BookingsRead}\"", module, StringComparison.Ordinal);
+        Assert.Contains($"BOOKINGS_MANAGE_VERB = \"{Constants.Verbs.BookingsManage}\"", module, StringComparison.Ordinal);
+        Assert.Contains($"CONFIGURE_VERB = \"{Constants.Verbs.Configure}\"", module, StringComparison.Ordinal);
 
         // The manifest declares exactly three permission entries, one per verb, via the
         // module's constants (so the manifest cannot drift from the module, and the
@@ -212,6 +214,40 @@ public class PermissionsTests
         {
             Assert.False(await AuthorizeAsync(user, policy));
         }
+    }
+
+    /// <summary>
+    /// QA round 1's second MAJOR, the enumerate-the-class lesson verbatim: every policy
+    /// carrying the OpenIddict scheme line has a guard asserting it survives, because
+    /// deleting that exact line once "passed 860/860" — and the three verb policies
+    /// arrived carrying the line with no guard. Composed for real, read back through
+    /// the policy provider, exactly as the section and sensitive-data guards do.
+    /// </summary>
+    [Theory]
+    [InlineData(Constants.VerbPolicies.BookingsRead)]
+    [InlineData(Constants.VerbPolicies.BookingsManage)]
+    [InlineData(Constants.VerbPolicies.Configure)]
+    public async Task Each_verb_policy_carries_the_scheme_and_both_requirements(string policyName)
+    {
+        var services = new ServiceCollection();
+        services.AddLogging();
+
+        new UBookItAuthorizationComposer().Compose(new ServicesOnlyUmbracoBuilder(services));
+
+        await using var provider = services.BuildServiceProvider();
+        var policy = await provider
+            .GetRequiredService<IAuthorizationPolicyProvider>()
+            .GetPolicyAsync(policyName);
+
+        Assert.NotNull(policy);
+        Assert.Contains(
+            OpenIddict.Validation.AspNetCore.OpenIddictValidationAspNetCoreDefaults.AuthenticationScheme,
+            policy.AuthenticationSchemes);
+
+        var requirements = policy.Requirements.Select(r => r.GetType()).ToList();
+
+        Assert.Contains(typeof(UBookIt.Backoffice.Security.UBookItSectionRequirement), requirements);
+        Assert.Contains(typeof(UBookIt.Backoffice.Security.UBookItVerbRequirement), requirements);
     }
 
     // ---- the seed's selection rule, arm by arm ----
