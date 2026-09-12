@@ -271,3 +271,15 @@ internal static class ResponsibilityPartyTypes
 
     public const string Group = "group";
 }
+
+/// <summary>
+/// Table: uBookItFlag. One row per one-shot operation the package has completed —
+/// the permissions seed is the first. The key is the primary key: a flag exists or
+/// it does not, and carries nothing but when it was applied. No personal data, ever.
+/// </summary>
+internal sealed class FlagRow
+{
+    public required string Key { get; set; }
+
+    public DateTimeOffset AppliedUtc { get; set; }
+}

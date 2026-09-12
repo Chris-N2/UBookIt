@@ -22,7 +22,8 @@ namespace UBookIt.Backoffice.Controllers;
 /// <para>
 /// Depends on the booking <b>management</b> port and validated Core types only — never on
 /// <c>IBookingStore</c> or <c>Booking.Rehydrate</c>, per the HTTP-caller containment
-/// requirement. Authorization comes from the shared base controller.
+/// requirement. The shared base controller supplies the section gate; each action names
+/// its own verb policy on top (see <see cref="Constants.VerbPolicies"/>).
 /// </para>
 /// <para>
 /// Reads through the management port and changes a booking's status through the Core booking
@@ -32,10 +33,12 @@ namespace UBookIt.Backoffice.Controllers;
 /// not here; its shape is a cancellation and a new booking.
 /// </para>
 /// <para>
-/// <b>Two gates, answering different questions.</b> The base controller's section policy
-/// decides whether this user may reach uBookIt at all; Umbraco's sensitive-data access decides
-/// whether the rows they get carry the booker's contact details. A user holding the section
-/// alone gets every booking, without the people.
+/// <b>Three gates, answering different questions.</b> The base controller's section policy
+/// decides whether this user may reach uBookIt at all; each action's verb policy decides
+/// whether they may see bookings (or, for the status verbs, act on them); Umbraco's
+/// sensitive-data access decides whether the rows they get carry the booker's contact
+/// details. A user holding the section and the see-bookings permission gets every booking,
+/// without the people; the section alone gets a <c>403</c>.
 /// </para>
 /// </remarks>
 [ApiVersion("1.0")]
@@ -65,6 +68,7 @@ public class BookingsController(
     /// <param name="resourceIds">
     /// Return only bookings claiming any of these resources. Omitted means no filter.
     /// </param>
+    [Authorize(Policy = Constants.VerbPolicies.BookingsRead)]
     [HttpGet("bookings")]
     [ProducesResponseType<PagedBookingsModel>(StatusCodes.Status200OK)]
     [ProducesResponseType(StatusCodes.Status400BadRequest)]
@@ -179,6 +183,7 @@ public class BookingsController(
     /// </para>
     /// </remarks>
     /// <param name="id">The booking to cancel.</param>
+    [Authorize(Policy = Constants.VerbPolicies.BookingsManage)]
     [HttpPost("bookings/{id:guid}/cancel")]
     [ProducesResponseType<CancelledBookingModel>(StatusCodes.Status200OK)]
     [ProducesResponseType(StatusCodes.Status400BadRequest)]
@@ -215,6 +220,7 @@ public class BookingsController(
     /// </para>
     /// </remarks>
     /// <param name="id">The booking to confirm.</param>
+    [Authorize(Policy = Constants.VerbPolicies.BookingsManage)]
     [HttpPost("bookings/{id:guid}/confirm")]
     [ProducesResponseType<ConfirmedBookingModel>(StatusCodes.Status200OK)]
     [ProducesResponseType(StatusCodes.Status400BadRequest)]
@@ -252,6 +258,7 @@ public class BookingsController(
     /// </para>
     /// </remarks>
     /// <param name="id">The booking to decline.</param>
+    [Authorize(Policy = Constants.VerbPolicies.BookingsManage)]
     [HttpPost("bookings/{id:guid}/decline")]
     [ProducesResponseType<DeclinedBookingModel>(StatusCodes.Status200OK)]
     [ProducesResponseType(StatusCodes.Status400BadRequest)]
@@ -308,6 +315,7 @@ public class BookingsController(
     /// asking — not from a count, not from an error, and not from how long it took.
     /// </para>
     /// </remarks>
+    [Authorize(Policy = Constants.VerbPolicies.BookingsRead)]
     [HttpPost("bookings/find-by-booker")]
     [Authorize(Policy = Constants.SensitiveDataAccessPolicy)]
     [ProducesResponseType<PagedBookingsModel>(StatusCodes.Status200OK)]
@@ -385,6 +393,7 @@ public class BookingsController(
     /// </para>
     /// </remarks>
     /// <param name="id">The booking whose booker to erase.</param>
+    [Authorize(Policy = Constants.VerbPolicies.BookingsRead)]
     [HttpPost("bookings/{id:guid}/erase-booker")]
     [Authorize(Policy = Constants.SensitiveDataAccessPolicy)]
     [ProducesResponseType<ErasedBookerModel>(StatusCodes.Status200OK)]

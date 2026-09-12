@@ -133,13 +133,16 @@ public class FindByBookerEndpointTests
     [Fact]
     public void The_search_requires_sensitive_data_access_by_policy()
     {
-        var action = typeof(BookingsController)
-            .GetMethod(nameof(BookingsController.FindBookingsByBooker))!;
+        // Among the action's policies, no longer alone: the permissions model added the
+        // booking read verb BESIDE this gate (its spec: "Sensitive-data gates are joined
+        // by verbs, never replaced"), so this asserts membership rather than singularity
+        // — and asserts the companion too, so the pair is a decision, not an accident.
+        var action = typeof(BookingsController).GetMethod(nameof(BookingsController.FindBookingsByBooker))!;
 
-        var authorize = action.GetCustomAttributes<AuthorizeAttribute>().SingleOrDefault();
+        var policies = action.GetCustomAttributes<AuthorizeAttribute>().Select(a => a.Policy).ToList();
 
-        Assert.NotNull(authorize);
-        Assert.Equal(UBookIt.Backoffice.Constants.SensitiveDataAccessPolicy, authorize.Policy);
+        Assert.Contains(UBookIt.Backoffice.Constants.SensitiveDataAccessPolicy, policies);
+        Assert.Contains(UBookIt.Backoffice.Constants.VerbPolicies.BookingsRead, policies);
     }
 
     [Fact]

@@ -34,5 +34,38 @@ namespace UBookIt.Backoffice
         /// on the people inside it.
         /// </remarks>
         public const string SensitiveDataAccessPolicy = "UBookItSensitiveDataAccess";
+
+        /// <summary>
+        /// The permission verbs, exactly as a user group stores them once toggled in the
+        /// group editor — free strings on <c>IUserGroup.Permissions</c>, persisted verbatim
+        /// by Umbraco with no server-side registration. This class is the single vocabulary:
+        /// the client manifest, the policies and the seed all read these, and a guard fails
+        /// when the manifest and these constants disagree.
+        /// </summary>
+        public static class Verbs
+        {
+            /// <summary>The bookings list and every read over bookings.</summary>
+            public const string BookingsRead = "UBookIt.Bookings.Read";
+
+            /// <summary>Cancelling, confirming and declining bookings. Implies <see cref="BookingsRead"/> — in the authorization rule, never by copying verbs onto groups.</summary>
+            public const string BookingsManage = "UBookIt.Bookings.Manage";
+
+            /// <summary>Resources, services, their supporting reads, and responsibility assignment.</summary>
+            public const string Configure = "UBookIt.Configure";
+        }
+
+        /// <summary>
+        /// The verb policies. Each carries the section requirement as well as its verb, so
+        /// naming one on an action can only ever ADD a condition — the same reasoning the
+        /// sensitive-data policy records.
+        /// </summary>
+        public static class VerbPolicies
+        {
+            public const string BookingsRead = "UBookItBookingsRead";
+
+            public const string BookingsManage = "UBookItBookingsManage";
+
+            public const string Configure = "UBookItConfigure";
+        }
     }
 }

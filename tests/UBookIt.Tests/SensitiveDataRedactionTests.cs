@@ -442,6 +442,11 @@ public class SensitiveDataRedactionTests
             "BookingRow: BookerEmail,BookerErasedUtc,BookerName,BookerPhone,Claims,CreatedUtc,EndUtc,Id,MemberKey,Reference,ServiceId,ServiceName,StartUtc,Status,TimeZoneId",
             "ClaimRow: BookingId,Id,ResourceId",
             "ExceptionRow: Date,EndTime,Id,ResourceId,StartTime",
+            // Decision, permissions-model (roadmap 0.10.0): a one-shot marker — an
+            // operation key and when it was applied, nothing else. No personal data can
+            // reach it: the key names an operation, never a person.
+            "FlagRow: AppliedUtc,Key",
+
             "OpenHoursRow: DayOfWeek,EndTime,Id,ResourceId,StartTime",
             "ResourceCapabilityRow: Key,ResourceId",
             "ResourceRow: Capabilities,Description,DirectlyBookable,DisplayName,Exceptions,GranularityMinutes,HorizonDays,Id,LeadTimeMinutes,MaxDurationMinutes,MinDurationMinutes,OpenHours,Type",
@@ -608,7 +613,8 @@ public class SensitiveDataRedactionTests
         // caller who could already read every address on the page learns nothing from asking
         // about one; a caller who could not must not be able to ask at all. So the tripwire
         // still fires on exactly the thing it was built to catch — a filter added to an
-        // endpoint gated on section access alone — and no longer fires on the gated lookup.
+        // endpoint without sensitive-data access in its OWN authorization, whatever else
+        // (section, verbs) gates it — and no longer fires on the gated lookup.
         //
         // It is a POLICY that satisfies this, never a check inside a handler: a condition
         // somebody must remember to write leaves a route that reaches the query having
@@ -707,9 +713,11 @@ public class SensitiveDataRedactionTests
                 classifiedActions.Add(
                     $"{controller.Name}.{method.Name} = {(isWrite ? "write" : "read")}");
 
-                // The action's OWN authorization, not the controller's. The base controller's
-                // section policy applies to everything and would make every endpoint look
-                // gated; what this requirement is about is the second, narrower gate.
+                // The action's OWN authorization, and the SD policy by NAME. The base
+                // controller's section policy applies to everything, and since the permission
+                // verbs every action carries a verb policy of its own — so counting Authorize
+                // attributes would make every endpoint look gated. What this requirement is
+                // about is the sensitive-data gate specifically, so that is what is named.
                 var gated = method.GetCustomAttributes<AuthorizeAttribute>()
                     .Any(attribute => attribute.Policy == UBookIt.Backoffice.Constants.SensitiveDataAccessPolicy);
 

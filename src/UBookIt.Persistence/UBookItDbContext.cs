@@ -33,6 +33,8 @@ public sealed class UBookItDbContext(DbContextOptions<UBookItDbContext> options)
 
     internal DbSet<ResponsibilityRow> Responsibilities => Set<ResponsibilityRow>();
 
+    internal DbSet<FlagRow> Flags => Set<FlagRow>();
+
     /// <summary>
     /// Single place that configures the SQL Server provider (uBookIt requires
     /// SQL Server 2019+) with the package-private migrations history table.
@@ -214,6 +216,13 @@ public sealed class UBookItDbContext(DbContextOptions<UBookItDbContext> options)
             // the subject side one would make the two halves behave
             // differently for no query we run; the stores delete assignment
             // rows with their owner instead.
+        });
+
+        modelBuilder.Entity<FlagRow>(flag =>
+        {
+            flag.ToTable("uBookItFlag");
+            flag.HasKey(f => f.Key);
+            flag.Property(f => f.Key).HasMaxLength(128);
         });
     }
 }

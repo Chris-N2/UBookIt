@@ -440,6 +440,23 @@ export default {
     confirmBookingFailed: "The booking could not be confirmed.",
     declineBookingFailed: "The booking could not be declined.",
   },
+  // Extends Umbraco's own "user" localization section: the group editor derives the
+  // heading for each entity type's permission group as user_permissionsEntityGroup_<type>,
+  // and without this entry the RAW KEY renders as the heading (observed live).
+  user: {
+    permissionsEntityGroup_ubookit: "uBookIt",
+  },
+  ubookitPermissions: {
+    bookingsReadLabel: "See bookings",
+    bookingsReadDescription:
+      "View the Bookings list. Contact details still need the Sensitive data group on top.",
+    bookingsManageLabel: "Act on bookings",
+    bookingsManageDescription:
+      "Cancel, confirm and decline bookings. Includes seeing them — acting on what you cannot see makes no sense, so this does not need 'See bookings' ticked as well.",
+    configureLabel: "Configure resources and services",
+    configureDescription:
+      "Create, edit and delete resources and services, and assign who is responsible for them.",
+  },
   ubookitResponsibility: {
     headline: "Responsibility",
     hint: "Who is emailed about this item's bookings — being responsible does not grant or restrict access to anything.",

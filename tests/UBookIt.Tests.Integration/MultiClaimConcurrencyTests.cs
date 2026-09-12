@@ -282,6 +282,12 @@ public class MultiClaimConcurrencyTests(SqlServerFixture fixture)
                 // referenced or altered — the guarantee above still holds. Who is
                 // emailed about a booking changes nothing about what it claims.
                 "20260911190750_AddResponsibility",
+
+                // One new table, `uBookItFlag` (operation key + applied instant, key PK),
+                // for one-shot markers — the permissions seed is the first. Checked:
+                // neither `uBookItResourceClaim` nor `uBookItBooking` is referenced or
+                // altered — the guarantee above still holds.
+                "20260912123308_AddFlags",
             ],
             applied.OrderBy(name => name, StringComparer.Ordinal));
 

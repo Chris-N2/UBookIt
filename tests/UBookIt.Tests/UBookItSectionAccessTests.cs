@@ -97,10 +97,13 @@ public class UBookItSectionAccessTests
     }
 
     [Fact]
-    public async Task The_packages_section_alone_is_sufficient()
+    public async Task The_packages_section_alone_satisfies_the_section_policy()
     {
         // The other half: a user granted uBookIt and nothing else was previously refused
-        // an API for the only section they had.
+        // an API for the only section they had. "Satisfies the SECTION policy", precisely:
+        // since the permission verbs, this is the outer gate and no longer the whole of
+        // authorization — a section-only user passes here and is refused by every verb
+        // policy (PermissionsTests).
         Assert.True(await IsAuthorizedAsync(UserWithSections(Constants.SectionAlias)));
         Assert.False(await IsAuthorizedAsync(UserWithSections()));
     }

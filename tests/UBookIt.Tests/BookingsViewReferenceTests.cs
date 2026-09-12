@@ -211,10 +211,27 @@ public class BookingsViewReferenceTests
         // The response already says what happened. A second source could answer "yes, you may"
         // over a row that was withheld anyway, leaving a blank cell and no explanation — the
         // exact failure the note exists to prevent, arriving by the route meant to prevent it.
+        //
+        // Previously asserted "currentUser" appears NOWHERE in the file — the mechanism,
+        // and the permissions model falsified it: the view now legitimately consults the
+        // current user's VERBS to hide the action buttons, which is a different question
+        // from whether details may be shown. The guarantee is that the DETAIL-rendering
+        // path consults no second source, so the absence is asserted over the booker
+        // cell's own code, anchored the way the note guard above anchors.
         var source = RepoFiles.Read(Element);
 
         Assert.DoesNotContain("hasAccessToSensitiveData", source, StringComparison.OrdinalIgnoreCase);
-        Assert.DoesNotContain("currentUser", source, StringComparison.OrdinalIgnoreCase);
+
+        var cell = source.IndexOf("#bookerCell(", StringComparison.Ordinal);
+        Assert.True(cell > 0, "The booker cell has moved and this guard is measuring nothing.");
+
+        var nextMember = source.IndexOf("\n  #", cell + 1, StringComparison.Ordinal);
+        Assert.True(nextMember > cell, "The booker cell is no longer followed by another member.");
+
+        var cellBody = source[cell..nextMember];
+        Assert.DoesNotContain("currentUser", cellBody, StringComparison.OrdinalIgnoreCase);
+        Assert.DoesNotContain("fallbackPermissions", cellBody, StringComparison.OrdinalIgnoreCase);
+        Assert.DoesNotContain("_canManage", cellBody, StringComparison.Ordinal);
     }
 
     [Fact]

@@ -24,11 +24,12 @@ public sealed class UBookItSensitiveDataRequirement : IAuthorizationRequirement;
 /// caller who does not satisfy it never arrives.
 /// </para>
 /// <para>
-/// <b>It composes with the section policy, it does not replace it.</b> Both apply to an
-/// endpoint carrying this attribute, because they answer different questions: the section
-/// decides whether a user may reach uBookIt at all, and this decides whether they may act on
-/// the people inside it. A user with neither reaches nothing; a user with the section alone
-/// reaches the bookings list without contact details, and cannot erase them.
+/// <b>It composes with the section and verb policies, it does not replace them.</b> All
+/// apply to an endpoint carrying this attribute, because they answer different questions:
+/// the section decides whether a user may reach uBookIt at all, the endpoint's verb policy
+/// decides what they may do inside it, and this decides whether they may act on the people.
+/// A user with the section and the read verb reaches the bookings list without contact
+/// details, and cannot erase them; the section alone reaches nothing at all.
 /// </para>
 /// <para>
 /// <b>It reuses Umbraco's own membership test</b> rather than inventing a group, flag or

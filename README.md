@@ -54,7 +54,9 @@ migration time rather than quietly misbehave.
   using the API, are in [the delivery API](docs/delivery-api.md).
 - **A Bookings section** in the backoffice for seeing bookings, cancelling them, and — where
   you have asked for bookings to be approved rather than confirmed on the spot — confirming
-  or declining them.
+  or declining them. **With permissions per user group**: seeing bookings, acting on them,
+  and configuring resources and services are separate grants within the section, ticked in
+  the ordinary Umbraco group editor.
 - **Approval, if you want it.** `UBookIt:AutoConfirm` is on by default, so bookings confirm
   immediately; turn it off and each one waits for somebody to confirm or decline it, holding
   its time meanwhile.
