@@ -613,7 +613,8 @@ public class SensitiveDataRedactionTests
         // caller who could already read every address on the page learns nothing from asking
         // about one; a caller who could not must not be able to ask at all. So the tripwire
         // still fires on exactly the thing it was built to catch — a filter added to an
-        // endpoint gated on section access alone — and no longer fires on the gated lookup.
+        // endpoint without sensitive-data access in its OWN authorization, whatever else
+        // (section, verbs) gates it — and no longer fires on the gated lookup.
         //
         // It is a POLICY that satisfies this, never a check inside a handler: a condition
         // somebody must remember to write leaves a route that reaches the query having
@@ -712,9 +713,11 @@ public class SensitiveDataRedactionTests
                 classifiedActions.Add(
                     $"{controller.Name}.{method.Name} = {(isWrite ? "write" : "read")}");
 
-                // The action's OWN authorization, not the controller's. The base controller's
-                // section policy applies to everything and would make every endpoint look
-                // gated; what this requirement is about is the second, narrower gate.
+                // The action's OWN authorization, and the SD policy by NAME. The base
+                // controller's section policy applies to everything, and since the permission
+                // verbs every action carries a verb policy of its own — so counting Authorize
+                // attributes would make every endpoint look gated. What this requirement is
+                // about is the sensitive-data gate specifically, so that is what is named.
                 var gated = method.GetCustomAttributes<AuthorizeAttribute>()
                     .Any(attribute => attribute.Policy == UBookIt.Backoffice.Constants.SensitiveDataAccessPolicy);
 

@@ -175,3 +175,44 @@ enforced by a composer registration needs a test that runs the composer.
       user in a handler) still true; the responsibility docs' "will still receive the
       messages" claim still true — resolution reads verbs never. The only "nothing else
       to configure" left in the repo is the TestSite README's, about databases.
+
+## QA round 4 (sync scope) — REJECT, and the fix (2026-09-12)
+
+The 7.2 sweep above verified its four NAMED candidates and did not enumerate the class —
+the finding-enumerates-a-sample lesson recurring inside the sweep itself. QA found two
+falsified XML remarks squarely in scope:
+
+- [x] R4.1 [MAJOR] `UBookItSensitiveDataAccess.cs` — "a user with the section alone
+      reaches the bookings list without contact details". Post-verbs the section alone
+      reaches nothing. Rewritten: composes with section AND verb policies; section+read
+      reaches the list without contact details; section alone reaches nothing at all.
+- [x] R4.2 [MAJOR] `BookingsController.cs` — "Two gates… A user holding the section
+      alone gets every booking" and "Authorization comes from the shared base
+      controller". Rewritten: three gates; section+see-bookings gets every booking
+      without the people; section alone gets a 403; base supplies the section gate and
+      each action names its verb policy.
+- [x] R4.3 Class re-sweep at HEAD, wrap-normalised, per QA's instruction ("the applier
+      should re-sweep the class rather than fix exactly two"). Patterns: section
+      alone/holding the section/reaches the bookings/gate counts/base controller/
+      nothing weaker/sufficient-family. SEVEN more members found and fixed:
+      `ResourcesController` + `ServicesController` summaries (same "Authorization comes
+      from the shared base controller" sentence QA caught on Bookings);
+      `ResponsibilityController` summary (also carried the SUPERSEDED "nothing here for
+      a finer policy to protect" rationale — now states the responsibility spec's own
+      wording: section gate refined by the configuration verb, and nothing weaker);
+      `UBookItSensitiveDataAccessTests` ("the two gates are genuinely independent" +
+      "a caller the site permitted to SEE bookings" said of a section-only fixture);
+      `SensitiveDataRedactionTests` × 2 ("the second, narrower gate" count; the
+      tripwire's "endpoint gated on section access alone");
+      `ServicePreviewEndpointTests` ("the policy is on the shared base controller" as
+      the whole authorization story — now defers the verb half to PermissionsTests);
+      `UBookItSectionAccessTests` test renamed
+      `The_packages_section_alone_satisfies_the_section_policy` with the boundary
+      stated (outer gate, no longer the whole of authorization).
+      Checked and NOT falsified: controller-test summaries claiming only ANONYMOUS
+      rejection from the base policy (true); the seed's upgrade-risk comment;
+      `PermissionsTests`' own "section alone" (new code, accurate); delivery-side
+      "base controller" (unrelated, anonymous by design); the pool-sufficiency
+      vocabulary (unrelated "sufficient" family).
+      Verified after: 2618 .NET (1451 + 130 + 1037) + 167 client green, Release
+      no-incremental 0 warnings.

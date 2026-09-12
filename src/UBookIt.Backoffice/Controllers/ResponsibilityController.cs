@@ -10,11 +10,11 @@ using UBookIt.Persistence.Responsibility;
 namespace UBookIt.Backoffice.Controllers;
 
 /// <summary>
-/// Reads and writes the responsible parties of a resource or service. Authorization comes
-/// from the shared base controller: the package's own section, and nothing weaker —
-/// deliberately the SAME authorization as every other endpoint, because responsibility is
-/// who is emailed about bookings and grants nothing, so there is nothing here for a finer
-/// policy to protect.
+/// Reads and writes the responsible parties of a resource or service. Authorized as the
+/// responsibility spec states it: the shared base controller's section gate, refined by
+/// each action's verb policy — here the configuration verb, responsibility being
+/// configuration — and nothing weaker. Deliberately the SAME shape as every other
+/// management endpoint.
 /// </summary>
 /// <remarks>
 /// <para>

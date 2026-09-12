@@ -12,7 +12,8 @@ namespace UBookIt.Backoffice.Controllers;
 /// <summary>
 /// Service management endpoints. Depends only on the service read/management
 /// ports and on Core resolution — never on booking storage (HTTP-caller
-/// containment). Authorization comes from the shared base controller.
+/// containment). The shared base controller supplies the section gate; each action names
+/// the configuration verb policy on top (see <see cref="Constants.VerbPolicies"/>).
 /// </summary>
 [ApiVersion("1.0")]
 [ApiExplorerSettings(GroupName = "UBookIt.Backoffice")]

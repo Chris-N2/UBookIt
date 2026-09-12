@@ -116,10 +116,12 @@ public class UBookItSensitiveDataAccessTests
     [Fact]
     public async Task Section_access_alone_does_not_grant_it()
     {
-        // The fixture above gives every user the package's section, so this asserts the two
-        // gates are genuinely independent: holding the section is not holding this. A caller
-        // the site permitted to SEE bookings must not thereby be permitted to destroy the
-        // people in them.
+        // The fixture above gives every user the package's section, so this asserts the
+        // sensitive-data gate is independent of it: holding the section is not holding this.
+        // (Since the verbs, the section alone no longer reaches the list either — but that is
+        // the verb policies' refusal, tested in PermissionsTests; THIS gate must refuse on its
+        // own grounds, not lean on theirs.) A caller the site permits to see bookings must not
+        // thereby be permitted to destroy the people in them.
         var sectionOnly = UserInGroup(Guid.NewGuid());
 
         Assert.Contains(

@@ -597,10 +597,11 @@ public class ServicePreviewEndpointTests
     // ------------------------------------------------------------ contract shape
 
     /// <summary>
-    /// Spec scenario "Authorization is required": asserted structurally, as this
-    /// repository asserts every other management endpoint's authorization — the
+    /// Spec scenario "Authorization is required": asserted structurally — the section
     /// policy is on the shared base controller, so a request without backoffice
-    /// authentication is rejected by the framework before the action runs.
+    /// authentication is rejected by the framework before the action runs. The verb
+    /// policy the action itself names is covered where every action's is:
+    /// <c>PermissionsTests</c>' recorded classification and real-pipeline checks.
     /// </summary>
     [Fact]
     public void Spec_scenario_authorization_is_required()
