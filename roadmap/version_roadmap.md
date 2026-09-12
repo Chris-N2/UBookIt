@@ -189,10 +189,30 @@ cancel both get an email, and decline is the third thing a customer needs tellin
    load-bearing question. Full research, including what core actually does and why
    `SendEmailNotification` cannot change wording, is in the agent memory
    `ubookit-email-templates-research`.
-2. **Does the permissions spike come back feasible?** Run it against the Umbraco source in
-   `ref/` before committing 0.10.0 to a release. If the backoffice cannot express granularity
-   within a section without fighting it, say so and defer — it is additive, so it is allowed
-   after 17.0.0.
+2. ~~**Does the permissions spike come back feasible?**~~ **CLOSED, 2026-09-12: yes — granularity
+   within the existing section, no section split needed.** Run against the Umbraco 17 source in
+   `ref/` and the public docs. The shape, verified end to end:
+
+   - **UI**: an `entityUserPermission` manifest (our existing package manifest, no new UI) with
+     uBookIt entity-type and verb strings renders toggles in *Users → User Groups → Default
+     permissions*. The CMS's own example targets the dictionary entity, so non-document types
+     are supported, and a Skrift article (Warren Buckley) documents the exact pattern.
+   - **Storage**: verbs land in `IUserGroup.Permissions` (`ISet<string>`, free strings);
+     `UserGroupPresentationFactory` maps `FallbackPermissions` verbatim in both directions —
+     no whitelist, so custom verbs round-trip through the group editor.
+   - **Server**: our management controllers check current user → groups → union of
+     `Permissions` → verb, as an authorization handler layered on the existing section policy.
+     The section grant remains the gate; verbs refine within it.
+   - **Client**: `ContentPermissionService.FilterFallbackPermissionsAsync` is a pass-through by
+     default, so the current-user presentation carries custom verbs and our section UI can
+     condition on them.
+
+   The section-split fallback below is therefore NOT needed — and the admin-only settings
+   screen rides on a verb (e.g. `UBookIt.Settings`) rather than a second section. **The 0.10.0
+   proposal's central open decision is upgrade semantics**: a group holding the section grant
+   today has no uBookIt verbs, and existing installs must not lose access on upgrade — so
+   either a migration seeds the verbs for section-granted groups, or absence of every uBookIt
+   verb reads as legacy full access. Decide there, not here.
 
    **There is a fallback, so the spike cannot return "impossible" — only "which shape".**
    (Chris, 2026-09-11.) If granularity *within* a section proves impractical, split the section:
