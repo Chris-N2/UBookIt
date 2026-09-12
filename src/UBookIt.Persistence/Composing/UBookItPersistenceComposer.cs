@@ -101,6 +101,7 @@ public sealed class UBookItPersistenceComposer : IComposer
         // depend on the state of configuration at startup in a second, invisible way.
         builder.Services.AddScoped<BookingMessageComposer>();
         builder.Services.AddScoped<IResponsibilityStore, SqlResponsibilityStore>();
+        builder.Services.AddScoped<IFlagStore, SqlFlagStore>();
         builder.Services.AddScoped<IUmbracoUserDirectory, UmbracoUserDirectory>();
         builder.Services.AddScoped<IResponsibleRecipientResolver, ResponsibleRecipientResolver>();
         builder.AddNotificationAsyncHandler<BookingPlacedNotification, BookingEmailHandler>();

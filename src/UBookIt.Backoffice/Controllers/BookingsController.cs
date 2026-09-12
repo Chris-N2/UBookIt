@@ -65,6 +65,7 @@ public class BookingsController(
     /// <param name="resourceIds">
     /// Return only bookings claiming any of these resources. Omitted means no filter.
     /// </param>
+    [Authorize(Policy = Constants.VerbPolicies.BookingsRead)]
     [HttpGet("bookings")]
     [ProducesResponseType<PagedBookingsModel>(StatusCodes.Status200OK)]
     [ProducesResponseType(StatusCodes.Status400BadRequest)]
@@ -179,6 +180,7 @@ public class BookingsController(
     /// </para>
     /// </remarks>
     /// <param name="id">The booking to cancel.</param>
+    [Authorize(Policy = Constants.VerbPolicies.BookingsManage)]
     [HttpPost("bookings/{id:guid}/cancel")]
     [ProducesResponseType<CancelledBookingModel>(StatusCodes.Status200OK)]
     [ProducesResponseType(StatusCodes.Status400BadRequest)]
@@ -215,6 +217,7 @@ public class BookingsController(
     /// </para>
     /// </remarks>
     /// <param name="id">The booking to confirm.</param>
+    [Authorize(Policy = Constants.VerbPolicies.BookingsManage)]
     [HttpPost("bookings/{id:guid}/confirm")]
     [ProducesResponseType<ConfirmedBookingModel>(StatusCodes.Status200OK)]
     [ProducesResponseType(StatusCodes.Status400BadRequest)]
@@ -252,6 +255,7 @@ public class BookingsController(
     /// </para>
     /// </remarks>
     /// <param name="id">The booking to decline.</param>
+    [Authorize(Policy = Constants.VerbPolicies.BookingsManage)]
     [HttpPost("bookings/{id:guid}/decline")]
     [ProducesResponseType<DeclinedBookingModel>(StatusCodes.Status200OK)]
     [ProducesResponseType(StatusCodes.Status400BadRequest)]
@@ -308,6 +312,7 @@ public class BookingsController(
     /// asking — not from a count, not from an error, and not from how long it took.
     /// </para>
     /// </remarks>
+    [Authorize(Policy = Constants.VerbPolicies.BookingsRead)]
     [HttpPost("bookings/find-by-booker")]
     [Authorize(Policy = Constants.SensitiveDataAccessPolicy)]
     [ProducesResponseType<PagedBookingsModel>(StatusCodes.Status200OK)]
@@ -385,6 +390,7 @@ public class BookingsController(
     /// </para>
     /// </remarks>
     /// <param name="id">The booking whose booker to erase.</param>
+    [Authorize(Policy = Constants.VerbPolicies.BookingsRead)]
     [HttpPost("bookings/{id:guid}/erase-booker")]
     [Authorize(Policy = Constants.SensitiveDataAccessPolicy)]
     [ProducesResponseType<ErasedBookerModel>(StatusCodes.Status200OK)]

@@ -442,6 +442,11 @@ public class SensitiveDataRedactionTests
             "BookingRow: BookerEmail,BookerErasedUtc,BookerName,BookerPhone,Claims,CreatedUtc,EndUtc,Id,MemberKey,Reference,ServiceId,ServiceName,StartUtc,Status,TimeZoneId",
             "ClaimRow: BookingId,Id,ResourceId",
             "ExceptionRow: Date,EndTime,Id,ResourceId,StartTime",
+            // Decision, permissions-model (roadmap 0.10.0): a one-shot marker — an
+            // operation key and when it was applied, nothing else. No personal data can
+            // reach it: the key names an operation, never a person.
+            "FlagRow: AppliedUtc,Key",
+
             "OpenHoursRow: DayOfWeek,EndTime,Id,ResourceId,StartTime",
             "ResourceCapabilityRow: Key,ResourceId",
             "ResourceRow: Capabilities,Description,DirectlyBookable,DisplayName,Exceptions,GranularityMinutes,HorizonDays,Id,LeadTimeMinutes,MaxDurationMinutes,MinDurationMinutes,OpenHours,Type",

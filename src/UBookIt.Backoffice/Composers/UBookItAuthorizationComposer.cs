@@ -26,6 +26,7 @@ public sealed class UBookItAuthorizationComposer : IComposer
     {
         builder.Services.AddSingleton<IAuthorizationHandler, UBookItSectionHandler>();
         builder.Services.AddSingleton<IAuthorizationHandler, UBookItSensitiveDataHandler>();
+        builder.Services.AddSingleton<IAuthorizationHandler, UBookItVerbHandler>();
 
         builder.Services.AddAuthorization(options =>
         {
@@ -48,6 +49,28 @@ public sealed class UBookItAuthorizationComposer : IComposer
                 policy.Requirements.Add(new UBookItSectionRequirement());
                 policy.Requirements.Add(new UBookItSensitiveDataRequirement());
             });
+
+            // The three verb policies (permissions capability). Each carries the section
+            // requirement as well as its verb, for the reason the sensitive-data policy
+            // records: naming one on an action can only ever ADD a condition. "Manage
+            // implies Read" lives HERE and nowhere else — the read policy is satisfied by
+            // either verb, so no group's stored verbs ever restate the implication.
+            AddVerbPolicy(options, Constants.VerbPolicies.BookingsRead,
+                Constants.Verbs.BookingsRead, Constants.Verbs.BookingsManage);
+            AddVerbPolicy(options, Constants.VerbPolicies.BookingsManage,
+                Constants.Verbs.BookingsManage);
+            AddVerbPolicy(options, Constants.VerbPolicies.Configure,
+                Constants.Verbs.Configure);
         });
     }
+
+    private static void AddVerbPolicy(
+        AuthorizationOptions options, string policyName, params string[] anyOfVerbs)
+        => options.AddPolicy(policyName, policy =>
+        {
+            policy.AuthenticationSchemes.Add(
+                OpenIddictValidationAspNetCoreDefaults.AuthenticationScheme);
+            policy.Requirements.Add(new UBookItSectionRequirement());
+            policy.Requirements.Add(new UBookItVerbRequirement(anyOfVerbs));
+        });
 }

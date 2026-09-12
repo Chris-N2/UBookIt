@@ -1,0 +1,114 @@
+# Tasks — permissions-model
+
+Working rules carried forward: verify against `HEAD` after the last edit before claiming;
+recount test totals at HEAD every QA round; enumerate the class when fixing a named
+finding; mutate against a COMMIT; Release build claims come from `--no-incremental` with
+the TestSite stopped, read against ZERO warnings; the delta-integrity guard matches raw
+ordinal substrings — replaced titles live here unwrapped, one per line; sweep
+wrap-normalised; never write prose through a double-quoted shell string. A guarantee
+enforced by a composer registration needs a test that runs the composer.
+
+## 1. Thin end-to-end proof (design D6 — before anything else is built)
+
+- [ ] 1.1 One verb (`UBookIt.Configure`) wired through: one `entityUserPermission`
+      manifest entry, one policy + `UBookItVerbHandler` on one endpoint
+      (`ListResources`), TestSite live: toggle visible in the group editor, persists,
+      endpoint flips with it. STOP and reassess if any link surprises — the spike
+      verified source, not runtime.
+
+## 2. Server: constants, policies, classification
+
+- [x] 2.1 Verb constants beside the section constants; three policies
+      (`BookingsRead`, `BookingsManage`, `Configure`) requiring section AND verb; one
+      `UBookItVerbHandler` reading the union of the current user's groups' permissions;
+      **Manage implies Read inside the handler's Read rule**, nowhere else.
+- [x] 2.2 `[Authorize(Policy=…)]` per the D2 classification on every management action;
+      Sensitive-data endpoints (`FindBookingsByBooker`, `EraseBooker`) keep their SD
+      policy AND gain `BookingsRead`.
+- [x] 2.3 The classification totality guard: reflection over every action on the
+      management base — exactly one verb policy each, failure names the offender.
+- [x] 2.4 The one-vocabulary guard: the client manifest's verbs and the server constants
+      compared, wrap-safe; a difference is a named failure.
+- [x] 2.5 Composer-wiring pin: better than a registration assertion — every pipeline
+      test in `PermissionsTests` composes the REAL `UBookItAuthorizationComposer` and
+      authorizes through `IAuthorizationService`, so the registration production relies
+      on is what every scenario exercises (the section tests' established shape).
+- [ ] 2.6 Behaviour tests per the permissions delta scenarios: read-not-manage,
+      manage-implies-read, configure-not-bookings, union-across-groups, all-verbs-no-
+      section refused, section-alone-post-seed shell only, SD-without-read refused,
+      read-without-SD withholds. Vary fixtures so no two pass for the same reason;
+      mutation-check the implication rule and one policy arm live, against a commit.
+
+## 3. Persistence: the flag table and the seed
+
+- [x] 3.1 `uBookItFlag` (Key PK nvarchar, AppliedUtc) + additive `AddFlags` migration;
+      integration round-trip + fresh-db scenarios; join the migration-list prompt guard
+      and the stored-surface snapshot with the no-personal-data reasoning.
+- [x] 3.2 The seed handler, registered by its own composer with
+      `[ComposeAfter(typeof(UBookItPersistenceComposer))]` so it lands after
+      `RunUBookItMigrations` (handler order = registration order; the ComposeAfter makes
+      the cross-composer order deterministic — live check 6.3(a) is the runtime proof);
+      tolerates any failure by logging without failing boot, flag written only on full
+      success, retry idempotent via the zero-uBookIt-verbs selection rule. **The seed
+      lives in UBookIt.Backoffice, not Persistence** — the verbs are Backoffice
+      constants and Persistence cannot reference them; Backoffice already references
+      Persistence for the flag store. Selection rule unit-tested arm by arm including
+      the future-verb arm; the flow-level scenarios (flag on success, absent on
+      failure) are covered by the rule's shape + live check, with the store
+      integration-tested in 3.3.
+- [ ] 3.3 Integration test against real SQL for flag write/read through the store the
+      handler uses.
+
+## 4. Client
+
+- [x] 4.1 Three `entityUserPermission` entries in the package manifest, one uBookIt
+      entity type, localized labels/descriptions.
+- [ ] 4.2 Section views hide what verbs do not cover: Bookings view + row actions
+      (Read/Manage split — actions hidden without Manage), Resources and Services views
+      (Configure), responsibility panel rides with its host editors. Hidden, not
+      disabled. Logic in a pure module tested per the client's established pattern.
+- [ ] 4.3 Full client build + tests.
+
+## 5. Docs
+
+- [ ] 5.1 `docs/backoffice.md`: the verbs and what each governs, Manage-implies-Read,
+      the group-editor toggles, the seed (upgrades keep access; a NEW section grant
+      shows the shell until verbs are ticked — "tick the section, then tick what they
+      may do"), SD unchanged and now beside Read, client hiding is convenience and the
+      server is the truth.
+- [ ] 5.2 README: the backoffice bullet if it implies all-or-nothing access; sweep.
+- [ ] 5.3 `DocumentationAssert` guards on the guarantees: the seed's keeps-access claim,
+      the new-group shell behaviour, SD-not-replaced, server-is-truth.
+
+## 6. Verification
+
+- [ ] 6.1 Full .NET + client suites green; `--no-incremental` Release build, ZERO
+      warnings, TestSite stopped; counts measured at HEAD.
+- [ ] 6.2 `openspec validate --all --strict`; guarantee-diffs re-checked for the two
+      wholesale replacements, titles unwrapped for the guard:
+      - Management endpoints require backoffice authorization
+      - Personal data is shown only to a backoffice user Umbraco permits to see it
+- [ ] 6.3 Live check on the TestSite: (a) fresh state — seed runs, admin group (holds
+      the section) gains the three verbs, everything works as before; (b) create a
+      second group with section + Read only, log in as a user in it (or verify via the
+      API with that user's context): bookings visible, cancel refused, resources
+      refused, client hides accordingly; (c) empty a group's verbs, restart, verify the
+      seed does not re-grant; (d) toggles visible and persisting in the group editor.
+      Use the pickup-directory site; screenshots where the browser is needed.
+
+## 7. Sync-time greps (run at sync, not before; do not tick until executed)
+
+- [ ] 7.1 Outward sweep, wrap-normalised: sibling specs and Purpose prose for sentences
+      the verbs falsify — candidates known now: `booking-management`'s "same terms as
+      every other management endpoint" phrasing (check it survives), `backoffice.md`'s
+      "one grant governs both halves" claim and the sensitive-data Purpose, any
+      "section access is sufficient/alone" phrasing anywhere, `responsibility`'s
+      management-endpoints requirement ("the same backoffice authorization every other
+      management endpoint uses" — verify it reads correctly once endpoints differ by
+      verb).
+- [ ] 7.2 Falsified-claims sweep over `README.md`, `docs/*.md`, XML doc comments —
+      candidates known now: `UBookItBackofficeApiControllerBase` remarks ("that single
+      grant governs both"), `docs/backoffice.md` "Who can use it" section (rewritten in
+      5.1 but sweep the rest), `UBookItSectionHandler` docs, the responsibility docs'
+      "will still receive the messages" claim about users who cannot see the bookings
+      screen (still true — verify).

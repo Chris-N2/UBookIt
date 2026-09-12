@@ -1,4 +1,5 @@
 using Asp.Versioning;
+using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
 using UBookIt.Backoffice.Mapping;
@@ -51,6 +52,7 @@ public class ServicesController(
     /// below, and there is no POST on <c>services/{id}</c> in any case.
     /// </para>
     /// </summary>
+    [Authorize(Policy = Constants.VerbPolicies.Configure)]
     [HttpPost("services/preview")]
     [ProducesResponseType<ServicePreviewResponseModel>(StatusCodes.Status200OK)]
     [ProducesResponseType<ProblemDetails>(StatusCodes.Status400BadRequest)]
@@ -111,6 +113,7 @@ public class ServicesController(
         return Ok(ServiceModelMapper.ToModel(chains, misalignment, shortfall));
     }
 
+    [Authorize(Policy = Constants.VerbPolicies.Configure)]
     [HttpGet("services")]
     [ProducesResponseType<PagedServicesModel>(StatusCodes.Status200OK)]
     public async Task<IActionResult> ListServices(
@@ -125,6 +128,7 @@ public class ServicesController(
         });
     }
 
+    [Authorize(Policy = Constants.VerbPolicies.Configure)]
     [HttpGet("services/{id:guid}")]
     [ProducesResponseType<ServiceResponseModel>(StatusCodes.Status200OK)]
     [ProducesResponseType<ProblemDetails>(StatusCodes.Status404NotFound)]
@@ -137,6 +141,7 @@ public class ServicesController(
             : Ok(ServiceModelMapper.ToModel(service));
     }
 
+    [Authorize(Policy = Constants.VerbPolicies.Configure)]
     [HttpPost("services")]
     [ProducesResponseType<ServiceResponseModel>(StatusCodes.Status200OK)]
     [ProducesResponseType<ProblemDetails>(StatusCodes.Status400BadRequest)]
@@ -156,6 +161,7 @@ public class ServicesController(
             : created.Failures.ToProblemResult();
     }
 
+    [Authorize(Policy = Constants.VerbPolicies.Configure)]
     [HttpPut("services/{id:guid}")]
     [ProducesResponseType<ServiceResponseModel>(StatusCodes.Status200OK)]
     [ProducesResponseType<ProblemDetails>(StatusCodes.Status400BadRequest)]
@@ -176,6 +182,7 @@ public class ServicesController(
             : updated.Failures.ToProblemResult();
     }
 
+    [Authorize(Policy = Constants.VerbPolicies.Configure)]
     [HttpDelete("services/{id:guid}")]
     [ProducesResponseType(StatusCodes.Status200OK)]
     [ProducesResponseType<ProblemDetails>(StatusCodes.Status404NotFound)]

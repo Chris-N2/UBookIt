@@ -1,4 +1,5 @@
 using Asp.Versioning;
+using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
 using UBookIt.Backoffice.Mapping;
@@ -18,6 +19,7 @@ public class ResourcesController(
     IResourceStore resourceStore,
     IResourceManagementStore managementStore) : UBookItBackofficeApiControllerBase
 {
+    [Authorize(Policy = Constants.VerbPolicies.Configure)]
     [HttpGet("resources")]
     [ProducesResponseType<PagedResourcesModel>(StatusCodes.Status200OK)]
     public async Task<IActionResult> ListResources(
@@ -38,6 +40,7 @@ public class ResourcesController(
     /// The literal segment cannot collide with the id route below, which is
     /// constrained to a guid.
     /// </summary>
+    [Authorize(Policy = Constants.VerbPolicies.Configure)]
     [HttpGet("resources/types")]
     [ProducesResponseType<IEnumerable<ResourceTypeUsageModel>>(StatusCodes.Status200OK)]
     public async Task<IActionResult> ListResourceTypes(CancellationToken cancellationToken = default)
@@ -52,6 +55,7 @@ public class ResourcesController(
     /// key. Mirrors the type usage endpoint, including the literal-segment
     /// routing that cannot collide with the guid-constrained id route.
     /// </summary>
+    [Authorize(Policy = Constants.VerbPolicies.Configure)]
     [HttpGet("resources/capabilities")]
     [ProducesResponseType<IEnumerable<CapabilityUsageModel>>(StatusCodes.Status200OK)]
     public async Task<IActionResult> ListCapabilities(CancellationToken cancellationToken = default)
@@ -61,6 +65,7 @@ public class ResourcesController(
         return Ok(capabilities.Select(ResourceModelMapper.ToModel).ToList());
     }
 
+    [Authorize(Policy = Constants.VerbPolicies.Configure)]
     [HttpGet("resources/{id:guid}")]
     [ProducesResponseType<ResourceResponseModel>(StatusCodes.Status200OK)]
     [ProducesResponseType<ProblemDetails>(StatusCodes.Status404NotFound)]
@@ -73,6 +78,7 @@ public class ResourcesController(
             : Ok(ResourceModelMapper.ToModel(resource));
     }
 
+    [Authorize(Policy = Constants.VerbPolicies.Configure)]
     [HttpPost("resources")]
     [ProducesResponseType<ResourceResponseModel>(StatusCodes.Status200OK)]
     [ProducesResponseType<ProblemDetails>(StatusCodes.Status400BadRequest)]
@@ -92,6 +98,7 @@ public class ResourcesController(
             : created.Failures.ToProblemResult();
     }
 
+    [Authorize(Policy = Constants.VerbPolicies.Configure)]
     [HttpPut("resources/{id:guid}")]
     [ProducesResponseType<ResourceResponseModel>(StatusCodes.Status200OK)]
     [ProducesResponseType<ProblemDetails>(StatusCodes.Status400BadRequest)]
@@ -112,6 +119,7 @@ public class ResourcesController(
             : updated.Failures.ToProblemResult();
     }
 
+    [Authorize(Policy = Constants.VerbPolicies.Configure)]
     [HttpDelete("resources/{id:guid}")]
     [ProducesResponseType(StatusCodes.Status200OK)]
     [ProducesResponseType<ProblemDetails>(StatusCodes.Status404NotFound)]

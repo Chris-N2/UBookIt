@@ -145,12 +145,16 @@ public class EraseBookerEndpointTests
         // Not by a check inside the handler. A conditional is correct only for as long as
         // somebody remembers to write it, and it leaves a route that reaches the operation
         // having established nothing; a policy is a property of the endpoint.
+        // Among the action's policies, no longer alone: the permissions model added the
+        // booking read verb BESIDE this gate (its spec: "Sensitive-data gates are joined
+        // by verbs, never replaced"), so this asserts membership rather than singularity
+        // — and asserts the companion too, so the pair is a decision, not an accident.
         var action = typeof(BookingsController).GetMethod(nameof(BookingsController.EraseBooker))!;
 
-        var authorize = action.GetCustomAttributes<AuthorizeAttribute>().SingleOrDefault();
+        var policies = action.GetCustomAttributes<AuthorizeAttribute>().Select(a => a.Policy).ToList();
 
-        Assert.NotNull(authorize);
-        Assert.Equal(UBookIt.Backoffice.Constants.SensitiveDataAccessPolicy, authorize.Policy);
+        Assert.Contains(UBookIt.Backoffice.Constants.SensitiveDataAccessPolicy, policies);
+        Assert.Contains(UBookIt.Backoffice.Constants.VerbPolicies.BookingsRead, policies);
     }
 
     [Fact]
@@ -160,9 +164,16 @@ public class EraseBookerEndpointTests
         // than sprayed across the controller. Cancelling is a different act: it does not
         // disclose or destroy personal data, and requiring the group for it would lock out
         // operators the site meant to let cancel bookings.
+        //
+        // Previously asserted NO Authorize attribute at all — the mechanism, not the
+        // guarantee, and the permissions model falsified it by adding the Manage verb
+        // policy (a different gate for a different question). The guarantee is that the
+        // SENSITIVE-DATA policy is absent here, and that is what is asserted.
         var action = typeof(BookingsController).GetMethod(nameof(BookingsController.CancelBooking))!;
 
-        Assert.Empty(action.GetCustomAttributes<AuthorizeAttribute>());
+        Assert.DoesNotContain(
+            action.GetCustomAttributes<AuthorizeAttribute>().Select(a => a.Policy),
+            policy => policy == UBookIt.Backoffice.Constants.SensitiveDataAccessPolicy);
     }
 
     [Fact]

@@ -1,9 +1,11 @@
 import { css, html, customElement, state, nothing } from "@umbraco-cms/backoffice/external/lit";
 import { UmbLitElement } from "@umbraco-cms/backoffice/lit-element";
+import { UMB_CURRENT_USER_CONTEXT } from "@umbraco-cms/backoffice/current-user";
 import { UBookItBackofficeService } from "../api/index.js";
 import type { BookingModel } from "../api/index.js";
 import { toApiErrors } from "./api-errors.js";
 import { confirmDestructive } from "./confirm.js";
+import { canManageBookings } from "./permission-verbs.js";
 import {
   actionFor,
   bookerCell,
@@ -49,6 +51,25 @@ const STATUSES = ["Requested", "Confirmed", "Cancelled", "Declined"] as const;
  */
 @customElement("ubookit-bookings-list")
 export class UBookItBookingsListElement extends UmbLitElement {
+  /**
+   * Whether the current user's verbs allow acting on bookings (Manage). Read from the
+   * current-user context; convenience only — the endpoints refuse independently, so a
+   * stale value here can never authorize anything. Without Manage the whole Actions
+   * column goes, header included: a column of nothing reads as data that failed to
+   * load, which is the same reasoning the booker cell records.
+   */
+  @state()
+  private _canManage = false;
+
+  constructor() {
+    super();
+    this.consumeContext(UMB_CURRENT_USER_CONTEXT, (context) => {
+      this.observe(context?.currentUser, (currentUser) => {
+        this._canManage = canManageBookings(currentUser?.fallbackPermissions);
+      });
+    });
+  }
+
   @state()
   private _items: BookingModel[] = [];
 
@@ -348,9 +369,11 @@ export class UBookItBookingsListElement extends UmbLitElement {
           <uui-table-head-cell>${this.#term("resources")}</uui-table-head-cell>
           <uui-table-head-cell>${this.#term("service")}</uui-table-head-cell>
           <uui-table-head-cell>${this.#term("status")}</uui-table-head-cell>
-          <uui-table-head-cell>
-            <span class="visually-hidden">${this.#term("actions")}</span>
-          </uui-table-head-cell>
+          ${this._canManage
+            ? html`<uui-table-head-cell>
+                <span class="visually-hidden">${this.#term("actions")}</span>
+              </uui-table-head-cell>`
+            : nothing}
         </uui-table-head>
         ${this._items.map((booking) => this.#renderRow(booking, showZone))}
       </uui-table>
@@ -437,7 +460,7 @@ export class UBookItBookingsListElement extends UmbLitElement {
         </uui-table-cell>
         <uui-table-cell>${serviceLabel(booking, this.#term("bookedDirectly"))}</uui-table-cell>
         <uui-table-cell>${this.#term(`status${booking.status}`)}</uui-table-cell>
-        <uui-table-cell>
+        ${this._canManage ? html`<uui-table-cell>
           <!--
             Offered only where the domain would allow it. A control that is always
             refused teaches an operator to ignore failures — and the endpoint refuses
@@ -465,7 +488,7 @@ export class UBookItBookingsListElement extends UmbLitElement {
                 @click=${() => this.#cancel(booking)}
               ></uui-button>`
             : nothing}
-        </uui-table-cell>
+        </uui-table-cell>` : nothing}
       </uui-table-row>
     `;
   }

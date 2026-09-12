@@ -1,4 +1,5 @@
 using Asp.Versioning;
+using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
 using UBookIt.Backoffice.Mapping;
@@ -39,16 +40,19 @@ public class ResponsibilityController(
     /// <summary>Not in Core's <c>FailureCodes</c>: the code names a contract-level shape error this controller owns.</summary>
     internal const string UnknownPartyKind = "responsibility-party-kind-unknown";
 
+    [Authorize(Policy = Constants.VerbPolicies.Configure)]
     [HttpGet("resources/{id:guid}/responsibility")]
     [ProducesResponseType<ResponsibilityResponseModel>(StatusCodes.Status200OK)]
     public Task<IActionResult> GetResourceResponsibility(Guid id, CancellationToken cancellationToken = default)
         => GetAsync(ResponsibilitySubject.Resource, id, cancellationToken);
 
+    [Authorize(Policy = Constants.VerbPolicies.Configure)]
     [HttpGet("services/{id:guid}/responsibility")]
     [ProducesResponseType<ResponsibilityResponseModel>(StatusCodes.Status200OK)]
     public Task<IActionResult> GetServiceResponsibility(Guid id, CancellationToken cancellationToken = default)
         => GetAsync(ResponsibilitySubject.Service, id, cancellationToken);
 
+    [Authorize(Policy = Constants.VerbPolicies.Configure)]
     [HttpPut("resources/{id:guid}/responsibility")]
     [ProducesResponseType<ResponsibilityResponseModel>(StatusCodes.Status200OK)]
     [ProducesResponseType<ProblemDetails>(StatusCodes.Status400BadRequest)]
@@ -57,6 +61,7 @@ public class ResponsibilityController(
         Guid id, ResponsibilityRequestModel model, CancellationToken cancellationToken = default)
         => PutAsync(ResponsibilitySubject.Resource, id, model, cancellationToken);
 
+    [Authorize(Policy = Constants.VerbPolicies.Configure)]
     [HttpPut("services/{id:guid}/responsibility")]
     [ProducesResponseType<ResponsibilityResponseModel>(StatusCodes.Status200OK)]
     [ProducesResponseType<ProblemDetails>(StatusCodes.Status400BadRequest)]
