@@ -55,27 +55,33 @@ wrap-normalised; never write prose through a double-quoted shell string.
 
 ## 3. Docs
 
-- [ ] 3.1 New `docs/delivery-api.md`: the two switches and their off defaults; anonymous
+- [x] 3.1 New `docs/delivery-api.md`: the two switches and their off defaults; anonymous
       by design and what that means; why origin validation cannot exist (client-supplied
       headers; CORS restricts browsers, not callers); volume defence is the host's rate
       limiter or edge and the package claims no DDoS protection; `MaxQueryRangeDays` as
       the per-request cost bound on every caller path; anonymous placement risk stated
       honestly with approval mode as the business-level mitigation; the declined
       per-caller cap and its reasoning; the breaking default-flip and the two-line fix.
-- [ ] 3.2 README: the security story in the feature area, up front (Chris's explicit
+- [x] 3.2 README: the security story in the feature area, up front (Chris's explicit
       ask) — the API is off by default, what turning it on exposes, and the pointer to
       the full page. Sweep README's existing feature bullets for sentences the flip
       falsifies (the headless/API bullet, if any, must not imply always-on).
-- [ ] 3.3 `docs/booking-page.md` and other docs cross-references: sweep for any claim
-      that the API is available/always there.
-- [ ] 3.4 `DocumentationAssert` guards on the guarantees: off-by-default stated in both
+- [x] 3.3 `docs/booking-page.md` and other docs cross-references: sweep for any claim
+      that the API is available/always there. Swept: booking-page.md has no API mention;
+      notifications.md's mention is conditional ("if you have built your own front end")
+      and stays true; README's package-table row describes what UBookIt.Web contains,
+      which is still true with exposure off. **Found during 4.1 and folded in here:
+      Umbraco's own content Delivery API lives at the near-identical
+      `Umbraco:CMS:DeliveryApi:Enabled` (the TestSite sets it) — disambiguated in
+      docs/delivery-api.md and guarded.**
+- [x] 3.4 `DocumentationAssert` guards on the guarantees: off-by-default stated in both
       README and docs page; the no-DDoS-claim boundary; the origin-validation
       impossibility; the breaking-change callout. Wrap-safe, on the document as
       normalised text.
 
 ## 4. Dev environment
 
-- [ ] 4.1 TestSite `appsettings.Development.json`: enable both directions (the API's
+- [x] 4.1 TestSite `appsettings.Development.json`: enable both directions (the API's
       test bed; not shipped). Confirm the Install Check site inherits nothing and so
       exercises the shipped default.
 
