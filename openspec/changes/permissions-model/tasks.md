@@ -33,11 +33,17 @@ enforced by a composer registration needs a test that runs the composer.
       test in `PermissionsTests` composes the REAL `UBookItAuthorizationComposer` and
       authorizes through `IAuthorizationService`, so the registration production relies
       on is what every scenario exercises (the section tests' established shape).
-- [ ] 2.6 Behaviour tests per the permissions delta scenarios: read-not-manage,
+- [x] 2.6 Behaviour tests per the permissions delta scenarios: read-not-manage,
       manage-implies-read, configure-not-bookings, union-across-groups, all-verbs-no-
       section refused, section-alone-post-seed shell only, SD-without-read refused,
       read-without-SD withholds. Vary fixtures so no two pass for the same reason;
       mutation-check the implication rule and one policy arm live, against a commit.
+      DONE: all through the real composed pipeline; two mutations run against commit
+      0eda011 and caught (implication dropped → Manage_implies_read; ConfirmBooking
+      misclassified → the snapshot guard, each exactly one failure). SD-without-read
+      and read-without-SD are covered at the policy layer (SD endpoints carry both
+      policies — asserted — and the SD handler itself is unchanged); the withholding
+      behaviour is the sensitive-data capability's existing suite.
 
 ## 3. Persistence: the flag table and the seed
 
@@ -56,28 +62,28 @@ enforced by a composer registration needs a test that runs the composer.
       the future-verb arm; the flow-level scenarios (flag on success, absent on
       failure) are covered by the rule's shape + live check, with the store
       integration-tested in 3.3.
-- [ ] 3.3 Integration test against real SQL for flag write/read through the store the
+- [x] 3.3 Integration test against real SQL for flag write/read through the store the
       handler uses.
 
 ## 4. Client
 
 - [x] 4.1 Three `entityUserPermission` entries in the package manifest, one uBookIt
       entity type, localized labels/descriptions.
-- [ ] 4.2 Section views hide what verbs do not cover: Bookings view + row actions
+- [x] 4.2 Section views hide what verbs do not cover: Bookings view + row actions
       (Read/Manage split — actions hidden without Manage), Resources and Services views
       (Configure), responsibility panel rides with its host editors. Hidden, not
       disabled. Logic in a pure module tested per the client's established pattern.
-- [ ] 4.3 Full client build + tests.
+- [x] 4.3 Full client build + tests.
 
 ## 5. Docs
 
-- [ ] 5.1 `docs/backoffice.md`: the verbs and what each governs, Manage-implies-Read,
+- [x] 5.1 `docs/backoffice.md`: the verbs and what each governs, Manage-implies-Read,
       the group-editor toggles, the seed (upgrades keep access; a NEW section grant
       shows the shell until verbs are ticked — "tick the section, then tick what they
       may do"), SD unchanged and now beside Read, client hiding is convenience and the
       server is the truth.
-- [ ] 5.2 README: the backoffice bullet if it implies all-or-nothing access; sweep.
-- [ ] 5.3 `DocumentationAssert` guards on the guarantees: the seed's keeps-access claim,
+- [x] 5.2 README: the backoffice bullet if it implies all-or-nothing access; sweep.
+- [x] 5.3 `DocumentationAssert` guards on the guarantees: the seed's keeps-access claim,
       the new-group shell behaviour, SD-not-replaced, server-is-truth.
 
 ## 6. Verification

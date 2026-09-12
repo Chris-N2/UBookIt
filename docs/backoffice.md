@@ -6,13 +6,30 @@ configured, and where the bookings it has taken are read.
 
 ## Who can use it
 
-Access is granted the same way as any other section: **Users → User Groups → *(a group)* →
-Sections**, and tick **uBookIt Section**.
+Access has two steps, both in **Users → User Groups → *(a group)***: tick **uBookIt
+Section** under *Sections*, then tick what the group may do under *Default permissions* —
+**tick the section, then tick what they may do**. The section grant is the outer gate: it
+decides whether the section appears and whether uBookIt's management API may be called at
+all. The permissions decide what within it:
 
-That one grant governs both halves. It decides whether the section appears in the
-backoffice *and* whether that user may call uBookIt's management API — the endpoints the
-section's own screens are built on. There is nothing else to configure and no second
-permission to keep in step.
+| Permission | What it allows |
+|---|---|
+| **See bookings** | The Bookings list and its reads. Contact details still need the Sensitive data group on top — see below. |
+| **Act on bookings** | Cancel, confirm and decline. Includes seeing them: acting on what you cannot see makes no sense, so this needs no second tick. |
+| **Configure resources and services** | Create, edit and delete resources and services, and assign who is responsible for them. |
+
+A group with the section and no uBookIt permissions sees the section shell and nothing in
+it. Permissions union across a user's groups, and none of them ever substitutes for the
+section grant — a group holding every permission but not the section reaches nothing.
+
+**Upgrading from a version before these permissions existed?** Every group that already
+held the uBookIt section is granted all three automatically, once, at the first start — so
+nobody loses access by upgrading. Groups you create afterwards start with nothing ticked,
+and a group whose permissions you later empty stays emptied.
+
+The backoffice hides screens and buttons a user's permissions do not cover, as a
+courtesy; **the server makes the actual decision on every request**, so a bookmarked link
+or a handwritten API call is refused regardless of what was visible.
 
 **Access to another section does not grant uBookIt.** A user with full Content access and
 no uBookIt grant cannot reach uBookIt's endpoints, and a user granted only uBookIt can use
@@ -79,8 +96,9 @@ it is not something a site can agree to on their behalf.
 `POST /umbraco/ubookitbackoffice/api/v1/bookings/{id}/erase-booker`
 
 **Who can do it.** The same **Sensitive data** group that decides who may *read* contact
-details also decides who may erase them, on top of access to the uBookIt section. A user your
-site has decided may not so much as see a booker's name cannot destroy it.
+details also decides who may erase them, on top of access to the uBookIt section and the
+**See bookings** permission. A user your site has decided may not so much as see a booker's
+name cannot destroy it, and one who may not see bookings at all reaches neither.
 
 **It cannot be undone.** There is no restore. Once the details are gone from the booking, no
 permission, no group and no support call brings them back — which is the whole point, and the
@@ -98,7 +116,7 @@ keeping the *first* erasure's timestamp. That is deliberately unlike cancelling,
 a second attempt: a retry after a network timeout must not become a second, differently-dated
 erasure.
 
-After erasure, everyone with access to the section — in the Sensitive data group or not —
+After erasure, everyone who can see the bookings list — in the Sensitive data group or not —
 sees the row marked *"Contact details erased"* rather than *"Contact details hidden"*. The two
 say different things and lead to different actions: **hidden** means a colleague in the group
 can read them for you, and **erased** means there is nobody to ask.
