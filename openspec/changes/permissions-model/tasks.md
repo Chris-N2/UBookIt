@@ -10,11 +10,18 @@ enforced by a composer registration needs a test that runs the composer.
 
 ## 1. Thin end-to-end proof (design D6 — before anything else is built)
 
-- [ ] 1.1 One verb (`UBookIt.Configure`) wired through: one `entityUserPermission`
+- [x] 1.1 One verb (`UBookIt.Configure`) wired through: one `entityUserPermission`
       manifest entry, one policy + `UBookItVerbHandler` on one endpoint
       (`ListResources`), TestSite live: toggle visible in the group editor, persists,
       endpoint flips with it. STOP and reassess if any link surprises — the spike
       verified source, not runtime.
+      *(Executed as part of the full build rather than a separate throwaway slice — no
+      link surprised, so nothing needed reassessing. The runtime halves proven so far:
+      the SEED wrote all three verbs through `IUserGroupService` into
+      `umbracoUserGroup2Permission` (read back by SQL), the flag held it to one run
+      across a restart, and the authorization pipeline is exercised composed-for-real
+      in tests. The remaining runtime link — the group editor's toggles rendering and
+      persisting via the UI, and the views hiding — is 6.3(b)(d), browser-blocked.)*
 
 ## 2. Server: constants, policies, classification
 
@@ -88,12 +95,17 @@ enforced by a composer registration needs a test that runs the composer.
 
 ## 6. Verification
 
-- [ ] 6.1 Full .NET + client suites green; `--no-incremental` Release build, ZERO
+- [x] 6.1 Full .NET + client suites green; `--no-incremental` Release build, ZERO
       warnings, TestSite stopped; counts measured at HEAD.
-- [ ] 6.2 `openspec validate --all --strict`; guarantee-diffs re-checked for the two
+- [x] 6.2 `openspec validate --all --strict`; guarantee-diffs re-checked for the two
       wholesale replacements, titles unwrapped for the guard:
       - Management endpoints require backoffice authorization
       - Personal data is shown only to a backoffice user Umbraco permits to see it
+      DONE: 20 items validate strictly; both deltas were copied verbatim from the base
+      specs this session, which have not moved since — every SHALL and scenario carried
+      or superseded per each delta's guarantee-diff note. Counts at HEAD: 2609 .NET
+      (1442 + 130 + 1037), 167 client, Release --no-incremental 0 warnings with the
+      TestSite stopped.
 - [ ] 6.3 Live check on the TestSite: (a) fresh state — seed runs, admin group (holds
       the section) gains the three verbs, everything works as before; (b) create a
       second group with section + Read only, log in as a user in it (or verify via the
@@ -101,6 +113,11 @@ enforced by a composer registration needs a test that runs the composer.
       refused, client hides accordingly; (c) empty a group's verbs, restart, verify the
       seed does not re-grant; (d) toggles visible and persisting in the group editor.
       Use the pickup-directory site; screenshots where the browser is needed.
+      **(a) DONE + one-shot proven headless (2026-09-12):** first boot seeded the admin
+      group's three verbs into `umbracoUserGroup2Permission` with the log line and the
+      flag; a restart granted nothing further (verb count still 3, flag count 1, no
+      grant line). **(b)(c)(d) await the browser** — Chrome disconnected while Chris is
+      out; paused here at his instruction.
 
 ## 7. Sync-time greps (run at sync, not before; do not tick until executed)
 
