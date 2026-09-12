@@ -2,7 +2,9 @@ using System.Reflection;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.Mvc.ApiExplorer;
 using Microsoft.AspNetCore.Mvc.Infrastructure;
+using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
+using UBookIt.Tests.Support;
 using UBookIt.Web;
 using UBookIt.Web.Composing;
 using UBookIt.Web.Controllers;
@@ -91,6 +93,13 @@ public class DeliveryApiExposureTests
 
     // ---- the exposure matrix, through MVC's own pipeline ----
 
+    /// <summary>
+    /// Also the structural form of the "disabled and non-existent are indistinguishable"
+    /// scenario: an action with no descriptor has no route, so a request reaches the
+    /// host's own not-found handling — the same status, shape and headers as a made-up
+    /// URL, because it IS the same code path and none of ours. Observed live as well
+    /// (task 5.3): byte-identical 404 headers against a never-existed route.
+    /// </summary>
     [Fact]
     public void An_untouched_install_serves_nothing()
     {
@@ -154,6 +163,102 @@ public class DeliveryApiExposureTests
             Assert.NotEmpty(offActions);
             Assert.Equal(Sorted(onActions), Sorted(offActions));
         }
+    }
+
+    // ---- the composer wiring (QA round 1's MAJOR: the one line production relies on) ----
+
+    /// <summary>
+    /// Everything above registers the convention ITSELF, so none of it can see the
+    /// registration production actually relies on: the composer's single
+    /// <c>Configure&lt;MvcOptions&gt;</c> line. Deleting that line — or the composer not
+    /// running, the exact shape of the razor-theme <c>AddComposers()</c> CRITICAL —
+    /// would leave the API always-on in production with every other test green. So the
+    /// real composer is composed here, in the house idiom, and what it registered is
+    /// asserted: the convention is in the built <see cref="MvcOptions"/>, and the
+    /// settings it carries came from the bound section.
+    /// </summary>
+    [Fact]
+    public void The_composer_registers_the_convention_with_bound_settings()
+    {
+        var (options, settings) = ComposeReal(new Dictionary<string, string?>
+        {
+            ["UBookIt:DeliveryApi:EnableReads"] = "true",
+        });
+
+        var convention = Assert.Single(options.Conventions.OfType<DeliveryApiExposureConvention>());
+
+        Assert.True(settings.EnableReads);
+        Assert.False(settings.EnablePlacement);
+
+        // The registered convention acts on the BOUND settings — asserted by effect, on
+        // one real action of each direction, because the instance's settings are not
+        // observable directly and a convention constructed with the wrong record would
+        // pass every containment assertion.
+        Assert.True(SurvivesRegisteredConvention(convention, nameof(ResourcesController.ListResources)));
+        Assert.False(SurvivesRegisteredConvention(convention, nameof(BookingsController.PlaceBooking)));
+    }
+
+    /// <summary>
+    /// The default the whole change exists for: no section bound means BOTH directions
+    /// off — the composer's null-coalesced fallback at the binding site, which nothing
+    /// else exercises.
+    /// </summary>
+    [Fact]
+    public void The_composer_defaults_to_everything_off_when_the_section_is_absent()
+    {
+        var (options, settings) = ComposeReal([]);
+
+        var convention = Assert.Single(options.Conventions.OfType<DeliveryApiExposureConvention>());
+
+        Assert.False(settings.EnableReads);
+        Assert.False(settings.EnablePlacement);
+        Assert.False(SurvivesRegisteredConvention(convention, nameof(ResourcesController.ListResources)));
+        Assert.False(SurvivesRegisteredConvention(convention, nameof(BookingsController.PlaceBooking)));
+    }
+
+    /// <summary>
+    /// Composes the REAL delivery composer against real in-memory configuration and
+    /// returns what production would resolve: the built MvcOptions and the registered
+    /// settings singleton.
+    /// </summary>
+    private static (MvcOptions Options, DeliveryApiSettings Settings) ComposeReal(
+        Dictionary<string, string?> configuration)
+    {
+        var services = new ServiceCollection();
+        var config = new ConfigurationBuilder().AddInMemoryCollection(configuration).Build();
+
+        new UBookItDeliveryApiComposer().Compose(new ServicesOnlyUmbracoBuilder(services, config));
+
+        using var provider = services.BuildServiceProvider();
+
+        return (
+            provider.GetRequiredService<Microsoft.Extensions.Options.IOptions<MvcOptions>>().Value,
+            provider.GetRequiredService<DeliveryApiSettings>());
+    }
+
+    /// <summary>
+    /// Whether the named delivery action keeps its selectors when THE REGISTERED
+    /// convention instance is applied to a minimal model holding it. Hand-built model,
+    /// acceptable here alone: this half tests which settings the composer handed the
+    /// convention, and the matrix above already proves the convention's behaviour
+    /// through MVC's real pipeline.
+    /// </summary>
+    private static bool SurvivesRegisteredConvention(
+        DeliveryApiExposureConvention convention, string actionName)
+    {
+        var method = DeliveryActions().Single(m => m.Name == actionName);
+        var controller = new Microsoft.AspNetCore.Mvc.ApplicationModels.ControllerModel(
+            method.DeclaringType!.GetTypeInfo(), [])
+        { };
+        var action = new Microsoft.AspNetCore.Mvc.ApplicationModels.ActionModel(method, []);
+        action.Selectors.Add(new Microsoft.AspNetCore.Mvc.ApplicationModels.SelectorModel());
+        controller.Actions.Add(action);
+        var application = new Microsoft.AspNetCore.Mvc.ApplicationModels.ApplicationModel();
+        application.Controllers.Add(controller);
+
+        convention.Apply(application);
+
+        return action.Selectors.Count > 0;
     }
 
     // ---- harness ----

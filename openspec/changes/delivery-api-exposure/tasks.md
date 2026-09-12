@@ -51,6 +51,16 @@ wrap-normalised; never write prose through a double-quoted shell string.
       real generated document twice: 11 operations with both directions on, **0 paths**
       with nothing configured. Standing Swashbuckle's generator up inside a unit test
       would re-test Swashbuckle, not us.
+- [x] 2.5 *(QA round 1's MAJOR, added at fix time)* Pin the composer wiring — the one
+      line production relies on, which every self-registering test is blind to: compose
+      the REAL `UBookItDeliveryApiComposer` against real in-memory configuration (the
+      house `ServicesOnlyUmbracoBuilder` idiom, which gained an optional real
+      `IConfiguration` for it) and assert the built `MvcOptions` contains the
+      convention, the settings singleton carries the bound values, the section-absent
+      binding defaults to both-off, and — by effect on one action of each direction —
+      that the REGISTERED instance acts on the BOUND settings. Mutation run against a
+      commit this time: deleting the composer's `Configure<MvcOptions>` line must fail
+      these and nothing self-registering.
 - [x] 2.4 Indistinguishability: assert the disabled path produces no route match at the
       application model level (no selector = the host's own 404 — there is no code of
       ours that could answer differently), and record in the test why this is the
