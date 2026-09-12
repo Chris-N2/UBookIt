@@ -738,14 +738,24 @@ outcome that placement already produces.
 - **THEN** no booking is created, and no service attribution is stored
 
 ### Requirement: Eligibility remains derivable from public reads
-Every input to the eligibility rule SHALL be readable through the anonymous delivery
-API: a resource's type and capabilities, and, for **every one of a service's roles**,
-its resource type and required capabilities. A caller SHALL therefore be able to
-compute each role's candidate pool from public reads alone, without probing.
+Where the delivery API's read direction is exposed, every input to the eligibility
+rule SHALL be readable through it: a resource's type and capabilities, and, for
+**every one of a service's roles**, its resource type and required capabilities. A
+caller SHALL therefore be able to compute each role's candidate pool from public
+reads alone, without probing.
 
 A role's **count** SHALL also be published. It is not an input to eligibility, but it
 determines how many distinct resources a role consumes, so without it a caller can
 compute the pools and still not know what the service requires of them.
+
+**On a site exposing placement without reads, the parity this rests on is absent by
+that site's own choice.** The placement failures below still disclose what they
+disclose — pool membership, and occupancy at an instant — while the reads that made
+those facts "already derivable" are switched off. That combination is legal and the
+disclosure is accepted, because the site chose the asymmetry knowingly and the
+alternative — changing failure codes by configuration — would make the API's contract
+unstable; but the justification below SHALL be read as holding in full only where
+reads are exposed.
 
 This SHALL be treated as a standing constraint rather than a convenience. The
 `resource-not-eligible` failure returned for an out-of-pool `pinnedResourceId`

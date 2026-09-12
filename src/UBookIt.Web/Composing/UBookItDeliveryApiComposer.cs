@@ -12,11 +12,16 @@ using Umbraco.Cms.Core.DependencyInjection;
 namespace UBookIt.Web.Composing;
 
 /// <summary>
-/// Registers the delivery API's OpenAPI document — separate from the backoffice
-/// document and, unlike it, with no backoffice security requirements: the
-/// delivery API is anonymous (delivery-api spec). Controllers are routed into
-/// this document by <c>[MapToApi(Constants.DeliveryApiName)]</c> on the shared
-/// base controller.
+/// Composes the delivery API's exposure and its OpenAPI document. Exposure first,
+/// because it is the change that matters: the two direction switches are bound here
+/// (both off when unconfigured) and <see cref="DeliveryApiExposureConvention"/> is
+/// registered into MVC, which is the single line the off-by-default guarantee rides
+/// on — pinned by its own tests precisely because every other exposure test
+/// registers the convention itself and cannot see this one. The OpenAPI document is
+/// separate from the backoffice document and, unlike it, carries no backoffice
+/// security requirements: the delivery API, where a direction is enabled, is
+/// anonymous (delivery-api spec). Controllers are routed into the document by
+/// <c>[MapToApi(Constants.DeliveryApiName)]</c> on the shared base controller.
 /// </summary>
 public sealed class UBookItDeliveryApiComposer : IComposer
 {

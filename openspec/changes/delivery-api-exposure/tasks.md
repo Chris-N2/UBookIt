@@ -117,7 +117,7 @@ wrap-normalised; never write prose through a double-quoted shell string.
 
 ## 6. Sync-time greps (run at sync, not before; do not tick until executed)
 
-- [ ] 6.1 Outward sweep, wrap-normalised: sibling specs and Purpose prose for sentences
+- [x] 6.1 Outward sweep, wrap-normalised: sibling specs and Purpose prose for sentences
       the flip falsifies — candidates known now: `delivery-api` Purpose ("public,
       anonymous, versioned delivery API that every booking UI consumes" — needs the
       off-by-default framing); any spec or Purpose stating the API "is" available,
@@ -125,7 +125,30 @@ wrap-normalised; never write prose through a double-quoted shell string.
       provides; the front-end-contract rationale wherever specs restate it
       ("alternative UIs consume the API" sentences are fine — "the API is there" ones
       are not).
-- [ ] 6.2 Falsified-claims sweep over `README.md`, `docs/*.md`, and XML doc comments —
+      **RUN at sync (2026-09-12), findings:** the Purpose hand-edited (delta-unreachable,
+      the established exception) to the off-by-default framing. Two sibling requirement
+      bodies falsified, both fixed by DELTA with verbatim bodies amended only as
+      described, their titles below unwrapped for the delta-integrity guard:
+      - The package can be installed
+      - Eligibility remains derivable from public reads
+      (packaging's one-install scenario now says the delivery API arrives "present and
+      off, until the site enables its directions"; service-booking's disclosure-parity
+      SHALL is scoped to an exposed read direction, with a new paragraph stating
+      honestly that a placement-only site keeps the disclosing failure codes while the
+      reads that justified them are off — the site's own chosen asymmetry, accepted
+      over configuration-dependent failure codes.) Checked and NOT falsified:
+      `booker-erasure` ("the delivery api has no endpoint that reads a booking back" —
+      still true), all four `default-frontend` mentions (they REQUIRE not calling the
+      API — strengthened), `verify-install.ps1` and the packaging tests (no delivery
+      endpoint probing anywhere).
+- [x] 6.2 Falsified-claims sweep over `README.md`, `docs/*.md`, and XML doc comments —
       candidates known now: `UBookItDeliveryApiComposer`'s summary ("the delivery API
       is anonymous"), `UBookItDeliveryApiControllerBase` docs, `Constants` comments,
       and `docs/booking-page.md` if it mentions the API.
+      **RUN at sync (2026-09-12), findings:** the composer summary rewritten (it now
+      composes exposure first, and says why the registration line is pinned); the base
+      controller's summary now leads with off-by-default and scopes anonymity to an
+      enabled direction. Checked and NOT falsified: `Constants` (route comment mirrors
+      Umbraco's content API — about the route shape, not availability), README and
+      docs (rewritten in 3.x with guards), `booking-page.md` (no API mention),
+      `notifications.md` (conditional mention).

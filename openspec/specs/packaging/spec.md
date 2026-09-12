@@ -313,7 +313,7 @@ usually been made complete by hand already.
 
 #### Scenario: One install is enough
 - **WHEN** a site adds the single uBookIt package to a newly created Umbraco project
-- **THEN** restore succeeds, and the site has the backoffice section, the management API, the delivery API and the front-end rendering available
+- **THEN** restore succeeds, and the site has the backoffice section, the management API and the front-end rendering available, and the delivery API installed — present and off, until the site enables its directions as the `delivery-api` capability defines
 
 #### Scenario: Nothing is declared that is not published
 - **WHEN** the produced packages' dependencies are inspected
