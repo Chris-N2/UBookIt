@@ -340,3 +340,41 @@ domain usage.
 
 At HEAD: 2698 .NET (1483 + 130 + 1085), 167 client, Release no-incremental 0 warnings,
 21 items strict.
+
+## QA round 5 (sync) — REJECT (1 MAJOR), and the fix (2026-09-15)
+
+**The finding landed exactly where this project's other standing lesson says it would.** I
+swept the whole tree, found and fixed a falsified present-tense claim in the roadmap's
+PROSE — and never looked four lines up into the TABLE of the same file, where the identical
+fact sat in the identical tense. QA found three survivors there (`:31` 0.4.0, `:32` 0.5.0's
+permissions remark, `:37` 0.10.0), the first of which is the table twin of the prose
+sentence I had just hand-corrected.
+
+**A hand-edit is the strongest available signal that the class lives right there, and it is
+the one region a sweep skips** — because a hand-fixed instance *feels* like the class has
+been handled. ⑰ and ㉝ taught this; it is now at the top of
+[[a-finding-enumerates-a-sample]] rather than buried in a change's tasks file.
+
+- [x] R5.1 [MAJOR] **Both** of QA's offered fixes taken, because either alone leaves half the
+      problem:
+      (a) **The boundary.** The header said "read **the prose below the table**…", excluding
+      the table — while I was correcting table cells. A disclaimer narrower than my own
+      editing standard is not a disclaimer, it is a blind spot with a sentence in front of
+      it. It now covers the whole file, on the honest grounds that *every row was written
+      before the work in it existed*.
+      (b) **The three survivors**, corrected the way row 0.9.0 was: past tense, plus an
+      inline note where the outcome differed from the plan (`:31` now cites the shipped
+      requirement; `:32` records that the permissions arrived in 0.10.0 and the settings
+      screen is 17.1.0; `:37` records that the spike came back feasible and that the settings
+      screen did NOT ride with it, correcting a plan the row still asserted).
+- [x] R5.2 Re-swept **the table itself** by pattern afterwards — the region QA proved I had
+      skipped. Clean: no present-tense marker survives any row. I also read all eleven rows
+      by hand; `:33`'s "the default is exactly today's behaviour" is time-relative but not
+      false (AutoConfirm does default on), so it stands.
+- [x] R5.3 Memory updated with the two durable rules QA asked be carried out of the tasks
+      file: the sweep-your-own-edits rule and the disclaimer-scope corollary in
+      [[a-finding-enumerates-a-sample]]; the green-mutant rule and the
+      normalise-your-instrument rule in [[ubookit-guard-correctness]].
+
+At HEAD: 2698 .NET, 167 client, Release 0 warnings, 21 items strict. The sync touched no
+test and no source — three table cells, one header, and memory.
