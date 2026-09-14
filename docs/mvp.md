@@ -16,8 +16,8 @@ say what the package does, and this says which of them had to exist before it wa
 releasing.
 
 > **This document is now history, and is kept as history.** It was a living record until v1
-> was complete; the first release is **`17.0.0`**. Its own instruction was to fold into the README at that
-> point, and that was declined deliberately: what it holds is *scope* history — what was
+> was complete; the first release is **`17.0.0`**. Its own instruction was to fold into the
+> README at that point, and that was declined deliberately: what it holds is *scope* history — what was
 > knowingly left out of v1 and why — which a README should not carry, since a README says what
 > the package does rather than what it once chose not to do. Several archived changes cite this
 > file, so it stays where they point. **For what uBookIt does today, read

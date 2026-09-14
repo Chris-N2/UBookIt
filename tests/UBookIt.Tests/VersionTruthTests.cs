@@ -58,6 +58,13 @@ public class VersionTruthTests
     /// pattern that stopped matching — or a document that dropped its version claim — would
     /// leave the scan passing over nothing at all.
     /// </summary>
+    /// <remarks>
+    /// The pin is per DOCUMENT, not per claim: <c>docs/mvp.md</c> states the version twice,
+    /// and reworking one of the two away leaves this satisfied by the other. Deliberate —
+    /// the surviving claim still keeps the file honest at the next bump, which is what this
+    /// is protecting, and pinning every individual sentence would make ordinary rewording
+    /// fail for no gain.
+    /// </remarks>
     private static readonly string[] DocumentsKnownToClaim =
     [
         "README.md",
@@ -67,10 +74,24 @@ public class VersionTruthTests
     ];
 
     /// <summary>
-    /// Every live document a reader could meet. <c>openspec/changes/archive/**</c> is
-    /// excluded deliberately — it is history, it records versions that were true when
-    /// written, and it must never be edited to satisfy a guard.
+    /// Every live document a reader could meet — the markdown a consumer reads AND the
+    /// package sources, whose XML documentation is what a site author meets first, in
+    /// IntelliSense.
     /// </summary>
+    /// <remarks>
+    /// <para>
+    /// The source files are here because <see cref="DocumentationAssert"/> was built for
+    /// them: its own remarks say it strips <c>///</c> "because these guards are asked about
+    /// source files as well as markdown", and that a claim in a public type's
+    /// <c>&lt;remarks&gt;</c> is the one a site author meets first. A scan that walked only
+    /// markdown would be blind exactly where the helper was designed to see (QA round 2).
+    /// </para>
+    /// <para>
+    /// <c>openspec/changes/archive/**</c> is excluded deliberately — it is history, it
+    /// records versions that were true when written, and it must never be edited to satisfy
+    /// a guard. <c>ref/</c> is Umbraco's source, not ours.
+    /// </para>
+    /// </remarks>
     private static IEnumerable<string> LiveDocuments()
     {
         var root = RepoFiles.Root;
@@ -80,7 +101,14 @@ public class VersionTruthTests
             yield return file;
         }
 
-        foreach (var directory in new[] { "docs", "roadmap", "openspec/specs" })
+        foreach (var (directory, pattern) in new[]
+        {
+            ("docs", "*.md"),
+            ("roadmap", "*.md"),
+            ("openspec/specs", "*.md"),
+            ("src", "*.md"),
+            ("src", "*.cs"),
+        })
         {
             var full = Path.Combine(root, directory.Replace('/', Path.DirectorySeparatorChar));
 
@@ -89,9 +117,42 @@ public class VersionTruthTests
                 continue;
             }
 
-            foreach (var file in Directory.EnumerateFiles(full, "*.md", SearchOption.AllDirectories))
+            foreach (var file in EnumeratePruned(full, pattern))
             {
                 yield return Path.GetRelativePath(root, file).Replace(Path.DirectorySeparatorChar, '/');
+            }
+        }
+    }
+
+    /// <summary>
+    /// Walks a directory, skipping build output and dependency trees as it goes.
+    /// </summary>
+    /// <remarks>
+    /// Pruned DURING the walk rather than filtered after it. Filtering afterwards still
+    /// enumerates <c>Client/node_modules</c> — tens of thousands of files — and took the
+    /// suite from instant to 34 seconds. The difference is invisible in the results and
+    /// obvious in the clock.
+    /// </remarks>
+    private static IEnumerable<string> EnumeratePruned(string directory, string pattern)
+    {
+        var pending = new Stack<string>();
+        pending.Push(directory);
+
+        while (pending.Count > 0)
+        {
+            var current = pending.Pop();
+
+            foreach (var child in Directory.EnumerateDirectories(current))
+            {
+                if (Path.GetFileName(child) is not ("node_modules" or "bin" or "obj" or "dist"))
+                {
+                    pending.Push(child);
+                }
+            }
+
+            foreach (var file in Directory.EnumerateFiles(current, pattern))
+            {
+                yield return file;
             }
         }
     }
@@ -208,27 +269,130 @@ public class VersionTruthTests
     }
 
     /// <summary>
-    /// No live document claims the package has been published, because it has not been.
+    /// The vocabulary a document uses when it claims THE PACKAGE has reached a feed. Every
+    /// occurrence must be classified in <see cref="AcceptedPublicationMentions"/>.
     /// </summary>
     /// <remarks>
-    /// <b>QA round 1 found this change asserting exactly that</b>, in three documents at once
+    /// Scoped to the package as the SUBJECT. A bare "is published" is pervasive in this
+    /// repository for a value being published on a read model — "a role's count is
+    /// published", "the contract is published" — and matching it unscoped would bury a real
+    /// claim under twenty legitimate ones.
+    /// </remarks>
+    private static readonly string[] PublicationVocabulary =
+    [
+        @"nuget\.org",
+        @"on NuGet",
+        @"(?:uBookIt|UBookIt\.[A-Za-z.]+|[Tt]he package|[Ii]t) (?:is|has been) published",
+        @"published to (?:a |the )?feed",
+        @"is now (?:live|available) on",
+    ];
+
+    /// <summary>
+    /// Every accepted occurrence of <see cref="PublicationVocabulary"/>, with the reason it
+    /// is accepted. Anything not here fails.
+    /// </summary>
+    private static readonly (string Document, string Accepted, string Why)[] AcceptedPublicationMentions =
+    [
+        ("openspec/specs/bookings/spec.md", "UBookIt.Core is published",
+            "Pre-existing rationale for stating a break in that requirement, written in "
+            + "anticipation of publication. Becomes true the moment the package ships, and "
+            + "correcting it would mean replacing a requirement about booker identity "
+            + "wholesale for two words — the disproportionate edit CLAUDE.md warns against. "
+            + "Recorded here and in the deferred-obligations memory for whichever change "
+            + "next legitimately modifies `bookings`."),
+    ];
+
+    /// <summary>
+    /// No live document claims the package has reached a feed, because it has not.
+    /// </summary>
+    /// <remarks>
+    /// <para>
+    /// <b>QA round 1 found this change asserting exactly that</b> in three documents at once,
     /// including this repository's own governing instructions — the defect class the change
-    /// exists to close, reintroduced by the change. The repair was not only to reword them but
-    /// to prefer sentences that stay true ACROSS the publication event ("the surface is
-    /// declared stable from 17.0.0", "the release is prepared and versioned") over sentences
-    /// that need a second edit at it. This guard holds the line until a push actually happens
-    /// — at which point it is the thing to delete, deliberately, in the change that publishes.
+    /// exists to close, reintroduced by the change. The repair was to prefer sentences that
+    /// stay true ACROSS the publication event over sentences needing a second edit at it.
+    /// </para>
+    /// <para>
+    /// <b>This guard is an ALLOW-LIST, and the first version of it was not.</b> That version
+    /// forbade three named sentences — the two it had just deleted, plus one no document ever
+    /// contained — under a name that quantified over every document and every phrasing. QA
+    /// round 2 demonstrated it green while <c>docs/mvp.md</c> claimed "live on nuget.org
+    /// today", and green while <c>bookings/spec.md</c> said "UBookIt.Core is published" in a
+    /// directory it walked. The reasoning against it was already written eighty lines above,
+    /// in <see cref="VersionClaimPatterns"/>' own doc: a denylist fences only what somebody
+    /// thought of. <b>An allow-list fails closed — a new claim, in a phrasing nobody
+    /// anticipated, fails until a human classifies it.</b>
+    /// </para>
+    /// <para>
+    /// When the package is published, this does not get deleted: the accepted list absorbs
+    /// the claims that become true, one at a time, each with its reason.
+    /// </para>
     /// </remarks>
     [Fact]
-    public void No_document_claims_the_package_is_already_published()
+    public void No_document_claims_the_package_has_reached_a_feed()
     {
+        var unclassified = new List<string>();
+
         foreach (var document in LiveDocuments())
         {
             var text = RepoFiles.Read(document);
 
-            DocumentationAssert.DoesNotSay(text, "and it is published, from 17.0.0");
-            DocumentationAssert.DoesNotSay(text, "v1 shipped as 17.0.0");
-            DocumentationAssert.DoesNotSay(text, "uBookIt is published on NuGet");
+            foreach (var vocabulary in PublicationVocabulary)
+            {
+                foreach (Match match in Regex.Matches(text, vocabulary))
+                {
+                    var accepted = AcceptedPublicationMentions.Any(entry =>
+                        entry.Document == document
+                        && match.Value.Contains(entry.Accepted, StringComparison.Ordinal));
+
+                    if (!accepted)
+                    {
+                        unclassified.Add($"{document}: \"{match.Value}\"");
+                    }
+                }
+            }
         }
+
+        Assert.True(
+            unclassified.Count == 0,
+            "These read as claims that uBookIt has reached a package feed. It has not — "
+            + "nothing is pushed. Correct the claim, or, if it is legitimate, add it to "
+            + "AcceptedPublicationMentions with the reason:\n  "
+            + string.Join("\n  ", unclassified));
+    }
+
+    /// <summary>
+    /// The publication blocker in <c>Directory.Build.props</c> is now the only thing standing
+    /// between a push and a package pointing consumers at a private repository, so the two
+    /// halves are tied together: while the URLs are the Azure DevOps ones, the warning must
+    /// still be there.
+    /// </summary>
+    /// <remarks>
+    /// A biconditional rather than an assertion about the URLs themselves (QA round 2's
+    /// suggestion, taken). Asserting they are NOT the Azure URLs would fail today, when they
+    /// correctly are; asserting only that the warning exists would not notice the URLs being
+    /// fixed and the stale warning left behind. This fails on the one rot that can actually
+    /// happen — somebody tidying the comment away while the URLs remain.
+    /// </remarks>
+    [Fact]
+    public void The_publication_blocker_stands_while_the_private_urls_do()
+    {
+        var props = RepoFiles.Read("Directory.Build.props");
+
+        var namesPrivateUrls = props.Contains("dev.azure.com", StringComparison.Ordinal);
+        var carriesWarning = props.Contains(
+            "CORRECT THESE BEFORE THE FIRST PUSH TO A PUBLIC FEED", StringComparison.Ordinal);
+
+        Assert.True(
+            namesPrivateUrls == carriesWarning,
+            namesPrivateUrls
+                ? "Directory.Build.props still points PackageProjectUrl/RepositoryUrl at a "
+                  + "PRIVATE Azure DevOps organisation, but the warning that says to correct "
+                  + "them before the first push is gone. nuget.org does not allow a pushed "
+                  + "version's metadata to be edited: publishing like this costs a version "
+                  + "number and leaves the bad listing permanently visible."
+                : "The private Azure DevOps URLs are gone from Directory.Build.props — good — "
+                  + "but the warning about them is still there, telling a reader to fix "
+                  + "something already fixed. Remove it.");
     }
 }
