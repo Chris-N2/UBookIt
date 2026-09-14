@@ -46,10 +46,19 @@ repository they cannot open.
 ```
 1. correct the properties        (committed, in the repo)
 2. switch the git remote         git remote set-url origin <public URL>
-3. clean rebuild                 dotnet build UBookIt.slnx -c Release --no-incremental
-4. pack                          dotnet pack UBookIt.slnx -c Release
-5. VERIFY before pushing         (below)
+3. DELETE the old artifacts      dotnet clean UBookIt.slnx -c Release
+                                 rm -rf src/*/bin/Release
+4. clean rebuild                 dotnet build UBookIt.slnx -c Release --no-incremental
+5. pack                          dotnet pack UBookIt.slnx -c Release
+6. VERIFY before pushing         (below)
 ```
+
+**Step 3 is not housekeeping — without it steps 4 and 5 can produce nothing.** `--no-incremental`
+governs the *build*; it does not force `GenerateNuspec`, which skips when its outputs look
+up-to-date (`Skipping target "GenerateNuspec" because all output files are up-to-date`). A
+`.nupkg` produced *before* the remote moved therefore survives this whole procedure untouched
+and is then matched by the push wildcard below — the exact failure this document exists to
+prevent, hiding inside its own instructions.
 
 ### Verify, do not assume
 
@@ -61,8 +70,9 @@ unzip -p src/UBookIt/bin/Release/UBookIt.17.0.0.nupkg UBookIt.nuspec | grep -iE 
 cat src/UBookIt.Core/obj/Release/net10.0/UBookIt.Core.sourcelink.json
 ```
 
-Both must name the public repository. If `sourcelink.json` still names the old host, step 2 or
-step 3 did not happen — repack, do not push.
+**Each package carries its own metadata, so check all five** — the commands above read one as
+an example. If any `sourcelink.json` still names the old host, step 2 or step 3 did not happen:
+repack, do not push.
 
 ## Publish only from a commit that is already on the public repository
 
@@ -95,17 +105,23 @@ dotnet nuget push "src/**/bin/Release/*.nupkg" \
   --api-key <key> --source https://api.nuget.org/v3/index.json --skip-duplicate
 ```
 
-The `.snupkg` symbol packages are pushed by the same command alongside their `.nupkg`. Push the
-libraries before the `UBookIt` meta-package if you push them individually, so the meta-package's
-dependencies resolve for the first person who installs it.
+The `.snupkg` symbol packages are pushed by the same command alongside their `.nupkg`.
+
+The wildcard resolves alphabetically, so it pushes the `UBookIt` meta-package FIRST, before the
+libraries it depends on. That is harmless — nuget.org validates each package independently and
+does not require a dependency to exist at push time — but if you push them individually, push
+the libraries first so the meta-package is never briefly uninstallable.
 
 **Expect a delay**: indexing and validation take minutes, and the Umbraco Marketplace picks the
 package up separately via the `umbraco-marketplace` tag it already carries.
 
 ## The guard that is SUPPOSED to fail when you publish
 
-`VersionTruthTests.No_document_claims_the_package_has_reached_a_feed` asserts that no document
-claims uBookIt is on a feed — true until the moment it is.
+`VersionTruthTests.No_document_claims_the_package_has_reached_a_feed` scans the documents it
+walks for a fixed vocabulary of feed-arrival phrasings and requires every hit to be classified.
+It is not a proof that no document anywhere makes the claim — a wording outside that vocabulary
+passes, as its own remarks state — but it turns the claims it does know about into a list you
+must work through.
 
 **When you publish, that guard will start failing. Do not delete it.** It is an allow-list:
 `AcceptedPublicationMentions` absorbs claims that become true, one at a time, each with a reason
@@ -113,5 +129,6 @@ and an occurrence count. The failure is the checklist of every sentence that nee
 now the package is public — which is exactly what you want at that moment. `openspec/specs/bookings/spec.md`
 already carries one such sentence, waiting.
 
-The same applies to the pre-release framing guards: they are the record of what had to change,
-not an obstacle to changing it.
+The pre-release framing guards are different and will **not** go red: they assert that certain
+sentences are ABSENT, and publishing does not bring them back. Only the feed-arrival guard above
+is designed to fail at this moment.

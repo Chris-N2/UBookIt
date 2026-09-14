@@ -52,7 +52,11 @@
 
 ## 7. Sync + archive
 
-- [ ] 7.1 No delta to sync (no requirement changes). Still run the falsified-sentence sweep BY
+- [ ] 7.1 SYNC the ADDED `packaging` requirement into `openspec/specs/packaging/spec.md`.
+      (This task first said "no delta to sync (no requirement changes)" — corrected with the
+      proposal when the tooling refused a change with no delta; QA round 1 found the
+      contradiction still standing here, which is the record disagreeing with the change it
+      records.) Then run the falsified-sentence sweep BY
       PATTERN, wrap- and decoration-normalised, over the whole tree — **including the lines
       edited by hand**, which is the region a sweep skips (㉟ R5).
 - [ ] 7.2 Memory: retire `azure-devops-not-github` — it will be false the moment 4.1 runs;
@@ -144,3 +148,55 @@ Added to `docs/publishing.md` as its own section with the two commands that chec
 doing the verification rather than by reasoning about it** — the design predicted the remote
 would fix SourceLink and stopped there; looking at the actual output showed what else the URL
 carried.
+
+## QA round 1 — REJECT (1 CRITICAL, 6 MAJOR, 5 MINOR, 3 NIT), and the fix (2026-09-15)
+
+### The CRITICAL is mine, and its cause is a process failure already in memory
+
+`38d37ea` recorded "Added to `docs/publishing.md` … and guarded" while containing **only
+tasks.md**. Verified: the section and the guard were absent at HEAD, tree clean.
+
+**Cause: I left the QA agent running and kept editing the same working tree.** QA's mutation
+testing restores files with `git checkout --`, which destroyed those edits while they were
+uncommitted; my subsequent `git add -A` then committed only the file QA had not touched. The
+7/7 test run I cited as evidence passed genuinely — *before* the restore. This is
+`never-git-add-all-while-an-agent-runs` exactly, repeated, and the correct structural answer is
+the one that memory already gives: **do not edit a tree an agent is mutating, and commit before
+any concurrent verification.** Re-applied at `6c28a5a` and verified present at HEAD before
+continuing.
+
+- [x] R1.1 [CRITICAL] Runbook section + guard re-applied and confirmed in the commit's diff.
+- [x] R1.2 [MAJOR] `publishing.md` claimed the feed guard "asserts that no document claims
+      uBookIt is on a feed". Narrowed to what it does — a fixed vocabulary over the documents
+      it walks, with its own remarks' limit restated. **The predecessor's six-round fault
+      (a claim exceeding its mechanism) reappearing in a new document one layer out.**
+- [x] R1.3 [MAJOR] The URL guard used `Contains`, so `github.com/Chris-N2/UBookIt-fork`
+      passed (QA's M6, reproduced). Now anchored: `^https://github\.com/Chris-N2/UBookIt(\.git)?$`.
+      **Fixed by SHAPE** — any repository merely extending our path would have shipped.
+- [x] R1.4 [MAJOR] The spec's reachability scenario required the docs to name the manual
+      check; nothing enforced it (deleting the sentence left the suite green). Guarded.
+- [x] R1.5 [MAJOR] Task 7.1 still said "no delta to sync (no requirement changes)" after the
+      proposal had been corrected — the record disagreeing with the change it records.
+      Corrected, with the history kept.
+- [x] R1.6 [MAJOR] `openspec/config.yaml` said "Azure DevOps (not GitHub) for hosting/CI" —
+      falsified by the remote move, **in-repo, non-archive, and injected into every future
+      OpenSpec artifact**, so it would have propagated the false claim indefinitely. No guard
+      reads it: `LiveDocuments()` walks `*.md`/`*.cs`/`*.cshtml`/`*.ts`, not `*.yaml`.
+- [x] R1.7 [MAJOR] **`dotnet pack` is incremental and `--no-incremental` does not govern it**
+      (QA reproduced: `Skipping target "GenerateNuspec" because all output files are
+      up-to-date`). A `.nupkg` built before the remote moved survived the runbook's own
+      ordering and would be matched by the push wildcard — the failure the document exists to
+      prevent, inside its own procedure. A delete step is now step 3, with the reason stated.
+- [x] R1.8 [MINOR ×4] The verify block reads one of five packages (now says check all five);
+      the push-order sentence contradicted its own wildcard (now states the wildcard pushes the
+      meta-package first and why that is harmless); "the same applies to the pre-release
+      framing guards" was wrong — they will NOT go red at publication (corrected).
+- [x] R1.9 The allow-list count moved 3 → 4 as the runbook grew. **Both directions bite**: the
+      new text tripped the guard immediately, and a deliberate over-count of 5 failed the
+      dead-allowance check. The count doing its job in both directions, unprompted.
+
+Still open from QA and handled in round 2's scope: the hardcoded `17.0.0` in the runbook, the
+retirement narrowing (old guard read the whole file, new one reads two element values), and
+the NITs.
+
+At HEAD: 2699 .NET (1484 + 130 + 1085), Release no-incremental 0 warnings, 21 items strict.

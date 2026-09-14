@@ -342,7 +342,7 @@ public class VersionTruthTests
             + "Recorded here and in the deferred-obligations memory for whichever change "
             + "next legitimately modifies `bookings`."),
 
-        ("docs/publishing.md", "nuget.org", 3,
+        ("docs/publishing.md", "nuget.org", 4,
             "The publishing runbook names the feed as a DESTINATION - what nuget.org will "
             + "not let you undo, where to get an API key, which source to push to. That is "
             + "the distinction this guard exists to draw: instructions FOR publishing are "
@@ -532,8 +532,13 @@ public class VersionTruthTests
                 + " wall. nuget.org will not let a pushed version's metadata be edited, so"
                 + " publishing this costs a version number — see docs/publishing.md.");
 
+            // ANCHORED, not a substring: QA's mutant pointed both URLs at
+            // "github.com/Chris-N2/UBookIt-fork" and a Contains check passed it. Any
+            // repository whose path merely EXTENDS ours would have shipped. The failure
+            // message claims the URL names the repository the source lives in, so the
+            // mechanism has to decide exactly that.
             Assert.True(
-                value.Contains("github.com/Chris-N2/UBookIt", StringComparison.Ordinal),
+                Regex.IsMatch(value, @"^https://github\.com/Chris-N2/UBookIt(\.git)?$"),
                 $"<{element}> is '{value}', which is not the repository the source lives in.");
         }
     }
@@ -551,6 +556,12 @@ public class VersionTruthTests
     public void The_publishing_runbook_states_what_cannot_be_undone()
     {
         var runbook = RepoFiles.Read("docs/publishing.md");
+
+        // The spec requires the documentation to name the MANUAL check, because no
+        // automated check may reach the network. Unenforced until QA round 1: deleting the
+        // sentence left the suite green while the spec scenario said it must be there.
+        DocumentationAssert.Says(
+            runbook, "It cannot check the URL actually resolves — open it in a browser once,");
 
         // The one-way doors.
         DocumentationAssert.Says(runbook, "A pushed version's metadata cannot be edited");

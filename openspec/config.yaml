@@ -21,7 +21,8 @@ context: |
   central package management in root Directory.Packages.props, Management
   API endpoints require backoffice authorization policies, delivery
   endpoints validate all input, booking form submissions use anti-forgery
-  protection. Azure DevOps (not GitHub) for hosting/CI.
+  protection. Public GitHub repository at github.com/Chris-N2/UBookIt; nothing is
+  published to a package feed yet.
 
 # Per-artifact rules
 rules:
