@@ -61,7 +61,7 @@
       edited by hand**, which is the region a sweep skips (㉟ R5).
 - [x] 7.2 Memory: retire `azure-devops-not-github` — it will be false the moment 4.1 runs;
       update the ㉟ handover's outstanding-item section.
-- [ ] 7.3 Archive; merge after QA approval.
+- [x] 7.3 Archive; merge after QA approval.
 
 ## Observed during apply
 
