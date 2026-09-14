@@ -90,12 +90,15 @@ public readonly record struct BookingSubject(BookableKind Kind, Guid Id)
 
 /// <summary>
 /// The query string a step is reached at: what is being booked, the chosen date
-/// and the chosen length — and nothing else, ever.
+/// and the chosen length — plus, since the preserved-query requirement, the
+/// host page's site-listed parameters, and nothing else, ever.
 /// <para>
 /// Built here rather than at each redirect so both flows produce one vocabulary,
 /// and so the rule that contact details never travel in a URL is a property of a
-/// function rather than of two call sites agreeing. Every value is re-serialised
-/// from parsed input; nothing a caller typed is echoed.
+/// function rather than of two call sites agreeing. Every flow value is
+/// re-serialised from parsed input; the preserved tail is the one deliberate
+/// exception — visitor-controlled values, bounded by the site's configured
+/// allow-list upstream and percent-encoded here, never raw.
 /// </para>
 /// <para>
 /// The date and length are carried because a step has to be <b>linkable</b>: a
@@ -107,7 +110,11 @@ public readonly record struct BookingSubject(BookableKind Kind, Guid Id)
 public static class BookingFlowLink
 {
     public static QueryString For(
-        BookingSubject subject, DateOnly date, int durationMinutes, Guid? chosenResourceId = null)
+        BookingSubject subject,
+        DateOnly date,
+        int durationMinutes,
+        Guid? chosenResourceId = null,
+        IReadOnlyList<PreservedQueryPair>? preserved = null)
     {
         var query = QueryString.Create(BookingKeys.SubjectQuery, subject.Token)
             .Add(BookingKeys.DateQuery, date.ToString("yyyy-MM-dd", CultureInfo.InvariantCulture));
@@ -126,9 +133,39 @@ public static class BookingFlowLink
         // with the page it draws, and "who" is now one of the step's choices.
         // Absent when the visitor chose nobody, so a flow offering no choice
         // produces exactly the query string it produced before.
-        return chosenResourceId is { } chosen
-            ? query.Add(BookingKeys.ResourceQuery, chosen.ToString("D", CultureInfo.InvariantCulture))
-            : query;
+        if (chosenResourceId is { } chosen)
+        {
+            query = query.Add(BookingKeys.ResourceQuery, chosen.ToString("D", CultureInfo.InvariantCulture));
+        }
+
+        return AppendPreserved(query, preserved);
+    }
+
+    /// <summary>
+    /// A redirect query that is ONLY the preserved host-page parameters — the
+    /// component-named flow's case, where there is no flow state to carry but the
+    /// page's own parameters must still survive the submission. Empty pairs produce
+    /// an empty query, so that flow's redirect stays byte-for-byte what it was on
+    /// every site that has configured nothing.
+    /// </summary>
+    public static QueryString Carrying(IReadOnlyList<PreservedQueryPair> preserved)
+        => AppendPreserved(QueryString.Empty, preserved);
+
+    // The preserved tail rides here, not at the call sites, so "every query string
+    // the controllers produce is built by one vocabulary" stays a property of this
+    // class — and so the Location-header rule below can be stated once: preserved
+    // values are visitor-controlled, BOUNDED by the site's allow-list (that filter is
+    // PreservedQuery.Compute's, upstream), and re-serialised through QueryString.Add,
+    // which percent-encodes them. Nothing reaches the header as raw text.
+    private static QueryString AppendPreserved(
+        QueryString query, IReadOnlyList<PreservedQueryPair>? preserved)
+    {
+        foreach (var pair in preserved ?? [])
+        {
+            query = query.Add(pair.Name, pair.Value);
+        }
+
+        return query;
     }
 }
 

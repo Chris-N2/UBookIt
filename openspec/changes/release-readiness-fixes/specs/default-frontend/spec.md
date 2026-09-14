@@ -17,6 +17,14 @@ not on the list SHALL be dropped — preservation of unlisted parameters is decl
 because every preserved value is visitor-controlled input reflected into the markup, and
 the configured bound is what makes the reflection acceptable.
 
+The redirect that follows a booking submission SHALL carry the same preserved
+parameters, so both pages a submission can land on — the confirmation and a failed
+submission's redraw — keep them (decided 2026-09-14: a site's parameters may matter
+after the redirect, so preservation covers the whole flow, not the GET steps alone).
+The same allow-list bounds what reaches the redirect's Location header, and the values
+are re-serialised through the flow's one query-building function, never echoed as raw
+text.
+
 #### Scenario: A listed parameter survives form submission
 
 - **GIVEN** a site configures `utm_source` in `UBookIt:Frontend:PreservedQueryParameters`
@@ -52,6 +60,23 @@ the configured bound is what makes the reflection acceptable.
 - **WHEN** either GET form is rendered
 - **THEN** two hidden inputs named `tag` are rendered with values `a` and `b` in that
   order
+
+#### Scenario: Preserved parameters survive the submission redirect
+
+- **GIVEN** a site lists `utm_source` and the booking page is reached with
+  `?utm_source=newsletter`
+- **WHEN** the booking form is submitted — whether the submission succeeds or is
+  refused
+- **THEN** the URL the visitor is redirected to still carries
+  `utm_source=newsletter`, alongside the flow's own parameters
+
+#### Scenario: A component-named flow's redirect gains only the preserved parameters
+
+- **GIVEN** a site author named the resource on the component (no flow state in the
+  URL) and a listed parameter is present on the request
+- **WHEN** the form is submitted
+- **THEN** the redirect carries the preserved parameter, and with no listed parameter
+  present the redirect is byte-for-byte what it was before this requirement existed
 
 #### Scenario: Preserved values are encoded
 

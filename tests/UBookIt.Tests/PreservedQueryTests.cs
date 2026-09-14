@@ -137,13 +137,86 @@ public class PreservedQueryTests
             "are never preserved through this mechanism, even if you list them");
 
     /// <summary>
-    /// The honest limit: preservation ends at the post-submission redirect. If the
-    /// redirect is ever taught to carry the parameters, this sentence must change WITH
-    /// it — a doc promising less than the code does is stale, not safe.
+    /// The whole-flow claim. This guard's first version pinned the OPPOSITE sentence
+    /// ("but not the redirect after it") while the redirect genuinely dropped the
+    /// parameters; the redirect was then taught to carry them (Chris, 2026-09-14)
+    /// and the doc and guard flipped together — which is the point of pairing them.
     /// </summary>
     [Fact]
-    public void The_docs_state_where_preservation_ends()
+    public void The_docs_state_the_whole_flow_claim()
         => DocumentationAssert.Says(
             BookingPageDocs(),
-            "but not the redirect after it");
+            "every step's URL, the booking submission, and the redirect after it");
+
+    // ---- the redirect's preserved tail (the submission-redirect scenarios) ----
+
+    [Fact]
+    public void The_flow_link_appends_preserved_pairs_encoded_and_in_order()
+    {
+        var query = BookingFlowLink.For(
+            BookingSubject.Resource(new Guid("00000000-0000-0000-0000-000000000001")),
+            new DateOnly(2026, 9, 15),
+            60,
+            preserved:
+            [
+                new PreservedQueryPair("utm_source", "newsletter"),
+                new PreservedQueryPair("tag", "a"),
+                new PreservedQueryPair("tag", "b"),
+                new PreservedQueryPair("note", "a&b=c"),
+            ]).ToUriComponent();
+
+        // The flow's own parameters first, then the preserved tail in request order,
+        // values percent-encoded so a reserved character cannot become structure.
+        Assert.Contains("ubBook=", query, StringComparison.Ordinal);
+        Assert.EndsWith(
+            "&utm_source=newsletter&tag=a&tag=b&note=a%26b%3Dc", query, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public void No_preserved_pairs_leaves_the_flow_link_byte_identical()
+        => Assert.Equal(
+            BookingFlowLink.For(
+                BookingSubject.Resource(new Guid("00000000-0000-0000-0000-000000000001")),
+                new DateOnly(2026, 9, 15), 60).ToUriComponent(),
+            BookingFlowLink.For(
+                BookingSubject.Resource(new Guid("00000000-0000-0000-0000-000000000001")),
+                new DateOnly(2026, 9, 15), 60, preserved: []).ToUriComponent());
+
+    [Fact]
+    public void A_preserved_only_query_is_the_pairs_and_nothing_else()
+    {
+        // The component-named flow's redirect: no flow state, just the page's own
+        // parameters — and empty pairs produce an empty query, so an unconfigured
+        // site's redirect is byte-for-byte what it always was.
+        Assert.Equal(
+            "?utm_source=newsletter",
+            BookingFlowLink.Carrying([new PreservedQueryPair("utm_source", "newsletter")]).ToUriComponent());
+        Assert.Equal(string.Empty, BookingFlowLink.Carrying([]).ToUriComponent());
+    }
+
+    /// <summary>
+    /// The wiring, since <c>BackToFlow</c> is private and needs an Umbraco host: both
+    /// surface controllers compute the preserved pairs from the request and hand them
+    /// to the one link-building vocabulary. Source-level, like the sibling guard that
+    /// already pins "every query string the controllers produce is BookingFlowLink's"
+    /// — this narrows it to "and the preserved tail rides through it".
+    /// </summary>
+    [Fact]
+    public void Both_surface_controllers_carry_the_preserved_tail_through_the_link()
+    {
+        foreach (var controller in new[]
+        {
+            "src/UBookIt.Web/Rendering/BookingSurfaceController.cs",
+            "src/UBookIt.Web/Rendering/ServiceBookingSurfaceController.cs",
+        })
+        {
+            var source = RepoFiles.Read(controller);
+
+            Assert.Contains(
+                "PreservedQuery.Compute(", source, StringComparison.Ordinal);
+            Assert.Contains(
+                "BookingFlowLink.Carrying(preserved)", source, StringComparison.Ordinal);
+            Assert.Contains("preserved", source, StringComparison.Ordinal);
+        }
+    }
 }

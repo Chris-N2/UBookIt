@@ -158,10 +158,9 @@ worth knowing:
 - **uBookIt's own parameters** (`ubBook`, `ubDate`, `ubDateOther`, `ubMins`, `ubWho`)
   are never preserved through this mechanism, even if you list them — they are the
   flow's live controls, and duplicating one would submit two values for it.
-- **The parameters survive each step of the flow and the booking submission itself,
-  but not the redirect after it** — the confirmation page (and a failed submission's
-  redraw) land on a URL carrying only the flow's own state. If that matters to your
-  analytics, measure the flow's steps rather than the confirmation URL.
+- **The parameters survive the whole flow, the submission included** — every step's
+  URL, the booking submission, and the redirect after it, so the confirmation page
+  and a failed submission's redraw both keep them.
 
 ## Styling the booking flow
 

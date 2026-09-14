@@ -28,6 +28,7 @@ public sealed class BookingSurfaceController : SurfaceController
     private readonly IResourceStore _resourceStore;
     private readonly IBookingService _bookingService;
     private readonly SiteBookingSettings _settings;
+    private readonly FrontendSettings _frontendSettings;
 
     public BookingSurfaceController(
         IUmbracoContextAccessor umbracoContextAccessor,
@@ -38,12 +39,14 @@ public sealed class BookingSurfaceController : SurfaceController
         IPublishedUrlProvider publishedUrlProvider,
         IResourceStore resourceStore,
         IBookingService bookingService,
-        SiteBookingSettings settings)
+        SiteBookingSettings settings,
+        FrontendSettings frontendSettings)
         : base(umbracoContextAccessor, databaseFactory, services, appCaches, profilingLogger, publishedUrlProvider)
     {
         _resourceStore = resourceStore;
         _bookingService = bookingService;
         _settings = settings;
+        _frontendSettings = frontendSettings;
     }
 
     [HttpPost]
@@ -143,10 +146,13 @@ public sealed class BookingSurfaceController : SurfaceController
     /// its redirect is byte-for-byte what it was before the service flow existed.
     /// </para>
     /// <para>
-    /// Every value is re-serialised from parsed input rather than echoed, so
-    /// nothing a caller typed reaches the Location header. Contact details are
-    /// never among the parameters — they arrived in the POST body and stay there
-    /// (design D3).
+    /// Every flow value is re-serialised from parsed input rather than echoed.
+    /// Contact details are never among the parameters — they arrived in the POST
+    /// body and stay there (design D3). The preserved host-page parameters are
+    /// the one deliberate exception to "nothing typed reaches the Location
+    /// header": visitor-controlled values, bounded by the site's configured
+    /// allow-list and percent-encoded by the link builder, carried so the page a
+    /// submission lands on still holds the parameters the page it left had.
     /// </para>
     /// <para>
     /// The date and length travel with the subject. Carrying the subject alone
@@ -163,10 +169,24 @@ public sealed class BookingSurfaceController : SurfaceController
     /// on the floor. Only self-inflicted, but the check is one comparison.
     /// </remarks>
     private IActionResult BackToFlow(BookingSubmission form)
-        => BookingSubject.Agreeing(form.Subject, BookingSubject.Resource(form.ResourceId)) is { } subject
-            ? RedirectToCurrentUmbracoPage(
-                BookingFlowLink.For(subject, form.Date, form.DurationMinutes))
+    {
+        // From the POSTed-to URL's own query (BeginUmbracoForm posts to
+        // PathAndQuery), filtered by the same allow-list the forms render from.
+        var preserved = PreservedQuery.Compute(
+            Request.Query, _frontendSettings.PreservedQueryParameters);
+
+        if (BookingSubject.Agreeing(form.Subject, BookingSubject.Resource(form.ResourceId)) is { } subject)
+        {
+            return RedirectToCurrentUmbracoPage(
+                BookingFlowLink.For(subject, form.Date, form.DurationMinutes, preserved: preserved));
+        }
+
+        // No flow state to carry, but the page's own parameters still survive.
+        // Empty preserved = the exact redirect this branch always produced.
+        return preserved.Count > 0
+            ? RedirectToCurrentUmbracoPage(BookingFlowLink.Carrying(preserved))
             : RedirectToCurrentUmbracoPage();
+    }
 
     /// <summary>
     /// Post-Redirect-Get with a literal 303 See Other (the spec's required
