@@ -180,3 +180,18 @@ branch did too — the wiring guard pinned only the subjectless branch's mechani
       controllers — the parameter is required.
       At HEAD after fixes: 2692 .NET (1477 + 130 + 1085) + 167 client, Release
       no-incremental 0 warnings.
+
+## QA round 2 — REJECT (one MAJOR), and the fix (2026-09-14)
+
+- [x] R2.1 [MAJOR] `Compute(Request.Query, [])` — an empty stand-in laundered
+      through the pinned function — left all 2692 tests green (QA ran it on the
+      service controller). The wiring regex now pins BOTH Compute arguments
+      (`Request.Query, _frontendSettings.PreservedQueryParameters`). Chose QA's
+      one-line close over moving Compute behind the seam: QA's own analysis rules
+      the remaining decay mode (a constructor assigning a fresh FrontendSettings)
+      implausible-by-accident and explicitly not required.
+- [x] R2.2 Mutation evidence at commit `99cd80f`, QA's exact mutant in BOTH
+      controllers, mutant-differs verified before each run ("mutated:" printed from
+      a string-compare, the round-1 CRLF no-op lesson): each fails the guard;
+      restored; tree clean. Green at HEAD first, then mutated — the guard passes
+      unmutated and fails mutated in both.
