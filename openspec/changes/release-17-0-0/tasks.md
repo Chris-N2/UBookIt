@@ -227,3 +227,53 @@ At HEAD: 2697 .NET (1482 + 130 + 1085), Release 0 warnings.
 
 At HEAD: 2698 .NET (1483 + 130 + 1085), 167 client, Release no-incremental 0 warnings,
 21 items strict.
+
+## QA round 3 — REJECT (1 MAJOR: one sentence), and the fix (2026-09-15)
+
+QA's ladder observation is the finding, not the sentence: **round 1 the prose claimed more
+than the package did; round 2 a guard's NAME claimed more than its body; round 3 a guard's
+REMARKS claim more than its vocabulary.** It climbs one layer each time the check is
+applied to the layer below the one being written. Its terminal question — *for every
+sentence this documentation adds, is there a mutant that would falsify it?* — is the
+discipline this round was done under, and every claim below has one.
+
+- [x] R3.1 [MAJOR] "An allow-list fails closed — a new claim, in a phrasing nobody
+      anticipated, fails until a human classifies it" was FALSE: QA changed one word
+      (`is` → `was`) and it passed. The paragraph now states what it reaches and what it
+      does not, **worded the same way `VersionClaimPatterns`' neighbour states the
+      identical residual**, so the two guards in one file no longer disagree about their
+      own reach.
+- [x] R3.2 [free, taken] Tense alternation widened to `is|was|has been|have been`;
+      `released to` added beside `published to`. QA's demonstration 2 is now caught.
+- [x] R3.3 [NIT, taken] The allow-list accepts by **occurrence count**, consuming one
+      allowance per hit — accepting an instance rather than a class, which is round 1's
+      shape. **And an allowance nobody consumes now FAILS as dead code** — which is
+      round 2's bug made impossible rather than merely fixed: that entry was dead for a
+      whole round and nothing said so.
+- [x] R3.4 [NIT, taken] `EnumeratePruned` prunes by directory NAME anywhere beneath the
+      root; stated, with the verification that nothing tracked lives under a pruned name.
+- [x] R3.5 [NIT, taken] `*.cshtml` and `*.ts` now walked — the last consumer-facing
+      surfaces. Closes the category rather than declaring it latent.
+
+### Every sentence, with the mutant that falsifies it (at commit `176e264`, tree restored)
+
+| Claim in the documentation | Mutant | Result |
+|---|---|---|
+| "fails closed on every occurrence of the vocabulary it knows" | unclassified `nuget.org` into `docs/mvp.md` | **Fails** ✓ |
+| (tense widening is real) | "uBookIt **was** published in September 2026" — QA's demo 2 | **Fails** ✓ |
+| "does not see a claim phrased outside that vocabulary — `uBookIt was released to the public gallery` matches nothing and **passes**" | that exact sentence | **Passes** ✓ — the limit is true as written |
+| "an allowance nobody consumes fails as dead" | correct the `bookings` sentence away | **Fails**, "1 unused" ✓ |
+| "one allowance CONSUMED per occurrence" | second copy of the accepted sentence | **Fails** ✓ |
+
+### The wrapping trap, FOURTH costume
+
+Mutant D was a **no-op** on its first run and reported "Passed" — the spec sentence wraps
+mid-clause, so a multi-line replacement matched nothing. Caught by printing whether the
+mutant differed. In this one change that trap has now appeared as: a sweep missing
+`it **is** published` (emphasis); a scan missing `` `UBookIt.Core` `` (backticks); and
+twice as a mutation that changed nothing (CRLF, then wrapping). **The standing rule is
+not "beware wrapping" — it is that every text-matching instrument, guard and mutation
+tool alike, must be normalised before it is trusted.**
+
+At HEAD: 2698 .NET (1483 + 130 + 1085), 167 client, Release no-incremental 0 warnings,
+21 items strict.
