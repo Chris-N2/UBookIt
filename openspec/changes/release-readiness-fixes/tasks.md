@@ -151,3 +151,32 @@ Determinism proof (2.3): with the erased booking id pinned to QA's
 fails — both measured, then the pin reverted. First mutation attempt was a no-op
 (CRLF mismatch in the replace) and was caught by the test NOT failing: a mutation that
 changes nothing proves nothing, verify the mutant differs before trusting its verdict.
+
+## QA round 1 — REJECT, and the fix (2026-09-14)
+
+Two MAJORs, both guard blindness: (1) deleting the FrontendSettings AddSingleton left
+2684 tests green; (2) dropping the preserved argument from the subject-ful redirect
+branch did too — the wiring guard pinned only the subjectless branch's mechanism.
+
+- [x] R1.1 [MAJOR 1] The composer is now composed FOR REAL over an in-memory
+      configuration and asserted BY EFFECT: registration resolves, and the configured
+      names arrive through the real section key and binder. Second test pins the
+      absent-section empty default.
+- [x] R1.2 [MAJOR 2] The whole redirect decision extracted to
+      `BookingFlowLink.AfterSubmission` (preserved parameter REQUIRED — a call
+      without it does not compile) and asserted by OUTPUT branch by branch, including
+      the differential guard that the subject-ful result still ENDS with the tail
+      (equality with For() alone could agree on the wrong answer). Controllers may
+      call nothing but AfterSubmission (seam guard now forbids For/Carrying there)
+      and a Singleline regex pins that the argument is computed from Request.Query.
+- [x] R1.3 [MINOR] The vacuous `Contains("preserved")` died with the guard it padded.
+- [x] R1.4 [NIT] The docs' own-keys sentence is tied to the derived set
+      (`The_docs_name_every_own_key` iterates `PreservedQuery.OwnKeys`).
+- [x] R1.5 Mutations at commit `5730dc6`, all detected, tree restored: delete
+      AddSingleton → both composer tests fail; section key "UBookIt:Frontends" →
+      binding test fails; AfterSubmission's subject branch drops the tail → two
+      output tests fail; controller passes `[]` instead of Compute → regex guard
+      fails. QA's original "remove preserved:" mutation is now UNWRITABLE in the
+      controllers — the parameter is required.
+      At HEAD after fixes: 2692 .NET (1477 + 130 + 1085) + 167 client, Release
+      no-incremental 0 warnings.
