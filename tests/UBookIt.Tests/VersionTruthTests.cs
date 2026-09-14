@@ -108,6 +108,12 @@ public class VersionTruthTests
             ("openspec/specs", "*.md"),
             ("src", "*.md"),
             ("src", "*.cs"),
+
+            // The shipped views and the backoffice client: the last surfaces with any
+            // consumer-facing text. Verified clean when added, so this closes the category
+            // rather than leaving it declared-latent.
+            ("src", "*.cshtml"),
+            ("src", "*.ts"),
         })
         {
             var full = Path.Combine(root, directory.Replace('/', Path.DirectorySeparatorChar));
@@ -128,10 +134,17 @@ public class VersionTruthTests
     /// Walks a directory, skipping build output and dependency trees as it goes.
     /// </summary>
     /// <remarks>
+    /// <para>
     /// Pruned DURING the walk rather than filtered after it. Filtering afterwards still
     /// enumerates <c>Client/node_modules</c> — tens of thousands of files — and took the
     /// suite from instant to 34 seconds. The difference is invisible in the results and
     /// obvious in the clock.
+    /// </para>
+    /// <para>
+    /// It prunes by directory NAME anywhere beneath the root, so a source directory
+    /// legitimately called <c>dist</c> would be skipped with nothing to notice. None exists
+    /// under <c>src/</c> today, and no git-tracked source lives under any pruned name.
+    /// </para>
     /// </remarks>
     private static IEnumerable<string> EnumeratePruned(string directory, string pattern)
     {
@@ -295,18 +308,26 @@ public class VersionTruthTests
     [
         @"nuget\.org",
         @"on NuGet",
-        @"(?:uBookIt|UBookIt\.[A-Za-z.]+|[Tt]he package|[Ii]t) (?:is|has been) published",
-        @"published to (?:a |the )?feed",
+        @"(?:uBookIt|UBookIt\.[A-Za-z.]+|[Tt]he package|[Ii]t) (?:is|was|has been|have been) published",
+        @"(?:published|released) to (?:a |the )?feed",
         @"is now (?:live|available) on",
     ];
 
     /// <summary>
-    /// Every accepted occurrence of <see cref="PublicationVocabulary"/>, with the reason it
-    /// is accepted. Anything not here fails.
+    /// Every accepted occurrence of <see cref="PublicationVocabulary"/>: the document, the
+    /// text, HOW MANY times it may appear there, and why it is accepted.
     /// </summary>
-    private static readonly (string Document, string Accepted, string Why)[] AcceptedPublicationMentions =
+    /// <remarks>
+    /// <b>The count is what makes this accept an instance rather than a class.</b> Without
+    /// it, one entry excuses any number of copies of that sentence in that file — accepting
+    /// a class while meaning to accept an instance, which is the shape of this change's
+    /// round-1 finding. It also makes a DEAD entry impossible to miss: an allowance nobody
+    /// consumes fails, which is precisely the bug that survived round 2 unnoticed (the entry
+    /// matched nothing because the scan read raw text, and nothing said so).
+    /// </remarks>
+    private static readonly (string Document, string Accepted, int Occurrences, string Why)[] AcceptedPublicationMentions =
     [
-        ("openspec/specs/bookings/spec.md", "UBookIt.Core is published",
+        ("openspec/specs/bookings/spec.md", "UBookIt.Core is published", 1,
             "Pre-existing rationale for stating a break in that requirement, written in "
             + "anticipation of publication. Becomes true the moment the package ships, and "
             + "correcting it would mean replacing a requirement about booker identity "
@@ -333,18 +354,30 @@ public class VersionTruthTests
     /// today", and green while <c>bookings/spec.md</c> said "UBookIt.Core is published" in a
     /// directory it walked. The reasoning against it was already written eighty lines above,
     /// in <see cref="VersionClaimPatterns"/>' own doc: a denylist fences only what somebody
-    /// thought of. <b>An allow-list fails closed — a new claim, in a phrasing nobody
-    /// anticipated, fails until a human classifies it.</b>
+    /// thought of.
+    /// </para>
+    /// <para>
+    /// <b>What it does and does not reach, stated so this guard and its neighbour agree.</b>
+    /// It fails closed on every OCCURRENCE of the vocabulary it knows: an unclassified hit
+    /// fails, naming the document and the matched text, and an allowance nobody consumes
+    /// fails as dead. It does <b>not</b> see a claim phrased outside that vocabulary —
+    /// <c>uBookIt was released to the public gallery</c> matches nothing and passes. That is
+    /// the same residual <see cref="VersionClaimPatterns"/> states about its own phrases, and
+    /// it is worded the same way here deliberately: QA round 3 found this paragraph claiming
+    /// a reach the vocabulary did not have, which is the round-2 fault — a name promising
+    /// more than a body — climbed one layer into the documentation.
     /// </para>
     /// <para>
     /// When the package is published, this does not get deleted: the accepted list absorbs
-    /// the claims that become true, one at a time, each with its reason.
+    /// the claims that become true, one at a time, each with its reason and its count.
     /// </para>
     /// </remarks>
     [Fact]
     public void No_document_claims_the_package_has_reached_a_feed()
     {
         var unclassified = new List<string>();
+        var allowance = AcceptedPublicationMentions.ToDictionary(
+            entry => (entry.Document, entry.Accepted), entry => entry.Occurrences);
 
         foreach (var document in LiveDocuments())
         {
@@ -357,11 +390,19 @@ public class VersionTruthTests
             {
                 foreach (Match match in Regex.Matches(text, vocabulary))
                 {
-                    var accepted = AcceptedPublicationMentions.Any(entry =>
-                        entry.Document == document
-                        && match.Value.Contains(entry.Accepted, StringComparison.Ordinal));
+                    // One allowance CONSUMED per occurrence, so a second copy of an accepted
+                    // sentence is not excused by the entry that covers the first.
+                    var key = AcceptedPublicationMentions
+                        .Where(entry => entry.Document == document
+                            && match.Value.Contains(entry.Accepted, StringComparison.Ordinal))
+                        .Select(entry => ((string, string)?)(entry.Document, entry.Accepted))
+                        .FirstOrDefault();
 
-                    if (!accepted)
+                    if (key is { } accepted && allowance[accepted] > 0)
+                    {
+                        allowance[accepted]--;
+                    }
+                    else
                     {
                         unclassified.Add($"{document}: \"{match.Value}\"");
                     }
@@ -373,8 +414,22 @@ public class VersionTruthTests
             unclassified.Count == 0,
             "These read as claims that uBookIt has reached a package feed. It has not — "
             + "nothing is pushed. Correct the claim, or, if it is legitimate, add it to "
-            + "AcceptedPublicationMentions with the reason:\n  "
+            + "AcceptedPublicationMentions with its reason and count:\n  "
             + string.Join("\n  ", unclassified));
+
+        // An allowance nobody consumed is a dead entry — the sentence it excuses is gone, or
+        // the scan cannot see it. Round 2 shipped exactly that and nothing said so.
+        var unconsumed = allowance
+            .Where(entry => entry.Value > 0)
+            .Select(entry => $"{entry.Key.Item1}: \"{entry.Key.Item2}\" ({entry.Value} unused)")
+            .ToList();
+
+        Assert.True(
+            unconsumed.Count == 0,
+            "These AcceptedPublicationMentions entries excuse something no longer there — "
+            + "either the claim was corrected (remove the entry) or the scan cannot see it "
+            + "(the entry is dead code and proves nothing):\n  "
+            + string.Join("\n  ", unconsumed));
     }
 
     /// <summary>
