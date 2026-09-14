@@ -30,6 +30,14 @@ public sealed record BookingFlowInput
     /// named the subject on the component and there is no flow state in the URL.
     /// </summary>
     public string? FlowToken { get; init; }
+
+    /// <summary>
+    /// Host-page query parameters to carry across the GET forms — the configured
+    /// allow-list applied to the current request by the ViewComponent
+    /// (<see cref="PreservedQuery"/>), travelling the same route as every other
+    /// request-derived value so the flows stay host-free.
+    /// </summary>
+    public IReadOnlyList<PreservedQueryPair> PreservedQueryPairs { get; init; } = [];
 }
 
 /// <summary>What the resource flow decided to render. Exactly one member is non-null.</summary>
@@ -133,7 +141,8 @@ public sealed class ResourceBookingFlow(
         return new ResourceFlowOutcome(
             BookingFormBuilder.Build(
                 resource, selectedDate, today, windowStarts, dayStarts, duration, zone,
-                PrivacyNoticeView.From(settings, HostMailAvailability.CanSend(emailSender)), windowDays, failed, input.FlowToken),
+                PrivacyNoticeView.From(settings, HostMailAvailability.CanSend(emailSender)), windowDays, failed, input.FlowToken,
+                input.PreservedQueryPairs),
             null);
     }
 }

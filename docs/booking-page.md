@@ -131,6 +131,37 @@ To use it: create the template, allow it on the **Booking Page** document type, 
 select it on your page. uBookIt only touches templates it declares, so yours is never
 overwritten — including by a release carrying a migration step.
 
+### If your page has its own query parameters
+
+The booking flow's steps are GET forms, and a GET form **replaces the page's query
+string when submitted** — that is how HTML forms work, not a choice uBookIt made. So if
+the page hosting the flow carries its own parameters (`utm_source=`, a culture switch, a
+paging or filter parameter), a visitor's first click into the flow would drop them.
+
+Name the parameters your page uses and uBookIt's forms will carry them across:
+
+```json
+"UBookIt": {
+  "Frontend": {
+    "PreservedQueryParameters": ["utm_source", "utm_campaign", "culture"]
+  }
+}
+```
+
+The list is empty by default, so nothing changes until you configure it. Three rules
+worth knowing:
+
+- **Only listed names are preserved.** uBookIt deliberately does not carry unknown
+  parameters: every preserved value is visitor-controlled input echoed back into the
+  page's markup, and the list you configure is the bound that keeps that safe. Values
+  are HTML-encoded on render either way.
+- **uBookIt's own parameters** (`ubBook`, `ubDate`, `ubDateOther`, `ubMins`, `ubWho`)
+  are never preserved through this mechanism, even if you list them — they are the
+  flow's live controls, and duplicating one would submit two values for it.
+- **The parameters survive the whole flow, the submission included** — every step's
+  URL, the booking submission, and the redirect after it, so the confirmation page
+  and a failed submission's redraw both keep them.
+
 ## Styling the booking flow
 
 uBookIt ships a stylesheet, and it is **off until you ask for it**. It does layout and

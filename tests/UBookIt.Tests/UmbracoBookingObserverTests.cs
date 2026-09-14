@@ -21,10 +21,6 @@ namespace UBookIt.Tests;
 /// </remarks>
 public class UmbracoBookingObserverTests
 {
-    private static readonly Regex AnyGuid = new(
-        "[0-9a-fA-F]{8}-?[0-9a-fA-F]{4}-?[0-9a-fA-F]{4}-?[0-9a-fA-F]{4}-?[0-9a-fA-F]{12}",
-        RegexOptions.Compiled);
-
     private sealed class RecordingAggregator : IEventAggregator
     {
         public List<INotification> Published { get; } = [];
@@ -139,7 +135,7 @@ public class UmbracoBookingObserverTests
             // haystack before names are looked for in it ("Ada" is three hex digits).
             Assert.Contains(booking.Id.ToString(), entry.Message, StringComparison.Ordinal);
 
-            var haystack = AnyGuid.Replace(entry.Message, "{guid}");
+            var haystack = GuidRedaction.WithoutGuids(entry.Message);
             Assert.DoesNotContain("Ada", haystack, StringComparison.OrdinalIgnoreCase);
             Assert.DoesNotContain("Lovelace", haystack, StringComparison.OrdinalIgnoreCase);
             Assert.DoesNotContain("ada@example.com", haystack, StringComparison.OrdinalIgnoreCase);

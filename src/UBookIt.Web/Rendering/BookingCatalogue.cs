@@ -22,6 +22,13 @@ public sealed class CatalogueModel
     public required IReadOnlyList<CatalogueEntry> Entries { get; init; }
 
     public bool HasEntries => Entries.Count > 0;
+
+    /// <summary>
+    /// Host-page query parameters the catalogue's GET form carries forward as hidden
+    /// inputs — the site-configured allow-list applied to the current request
+    /// (<see cref="PreservedQuery.Compute"/>). Empty on an unconfigured site.
+    /// </summary>
+    public IReadOnlyList<PreservedQueryPair> PreservedQuery { get; init; } = [];
 }
 
 /// <summary>
@@ -45,7 +52,9 @@ public sealed class BookingCatalogue(IServiceStore serviceStore, IResourceStore 
     /// </summary>
     public const int PageSize = 500;
 
-    public async Task<CatalogueModel> BuildAsync(CancellationToken cancellationToken = default)
+    public async Task<CatalogueModel> BuildAsync(
+        IReadOnlyList<PreservedQueryPair>? preservedQuery = null,
+        CancellationToken cancellationToken = default)
     {
         var services = await serviceStore.ListAsync(0, PageSize, cancellationToken).ConfigureAwait(false);
         var resources = await resourceStore.ListAsync(0, PageSize, cancellationToken).ConfigureAwait(false);
@@ -69,6 +78,6 @@ public sealed class BookingCatalogue(IServiceStore serviceStore, IResourceStore 
             .ThenBy(entry => entry.Subject.Token, StringComparer.Ordinal)
             .ToList();
 
-        return new CatalogueModel { Entries = entries };
+        return new CatalogueModel { Entries = entries, PreservedQuery = preservedQuery ?? [] };
     }
 }

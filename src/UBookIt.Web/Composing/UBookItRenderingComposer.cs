@@ -1,3 +1,4 @@
+using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using UBookIt.Core.Notifications;
 using UBookIt.Web.Emails;
@@ -21,6 +22,16 @@ public sealed class UBookItRenderingComposer : IComposer
 {
     public void Compose(IUmbracoBuilder builder)
     {
+        // Bound once at startup, absent section = the all-default record (empty
+        // preservation list) — the same idiom as DeliveryApiSettings, for the same
+        // reason: an unconfigured site must behave exactly as it did before the
+        // setting existed.
+        var frontendSettings = builder.Config
+            .GetSection(FrontendSettings.SectionKey)
+            .Get<FrontendSettings>() ?? new FrontendSettings();
+
+        builder.Services.AddSingleton(frontendSettings);
+
         builder.Services.AddScoped<ResourceBookingFlow>();
         builder.Services.AddScoped<ServiceBookingFlow>();
         builder.Services.AddScoped<BookingCatalogue>();

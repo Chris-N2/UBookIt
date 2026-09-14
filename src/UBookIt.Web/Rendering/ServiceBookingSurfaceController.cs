@@ -37,6 +37,7 @@ public sealed class ServiceBookingSurfaceController : SurfaceController
     private readonly IResourceStore _resourceStore;
     private readonly IServiceBookingService _serviceBooking;
     private readonly SiteBookingSettings _settings;
+    private readonly FrontendSettings _frontendSettings;
 
     public ServiceBookingSurfaceController(
         IUmbracoContextAccessor umbracoContextAccessor,
@@ -48,13 +49,15 @@ public sealed class ServiceBookingSurfaceController : SurfaceController
         IServiceStore serviceStore,
         IResourceStore resourceStore,
         IServiceBookingService serviceBooking,
-        SiteBookingSettings settings)
+        SiteBookingSettings settings,
+        FrontendSettings frontendSettings)
         : base(umbracoContextAccessor, databaseFactory, services, appCaches, profilingLogger, publishedUrlProvider)
     {
         _serviceStore = serviceStore;
         _resourceStore = resourceStore;
         _serviceBooking = serviceBooking;
         _settings = settings;
+        _frontendSettings = frontendSettings;
     }
 
     [HttpPost]
@@ -219,9 +222,16 @@ public sealed class ServiceBookingSurfaceController : SurfaceController
     /// losing the confirmation for a booking that was actually placed.
     /// </remarks>
     private IActionResult BackToFlow(ServiceBookingSubmission form)
-        => BookingSubject.Agreeing(form.Subject, BookingSubject.Service(form.ServiceId)) is { } subject
-            ? RedirectToCurrentUmbracoPage(
-                BookingFlowLink.For(subject, form.Date, form.DurationMinutes, form.PinnedResourceId))
+        // See BookingSurfaceController.BackToFlow: the decision lives in
+        // AfterSubmission, unit-tested; this adds only the host's two facts.
+        => BookingFlowLink.AfterSubmission(
+                BookingSubject.Agreeing(form.Subject, BookingSubject.Service(form.ServiceId)),
+                form.Date,
+                form.DurationMinutes,
+                form.PinnedResourceId,
+                PreservedQuery.Compute(Request.Query, _frontendSettings.PreservedQueryParameters))
+            is { } query
+            ? RedirectToCurrentUmbracoPage(query)
             : RedirectToCurrentUmbracoPage();
 
     /// <summary>

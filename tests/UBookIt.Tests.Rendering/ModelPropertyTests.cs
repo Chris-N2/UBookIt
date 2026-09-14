@@ -360,6 +360,7 @@ public class ModelPropertyTests
                 "LengthIsFixed",
                 "LengthIsTheProblem",
                 "OffersResourceChoice",
+                "PreservedQuery",
                 "ResourceChoiceCount",
                 "ResourceChoiceWasReset",
                 "ResourceChoices",

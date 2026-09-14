@@ -121,7 +121,8 @@ public static class BookingFormBuilder
         PrivacyNoticeView privacyNotice,
         int windowDays,
         FailedSubmission? failed = null,
-        string? flowToken = null)
+        string? flowToken = null,
+        IReadOnlyList<PreservedQueryPair>? preservedQuery = null)
     {
         var constraints = resource.Availability.Constraints;
 
@@ -144,6 +145,7 @@ public static class BookingFormBuilder
             LongestAvailableInWindowMinutes = LongestAvailableMinutes(windowStarts),
             PrivacyNotice = privacyNotice,
             FlowToken = flowToken,
+            PreservedQuery = preservedQuery ?? [],
             ResourceId = resource.Id,
             ResourceName = resource.DisplayName,
             SelectedDate = selectedDate,

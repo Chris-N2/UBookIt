@@ -748,8 +748,12 @@ public class BookingsEndpointTests
 
         var (controller, _) = Endpoint(page, security: Security(sensitiveData: false));
 
+        // The rows' ids are legitimately present and are random GUIDs, in which "ada"
+        // occurs ~0.7% of the time ("a" and "d" are hex digits) — this guard was one
+        // of the class that failed at random. GUIDs come out of the haystack, the
+        // needles stay granular; see GuidRedaction for the reasoning.
         var model = Payload<PagedBookingsModel>(await controller.ListBookings(From, To));
-        var json = System.Text.Json.JsonSerializer.Serialize(model);
+        var json = GuidRedaction.WithoutGuids(System.Text.Json.JsonSerializer.Serialize(model));
 
         Assert.DoesNotContain("Ada", json, StringComparison.OrdinalIgnoreCase);
         Assert.DoesNotContain("Lovelace", json, StringComparison.OrdinalIgnoreCase);
