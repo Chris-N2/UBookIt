@@ -46,10 +46,10 @@
 
 ## 5. Verification
 
-- [ ] 5.1 Full suites green at Release, client suite green, Release `--no-incremental`
+- [x] 5.1 Full suites green at Release, client suite green, Release `--no-incremental`
       build 0 warnings. Recount totals at HEAD for the QA handover — never reuse a
       previous count, and never accept a `--no-build` run as evidence (㉞'s lesson).
-- [ ] 5.2 `openspec validate --all --strict` clean.
+- [x] 5.2 `openspec validate --all --strict` clean.
 - [x] 5.3 Pack and inspect: `dotnet pack -c Release` and confirm the produced packages
       carry `17.0.0` and the README, per the packaging spec's existing requirements.
 
