@@ -51,7 +51,7 @@
 - [x] 2.3 Prove determinism: pin an id containing "ada"
       (`20faadab-d4e1-4118-bc8c-d16111111111`) at one previously-flaky site and show
       the fixed assertion passes while the unfixed shape fails.
-- [ ] 2.4 Re-run the sweep after; update the deferred-obligations memory entry at
+- [x] 2.4 Re-run the sweep after; update the deferred-obligations memory entry at
       archive time (it currently claims ~2% flaky runs as live).
 
 ## 3. `directlyBookable` disposition (design D5)
@@ -108,18 +108,18 @@
 
 ## 5. QA
 
-- [ ] 5.1 QA round(s) — fresh subagent, reused across rounds; report claims for it to
+- [x] 5.1 QA round(s) — fresh subagent, reused across rounds; report claims for it to
       verify rather than trust; treat each round's fixes as new code. Findings return
       through apply.
 
 ## 6. Sync + archive (after QA approval)
 
-- [ ] 6.1 Sync the delta into `openspec/specs/default-frontend/spec.md` (ADDED — no
+- [x] 6.1 Sync the delta into `openspec/specs/default-frontend/spec.md` (ADDED — no
       guarantee-diff owed, but run the falsified-sentence sweep over sibling specs,
       docs and XML remarks wrap-normalised BY PATTERN over the whole tree, not by
       candidate list — round 4 of `permissions-model` is why).
-- [ ] 6.2 Update the deferred-obligations memory (items 2.4 and 3.3).
-- [ ] 6.3 Archive the change; merge after QA approval.
+- [x] 6.2 Update the deferred-obligations memory (items 2.4 and 3.3).
+- [x] 6.3 Archive the change; merge after QA approval.
 
 ## 2.1 sweep record (2026-09-14, at HEAD before this commit)
 
