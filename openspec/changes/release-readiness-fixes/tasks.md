@@ -56,22 +56,55 @@
 
 ## 3. `directlyBookable` disposition (design D5)
 
-- [ ] 3.1 Start the TestSite; management-API round-trip: GET a resource with the flag
-      true → change one unrelated field → PUT the read-back body → GET → flag intact?
-- [ ] 3.2 Same round-trip through the backoffice editor (browser), since the original
-      reproductions were manual.
-- [ ] 3.3 EITHER: reproduces → STOP, write the `resource-management` delta, fix under
-      it, with a regression test. OR: does not reproduce → record the disposition here
-      and rewrite the deferred-obligations entry at archive time (verified chain at
-      HEAD, likely original cause: the TestSite harness picks the first resource by
-      list order).
+- [x] 3.1 / 3.2 **RUN LIVE 2026-09-14, DOES NOT REPRODUCE.** Two full round-trips on
+      the running TestSite through the backoffice editor — the real client's GET →
+      edit one unrelated field (Description) → PUT — against `DBO Granted`
+      (05691531-…, flag ON): SQL after each save shows `DirectlyBookable = 1` intact,
+      and the description round-tripped both ways (set, then back to null). The
+      editor reload between saves also proves the GET half (toggle re-rendered
+      ticked). A hand-rolled curl PUT was NOT performed — the backoffice token is not
+      reachable from outside the app and IndexedDB access is blocked — accepted
+      because the editor's PUT exercises the same wire models, which are symmetric by
+      inspection (`ResourceRequestModel`/`ResourceResponseModel` both carry
+      `DirectlyBookable`; `ResourceModelMapper` maps it both directions; the client
+      loads, renders and sends it), and nothing in that chain has changed since the
+      2026-09-10 note.
+- [x] 3.3 Disposition: **not a live defect.** Likely original cause, recorded in the
+      same memory entry that reported it: the TestSite harness picks the FIRST
+      resource by list order, so a rename changes which resource the front end
+      shows — producing exactly the observed symptom ("vanished from the front end
+      while the backoffice still lists it") with no data change at all.
+      Deferred-obligations memory to be rewritten at archive (6.2).
+
+## 3b. The submission-redirect fix (approved by Chris 2026-09-14, delta amended)
+
+- [x] 3b.1 Delta: requirement gains the whole-flow sentence and two scenarios
+      (submission redirect; component-named flow's redirect).
+- [x] 3b.2 `BookingFlowLink` carries the preserved tail (`For(..., preserved:)` +
+      `Carrying` for the subjectless branch) so "every query string the controllers
+      produce is built by one vocabulary" holds; both surface controllers compute the
+      pairs from the POSTed-to URL's query and pass them through. Location-header
+      reflection stated and bounded in the remarks (allow-list + percent-encoding).
+- [x] 3b.3 Docs flipped from "but not the redirect after it" to the whole-flow claim,
+      WITH its guard — the pair moved together.
+- [x] 3b.4 Unit tests: appended-in-order + encoded, empty-tail byte-identity,
+      preserved-only query, and the source-level wiring guard over both controllers.
+- [x] 3b.5 **LIVE end-to-end (2026-09-14), new binaries, TestSite configured with
+      `PreservedQueryParameters: ["utm_source", "culture"]`:** `/book?utm_source=e2e`
+      → catalogue Continue → URL kept `utm_source` → date form "Show times" → kept →
+      time + details + Book (POST) → confirmation at
+      `/book/?ubBook=…&ubDate=2026-09-21&ubMins=30&utm_source=e2e`. Every step of the
+      requirement observed on a real page. Left behind on the dev site: booking
+      **CQ8C-72JQ** (E2E Preserved, 2026-09-21 09:30, DBO Granted) and the
+      TestSite config entry (kept deliberately — it documents the setting in dev,
+      like the delivery-API flags beside it).
 
 ## 4. Verification
 
-- [ ] 4.1 Full suites green at Release (`dotnet test UBookIt.slnx -c Release`), client
+- [x] 4.1 Full suites green at Release (`dotnet test UBookIt.slnx -c Release`), client
       suite green, Release --no-incremental build 0 warnings. Recount totals at HEAD
       for the QA handover — never reuse a previous count.
-- [ ] 4.2 `openspec validate --all --strict` clean.
+- [x] 4.2 `openspec validate --all --strict` clean.
 
 ## 5. QA
 
