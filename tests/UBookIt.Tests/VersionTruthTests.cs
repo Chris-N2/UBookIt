@@ -341,6 +341,13 @@ public class VersionTruthTests
             + "wholesale for two words — the disproportionate edit CLAUDE.md warns against. "
             + "Recorded here and in the deferred-obligations memory for whichever change "
             + "next legitimately modifies `bookings`."),
+
+        ("docs/publishing.md", "nuget.org", 3,
+            "The publishing runbook names the feed as a DESTINATION - what nuget.org will "
+            + "not let you undo, where to get an API key, which source to push to. That is "
+            + "the distinction this guard exists to draw: instructions FOR publishing are "
+            + "not a claim of HAVING published. The count is deliberately exact, so editing "
+            + "the runbook forces a fresh look at whether the new text still only instructs."),
     ];
 
     /// <summary>
@@ -470,37 +477,94 @@ public class VersionTruthTests
     }
 
     /// <summary>
-    /// The publication blocker in <c>Directory.Build.props</c> is now the only thing standing
-    /// between a push and a package pointing consumers at a private repository, so the two
-    /// halves are tied together: while the URLs are the Azure DevOps ones, the warning must
-    /// still be there.
+    /// The package points a consumer at a public home they can actually reach: both URLs
+    /// are <c>https</c>, neither names a known-private host, and both name the repository
+    /// the source lives in.
     /// </summary>
     /// <remarks>
-    /// A biconditional rather than an assertion about the URLs themselves (QA round 2's
-    /// suggestion, taken). Asserting they are NOT the Azure URLs would fail today, when they
-    /// correctly are; asserting only that the warning exists would not notice the URLs being
-    /// fixed and the stale warning left behind. This fails on the one rot that can actually
-    /// happen — somebody tidying the comment away while the URLs remain.
+    /// <para>
+    /// <b>This replaces a biconditional that existed to fail exactly once</b> — it tied the
+    /// old Azure DevOps URLs to a <c>CORRECT THESE BEFORE THE FIRST PUSH</c> warning, so
+    /// fixing the URLs without removing the warning failed, and vice versa. The GitHub move
+    /// fired it. **The cheapest way to make that guard pass was to delete it**, which would
+    /// have satisfied the suite while dropping the only thing watching the package's public
+    /// identity — so it was replaced rather than removed, by a guard on the POSITIVE
+    /// property the release depends on. A positive property keeps working after the move;
+    /// the absence of a bad one goes vacuous the moment it passes.
+    /// </para>
+    /// <para>
+    /// <b>It deliberately does not reach the network.</b> Fetching the URL would be slow,
+    /// fail offline, and start going red for reasons that have nothing to do with this
+    /// repository — a private repo, a rate limit, a DNS hiccup. Whether the URL truly
+    /// resolves is a human check at publish time, and <c>docs/publishing.md</c> says so.
+    /// </para>
     /// </remarks>
     [Fact]
-    public void The_publication_blocker_stands_while_the_private_urls_do()
+    public void The_package_points_at_a_public_home()
     {
         var props = RepoFiles.Read("Directory.Build.props");
 
-        var namesPrivateUrls = props.Contains("dev.azure.com", StringComparison.Ordinal);
-        var carriesWarning = props.Contains(
-            "CORRECT THESE BEFORE THE FIRST PUSH TO A PUBLIC FEED", StringComparison.Ordinal);
+        var urls = new[] { "PackageProjectUrl", "RepositoryUrl" }
+            .Select(element => (Element: element, Value: Regex.Match(
+                props, $"<{element}>(?<url>[^<]+)</{element}>").Groups["url"].Value))
+            .ToList();
 
-        Assert.True(
-            namesPrivateUrls == carriesWarning,
-            namesPrivateUrls
-                ? "Directory.Build.props still points PackageProjectUrl/RepositoryUrl at a "
-                  + "PRIVATE Azure DevOps organisation, but the warning that says to correct "
-                  + "them before the first push is gone. nuget.org does not allow a pushed "
-                  + "version's metadata to be edited: publishing like this costs a version "
-                  + "number and leaves the bad listing permanently visible."
-                : "The private Azure DevOps URLs are gone from Directory.Build.props — good — "
-                  + "but the warning about them is still there, telling a reader to fix "
-                  + "something already fixed. Remove it.");
+        foreach (var (element, value) in urls)
+        {
+            Assert.True(
+                value.Length > 0,
+                $"Directory.Build.props declares no <{element}>. Without it a consumer has no"
+                + " route from the package page back to the source.");
+
+            Assert.True(
+                value.StartsWith("https://", StringComparison.Ordinal),
+                $"<{element}> is '{value}' — a package URL must be https.");
+
+            // The hosts uBookIt has actually lived on that a consumer cannot open. Named
+            // rather than inferred: 'is this URL public' is not decidable offline, and a
+            // guard that pretended otherwise would be the over-claim this file keeps
+            // teaching. What IS decidable is that we have not regressed to a home we know
+            // was private.
+            Assert.True(
+                !value.Contains("dev.azure.com", StringComparison.OrdinalIgnoreCase),
+                $"<{element}> is '{value}', a PRIVATE Azure DevOps organisation. A consumer"
+                + " following it from nuget.org or the Umbraco Marketplace reaches a sign-in"
+                + " wall. nuget.org will not let a pushed version's metadata be edited, so"
+                + " publishing this costs a version number — see docs/publishing.md.");
+
+            Assert.True(
+                value.Contains("github.com/Chris-N2/UBookIt", StringComparison.Ordinal),
+                $"<{element}> is '{value}', which is not the repository the source lives in.");
+        }
+    }
+
+    /// <summary>
+    /// The publishing runbook keeps the claims a maintainer acts on at the one moment the
+    /// mistakes are irreversible.
+    /// </summary>
+    /// <remarks>
+    /// Guarded because every one of these costs a VERSION NUMBER rather than a commit if it
+    /// is wrong or missing — and because the SourceLink ordering is the half nobody would
+    /// rediscover until a consumer's debugger sent them somewhere they cannot go.
+    /// </remarks>
+    [Fact]
+    public void The_publishing_runbook_states_what_cannot_be_undone()
+    {
+        var runbook = RepoFiles.Read("docs/publishing.md");
+
+        // The one-way doors.
+        DocumentationAssert.Says(runbook, "A pushed version's metadata cannot be edited");
+        DocumentationAssert.Says(runbook, "A version number cannot be reused");
+        DocumentationAssert.Says(runbook, "Unlisting is not deletion");
+
+        // The ordering, which is the finding this change was built on.
+        DocumentationAssert.Says(runbook, "This order is load-bearing, not tidiness");
+        DocumentationAssert.Says(
+            runbook,
+            "a package built before the remote moved carries the old SourceLink URLs");
+
+        // And the guard that is meant to fail, so a red test is not read as an obstacle.
+        DocumentationAssert.Says(
+            runbook, "When you publish, that guard will start failing. Do not delete it.");
     }
 }
