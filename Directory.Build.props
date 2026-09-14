@@ -17,7 +17,13 @@
     already what each package should be called. The one exception sets it itself.
   -->
   <PropertyGroup>
-    <Version>0.1.0</Version>
+    <!--
+      The major tracks the UMBRACO major this package targets, not uBookIt's own
+      breaking changes — see README.md's versioning note. Every document that states
+      this number is checked against it (VersionTruthTests), so a bump here fails the
+      build until the prose follows.
+    -->
+    <Version>17.0.0</Version>
 
     <Authors>Norwood Development</Authors>
     <Company>Norwood Development</Company>

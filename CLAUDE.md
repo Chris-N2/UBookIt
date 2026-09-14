@@ -109,9 +109,13 @@ flow against the delivery API without referencing `UBookIt.Web`.
 ## Conventions
 
 - Nullable reference types enabled everywhere; warnings are errors in CI.
-- Public API surface is a compatibility promise once published. Additive
-  changes preferred; a breaking change must be called out explicitly in its
-  spec.
+- Public API surface is a compatibility promise once published — and it **is**
+  published, from `17.0.0`. Additive changes preferred; a breaking change must
+  be called out explicitly in its spec **and lands in a minor release
+  (`17.x.0`), never a patch**, carrying defaults or a documented upgrade path
+  so an existing site keeps working. The major is spent on the Umbraco major,
+  so it cannot signal a break — the minor does. Parallel API versions are
+  deliberately not used while the product is young.
 - EF Core migrations are additive. Destructive schema changes require
   explicit spec approval and an upgrade path from the previous package
   version.

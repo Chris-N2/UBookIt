@@ -20,9 +20,29 @@ question, answered by Umbraco's built-in **Sensitive data** group — and note t
 site's original super user is in that group to begin with, so a newly created administrator
 sees those details hidden until you add them. See [the backoffice docs](docs/backoffice.md).
 
-> **uBookIt is at `0.1.0`, and the public API may still move.** It does what the list below
-> says and it does it properly, but the version is not decoration: treat contracts as settled
-> from `1.0.0`, not before.
+> **uBookIt is at `17.0.0`, and the public API is now a promise.** Leaving `0.x` is that
+> promise — treat the contracts as settled from here.
+
+### What the version number means
+
+**The major tracks the Umbraco major**, as Umbraco packages are conventionally versioned:
+uBookIt `17.x` is for Umbraco 17, and the uBookIt for a later Umbraco carries that Umbraco's
+major. You never have to remember which uBookIt went with which CMS.
+
+**That means the major is not a breaking-change signal, and this is where uBookIt departs
+from Semantic Versioning.** The major is spent on the CMS version, so:
+
+| | |
+|---|---|
+| **`17.x.y` → `17.x.z`** (patch) | Never breaks. Fixes and internal changes only. |
+| **`17.x.0` → `17.y.0`** (minor) | New features — and the only place a breaking change may appear. |
+| **`17` → a later major** | A different Umbraco. |
+
+Breaking changes are avoided: the public interface is kept as consistent as possible, and
+additions are preferred to changes. Where one is genuinely unavoidable it lands in a **minor**
+release, is called out explicitly in the release notes, and ships with sensible defaults or a
+documented upgrade path so a site that already works keeps working. A patch release never
+carries a breaking change.
 
 ## Requirements
 
