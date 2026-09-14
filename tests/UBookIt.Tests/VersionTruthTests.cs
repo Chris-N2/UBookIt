@@ -563,6 +563,12 @@ public class VersionTruthTests
             runbook,
             "a package built before the remote moved carries the old SourceLink URLs");
 
+        // The commit SHA. Found by VERIFYING the SourceLink flip rather than reasoning about
+        // it: a pack from an unpushed commit yields source links that 404 for every consumer,
+        // permanently, and passes every other check here.
+        DocumentationAssert.Says(runbook, "SourceLink embeds the commit SHA");
+        DocumentationAssert.Says(
+            runbook, "Pack from the merge commit on main, after it is pushed");
         // And the guard that is meant to fail, so a red test is not read as an obstacle.
         DocumentationAssert.Says(
             runbook, "When you publish, that guard will start failing. Do not delete it.");

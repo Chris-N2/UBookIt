@@ -64,6 +64,28 @@ cat src/UBookIt.Core/obj/Release/net10.0/UBookIt.Core.sourcelink.json
 Both must name the public repository. If `sourcelink.json` still names the old host, step 2 or
 step 3 did not happen — repack, do not push.
 
+## Publish only from a commit that is already on the public repository
+
+SourceLink embeds the commit SHA, not just the repository:
+
+```
+https://raw.githubusercontent.com/Chris-N2/UBookIt/<commit>/*
+```
+
+So packing from a commit that has not been pushed produces a package whose source links
+resolve to nothing - a 404 for every file, for every consumer, permanently, because a pushed
+version cannot be corrected. A local-only commit, an unmerged branch, or a commit amended
+after packing all produce this, and every other check in this repository still passes: the
+URLs are right, the host is right, the nuspec is right. Only the SHA is unreachable.
+
+**Pack from the merge commit on main, after it is pushed**, and confirm the SHA the pack will
+embed is one the public repository actually has:
+
+```bash
+git rev-parse HEAD                       # the SHA the pack will embed
+git branch -r --contains HEAD            # must list origin/main
+```
+
 ## Pushing
 
 An API key from nuget.org (Account → API Keys), scoped to push, then for each package:
