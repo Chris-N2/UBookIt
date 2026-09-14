@@ -16,7 +16,7 @@
 - [x] 2.2 Replace with a guard on the positive property: both package URLs are `https`, are not
       a known-private host, and name the repository the source lives in. No network access
       (D1) — say why in the remarks.
-- [ ] 2.3 Mutation-check against a COMMIT: revert either URL to the Azure one → fails; switch to
+- [x] 2.3 Mutation-check against a COMMIT: revert either URL to the Azure one → fails; switch to
       `http` → fails; point at a different repository → fails. Verify each mutant DIFFERS first.
 
 ## 3. The runbook (design D3)
@@ -39,10 +39,10 @@
 
 ## 5. Verification
 
-- [ ] 5.1 Full suites green at Release, client green, Release `--no-incremental` 0 warnings.
+- [x] 5.1 Full suites green at Release, client green, Release `--no-incremental` 0 warnings.
       Recount at HEAD; never accept a `--no-build` run as evidence.
 - [x] 5.2 `openspec validate --all --strict` clean.
-- [ ] 5.3 `dotnet pack -c Release` and inspect the produced `.nuspec`: `projectUrl` and
+- [x] 5.3 `dotnet pack -c Release` and inspect the produced `.nuspec`: `projectUrl` and
       `repository url` are the GitHub ones, `license` is the MIT expression.
 
 ## 6. QA
@@ -77,3 +77,41 @@ clean full suite. **Not dismissed as environmental** — ㉞'s rule is that a fl
 failure is real — but investigated to a cause outside the product: a test that shells out to
 the build system is contending with the build system. Pre-existing since ⑳. Recorded as a
 fragility, not a defect: worth an isolation guard if it recurs.
+
+## 2.3 mutation evidence (at commit `8a2c6f6`, each mutant verified to DIFFER first, tree restored)
+
+| Mutant | Result |
+|---|---|
+| `PackageProjectUrl` reverted to the Azure URL | **Caught** |
+| `RepositoryUrl` downgraded to `http://` | **Caught** |
+| URLs point at a different repository | **Caught** |
+| Runbook's "Do not delete it" sentence removed | **Caught** |
+| A 4th `nuget.org` mention against an allowance of 3 | **Caught** — the per-occurrence count works |
+
+## 5.3 — the packed artifact, and the ordering claim PROVEN rather than argued
+
+`dotnet pack -c Release`, then the `.nuspec` a consumer actually sees:
+
+```
+<id>UBookIt</id>  <version>17.0.0</version>
+<license type="expression">MIT</license>
+<licenseUrl>https://licenses.nuget.org/MIT</licenseUrl>
+<projectUrl>https://github.com/Chris-N2/UBookIt</projectUrl>
+<repository type="git" url="https://github.com/Chris-N2/UBookIt.git" commit="8a2c6f6…" />
+```
+
+**And from the SAME build, the symbol package's source links still name Azure DevOps:**
+
+```
+UBookIt.Core.sourcelink.json →
+  https://dev.azure.com/NorwoodDesignDev/uBookIt/_apis/git/repositories/uBookIt/items?…
+```
+
+This is design D2 demonstrated rather than asserted: **the visible metadata is already correct
+and the debugger metadata is still wrong**, because one comes from the properties this change
+edited and the other from a remote only Chris can move. A package pushed from this commit would
+look right on nuget.org and send every consumer's debugger to a repository they cannot open —
+the same defect as the project URL, hidden one layer down.
+
+**Task 4 is therefore a genuine blocker on publication, not a formality**, and 4.2's
+verification is the step that proves it cleared.
