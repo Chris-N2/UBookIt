@@ -66,7 +66,7 @@
       published", "the API may still move", or describing the roadmap as unfinished.
 - [x] 7.2 Update memory: the versioning note's "open question" (majors for non-LTS
       Umbraco) and the Azure DevOps note, which the GitHub move will stale.
-- [ ] 7.3 Archive; merge after QA approval.
+- [x] 7.3 Archive; merge after QA approval.
 
 ## Records
 
@@ -369,8 +369,11 @@ been handled. ⑰ and ㉝ taught this; it is now at the top of
       screen did NOT ride with it, correcting a plan the row still asserted).
 - [x] R5.2 Re-swept **the table itself** by pattern afterwards — the region QA proved I had
       skipped. Clean: no present-tense marker survives any row. I also read all eleven rows
-      by hand; `:33`'s "the default is exactly today's behaviour" is time-relative but not
-      false (AutoConfirm does default on), so it stands.
+      by hand; row 0.6.0's "the default is exactly today's behaviour" is time-relative but
+      not false (AutoConfirm does default on, verified at `SiteBookingSettings`), so it
+      stands. **Line numbers are deliberately absent here: the header edit moved every one
+      of them, and a stale citation inside a record about stale sentences would be the exact
+      joke this change does not need.** The table has TEN data rows.
 - [x] R5.3 Memory updated with the two durable rules QA asked be carried out of the tasks
       file: the sweep-your-own-edits rule and the disclaimer-scope corollary in
       [[a-finding-enumerates-a-sample]]; the green-mutant rule and the
@@ -378,3 +381,19 @@ been handled. ⑰ and ㉝ taught this; it is now at the top of
 
 At HEAD: 2698 .NET, 167 client, Release 0 warnings, 21 items strict. The sync touched no
 test and no source — three table cells, one header, and memory.
+
+## QA round 6 — APPROVE (2026-09-15), three NITs taken
+
+- [x] R6.1 [NIT] `:38`'s "the settings screen **rides** with this" was the one present-tense
+      verb left in a cell whose neighbours were all converted. Now "was to ride with this",
+      beside its own correction.
+- [x] R6.2 [NIT] **The header vs the guard.** The widened disclaimer sat above the one
+      sentence in the file that MUST be currently true — the version line, which
+      `VersionClaimPatterns` reads and `DocumentsKnownToClaim` pins. Telling a reader to take
+      the whole file as a record of the plan invited them to think that line need not track
+      the build, while a test requires it to. The header now names the exception explicitly.
+      **Taken rather than waved through because "a document disagreeing with what a guard
+      enforces" is these six rounds in miniature** — it is the same fault as round 2's name
+      and round 3's remarks, one more layer out, in the document instead of the test.
+- [x] R6.3 [NIT] The R5.2 record's line citations were pre-edit and are removed rather than
+      renumbered; the row count corrected to ten.
