@@ -116,6 +116,19 @@ public static class ViewFixtures
     ];
 
     /// <summary>
+    /// Host-page parameters for the preservation states: a plain pair, a repeated name
+    /// (a multi-valued parameter arrives as one pair per value, order kept), and a
+    /// markup-hostile value — the one the encoding scenario watches.
+    /// </summary>
+    private static readonly IReadOnlyList<PreservedQueryPair> PreservedPairs =
+    [
+        new("utm_source", "newsletter"),
+        new("tag", "a"),
+        new("tag", "b"),
+        new("note", "\"><script>alert(1)</script>"),
+    ];
+
+    /// <summary>
     /// The views that are fragments rather than pages. They are included only by the
     /// flow views, so nothing in this suite renders them as a page — and rule 1 asks
     /// a question only a page can answer. They reach rule 1 inside the flow pages
@@ -233,6 +246,17 @@ public static class ViewFixtures
 
         yield return new ViewCase(
             ViewInventory.Catalogue, "nothing to book", new CatalogueModel { Entries = [] });
+
+        // The catalogue's own preservation state — its loop is a separate copy of the
+        // date form's (design D3), so the flow states above are no evidence about it.
+        yield return new ViewCase(ViewInventory.Catalogue, "preserved query carried", new CatalogueModel
+        {
+            Entries =
+            [
+                new(BookingSubject.Service(new Guid("00000000-0000-0000-0000-000000000900")), "Massage"),
+            ],
+            PreservedQuery = PreservedPairs,
+        });
 
         foreach (var view in new[]
         {
@@ -413,6 +437,15 @@ public static class ViewFixtures
             selectedTimeIso: Times[0].InstantIso));
         yield return ("service: via the catalogue", Service(flowToken: "s:00000000-0000-0000-0000-000000000900"));
 
+        // THE PRESERVATION STATES. Every other state leaves PreservedQuery empty —
+        // which is the default install and stays the common rendering — so without
+        // these the hidden-input loop would never run and the member would read as
+        // dead. One state per flow, because the forms render the loop independently
+        // (design D3: inlined, not shared) and a defect in one is invisible to the
+        // other's state.
+        yield return ("service: preserved query carried", Service(preservedQuery: PreservedPairs));
+        yield return ("resource: preserved query carried", Resource(preservedQuery: PreservedPairs));
+
         // The resource flow's states mirror the service flow's wherever
         // `BookingFormModel` can express them. It cannot express a choice control
         // (`ResourceChoices` is structurally empty — a directly booked resource IS
@@ -477,13 +510,15 @@ public static class ViewFixtures
         string? flowToken = null,
         PrivacyNoticeView? privacyNotice = null,
         IReadOnlyList<AvailableDate>? availableDates = null,
-        int? longestInWindow = null)
+        int? longestInWindow = null,
+        IReadOnlyList<PreservedQueryPair>? preservedQuery = null)
         => new()
         {
             // Defaults to the DEFAULT INSTALL: no retention period and no policy link. A
             // fixture that defaulted to a configured period would exercise the branch most
             // sites never see and leave the common one untested.
             PrivacyNotice = privacyNotice ?? new PrivacyNoticeView(null, null, false),
+            PreservedQuery = preservedQuery ?? [],
             AvailableDates = availableDates ?? Dates,
             SelectedDateIsListed = (availableDates ?? Dates).Any(date => date.IsSelected),
             WindowDays = 30,
@@ -521,11 +556,13 @@ public static class ViewFixtures
         string? flowToken = null,
         PrivacyNoticeView? privacyNotice = null,
         IReadOnlyList<AvailableDate>? availableDates = null,
-        int? longestInWindow = null)
+        int? longestInWindow = null,
+        IReadOnlyList<PreservedQueryPair>? preservedQuery = null)
         => new()
         {
             /// <inheritdoc cref="Service" />
             PrivacyNotice = privacyNotice ?? new PrivacyNoticeView(null, null, false),
+            PreservedQuery = preservedQuery ?? [],
             AvailableDates = availableDates ?? Dates,
             SelectedDateIsListed = (availableDates ?? Dates).Any(date => date.IsSelected),
             WindowDays = 30,

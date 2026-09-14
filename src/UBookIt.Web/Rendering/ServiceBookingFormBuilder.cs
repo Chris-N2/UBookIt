@@ -270,7 +270,8 @@ public static class ServiceBookingFormBuilder
         int windowDays,
         FailedSubmission? failed = null,
         string? flowToken = null,
-        ResourceChoiceState choice = default)
+        ResourceChoiceState choice = default,
+        IReadOnlyList<PreservedQueryPair>? preservedQuery = null)
     {
         var duration = TimeSpan.FromMinutes(durationMinutes);
 
@@ -295,6 +296,7 @@ public static class ServiceBookingFormBuilder
             ResourceChoiceCount = choice.Count,
             ResourceChoiceWasReset = choice.WasReset,
             FlowToken = flowToken,
+            PreservedQuery = preservedQuery ?? [],
             ServiceId = service.Id,
             ServiceName = service.Name,
             SelectedDate = selectedDate,

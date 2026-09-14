@@ -208,6 +208,19 @@ public interface IBookingFormView
     /// </para>
     /// </remarks>
     PrivacyNoticeView PrivacyNotice { get; }
+
+    /// <summary>
+    /// Host-page query parameters the GET form carries forward as hidden inputs —
+    /// the site-configured allow-list applied to the current request
+    /// (<see cref="Rendering.PreservedQuery.Compute"/>). Empty on an unconfigured site.
+    /// </summary>
+    /// <remarks>
+    /// Passes this interface's own test the way <see cref="PrivacyNotice"/> does: not
+    /// answerable from what is being booked, but identical whichever flow is asking —
+    /// a property of the request and the site's configuration — so it cannot turn a
+    /// shared partial into a per-flow component by accretion.
+    /// </remarks>
+    IReadOnlyList<PreservedQueryPair> PreservedQuery { get; }
 }
 
 /// <summary>

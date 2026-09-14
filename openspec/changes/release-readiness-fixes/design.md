@@ -37,13 +37,22 @@ The ViewComponents compute the pairs from `Request.Query` and pass them through
 value already takes — so the flows and view models stay `HttpContext`-free, and the
 rendering suite can drive every case by setting the model.
 
-## D3 — One partial renders it for both forms
+## D3 — The loop is inlined in both forms, NOT a shared partial — revised at apply
 
-`_PreservedQuery.cshtml` renders the pairs as `<input type="hidden">` and is included by
-both GET forms (`Catalogue.cshtml`, `_DateAndLength.cshtml`). One implementation, so the
-two forms cannot diverge — the date form already diverged from the catalogue once (it
-preserves the subject token; the catalogue preserves nothing), and that divergence is
-half of why this class existed. The POST step is out of scope (proposal Non-goals) but
+The first draft of this decision shipped a `_PreservedQuery.cshtml` partial, "one
+implementation so the two forms cannot diverge". Implementation corrected it: **every
+`_*` partial under `Views/Shared/UBookIt` is part of the public theming contract**
+(`UBookItThemeContract.SharedPartials`, asserted by `ThemeBuildingBlockTests`), must
+declare `@model IBookingFormView` — which a list-of-pairs partial cannot — and becomes a
+compatibility promise the moment 17.0.0 ships. Growing that surface is exactly what this
+change's Non-goals forbid. So the three-line hidden-input loop is inlined in
+`Catalogue.cshtml` and `_DateAndLength.cshtml`, each commenting the other's existence,
+and the anti-divergence duty is carried by the requirement's scenarios and the rendering
+guards, which assert preservation over BOTH forms independently. A theme supplying its
+own form markup renders its own hidden inputs from the same model members — the data is
+the contract, per the package's front-end principle, not the partial.
+
+The POST step is out of scope (proposal Non-goals) but
 its behaviour is *verified* during apply and recorded: `BeginUmbracoForm` posts to the
 page URL, and whether that URL retains the query decides whether the fix is complete for
 the whole flow or the POST needs its own follow-up entry.

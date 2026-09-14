@@ -1,4 +1,5 @@
 using System.Reflection;
+using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Logging.Abstractions;
@@ -769,8 +770,12 @@ public class BookingMessageModelContractTests
         // boot check as the mitigation for "registration silently does nothing", but the boot
         // check was itself only ever constructed directly.
         var registrations = new ServiceCollection();
+
+        // A REAL empty configuration, not an invented answer: the composer now binds
+        // FrontendSettings, and an empty root is exactly what an unconfigured site has.
         new UBookIt.Web.Composing.UBookItRenderingComposer()
-            .Compose(new ServicesOnlyUmbracoBuilder(registrations));
+            .Compose(new ServicesOnlyUmbracoBuilder(
+                registrations, new ConfigurationBuilder().Build()));
 
         Assert.Contains(registrations, d => d.ServiceType == typeof(IBookingTemplateRenderer));
         Assert.Contains(registrations, d => d.ServiceType == typeof(RazorBookingTemplateRenderer));
@@ -791,7 +796,8 @@ public class BookingMessageModelContractTests
         // somebody caches a compiled view on it.
         var registrations = new ServiceCollection();
         new UBookIt.Web.Composing.UBookItRenderingComposer()
-            .Compose(new ServicesOnlyUmbracoBuilder(registrations));
+            .Compose(new ServicesOnlyUmbracoBuilder(
+                registrations, new ConfigurationBuilder().Build()));
 
         var port = Assert.Single(
             (IEnumerable<ServiceDescriptor>)registrations,

@@ -33,23 +33,29 @@ namespace UBookIt.Web.Rendering;
 public sealed class BookingFlowViewComponent(
     ResourceBookingFlow resourceFlow,
     ServiceBookingFlow serviceFlow,
-    BookingCatalogue catalogue) : ViewComponent
+    BookingCatalogue catalogue,
+    FrontendSettings frontendSettings) : ViewComponent
 {
     public async Task<IViewComponentResult> InvokeAsync(Guid? serviceId = null, Guid? resourceId = null)
     {
         var entry = FlowEntry.Resolve(serviceId, resourceId, Request.ReadSubjectQuery());
 
+        // Computed here, once, because the query string is the host's and only the
+        // component sees it — the flows and models stay host-free (design D2).
+        var preserved = PreservedQuery.Compute(Request.Query, frontendSettings.PreservedQueryParameters);
+
         if (entry.Subject is not { } chosen)
         {
-            return View("Catalogue", await catalogue.BuildAsync());
+            return View("Catalogue", await catalogue.BuildAsync(preserved));
         }
 
         return chosen.Kind == BookableKind.Service
-            ? await ServiceAsync(chosen.Id, entry.Token)
-            : await ResourceAsync(chosen.Id, entry.Token);
+            ? await ServiceAsync(chosen.Id, entry.Token, preserved)
+            : await ResourceAsync(chosen.Id, entry.Token, preserved);
     }
 
-    private async Task<IViewComponentResult> ServiceAsync(Guid serviceId, string? token)
+    private async Task<IViewComponentResult> ServiceAsync(
+        Guid serviceId, string? token, IReadOnlyList<PreservedQueryPair> preserved)
     {
         // A completed booking (PRG success) takes precedence over the form.
         if (TempData.Read<ServiceConfirmationModel>(BookingKeys.ServiceConfirmation) is { } confirmation)
@@ -66,6 +72,7 @@ public sealed class BookingFlowViewComponent(
                 Failed = TempData.Read<FailedSubmission>(BookingKeys.ServiceFailedSubmission),
                 ChosenResourceId = Request.ReadResourceQuery(),
                 FlowToken = token,
+                PreservedQueryPairs = preserved,
             });
 
         return outcome.Unavailable is { } unavailable
@@ -73,7 +80,8 @@ public sealed class BookingFlowViewComponent(
             : View("Service", outcome.Form);
     }
 
-    private async Task<IViewComponentResult> ResourceAsync(Guid resourceId, string? token)
+    private async Task<IViewComponentResult> ResourceAsync(
+        Guid resourceId, string? token, IReadOnlyList<PreservedQueryPair> preserved)
     {
         if (TempData.Read<BookingConfirmationModel>(BookingKeys.Confirmation) is { } confirmation)
         {
@@ -88,6 +96,7 @@ public sealed class BookingFlowViewComponent(
                 DurationMinutes = Request.ReadDurationQuery(),
                 Failed = TempData.Read<FailedSubmission>(BookingKeys.FailedSubmission),
                 FlowToken = token,
+                PreservedQueryPairs = preserved,
             });
 
         return outcome.Unavailable is { } unavailable

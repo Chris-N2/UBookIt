@@ -15,7 +15,9 @@ namespace UBookIt.Web.Rendering;
 /// TempData handoffs and the query string.
 /// </para>
 /// </summary>
-public sealed class BookingViewComponent(ResourceBookingFlow flow) : ViewComponent
+public sealed class BookingViewComponent(
+    ResourceBookingFlow flow,
+    FrontendSettings frontendSettings) : ViewComponent
 {
     public async Task<IViewComponentResult> InvokeAsync(Guid resourceId)
     {
@@ -38,6 +40,8 @@ public sealed class BookingViewComponent(ResourceBookingFlow flow) : ViewCompone
                 // token here would change this flow's redirect target for every
                 // site already using it.
                 FlowToken = null,
+                PreservedQueryPairs = PreservedQuery.Compute(
+                    Request.Query, frontendSettings.PreservedQueryParameters),
             });
 
         return outcome.Unavailable is { } unavailable

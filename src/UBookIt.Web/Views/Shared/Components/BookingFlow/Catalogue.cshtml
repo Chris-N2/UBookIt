@@ -15,6 +15,16 @@
     @if (Model.HasEntries)
     {
         <form method="get" class="ubookit-catalogue-form">
+            @* The host page's query parameters, carried across the submission — a GET
+               form REPLACES the query string, and this page's parameters are not ours
+               to discard. Only site-listed names reach the model, never uBookIt's own
+               keys (PreservedQuery.Compute). _DateAndLength renders the same loop:
+               inlined in both rather than shared, because a shared partial in this
+               folder joins the public theming contract, which this must not. *@
+            @foreach (var pair in Model.PreservedQuery)
+            {
+                <input type="hidden" name="@pair.Name" value="@pair.Value" />
+            }
             <fieldset class="ubookit-catalogue-choices">
                 <legend>What would you like to book?</legend>
                 @foreach (var (entry, index) in Model.Entries.Select((entry, index) => (entry, index)))

@@ -28,6 +28,13 @@
     submittable, and no extra round trip is needed to bound the control.
 *@
 <form method="get" class="ubookit-date-form">
+    @* The host page's query parameters, carried across the submission (see the
+       catalogue's copy of this loop for the full reasoning — inlined in both forms
+       rather than shared, so it stays off the public theming contract). *@
+    @foreach (var pair in Model.PreservedQuery)
+    {
+        <input type="hidden" name="@pair.Name" value="@pair.Value" />
+    }
     @if (Model.FlowToken is { } token)
     {
         @* Keeps the subject in the URL across the reload, so the step stays

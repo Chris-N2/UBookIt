@@ -12,6 +12,10 @@ public sealed class BookingFormModel : IBookingFormView
 {
     /// <inheritdoc />
     public required PrivacyNoticeView PrivacyNotice { get; init; }
+
+    /// <inheritdoc />
+    public IReadOnlyList<PreservedQueryPair> PreservedQuery { get; init; } = [];
+
     /// <inheritdoc />
     public IReadOnlyList<AvailableDate> AvailableDates { get; init; } = [];
 

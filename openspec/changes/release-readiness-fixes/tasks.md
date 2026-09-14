@@ -14,8 +14,11 @@
 - [ ] 1.4 Thread the pairs from both ViewComponents (`BookingFlowViewComponent`,
       `BookingViewComponent`) through `BookingFlowInput` and the catalogue build onto
       the form models and `CatalogueModel`.
-- [ ] 1.5 `_PreservedQuery.cshtml` partial; include from `Catalogue.cshtml` and
-      `_DateAndLength.cshtml`.
+- [ ] 1.5 Render the pairs as hidden inputs from `Catalogue.cshtml` and
+      `_DateAndLength.cshtml` — INLINED in both, not a shared partial: a `_*` partial
+      in the shared folder joins the public theming contract, which this change must
+      not grow (design D3, revised at apply; a `_PreservedQuery.cshtml` was written
+      and deleted for exactly this).
 - [ ] 1.6 Rendering guards (UBookIt.Tests.Rendering) over BOTH forms: listed parameter
       present, unlisted absent, empty-list renders nothing, own-key never rendered,
       multi-value order, encoding. Mutation-check at least one guard per form against a
