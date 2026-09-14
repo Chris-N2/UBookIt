@@ -268,9 +268,12 @@ public class PreservedQueryTests
 
     /// <summary>
     /// The last unprovable-by-output hop: that each controller passes AfterSubmission
-    /// the pairs COMPUTED FROM THE REQUEST, not an empty stand-in. One regex per
-    /// controller, spanning the call: replacing the Compute argument with <c>[]</c>
-    /// fails it, and the sibling seam guard forbids any other link call.
+    /// the pairs computed from THE REQUEST'S QUERY against THE CONFIGURED ALLOW-LIST.
+    /// One regex per controller, spanning the call and pinning BOTH Compute
+    /// arguments — QA round 2 proved the query-only version green with
+    /// <c>Compute(Request.Query, [])</c>, an empty stand-in laundered through the
+    /// pinned function, so the allow-list source is pinned too. The sibling seam
+    /// guard forbids any other link call.
     /// </summary>
     [Fact]
     public void Both_controllers_hand_the_computed_pairs_to_the_submission_decision()
@@ -283,7 +286,8 @@ public class PreservedQueryTests
         {
             Assert.Matches(
                 new System.Text.RegularExpressions.Regex(
-                    @"BookingFlowLink\.AfterSubmission\((?:(?!;).)*?PreservedQuery\.Compute\(Request\.Query",
+                    @"BookingFlowLink\.AfterSubmission\((?:(?!;).)*?PreservedQuery\.Compute\("
+                    + @"Request\.Query,\s*_frontendSettings\.PreservedQueryParameters\)",
                     System.Text.RegularExpressions.RegexOptions.Singleline),
                 RepoFiles.Read(controller));
         }
