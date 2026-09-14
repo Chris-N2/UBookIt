@@ -39,28 +39,23 @@
     <PackageTags>umbraco;umbraco-marketplace;booking;bookings;scheduling;reservations</PackageTags>
 
     <!--
-      ============================================================================
-      CORRECT THESE BEFORE THE FIRST PUSH TO A PUBLIC FEED. They are not yet right.
-      ============================================================================
+      The package's public home, and the repository the source actually lives in. Both
+      are read by nuget.org and by the Umbraco Marketplace listing, so a consumer follows
+      them out of a package page expecting to arrive somewhere they can read the code.
 
-      Both URLs name a PRIVATE Azure DevOps organisation: a consumer following them
-      from nuget.org or the Umbraco Marketplace reaches a sign-in wall, not a
-      repository. The project is moving to a public GitHub home (Chris, 2026-09-14);
-      these were left pointing at the current remote rather than at a guessed URL that
-      does not exist yet.
+      ONE-WAY DOOR: nuget.org does not allow a pushed version's metadata to be edited, so
+      an error here is not a commit away from fixed - it costs a version number and the
+      bad listing stays visible. See docs/publishing.md before the first push.
 
-      Why this is a publish-time gate rather than a merge-time one: nuget.org does not
-      allow a pushed version's metadata to be edited. Getting this wrong is not a
-      commit away from fixed — it costs a version number and leaves the bad listing
-      permanently visible.
+      NOTE the casing: the repository is UBookIt, which differs from the old Azure path.
 
-      Deliberately not guarded by a test: there is no in-repo signal for "about to
-      publish", and a test asserting these are NOT the Azure URLs would fail today,
-      when they are correctly the Azure URLs. The check that matters is a human one at
-      push time, which is why it is stated here, at the point of use.
+      SourceLink does NOT read these - it derives the source-fetch URLs in the symbol
+      package from the GIT REMOTE. Changing these two lines without switching the remote
+      leaves the .snupkg pointing somewhere else entirely. Order matters; the runbook
+      has it.
     -->
-    <PackageProjectUrl>https://dev.azure.com/NorwoodDesignDev/uBookIt</PackageProjectUrl>
-    <RepositoryUrl>https://dev.azure.com/NorwoodDesignDev/uBookIt/_git/uBookIt</RepositoryUrl>
+    <PackageProjectUrl>https://github.com/Chris-N2/UBookIt</PackageProjectUrl>
+    <RepositoryUrl>https://github.com/Chris-N2/UBookIt.git</RepositoryUrl>
     <RepositoryType>git</RepositoryType>
 
     <!--
