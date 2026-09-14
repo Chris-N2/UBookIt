@@ -99,3 +99,67 @@ edited: correcting it later costs a version number. The file's own comment names
 the one place they change.
 
 **Reported to Chris. Must be corrected in the same commit as, or before, the first push.**
+
+## QA round 1 — REJECT (4 MAJOR, 3 MINOR, 3 NIT), and the fix (2026-09-15)
+
+QA's closing instruction was the important one: MAJORs 1 and 2 are ONE fault — a sentence
+stating something about the release that nothing checks — so the fix swept the class
+rather than patching the four named lines.
+
+- [x] R1.1 [MAJOR 1] **The change asserted the package is published; nuget.org 404s on
+      it.** QA checked the feed. Three documents claimed it (`CLAUDE.md`, `docs/mvp.md`,
+      `roadmap/version_roadmap.md`) — the exact defect class this change exists to close,
+      reintroduced by the change, in the repository's own governing instructions.
+      **Swept by pattern** (publication-claim family, emphasis-stripped — my FIRST sweep
+      missed `it **is** published` because it stripped comment markers but not markdown
+      emphasis, which is the wrapped-sentence trap in a new costume). Class is four:
+      the three above, fixed; plus `openspec/specs/bookings/spec.md` ("`UBookIt.Core` is
+      published and its surface is a compatibility promise") — **pre-existing, NOT fixed
+      here**: it becomes true at publication and correcting it means replacing a
+      requirement this change does not own, per the standing rule. Recorded for whichever
+      change next touches `bookings`.
+      **The repair shape is the keeper**: prefer sentences that stay true ACROSS the
+      publication event ("the surface is declared stable from `17.0.0`", "the release is
+      prepared and versioned") over sentences that need a second edit at it. A guard,
+      `No_document_claims_the_package_is_already_published`, holds the line and is
+      explicitly the thing to delete in the change that publishes.
+- [x] R1.2 [MAJOR 2] **The version guard's file list was a sample** — QA set
+      `roadmap/version_roadmap.md`'s identically-shaped claim to `16.4.2` and all three
+      tests passed green. The population is now found **by phrase across every live
+      document** (README, CLAUDE.md, docs/**, roadmap/**, openspec/specs/**; archive
+      excluded as history), with `ClaimsAreFoundWhereTheyAreKnownToLive` pinning the four
+      documents known to claim so the scan cannot pass over nothing. The residual limit —
+      a NEW phrasing in a NEW document is not covered — is stated in the test's own XML
+      doc and in `Directory.Build.props`, rather than left for the next reviewer to find.
+- [x] R1.3 [MAJOR 3] The props comment claimed "every document" (two were checked) and
+      "fails the build" (it fails the test suite). Both corrected; it now also tells
+      whoever bumps the version that a new phrasing must be registered.
+- [x] R1.4 [MAJOR 4] The publication blocker now lives in `Directory.Build.props` beside
+      the URLs themselves — where somebody about to push will read it — not only in this
+      file, which task 7.3 archives. It states the nuget.org immutability consequence and
+      **why no test guards it**: there is no in-repo signal for "about to publish", and a
+      test asserting the URLs are not the Azure ones would fail today, when they correctly
+      are.
+- [x] R1.5 [MINOR] README no longer promises "the release notes" (no CHANGELOG, no
+      GitHub releases, and `PackageProjectUrl` is a private URL — a reader sent there
+      arrives nowhere). Now: "called out explicitly rather than left to be discovered".
+- [x] R1.6 [MINOR] `roadmap/version_roadmap.md:3` ("between `0.1.0` and its first full
+      release") rewritten — it was falsified by line 31 of its own file.
+- [x] R1.7 [MINOR] The README's major row said least of the three; it now says the API
+      may change across an Umbraco major, since the CMS it targets did.
+- [x] R1.8 [NIT] Both version patterns now tolerate wrapping symmetrically; `DeclaredVersion`
+      asserts EXACTLY ONE `<Version>` rather than reading the first of several.
+- [ ] R1.9 [NIT, deferred to 7.1 as QA agreed] the "BREAKING (**unpublished**)" phrasings
+      in `BookingModels.cs` and three specs — accurate as history, but that XML comment is
+      what a 17.0.0 consumer meets in IntelliSense.
+
+### R1 mutation evidence (at commit `12cd7e4`, each mutant verified to DIFFER first, tree restored)
+
+| Mutant | Result |
+|---|---|
+| **QA's own demonstration**: roadmap claim → `16.4.2` | **Caught**, names `roadmap/version_roadmap.md` |
+| `CLAUDE.md`'s claim → `9.9.9` (newly covered) | **Caught**, names `CLAUDE.md` |
+| Re-add "and it is published, from `17.0.0`" | **Caught** by the publication guard |
+| `docs/mvp.md` drops its claim entirely | **Caught** by the anti-vacuity pin |
+
+At HEAD: 2697 .NET (1482 + 130 + 1085), Release 0 warnings.
