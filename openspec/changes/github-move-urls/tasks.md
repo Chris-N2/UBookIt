@@ -30,10 +30,10 @@
 
 ## 4. Ordering dependency — CHRIS'S ACTION, not absorbed (design D2)
 
-- [ ] 4.1 Chris switches the remote:
+- [x] 4.1 Chris switches the remote:
       `git remote set-url origin git@github.com:Chris-N2/UBookIt.git` (or `remote add` if he
       keeps Azure as a mirror), then pushes.
-- [ ] 4.2 AFTER 4.1: clean rebuild and repack, then VERIFY the emitted
+- [x] 4.2 AFTER 4.1: clean rebuild and repack, then VERIFY the emitted
       `obj/**/*.sourcelink.json` names github.com and not dev.azure.com. This change cannot
       verify it before the remote moves — record the result here rather than assuming.
 
@@ -115,3 +115,32 @@ the same defect as the project URL, hidden one layer down.
 
 **Task 4 is therefore a genuine blocker on publication, not a formality**, and 4.2's
 verification is the step that proves it cleared.
+
+## 4.1 / 4.2 — DONE, and the verification found something neither the design nor QA anticipated
+
+Chris moved the remote to `https://github.com/Chris-N2/UBookIt.git` (HTTPS rather than SSH —
+no key was registered, and Credential Manager's account prompt let him pick the right identity;
+his GitHub login is otherwise a client's, so that choice mattered). Then, same commit, clean
+rebuild:
+
+```
+before:  https://dev.azure.com/NorwoodDesignDev/uBookIt/_apis/git/repositories/uBookIt/items?…
+after:   https://raw.githubusercontent.com/Chris-N2/UBookIt/ce36ba09…/*
+```
+
+**The ordering claim is now proven end to end** rather than half-proven: properties → remote →
+rebuild, and both surfaces correct.
+
+### The finding: SourceLink embeds the COMMIT SHA, so a pack from an unpushed commit ships dead links
+
+Visible in the URL above. The consequence is a one-way door nobody had named — packing from a
+local-only commit, an unmerged branch, or a commit amended after packing produces a package
+whose source links **404 for every consumer, permanently**, because a pushed version cannot be
+corrected. It would pass every check in this change: the URLs are right, the host is right,
+the nuspec is right. Only the SHA is unreachable.
+
+Added to `docs/publishing.md` as its own section with the two commands that check it
+(`git rev-parse HEAD`, `git branch -r --contains HEAD`), and guarded. **Note this was found by
+doing the verification rather than by reasoning about it** — the design predicted the remote
+would fix SourceLink and stopped there; looking at the actual output showed what else the URL
+carried.
