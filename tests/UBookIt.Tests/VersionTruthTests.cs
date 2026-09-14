@@ -365,7 +365,7 @@ public class VersionTruthTests
             + "Recorded here and in the deferred-obligations memory for whichever change "
             + "next legitimately modifies `bookings`."),
 
-        ("docs/publishing.md", "nuget.org", 4,
+        ("docs/publishing.md", "nuget.org", 5,
             "The publishing runbook names the feed as a DESTINATION - what nuget.org will "
             + "not let you undo, where to get an API key, which source to push to. That is "
             + "the distinction this guard exists to draw: instructions FOR publishing are "

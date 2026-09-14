@@ -8,13 +8,21 @@ mistakes below cost a version number rather than a commit.
 - **A pushed version's metadata cannot be edited.** Project URL, repository URL, licence,
   description, icon — all of it is frozen at push. A wrong URL is fixed by publishing a *new
   version*, and the wrong one stays visible on the version history forever.
-- **A version number cannot be reused**, even after unlisting. uBookIt is at `17.0.0`, and that
-  number is spent the moment it
-  is pushed, successfully or not.
+- **A version number cannot be reused**, even after unlisting. uBookIt is at `17.0.0`, and
+  that number is spent the moment it is pushed, successfully or not.
 - **Unlisting is not deletion.** An unlisted package stays resolvable by exact version, so
   anything published by mistake remains installable by anyone who knows the number.
 
 The practical consequence: **check the produced `.nuspec`, not the source, before you push.**
+
+## Status
+
+**uBookIt has not been pushed to nuget.org.** This line is the publication status
+`openspec/config.yaml` points at. It is deliberately phrased so the feed-arrival guard counts
+it: changing it at publication changes the count, which trips
+`No_document_claims_the_package_has_reached_a_feed` and hands you the checklist of every
+other sentence that needs revisiting. That is the mechanism this document recommends to its
+reader, applied to itself.
 
 ## Before the first push
 
@@ -73,8 +81,10 @@ cat src/UBookIt.Core/obj/Release/net10.0/UBookIt.Core.sourcelink.json
 
 **Each package carries its own metadata, so check all five** — the commands above read one as
 an example. (Five `.nupkg`, but only four `.snupkg`/`sourcelink.json`: the `UBookIt`
-meta-package contains no assemblies and sets `IncludeSymbols=false`.) If any `sourcelink.json` still names the old host, step 2 or step 3 did not happen:
-repack, do not push.
+meta-package contains no assemblies and sets `IncludeSymbols=false`.)
+
+If any `sourcelink.json` still names the old host, step 2 or step 3 did not happen: repack,
+do not push.
 
 ## Publish only from a commit that is already on the public repository
 

@@ -47,19 +47,19 @@
 
 ## 6. QA
 
-- [ ] 6.1 QA round(s) — fresh subagent; report claims to verify rather than trust; treat each
+- [x] 6.1 QA round(s) — fresh subagent; report claims to verify rather than trust; treat each
       round's fixes as new code.
 
 ## 7. Sync + archive
 
-- [ ] 7.1 SYNC the ADDED `packaging` requirement into `openspec/specs/packaging/spec.md`.
+- [x] 7.1 SYNC the ADDED `packaging` requirement into `openspec/specs/packaging/spec.md`.
       (This task first said "no delta to sync (no requirement changes)" — corrected with the
       proposal when the tooling refused a change with no delta; QA round 1 found the
       contradiction still standing here, which is the record disagreeing with the change it
       records.) Then run the falsified-sentence sweep BY
       PATTERN, wrap- and decoration-normalised, over the whole tree — **including the lines
       edited by hand**, which is the region a sweep skips (㉟ R5).
-- [ ] 7.2 Memory: retire `azure-devops-not-github` — it will be false the moment 4.1 runs;
+- [x] 7.2 Memory: retire `azure-devops-not-github` — it will be false the moment 4.1 runs;
       update the ㉟ handover's outstanding-item section.
 - [ ] 7.3 Archive; merge after QA approval.
 
@@ -240,5 +240,51 @@ nuget.org left the suite 7/7 green.
       `IncludeSymbols=false`. Stated.
 - [x] R2.9 [CLOSED by QA] The retirement narrowing — agreed, no change wanted; raised so it was
       stated rather than inherited silently, and it now is.
+
+At HEAD: 2699 .NET (1484 + 130 + 1085), Release no-incremental 0 warnings, 21 items strict.
+
+## QA round 3 — APPROVE (2026-09-15), the MINOR taken, and the sync
+
+QA verified the YAML population exhaustively rather than accepting my `TopDirectoryOnly`
+narrowing: every `*.yaml`/`*.yml` in the repository is under `openspec/`, and the union of
+top-level keys across ALL ~40 `.openspec.yaml` files is `schema:` and `created:` — no prose,
+not a sample. It also corrected me in my favour: its own suggested widening would NOT have
+caught my clause, because `published to (a |the )?feed` does not match "published to a
+**package** feed". Closing the blind spot and removing the second-edit clause were two
+different fixes and both were needed.
+
+- [x] R3.1 [MINOR] The config pointer promised "publication **status**" from a document that
+      stated only a procedure — true about half its sentence, unfalsifiable about the other
+      half. Took QA's stronger variant: `docs/publishing.md` gains a **Status** line,
+      *"uBookIt has not been pushed to nuget.org"*, phrased so the feed guard COUNTS it
+      (allowance 4 → 5). At publication, editing that line changes the count and trips the
+      guard — **converting a second-edit sentence into a guarded one**, which is the mechanism
+      the runbook already recommends to its reader, applied to itself.
+- [x] R3.2 [NIT ×3] Ragged wrap from the version insertion; a ~140-column line; the missing
+      trailing newline. All three taken.
+
+## 7.1 Sync — delta landed, sweep run
+
+The ADDED requirement (now **five** scenarios) landed **VERBATIM** in
+`openspec/specs/packaging/spec.md`, byte-identity asserted; 21 items validate strictly.
+
+**Sweep BY PATTERN, wrap- and decoration-normalised, whole tree, including the lines edited by
+hand.** Two passes — the Azure/hosting family, then what this change itself altered (the
+warning block, the retired guard, the publication-blocker language). **Nothing falsified.**
+Every hit is either this change's own record, the archive (history, untouched), or the
+deliberate `dev.azure.com` known-private-host check inside the new guard, whose historical
+remark about the retired biconditional is accurate.
+
+## 7.2 Memory
+
+- `azure-devops-not-github` **rewritten rather than deleted**: its premise is false (the repo
+  is public GitHub now), but **its CI half is still true and still the sharpest thing in it** —
+  there is no CI anywhere, and 415 tests once stopped running for three days because nothing
+  runs unattended. Now also notes that GitHub Actions is finally *available*, and that
+  `Directory.Build.props` already keys warnings-as-errors on `CI`, which Actions sets.
+- `MEMORY.md` head rewritten: the URL trap is closed, the publish traps recorded. **And the two
+  lines adjacent to my own edit had gone stale** ("16 ahead of origin", "Next: the GitHub move")
+  — caught by applying ㉟ R5's lesson to my own cursor, which is the one place it keeps not
+  getting applied.
 
 At HEAD: 2699 .NET (1484 + 130 + 1085), Release no-incremental 0 warnings, 21 items strict.

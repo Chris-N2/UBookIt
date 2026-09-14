@@ -22,7 +22,8 @@ context: |
   API endpoints require backoffice authorization policies, delivery
   endpoints validate all input, booking form submissions use anti-forgery
   protection. Public GitHub repository at github.com/Chris-N2/UBookIt; publication
-  status and the release procedure are documented in docs/publishing.md.
+  status and the release procedure are both stated in docs/publishing.md, which carries a
+  Status line the test suite watches.
 
 # Per-artifact rules
 rules:
