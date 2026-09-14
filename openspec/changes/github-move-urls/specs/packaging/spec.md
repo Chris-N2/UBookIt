@@ -24,7 +24,9 @@ properties, move the remote, then rebuild — and SHALL require the produced art
 inspected rather than assumed.
 
 Because a published version's metadata cannot be corrected in place on a public feed, the
-publishing documentation SHALL state what a push makes permanent.
+publishing documentation SHALL state what a push makes permanent — including that symbol
+source links identify a specific commit, so a package built from a commit absent from the
+public repository resolves to nothing for every consumer and cannot be repaired.
 
 #### Scenario: The declared URLs are public and name the source repository
 
@@ -44,6 +46,12 @@ publishing documentation SHALL state what a push makes permanent.
 - **THEN** it states that symbol-package source links follow the repository remote rather than
   the declared URLs, gives the order that makes both correct, and requires the produced
   artifacts to be inspected before pushing
+
+#### Scenario: Publishing from an unpublished commit is documented as unrecoverable
+
+- **WHEN** a maintainer consults the publishing documentation
+- **THEN** it states that source links identify a specific commit, and requires the commit
+  being packaged to be one the public repository already has
 
 #### Scenario: What a push makes permanent is documented
 

@@ -200,3 +200,45 @@ retirement narrowing (old guard read the whole file, new one reads two element v
 the NITs.
 
 At HEAD: 2699 .NET (1484 + 130 + 1085), Release no-incremental 0 warnings, 21 items strict.
+
+## QA round 2 — REJECT (1 MAJOR + 5 MINOR/NIT), and the fix (2026-09-15)
+
+**The MAJOR is the round-1 fix producing the round-2 defect**, which is this project's stated
+pattern and was correctly refused. My correction to `openspec/config.yaml` replaced a falsified
+hosting sentence with *"nothing is published to a package feed yet"* — a **publication-sensitive
+claim placed back into the one file the feed guard cannot see**, which is why round 1 flagged
+that file in the first place. QA demonstrated it: rewriting the line to say uBookIt is live on
+nuget.org left the suite 7/7 green.
+
+- [x] R2.1 [MAJOR] **Both** halves, because either alone is half a fix:
+      (a) **The blind spot is closed** — `LiveDocuments()` now walks `openspec/*.yaml`,
+      TOP LEVEL ONLY (the per-change `.openspec.yaml` files carry a schema name and a date,
+      and those under `changes/archive/` are history that must never be edited to satisfy a
+      guard). This would have caught the ORIGINAL Azure sentence too, which is why it beats
+      stepping around the file.
+      (b) **The sentence is now true across the publication event** — it points at
+      `docs/publishing.md` for publication status instead of asserting one. The guard's own
+      remarks record that rule from the predecessor's round 1; my clause had violated it.
+- [x] R2.2 [MINOR] The reachability guard pinned the sentence but stopped before `logged out` —
+      so the docs could have named a check that **cannot detect the failure**, since a private
+      URL looks fine to an authenticated maintainer. That is the entire failure mode this
+      change exists for. Guarded string extended.
+- [x] R2.3 [MINOR] The `DELETE the old artifacts` step was unguarded while the narrative about
+      it was guarded. Both now pinned.
+- [x] R2.4 [MINOR] The spec's artifact-inspection clause: both sentences now guarded.
+- [x] R2.5 [MINOR] The numbered order block said step 1 was "committed"; a maintainer following
+      it alone would still pack from an unpushed commit. Now "committed AND PUSHED".
+- [x] R2.6 [MINOR] The SHA guard had no requirement behind it — the shape this change's own
+      proposal names. The `packaging` delta gains a fifth scenario, and the requirement body
+      states that source links identify a specific commit.
+- [x] R2.7 [QA's judgement call, taken as advised] Hardcoded `17.0.0`: `docs/publishing.md`
+      joins `DocumentsKnownToClaim` and states its version in the guarded phrasing; the verify
+      command is now version-agnostic (`UBookIt.*.nupkg`). A new `VersionClaimPattern` was
+      rejected for QA's reason — matching a bare version inside a shell command would fire
+      across every document walked and need exclusions back.
+- [x] R2.8 [NIT] Five `.nupkg` but only four `.snupkg`: the meta-package sets
+      `IncludeSymbols=false`. Stated.
+- [x] R2.9 [CLOSED by QA] The retirement narrowing — agreed, no change wanted; raised so it was
+      stated rather than inherited silently, and it now is.
+
+At HEAD: 2699 .NET (1484 + 130 + 1085), Release no-incremental 0 warnings, 21 items strict.

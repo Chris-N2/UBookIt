@@ -8,7 +8,8 @@ mistakes below cost a version number rather than a commit.
 - **A pushed version's metadata cannot be edited.** Project URL, repository URL, licence,
   description, icon — all of it is frozen at push. A wrong URL is fixed by publishing a *new
   version*, and the wrong one stays visible on the version history forever.
-- **A version number cannot be reused**, even after unlisting. `17.0.0` is spent the moment it
+- **A version number cannot be reused**, even after unlisting. uBookIt is at `17.0.0`, and that
+  number is spent the moment it
   is pushed, successfully or not.
 - **Unlisting is not deletion.** An unlisted package stays resolvable by exact version, so
   anything published by mistake remains installable by anyone who knows the number.
@@ -44,7 +45,7 @@ properties are right* — and a consumer stepping into uBookIt in a debugger is 
 repository they cannot open.
 
 ```
-1. correct the properties        (committed, in the repo)
+1. correct the properties        (committed AND PUSHED - see the SHA section below)
 2. switch the git remote         git remote set-url origin <public URL>
 3. DELETE the old artifacts      dotnet clean UBookIt.slnx -c Release
                                  rm -rf src/*/bin/Release
@@ -64,14 +65,15 @@ prevent, hiding inside its own instructions.
 
 ```bash
 # the packed metadata a consumer sees
-unzip -p src/UBookIt/bin/Release/UBookIt.17.0.0.nupkg UBookIt.nuspec | grep -iE "projectUrl|repository|license"
+unzip -p src/UBookIt/bin/Release/UBookIt.*.nupkg UBookIt.nuspec | grep -iE "projectUrl|repository|license"
 
 # where a debugger will be sent for source
 cat src/UBookIt.Core/obj/Release/net10.0/UBookIt.Core.sourcelink.json
 ```
 
 **Each package carries its own metadata, so check all five** — the commands above read one as
-an example. If any `sourcelink.json` still names the old host, step 2 or step 3 did not happen:
+an example. (Five `.nupkg`, but only four `.snupkg`/`sourcelink.json`: the `UBookIt`
+meta-package contains no assemblies and sets `IncludeSymbols=false`.) If any `sourcelink.json` still names the old host, step 2 or step 3 did not happen:
 repack, do not push.
 
 ## Publish only from a commit that is already on the public repository

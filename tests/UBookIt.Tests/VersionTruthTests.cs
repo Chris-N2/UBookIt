@@ -71,6 +71,12 @@ public class VersionTruthTests
         "CLAUDE.md",
         "docs/mvp.md",
         "roadmap/version_roadmap.md",
+
+        // The runbook names a version, and it is the document a maintainer opens at the NEXT
+        // release — the worst place for a stale number. Registered here rather than given a
+        // new VersionClaimPattern: a pattern able to match a bare version inside a shell
+        // command would fire across every document walked and need exclusions back.
+        "docs/publishing.md",
     ];
 
     /// <summary>
@@ -99,6 +105,23 @@ public class VersionTruthTests
         foreach (var file in new[] { "README.md", "CLAUDE.md" })
         {
             yield return file;
+        }
+
+        // The OpenSpec context file is prose, and it is injected into EVERY future artifact —
+        // so a false claim there propagates into changes not yet written. QA round 1 found a
+        // falsified hosting sentence in it; round 2 found my fix had put a publication-
+        // sensitive clause back into the same blind spot, green while the file could claim
+        // the package was live on a feed. TOP LEVEL ONLY: the per-change `.openspec.yaml`
+        // files carry no prose (a schema name and a date), and the ones under
+        // `changes/archive/` are history that must never be edited to satisfy a guard.
+        var openspec = Path.Combine(root, "openspec");
+
+        if (Directory.Exists(openspec))
+        {
+            foreach (var file in Directory.EnumerateFiles(openspec, "*.yaml", SearchOption.TopDirectoryOnly))
+            {
+                yield return Path.GetRelativePath(root, file).Replace(Path.DirectorySeparatorChar, '/');
+            }
         }
 
         foreach (var (directory, pattern) in new[]
@@ -561,7 +584,16 @@ public class VersionTruthTests
         // automated check may reach the network. Unenforced until QA round 1: deleting the
         // sentence left the suite green while the spec scenario said it must be there.
         DocumentationAssert.Says(
-            runbook, "It cannot check the URL actually resolves — open it in a browser once,");
+            runbook,
+            "It cannot check the URL actually resolves — open it in a browser once, logged out.");
+
+        // The spec requires the documentation to demand INSPECTION of what was produced,
+        // rather than trust that the procedure worked. Both halves, because deleting either
+        // left the suite green (QA rounds 1 and 2).
+        DocumentationAssert.Says(
+            runbook, "check the produced `.nuspec`, not the source, before you push");
+        DocumentationAssert.Says(
+            runbook, "Each package carries its own metadata, so check all five");
 
         // The one-way doors.
         DocumentationAssert.Says(runbook, "A pushed version's metadata cannot be edited");
@@ -570,6 +602,13 @@ public class VersionTruthTests
 
         // The ordering, which is the finding this change was built on.
         DocumentationAssert.Says(runbook, "This order is load-bearing, not tidiness");
+
+        // The STEP, not just the narrative about it: QA round 2 deleted this line and the
+        // suite stayed green while the document still claimed its order was load-bearing.
+        // `dotnet pack` is incremental and `--no-incremental` does not govern it, so without
+        // this step a stale .nupkg survives the whole procedure and is pushed by the wildcard.
+        DocumentationAssert.Says(runbook, "DELETE the old artifacts");
+        DocumentationAssert.Says(runbook, "Step 3 is not housekeeping");
         DocumentationAssert.Says(
             runbook,
             "a package built before the remote moved carries the old SourceLink URLs");

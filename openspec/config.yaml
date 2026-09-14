@@ -21,8 +21,8 @@ context: |
   central package management in root Directory.Packages.props, Management
   API endpoints require backoffice authorization policies, delivery
   endpoints validate all input, booking form submissions use anti-forgery
-  protection. Public GitHub repository at github.com/Chris-N2/UBookIt; nothing is
-  published to a package feed yet.
+  protection. Public GitHub repository at github.com/Chris-N2/UBookIt; publication
+  status and the release procedure are documented in docs/publishing.md.
 
 # Per-artifact rules
 rules:
