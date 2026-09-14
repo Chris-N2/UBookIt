@@ -37,7 +37,9 @@ public sealed class BookingFormModel : IBookingFormView
     /// Null unless the flow was entered through the dispatcher's query string.
     /// A site author who invokes the <c>Booking</c> component with a resource id
     /// has no flow state in the URL, and the rendered markup is then byte-for-byte
-    /// what it was before the service flow existed.
+    /// what it was before the service flow existed — on a site with no preserved
+    /// query parameters configured; with them, the form additionally carries their
+    /// hidden inputs (<see cref="IBookingFormView.PreservedQuery"/>).
     /// </remarks>
     public string? FlowToken { get; init; }
 

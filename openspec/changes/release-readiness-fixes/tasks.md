@@ -195,3 +195,30 @@ branch did too — the wiring guard pinned only the subjectless branch's mechani
       a string-compare, the round-1 CRLF no-op lesson): each fails the guard;
       restored; tree clean. Green at HEAD first, then mutated — the guard passes
       unmutated and fails mutated in both.
+
+## Sync (task 6.1) — RUN 2026-09-14
+
+- [x] 6.1 The ADDED requirement landed VERBATIM in
+      `openspec/specs/default-frontend/spec.md` (appended; scripted copy of the
+      delta's requirement block, no retyping). 21 items validate strictly.
+      **Falsified-sentence sweep, wrap-normalised, BY PATTERN over src + tests +
+      docs + specs** (patterns: nothing else / nothing a caller typed / Location
+      header / flow state in the URL / carries only / not the redirect / byte-for-
+      byte / byte-identical / exactly the query string / exactly what it rendered).
+      THREE falsifications found and fixed — all the same class, an UNCONDITIONAL
+      byte-for-byte identity claim now conditional on no preserved configuration:
+      `BookingSurfaceController` BackToFlow summary ("its redirect is byte-for-byte
+      what it was before the service flow existed"); `BookingViewModels.FlowToken`
+      remark (same sentence about the rendered markup); `Booking/Default.cshtml`'s
+      hidden-token comment (same sentence about the redirect). Each now names the
+      condition and what changes when it fails.
+      Checked and NOT falsified, on the record: `BookingSubject`'s "and nothing
+      else, ever" and the Location-header sentences (amended in-change to name the
+      preserved tail); "no flow state in the URL" family (preserved parameters are
+      HOST state, not flow state — every sentence remains true);
+      `The_only_flow_state_in_the_URL_...` test (asserts the BookingKeys enumeration,
+      which did not grow); `FrontendSettings`' own unconfigured-site claim (states
+      its condition already); "contact details never travel in a URL" (still true —
+      uBookIt puts none there; what a site lists is the site's act); the delivery/
+      theming/persistence "and nothing else" family (unrelated domains); TestSite
+      Program.cs's theming claim (about themes, unaffected).

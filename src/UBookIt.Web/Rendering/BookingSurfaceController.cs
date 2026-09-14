@@ -143,7 +143,10 @@ public sealed class BookingSurfaceController : SurfaceController
     /// land the visitor back at the catalogue, losing the confirmation with it.
     /// <b>Only</b> when a subject was submitted: a form rendered by the
     /// <c>Booking</c> component names the resource on the component instead, and
-    /// its redirect is byte-for-byte what it was before the service flow existed.
+    /// its redirect — on a site with no preserved query parameters configured, which
+    /// is every site until one asks — is byte-for-byte what it was before the
+    /// service flow existed. With preservation configured it gains exactly the
+    /// preserved pairs and nothing of the flow's.
     /// </para>
     /// <para>
     /// Every flow value is re-serialised from parsed input rather than echoed.

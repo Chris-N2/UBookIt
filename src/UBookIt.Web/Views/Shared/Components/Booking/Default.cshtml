@@ -24,7 +24,9 @@
         {
             @* Only present when the dispatcher put the subject in the URL. Its
                absence is what keeps the redirect after a component-invoked
-               submission byte-for-byte what it was before this flow existed. *@
+               submission byte-for-byte what it was before this flow existed — on a
+               site with no preserved query parameters configured; with them, that
+               redirect carries exactly the preserved pairs (AfterSubmission). *@
             <input type="hidden" name="@nameof(BookingSubmission.Subject)" value="@token" />
         }
 
