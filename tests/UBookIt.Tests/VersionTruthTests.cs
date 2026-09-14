@@ -112,6 +112,13 @@ public class VersionTruthTests
             // The shipped views and the backoffice client: the last surfaces with any
             // consumer-facing text. Verified clean when added, so this closes the category
             // rather than leaving it declared-latent.
+            //
+            // The .ts sweep reads GENERATED sources too (`api/*.gen.ts`, emitted by
+            // @hey-api/openapi-ts). Deliberate — generated text ships to a consumer exactly
+            // like written text — but it couples this guard to codegen output, so a
+            // regeneration could fail the suite over words nobody typed. Clean today; if it
+            // ever fires there, fix the generator input or exclude the file explicitly, and
+            // never by widening the vocabulary.
             ("src", "*.cshtml"),
             ("src", "*.ts"),
         })
@@ -376,6 +383,23 @@ public class VersionTruthTests
     public void No_document_claims_the_package_has_reached_a_feed()
     {
         var unclassified = new List<string>();
+
+        // Distinctness asserted rather than left to ToDictionary, which would throw an
+        // ArgumentException naming nothing useful. Irrelevant at one entry; the list is
+        // DESIGNED to grow at publication, which is exactly when a duplicated pair would
+        // appear and want explaining.
+        var duplicates = AcceptedPublicationMentions
+            .GroupBy(entry => (entry.Document, entry.Accepted))
+            .Where(group => group.Count() > 1)
+            .Select(group => $"{group.Key.Document}: \"{group.Key.Accepted}\"")
+            .ToList();
+
+        Assert.True(
+            duplicates.Count == 0,
+            "AcceptedPublicationMentions names the same (document, text) twice. Merge them "
+            + "into one entry with the combined count, so the allowance is stated once:\n  "
+            + string.Join("\n  ", duplicates));
+
         var allowance = AcceptedPublicationMentions.ToDictionary(
             entry => (entry.Document, entry.Accepted), entry => entry.Occurrences);
 
@@ -410,13 +434,6 @@ public class VersionTruthTests
             }
         }
 
-        Assert.True(
-            unclassified.Count == 0,
-            "These read as claims that uBookIt has reached a package feed. It has not — "
-            + "nothing is pushed. Correct the claim, or, if it is legitimate, add it to "
-            + "AcceptedPublicationMentions with its reason and count:\n  "
-            + string.Join("\n  ", unclassified));
-
         // An allowance nobody consumed is a dead entry — the sentence it excuses is gone, or
         // the scan cannot see it. Round 2 shipped exactly that and nothing said so.
         var unconsumed = allowance
@@ -424,12 +441,32 @@ public class VersionTruthTests
             .Select(entry => $"{entry.Key.Item1}: \"{entry.Key.Item2}\" ({entry.Value} unused)")
             .ToList();
 
-        Assert.True(
-            unconsumed.Count == 0,
-            "These AcceptedPublicationMentions entries excuse something no longer there — "
-            + "either the claim was corrected (remove the entry) or the scan cannot see it "
-            + "(the entry is dead code and proves nothing):\n  "
-            + string.Join("\n  ", unconsumed));
+        // BOTH reported together, deliberately. Asserting the unclassified list first would
+        // throw before the dead entries were even computed, so a dead allowance could stay
+        // hidden behind an unrelated failure — and the remarks above call it "impossible to
+        // miss". A sentence slightly stronger than its mechanism is the fault this whole
+        // change kept climbing; this is it at NIT scale, closed rather than argued with.
+        var failures = new List<string>();
+
+        if (unclassified.Count > 0)
+        {
+            failures.Add(
+                "These read as claims that uBookIt has reached a package feed. It has not — "
+                + "nothing is pushed. Correct the claim, or, if it is legitimate, add it to "
+                + "AcceptedPublicationMentions with its reason and count:\n  "
+                + string.Join("\n  ", unclassified));
+        }
+
+        if (unconsumed.Count > 0)
+        {
+            failures.Add(
+                "These AcceptedPublicationMentions entries excuse something no longer there — "
+                + "either the claim was corrected (remove the entry) or the scan cannot see it "
+                + "(the entry is dead code and proves nothing):\n  "
+                + string.Join("\n  ", unconsumed));
+        }
+
+        Assert.True(failures.Count == 0, string.Join("\n\n", failures));
     }
 
     /// <summary>
