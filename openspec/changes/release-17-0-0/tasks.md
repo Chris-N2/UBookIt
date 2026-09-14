@@ -163,3 +163,67 @@ rather than patching the four named lines.
 | `docs/mvp.md` drops its claim entirely | **Caught** by the anti-vacuity pin |
 
 At HEAD: 2697 .NET (1482 + 130 + 1085), Release 0 warnings.
+
+## QA round 2 — REJECT (1 MAJOR), and the fix (2026-09-15)
+
+- [x] R2.1 [MAJOR] **The publication guard was a denylist under a name that quantified
+      over everything.** QA answered my own question with two live counterexamples: it
+      added "uBookIt 17.0.0 is now live on nuget.org today" to `docs/mvp.md` — a scanned
+      document — and all five tests passed; and `openspec/specs/bookings/spec.md`, in a
+      walked directory, says "`UBookIt.Core` is published" while the guard named
+      "No_document_claims_the_package_is_already_published" was green. The reasoning
+      against it was already written eighty lines above in the same file, in
+      `VersionClaimPatterns`' doc: *a denylist fences only what somebody thought of.*
+      Applied to one guard and not its neighbour.
+      **Took QA's option 2 (the real guard) over option 1 (rename to a regression pin)**,
+      against its mild preference, because option 1 leaves the class unguarded and the
+      class is precisely what round 1 showed I get wrong. Measured first: the publication
+      vocabulary produces FOUR hits repo-wide, so an allow-list is tractable. Now:
+      vocabulary × every live document, every hit classified or failing. **An allow-list
+      fails closed.**
+- [x] R2.2 [MINOR, taken] `LiveDocuments()` now walks `src/**/*.cs` and the two project
+      READMEs. QA's argument is the project's own: `DocumentationAssert` strips `///`
+      *"because these guards are asked about source files as well as markdown"*, and a
+      claim in a public type's `<remarks>` is what a site author meets first, in
+      IntelliSense. A scan walking only markdown was blind where the helper was built to
+      see.
+- [x] R2.3 [MINOR, taken] The biconditional guard: while the URLs are the `dev.azure.com`
+      ones, the `CORRECT THESE BEFORE THE FIRST PUSH` block must be present — and when
+      they are fixed, the stale warning must go. Fails on the only rot that can happen.
+- [x] R2.4 [NIT, taken] The per-document anti-vacuity pin is now documented as deliberate.
+- [x] R2.5 [NIT, taken] `docs/mvp.md:19` rewrapped.
+- [x] R2.6 [QA must-fix 2] The declined `bookings/spec.md` item now has **two homes the
+      archive cannot eat**: the deferred-obligations memory, and
+      `AcceptedPublicationMentions` — where it is the one classified exception, with its
+      reason, read by anyone who opens the guard.
+
+### TWO FAULTS OF MY OWN, found by mutation, worth more than the fix
+
+1. **The guard was green for the wrong reason, and only a mutant that FAILED TO FAIL
+   showed it.** Removing the allow-list entry for `bookings/spec.md` left the test
+   passing. Cause: the scan read raw text, and the document says `` `UBookIt.Core` ``
+   **backticked** — as this repository quotes every identifier — so the pattern never
+   matched, the allow-list entry was dead code, and QA's counterexample 2 was still live
+   inside the fix for it. Markdown decoration defeating a raw pattern: the **third**
+   costume of that trap in this one change (the first sweep missed `it **is** published`;
+   `DocumentationAssert` exists because of the second). Fixed by stripping decoration
+   before matching — and note the version scan deliberately does NOT, because it needs the
+   backticks to delimit the number it captures.
+   **The transferable rule: a mutant that leaves a guard green has not proven the guard
+   wrong — it has proven you do not yet know what the guard reads.**
+2. **A `git checkout` of a mutation ate the uncommitted fix** — the trap recorded in
+   memory, hit again, in the same session that re-recorded it. The decoration fix was
+   reverted silently and the suite went green against the BUGGY committed version. Caught
+   by grepping for the fix after restoring. It is now its own commit (`6d7049f`) made
+   BEFORE any further mutation.
+
+### R2 mutation evidence (at commits `634a289` / `6d7049f`, mutants verified to differ, tree restored and the fix confirmed present after)
+
+| Mutant | Result |
+|---|---|
+| **QA's counterexample 1**: "now live on nuget.org today" into `docs/mvp.md` | **Caught** twice (`nuget.org`, `is now live on`) |
+| **QA's counterexample 2**: allow-list entry pointed elsewhere | **Caught** — names `bookings/spec.md: "UBookIt.Core is published"` (and **failed to fail** before the decoration fix) |
+| Warning block tidied away while the private URLs remain | **Caught** by the biconditional |
+
+At HEAD: 2698 .NET (1483 + 130 + 1085), 167 client, Release no-incremental 0 warnings,
+21 items strict.
