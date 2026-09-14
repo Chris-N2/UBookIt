@@ -16,7 +16,7 @@ say what the package does, and this says which of them had to exist before it wa
 releasing.
 
 > **This document is now history, and is kept as history.** It was a living record until v1
-> shipped; v1 shipped as **`17.0.0`**. Its own instruction was to fold into the README at that
+> was complete; the first release is **`17.0.0`**. Its own instruction was to fold into the README at that
 > point, and that was declined deliberately: what it holds is *scope* history — what was
 > knowingly left out of v1 and why — which a README should not carry, since a README says what
 > the package does rather than what it once chose not to do. Several archived changes cite this
@@ -41,9 +41,9 @@ A gap anywhere in this list means there is no product, however complete the rest
 | 9 | **It is licensed and documented** enough for someone to adopt | ✅ |
 
 **Every step is done.** A site adds one package, `UBookIt`, and gets all four assemblies;
-the repository carries an MIT `LICENSE` and a `README.md`; and the first release is
-`17.0.0` — the major tracking the Umbraco major it targets, and leaving `0.x` being the
-claim that the API has settled. *(It read `0.1.0` while this document was still live: that
+the repository carries an MIT `LICENSE` and a `README.md`; and the first release is `17.0.0`
+— the major tracking the Umbraco major it targets, and leaving `0.x` being the claim that
+the API has settled. *(It read `0.1.0` while this document was still live: that
 was the pre-release number, a claim the package worked rather than that its API had stopped
 moving.)*
 

@@ -19,9 +19,13 @@
   <PropertyGroup>
     <!--
       The major tracks the UMBRACO major this package targets, not uBookIt's own
-      breaking changes — see README.md's versioning note. Every document that states
-      this number is checked against it (VersionTruthTests), so a bump here fails the
-      build until the prose follows.
+      breaking changes — see README.md's versioning note.
+
+      Bumping this alone will FAIL THE TEST SUITE (not the build): VersionTruthTests
+      reads this value and checks it against the documents that state uBookIt's
+      version, so the prose has to follow. It matches those claims by the PHRASINGS it
+      knows rather than by scanning for version-shaped text — a new document inventing a
+      new way to say it is not covered, so add the phrasing there when you add one.
     -->
     <Version>17.0.0</Version>
 
@@ -35,8 +39,25 @@
     <PackageTags>umbraco;umbraco-marketplace;booking;bookings;scheduling;reservations</PackageTags>
 
     <!--
-      Taken from the actual git remote rather than invented. If uBookIt's public home ends up
-      somewhere else when it is published, this is the one place it changes.
+      ============================================================================
+      CORRECT THESE BEFORE THE FIRST PUSH TO A PUBLIC FEED. They are not yet right.
+      ============================================================================
+
+      Both URLs name a PRIVATE Azure DevOps organisation: a consumer following them
+      from nuget.org or the Umbraco Marketplace reaches a sign-in wall, not a
+      repository. The project is moving to a public GitHub home (Chris, 2026-09-14);
+      these were left pointing at the current remote rather than at a guessed URL that
+      does not exist yet.
+
+      Why this is a publish-time gate rather than a merge-time one: nuget.org does not
+      allow a pushed version's metadata to be edited. Getting this wrong is not a
+      commit away from fixed — it costs a version number and leaves the bad listing
+      permanently visible.
+
+      Deliberately not guarded by a test: there is no in-repo signal for "about to
+      publish", and a test asserting these are NOT the Azure URLs would fail today,
+      when they are correctly the Azure URLs. The check that matters is a human one at
+      push time, which is why it is stated here, at the point of use.
     -->
     <PackageProjectUrl>https://dev.azure.com/NorwoodDesignDev/uBookIt</PackageProjectUrl>
     <RepositoryUrl>https://dev.azure.com/NorwoodDesignDev/uBookIt/_git/uBookIt</RepositoryUrl>

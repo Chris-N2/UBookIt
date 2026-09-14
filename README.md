@@ -36,13 +36,13 @@ from Semantic Versioning.** The major is spent on the CMS version, so:
 |---|---|
 | **`17.x.y` → `17.x.z`** (patch) | Never breaks. Fixes and internal changes only. |
 | **`17.x.0` → `17.y.0`** (minor) | New features — and the only place a breaking change may appear. |
-| **`17` → a later major** | A different Umbraco. |
+| **`17` → a later major** | A different Umbraco — and the API may change with it, since the CMS it targets did. |
 
 Breaking changes are avoided: the public interface is kept as consistent as possible, and
 additions are preferred to changes. Where one is genuinely unavoidable it lands in a **minor**
-release, is called out explicitly in the release notes, and ships with sensible defaults or a
-documented upgrade path so a site that already works keeps working. A patch release never
-carries a breaking change.
+release, is called out explicitly rather than left to be discovered, and ships with sensible
+defaults or a documented upgrade path so a site that already works keeps working. A patch
+release never carries a breaking change.
 
 ## Requirements
 
