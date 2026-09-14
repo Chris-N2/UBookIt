@@ -33,13 +33,13 @@
 - [x] 3.2 `DocumentationAssert` guards for the policy sentences a consumer acts on: the
       major is not a breaking-change signal, the SemVer departure, minor-not-patch, and
       the upgrade-path promise.
-- [ ] 3.3 Mutation-check both, against a COMMIT: bump the props version alone → 3.1
+- [x] 3.3 Mutation-check both, against a COMMIT: bump the props version alone → 3.1
       fails naming the stale document; delete a policy sentence → 3.2 fails. Verify each
       mutant DIFFERS before trusting its verdict.
 
 ## 4. The deferred URLs (design D4) — NOT fixed here
 
-- [ ] 4.1 Record, and report to Chris, that `Directory.Build.props`'
+- [x] 4.1 Record, and report to Chris, that `Directory.Build.props`'
       `PackageProjectUrl` / `RepositoryUrl` still name Azure DevOps and MUST be corrected
       before the package is published, once the GitHub URL exists. A blocker on
       publication, not on merge.
@@ -67,3 +67,35 @@
 - [ ] 7.2 Update memory: the versioning note's "open question" (majors for non-LTS
       Umbraco) and the Azure DevOps note, which the GitHub move will stale.
 - [ ] 7.3 Archive; merge after QA approval.
+
+## Records
+
+### 3.3 mutation evidence (at commit `074c126`, tree restored clean after each)
+
+| Mutant | Result |
+|---|---|
+| `<Version>` → `17.1.0`, prose untouched | **Caught** — names README.md and both numbers |
+| README's version claim reworded away (`uBookIt is at ...` removed) | **Caught** — anti-vacuity message says the claim is gone or reworded |
+| "not a breaking-change signal" → "not a release signal" | **Caught** — policy guard names the missing sentence |
+| "documented upgrade path" → "documented upgrade note" | **Caught** — policy guard names the missing sentence |
+
+**One mutant was a no-op and its "pass" proved nothing** — a multi-line PowerShell
+`Replace` against a CRLF file matched nothing, and the test passed because the file was
+unchanged. Caught by printing whether the mutant differed, which is why that check is in
+the loop. ㉞ recorded this lesson; it recurred within one change of being written down.
+
+### 4.1 BLOCKER ON PUBLICATION, not on merge — the repository URLs
+
+`Directory.Build.props` still carries:
+
+- `PackageProjectUrl` → `https://dev.azure.com/NorwoodDesignDev/uBookIt`
+- `RepositoryUrl` → `https://dev.azure.com/NorwoodDesignDev/uBookIt/_git/uBookIt`
+
+Both are **private Azure DevOps URLs**, and the repository is moving to GitHub (Chris,
+2026-09-14). They are deliberately NOT guessed here. **A package pushed to NuGet with
+these uncorrected sends every consumer — and the Umbraco Marketplace listing — to a
+repository they cannot open**, and NuGet.org does not allow a pushed version to be
+edited: correcting it later costs a version number. The file's own comment names this as
+the one place they change.
+
+**Reported to Chris. Must be corrected in the same commit as, or before, the first push.**
