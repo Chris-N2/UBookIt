@@ -55,16 +55,16 @@
 
 ## 6. QA
 
-- [ ] 6.1 QA round(s) — fresh subagent, reused across rounds; report claims for it to
+- [x] 6.1 QA round(s) — fresh subagent, reused across rounds; report claims for it to
       verify rather than trust; treat each round's fixes as new code.
 
 ## 7. Sync + archive (after QA approval)
 
-- [ ] 7.1 Sync the ADDED delta into `openspec/specs/packaging/spec.md`, then the
+- [x] 7.1 Sync the ADDED delta into `openspec/specs/packaging/spec.md`, then the
       falsified-sentence sweep wrap-normalised BY PATTERN over the whole tree — candidates
       to expect: anything saying uBookIt is pre-release, "0.1.0", "1.0.0", "not yet
       published", "the API may still move", or describing the roadmap as unfinished.
-- [ ] 7.2 Update memory: the versioning note's "open question" (majors for non-LTS
+- [x] 7.2 Update memory: the versioning note's "open question" (majors for non-LTS
       Umbraco) and the Azure DevOps note, which the GitHub move will stale.
 - [ ] 7.3 Archive; merge after QA approval.
 
@@ -149,7 +149,7 @@ rather than patching the four named lines.
       may change across an Umbraco major, since the CMS it targets did.
 - [x] R1.8 [NIT] Both version patterns now tolerate wrapping symmetrically; `DeclaredVersion`
       asserts EXACTLY ONE `<Version>` rather than reading the first of several.
-- [ ] R1.9 [NIT, deferred to 7.1 as QA agreed] the "BREAKING (**unpublished**)" phrasings
+- [x] R1.9 [NIT, deferred to 7.1 as QA agreed] the "BREAKING (**unpublished**)" phrasings
       in `BookingModels.cs` and three specs — accurate as history, but that XML comment is
       what a 17.0.0 consumer meets in IntelliSense.
 
@@ -274,6 +274,69 @@ mutant differed. In this one change that trap has now appeared as: a sweep missi
 twice as a mutation that changed nothing (CRLF, then wrapping). **The standing rule is
 not "beware wrapping" — it is that every text-matching instrument, guard and mutation
 tool alike, must be normalised before it is trusted.**
+
+At HEAD: 2698 .NET (1483 + 130 + 1085), 167 client, Release no-incremental 0 warnings,
+21 items strict.
+
+## QA round 4 — APPROVE (2026-09-15), the three take-or-declines, and the sync
+
+QA's verdict on the ladder: it **ended** this round, and its evidence is the right test —
+the documentation now names a case where the guard does nothing and the mutant confirming
+it expects *Passes*. A guard's documentation that predicts its own failure to fire, and is
+right, is the opposite of the fault that had been climbing.
+
+- [x] R4.1 [MINOR, taken] The dead-allowance check was unreachable behind the unclassified
+      assertion — so a dead entry could hide behind an unrelated failure while the remarks
+      called it "impossible to miss". Both lists are now collected and asserted once. The
+      same sentence-stronger-than-mechanism shape, at NIT scale, closed rather than argued
+      with.
+- [x] R4.2 [MINOR, taken] Duplicate `(Document, Accepted)` keys are asserted with a message
+      instead of thrown by `ToDictionary` — irrelevant at one entry, relevant exactly when
+      the list grows at publication.
+- [x] R4.3 [NIT, taken] The generated-TypeScript coupling is stated beside the `*.ts` entry,
+      with the instruction to fix the generator input or exclude the file explicitly if it
+      ever fires — **never by widening the vocabulary**.
+
+## 7.1 Sync — the delta, and the sweep
+
+- The ADDED requirement landed **VERBATIM** in `openspec/specs/packaging/spec.md`
+  (scripted copy, byte-identity asserted). 21 items validate strictly.
+- **Sweep run BY PATTERN, wrap- AND decoration-normalised** — my own fourth-costume rule
+  applied to the sweep's own tooling, since the instrument is as defeatable as the guard.
+  Two passes: the release-framing family, then a second pass aimed at what THIS change
+  actually changed (mvp.md's status, the `0.x` framing, the roadmap prose).
+
+**THE SWEEP'S REAL FINDING, and it is not this change's defect:**
+`roadmap/version_roadmap.md` stated in the **present tense** that the delivery API "is on
+by default" and that `UBookItDeliveryApiComposer` "registers it unconditionally" (:30,
+:71-72). **0.9.0 flipped exactly that** — off by default in both directions, a disabled
+direction absent rather than refused. So the sentence has been false since 0.9.0 merged,
+and **0.9.0's own sync sweep did not catch it**. Fixed here because it is prose in a
+roadmap, not a requirement — no delta, no wholesale replacement, none of the objection
+that correctly stopped the `bookings/spec.md` fix. Two more of the same shape found and
+corrected: "a page that currently only lists times" (falsified by 0.4.0) and "a group
+holding the section grant today has no uBookIt verbs" (falsified by 0.10.0).
+
+**And the structural fix, because three instances means the next one exists too:** the
+roadmap now says in its header that the prose below the table is reasoning from the time
+of writing, that corrections are noted inline where behaviour changed, and that **the
+current truth is the README and the docs, never that file.** A document that describes
+past reasoning cannot be kept true sentence by sentence forever; it can be kept honest
+about what it is.
+
+**Checked and NOT falsified**, with reasons: "frozen by the compatibility promise at the
+first full release" (×5, specs + `.cs`) — timelessly true, and **adding `17.0.0` there
+would create an unguarded version claim in files no version pattern reads, which is the
+opposite of this change's purpose**; `BREAKING (unpublished)` (×4, R1.9) — true history
+and still true, since nothing is published; it goes stale at publication, not now, so it
+belongs to the change that publishes; `docs/mvp.md`'s "(It read `0.1.0` while this
+document was still live)" — deliberate history; `docs/delivery-api.md`'s "flipped before
+the first full release" — true; the `may still` / `is published` families — unrelated
+domain usage.
+
+- [x] 7.2 Memory updated: the `bookings/spec.md` publication claim recorded in
+      deferred-obligations (and in `AcceptedPublicationMentions`, which the archive cannot
+      eat).
 
 At HEAD: 2698 .NET (1483 + 130 + 1085), 167 client, Release no-incremental 0 warnings,
 21 items strict.

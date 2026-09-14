@@ -3,6 +3,12 @@
 How uBookIt got from `0.1.0` (the MVP) to its first full release. **Every row is now
 delivered** — this is the record of that plan, not a list of outstanding work.
 
+> **Read the prose below the table as reasoning from the time it was written**, not as a
+> description of the package today. Each section argued for a version that has since shipped,
+> sometimes shipping something better than the argument anticipated. Where a sentence describes
+> behaviour a later change replaced, the correction is noted inline — but **the current truth
+> is [the README](../README.md) and [the docs](../docs/), never this file.**
+
 **The first release is `17.0.0`, not `1.0.0`** — the major tracks the Umbraco major, as Umbraco
 packages conventionally do, so that the uBookIt for Umbraco 18 is 18.x and nobody has to
 remember which uBookIt went with which CMS.
@@ -27,7 +33,7 @@ the reorder cost nothing.
 | 0.6.0 | Approval and decline | An `AutoConfirm` option **defaulting to on**, so the default is exactly today's behaviour. When off, placement produces `Requested`; an operator confirms or declines from the backoffice, and the booker is told either way through 0.5.0's email path — which already derives its wording from `Booking.Status` in anticipation of exactly this. `Booking.Confirm()` and `Decline()` exist and are tested; the change builds the routes into them. **Slotted before templates deliberately**: approval adds new message types, and the template scheme should be designed against the complete catalogue rather than retrofitted. *(Decided 2026-09-11 — previously "Not yet slotted".)* |
 | 0.7.0 | Email templates — **developer-facing** | A site supplies its own message content as **Razor partials at a convention path**, with an RCL able to supply them too, following Umbraco Forms' shape rather than core's (core has no email templating at all — see below). **Built into this package, not a separate one** (decided 2026-09-11). **Caveat: email HTML is not web HTML** (inline styles, tables, no external stylesheet), so this is a separate rendering path, not a reuse of the theming mechanism. **Editors editing wording in the backoffice is explicitly NOT in this row** — see "Not yet slotted". |
 | 0.8.0 | Resource / service responsibility | Who is responsible for which resource or service, by backoffice user or group — or by groups a site defines itself, as Umbraco Workflow does. **Not permissions: this decides who gets emailed** about what, and supersedes 0.5.0's flat list. Pairs with 0.6.0: who gets emailed about a pending booking is the same question as who must act on it. |
-| 0.9.0 | Control the delivery API's exposure | **Reframed from "throttling"** — see "On the public API" below. Chiefly: let a site turn the delivery API **off**, since it is currently registered on every install whether used or not; document that it is anonymous and belongs behind the host's own rate limiting; and consider a per-caller cap on the expensive availability queries. **API keys are out of scope.** |
+| 0.9.0 | Control the delivery API's exposure | **Reframed from "throttling"** — see "On the public API" below. Chiefly: let a site turn the delivery API **off**, since it was then registered on every install whether used or not; document that it is anonymous and belongs behind the host's own rate limiting; and consider a per-caller cap on the expensive availability queries. **API keys are out of scope.** |
 | 0.10.0 | Permissions model *(gated on a spike)* | Who may create resources and services, who may view and cancel bookings — via Umbraco user groups. **Partly shipped already**: the whole section can be hidden by group today; what is missing is granularity *within* it. **Do a spike first** against the Umbraco source in `ref/` to establish what the backoffice actually permits. If it proves impractical, this waits until after 17.0.0, where it would be purely additive and so allowed by the release policy. The admin-only **settings screen** rides with this. |
 | 17.0.0 | First full release ✅ | **Complete.** Every row above is delivered and the release is prepared and versioned; the compatibility promise applies from this version, and takes public effect when the package reaches a feed. **Policy re-settled 2026-09-14, superseding "adopt Umbraco's own schedule":** a package's changes are far less impactful than a whole CMS's and the install base is far smaller, so uBookIt keeps its own rule — the public interface stays as consistent as possible, and a breaking change, where genuinely required, lands in a **minor** (`17.x.0`) and never a patch, with sensible defaults or an upgrade path. Parallel API versions are deliberately avoided while the product is young. Stated in the README, which also names the departure from SemVer. |
 
@@ -68,12 +74,18 @@ requested range day by day, so a cheap request produces expensive work — far m
 static page. `MaxQueryRangeDays` (default **31**) already caps the worst case per request, which
 is the main lever and it is already in place.
 
-**The cheapest and largest lever is not throttling at all: it is that the delivery API is on by
-default.** `UBookItDeliveryApiComposer` registers it unconditionally, so a site using only the
-Razor front end still exposes anonymous availability and placement endpoints it never asked for
-and gains nothing from. **An opt-out removes the surface entirely** for those sites, which no
+**The cheapest and largest lever is not throttling at all: it is that the delivery API was on by
+default.** `UBookItDeliveryApiComposer` registered it unconditionally, so a site using only the
+Razor front end still exposed anonymous availability and placement endpoints it never asked for
+and gained nothing from. **An opt-out removes the surface entirely** for those sites, which no
 amount of rate limiting can match. That, plus documenting the API as anonymous and expecting the
-host's rate limiter in front of it, is the honest shape of 0.9.0.
+host's rate limiter in front of it, was the honest shape of 0.9.0.
+
+> **What 0.9.0 actually shipped, since the paragraph above is the reasoning that led to it and
+> not a description of the package today.** The API is now **off by default in both
+> directions** (`UBookIt:DeliveryApi:EnableReads` / `EnablePlacement`), and a disabled
+> direction is *absent* rather than refused — the host's own 404, indistinguishable from a
+> route that never existed. See [the delivery API docs](../docs/delivery-api.md).
 
 ## What is already built
 
@@ -106,7 +118,7 @@ with JS disabled, and that is a stated invariant. Fortunately a list of availabl
 Two costs to design around: a 30-day availability query walks the range day by day, which is
 exactly the expense `MaxQueryRangeDays` was added to bound — so the intended window fits inside
 the existing guardrail with a day to spare, but it is real work per render and may want caching.
-And it is a *second* query on a page that currently only lists times.
+And it is a *second* query on a page that, at the time, only listed times.
 
 ## Not yet slotted
 
@@ -211,7 +223,7 @@ cancel both get an email, and decline is the third thing a customer needs tellin
    The section-split fallback below is therefore NOT needed — and the admin-only settings
    screen rides on a verb (e.g. `UBookIt.Settings`) rather than a second section. **The 0.10.0
    proposal's central open decision is upgrade semantics**: a group holding the section grant
-   today has no uBookIt verbs, and existing installs must not lose access on upgrade — so
+   then had no uBookIt verbs, and existing installs must not lose access on upgrade — so
    either a migration seeds the verbs for section-granted groups, or absence of every uBookIt
    verb reads as legacy full access. Decide there, not here.
 
