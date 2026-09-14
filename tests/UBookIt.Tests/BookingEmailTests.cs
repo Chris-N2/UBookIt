@@ -22,15 +22,6 @@ public class BookingEmailTests
 {
     private static readonly Guid ResourceId = Guid.NewGuid();
 
-    /// <summary>
-    /// Any GUID, in the forms a log line renders one. Hex digits collide with short alphabetic
-    /// needles — "Ada" is three of them — so an identifier that is not personal data must be out
-    /// of the haystack before personal data is looked for in it.
-    /// </summary>
-    private static readonly Regex AnyGuid = new(
-        "[0-9a-fA-F]{8}-?[0-9a-fA-F]{4}-?[0-9a-fA-F]{4}-?[0-9a-fA-F]{4}-?[0-9a-fA-F]{12}",
-        RegexOptions.Compiled);
-
     // ---- composing --------------------------------------------------------------------------
 
     [Fact]
@@ -338,7 +329,7 @@ public class BookingEmailTests
         // GUIDs out of the haystack before names are looked for in it — "Ada" is three hex
         // digits, and the reference display is alphanumeric too. Same fix, same reason, as the
         // log-line guard below.
-        var haystack = AnyGuid.Replace(message.Subject + "\n" + message.Body, "{guid}");
+        var haystack = GuidRedaction.WithoutGuids(message.Subject + "\n" + message.Body);
 
         Assert.DoesNotContain("Ada", haystack.Replace(booking.Reference.Display, "{ref}"), StringComparison.OrdinalIgnoreCase);
         Assert.DoesNotContain("Lovelace", haystack, StringComparison.OrdinalIgnoreCase);
@@ -490,7 +481,7 @@ public class BookingEmailTests
             // so a line carrying `claim.ResourceId` is the obvious next addition — and it would
             // reintroduce the collision while looking exactly like a PII leak. Same lesson as the
             // defect this redaction exists to fix, one level up.
-            var haystack = AnyGuid.Replace(entry.Message + " " + entry.Exception, "{guid}");
+            var haystack = GuidRedaction.WithoutGuids(entry.Message + " " + entry.Exception);
 
             Assert.DoesNotContain("Ada", haystack, StringComparison.OrdinalIgnoreCase);
             Assert.DoesNotContain("Lovelace", haystack, StringComparison.OrdinalIgnoreCase);

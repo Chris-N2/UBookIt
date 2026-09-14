@@ -31,15 +31,6 @@ namespace UBookIt.Tests;
 /// </remarks>
 public class BookingTemplateCompositionTests
 {
-    /// <summary>
-    /// Any GUID, in the forms a log line renders one — removed from a haystack before short
-    /// alphabetic needles are looked for in it. See BookingEmailTests for the defect this
-    /// prevents.
-    /// </summary>
-    private static readonly System.Text.RegularExpressions.Regex AnyGuid = new(
-        "[0-9a-fA-F]{8}-?[0-9a-fA-F]{4}-?[0-9a-fA-F]{4}-?[0-9a-fA-F]{4}-?[0-9a-fA-F]{12}",
-        System.Text.RegularExpressions.RegexOptions.Compiled);
-
     /// <summary>Returns whatever the test needs, and records what it was asked for.</summary>
     private sealed class StubRenderer(BookingTemplateResult result) : IBookingTemplateRenderer
     {
@@ -247,7 +238,7 @@ public class BookingTemplateCompositionTests
 
         // And no booker. GUIDs come out of the haystack first — "Ada" is three hex digits, so a
         // random id matches it about 0.7% of the time and this guard would fail at random.
-        var haystack = AnyGuid.Replace($"{entry.Message} {entry.Exception}", "{guid}");
+        var haystack = GuidRedaction.WithoutGuids($"{entry.Message} {entry.Exception}");
 
         Assert.DoesNotContain("Ada", haystack, StringComparison.OrdinalIgnoreCase);
         Assert.DoesNotContain("Lovelace", haystack, StringComparison.OrdinalIgnoreCase);

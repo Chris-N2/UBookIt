@@ -89,8 +89,14 @@ public class EraseBookerEndpointTests
         var result = await Endpoint(
             new ErasingBookingService(DomainResult<Booking>.Success(booking))).EraseBooker(booking.Id);
 
-        var payload = System.Text.Json.JsonSerializer.Serialize(
-            Assert.IsType<OkObjectResult>(result).Value);
+        // The booking id is legitimately in the payload and is a random GUID — 32 hex
+        // digits in which "ada" occurs ~0.7% of the time and "01234" ~1 in 37,000
+        // ("A" and "D" are hex; so are all of 0-4). This guard failed at random for
+        // weeks and was misdiagnosed once as a build race. GUIDs come out of the
+        // haystack, the needles stay granular — see GuidRedaction for the reasoning.
+        var payload = GuidRedaction.WithoutGuids(
+            System.Text.Json.JsonSerializer.Serialize(
+                Assert.IsType<OkObjectResult>(result).Value));
 
         Assert.DoesNotContain("Ada", payload, StringComparison.OrdinalIgnoreCase);
         Assert.DoesNotContain("ada@example.com", payload, StringComparison.OrdinalIgnoreCase);
@@ -133,8 +139,10 @@ public class EraseBookerEndpointTests
 
         Assert.IsNotType<OkObjectResult>(result);
 
-        var payload = System.Text.Json.JsonSerializer.Serialize(
-            Assert.IsType<ObjectResult>(result).Value);
+        // Same redaction as above, same reason.
+        var payload = GuidRedaction.WithoutGuids(
+            System.Text.Json.JsonSerializer.Serialize(
+                Assert.IsType<ObjectResult>(result).Value));
 
         Assert.DoesNotContain("Ada", payload, StringComparison.OrdinalIgnoreCase);
     }

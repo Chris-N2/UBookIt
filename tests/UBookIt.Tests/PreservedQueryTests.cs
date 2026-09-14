@@ -1,5 +1,6 @@
 using System.Reflection;
 using Microsoft.Extensions.Primitives;
+using UBookIt.Tests.Support;
 using UBookIt.Web.Rendering;
 
 namespace UBookIt.Tests;
@@ -105,4 +106,44 @@ public class PreservedQueryTests
             new HashSet<string>(["ubBook", "ubDate", "ubDateOther", "ubMins", "ubWho"]),
             declared);
     }
+
+    // ---- the documentation's load-bearing claims (task 1.8) ----
+
+    private static string BookingPageDocs() => RepoFiles.Read("docs/booking-page.md");
+
+    /// <summary>
+    /// The empty default and the refusal to preserve unknown parameters — the two
+    /// claims a site owner acts on when deciding whether this setting is safe.
+    /// </summary>
+    [Fact]
+    public void The_docs_state_the_empty_default_and_the_bound()
+    {
+        DocumentationAssert.Says(
+            BookingPageDocs(),
+            "The list is empty by default, so nothing changes until you configure it");
+        DocumentationAssert.Says(
+            BookingPageDocs(),
+            "Only listed names are preserved");
+        DocumentationAssert.Says(
+            BookingPageDocs(),
+            "the list you configure is the bound that keeps that safe");
+    }
+
+    /// <summary>The own-keys exclusion, stated where the setting is documented.</summary>
+    [Fact]
+    public void The_docs_state_the_own_key_exclusion()
+        => DocumentationAssert.Says(
+            BookingPageDocs(),
+            "are never preserved through this mechanism, even if you list them");
+
+    /// <summary>
+    /// The honest limit: preservation ends at the post-submission redirect. If the
+    /// redirect is ever taught to carry the parameters, this sentence must change WITH
+    /// it — a doc promising less than the code does is stale, not safe.
+    /// </summary>
+    [Fact]
+    public void The_docs_state_where_preservation_ends()
+        => DocumentationAssert.Says(
+            BookingPageDocs(),
+            "but not the redirect after it");
 }
