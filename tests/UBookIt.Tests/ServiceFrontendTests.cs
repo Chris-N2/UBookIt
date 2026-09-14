@@ -1765,7 +1765,13 @@ public class ServiceFrontendTests
         {
             var source = RepoFiles.Read(controller);
 
-            Assert.Contains("BookingFlowLink.For(", source, StringComparison.Ordinal);
+            // Since QA round 1 of release-readiness-fixes, the ONE entry point is
+            // AfterSubmission — whose preserved parameter is required, so a
+            // controller cannot even compile a call that forgets the tail. For( and
+            // Carrying( are forbidden here so no controller can reach around it.
+            Assert.Contains("BookingFlowLink.AfterSubmission(", source, StringComparison.Ordinal);
+            Assert.DoesNotContain("BookingFlowLink.For(", source, StringComparison.Ordinal);
+            Assert.DoesNotContain("BookingFlowLink.Carrying(", source, StringComparison.Ordinal);
             Assert.DoesNotContain("QueryString.Create(", source, StringComparison.Ordinal);
         }
 

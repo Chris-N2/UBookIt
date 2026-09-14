@@ -169,24 +169,20 @@ public sealed class BookingSurfaceController : SurfaceController
     /// on the floor. Only self-inflicted, but the check is one comparison.
     /// </remarks>
     private IActionResult BackToFlow(BookingSubmission form)
-    {
-        // From the POSTed-to URL's own query (BeginUmbracoForm posts to
-        // PathAndQuery), filtered by the same allow-list the forms render from.
-        var preserved = PreservedQuery.Compute(
-            Request.Query, _frontendSettings.PreservedQueryParameters);
-
-        if (BookingSubject.Agreeing(form.Subject, BookingSubject.Resource(form.ResourceId)) is { } subject)
-        {
-            return RedirectToCurrentUmbracoPage(
-                BookingFlowLink.For(subject, form.Date, form.DurationMinutes, preserved: preserved));
-        }
-
-        // No flow state to carry, but the page's own parameters still survive.
-        // Empty preserved = the exact redirect this branch always produced.
-        return preserved.Count > 0
-            ? RedirectToCurrentUmbracoPage(BookingFlowLink.Carrying(preserved))
+        // The whole decision — branch selection and the preserved tail — lives in
+        // AfterSubmission, where it is unit-tested; what this method adds is only
+        // what genuinely needs the host: the request's query (BeginUmbracoForm
+        // posts to PathAndQuery, so the page's own parameters arrive here) and the
+        // Umbraco redirect itself.
+        => BookingFlowLink.AfterSubmission(
+                BookingSubject.Agreeing(form.Subject, BookingSubject.Resource(form.ResourceId)),
+                form.Date,
+                form.DurationMinutes,
+                chosenResourceId: null,
+                PreservedQuery.Compute(Request.Query, _frontendSettings.PreservedQueryParameters))
+            is { } query
+            ? RedirectToCurrentUmbracoPage(query)
             : RedirectToCurrentUmbracoPage();
-    }
 
     /// <summary>
     /// Post-Redirect-Get with a literal 303 See Other (the spec's required

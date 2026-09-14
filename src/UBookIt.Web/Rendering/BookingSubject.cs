@@ -151,6 +151,36 @@ public static class BookingFlowLink
     public static QueryString Carrying(IReadOnlyList<PreservedQueryPair> preserved)
         => AppendPreserved(QueryString.Empty, preserved);
 
+    /// <summary>
+    /// The whole post-submission redirect decision, as one pure function: with a
+    /// subject, the flow's own state plus the preserved tail; without one, the
+    /// preserved tail alone; with neither, <c>null</c> — meaning "redirect with no
+    /// query at all", which keeps the component-named flow's redirect byte-for-byte
+    /// what it always was on an unconfigured site.
+    /// </summary>
+    /// <remarks>
+    /// Extracted from the controllers at QA round 1's insistence, and the reason is
+    /// worth keeping: the branch selection and the preserved tail lived in a private
+    /// controller method a test could only see as source text, and QA proved the
+    /// suite green with the tail dropped from the branch every normal submission
+    /// takes. As a value-returning function the decision is exercised directly, and
+    /// what remains in each controller is a single expression.
+    /// </remarks>
+    public static QueryString? AfterSubmission(
+        BookingSubject? subject,
+        DateOnly date,
+        int durationMinutes,
+        Guid? chosenResourceId,
+        IReadOnlyList<PreservedQueryPair> preserved)
+    {
+        if (subject is { } chosen)
+        {
+            return For(chosen, date, durationMinutes, chosenResourceId, preserved);
+        }
+
+        return preserved.Count > 0 ? Carrying(preserved) : null;
+    }
+
     // The preserved tail rides here, not at the call sites, so "every query string
     // the controllers produce is built by one vocabulary" stays a property of this
     // class — and so the Location-header rule below can be stated once: preserved

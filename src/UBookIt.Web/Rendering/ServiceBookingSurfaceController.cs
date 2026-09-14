@@ -222,23 +222,17 @@ public sealed class ServiceBookingSurfaceController : SurfaceController
     /// losing the confirmation for a booking that was actually placed.
     /// </remarks>
     private IActionResult BackToFlow(ServiceBookingSubmission form)
-    {
-        // Same as the resource controller's: the POSTed-to URL's own query,
-        // filtered by the allow-list the forms render from.
-        var preserved = PreservedQuery.Compute(
-            Request.Query, _frontendSettings.PreservedQueryParameters);
-
-        if (BookingSubject.Agreeing(form.Subject, BookingSubject.Service(form.ServiceId)) is { } subject)
-        {
-            return RedirectToCurrentUmbracoPage(
-                BookingFlowLink.For(
-                    subject, form.Date, form.DurationMinutes, form.PinnedResourceId, preserved));
-        }
-
-        return preserved.Count > 0
-            ? RedirectToCurrentUmbracoPage(BookingFlowLink.Carrying(preserved))
+        // See BookingSurfaceController.BackToFlow: the decision lives in
+        // AfterSubmission, unit-tested; this adds only the host's two facts.
+        => BookingFlowLink.AfterSubmission(
+                BookingSubject.Agreeing(form.Subject, BookingSubject.Service(form.ServiceId)),
+                form.Date,
+                form.DurationMinutes,
+                form.PinnedResourceId,
+                PreservedQuery.Compute(Request.Query, _frontendSettings.PreservedQueryParameters))
+            is { } query
+            ? RedirectToCurrentUmbracoPage(query)
             : RedirectToCurrentUmbracoPage();
-    }
 
     /// <summary>
     /// Post-Redirect-Get with a literal 303 See Other (the spec's required code).

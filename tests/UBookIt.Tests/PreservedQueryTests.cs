@@ -1,4 +1,6 @@
 using System.Reflection;
+using Microsoft.Extensions.Configuration;
+using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Primitives;
 using UBookIt.Tests.Support;
 using UBookIt.Web.Rendering;
@@ -137,6 +139,17 @@ public class PreservedQueryTests
             "are never preserved through this mechanism, even if you list them");
 
     /// <summary>
+    /// The doc's own-keys list is tied to the DERIVED set (QA round 1's nit): the
+    /// code derives the exclusion from BookingKeys, but the sentence naming the five
+    /// keys was hand-kept, so a sixth key would leave it silently incomplete.
+    /// </summary>
+    [Fact]
+    public void The_docs_name_every_own_key()
+        => Assert.All(
+            PreservedQuery.OwnKeys,
+            key => Assert.Contains($"`{key}`", BookingPageDocs(), StringComparison.Ordinal));
+
+    /// <summary>
     /// The whole-flow claim. This guard's first version pinned the OPPOSITE sentence
     /// ("but not the redirect after it") while the redirect genuinely dropped the
     /// parameters; the redirect was then taught to carry them (Chris, 2026-09-14)
@@ -194,15 +207,73 @@ public class PreservedQueryTests
         Assert.Equal(string.Empty, BookingFlowLink.Carrying([]).ToUriComponent());
     }
 
+    // ---- the whole redirect decision, exercised as a value (QA round 1's MAJOR 2) ----
+    //
+    // The first guard here was source-level and pinned only the subjectless branch's
+    // mechanism: QA deleted the preserved argument from the branch every normal
+    // submission takes and 2684 tests stayed green. The decision now lives in
+    // AfterSubmission and is asserted by OUTPUT, branch by branch; the controllers'
+    // remaining wiring is held by two things — AfterSubmission's preserved parameter
+    // is REQUIRED (a call without it does not compile), and the source guard below
+    // pins that what is passed is computed from the request, not an empty stand-in.
+
+    private static readonly IReadOnlyList<PreservedQueryPair> Tail =
+        [new PreservedQueryPair("utm_source", "newsletter")];
+
+    [Fact]
+    public void A_subject_ful_submission_redirect_carries_flow_state_and_the_tail()
+        => Assert.Equal(
+            BookingFlowLink.For(
+                BookingSubject.Resource(new Guid("00000000-0000-0000-0000-000000000001")),
+                new DateOnly(2026, 9, 15), 60, preserved: Tail).ToUriComponent(),
+            BookingFlowLink.AfterSubmission(
+                BookingSubject.Resource(new Guid("00000000-0000-0000-0000-000000000001")),
+                new DateOnly(2026, 9, 15), 60, chosenResourceId: null, Tail)!.Value.ToUriComponent());
+
+    [Fact]
+    public void The_subject_ful_redirect_still_ends_with_the_tail()
+        // Not implied by the equality above alone: if For() itself lost the tail,
+        // both sides would agree on the wrong answer. This pins the guarantee.
+        => Assert.EndsWith(
+            "&utm_source=newsletter",
+            BookingFlowLink.AfterSubmission(
+                BookingSubject.Service(new Guid("00000000-0000-0000-0000-000000000900")),
+                new DateOnly(2026, 9, 15), 60, chosenResourceId: null, Tail)!.Value.ToUriComponent(),
+            StringComparison.Ordinal);
+
+    [Fact]
+    public void A_component_named_submission_redirect_is_the_tail_alone()
+        => Assert.Equal(
+            "?utm_source=newsletter",
+            BookingFlowLink.AfterSubmission(
+                subject: null, new DateOnly(2026, 9, 15), 60, chosenResourceId: null, Tail)!
+                .Value.ToUriComponent());
+
+    [Fact]
+    public void A_component_named_submission_with_nothing_to_preserve_redirects_with_no_query()
+        // Null, not an empty QueryString: the controller redirects plain, so an
+        // unconfigured site's redirect stays byte-for-byte what it always was.
+        => Assert.Null(BookingFlowLink.AfterSubmission(
+            subject: null, new DateOnly(2026, 9, 15), 60, chosenResourceId: null, []));
+
+    [Fact]
+    public void The_chosen_resource_still_travels_through_the_submission_redirect()
+        => Assert.Contains(
+            "ubWho=00000000-0000-0000-0000-000000000002",
+            BookingFlowLink.AfterSubmission(
+                BookingSubject.Service(new Guid("00000000-0000-0000-0000-000000000900")),
+                new DateOnly(2026, 9, 15), 60,
+                new Guid("00000000-0000-0000-0000-000000000002"), Tail)!.Value.ToUriComponent(),
+            StringComparison.Ordinal);
+
     /// <summary>
-    /// The wiring, since <c>BackToFlow</c> is private and needs an Umbraco host: both
-    /// surface controllers compute the preserved pairs from the request and hand them
-    /// to the one link-building vocabulary. Source-level, like the sibling guard that
-    /// already pins "every query string the controllers produce is BookingFlowLink's"
-    /// — this narrows it to "and the preserved tail rides through it".
+    /// The last unprovable-by-output hop: that each controller passes AfterSubmission
+    /// the pairs COMPUTED FROM THE REQUEST, not an empty stand-in. One regex per
+    /// controller, spanning the call: replacing the Compute argument with <c>[]</c>
+    /// fails it, and the sibling seam guard forbids any other link call.
     /// </summary>
     [Fact]
-    public void Both_surface_controllers_carry_the_preserved_tail_through_the_link()
+    public void Both_controllers_hand_the_computed_pairs_to_the_submission_decision()
     {
         foreach (var controller in new[]
         {
@@ -210,13 +281,57 @@ public class PreservedQueryTests
             "src/UBookIt.Web/Rendering/ServiceBookingSurfaceController.cs",
         })
         {
-            var source = RepoFiles.Read(controller);
-
-            Assert.Contains(
-                "PreservedQuery.Compute(", source, StringComparison.Ordinal);
-            Assert.Contains(
-                "BookingFlowLink.Carrying(preserved)", source, StringComparison.Ordinal);
-            Assert.Contains("preserved", source, StringComparison.Ordinal);
+            Assert.Matches(
+                new System.Text.RegularExpressions.Regex(
+                    @"BookingFlowLink\.AfterSubmission\((?:(?!;).)*?PreservedQuery\.Compute\(Request\.Query",
+                    System.Text.RegularExpressions.RegexOptions.Singleline),
+                RepoFiles.Read(controller));
         }
+    }
+
+    // ---- the composer's registration and binding, by effect (QA round 1's MAJOR 1) ----
+
+    /// <summary>
+    /// QA deleted the <c>AddSingleton(frontendSettings)</c> line and 2684 tests
+    /// stayed green while production would fail every booking render at DI
+    /// resolution. So: compose the REAL composer over a REAL in-memory configuration
+    /// and assert the registered instance by effect — the registration exists, and
+    /// the section key and binder actually delivered the configured names. A typo in
+    /// "UBookIt:Frontend" now fails here instead of silently giving every configured
+    /// site the empty default.
+    /// </summary>
+    [Fact]
+    public void The_rendering_composer_registers_frontend_settings_bound_from_configuration()
+    {
+        var configuration = new ConfigurationBuilder()
+            .AddInMemoryCollection(new Dictionary<string, string?>
+            {
+                ["UBookIt:Frontend:PreservedQueryParameters:0"] = "utm_source",
+                ["UBookIt:Frontend:PreservedQueryParameters:1"] = "culture",
+            })
+            .Build();
+
+        var services = new ServiceCollection();
+        new UBookIt.Web.Composing.UBookItRenderingComposer()
+            .Compose(new ServicesOnlyUmbracoBuilder(services, configuration));
+
+        using var provider = services.BuildServiceProvider();
+        var settings = provider.GetService<UBookIt.Web.FrontendSettings>();
+
+        Assert.NotNull(settings);
+        Assert.Equal(["utm_source", "culture"], settings.PreservedQueryParameters);
+    }
+
+    /// <summary>An absent section binds to the empty default rather than failing resolution.</summary>
+    [Fact]
+    public void An_unconfigured_site_composes_the_empty_default()
+    {
+        var services = new ServiceCollection();
+        new UBookIt.Web.Composing.UBookItRenderingComposer()
+            .Compose(new ServicesOnlyUmbracoBuilder(services, new ConfigurationBuilder().Build()));
+
+        using var provider = services.BuildServiceProvider();
+
+        Assert.Empty(provider.GetRequiredService<UBookIt.Web.FrontendSettings>().PreservedQueryParameters);
     }
 }
