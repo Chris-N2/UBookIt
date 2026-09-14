@@ -273,10 +273,23 @@ public class VersionTruthTests
     /// occurrence must be classified in <see cref="AcceptedPublicationMentions"/>.
     /// </summary>
     /// <remarks>
+    /// <para>
     /// Scoped to the package as the SUBJECT. A bare "is published" is pervasive in this
     /// repository for a value being published on a read model — "a role's count is
     /// published", "the contract is published" — and matching it unscoped would bury a real
     /// claim under twenty legitimate ones.
+    /// </para>
+    /// <para>
+    /// <b>Matched against text with markdown decoration stripped</b>, and that is not a
+    /// nicety. The first version of this scan ran against raw text, so
+    /// <c>`UBookIt.Core` is published</c> — backticked, as this repository quotes every
+    /// identifier — did not match at all: the single entry in
+    /// <see cref="AcceptedPublicationMentions"/> was dead code, and the guard was green for
+    /// the wrong reason while the very claim it was written for sat in a file it walked.
+    /// Found by mutating the allow-list and watching the test PASS when it had to fail —
+    /// a guard is only proven by a mutant that makes it fail for the right reason. Same trap
+    /// as <see cref="DocumentationAssert"/>'s wrapped sentence, third costume this change.
+    /// </para>
     /// </remarks>
     private static readonly string[] PublicationVocabulary =
     [
@@ -335,7 +348,10 @@ public class VersionTruthTests
 
         foreach (var document in LiveDocuments())
         {
-            var text = RepoFiles.Read(document);
+            // Decoration stripped so a backticked or emphasised identifier still reads as
+            // the sentence it is. The version scan above deliberately does NOT do this — it
+            // needs the backticks to delimit the number it captures.
+            var text = Regex.Replace(RepoFiles.Read(document), @"[`*_]", string.Empty);
 
             foreach (var vocabulary in PublicationVocabulary)
             {
