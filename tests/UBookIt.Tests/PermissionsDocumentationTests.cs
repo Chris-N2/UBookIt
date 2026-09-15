@@ -20,11 +20,32 @@ public class PermissionsDocumentationTests
     {
         DocumentationAssert.Says(
             Backoffice(),
-            "Every group that already held the uBookIt section is granted all three automatically, once, at the first start");
+            "held the uBookIt section is granted the first three automatically, once, at the first start");
         DocumentationAssert.Says(Backoffice(), "nobody loses access by upgrading");
         DocumentationAssert.Says(
             Backoffice(),
             "a group whose permissions you later empty stays emptied");
+    }
+
+    /// <summary>
+    /// The OTHER half of the upgrade promise, and the one a site hits first: the settings
+    /// permission is NOT seeded, so after upgrading nobody holds it — not even an Umbraco
+    /// administrator. A site owner who is not told this reads an empty Settings tab as a broken
+    /// feature, and the reason it is withheld (privilege widening during an upgrade) is exactly
+    /// the kind of decision that becomes undocumented magic if nothing pins it.
+    /// </summary>
+    [Fact]
+    public void The_settings_permission_is_stated_as_never_seeded()
+    {
+        DocumentationAssert.Says(
+            Backoffice(),
+            "is never granted automatically");
+        DocumentationAssert.Says(
+            Backoffice(),
+            "not even to Umbraco administrators");
+        DocumentationAssert.Says(
+            Backoffice(),
+            "would widen privilege during an upgrade");
     }
 
     /// <summary>The new-group steady state, stated as the instruction it is.</summary>

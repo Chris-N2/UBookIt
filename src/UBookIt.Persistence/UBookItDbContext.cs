@@ -35,6 +35,8 @@ public sealed class UBookItDbContext(DbContextOptions<UBookItDbContext> options)
 
     internal DbSet<FlagRow> Flags => Set<FlagRow>();
 
+    internal DbSet<SettingRow> Settings => Set<SettingRow>();
+
     /// <summary>
     /// Single place that configures the SQL Server provider (uBookIt requires
     /// SQL Server 2019+) with the package-private migrations history table.
@@ -223,6 +225,17 @@ public sealed class UBookItDbContext(DbContextOptions<UBookItDbContext> options)
             flag.ToTable("uBookItFlag");
             flag.HasKey(f => f.Key);
             flag.Property(f => f.Key).HasMaxLength(128);
+        });
+
+        modelBuilder.Entity<SettingRow>(setting =>
+        {
+            setting.ToTable("uBookItSetting");
+
+            // The configuration key IS the primary key, which is what enforces "at most one row
+            // per key" in the schema rather than in the store's code.
+            setting.HasKey(s => s.Key);
+            setting.Property(s => s.Key).HasMaxLength(256);
+            setting.Property(s => s.Value).HasMaxLength(2048);
         });
     }
 }

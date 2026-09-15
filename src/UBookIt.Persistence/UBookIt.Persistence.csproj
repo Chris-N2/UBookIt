@@ -50,6 +50,12 @@
   </ItemGroup>
 
   <ItemGroup>
+    <!-- The backoffice settings screen resolves the settings twice — once over the effective
+         configuration and once over the site's configuration alone — so it can show what a
+         stored value is overriding. That needs ResolveSettings and EffectiveConfiguration, which
+         stay internal rather than being published: they are a resolution detail, not a contract,
+         and the public surface has been frozen since 17.0.0. -->
+    <InternalsVisibleTo Include="UBookIt.Backoffice" />
     <InternalsVisibleTo Include="UBookIt.Tests" />
     <InternalsVisibleTo Include="UBookIt.Tests.Integration" />
   </ItemGroup>

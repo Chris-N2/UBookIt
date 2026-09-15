@@ -12,6 +12,7 @@
 export const BOOKINGS_READ_VERB = "UBookIt.Bookings.Read";
 export const BOOKINGS_MANAGE_VERB = "UBookIt.Bookings.Manage";
 export const CONFIGURE_VERB = "UBookIt.Configure";
+export const SETTINGS_VERB = "UBookIt.Settings";
 
 /** Whether the fallback-permission set contains any of the given verbs. */
 export function hasAnyVerb(permissions: Array<string> | undefined, ...anyOf: Array<string>): boolean {
@@ -31,4 +32,16 @@ export function canManageBookings(permissions: Array<string> | undefined): boole
 /** Resources, services, and responsibility assignment. */
 export function canConfigure(permissions: Array<string> | undefined): boolean {
   return hasAnyVerb(permissions, CONFIGURE_VERB);
+}
+
+/**
+ * The site's own settings.
+ *
+ * Deliberately satisfied by NOTHING else — not by Configure, which is the verb for adding a
+ * meeting room, while these settings reach the site's retention posture, its anonymous API
+ * exposure and where bookers' details are emailed. The server's policy takes the same single
+ * verb, so the two cannot disagree about it.
+ */
+export function canManageSettings(permissions: Array<string> | undefined): boolean {
+  return hasAnyVerb(permissions, SETTINGS_VERB);
 }

@@ -456,6 +456,59 @@ export default {
     configureLabel: "Configure resources and services",
     configureDescription:
       "Create, edit and delete resources and services, and assign who is responsible for them.",
+    settingsLabel: "Change site settings",
+    settingsDescription:
+      "Change how bookings behave and who is told about them. Separate from configuring resources on purpose, and not granted automatically — tick it for the people who should decide these.",
+  },
+  ubookitSettings: {
+    label: "Settings",
+    intro:
+      "How bookings behave and who is told about them. Some settings are shown here but changed in the site's configuration — those are the ones whose cost of being wrong falls to whoever deploys the site rather than whoever runs the bookings.",
+    notPermitted:
+      "You do not have permission to change uBookIt settings. An administrator can grant it in Users → User Groups → Default permissions, by ticking “Change site settings”. It is not granted automatically, including on upgrade.",
+    loadFailed: "The settings could not be loaded.",
+    saveFailed: "That change could not be saved.",
+    resetFailed: "That setting could not be reset.",
+    reset: "Reset to configured value",
+    notSet: "Not set",
+    requiresRestart: "Changing this in configuration takes effect when the site restarts.",
+    overriddenConfiguredValue: "Overriding the configured value: %0%",
+    overriddenNothingConfigured: "Overriding — the site's configuration sets no value for this.",
+
+    // The tier-2 consequence statement. STATIC and unconditional: true of every site, and it
+    // reads no booking, resource or availability data. Availability rules are stored as
+    // day-and-time with no zone, while bookings are stored as absolute instants — so the
+    // zone changes what rules MEAN while bookings keep the times they were made for.
+    timeZoneConsequence:
+      "Availability rules are wall-clock in the site's time zone. Changing this makes a 9:00–17:00 rule mean 9:00–17:00 in the new zone. Existing bookings keep the actual times they were made for, so some may no longer fall inside their resource's hours. Nothing is rewritten, and setting it back restores what every rule meant.",
+
+    autoConfirmLabel: "Confirm bookings automatically",
+    autoConfirmDescription:
+      "On, bookings are confirmed as they are placed. Off, they arrive as requests for somebody to confirm or decline.",
+    notificationsSendBookerEmailsLabel: "Email the person who booked",
+    notificationsSendBookerEmailsDescription:
+      "Whether the booker is emailed when their booking is placed, confirmed, declined or cancelled.",
+    notificationsInternalRecipientsLabel: "Internal recipients",
+    notificationsInternalRecipientsDescription:
+      "Your own addresses to tell about bookings, separated by commas. Supplying addresses is what turns internal messages on.",
+    privacyPolicyUrlLabel: "Privacy policy link",
+    privacyPolicyUrlDescription:
+      "Linked from the booking form's privacy notice. With none, the notice renders without a link rather than with a broken one.",
+    timeZoneIdLabel: "Time zone",
+    timeZoneIdDescription:
+      "The IANA time zone the site's availability rules are written in, such as Europe/London.",
+    retentionDaysLabel: "Erase booker details after (days)",
+    retentionDaysDescription:
+      "Changed in configuration only. Erasure is irreversible and happens on a timer rather than when you save, so it is deliberately not changed from here.",
+    maxQueryRangeDaysLabel: "Maximum availability query range (days)",
+    maxQueryRangeDaysDescription:
+      "Changed in configuration only. A cost guardrail: too high does not look broken, it just makes the site slower.",
+    deliveryApiEnableReadsLabel: "Delivery API: reads",
+    deliveryApiEnableReadsDescription:
+      "Whether the anonymous read endpoints are served. Changed in configuration only — exposure is decided as the application starts, so a disabled direction is absent rather than refused.",
+    deliveryApiEnablePlacementLabel: "Delivery API: booking placement",
+    deliveryApiEnablePlacementDescription:
+      "Whether anonymous booking placement is served. Changed in configuration only, for the same reason as reads.",
   },
   ubookitResponsibility: {
     headline: "Responsibility",

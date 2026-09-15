@@ -2,6 +2,7 @@ import {
   BOOKINGS_MANAGE_VERB,
   BOOKINGS_READ_VERB,
   CONFIGURE_VERB,
+  SETTINGS_VERB,
 } from "./permission-verbs.js";
 import { UBOOKIT_VERB_CONDITION_ALIAS } from "./verb.condition.js";
 
@@ -13,7 +14,7 @@ export const manifests: Array<UmbExtensionManifest> = [
     js: () => import("./verb.condition.js"),
   },
 
-  // The three permission verbs, surfaced as toggles in the user group editor's
+  // The four permission verbs, surfaced as toggles in the user group editor's
   // Default permissions pane by Umbraco's own extension surface — no custom UI.
   // The verbs are the server's constants verbatim; a server-side guard fails when
   // the two vocabularies disagree.
@@ -51,6 +52,18 @@ export const manifests: Array<UmbExtensionManifest> = [
       verbs: [CONFIGURE_VERB],
       label: "#ubookitPermissions_configureLabel",
       description: "#ubookitPermissions_configureDescription",
+    },
+  },
+  {
+    type: "entityUserPermission",
+    alias: "UBookIt.Permission.Settings",
+    name: "uBookIt Settings Permission",
+    forEntityTypes: ["ubookit"],
+    weight: 270,
+    meta: {
+      verbs: [SETTINGS_VERB],
+      label: "#ubookitPermissions_settingsLabel",
+      description: "#ubookitPermissions_settingsDescription",
     },
   },
   {
@@ -131,6 +144,33 @@ export const manifests: Array<UmbExtensionManifest> = [
         alias: UBOOKIT_VERB_CONDITION_ALIAS,
         oneOf: [BOOKINGS_READ_VERB, BOOKINGS_MANAGE_VERB],
       },
+    ],
+  },
+  {
+    type: "sectionView",
+    alias: "UBookIt.SectionView.Settings",
+    name: "uBookIt Settings Section View",
+    js: () => import("./settings-view.element.js"),
+    // Last. Settings are changed rarely and by fewer people than anything else here, so the
+    // section never opens on them.
+    weight: 60,
+    meta: {
+      label: "#ubookitSettings_label",
+      pathname: "settings",
+      icon: "icon-settings",
+    },
+    conditions: [
+      {
+        alias: "Umb.Condition.SectionAlias",
+        match: "UBookIt.Section",
+      },
+      // DELIBERATELY NOT gated on the settings verb, unlike every other view here.
+      //
+      // The verb is never seeded, so on every upgraded site it starts out held by nobody — and
+      // UBookItVerbHandler has no super-user bypass, so not even an Umbraco administrator has it
+      // until somebody ticks the box. A tab that simply did not appear would read as a feature
+      // that failed to ship. The view itself renders the explanation instead, and the server
+      // refuses the data regardless, so nothing is exposed by showing the tab.
     ],
   },
   {

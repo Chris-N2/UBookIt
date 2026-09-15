@@ -1,5 +1,6 @@
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Configuration;
+using UBookIt.Core.Stores;
 using Microsoft.Extensions.Logging;
 using Umbraco.Cms.Core;
 using Umbraco.Cms.Core.Events;
@@ -17,6 +18,7 @@ internal sealed class RunUBookItMigrations(
     UBookItDbContext dbContext,
     IRuntimeState runtimeState,
     IConfiguration configuration,
+    ISettingsStore settingsStore,
     ILogger<RunUBookItMigrations> logger) : INotificationAsyncHandler<UmbracoApplicationStartedNotification>
 {
     public async Task HandleAsync(UmbracoApplicationStartedNotification notification, CancellationToken cancellationToken)
@@ -26,30 +28,67 @@ internal sealed class RunUBookItMigrations(
             return;
         }
 
-        WarnIfTimeZoneNotConfigured(configuration, logger);
-        ErrorIfRetentionUnreadable(configuration, logger);
-        ErrorIfPrivacyPolicyUrlUnusable(configuration, logger);
-        ErrorIfAutoConfirmUnreadable(configuration, logger);
-
+        // MIGRATIONS FIRST, REPORTS SECOND, and the order is forced rather than tidy.
+        //
+        // The reports must read the EFFECTIVE configuration — the site's configuration with stored
+        // settings composed over it — or a site whose value lives in the store is told nothing
+        // about a malformed one, and a site whose time zone is stored is warned every boot that it
+        // has no time zone while running the stored one. Reading the store means the settings table
+        // has to exist, and on a fresh install it does not until the migration below has run.
         try
         {
             var pending = (await dbContext.Database
                 .GetPendingMigrationsAsync(cancellationToken).ConfigureAwait(false)).ToList();
 
-            if (pending.Count == 0)
+            if (pending.Count > 0)
             {
-                return;
+                await dbContext.Database.MigrateAsync(cancellationToken).ConfigureAwait(false);
+                logger.LogInformation(
+                    "uBookIt applied {Count} database migration(s): {Migrations}", pending.Count, string.Join(", ", pending));
             }
-
-            await dbContext.Database.MigrateAsync(cancellationToken).ConfigureAwait(false);
-            logger.LogInformation(
-                "uBookIt applied {Count} database migration(s): {Migrations}", pending.Count, string.Join(", ", pending));
         }
         catch (Exception ex)
         {
             logger.LogError(ex, "uBookIt database migration failed.");
             throw;
         }
+
+        Report(EffectiveConfigurationOrRaw(), logger);
+    }
+
+    /// <summary>
+    /// The effective configuration, falling back to the site's own if the store cannot be read.
+    /// </summary>
+    /// <remarks>
+    /// The fallback is not defensive clutter: these reports exist to tell a site about a value it
+    /// wrote and is not getting, and refusing to report anything because the store was unreachable
+    /// would silence the message on exactly the boot where something is already wrong. A site whose
+    /// store is unreadable still hears about its configuration file.
+    /// </remarks>
+    internal IConfiguration EffectiveConfigurationOrRaw()
+    {
+        try
+        {
+            return UBookItPersistenceComposer.EffectiveConfiguration(configuration, settingsStore);
+        }
+        catch (Exception exception)
+        {
+            logger.LogWarning(
+                exception,
+                "uBookIt could not read its stored settings while checking configuration at startup. "
+                + "The checks below cover the site's configuration file only.");
+
+            return configuration;
+        }
+    }
+
+    /// <summary>The startup checks, over whichever configuration was resolvable.</summary>
+    internal static void Report(IConfiguration configuration, ILogger logger)
+    {
+        WarnIfTimeZoneNotConfigured(configuration, logger);
+        ErrorIfRetentionUnreadable(configuration, logger);
+        ErrorIfPrivacyPolicyUrlUnusable(configuration, logger);
+        ErrorIfAutoConfirmUnreadable(configuration, logger);
     }
 
     internal static void WarnIfTimeZoneNotConfigured(IConfiguration configuration, ILogger logger)

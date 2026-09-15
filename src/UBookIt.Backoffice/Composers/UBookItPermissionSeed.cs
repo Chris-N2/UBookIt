@@ -25,7 +25,7 @@ public sealed class UBookItPermissionSeedComposer : IComposer
 }
 
 /// <summary>
-/// Grants the three permission verbs, exactly once per installation, to every user group
+/// Grants the three seeded permission verbs, exactly once per installation, to every user group
 /// that holds the uBookIt section and no uBookIt verb — so an installation upgrading to
 /// the permissions model keeps, group for group, exactly the access it had.
 /// </summary>
@@ -63,6 +63,32 @@ internal sealed class UBookItPermissionSeed(
 {
     internal const string FlagKey = "permissions-seed";
 
+    /// <summary>
+    /// The seeded verbs. <b>A CLOSED SET OF THREE, and <see cref="Backoffice.Constants.Verbs.Settings"/>
+    /// is deliberately not among them.</b>
+    /// </summary>
+    /// <remarks>
+    /// <para>
+    /// Adding it here would widen privilege during an upgrade, silently, into exactly the settings
+    /// the verb exists to separate: every group that holds <c>UBookIt.Configure</c> because somebody
+    /// once ticked "may add a meeting room" would gain the site's retention posture, its anonymous
+    /// delivery-API exposure and where bookers' details are emailed.
+    /// </para>
+    /// <para>
+    /// It would also make a FRESHLY INSTALLED site differ from an UPGRADED one. The flag is already
+    /// recorded on every installation that has run this seed, so the seed never runs again there —
+    /// an attempt to seed the settings verb would reach only sites installing for the first time,
+    /// and two otherwise identical sites would disagree about who may change their settings
+    /// depending on which version they happened to install first.
+    /// </para>
+    /// <para>
+    /// So the settings verb is granted only by an administrator, deliberately, in Users → User
+    /// Groups → Default permissions. The section says so rather than merely rendering nothing,
+    /// because <c>UBookItVerbHandler</c> has no super-user bypass: an Umbraco administrator who has
+    /// not ticked it is refused like anyone else, and an unexplained empty section would read as a
+    /// feature that failed to ship.
+    /// </para>
+    /// </remarks>
     private static readonly string[] AllVerbs =
     [
         Backoffice.Constants.Verbs.BookingsRead,

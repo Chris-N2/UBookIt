@@ -60,8 +60,18 @@ public sealed class UBookItPersistenceComposer : IComposer
             shareUmbracoConnection: true);
 
         builder.Services.AddSingleton(TimeProvider.System);
-        builder.Services.AddSingleton(serviceProvider =>
-            ResolveSettings(serviceProvider.GetRequiredService<IConfiguration>()));
+        // SCOPED, not singleton. Until the settings screen existed this was resolved once at
+        // startup and held for the application's lifetime, which is why a change to a setting
+        // needed a restart. A scope now resolves it through the store, so a setting saved in the
+        // backoffice takes effect on the next request.
+        //
+        // The record's shape and every consumer's constructor are untouched — this is a LIFETIME
+        // change, not a signature change, which is what keeps the public surface frozen at 17.0.0
+        // intact while making the value live.
+        builder.Services.AddScoped(serviceProvider => ResolveSettings(
+            EffectiveConfiguration(
+                serviceProvider.GetRequiredService<IConfiguration>(),
+                serviceProvider.GetRequiredService<ISettingsStore>())));
 
         builder.Services.AddScoped<IResourceStore, SqlResourceStore>();
         builder.Services.AddScoped<IResourceManagementStore, SqlResourceManagementStore>();
@@ -102,6 +112,7 @@ public sealed class UBookItPersistenceComposer : IComposer
         builder.Services.AddScoped<BookingMessageComposer>();
         builder.Services.AddScoped<IResponsibilityStore, SqlResponsibilityStore>();
         builder.Services.AddScoped<IFlagStore, SqlFlagStore>();
+        builder.Services.AddScoped<ISettingsStore, SqlSettingsStore>();
         builder.Services.AddScoped<IUmbracoUserDirectory, UmbracoUserDirectory>();
         builder.Services.AddScoped<IResponsibleRecipientResolver, ResponsibleRecipientResolver>();
         builder.AddNotificationAsyncHandler<BookingPlacedNotification, BookingEmailHandler>();
@@ -110,6 +121,52 @@ public sealed class UBookItPersistenceComposer : IComposer
         builder.AddNotificationAsyncHandler<BookingCancelledNotification, BookingEmailHandler>();
 
         builder.AddNotificationAsyncHandler<UmbracoApplicationStartedNotification, RunUBookItMigrations>();
+    }
+
+    /// <summary>
+    /// The site's configuration with the package's stored settings composed over it, so a stored
+    /// value wins and an unstored key falls through.
+    /// </summary>
+    /// <remarks>
+    /// <para>
+    /// <b>This is the whole of the two-source design, and it is deliberately this small.</b> The
+    /// stored settings become a configuration layer rather than a parallel object, so
+    /// <see cref="ResolveSettings"/> and every fallback inside it are untouched and unaware there
+    /// are now two sources. A stored value that cannot be read therefore falls back exactly as a
+    /// configured value that cannot be read does, logging the same error against the same
+    /// setting — because it is the same code reading it.
+    /// </para>
+    /// <para>
+    /// The alternative — a resolver that read the store, parsed values itself and merged typed
+    /// results — would be a second implementation of fallbacks whose asymmetry is load-bearing
+    /// (an unreadable query range becomes a working default; an unreadable retention period
+    /// becomes <i>no retention</i>, because the cost of being wrong is destroying personal data).
+    /// Two implementations of that would drift, and the drift would be silent.
+    /// </para>
+    /// <para>
+    /// The site's whole configuration stack survives underneath: environment variables,
+    /// per-environment files and secret stores are the base layer, exactly as they were. Stored
+    /// values are added last, and the last source wins.
+    /// </para>
+    /// </remarks>
+    internal static IConfiguration EffectiveConfiguration(
+        IConfiguration siteConfiguration, ISettingsStore store)
+    {
+        var stored = store.GetAll();
+
+        if (stored.Count == 0)
+        {
+            // Nothing overridden: the site's own configuration, untouched. A fresh install and an
+            // upgraded one both land here until somebody saves, which is what makes this change
+            // inert until it is used.
+            return siteConfiguration;
+        }
+
+        return new ConfigurationBuilder()
+            .AddConfiguration(siteConfiguration)
+            .AddInMemoryCollection(stored.Select(pair =>
+                new KeyValuePair<string, string?>(pair.Key, pair.Value)))
+            .Build();
     }
 
     /// <summary>

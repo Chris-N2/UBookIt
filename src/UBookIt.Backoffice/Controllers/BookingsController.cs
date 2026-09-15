@@ -320,7 +320,6 @@ public class BookingsController(
     [Authorize(Policy = Constants.SensitiveDataAccessPolicy)]
     [ProducesResponseType<PagedBookingsModel>(StatusCodes.Status200OK)]
     [ProducesResponseType(StatusCodes.Status400BadRequest)]
-    [ProducesResponseType(StatusCodes.Status403Forbidden)]
     public async Task<IActionResult> FindBookingsByBooker(
         [FromBody] FindBookingsByBookerModel request,
         CancellationToken cancellationToken = default)
@@ -397,7 +396,6 @@ public class BookingsController(
     [HttpPost("bookings/{id:guid}/erase-booker")]
     [Authorize(Policy = Constants.SensitiveDataAccessPolicy)]
     [ProducesResponseType<ErasedBookerModel>(StatusCodes.Status200OK)]
-    [ProducesResponseType(StatusCodes.Status403Forbidden)]
     [ProducesResponseType(StatusCodes.Status404NotFound)]
     public async Task<IActionResult> EraseBooker(Guid id, CancellationToken cancellationToken = default)
     {

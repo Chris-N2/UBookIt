@@ -1,3 +1,4 @@
+using System.Text.RegularExpressions;
 using System.Reflection;
 using System.Security.Claims;
 using System.Security.Principal;
@@ -58,6 +59,11 @@ public class PermissionsTests
         ["ServicesController.GetService"] = Constants.VerbPolicies.Configure,
         ["ServicesController.CreateService"] = Constants.VerbPolicies.Configure,
         ["ServicesController.UpdateService"] = Constants.VerbPolicies.Configure,
+
+        // The settings' own verb, never the configuration verb — see Constants.Verbs.Settings.
+        ["SettingsController.GetSettings"] = Constants.VerbPolicies.Settings,
+        ["SettingsController.PutSetting"] = Constants.VerbPolicies.Settings,
+        ["SettingsController.ResetSetting"] = Constants.VerbPolicies.Settings,
         ["ServicesController.DeleteService"] = Constants.VerbPolicies.Configure,
         ["ServicesController.PreviewServiceConfiguration"] = Constants.VerbPolicies.Configure,
         ["ResponsibilityController.GetResourceResponsibility"] = Constants.VerbPolicies.Configure,
@@ -66,12 +72,24 @@ public class PermissionsTests
         ["ResponsibilityController.PutServiceResponsibility"] = Constants.VerbPolicies.Configure,
     };
 
-    private static readonly string[] VerbPolicyNames =
-    [
-        Constants.VerbPolicies.BookingsRead,
-        Constants.VerbPolicies.BookingsManage,
-        Constants.VerbPolicies.Configure,
-    ];
+    /// <summary>
+    /// DERIVED from the constants, never listed. A hand-written list of three quietly stopped
+    /// covering the fourth policy the moment one was added, and the tests that loop over it —
+    /// "no section grants nothing", "the section alone reaches nothing" — would have gone on
+    /// passing while saying nothing about it.
+    /// </summary>
+    private static readonly string[] VerbPolicyNames = typeof(Constants.VerbPolicies)
+        .GetFields(BindingFlags.Public | BindingFlags.Static)
+        .Where(f => f.IsLiteral && f.FieldType == typeof(string))
+        .Select(f => (string)f.GetRawConstantValue()!)
+        .ToArray();
+
+    /// <summary>Every verb the server declares, derived for the same reason.</summary>
+    private static readonly string[] AllVerbs = typeof(Constants.Verbs)
+        .GetFields(BindingFlags.Public | BindingFlags.Static)
+        .Where(f => f.IsLiteral && f.FieldType == typeof(string))
+        .Select(f => (string)f.GetRawConstantValue()!)
+        .ToArray();
 
     /// <summary>
     /// The totality guard: every management action carries exactly one verb policy, and
@@ -134,19 +152,52 @@ public class PermissionsTests
         var module = RepoFiles.Read("src/UBookIt.Backoffice/Client/src/section/permission-verbs.ts");
         var manifest = RepoFiles.Read("src/UBookIt.Backoffice/Client/src/section/manifest.ts");
 
-        // Anchored on the CONSTANT BINDINGS, not mere presence: a comment quoting a verb
-        // string could otherwise mask a typo'd constant (QA round 1's nit).
-        Assert.Contains($"BOOKINGS_READ_VERB = \"{Constants.Verbs.BookingsRead}\"", module, StringComparison.Ordinal);
-        Assert.Contains($"BOOKINGS_MANAGE_VERB = \"{Constants.Verbs.BookingsManage}\"", module, StringComparison.Ordinal);
-        Assert.Contains($"CONFIGURE_VERB = \"{Constants.Verbs.Configure}\"", module, StringComparison.Ordinal);
+        // DERIVED from the server's constants, never listed. This used to name the three verbs
+        // by hand, and a fourth (UBookIt.Settings) walked straight past it — the same
+        // checks-the-mechanism-not-the-guarantee shape this repository keeps paying for. A
+        // hand-written list can only ever guard the verbs somebody remembered to add to it.
+        var serverVerbs = typeof(Constants.Verbs)
+            .GetFields(BindingFlags.Public | BindingFlags.Static)
+            .Where(f => f.IsLiteral && f.FieldType == typeof(string))
+            .Select(f => (CsharpName: f.Name, Value: (string)f.GetRawConstantValue()!))
+            .ToList();
 
-        // The manifest declares exactly three permission entries, one per verb, via the
-        // module's constants (so the manifest cannot drift from the module, and the
-        // module cannot drift from the server without the assertions above failing).
-        Assert.Equal(3, CountOf(manifest, "type: \"entityUserPermission\""));
-        Assert.Contains("verbs: [BOOKINGS_READ_VERB]", manifest, StringComparison.Ordinal);
-        Assert.Contains("verbs: [BOOKINGS_MANAGE_VERB]", manifest, StringComparison.Ordinal);
-        Assert.Contains("verbs: [CONFIGURE_VERB]", manifest, StringComparison.Ordinal);
+        // Both directions: an empty derivation would make every assertion below vacuous.
+        Assert.NotEmpty(serverVerbs);
+        Assert.Contains(serverVerbs, v => v.Value == Constants.Verbs.Configure);
+
+        // And the derivation must see EVERY string member, not only the const ones. A verb
+        // declared `static readonly` rather than `const` would be invisible to this guard and to
+        // the three others derived the same way — all four would go green while ignoring it.
+        var everyStringMember = typeof(Constants.Verbs)
+            .GetFields(BindingFlags.Public | BindingFlags.Static)
+            .Count(f => f.FieldType == typeof(string));
+
+        Assert.Equal(everyStringMember, serverVerbs.Count);
+
+        foreach (var (csharpName, value) in serverVerbs)
+        {
+            // BookingsRead -> BOOKINGS_READ_VERB, Configure -> CONFIGURE_VERB.
+            var tsName = Regex
+                .Replace(csharpName, "(?<!^)([A-Z])", "_$1")
+                .ToUpperInvariant() + "_VERB";
+
+            // Anchored on the CONSTANT BINDING, not mere presence: a comment quoting a verb
+            // string could otherwise mask a typo'd constant (QA round 1's nit).
+            Assert.True(
+                module.Contains($"{tsName} = \"{value}\"", StringComparison.Ordinal),
+                $"The client verb module must bind {tsName} to \"{value}\" — the server declares "
+                + $"{csharpName} and the two vocabularies must be one.");
+
+            Assert.True(
+                manifest.Contains($"verbs: [{tsName}]", StringComparison.Ordinal),
+                $"The manifest must declare an entityUserPermission entry carrying {tsName}, or "
+                + $"the verb \"{value}\" can never be ticked in the group editor.");
+        }
+
+        // One manifest entry per verb and no more, so the manifest cannot drift from the module
+        // and the module cannot drift from the server without the assertions above failing.
+        Assert.Equal(serverVerbs.Count, CountOf(manifest, "type: \"entityUserPermission\""));
     }
 
     // ---- the pipeline, composed for real ----
@@ -180,6 +231,49 @@ public class PermissionsTests
     }
 
     [Fact]
+    public async Task Configure_does_not_reach_the_settings()
+    {
+        // The separation the verb exists for. Configure is "may add a meeting room"; the settings
+        // reach the site's retention posture, its anonymous exposure and where bookers' details go.
+        var user = UserWith(section: true, Constants.Verbs.Configure);
+
+        Assert.True(await AuthorizeAsync(user, Constants.VerbPolicies.Configure));
+        Assert.False(await AuthorizeAsync(user, Constants.VerbPolicies.Settings));
+    }
+
+    [Fact]
+    public async Task Settings_reaches_neither_resources_nor_bookings()
+    {
+        // The other direction. Settings implies nothing — it is not a senior Configure.
+        var user = UserWith(section: true, Constants.Verbs.Settings);
+
+        Assert.True(await AuthorizeAsync(user, Constants.VerbPolicies.Settings));
+        Assert.False(await AuthorizeAsync(user, Constants.VerbPolicies.Configure));
+        Assert.False(await AuthorizeAsync(user, Constants.VerbPolicies.BookingsRead));
+        Assert.False(await AuthorizeAsync(user, Constants.VerbPolicies.BookingsManage));
+    }
+
+    [Fact]
+    public async Task An_administrator_without_the_verb_is_refused()
+    {
+        // UBookItVerbHandler intersects the user's groups' permissions and calls Fail() — there is
+        // NO super-user bypass. So an Umbraco administrator who has not ticked the box is refused
+        // like anybody else, and that is why the section has to explain its own empty state rather
+        // than simply render nothing.
+        // Umbraco's administrator IS a group alias, so this is a real administrator: a member of
+        // the built-in admin group, holding every uBookIt verb the seed ever grants.
+        var admin = UserWith(section: true, Constants.Verbs.Configure);
+        admin.AddGroup(Group(
+            99,
+            sections: [Constants.SectionAlias],
+            verbs: [Constants.Verbs.BookingsRead, Constants.Verbs.BookingsManage, Constants.Verbs.Configure],
+            alias: Umbraco.Cms.Core.Constants.Security.AdminGroupAlias));
+
+        Assert.True(await AuthorizeAsync(admin, Constants.VerbPolicies.Configure));
+        Assert.False(await AuthorizeAsync(admin, Constants.VerbPolicies.Settings));
+    }
+
+    [Fact]
     public async Task Verbs_union_across_groups()
     {
         var user = UserWith(section: true);
@@ -195,8 +289,19 @@ public class PermissionsTests
     [Fact]
     public async Task Verbs_without_the_section_grant_nothing()
     {
-        var user = UserWith(section: false,
-            Constants.Verbs.BookingsRead, Constants.Verbs.BookingsManage, Constants.Verbs.Configure);
+        var user = UserWith(section: false, AllVerbs);
+
+        // Both directions on the derivation: an empty set would make this loop assert nothing.
+        Assert.NotEmpty(VerbPolicyNames);
+        Assert.Contains(Constants.VerbPolicies.Settings, VerbPolicyNames);
+
+        // Completeness, as for the verbs: a policy declared `static readonly` rather than `const`
+        // would be invisible to the derivation and this loop would assert nothing about it.
+        Assert.Equal(
+            typeof(Constants.VerbPolicies)
+                .GetFields(BindingFlags.Public | BindingFlags.Static)
+                .Count(f => f.FieldType == typeof(string)),
+            VerbPolicyNames.Length);
 
         foreach (var policy in VerbPolicyNames)
         {
@@ -304,7 +409,8 @@ public class PermissionsTests
         return user;
     }
 
-    private static ReadOnlyUserGroup Group(int id, string[] sections, string[] verbs)
+    private static ReadOnlyUserGroup Group(
+        int id, string[] sections, string[] verbs, string? alias = null)
         => new(
             id,
             Guid.NewGuid(),
@@ -313,7 +419,7 @@ public class PermissionsTests
             "icon-users",
             startContentId: null,
             startMediaId: null,
-            alias: $"group{id}",
+            alias: alias ?? $"group{id}",
             allowedLanguages: [],
             allowedSections: sections,
             permissions: new HashSet<string>(verbs),
