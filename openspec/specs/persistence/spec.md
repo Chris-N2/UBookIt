@@ -233,7 +233,24 @@ The type-filtered resource listing SHALL be a single query filtered on the resou
 - **THEN** it fails with `reference-taken` and no booking or claim row from the attempt exists
 
 ### Requirement: Package composition registers persistence and Core services
-An Umbraco composer in `UBookIt.Persistence` SHALL register: the DbContext via Umbraco's EF Core integration (using the site's Umbraco connection string), the two store implementations, `TimeProvider.System`, `IAvailabilityQueryService`, `IBookingService`, `SiteBookingSettings` bound from the `UBookIt` configuration section, and **the retention background job**. When `UBookIt:TimeZoneId` is absent, the settings SHALL default to `UTC` and a warning SHALL be logged at startup.
+
+An Umbraco composer in `UBookIt.Persistence` SHALL register: the DbContext via Umbraco's EF Core
+integration (using the site's Umbraco connection string), the two store implementations,
+`TimeProvider.System`, `IAvailabilityQueryService`, `IBookingService`, the settings store,
+`SiteBookingSettings`, and **the retention background job**. When no `UBookIt:TimeZoneId` value is
+available from any source, the settings SHALL default to `UTC` and a warning SHALL be logged at
+startup.
+
+**`SiteBookingSettings` SHALL be resolved per scope rather than once at startup**, from the site's
+configuration with the package's stored settings composed over it. This replaces a registration that
+read the configuration once and held the result for the application's lifetime, so that a setting
+changed through the backoffice takes effect without a restart. The record's shape and every
+consumer's constructor are unchanged; only the registered lifetime and the source are.
+
+**The stored settings SHALL be composed as a configuration layer beneath the existing resolution,
+not resolved separately.** Every fallback below SHALL therefore apply identically to a stored value
+and a configured one, from a single implementation — because two implementations of rules this
+carefully asymmetric would drift, and the drift would be silent.
 
 **The retention job SHALL be registered whether or not retention is configured**, and SHALL do
 nothing when it is not. Registering it conditionally would make the setting's effect depend on
@@ -263,7 +280,10 @@ setting's meaning.
 **The job SHALL obtain the scoped services it needs per unit of work**, rather than holding them.
 Umbraco's background jobs are singletons resolved from the root container while the package's
 stores, services and DbContext are scoped; a singleton capturing a scoped dependency would hold
-one DbContext for the life of the application.
+one DbContext for the life of the application. **`SiteBookingSettings` is now among the scoped
+services this forbids the job to hold**, and the guard enforcing it SHALL determine what is scoped
+from the container's own registrations rather than from a fixed list of type names — a list cannot
+see a type whose lifetime changed after the list was written, which is exactly what happens here.
 
 **A configured privacy policy link that cannot be used as a link SHALL be treated as absent**, and
 reported at startup, rather than carried through to a public page. It is resolved on the same
@@ -278,7 +298,7 @@ capability, which owns the meaning of the setting.
 - **THEN** `IBookingService` and `IAvailabilityQueryService` are resolvable from the container and the uBookIt tables exist
 
 #### Scenario: Missing time zone setting defaults safely
-- **WHEN** the site configuration has no `UBookIt:TimeZoneId` value
+- **WHEN** neither the site configuration nor the store carries a `UBookIt:TimeZoneId` value
 - **THEN** `SiteBookingSettings.TimeZoneId` is `UTC` and a warning is logged
 
 #### Scenario: The retention job is registered
@@ -286,36 +306,48 @@ capability, which owns the meaning of the setting.
 - **THEN** the retention job is registered as scheduled background work, whether or not a retention period is configured
 
 #### Scenario: A malformed retention period does not become a default
-- **WHEN** the site configuration carries a retention period that cannot be read as a positive whole number of days
+- **WHEN** a retention period that cannot be read as a positive whole number of days is in effect from either source
 - **THEN** the settings report no retention period, no default is substituted, and an error is logged identifying the setting
 
 #### Scenario: An absent retention period is silent
-- **WHEN** the site configuration carries no retention period
+- **WHEN** neither source carries a retention period
 - **THEN** the settings report no retention period and nothing is logged about it
 
 #### Scenario: An absent AutoConfirm setting is on and silent
-- **WHEN** the site configuration carries no `UBookIt:AutoConfirm` value
+- **WHEN** neither source carries a `UBookIt:AutoConfirm` value
 - **THEN** the settings report auto-confirm on and nothing is logged about it
 
 #### Scenario: A malformed AutoConfirm value resolves to on and is reported
-- **WHEN** the site configuration carries an `UBookIt:AutoConfirm` value that cannot be read as a boolean
+- **WHEN** a `UBookIt:AutoConfirm` value that cannot be read as a boolean is in effect from either source
 - **THEN** the settings report auto-confirm on and an error is logged identifying the setting
 
 #### Scenario: An explicit off is honoured
-- **WHEN** the site configuration carries `UBookIt:AutoConfirm` readable as false
+- **WHEN** a `UBookIt:AutoConfirm` value readable as false is in effect from either source
 - **THEN** the settings report auto-confirm off
 
 #### Scenario: The job does not capture a scoped dependency
-- **WHEN** the retention job's construction is inspected
-- **THEN** it holds no scoped service, and obtains the ones it needs within a scope it creates per unit of work
+- **WHEN** the retention job's construction is inspected against the container's registrations
+- **THEN** it holds no service registered as scoped, including `SiteBookingSettings`, and obtains the ones it needs within a scope it creates per unit of work
+
+#### Scenario: The captive-dependency guard fails when the job captures one
+- **WHEN** the retention job is given a constructor parameter whose service is registered as scoped
+- **THEN** the guard fails, whether or not that type was known when the guard was written
 
 #### Scenario: An unusable privacy policy link does not reach a page
-- **WHEN** the site configuration carries a privacy policy link that cannot be used as a link
+- **WHEN** a privacy policy link that cannot be used as a link is in effect from either source
 - **THEN** the settings report no policy link, an error is logged identifying the setting, and no link is rendered
 
 #### Scenario: An absent privacy policy link is silent
-- **WHEN** the site configuration carries no privacy policy link
+- **WHEN** neither source carries a privacy policy link
 - **THEN** the settings report none and nothing is logged about it
+
+#### Scenario: The settings are resolved per scope
+- **WHEN** `SiteBookingSettings` is resolved in two separate scopes with a stored value changed between them
+- **THEN** the second scope sees the new value, without the application having restarted
+
+#### Scenario: A stored value and a configured value take the same path
+- **WHEN** the same unreadable text is supplied once as a configured value and once as a stored value
+- **THEN** the setting resolves identically and reports identically in both cases
 
 ### Requirement: Integration test coverage on real SQL Server
 Integration tests SHALL run against a real SQL Server instance (connection from the `UBOOKIT_TEST_DB` environment variable, defaulting to LocalDB), creating and dropping a uniquely named database per run. They SHALL cover: migration application and idempotency, resource and booking round-trip fidelity, half-open overlap at the SQL layer, status-change persistence, and the concurrency proof. When no SQL Server is reachable the tests SHALL skip with an explicit diagnostic, never silently pass.
@@ -504,3 +536,35 @@ over a partial earlier run, and that burden lies with the operation, not the tab
 
 - **WHEN** a one-shot operation starts on an installation whose flag is absent
 - **THEN** the operation runs, and the flag exists afterwards only if it fully succeeded
+
+### Requirement: Stored settings are held in their own additive table
+
+The package SHALL store overridden settings in a table of its own, created by an additive migration
+that alters and drops nothing.
+
+Each row SHALL hold one setting's key, exactly as the configuration spells it, and its value as
+text — the same text a configuration source would supply. **There SHALL be at most one row per
+key, and a key with no row SHALL be the representation of "not overridden".**
+
+**No booker's personal data SHALL reach this table, and nothing in it SHALL be subject to
+erasure.** The narrower claim is the honest one: the recipient list a site stores here is its own
+staff distribution list, which is personal data about staff, and a requirement saying "nothing here
+is personal data" would be contradicted by a setting the screen deliberately offers. What is
+guaranteed is that no booker's details reach it — the key side is a closed vocabulary of the
+package's own setting names and the server refuses anything outside it, so no caller can invent a
+key naming a person.
+
+Removing every row SHALL restore the package's behaviour from before the table existed, without a
+schema change.
+
+#### Scenario: The migration adds and does not alter
+- **WHEN** the migration runs against a database from the previous version
+- **THEN** the settings table exists and no existing table, column or index has been altered or dropped
+
+#### Scenario: A fresh install resolves from configuration alone
+- **WHEN** the package starts with an empty settings table
+- **THEN** every setting resolves from the site's configuration exactly as it did before this version
+
+#### Scenario: One row per key
+- **WHEN** a setting already holding a stored value is stored again
+- **THEN** the table holds one row for that key, carrying the new value
