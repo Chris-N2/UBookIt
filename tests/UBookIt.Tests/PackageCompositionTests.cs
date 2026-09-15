@@ -234,6 +234,7 @@ public class PackageCompositionTests(PackedSolutionFixture fixture)
     [InlineData("projectUrl")]
     [InlineData("license")]
     [InlineData("readme")]
+    [InlineData("icon")]
     public void No_package_leaves_its_metadata_unsaid(string element)
     {
         foreach (var package in Packed.Packages)
@@ -241,6 +242,45 @@ public class PackageCompositionTests(PackedSolutionFixture fixture)
             Assert.False(
                 string.IsNullOrWhiteSpace(package.Value(element)),
                 $"{package.Id} has no <{element}> in its nuspec.");
+        }
+    }
+
+    /// <summary>
+    /// A nuspec element naming an embedded file is worth nothing unless the file is in the
+    /// package with it.
+    /// </summary>
+    /// <remarks>
+    /// <c>readme</c> and <c>icon</c> both name a path INSIDE the package, and both are put
+    /// there by a separate <c>None ... Pack="true"</c> item. Those are two declarations that
+    /// have to agree, and nothing in the build makes them: MSBuild will happily emit a nuspec
+    /// declaring <c>icon.png</c> while the ItemGroup meant to carry it is conditioned out, and
+    /// report success. nuget.org then renders a blank.
+    /// <para>
+    /// Both are checked, not just the one that prompted this, because on this project the
+    /// instance is never the class — a guard written for the icon alone would have left the
+    /// readme's identical failure mode unwatched.
+    /// </para>
+    /// </remarks>
+    [Theory]
+    [InlineData("readme")]
+    [InlineData("icon")]
+    public void Every_package_contains_the_metadata_file_it_declares(string element)
+    {
+        foreach (var package in Packed.Packages)
+        {
+            var declared = package.Value(element);
+
+            Assert.False(
+                string.IsNullOrWhiteSpace(declared),
+                $"{package.Id} declares no <{element}>.");
+
+            var path = declared.Replace('\\', '/');
+
+            Assert.True(
+                package.Entries.Contains(path),
+                $"{package.Id}'s nuspec declares <{element}>{declared}</{element}>, but the "
+                + $"package does not contain '{path}'. It contains: "
+                + string.Join(", ", package.Entries));
         }
     }
 

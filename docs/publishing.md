@@ -1,7 +1,8 @@
 # Publishing uBookIt
 
 Maintainer-facing. Everything here exists because **a first publish has one-way doors**: the
-mistakes below cost a version number rather than a commit.
+mistakes below cost a version number rather than a commit. It is written for EVERY push, not
+only the first: `17.0.0` is already out, and all of it applies unchanged to the next release.
 
 ## What nuget.org will not let you undo
 
@@ -10,8 +11,11 @@ mistakes below cost a version number rather than a commit.
   copyright are named explicitly because they have been wrong in this repository before, and
   a list that omits them is how that goes unnoticed. A wrong URL is fixed by publishing a *new
   version*, and the wrong one stays visible on the version history forever.
-- **A version number cannot be reused**, even after unlisting. uBookIt is at `17.0.0`, and
-  that number is spent the moment it is pushed, successfully or not.
+- **A version number cannot be reused**, even after unlisting. uBookIt is at `17.0.1`, and
+  that number is spent the moment it is pushed, successfully or not. This is no longer
+  hypothetical: `17.0.0` was published on 2026-09-15 carrying a readme whose documentation links
+  were relative, every one of them resolved against nuget.org rather than the repository, and
+  none of it could be corrected in place. `17.0.1` exists because of it.
 - **Unlisting is not deletion.** An unlisted package stays resolvable by exact version, so
   anything published by mistake remains installable by anyone who knows the number.
 
@@ -19,14 +23,65 @@ The practical consequence: **check the produced `.nuspec`, not the source, befor
 
 ## Status
 
-**uBookIt has not been pushed to nuget.org.** This line is the publication status
-`openspec/config.yaml` points at. It is deliberately phrased so the feed-arrival guard counts
-it: changing it at publication changes the count, which trips
-`No_document_claims_the_package_has_reached_a_feed` and hands you the checklist of every
-other sentence that needs revisiting. That is the mechanism this document recommends to its
-reader, applied to itself.
+**uBookIt reached nuget.org on 2026-09-15; the first release is `17.0.0`.** All five packages are
+indexed and restorable.
 
-## Before the first push
+**That sentence is phrased so two guards can see it, and both halves are deliberate.** It names
+**nuget.org**, so `Every_mention_of_the_feed_is_accounted_for` counts it and removing the feed's
+name leaves an unconsumed allowance that fails. It states the version in the *first release*
+phrasing, so `The_documented_anchors_do_not_move` pins that number against
+`openspec/changes/archive/` — the version here cannot be edited into a release that never happened.
+
+**It lost the first of those properties once, in the change that wrote it.** The original said
+*"uBookIt `17.0.0` was published on 2026-09-15"*, which names no feed and matches nothing in the
+guard's vocabulary — leaving this the one sentence in the repository that could say anything at all
+about a package feed with nothing reacting. QA proved it by editing it to claim a version that does
+not exist, on a date years away, with the whole suite green. **A sentence whose entire job is to be
+watched has to be written so the watcher can see it**, and "it is watched" is a claim to verify by
+mutation rather than assert in prose.
+
+**What is NOT machine-checked here — named in full, because naming one exemption implies the rest
+is covered:**
+
+- **The date.** Nothing derives it.
+- **The polarity of every sentence in this section.** The pins are substring matches, and a
+  substring match cannot see a negation: inserting a "not" into the status claim above satisfies
+  every guard exactly as well as the true sentence does. QA proved it, with that negation and with
+  a count inflated to fifty packages "indexed but not restorable" — both pass green.
+
+  *(The proof is described rather than quoted, deliberately. An earlier draft reproduced the
+  falsified sentence verbatim, which duplicated the pinned phrase — and a pinned phrase quoted
+  twice pins nothing, because any one occurrence satisfies it. `DocumentationAssert.SaysOnce`
+  now enforces that; the sentence you are reading is why it exists.)*
+- **The count and the indexing claim.** "All five packages are indexed and restorable" is derived
+  from nothing.
+
+So the guards keep this section *visible* and keep the version *honest*; they do not make it true.
+**Only the feed can do that** — `GET https://api.nuget.org/v3-flatcontainer/<id>/index.json`, per
+package. Anyone editing this section should re-read it against that, not against a green suite.
+
+When this status changed at publication it tripped the accounting guard, which handed over the list
+of sentences to revisit — this document, plus one in `openspec/specs/bookings/spec.md` that had been
+waiting to become true and now is. Each was judged individually and either rewritten or admitted to
+the allow-list with its own reason and count. **The guard was not relaxed to make the failure go
+away** — that failure was the deliverable.
+
+A second guard went red that nobody had predicted: a sentence pinned in this file was written in
+the future tense about publication, and publication happening made it read as a prediction about
+the past. The guarantee survived the rewording; the wording did not. **Expect pinned prose to
+expire at the events it describes.**
+
+**What is still outstanding**, stated here so this section cannot be read as "everything is done":
+
+- **There is no CI, anywhere.** Nothing builds or tests this repository except a maintainer's
+  machine, and nothing prevents an untested push.
+- **No Trusted Publishing.** Pushes use an API key, which nuget.org now caps at 30 days.
+- **Not submitted to the Umbraco Marketplace.** The package carries the `umbraco-marketplace` tag
+  the listing is picked up from, but the submission has not been made.
+- **The packages are owned by a personal account**, not by the organisation — see the key
+  ownership note under *Pushing*.
+
+## Before any push
 
 1. **The URLs must be the public ones.** `Directory.Build.props` carries
    `PackageProjectUrl` and `RepositoryUrl`; `VersionTruthTests.The_package_points_at_a_public_home`
@@ -58,7 +113,7 @@ repository they cannot open.
 1. correct the properties        (committed AND PUSHED - see the SHA section below)
 2. switch the git remote         git remote set-url origin <public URL>
 3. DELETE the old artifacts      dotnet clean UBookIt.slnx -c Release
-                                 rm -rf src/*/bin/Release
+                                 Remove-Item -Recurse -Force src/*/bin/Release
 4. clean rebuild                 dotnet build UBookIt.slnx -c Release --no-incremental
 5. pack                          dotnet pack UBookIt.slnx -c Release
 6. VERIFY before pushing         (below)
@@ -73,13 +128,29 @@ prevent, hiding inside its own instructions.
 
 ### Verify, do not assume
 
-```bash
-# the packed metadata a consumer sees
-unzip -p src/UBookIt/bin/Release/UBookIt.*.nupkg UBookIt.nuspec | grep -iE "projectUrl|repository|license|authors|copyright"
+```powershell
+# The packed metadata a consumer sees. A .nupkg is a zip; PowerShell reads one without unzip.
+Add-Type -AssemblyName System.IO.Compression.FileSystem
 
-# where a debugger will be sent for source
-cat src/UBookIt.Core/obj/Release/net10.0/UBookIt.Core.sourcelink.json
+# More than one match here IS the stale-artifact defect Step 3 exists for - a .nupkg from an
+# earlier version surviving the rebuild - so say so rather than failing with a null reference.
+$found = @(Get-ChildItem src/UBookIt/bin/Release/UBookIt.*.nupkg)
+if ($found.Count -ne 1) { throw "Expected exactly one .nupkg, found $($found.Count): $($found.Name -join ', '). Delete them and repack (Step 3)." }
+
+$pkg = [IO.Compression.ZipFile]::OpenRead($found[0].FullName)
+$reader = New-Object IO.StreamReader ($pkg.GetEntry('UBookIt.nuspec').Open())
+$reader.ReadToEnd() -split "`n" |
+  Select-String -Pattern 'projectUrl|repository|license|authors|copyright|icon|readme|version'
+$pkg.Dispose()
+
+# Where a debugger will be sent for source
+Get-Content src/UBookIt.Core/obj/Release/net10.0/UBookIt.Core.sourcelink.json
 ```
+
+**`icon` and `readme` are in that pattern deliberately.** Each names a file that must also BE in
+the package; the build never compares the declaration against the item that packs the file, and
+both are frozen at push. A declaration pointing at nothing renders as a blank on nuget.org for the
+life of that version.
 
 **Each package carries its own metadata, so check all five** — the commands above read one as
 an example. (Five `.nupkg`, but only four `.snupkg`/`sourcelink.json`: the `UBookIt`
@@ -112,37 +183,99 @@ git branch -r --contains HEAD            # must list origin/main
 
 ## Pushing
 
-An API key from nuget.org (Account → API Keys), scoped to push, then for each package:
+You need an API key from nuget.org. The route there is not obvious any more: **Account → API Keys
+now lands on Trusted Publishing**, and the API-key form is behind a link on that page.
 
-```bash
-dotnet nuget push "src/**/bin/Release/*.nupkg" \
-  --api-key <key> --source https://api.nuget.org/v3/index.json --skip-duplicate
+One command pushes everything. It is written for PowerShell, which is the shell this project is
+driven from — **do not carry a trailing `\` over onto a second line**, that is bash syntax and
+PowerShell will treat the two lines as two commands:
+
+```powershell
+dotnet nuget push "src/**/bin/Release/*.nupkg" --api-key <key> --source https://api.nuget.org/v3/index.json --skip-duplicate
 ```
 
+There is **no `dotnet nuget setapikey`**. That command belongs to `nuget.exe`, which the .NET SDK
+does not install, so the key goes on the command line. To keep it out of PSReadLine history, read
+it into a variable first with `Read-Host` and pass the variable.
+
 The `.snupkg` symbol packages are pushed by the same command alongside their `.nupkg`.
+
+### A 403 usually means the key's OWNER, not the key
+
+`403 (The specified API key is invalid, has expired, or does not have permission to access the
+specified package.)` is one message covering several conditions, and it names only the key — which
+sends you to check the thing that is least likely to be wrong. This cost the first publish attempt.
+In the order worth checking:
+
+1. **Can the key's owner publish at all?** A key can be owned by your account or by a nuget.org
+   **organization**, and an organization has its own email address that must be confirmed
+   separately from yours. nuget.org requires that address to be distinct from any member
+   account's, so giving the organization the address you already use leaves it permanently
+   unconfirmed — and a key owned by it returns exactly this 403. **The fastest way to isolate
+   this is a second key owned by your personal account**: if that works, the key was never the
+   problem.
+2. **Is the scope "push new packages and package versions"?** The narrower *push only new versions
+   of existing packages* cannot create an ID that does not exist yet, so a first publish fails on
+   every package.
+3. **Is the package ID already owned by somebody else?** `GET https://api.nuget.org/v3-flatcontainer/<id>/index.json`
+   returning 404 means the ID is unclaimed.
+
+Ownership is **not** a reason to delay a push: a package can be transferred to an organization
+afterwards from its Manage Owners page, and owners can be added and removed freely. Unlike the
+metadata, ownership is not a one-way door.
+
+### After the push
+
+A push that succeeds does not mean a package anyone can install yet. Three states follow:
+**accepted**, then **validating** (malware and signature checks), then **indexed**. Throughout the
+first two the package page presents as unlisted and `dotnet add package` cannot find it — that is
+normal and needs no action. Nothing here is a flag you set; there is no "push as unlisted" option.
+
+The signal that restore will actually work is the flat-container endpoint, which is what restore
+itself reads:
+
+```powershell
+curl https://api.nuget.org/v3-flatcontainer/ubookit/index.json
+```
+
+Search on the website lags further behind still. If an hour passes with no progress, check the
+package page and your email — nuget.org reports a validation failure by mail.
 
 The wildcard resolves alphabetically, so it pushes the `UBookIt` meta-package FIRST, before the
 libraries it depends on. That is harmless — nuget.org validates each package independently and
 does not require a dependency to exist at push time — but if you push them individually, push
 the libraries first so the meta-package is never briefly uninstallable.
 
-**Expect a delay**: indexing and validation take minutes, and the Umbraco Marketplace picks the
-package up separately via the `umbraco-marketplace` tag it already carries.
+The Umbraco Marketplace picks the package up separately, via the `umbraco-marketplace` tag it
+already carries, on its own schedule.
 
-## The guard that is SUPPOSED to fail when you publish
+## The guard that failed when we published — and what it guards now
 
-`VersionTruthTests.No_document_claims_the_package_has_reached_a_feed` scans the documents it
-walks for a fixed vocabulary of feed-arrival phrasings and requires every hit to be classified.
-It is not a proof that no document anywhere makes the claim — a wording outside that vocabulary
-passes, as its own remarks state — but it turns the claims it does know about into a list you
-must work through.
+`VersionTruthTests.Every_mention_of_the_feed_is_accounted_for` scans the documents it walks for a
+fixed vocabulary of feed phrasings and requires every hit to be registered in
+`AcceptedPublicationMentions` with a reason and an exact occurrence count. It is not a proof that
+no document anywhere makes a claim — a wording outside that vocabulary passes, as its own remarks
+state — but it turns the mentions it does know about into a list somebody has to work through.
 
-**When you publish, that guard will start failing. Do not delete it.** It is an allow-list:
-`AcceptedPublicationMentions` absorbs claims that become true, one at a time, each with a reason
-and an occurrence count. The failure is the checklist of every sentence that needs revisiting
-now the package is public — which is exactly what you want at that moment. `openspec/specs/bookings/spec.md`
-already carries one such sentence, waiting.
+**A guard that goes red at publication is doing its job. Do not delete it.** The cheapest way to
+make one of these pass is always to remove it, and that trades the only thing watching a set of
+sentences for a green run. Work the list instead; the red is the checklist.
 
-The pre-release framing guards are different and will **not** go red: they assert that certain
-sentences are ABSENT, and publishing does not bring them back. Only the feed-arrival guard above
-is designed to fail at this moment.
+That is not hypothetical advice inherited from before the first release — it is what happened. Before
+`17.0.0` shipped, it asserted an ABSENCE: no document may say the package is on a feed, because it
+was not. That premise expired the moment the push succeeded, so the guard was renamed and its
+message rewritten rather than left asserting "nothing is pushed" in a repository whose package is
+installable. It now asserts something weaker but still worth having: **every mention of the feed is
+deliberate and counted.**
+
+What that still catches: a document quietly gaining "available on nuget.org" about something that
+is not — the Marketplace listing, a version that was never pushed, a package that does not exist.
+Because the counts are exact, editing a document that mentions the feed forces a fresh look at
+whether the new text is true, which is the property that made this worth keeping.
+
+What it cannot catch, stated so nobody assumes otherwise: it does not verify that anything claimed
+about the feed is actually so. Only the feed can answer that. `GET
+https://api.nuget.org/v3-flatcontainer/<id>/index.json` is the cheapest check.
+
+The pre-release framing guards are different and did **not** go red: they assert that certain
+sentences are ABSENT, and publishing does not bring them back.

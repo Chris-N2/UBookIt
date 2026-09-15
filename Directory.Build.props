@@ -22,12 +22,23 @@
       breaking changes — see README.md's versioning note.
 
       Bumping this alone will FAIL THE TEST SUITE (not the build): VersionTruthTests
-      reads this value and checks it against the documents that state uBookIt's
-      version, so the prose has to follow. It matches those claims by the PHRASINGS it
-      knows rather than by scanning for version-shaped text — a new document inventing a
-      new way to say it is not covered, so add the phrasing there when you add one.
+      reads this value and checks it against the documents that state the version
+      uBookIt is CURRENTLY AT, so that prose has to follow the bump.
+
+      BUT NOT EVERY VERSION IN THE DOCUMENTATION IS THAT KIND, AND A FIND-AND-REPLACE
+      WILL BREAK THE OTHERS. "the first release is X" and "declared stable from X"
+      record HISTORY: they are true because they do NOT move, and a bump must leave
+      them exactly as they are. They are pinned against
+      openspec/changes/archive/*-release-<version>, so moving all of them together
+      still fails - which is what a repo-wide replace does, and what a reviewer caught
+      this guard missing. If one of those sentences goes red, the fix is to put it
+      back, never to edit it forward.
+
+      Claims are matched by the PHRASINGS the guard knows rather than by scanning for
+      version-shaped text — a new document inventing a new way to say it is not
+      covered, so add the phrasing there when you add one.
     -->
-    <Version>17.0.0</Version>
+    <Version>17.0.1</Version>
 
     <Authors>Norwood Design &amp; Development Ltd.</Authors>
     <Company>Norwood Design &amp; Development Ltd.</Company>
@@ -36,6 +47,17 @@
 
     <PackageLicenseExpression>MIT</PackageLicenseExpression>
     <PackageReadmeFile>README.md</PackageReadmeFile>
+
+    <!--
+      The icon nuget.org and the Visual Studio Package Manager render beside the package.
+      Without one, all five packages show a generic placeholder next to competitors that
+      have one - and like every other value here it is FROZEN at push, so a wrong or
+      missing icon costs a version number rather than a commit.
+
+      The value is the path INSIDE the package; the file is put there by the ItemGroup
+      below. NuGet's limits: 1MB, PNG or JPEG, 128x128 recommended.
+    -->
+    <PackageIcon>icon.png</PackageIcon>
     <PackageTags>umbraco;umbraco-marketplace;booking;bookings;scheduling;reservations</PackageTags>
 
     <!--
@@ -45,7 +67,7 @@
 
       ONE-WAY DOOR: nuget.org does not allow a pushed version's metadata to be edited, so
       an error here is not a commit away from fixed - it costs a version number and the
-      bad listing stays visible. See docs/publishing.md before the first push.
+      bad listing stays visible. See docs/publishing.md before ANY push.
 
       NOTE the casing: the repository is UBookIt, which differs from the old Azure path.
 
@@ -80,5 +102,13 @@
   -->
   <ItemGroup Condition="'$(IsPackable)' != 'false' AND Exists('$(MSBuildThisFileDirectory)README.md')">
     <None Include="$(MSBuildThisFileDirectory)README.md" Pack="true" PackagePath="\" Visible="false" />
+  </ItemGroup>
+
+  <!--
+    The icon, packed on exactly the conditions the README above uses and for the same two
+    reasons: not attached to test projects, and a partial checkout fails no build.
+  -->
+  <ItemGroup Condition="'$(IsPackable)' != 'false' AND Exists('$(MSBuildThisFileDirectory)assets\icon.png')">
+    <None Include="$(MSBuildThisFileDirectory)assets\icon.png" Pack="true" PackagePath="\" Visible="false" />
   </ItemGroup>
 </Project>

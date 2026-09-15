@@ -63,4 +63,36 @@ public class DocumentationAssertTests
     public void A_sentence_the_document_does_not_say_is_reported_missing(
         string document, string sentence)
         => Assert.False(Finds(document, sentence), $"Wrongly found: \"{sentence}\"");
+
+    private static bool AcceptsAsSingleOccurrence(string document, string sentence)
+    {
+        try
+        {
+            DocumentationAssert.SaysOnce(document, sentence);
+            return true;
+        }
+        catch (Exception)
+        {
+            return false;
+        }
+    }
+
+    [Theory]
+    // Exactly one occurrence is the whole point — a pin holds ONE sentence in place.
+    [InlineData("The package reached a feed on Tuesday.", "reached a feed on")]
+    // Absent still fails, so the stricter method has not lost the weaker guarantee.
+    [InlineData("Nothing relevant here.", "reached a feed on", false)]
+    // A SECOND occurrence fails, which is the branch that distinguishes this from Says and the
+    // reason it exists: a pinned phrase quoted again — typically in prose explaining the pin —
+    // leaves the sentence it was protecting free to be rewritten with the guard still green.
+    [InlineData("It reached a feed on Tuesday. Later it reached a feed on Friday.", "reached a feed on", false)]
+    // And a second occurrence that is WRAPPED or DECORATED must fail too. This is the trap this
+    // repository has paid for four times: an instrument that matches across wrapping but COUNTS
+    // without it reports one occurrence where there are two, and the duplicate is invisible
+    // exactly when it is written the way this project writes prose.
+    [InlineData("It reached a feed on Tuesday. Later it reached\na feed on Friday.", "reached a feed on", false)]
+    [InlineData("It reached a feed on Tuesday. Later it **reached** `a feed` *on* Friday.", "reached a feed on", false)]
+    public void A_pin_holds_exactly_one_occurrence(
+        string document, string sentence, bool expected = true)
+        => Assert.Equal(expected, AcceptsAsSingleOccurrence(document, sentence));
 }

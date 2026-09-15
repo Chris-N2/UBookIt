@@ -18,9 +18,9 @@ Grant it deliberately rather than to everyone: it decides who can see the bookin
 taken. Who can see the **name and email address** of the person who booked is a second
 question, answered by Umbraco's built-in **Sensitive data** group — and note that only the
 site's original super user is in that group to begin with, so a newly created administrator
-sees those details hidden until you add them. See [the backoffice docs](docs/backoffice.md).
+sees those details hidden until you add them. See [the backoffice docs](https://github.com/Chris-N2/UBookIt/blob/main/docs/backoffice.md).
 
-> **uBookIt is at `17.0.0`, and the public API is now a promise.** Leaving `0.x` is that
+> **uBookIt is at `17.0.1`, and the public API is now a promise.** Leaving `0.x` is that
 > promise — treat the contracts as settled from here.
 
 ### What the version number means
@@ -71,7 +71,7 @@ migration time rather than quietly misbehave.
   calling (no header check or CORS policy can make an anonymous API know that), and volume
   protection belongs to your host's rate limiting or edge — uBookIt makes no
   DDoS-protection claim. The details, including the breaking change if you were already
-  using the API, are in [the delivery API](docs/delivery-api.md).
+  using the API, are in [the delivery API](https://github.com/Chris-N2/UBookIt/blob/main/docs/delivery-api.md).
 - **A Bookings section** in the backoffice for seeing bookings, cancelling them, and — where
   you have asked for bookings to be approved rather than confirmed on the spot — confirming
   or declining them. **With permissions per user group**: seeing bookings, acting on them,
@@ -100,7 +100,7 @@ conformance is a property of a page. Text contrast, focus appearance and target 
 decided by CSS, the shipped stylesheet sets no text colour of its own, and non-text contrast
 for decorative borders is explicitly **not** claimed. The full account, including what becomes
 yours the moment you override a token or supply a theme, is in
-[the booking page docs](docs/booking-page.md#accessibility-what-we-hold-and-what-becomes-yours).
+[the booking page docs](https://github.com/Chris-N2/UBookIt/blob/main/docs/booking-page.md#accessibility-what-we-hold-and-what-becomes-yours).
 
 ## What it does not do yet
 
@@ -116,13 +116,13 @@ On the record as decisions, not gaps somebody discovers:
 
 ## Documentation
 
-- [The booking page](docs/booking-page.md) — creating it, the URL parameters, styling, the
+- [The booking page](https://github.com/Chris-N2/UBookIt/blob/main/docs/booking-page.md) — creating it, the URL parameters, styling, the
   deployment note about committing the installed template, and the accessibility statement
-- [The backoffice](docs/backoffice.md) — resources, availability, services and bookings
-- [The delivery API](docs/delivery-api.md) — turning it on, what anonymous means, and
+- [The backoffice](https://github.com/Chris-N2/UBookIt/blob/main/docs/backoffice.md) — resources, availability, services and bookings
+- [The delivery API](https://github.com/Chris-N2/UBookIt/blob/main/docs/delivery-api.md) — turning it on, what anonymous means, and
   where volume protection belongs
-- [Reacting to bookings](docs/notifications.md) — the notifications and how to handle them
-- [Writing a theme](docs/theming.md) — replacing the rendering with your own views
+- [Reacting to bookings](https://github.com/Chris-N2/UBookIt/blob/main/docs/notifications.md) — the notifications and how to handle them
+- [Writing a theme](https://github.com/Chris-N2/UBookIt/blob/main/docs/theming.md) — replacing the rendering with your own views
 
 ## The packages
 
@@ -144,6 +144,6 @@ booking page renders nothing. Install `UBookIt`.
 
 ## Licence
 
-[MIT](LICENSE). Copyright © Norwood Design & Development Ltd.
+[MIT](https://github.com/Chris-N2/UBookIt/blob/main/LICENSE). Copyright © Norwood Design & Development Ltd.
 
 Built by [Norwood Design & Development Ltd.](https://www.norwood-development.co.uk).
