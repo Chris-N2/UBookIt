@@ -623,4 +623,74 @@ public class VersionTruthTests
         DocumentationAssert.Says(
             runbook, "When you publish, that guard will start failing. Do not delete it.");
     }
+
+    /// <summary>
+    /// The package names ONE publisher, declared once (packaging spec, "The package names one
+    /// publisher, declared once").
+    /// </summary>
+    /// <remarks>
+    /// <para>
+    /// <b>Derived from <c>&lt;Company&gt;</c>, never restated.</b> Writing the name literally
+    /// here would reproduce the defect this guard exists to close — five copies of a company
+    /// name with nothing comparing them, wrong in all five and shipped in every release build —
+    /// one file further along.
+    /// </para>
+    /// <para>
+    /// <b>The comparison is against the DECODED value.</b> The name contains an ampersand, so
+    /// the props file must spell it <c>&amp;amp;</c> (a bare <c>&amp;</c> is invalid XML and
+    /// fails the build) while <c>LICENSE</c> and <c>README.md</c> are plain text and carry a
+    /// literal <c>&amp;</c>. Comparing raw text would report a mismatch that is not one —
+    /// and, worse, could be "fixed" by putting an XML entity into a licence file.
+    /// </para>
+    /// <para>
+    /// What it does NOT do: check the name is the correct legal name. No test can know that.
+    /// It checks that the three places agree with the one declaration; correctness of the name
+    /// itself came from the person who owns it.
+    /// </para>
+    /// </remarks>
+    [Fact]
+    public void The_package_names_one_publisher()
+    {
+        var props = RepoFiles.Read("Directory.Build.props");
+
+        string Declared(string element)
+        {
+            var match = Regex.Match(props, $"<{element}>(?<value>[^<]+)</{element}>");
+
+            Assert.True(
+                match.Success,
+                $"Directory.Build.props declares no <{element}>. The publisher a consumer sees "
+                + "on the package listing comes from it.");
+
+            // Decoded, so the XML spelling and the plain-text spelling compare equal.
+            return System.Net.WebUtility.HtmlDecode(match.Groups["value"].Value).Trim();
+        }
+
+        var company = Declared("Company");
+
+        Assert.False(
+            string.IsNullOrWhiteSpace(company),
+            "<Company> is empty, so every check below would pass by comparing nothing.");
+
+        // Authors and Company are DIFFERENT NuGet fields — Authors is the publisher shown on
+        // the listing, Company lands in assembly metadata — and nothing else stops them
+        // drifting, which is how a listing and the assemblies inside it come to disagree.
+        Assert.True(
+            Declared("Authors") == company,
+            $"<Authors> is '{Declared("Authors")}' but <Company> is '{company}'. They name the "
+            + "same publisher on two surfaces and must agree.");
+
+        Assert.True(
+            Declared("Copyright").Contains(company, StringComparison.Ordinal),
+            $"<Copyright> is '{Declared("Copyright")}', which does not name '{company}'.");
+
+        foreach (var document in new[] { "LICENSE", "README.md" })
+        {
+            Assert.True(
+                RepoFiles.Read(document).Contains(company, StringComparison.Ordinal),
+                $"{document} does not name the publisher declared in Directory.Build.props "
+                + $"('{company}'). The licence names who grants the rights and the readme is "
+                + "packed into every .nupkg, so a disagreement here ships.");
+        }
+    }
 }
