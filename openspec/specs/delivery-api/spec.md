@@ -500,7 +500,7 @@ The delivery API SHALL place service bookings over `POST /services/{id}/bookings
 
 Service placement SHALL be a distinct endpoint with its own request model rather than optional service fields added to the direct placement request model. A single model carrying a resource id, a service id, and a pinned resource id would admit combinations with no meaning and force every consumer to re-derive which are valid.
 
-**BREAKING (unpublished):** on success the response SHALL carry the resources the service resolved to as a **collection**, one per role, rather than a single resource id. A service may claim several resources for one booking, and a single-valued member could only report one of them or none. The collection SHALL be present and of length one for a single-role service. Each entry SHALL carry at least the resource id, so a booker is told everything they got.
+**BREAKING, made before the first release reached a feed:** on success the response SHALL carry the resources the service resolved to as a **collection**, one per role, rather than a single resource id. A service may claim several resources for one booking, and a single-valued member could only report one of them or none. The collection SHALL be present and of length one for a single-role service. Each entry SHALL carry at least the resource id, so a booker is told everything they got.
 
 A pinned resource id SHALL name the **booking**, not a role: a resource may be
 eligible for several of a service's roles, so the pin requires only that it appear

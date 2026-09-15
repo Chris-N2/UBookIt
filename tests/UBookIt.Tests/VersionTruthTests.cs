@@ -1,3 +1,4 @@
+using System.Buffers.Binary;
 using System.Text.RegularExpressions;
 using UBookIt.Tests.Support;
 
@@ -42,16 +43,53 @@ namespace UBookIt.Tests;
 public class VersionTruthTests
 {
     /// <summary>
-    /// The ways this repository's documents state uBookIt's own version. Each captures the
-    /// version in a group named <c>version</c>, and each tolerates the markdown emphasis and
-    /// wrapping these files are actually written with.
+    /// The ways this repository's documents state the version uBookIt is <b>currently at</b>.
+    /// Each captures the version in a group named <c>version</c>, and each tolerates the
+    /// markdown emphasis and wrapping these files are actually written with.
     /// </summary>
-    private static readonly string[] VersionClaimPatterns =
+    private static readonly string[] CurrentVersionClaimPatterns =
     [
         @"uBookIt is at\s+\*{0,2}`(?<version>[^`]+)`",
+    ];
+
+    /// <summary>
+    /// The ways this repository's documents state a version that is <b>not</b> the current one:
+    /// the release the package first made, and the release its public API was declared stable
+    /// from.
+    /// </summary>
+    /// <remarks>
+    /// <para>
+    /// <b>These are statements about history, and history does not move when a release does.</b>
+    /// Until <c>17.0.1</c> there had only ever been one version, so "the version uBookIt is at"
+    /// and "the version uBookIt was first released at" were the same string and a single list of
+    /// patterns could not tell them apart. The first patch release separated them: requiring
+    /// every stated version to equal the declared one would have demanded "the first release is
+    /// <c>17.0.1</c>", and the quickest way to make that guard pass would have been to edit four
+    /// true sentences into false ones.
+    /// </para>
+    /// <para>
+    /// So anchors are checked differently, by
+    /// <see cref="The_documented_anchors_do_not_move"/>: they are pinned to the first release
+    /// recorded in <c>openspec/changes/archive/</c>, and must additionally agree with each other
+    /// and name no version later than the declared one. The pin is what catches a bump that
+    /// moves every anchor at once — agreement alone does not, as QA demonstrated. None of it
+    /// needs a literal version written into this file, which is the property that made the
+    /// original guard worth having.
+    /// </para>
+    /// </remarks>
+    private static readonly string[] VersionAnchorPatterns =
+    [
         @"[Tt]he first release is\s+\*{0,2}`(?<version>[^`]+)`",
         @"declared stable from\s+\*{0,2}`(?<version>[^`]+)`",
     ];
+
+    /// <summary>
+    /// Every phrasing that states a version of uBookIt, of either kind. Used only by the
+    /// anti-vacuity pin, which cares that a document still says something about the version —
+    /// not which of the two things it says.
+    /// </summary>
+    private static readonly string[] VersionClaimPatterns =
+        [.. CurrentVersionClaimPatterns, .. VersionAnchorPatterns];
 
     /// <summary>
     /// The documents that must still be found making a claim. Anti-vacuity: without this, a
@@ -223,15 +261,18 @@ public class VersionTruthTests
     {
         var declared = DeclaredVersion();
         var offenders = new List<string>();
+        var claimsFound = 0;
 
         foreach (var document in LiveDocuments())
         {
             var text = RepoFiles.Read(document);
 
-            foreach (var pattern in VersionClaimPatterns)
+            foreach (var pattern in CurrentVersionClaimPatterns)
             {
                 foreach (Match match in Regex.Matches(text, pattern))
                 {
+                    claimsFound++;
+
                     var stated = match.Groups["version"].Value;
 
                     if (stated != declared)
@@ -247,6 +288,18 @@ public class VersionTruthTests
             $"Directory.Build.props declares {declared}, but these documents state another "
             + "version — each describes a release nobody can install:\n  "
             + string.Join("\n  ", offenders));
+
+        // Anti-vacuity, and specifically the hole that SPLITTING the patterns opened. Before the
+        // split, ClaimsAreFoundWhereTheyAreKnownToLive covered this: any pinned document losing
+        // its claim failed there. It no longer does — a document can satisfy that pin with an
+        // ANCHOR alone, which would leave this scan running over nothing while reporting that
+        // every documented version matches.
+        Assert.True(
+            claimsFound > 0,
+            "No document states the version uBookIt is currently at, so this guard compared "
+            + "nothing against Directory.Build.props and passed by finding nothing. Either the "
+            + "claim was removed from every document, or it was reworded out of "
+            + "CurrentVersionClaimPatterns.");
     }
 
     [Fact]
@@ -265,10 +318,169 @@ public class VersionTruthTests
                 VersionClaimPatterns.Any(pattern => Regex.IsMatch(text, pattern)),
                 $"{document} no longer states uBookIt's version in any phrasing this guard "
                 + "reads. Either the claim was removed — in which case a reader is no longer "
-                + "told which version they have — or it was reworded, in which case add the "
-                + "new phrasing to VersionClaimPatterns deliberately.");
+                + "told which version they have — or it was reworded, in which case add the new "
+                + "phrasing deliberately: to CurrentVersionClaimPatterns if it states the "
+                + "version uBookIt is AT, or to VersionAnchorPatterns if it records a version "
+                + "in its history. (VersionClaimPatterns itself is the two concatenated and "
+                + "cannot be added to.)");
         }
     }
+
+    /// <summary>
+    /// A version the documentation anchors to records history, and does not move when a release
+    /// does (packaging spec, "A version the documentation anchors to does not move with the
+    /// release").
+    /// </summary>
+    /// <remarks>
+    /// <para>
+    /// <b>Pinned to an independent record, and still without a literal.</b> The obvious
+    /// implementation — assert every anchor says <c>17.0.0</c> — would put the very number these
+    /// documents state into the file that checks them, which is the restatement this whole class
+    /// exists to avoid. The version the package was first released at is instead derived from
+    /// <c>openspec/changes/archive/</c>: the earliest archived change named
+    /// <c>release-&lt;major&gt;-&lt;minor&gt;-&lt;patch&gt;</c>. That directory is history, it is
+    /// immutable by CLAUDE.md's rule, and nothing that edits documentation can move it.
+    /// </para>
+    /// <para>
+    /// <b>Agreement between the anchors is NOT sufficient, and the first version of this guard
+    /// shipped believing it was.</b> QA moved all four anchors from <c>17.0.0</c> to
+    /// <c>17.0.1</c> together and every test in this class stayed green — which is precisely the
+    /// failure the change was written to prevent, since a repo-wide find-and-replace at the next
+    /// bump moves them uniformly by construction. Mutual agreement only catches the sloppy
+    /// version of that edit, the one that misses a file. The archive pin catches the tidy one.
+    /// </para>
+    /// <para>
+    /// <b>The remark this replaces asserted something false</b> — that nothing in this repository
+    /// records the first release independently — and used it to justify the weaker guarantee. The
+    /// archive was there the whole time; <see cref="LiveDocuments"/> excludes it precisely
+    /// BECAUSE it is an immutable record, which is the property that makes it usable here.
+    /// Reading the archive is not editing it.
+    /// </para>
+    /// <para>
+    /// Agreement and the not-later-than-declared check are both kept. They are now redundant
+    /// with the pin rather than load-bearing, and they fail with a more specific message when
+    /// they fire first, which is worth more than the line count they cost.
+    /// </para>
+    /// <para>
+    /// What this still does not prove: that the release named in the archive is the release the
+    /// API was truly frozen at. It proves the documentation agrees with the repository's own
+    /// immutable record of its first release.
+    /// </para>
+    /// </remarks>
+    [Fact]
+    public void The_documented_anchors_do_not_move()
+    {
+        var declared = DeclaredVersion();
+        var anchors = new List<(string Document, string Stated)>();
+
+        foreach (var document in LiveDocuments())
+        {
+            var text = RepoFiles.Read(document);
+
+            foreach (var pattern in VersionAnchorPatterns)
+            {
+                foreach (Match match in Regex.Matches(text, pattern))
+                {
+                    anchors.Add((document, match.Groups["version"].Value));
+                }
+            }
+        }
+
+        // A scan over nothing passes every assertion made about it.
+        Assert.True(
+            anchors.Count > 0,
+            "No document anchors to a first release or a stability version. Either those "
+            + "sentences were removed — in which case a reader is no longer told when the API "
+            + "promise began — or they were reworded out of VersionAnchorPatterns.");
+
+        var distinct = anchors.Select(a => a.Stated).Distinct(StringComparer.Ordinal).ToList();
+
+        Assert.True(
+            distinct.Count == 1,
+            "The documents disagree about the version uBookIt was first released at, and at most "
+            + "one of them can be right. This is what a find-and-replace across a version bump "
+            + $"looks like:\n  {string.Join("\n  ", anchors.Select(a => $"{a.Document}: {a.Stated}"))}");
+
+        var anchor = ParseRelease(distinct[0]);
+        var current = ParseRelease(declared);
+
+        Assert.True(
+            anchor is not null && current is not null,
+            $"An anchor states '{distinct[0]}' and Directory.Build.props declares '{declared}'; "
+            + "at least one is not a version this guard can compare. Pre-release suffixes are "
+            + "tolerated and ignored, but the numeric part has to parse.");
+
+        Assert.True(
+            anchor <= current,
+            $"The documentation anchors to {distinct[0]}, which is later than the declared "
+            + $"{declared}. A package cannot have been first released in a version it has not "
+            + "reached — most likely the anchor was moved by a bump that should have left it "
+            + "alone.");
+
+        // THE CHECK THAT CATCHES A UNIFORM MOVE. Everything above is satisfied by four anchors
+        // edited together to the same wrong value, which is exactly what a repo-wide
+        // find-and-replace at the next bump produces.
+        var firstReleased = FirstReleasedVersion();
+
+        Assert.True(
+            anchor == firstReleased,
+            $"The documentation anchors to {distinct[0]}, but this repository's own archive "
+            + $"records the first release as {firstReleased} "
+            + "(openspec/changes/archive/*-release-<version>). These sentences record history, so "
+            + "a release does not move them. If a version bump edited them — most likely a "
+            + "find-and-replace that moved every one of them together — put them back.");
+    }
+
+    /// <summary>
+    /// The version this package was first released at, read from the repository's own immutable
+    /// record: the earliest archived change named <c>release-&lt;major&gt;-&lt;minor&gt;-&lt;patch&gt;</c>.
+    /// </summary>
+    /// <remarks>
+    /// Derived rather than written down, so no literal version enters this file. The archive is
+    /// the right source because CLAUDE.md forbids editing it: an edit that falsifies documentation
+    /// cannot also move the thing the documentation is checked against.
+    /// <para>
+    /// Its reach is exactly the naming convention: a release change named some other way is not
+    /// seen. That is safe in the direction that matters — the earliest release is already
+    /// archived and cannot be removed, so this value is stable no matter what later changes are
+    /// called.
+    /// </para>
+    /// </remarks>
+    private static Version FirstReleasedVersion()
+    {
+        var archive = Path.Combine(RepoFiles.Root, "openspec", "changes", "archive");
+
+        Assert.True(Directory.Exists(archive), $"No archive at {archive} to read the first release from.");
+
+        var releases = Directory
+            .EnumerateDirectories(archive)
+            .Select(directory => Regex.Match(
+                Path.GetFileName(directory) ?? string.Empty,
+                @"release-(?<major>\d+)-(?<minor>\d+)-(?<patch>\d+)$"))
+            .Where(match => match.Success)
+            .Select(match => new Version(
+                int.Parse(match.Groups["major"].Value),
+                int.Parse(match.Groups["minor"].Value),
+                int.Parse(match.Groups["patch"].Value)))
+            .ToList();
+
+        // A scan over nothing passes every assertion made about it — and here it would silently
+        // turn the pin above into no check at all.
+        Assert.True(
+            releases.Count > 0,
+            $"No archived change under {archive} is named release-<major>-<minor>-<patch>, so the "
+            + "first released version cannot be derived and the anchor pin would prove nothing. "
+            + "The archive is immutable, so this means the naming convention changed.");
+
+        return releases.Min()!;
+    }
+
+    /// <summary>
+    /// Parses the numeric part of a release, ignoring any pre-release suffix, or null when it
+    /// is not a version at all.
+    /// </summary>
+    private static Version? ParseRelease(string value)
+        => Version.TryParse(value.Split('-', '+')[0], out var version) ? version : null;
 
     /// <summary>
     /// The policy a consumer plans an upgrade against. Each of these changes what somebody
@@ -358,23 +570,24 @@ public class VersionTruthTests
     private static readonly (string Document, string Accepted, int Occurrences, string Why)[] AcceptedPublicationMentions =
     [
         ("openspec/specs/bookings/spec.md", "UBookIt.Core is published", 1,
-            "Pre-existing rationale for stating a break in that requirement, written in "
-            + "anticipation of publication. Becomes true the moment the package ships, and "
-            + "correcting it would mean replacing a requirement about booker identity "
-            + "wholesale for two words — the disproportionate edit CLAUDE.md warns against. "
-            + "Recorded here and in the deferred-obligations memory for whichever change "
-            + "next legitimately modifies `bookings`."),
+            "Written in anticipation of publication, as the rationale for stating a break in "
+            + "that requirement, and TRUE since 2026-09-15 — UBookIt.Core 17.0.0 is on "
+            + "nuget.org. It was carried here for a year as a sentence waiting to become "
+            + "correct; it no longer needs excusing, only counting. The entry stays because "
+            + "this guard accounts for every mention, not only the doubtful ones."),
 
-        ("docs/publishing.md", "nuget.org", 5,
-            "The publishing runbook names the feed as a DESTINATION - what nuget.org will "
-            + "not let you undo, where to get an API key, which source to push to. That is "
-            + "the distinction this guard exists to draw: instructions FOR publishing are "
-            + "not a claim of HAVING published. The count is deliberately exact, so editing "
-            + "the runbook forces a fresh look at whether the new text still only instructs."),
+        ("docs/publishing.md", "nuget.org", 17,
+            "The publishing runbook names the feed as a DESTINATION — what nuget.org will "
+            + "not let you undo, where the API key lives, which source to push to, how to "
+            + "tell when indexing has finished — and, since publication, as a RECORD: its "
+            + "Status section states that 17.0.0 shipped on 2026-09-15. Both are legitimate "
+            + "here, and this is the one document where they should be. The count is "
+            + "deliberately exact, so editing the runbook forces a fresh look at whether "
+            + "each new mention is an instruction, a true record, or a claim nobody checked."),
     ];
 
     /// <summary>
-    /// No live document claims the package has reached a feed, because it has not.
+    /// Every mention of a package feed in a live document is deliberate, registered and counted.
     /// </summary>
     /// <remarks>
     /// <para>
@@ -390,7 +603,7 @@ public class VersionTruthTests
     /// round 2 demonstrated it green while <c>docs/mvp.md</c> claimed "live on nuget.org
     /// today", and green while <c>bookings/spec.md</c> said "UBookIt.Core is published" in a
     /// directory it walked. The reasoning against it was already written eighty lines above,
-    /// in <see cref="VersionClaimPatterns"/>' own doc: a denylist fences only what somebody
+    /// in this class's own remarks: a denylist fences only what somebody
     /// thought of.
     /// </para>
     /// <para>
@@ -399,18 +612,33 @@ public class VersionTruthTests
     /// fails, naming the document and the matched text, and an allowance nobody consumes
     /// fails as dead. It does <b>not</b> see a claim phrased outside that vocabulary —
     /// <c>uBookIt was released to the public gallery</c> matches nothing and passes. That is
-    /// the same residual <see cref="VersionClaimPatterns"/> states about its own phrases, and
+    /// the same residual this class's remarks state about the version phrasings, and
     /// it is worded the same way here deliberately: QA round 3 found this paragraph claiming
     /// a reach the vocabulary did not have, which is the round-2 fault — a name promising
     /// more than a body — climbed one layer into the documentation.
     /// </para>
     /// <para>
-    /// When the package is published, this does not get deleted: the accepted list absorbs
-    /// the claims that become true, one at a time, each with its reason and its count.
+    /// <b>Its premise changed at publication, and so did its name.</b> Until 2026-09-15 this
+    /// asserted an ABSENCE — <c>No_document_claims_the_package_has_reached_a_feed</c> — which was
+    /// exactly right while nothing was pushed. `17.0.0` then shipped, and that premise expired:
+    /// a guard whose failure message read "It has not — nothing is pushed" was, from that moment,
+    /// itself the false claim it existed to prevent. It was neither deleted nor relaxed, both of
+    /// which would have satisfied the suite while dropping the only thing watching these
+    /// sentences. It was re-premised on what is still true and still worth enforcing: a mention
+    /// of the feed must be REGISTERED, with a reason and an exact count.
+    /// </para>
+    /// <para>
+    /// <b>That is a weaker guarantee than the one it replaces, and the weakening is the point
+    /// rather than a cost silently absorbed.</b> "No document says X" is decidable here; "every
+    /// document that says X is right" is not, because whether a package is on a feed is a fact
+    /// about the feed. What survives is the accounting: because counts are exact, editing a
+    /// document that mentions the feed forces a fresh look at whether the new text is true. What
+    /// does not survive is any claim to catch a false statement about the feed on its own — only
+    /// the feed can answer that.
     /// </para>
     /// </remarks>
     [Fact]
-    public void No_document_claims_the_package_has_reached_a_feed()
+    public void Every_mention_of_the_feed_is_accounted_for()
     {
         var unclassified = new List<string>();
 
@@ -481,9 +709,11 @@ public class VersionTruthTests
         if (unclassified.Count > 0)
         {
             failures.Add(
-                "These read as claims that uBookIt has reached a package feed. It has not — "
-                + "nothing is pushed. Correct the claim, or, if it is legitimate, add it to "
-                + "AcceptedPublicationMentions with its reason and count:\n  "
+                "These mention a package feed without being registered. uBookIt IS published, so "
+                + "a mention is no longer wrong by definition — but it has to be deliberate. "
+                + "Check the sentence is actually true (only the feed can tell you: GET "
+                + "https://api.nuget.org/v3-flatcontainer/<id>/index.json), then either reword it "
+                + "or add it to AcceptedPublicationMentions with its reason and count:\n  "
                 + string.Join("\n  ", unclassified));
         }
 
@@ -583,45 +813,93 @@ public class VersionTruthTests
         // The spec requires the documentation to name the MANUAL check, because no
         // automated check may reach the network. Unenforced until QA round 1: deleting the
         // sentence left the suite green while the spec scenario said it must be there.
-        DocumentationAssert.Says(
+        DocumentationAssert.SaysOnce(
             runbook,
             "It cannot check the URL actually resolves — open it in a browser once, logged out.");
 
         // The spec requires the documentation to demand INSPECTION of what was produced,
         // rather than trust that the procedure worked. Both halves, because deleting either
         // left the suite green (QA rounds 1 and 2).
-        DocumentationAssert.Says(
+        DocumentationAssert.SaysOnce(
             runbook, "check the produced `.nuspec`, not the source, before you push");
-        DocumentationAssert.Says(
+        DocumentationAssert.SaysOnce(
             runbook, "Each package carries its own metadata, so check all five");
 
         // The one-way doors.
-        DocumentationAssert.Says(runbook, "A pushed version's metadata cannot be edited");
-        DocumentationAssert.Says(runbook, "A version number cannot be reused");
-        DocumentationAssert.Says(runbook, "Unlisting is not deletion");
+        DocumentationAssert.SaysOnce(runbook, "A pushed version's metadata cannot be edited");
+        DocumentationAssert.SaysOnce(runbook, "A version number cannot be reused");
+        DocumentationAssert.SaysOnce(runbook, "Unlisting is not deletion");
 
         // The ordering, which is the finding this change was built on.
-        DocumentationAssert.Says(runbook, "This order is load-bearing, not tidiness");
+        DocumentationAssert.SaysOnce(runbook, "This order is load-bearing, not tidiness");
 
         // The STEP, not just the narrative about it: QA round 2 deleted this line and the
         // suite stayed green while the document still claimed its order was load-bearing.
         // `dotnet pack` is incremental and `--no-incremental` does not govern it, so without
         // this step a stale .nupkg survives the whole procedure and is pushed by the wildcard.
-        DocumentationAssert.Says(runbook, "DELETE the old artifacts");
-        DocumentationAssert.Says(runbook, "Step 3 is not housekeeping");
-        DocumentationAssert.Says(
+        DocumentationAssert.SaysOnce(runbook, "DELETE the old artifacts");
+        DocumentationAssert.SaysOnce(runbook, "Step 3 is not housekeeping");
+        DocumentationAssert.SaysOnce(
             runbook,
             "a package built before the remote moved carries the old SourceLink URLs");
 
         // The commit SHA. Found by VERIFYING the SourceLink flip rather than reasoning about
         // it: a pack from an unpushed commit yields source links that 404 for every consumer,
         // permanently, and passes every other check here.
-        DocumentationAssert.Says(runbook, "SourceLink embeds the commit SHA");
-        DocumentationAssert.Says(
+        DocumentationAssert.SaysOnce(runbook, "SourceLink embeds the commit SHA");
+        DocumentationAssert.SaysOnce(
             runbook, "Pack from the merge commit on main, after it is pushed");
         // And the guard that is meant to fail, so a red test is not read as an obstacle.
-        DocumentationAssert.Says(
-            runbook, "When you publish, that guard will start failing. Do not delete it.");
+        //
+        // The sentence pinned here used to be "When you publish, that guard will start failing"
+        // — future tense, written before there had been a publication. It came true on
+        // 2026-09-15 and then read as a prediction about an event already past, which is how a
+        // pinned sentence rots: the guarantee survives, the wording expires, and the guard holds
+        // the repository to the expired wording. Replaced with a sentence that is true BEFORE
+        // and AFTER any publication, because there will be more of them.
+        DocumentationAssert.SaysOnce(
+            runbook, "A guard that goes red at publication is doing its job. Do not delete it.");
+
+        // WHAT THE FIRST PUBLISH ACTUALLY COST, pinned for the same reason as everything above:
+        // these were learned at an irreversible moment, and an unpinned lesson is one sentence
+        // away from being tidied out by somebody who was not there.
+        //
+        // The 403 is the sharpest of them. Its text names only the API key, which sends a
+        // maintainer to check the one thing that is almost never wrong, and the real cause —
+        // an organization owner that cannot publish — is invisible from the message.
+        DocumentationAssert.SaysOnce(
+            runbook, "an organization has its own email address that must be confirmed");
+        DocumentationAssert.SaysOnce(runbook, "push new packages and package versions");
+
+        // That ownership is not a reason to delay a push. Without this a maintainer blocks a
+        // release on an account problem that is fixable afterwards.
+        DocumentationAssert.SaysOnce(runbook, "transferred to an organization");
+
+        // And how to tell a successful push from an installable package: a package presents as
+        // unlisted for minutes afterwards, which reads as failure and invites a second push.
+        DocumentationAssert.SaysOnce(runbook, "the flat-container endpoint");
+
+        // THE FEED MUST BE NAMED IN THIS DOCUMENT EXACTLY ONCE, because that is the only reason
+        // any guard can see the Status line at all.
+        //
+        // Precisely: this proves ONE sentence here carries the phrase, not that it is the Status
+        // line. Moving the phrase into a trailing parenthetical while falsifying the status claim
+        // passes — QA measured it. That residue is subsumed by the polarity exemption the runbook
+        // already discloses in full, so it is no new exposure; it is stated here so the comment
+        // does not claim placement the mechanism never delivered. This is not belt-and-braces over the occurrence count — the count catches the feed
+        // name being REMOVED (the allowance goes unconsumed), but it cannot tell you the sentence
+        // that is supposed to carry it is the one that lost it.
+        //
+        // Written because this exact sentence lost the property once: a rewrite phrased it as
+        // "was published on <date>", naming no feed, and it became the single sentence in the
+        // repository able to make any claim about a package feed with nothing watching. QA
+        // falsified it to a version that does not exist and the suite stayed green.
+        DocumentationAssert.SaysOnce(runbook, "reached nuget.org on");
+
+        // And the lesson itself, so the next rewrite of that line knows why it is worded as it is.
+        DocumentationAssert.SaysOnce(
+            runbook, "A sentence whose entire job is to be watched has to be written so the "
+            + "watcher can see it");
     }
 
     /// <summary>
@@ -729,5 +1007,257 @@ public class VersionTruthTests
                     + "Do not reword the prose to satisfy the test.");
             }
         }
+    }
+
+    /// <summary>
+    /// Every link in the packed readme resolves from a host that is not this repository
+    /// (packaging spec, "Documentation a consumer follows from the package page resolves").
+    /// </summary>
+    /// <remarks>
+    /// <para>
+    /// <b>Why this is a guard and not a review item.</b> The readme is packed into all five
+    /// packages and rendered by nuget.org and the Visual Studio Package Manager, both of which
+    /// resolve a relative link against their OWN address. A relative link therefore does not
+    /// point at this repository from there; it points at a path on nuget.org that does not
+    /// exist. Review missed exactly this once, and a published readme cannot be corrected —
+    /// like the rest of the metadata it is frozen at push, so the fix costs a version number.
+    /// </para>
+    /// <para>
+    /// <b>Derived, never restated.</b> Both the readme's filename and the repository it may
+    /// point into come out of <c>Directory.Build.props</c>. Writing the repository here a
+    /// second time is the restatement failure this project has already paid for twice, in the
+    /// publisher name and in the version: a future move would leave the readme pointing at the
+    /// old host with this test still green.
+    /// </para>
+    /// <para>
+    /// <b>What it proves, and what it does not.</b> It proves link SHAPE (absolute https) and,
+    /// for links into this repository, that the PATH names a file that exists here. It does not
+    /// prove any URL answers over the network — that stays a human check, made once, logged
+    /// out, exactly as <see cref="The_package_points_at_a_public_home"/> says of the declared
+    /// URLs. An absolute URL to anywhere else is accepted unchecked, because checking it would
+    /// mean a unit test that fails when a third party's site is down.
+    /// </para>
+    /// <para>
+    /// <b>The blind spot, stated rather than implied.</b> Only the path is resolved, never the
+    /// git ref. A link reading <c>blob/main/docs/theming.md</c> still passes after <c>main</c>
+    /// has become a different product line, because <c>docs/theming.md</c> still exists in THIS
+    /// working tree. The branch rename planned for the Umbraco 18 work owns that problem; this
+    /// guard cannot see it and does not claim to.
+    /// </para>
+    /// </remarks>
+    [Fact]
+    public void The_readme_links_resolve_from_anywhere()
+    {
+        var props = RepoFiles.Read("Directory.Build.props");
+
+        var readmeFile = Regex
+            .Match(props, @"<PackageReadmeFile>(?<file>[^<]+)</PackageReadmeFile>")
+            .Groups["file"].Value.Trim();
+
+        Assert.True(
+            readmeFile.Length > 0,
+            "Directory.Build.props declares no <PackageReadmeFile>, so there is no packed readme "
+            + "for this guard to be about. If the readme stopped being packed, that is the defect.");
+
+        var repositoryUrl = Regex
+            .Match(props, @"<RepositoryUrl>(?<url>[^<]+)</RepositoryUrl>")
+            .Groups["url"].Value.Trim();
+
+        Assert.True(
+            repositoryUrl.Length > 0,
+            "Directory.Build.props declares no <RepositoryUrl>, so the repository a readme link "
+            + "may point into cannot be derived.");
+
+        var blobPrefix = Regex.Replace(repositoryUrl, @"\.git$", string.Empty) + "/blob/";
+
+        var readme = RepoFiles.Read(readmeFile);
+
+        // Markdown inline links and images. The leading '!' distinguishes an image, which has a
+        // harsher failure mode than a link: nuget.org renders NO image from a relative path and
+        // none at all from a domain outside its allow-list, so the reader is shown a gap with
+        // nothing indicating anything was intended.
+        var links = Regex.Matches(readme, @"(?<image>!)?\[(?<text>[^\]]*)\]\((?<target>[^)\s]+)\)");
+
+        // A scan over nothing passes every assertion made about it.
+        Assert.True(
+            links.Count > 0,
+            $"No markdown links were found in {readmeFile}. Either the readme lost its links or "
+            + "this guard's pattern no longer matches the way they are written.");
+
+        var offenders = new List<string>();
+        var resolvedIntoRepository = 0;
+
+        foreach (Match link in links)
+        {
+            var target = link.Groups["target"].Value;
+            var kind = link.Groups["image"].Success ? "image" : "link";
+            var text = link.Groups["text"].Value;
+
+            if (!target.StartsWith("https://", StringComparison.Ordinal))
+            {
+                offenders.Add(
+                    $"{kind} '{text}' targets '{target}', which is not an absolute https URL. "
+                    + "nuget.org resolves that against the package page, not against the "
+                    + "repository, so it leads nowhere.");
+
+                continue;
+            }
+
+            if (!target.StartsWith(blobPrefix, StringComparison.Ordinal))
+            {
+                // An absolute URL to somewhere else. Accepted unchecked — see the remarks.
+                continue;
+            }
+
+            // blob/<ref>/<path in the repository>
+            var afterPrefix = target[blobPrefix.Length..];
+            var firstSlash = afterPrefix.IndexOf('/');
+
+            if (firstSlash < 0)
+            {
+                offenders.Add(
+                    $"{kind} '{text}' targets '{target}', which names a git ref but no file "
+                    + "beneath it.");
+
+                continue;
+            }
+
+            var relativePath = afterPrefix[(firstSlash + 1)..];
+
+            // A '#heading' fragment is resolved by the rendering host, not by the filesystem.
+            var fragment = relativePath.IndexOf('#');
+
+            if (fragment >= 0)
+            {
+                relativePath = relativePath[..fragment];
+            }
+
+            var full = Path.Combine(
+                RepoFiles.Root, relativePath.Replace('/', Path.DirectorySeparatorChar));
+
+            if (File.Exists(full))
+            {
+                resolvedIntoRepository++;
+            }
+            else
+            {
+                offenders.Add(
+                    $"{kind} '{text}' targets '{target}', but this repository has no file at "
+                    + $"'{relativePath}'. A renamed or deleted document is caught here rather "
+                    + "than after it has been frozen into a published version.");
+            }
+        }
+
+        Assert.True(
+            offenders.Count == 0,
+            $"{readmeFile} carries {offenders.Count} link(s) a consumer cannot follow from a "
+            + "package page. nuget.org will not let a pushed readme be edited, so each of these "
+            + $"costs a version number once published:{Environment.NewLine}  "
+            + string.Join(Environment.NewLine + "  ", offenders));
+
+        // Anti-vacuity, and a different absence from the one above: every link could be
+        // absolute and point somewhere entirely outside this repository, in which case the
+        // existence half of this guard would have run over nothing while reporting success.
+        Assert.True(
+            resolvedIntoRepository > 0,
+            $"No link in {readmeFile} resolved to a file in this repository, so the half of this "
+            + "guard that checks link TARGETS proved nothing. Either the documentation links "
+            + $"stopped pointing at '{blobPrefix}...', or the derivation of that prefix is wrong.");
+    }
+
+    /// <summary>
+    /// The package presents an icon (packaging spec, "The package presents an icon").
+    /// </summary>
+    /// <remarks>
+    /// <para>
+    /// Declared once in <c>Directory.Build.props</c>, like the version and the publisher, and
+    /// for the same reason: five packages carrying separately-specified icons drift apart, and
+    /// the drift is silent because nothing compares them.
+    /// </para>
+    /// <para>
+    /// <b>This guard is deliberately narrower than NuGet.</b> NuGet accepts PNG or JPEG; this
+    /// requires PNG, because reading a PNG's dimensions needs only its header and brings in no
+    /// image library. Shipping a JPEG would fail here and would be a legitimate change to this
+    /// guard, not a defect in it. The limits it enforces — 1MB, square — are NuGet's own, and
+    /// they are checked HERE because at push time they would be checked against a version
+    /// number that cannot be reused.
+    /// </para>
+    /// <para>
+    /// That the icon is actually IN each produced package is a different claim, held against
+    /// the artefact rather than against the project file, by the packaging tests.
+    /// </para>
+    /// </remarks>
+    [Fact]
+    public void The_package_carries_an_icon()
+    {
+        var props = RepoFiles.Read("Directory.Build.props");
+
+        var declared = Regex
+            .Match(props, @"<PackageIcon>(?<file>[^<]+)</PackageIcon>")
+            .Groups["file"].Value.Trim();
+
+        Assert.True(
+            declared.Length > 0,
+            "Directory.Build.props declares no <PackageIcon>. Without one every package renders "
+            + "with a generic placeholder on nuget.org and in the Package Manager.");
+
+        // The declaration names the path INSIDE the package; the file gets there via a None
+        // item. Finding that item is what connects the declaration to a real file — a
+        // <PackageIcon> pointing at nothing produces a package whose icon silently does not
+        // render, and the build does not object.
+        var packing = Regex.Match(
+            props,
+            @"<None\s+Include=""\$\(MSBuildThisFileDirectory\)(?<source>[^""]*"
+            + Regex.Escape(declared)
+            + @")""\s+Pack=""true""");
+
+        Assert.True(
+            packing.Success,
+            $"<PackageIcon> declares '{declared}', but no <None ... Pack=\"true\"> item in "
+            + "Directory.Build.props puts a file of that name into the package. The declaration "
+            + "would be packed pointing at nothing.");
+
+        var source = packing.Groups["source"].Value
+            .Replace('\\', Path.DirectorySeparatorChar)
+            .Replace('/', Path.DirectorySeparatorChar);
+
+        var full = Path.Combine(RepoFiles.Root, source);
+
+        Assert.True(
+            File.Exists(full),
+            $"The icon item names '{source}', but no file exists there. Note the ItemGroup is "
+            + "conditioned on Exists(), so a missing file does not fail the BUILD — it silently "
+            + "produces packages with no icon.");
+
+        var bytes = File.ReadAllBytes(full);
+
+        Assert.True(
+            bytes.Length <= 1024 * 1024,
+            $"The icon is {bytes.Length} bytes; NuGet's limit is 1MB.");
+
+        ReadOnlySpan<byte> pngSignature = [0x89, 0x50, 0x4E, 0x47, 0x0D, 0x0A, 0x1A, 0x0A];
+
+        Assert.True(
+            bytes.Length > 24 && bytes.AsSpan(0, 8).SequenceEqual(pngSignature),
+            $"'{source}' is not a PNG. See this guard's remarks: PNG is required here, which is "
+            + "narrower than NuGet allows, so that the dimensions below can be read from the "
+            + "header without an image library.");
+
+        // IHDR is the first chunk of every PNG: its type tag sits at offset 12, and width and
+        // height follow as big-endian 32-bit values at offsets 16 and 20. The tag is checked
+        // rather than assumed, so the numbers read below are known to be dimensions.
+        Assert.True(
+            System.Text.Encoding.ASCII.GetString(bytes, 12, 4) == "IHDR",
+            $"'{source}' has a PNG signature but no IHDR chunk where one must be, so the bytes "
+            + "at offsets 16 and 20 are not its dimensions.");
+
+        var width = BinaryPrimitives.ReadUInt32BigEndian(bytes.AsSpan(16, 4));
+        var height = BinaryPrimitives.ReadUInt32BigEndian(bytes.AsSpan(20, 4));
+
+        Assert.True(
+            width == height,
+            $"The icon is {width}x{height}. NuGet scales an icon into a square slot, so a "
+            + "non-square image is distorted or letterboxed in nuget.org search results and in "
+            + "the Package Manager.");
     }
 }

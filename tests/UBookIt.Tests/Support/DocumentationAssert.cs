@@ -72,6 +72,47 @@ public static class DocumentationAssert
             $"The documentation still says, or says again: \"{sentence}\"");
 
     /// <summary>
+    /// Asserts <paramref name="document"/> contains <paramref name="sentence"/> <b>exactly
+    /// once</b> — for a pin whose job is to hold one specific sentence in place.
+    /// </summary>
+    /// <remarks>
+    /// <para>
+    /// <b>A pinned string quoted a second time stops pinning anything.</b> <see cref="Says"/> is
+    /// satisfied by any occurrence, so the moment the phrase appears somewhere else in the same
+    /// document — most naturally in prose <i>about</i> the pin — the sentence it was protecting is
+    /// free to be rewritten, deleted, or falsified with the guard still green. The pin has not
+    /// weakened; it has moved.
+    /// </para>
+    /// <para>
+    /// <b>Measured, not theorised.</b> <c>docs/publishing.md</c> pins the phrase
+    /// <c>reached nuget.org on</c> to hold its Status line. A later edit added a paragraph
+    /// explaining the pin and quoted a falsified version of that very line as the example — which
+    /// reproduced the substring. QA then rewrote the Status line into a phrasing the pin does not
+    /// recognise, with a date years in the future, and every guard stayed green. **The document
+    /// written to explain the guard was what defeated it.**
+    /// </para>
+    /// <para>
+    /// So the rule is: a pinned string must not be quoted elsewhere in the document it pins. This
+    /// enforces that rather than trusting an author to notice, which is the difference between a
+    /// convention and a guard.
+    /// </para>
+    /// </remarks>
+    public static void SaysOnce(string document, string sentence)
+    {
+        var occurrences = Regex.Matches(Normalise(document), PatternFor(sentence)).Count;
+
+        Assert.True(
+            occurrences == 1,
+            occurrences == 0
+                ? $"The documentation no longer says: \"{sentence}\""
+                : $"The documentation says \"{sentence}\" {occurrences} times. A pinned string "
+                  + "quoted a second time — usually in prose ABOUT the pin — stops holding the "
+                  + "sentence it was protecting: any one occurrence satisfies the pin, so the "
+                  + "original can then be rewritten or falsified with this guard green. "
+                  + "Paraphrase the other occurrence.");
+    }
+
+    /// <summary>
     /// Strips the <c>///</c> prefix from each line, so a sentence that wraps inside an XML
     /// documentation comment reads as one sentence.
     /// </summary>

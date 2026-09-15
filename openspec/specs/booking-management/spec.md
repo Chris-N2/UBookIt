@@ -358,7 +358,7 @@ port cannot fill, and no field the port fills reaches a caller who is not permit
 field the port does not carry is one the screen must obtain another way, which is how a
 second read path into bookings begins.
 
-**BREAKING (unpublished): the booker member SHALL NOT be nullable, and SHALL state its own
+**BREAKING, made before the first release reached a feed: the booker member SHALL NOT be nullable, and SHALL state its own
 condition.** It SHALL always be present and SHALL say which of *shown*, *withheld* or *erased*
 applies; contact details SHALL be carried only in the first case, and the erasure instant only
 in the last. This replaces the nullable member whose null meant "withheld from you", which was

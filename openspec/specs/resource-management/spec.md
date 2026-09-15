@@ -205,7 +205,7 @@ The vocabulary SHALL be descriptive, not prescriptive: this endpoint reports wha
 ### Requirement: Service configuration preview endpoint
 The Management API SHALL expose a versioned endpoint in the `ubookitbackoffice` swagger group that, given **a list of roles** (each a resource type key, a set of required capability keys, and a count) and a duration specification, returns **one resolution chain per role**: the resources of that role's type, those of them satisfying its capabilities, those of them whose constraints admit a permitted length, and the resources excluded at the duration stage with the bound that excluded them. Each chain SHALL identify the role it describes, and the chains SHALL be returned in the order the roles were supplied.
 
-**BREAKING (unpublished):** the request carries a list of roles and the response a chain per role, replacing the single-role request and single chain.
+**BREAKING, made before the first release reached a feed:** the request carries a list of roles and the response a chain per role, replacing the single-role request and single chain.
 
 A role's **count** SHALL be accepted on the request and SHALL default to 1 when
 omitted. It is not an input to any chain — a role of count *N* draws on exactly

@@ -83,7 +83,7 @@ public class BookerContactModel
 /// and <see cref="Condition"/> says why.
 /// </para>
 /// <para>
-/// <b>BREAKING (unpublished):</b> this replaces a nullable booker member whose null meant
+/// <b>BREAKING, made before the first release reached a feed:</b> this replaces a nullable booker member whose null meant
 /// "withheld from you". That null was spent the moment erasure existed: absence acquired a
 /// second cause, and a member whose absence is already meaningful must not be overloaded to
 /// carry withholding as well. Stating the condition removes the ambiguity rather than

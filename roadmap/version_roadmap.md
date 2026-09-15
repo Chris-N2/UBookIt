@@ -4,9 +4,12 @@ How uBookIt got from `0.1.0` (the MVP) to its first full release. **Every row is
 delivered** — this is the record of that plan, not a list of outstanding work.
 
 > **Read this whole file — the table included — as a record of the plan as it stood**, not as
-> a description of the package today. The one exception is the version line directly above:
-> that states uBookIt's current version and is machine-checked against
-> `Directory.Build.props` (`VersionTruthTests`), so it tracks the build rather than the plan.
+> a description of the package today. **No number in this file is uBookIt's current version**,
+> and that is deliberate rather than neglect: *The first release is `17.0.0`* below records
+> where the released line BEGAN, so a version bump must leave it exactly as it is.
+> `VersionTruthTests.The_documented_anchors_do_not_move` pins it to this repository's own
+> archive for that reason — including against a bump that moves every such sentence at once.
+> For the version uBookIt is actually at, read [the README](../README.md).
 > Every row below was written *before* the work in it existed,
 > and every section below argued for a version that has since shipped, sometimes shipping
 > something better than the argument anticipated. Where a sentence describes behaviour a later

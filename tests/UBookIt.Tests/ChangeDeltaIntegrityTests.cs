@@ -195,12 +195,29 @@ public class ChangeDeltaIntegrityTests
                 .Concat(delta.Added.Where(n => delta.Retired.Contains(n, StringComparer.Ordinal)))
                 .Distinct(StringComparer.Ordinal);
 
+            // NORMALISED before matching, because a requirement name is a whole sentence and
+            // tasks.md is wrapped at 100 columns — so the name a task lists is very often split
+            // across two lines, and a raw substring match cannot see it. This guard was written
+            // with a raw Contains and `release-17-0-1` demonstrated the hole immediately: the
+            // change listed its MODIFIED requirement, in a table, with the diff of every
+            // guarantee underneath, and this still failed because the name broke after "the
+            // package".
+            //
+            // That failure mode is the WRONG WAY ROUND for a guard like this. A false red here
+            // sends somebody to reword a task that was already correct, and the obvious way to
+            // make it pass is to fight the line wrap rather than to do the diff. Worse, it is
+            // the trap this repository has already paid for four times over in other guards —
+            // fixing the instance and leaving the class is the fault, not the wrap.
+            var flattenedTasks = Regex.Replace(tasks, @"\s+", " ");
+
             foreach (var name in replacements)
             {
                 Assert.True(
-                    tasks.Contains(name, StringComparison.Ordinal),
+                    flattenedTasks.Contains(Regex.Replace(name, @"\s+", " "), StringComparison.Ordinal),
                     $"{delta.Change} replaces \"{name}\" ({delta.Capability}) but never names it in tasks.md. "
-                    + "A wholesale replacement nobody lists is a wholesale replacement nobody diffs.");
+                    + "A wholesale replacement nobody lists is a wholesale replacement nobody diffs. "
+                    + "(Line wrapping is not the cause — both sides are whitespace-normalised "
+                    + "before this comparison.)");
             }
         }
     }
