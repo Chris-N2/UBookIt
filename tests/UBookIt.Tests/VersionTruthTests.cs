@@ -576,6 +576,16 @@ public class VersionTruthTests
             + "correct; it no longer needs excusing, only counting. The entry stays because "
             + "this guard accounts for every mention, not only the doubtful ones."),
 
+        ("openspec/specs/packaging/spec.md", "nuget.org", 4,
+            "Arrived at SYNC, not written by hand — `release-17-0-1`'s requirements moved into "
+            + "the main spec and brought the feed's name with them. All four describe what "
+            + "nuget.org DOES as a host: it resolves a relative link against the package page, "
+            + "renders no image from a relative path, scopes an API key to an owner, and shows a "
+            + "placeholder where a package has no icon. None asserts uBookIt has been published — "
+            + "that distinction is the one this guard exists to draw, and it survives a sync "
+            + "unchanged. The count is exact so a later requirement cannot smuggle a publication "
+            + "claim into this file behind an allowance granted for behavioural facts."),
+
         ("docs/publishing.md", "nuget.org", 17,
             "The publishing runbook names the feed as a DESTINATION — what nuget.org will "
             + "not let you undo, where the API key lives, which source to push to, how to "
