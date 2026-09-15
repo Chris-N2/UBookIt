@@ -702,17 +702,31 @@ public class VersionTruthTests
             // twice and only one spelling matched: a `Contains` check was satisfied by the
             // good line while the footer said "Norwood Design & Development" without the
             // "Ltd.". That is the ORIGINAL defect's exact shape — the correct name minus a
-            // component — reintroduced in the line added to fix something else. Checking
-            // containment finds an instance; checking every occurrence closes the class.
+            // component — reintroduced in the line added to fix something else.
+            //
+            // WHAT THIS REACHES, precisely: every mention that BEGINS WITH the declared name's
+            // first word, matching case. A case variant ("NORWOOD DESIGN & DEVELOPMENT") or an
+            // abbreviation ("NDD") shares no marker and passes — QA round 2 demonstrated both.
+            // It contains the near-miss that actually shipped, which is the class worth
+            // closing; it is not every possible way to misname the publisher, and saying so
+            // keeps the next reader from assuming cover they do not have.
+            //
+            // PRECONDITION: the declared name's first word does not otherwise appear in these
+            // files. It holds because "Norwood" is a proper noun absent from the prose. If a
+            // future name began with a common word, this would fail on a CORRECT tree —
+            // loudly, at rename time, with a file and an offset — and the right response
+            // would be to change the marker, not the prose.
             for (var at = text.IndexOf(marker, StringComparison.Ordinal); at >= 0;
                  at = text.IndexOf(marker, at + 1, StringComparison.Ordinal))
             {
                 Assert.True(
                     string.CompareOrdinal(text, at, company, 0, company.Length) == 0,
                     $"{document} mentions '{marker}' at offset {at} without going on to say "
-                    + $"'{company}'. A near-miss spelling of the publisher is how this was "
-                    + "wrong in the first place; make it the declared name or rename the "
-                    + "marker deliberately.");
+                    + $"'{company}'. Either it is a near-miss spelling of the publisher — how "
+                    + "this was wrong in the first place — and it should become the declared "
+                    + $"name; or '{marker}' now occurs in ordinary prose, in which case the "
+                    + "marker is unsuitable for this name and the guard needs a different one. "
+                    + "Do not reword the prose to satisfy the test.");
             }
         }
     }

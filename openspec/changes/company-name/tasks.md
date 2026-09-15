@@ -49,14 +49,14 @@ would NOT have been fine to link a URL that might move.
 
 ## 4. QA
 
-- [ ] 4.1 QA round(s) — fresh subagent, no editing of the tree while it runs (㉟ round 1's
+- [x] 4.1 QA round(s) — fresh subagent, no editing of the tree while it runs (㉟ round 1's
       CRITICAL came from exactly that).
 
 ## 5. Sync + archive
 
-- [ ] 5.1 Sync the ADDED requirement into `openspec/specs/packaging/spec.md`; falsified-sentence
+- [x] 5.1 Sync the ADDED requirement into `openspec/specs/packaging/spec.md`; falsified-sentence
       sweep BY PATTERN, wrap- and decoration-normalised, **including the lines edited by hand**.
-- [ ] 5.2 Archive; merge after QA approval.
+- [x] 5.2 Archive; merge after QA approval.
 
 ## QA round 1 — REJECT (1 MAJOR, 1 MINOR, 3 NIT), and the fix (2026-09-15)
 
@@ -71,7 +71,11 @@ would NOT have been fine to link a URL that might move.
       (a) the label is now the declared name, so it falls under the guard for free;
       (b) **the guard checks EVERY occurrence of the name's first word**, not mere containment
       — each must begin the full declared name. Containment finds an instance; enumeration
-      closes the class.
+      closes **the class of near-miss that begins with that word, matching case** — which is
+      the one that shipped. A case variant or an abbreviation shares no marker and still
+      passes (QA round 2 demonstrated both), and the guard's remarks say so rather than
+      implying wider cover. Precondition, also recorded there: the first word must not occur
+      in ordinary prose in those files, or the guard fails on a correct tree.
       *Chris's call outstanding, non-blocking*: if he prefers the trading name without `Ltd.`
       in a footer, the label changes and the decision gets recorded here — but the default is
       the guarded, consistent spelling.
@@ -97,3 +101,46 @@ The second is the terminal-question check on the remarks' limit sentence — a g
 not to verify legal correctness must PASS when the name is consistently wrong, and it does.
 
 At HEAD: 2700 .NET (1485 + 130 + 1085), Release no-incremental 0 warnings, 21 items strict.
+
+## QA round 2 — APPROVE (2 MINOR, 2 NIT), and the fix (2026-09-15)
+
+QA closed the MAJOR by mutant (footer dropping `Ltd.` now fails naming file and offset) and
+went further than I had: it injected a near-miss into the **`LICENSE`** body — a file it never
+touched in round 1 — and confirmed that fails too, so the enumeration is load-bearing rather
+than incidental. It also proved the new loop's boundary safety both ways (`Norwood` as the
+literal last token fails cleanly with no `ArgumentOutOfRangeException`; a file ending in the
+exact name passes).
+
+- [x] R2.1 [MINOR] **"checking every occurrence closes the class" over-claimed**, and QA
+      falsified it with two near-misses that PASS: an all-caps variant (the scan is Ordinal, so
+      the marker is never found) and an abbreviation (`NDD`, which shares no first word). What
+      the guard actually closes is *every mention beginning with the declared name's first
+      word, matching case* — which contains the defect that shipped, and is not "the class".
+      **The same fault this project keeps recording: a remark naming the mechanism's ambition
+      rather than its guarantee.** Corrected in BOTH homes — the guard's remarks and this
+      record — because the claim had been written twice.
+- [x] R2.2 [MINOR] **The marker's precondition was undeclared.** QA built the case: a correct
+      tree, consistently renamed to a company whose first word appears in prose, fails at a
+      real offset with a message that read as an accusation. Now stated in the remarks, and the
+      failure message distinguishes the two causes and says **"do not reword the prose to
+      satisfy the test"** — the wrong fix being the obvious one.
+- [x] R2.3 [NIT] `docs/publishing.md` pointed at "the `company-name` change", which task 5.2
+      was about to archive — a stale pointer in the one document read before an irreversible
+      action. Rewritten archive-stable.
+- [x] R2.4 [NIT] "caught with hours to spare" was an unanchored flourish that dates badly; the
+      checkable half (these fields have been wrong here before) is kept.
+
+## 5.1 Sync
+
+ADDED requirement landed **VERBATIM** in `openspec/specs/packaging/spec.md` (byte-identity
+asserted); 21 items strict. **Sweep by pattern over every live mention of the name**, including
+the lines edited by hand: six live mentions, all carrying `Ltd.`; the two in
+`VersionTruthTests` quote the WRONG name deliberately, describing the defect, in a file the
+guard does not walk and that ships to nobody. The only surviving "closes the class" phrase is
+in `NotificationDocumentationTests`, about markdown discovery, where a scan genuinely does
+close its class — not this over-claim.
+
+At HEAD: 2700 .NET (1485 + 130 + 1085), Release no-incremental 0 warnings, 21 items strict.
+
+**Outstanding for Chris, non-blocking:** the footer label uses the full legal name. If he
+prefers the trading name without `Ltd.`, the label changes and this line records the decision.
