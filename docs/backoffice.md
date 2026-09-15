@@ -17,15 +17,27 @@ all. The permissions decide what within it:
 | **See bookings** | The Bookings list and its reads. Contact details still need the Sensitive data group on top — see below. |
 | **Act on bookings** | Cancel, confirm and decline. Includes seeing them: acting on what you cannot see makes no sense, so this needs no second tick. |
 | **Configure resources and services** | Create, edit and delete resources and services, and assign who is responsible for them. |
+| **Change site settings** | The Settings screen — how bookings behave and who is told about them. See [Configuration](configuration.md). **Not granted automatically, including on upgrade.** |
 
 A group with the section and no uBookIt permissions sees the section shell and nothing in
 it. Permissions union across a user's groups, and none of them ever substitutes for the
 section grant — a group holding every permission but not the section reaches nothing.
 
 **Upgrading from a version before these permissions existed?** Every group that already
-held the uBookIt section is granted all three automatically, once, at the first start — so
-nobody loses access by upgrading. Groups you create afterwards start with nothing ticked,
-and a group whose permissions you later empty stays emptied.
+held the uBookIt section is granted the first three automatically, once, at the first start
+— so nobody loses access by upgrading. Groups you create afterwards start with nothing
+ticked, and a group whose permissions you later empty stays emptied.
+
+> **"Change site settings" is never granted automatically — on upgrade or otherwise, and
+> not even to Umbraco administrators.** After upgrading you will find the Settings tab
+> present and explaining that it needs a grant; tick the permission for the people who
+> should decide these things, and it appears.
+>
+> This is deliberate rather than an oversight. Those settings reach the site's retention
+> posture, its anonymous delivery-API exposure and the addresses bookers' details are sent
+> to. Handing them to every group that happened to hold "Configure resources and services"
+> would widen privilege during an upgrade, silently, into exactly what the separate
+> permission exists to keep apart.
 
 The backoffice hides screens and buttons a user's permissions do not cover, as a
 courtesy; **the server makes the actual decision on every request**, so a bookmarked link

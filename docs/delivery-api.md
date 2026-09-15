@@ -5,6 +5,11 @@ site, a mobile app, anything that would rather consume data than render our Razo
 It covers resource and service discovery, availability, and booking placement, and it is
 versioned under `/umbraco/ubookit/api/v1/`.
 
+> Every uBookIt setting, which of them can be changed in the backoffice and which are
+> configuration-only, and what happens when a value cannot be read, is in
+> **[Configuration](configuration.md)**.
+
+
 **It is off by default. Both halves of it.** A fresh install — and an upgrade that
 changes no configuration — serves none of these endpoints. Turning them on is one
 setting each:

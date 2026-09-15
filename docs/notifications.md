@@ -3,6 +3,11 @@
 uBookIt raises an Umbraco notification when a booking is placed, when a requested booking is
 confirmed or declined, and when one is cancelled, so your site can do whatever it needs to.
 
+> Every uBookIt setting, which of them can be changed in the backoffice and which are
+> configuration-only, and what happens when a value cannot be read, is in
+> **[Configuration](configuration.md)**.
+
+
 ## What uBookIt sends, and what it does not
 
 **Out of the box: nothing.** No email, no SMS, no message of any kind, to the booker or to

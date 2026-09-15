@@ -61,6 +61,12 @@ public sealed class UBookItAuthorizationComposer : IComposer
                 Constants.Verbs.BookingsManage);
             AddVerbPolicy(options, Constants.VerbPolicies.Configure,
                 Constants.Verbs.Configure);
+
+            // ONE verb, no implication. Unlike the bookings pair, nothing else satisfies this:
+            // Configure does not reach the settings and Settings does not reach resources,
+            // services or bookings. See Constants.Verbs.Settings for why.
+            AddVerbPolicy(options, Constants.VerbPolicies.Settings,
+                Constants.Verbs.Settings);
         });
     }
 

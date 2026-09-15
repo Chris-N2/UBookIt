@@ -52,6 +52,19 @@ namespace UBookIt.Backoffice
 
             /// <summary>Resources, services, their supporting reads, and responsibility assignment.</summary>
             public const string Configure = "UBookIt.Configure";
+
+            /// <summary>
+            /// Reading and changing the site's own settings.
+            /// </summary>
+            /// <remarks>
+            /// <b>Implies nothing and is implied by nothing — in particular it is NOT a senior form
+            /// of <see cref="Configure"/>.</b> Configuring a bookable resource and configuring the
+            /// site are different privileges: these settings reach the site's retention posture,
+            /// its anonymous delivery-API exposure and the addresses bookers' details are sent to,
+            /// and a grant meaning "may add a meeting room" does not carry them. The separation is
+            /// the point of the verb, so an implication in either direction would undo it.
+            /// </remarks>
+            public const string Settings = "UBookIt.Settings";
         }
 
         /// <summary>
@@ -66,6 +79,8 @@ namespace UBookIt.Backoffice
             public const string BookingsManage = "UBookItBookingsManage";
 
             public const string Configure = "UBookItConfigure";
+
+            public const string Settings = "UBookItSettings";
         }
     }
 }

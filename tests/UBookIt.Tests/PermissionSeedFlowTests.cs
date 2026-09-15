@@ -1,3 +1,4 @@
+using System.Reflection;
 using Microsoft.Extensions.Logging.Abstractions;
 using UBookIt.Backoffice;
 using UBookIt.Backoffice.Composers;
@@ -53,6 +54,61 @@ public class PermissionSeedFlowTests
         Assert.Contains(Constants.Verbs.BookingsManage, seedable.Permissions);
         Assert.Contains(Constants.Verbs.Configure, seedable.Permissions);
         Assert.True(flags.SetCalled);
+
+        // THE SETTINGS VERB IS NEVER SEEDED, on a fresh seed or any other.
+        //
+        // Seeding it would widen privilege into exactly what the verb exists to separate: every
+        // group holding Configure because somebody ticked "may add a meeting room" would gain the
+        // site's retention posture, its anonymous exposure and where bookers' details are emailed.
+        // It would also make a freshly installed site differ from an upgraded one, since the flag
+        // is already recorded wherever this seed has run.
+        Assert.DoesNotContain(Constants.Verbs.Settings, seedable.Permissions);
+        Assert.DoesNotContain(Constants.Verbs.Settings, untouchable.Permissions);
+    }
+
+    [Fact]
+    public async Task An_upgrade_grants_the_settings_verb_to_nobody()
+    {
+        // The upgrade case, which is the one that actually happens: groups already hold uBookIt
+        // verbs from a previous version, so the selection rule skips them AND the flag is already
+        // recorded. Nobody gains the settings verb, and nobody loses anything either.
+        var alreadySeeded = SectionGroupWithoutVerbs();
+        alreadySeeded.Permissions.Add(Constants.Verbs.BookingsRead);
+        alreadySeeded.Permissions.Add(Constants.Verbs.BookingsManage);
+        alreadySeeded.Permissions.Add(Constants.Verbs.Configure);
+
+        var groups = new StubUserGroupService(alreadySeeded);
+        var flags = new StubFlagStore();
+
+        await RunAsync(flags, groups);
+
+        Assert.DoesNotContain(Constants.Verbs.Settings, alreadySeeded.Permissions);
+        Assert.Contains(Constants.Verbs.BookingsRead, alreadySeeded.Permissions);
+        Assert.Contains(Constants.Verbs.BookingsManage, alreadySeeded.Permissions);
+        Assert.Contains(Constants.Verbs.Configure, alreadySeeded.Permissions);
+        Assert.Empty(groups.Updated);
+    }
+
+    [Fact]
+    public void The_seeded_set_is_every_verb_except_settings()
+    {
+        // Structural, so that adding a FIFTH verb has to make a decision here rather than being
+        // seeded by default. Derived from the server's constants for the same reason the
+        // vocabulary guard is: a hand-written expectation cannot see a verb nobody added to it.
+        var allVerbs = typeof(Constants.Verbs)
+            .GetFields(BindingFlags.Public | BindingFlags.Static)
+            .Where(f => f.IsLiteral && f.FieldType == typeof(string))
+            .Select(f => (string)f.GetRawConstantValue()!)
+            .ToHashSet(StringComparer.Ordinal);
+
+        var seeded = (string[])typeof(UBookItPermissionSeed)
+            .GetField("AllVerbs", BindingFlags.NonPublic | BindingFlags.Static)!
+            .GetValue(null)!;
+
+        Assert.NotEmpty(allVerbs);
+        Assert.Equal(
+            allVerbs.Except([Constants.Verbs.Settings], StringComparer.Ordinal).OrderBy(v => v, StringComparer.Ordinal),
+            seeded.OrderBy(v => v, StringComparer.Ordinal));
     }
 
     /// <summary>

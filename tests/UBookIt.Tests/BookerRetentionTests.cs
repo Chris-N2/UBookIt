@@ -107,7 +107,7 @@ public class BookerRetentionTests
 
         return new Harness(
             new BookerRetentionJob(
-                provider.GetRequiredService<IServiceScopeFactory>(), settings, clock, logger),
+                provider.GetRequiredService<IServiceScopeFactory>(), clock, logger),
             store,
             logger);
     }
@@ -330,7 +330,7 @@ public class BookerRetentionTests
         var provider = services.BuildServiceProvider();
         var logger = new CapturingLogger();
         var job = new BookerRetentionJob(
-            provider.GetRequiredService<IServiceScopeFactory>(), settings, clock, logger);
+            provider.GetRequiredService<IServiceScopeFactory>(), clock, logger);
 
         await job.ExecuteAsync(CancellationToken.None);
 
@@ -375,7 +375,7 @@ public class BookerRetentionTests
 
         var provider = services.BuildServiceProvider();
         var job = new BookerRetentionJob(
-            provider.GetRequiredService<IServiceScopeFactory>(), settings, clock, new CapturingLogger());
+            provider.GetRequiredService<IServiceScopeFactory>(), clock, new CapturingLogger());
 
         await job.ExecuteAsync(cts.Token);
 
@@ -401,7 +401,7 @@ public class BookerRetentionTests
 
         // Resumption, with a fresh token, completes it without re-erasing the first three.
         var finishing = new BookerRetentionJob(
-            provider.GetRequiredService<IServiceScopeFactory>(), settings, clock, new CapturingLogger());
+            provider.GetRequiredService<IServiceScopeFactory>(), clock, new CapturingLogger());
 
         await finishing.ExecuteAsync(CancellationToken.None);
 
@@ -505,7 +505,7 @@ public class BookerRetentionTests
         var provider = services.BuildServiceProvider();
         var logger = new CapturingLogger();
         var job = new BookerRetentionJob(
-            provider.GetRequiredService<IServiceScopeFactory>(), settings, clock, logger);
+            provider.GetRequiredService<IServiceScopeFactory>(), clock, logger);
 
         await job.ExecuteAsync(CancellationToken.None);
 
@@ -561,17 +561,39 @@ public class BookerRetentionTests
         // in its constructor would hold one DbContext for the lifetime of the application — and
         // would do so silently, since it would work perfectly on the first run.
         //
-        // The scoped services this package registers, by name, so that adding one to the job's
-        // constructor fails here rather than in production six weeks later.
-        Type[] scoped =
-        [
-            typeof(IBookingStore),
-            typeof(IBookingManagementStore),
-            typeof(IBookingService),
-            typeof(IResourceStore),
-            typeof(IServiceStore),
-            typeof(IAvailabilityQueryService),
-        ];
+        // The scoped set is DERIVED FROM THE CONTAINER, never listed here.
+        //
+        // It used to be a fixed array of six type names, and that is precisely the shape of guard
+        // this project keeps being burned by: it checks the mechanism (these six names) rather
+        // than the guarantee (nothing registered as scoped). A listed type cannot see a service
+        // whose LIFETIME CHANGED after the list was written — and that is exactly what happened
+        // when the settings screen moved `SiteBookingSettings` from singleton to scoped. The job
+        // took it in its constructor legally for as long as it was a singleton; the moment it
+        // became scoped the job was holding one DbContext for the life of the application, and
+        // the old guard stayed green throughout, because `SiteBookingSettings` was not one of the
+        // six names somebody had thought to write down.
+        var registrations = new ServiceCollection();
+        new UBookItPersistenceComposer().Compose(new ServicesOnlyUmbracoBuilder(registrations));
+
+        var scoped = registrations
+            .Where(d => d.Lifetime == ServiceLifetime.Scoped)
+            .Select(d => d.ServiceType)
+            .ToHashSet();
+
+        // The derivation's own preconditions, asserted in BOTH directions. An empty or
+        // mis-derived set would make the offender check below vacuously true and this test would
+        // pass while guarding nothing — the failure mode that let a suite report green for three
+        // days while not running. These three are known-scoped by the composer above, so if the
+        // derivation stops finding them it is the derivation that is broken, not the job.
+        Assert.NotEmpty(scoped);
+        Assert.Contains(typeof(IBookingService), scoped);
+        Assert.Contains(typeof(IBookingStore), scoped);
+        Assert.Contains(typeof(IAvailabilityQueryService), scoped);
+
+        // AND the one this rewrite exists for. Without it, a registration reverting to
+        // AddSingleton would leave the precondition green and the guard would silently stop
+        // guarding the regression it was written to catch.
+        Assert.Contains(typeof(SiteBookingSettings), scoped);
 
         var taken = typeof(BookerRetentionJob)
             .GetConstructors()
@@ -619,13 +641,20 @@ public class BookerRetentionTests
         var provider = services.BuildServiceProvider();
         var counting = new CountingScopeFactory(provider.GetRequiredService<IServiceScopeFactory>());
 
-        var job = new BookerRetentionJob(counting, settings, clock, new CapturingLogger());
+        var job = new BookerRetentionJob(counting, clock, new CapturingLogger());
         await job.ExecuteAsync(CancellationToken.None);
 
-        // Three full batches plus the empty one that ends the run. More than one is the
-        // guarantee; the exact count is asserted so hoisting the scope fails loudly rather than
-        // merely differently.
-        Assert.Equal(4, counting.ScopesCreated);
+        // One scope to read the retention period, then three full batches, then the empty one
+        // that ends the run.
+        //
+        // The settings scope is the fifth since SiteBookingSettings became scoped: the job may no
+        // longer hold it, so it resolves it once per RUN — the period defines the cutoff, and a
+        // cutoff that moved mid-sweep would page against a set it had already partly measured.
+        //
+        // The exact count is still asserted rather than ">= 2", so that hoisting the per-batch
+        // scope out of the loop fails loudly rather than merely differently: hoisting would give
+        // two scopes (settings plus one hoisted), not five.
+        Assert.Equal(5, counting.ScopesCreated);
     }
 
     [Fact]

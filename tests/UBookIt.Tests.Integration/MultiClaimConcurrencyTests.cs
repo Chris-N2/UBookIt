@@ -288,6 +288,12 @@ public class MultiClaimConcurrencyTests(SqlServerFixture fixture)
                 // neither `uBookItResourceClaim` nor `uBookItBooking` is referenced or
                 // altered — the guarantee above still holds.
                 "20260912123308_AddFlags",
+
+                // admin-settings-screen: creates uBookItSetting, one row per setting a site has
+                // overridden through the backoffice. Confirmed against the rule above — it does
+                // NOT touch the claims table, or any existing table: the migration is a single
+                // CreateTable and alters and drops nothing.
+                "20260915172610_AddSettings",
             ],
             applied.OrderBy(name => name, StringComparer.Ordinal));
 

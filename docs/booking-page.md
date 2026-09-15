@@ -5,6 +5,11 @@ name. Create a page of that type, publish it, and the booking flow renders on it
 do not need to write any Razor, know the name of a view component, or configure
 anything.
 
+> Every uBookIt setting, which of them can be changed in the backoffice and which are
+> configuration-only, and what happens when a value cannot be read, is in
+> **[Configuration](configuration.md)**.
+
+
 With nothing else specified the page shows the **catalogue** — everything the site
 offers, services and directly bookable resources together. To send a visitor straight
 to one thing, name it in the URL:

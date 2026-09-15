@@ -283,3 +283,18 @@ internal sealed class FlagRow
 
     public DateTimeOffset AppliedUtc { get; set; }
 }
+
+/// <summary>
+/// Table: uBookItSetting. One row per setting a site has overridden through the backoffice,
+/// keyed by the configuration key it overrides. A key with no row is not overridden — there is
+/// no sentinel, because several settings treat "no value" as meaningful. The value is held as
+/// text, exactly as a configuration source would supply it. No personal data, ever.
+/// </summary>
+internal sealed class SettingRow
+{
+    public required string Key { get; set; }
+
+    public required string Value { get; set; }
+
+    public DateTimeOffset UpdatedUtc { get; set; }
+}

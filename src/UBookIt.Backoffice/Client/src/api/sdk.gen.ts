@@ -2,7 +2,7 @@
 
 import type { Client, Options as Options2, TDataShape } from './client';
 import { client } from './client.gen';
-import type { CancelBookingData, CancelBookingErrors, CancelBookingResponses, ConfirmBookingData, ConfirmBookingErrors, ConfirmBookingResponses, CreateResourceData, CreateResourceErrors, CreateResourceResponses, CreateServiceData, CreateServiceErrors, CreateServiceResponses, DeclineBookingData, DeclineBookingErrors, DeclineBookingResponses, DeleteResourceData, DeleteResourceErrors, DeleteResourceResponses, DeleteServiceData, DeleteServiceErrors, DeleteServiceResponses, EraseBookerData, EraseBookerErrors, EraseBookerResponses, FindBookingsByBookerData, FindBookingsByBookerErrors, FindBookingsByBookerResponses, GetResourceData, GetResourceErrors, GetResourceResponses, GetResourceResponsibilityData, GetResourceResponsibilityErrors, GetResourceResponsibilityResponses, GetServiceData, GetServiceErrors, GetServiceResponses, GetServiceResponsibilityData, GetServiceResponsibilityErrors, GetServiceResponsibilityResponses, ListBookingsData, ListBookingsErrors, ListBookingsResponses, ListCapabilitiesData, ListCapabilitiesErrors, ListCapabilitiesResponses, ListResourcesData, ListResourcesErrors, ListResourcesResponses, ListResourceTypesData, ListResourceTypesErrors, ListResourceTypesResponses, ListServicesData, ListServicesErrors, ListServicesResponses, PreviewServiceConfigurationData, PreviewServiceConfigurationErrors, PreviewServiceConfigurationResponses, PutResourceResponsibilityData, PutResourceResponsibilityErrors, PutResourceResponsibilityResponses, PutServiceResponsibilityData, PutServiceResponsibilityErrors, PutServiceResponsibilityResponses, UpdateResourceData, UpdateResourceErrors, UpdateResourceResponses, UpdateServiceData, UpdateServiceErrors, UpdateServiceResponses } from './types.gen';
+import type { CancelBookingData, CancelBookingErrors, CancelBookingResponses, ConfirmBookingData, ConfirmBookingErrors, ConfirmBookingResponses, CreateResourceData, CreateResourceErrors, CreateResourceResponses, CreateServiceData, CreateServiceErrors, CreateServiceResponses, DeclineBookingData, DeclineBookingErrors, DeclineBookingResponses, DeleteResourceData, DeleteResourceErrors, DeleteResourceResponses, DeleteServiceData, DeleteServiceErrors, DeleteServiceResponses, EraseBookerData, EraseBookerErrors, EraseBookerResponses, FindBookingsByBookerData, FindBookingsByBookerErrors, FindBookingsByBookerResponses, GetResourceData, GetResourceErrors, GetResourceResponses, GetResourceResponsibilityData, GetResourceResponsibilityErrors, GetResourceResponsibilityResponses, GetServiceData, GetServiceErrors, GetServiceResponses, GetServiceResponsibilityData, GetServiceResponsibilityErrors, GetServiceResponsibilityResponses, GetSettingsData, GetSettingsErrors, GetSettingsResponses, ListBookingsData, ListBookingsErrors, ListBookingsResponses, ListCapabilitiesData, ListCapabilitiesErrors, ListCapabilitiesResponses, ListResourcesData, ListResourcesErrors, ListResourcesResponses, ListResourceTypesData, ListResourceTypesErrors, ListResourceTypesResponses, ListServicesData, ListServicesErrors, ListServicesResponses, PreviewServiceConfigurationData, PreviewServiceConfigurationErrors, PreviewServiceConfigurationResponses, PutResourceResponsibilityData, PutResourceResponsibilityErrors, PutResourceResponsibilityResponses, PutServiceResponsibilityData, PutServiceResponsibilityErrors, PutServiceResponsibilityResponses, PutSettingData, PutSettingErrors, PutSettingResponses, ResetSettingData, ResetSettingErrors, ResetSettingResponses, UpdateResourceData, UpdateResourceErrors, UpdateResourceResponses, UpdateServiceData, UpdateServiceErrors, UpdateServiceResponses } from './types.gen';
 
 export type Options<TData extends TDataShape = TDataShape, ThrowOnError extends boolean = boolean> = Options2<TData, ThrowOnError> & {
     /**
@@ -346,6 +346,49 @@ export class UBookItBackofficeService {
             headers: {
                 'Content-Type': 'application/json',
                 ...options?.headers
+            }
+        });
+    }
+    
+    public static getSettings<ThrowOnError extends boolean = false>(options?: Options<GetSettingsData, ThrowOnError>) {
+        return (options?.client ?? client).get<GetSettingsResponses, GetSettingsErrors, ThrowOnError>({
+            security: [
+                {
+                    scheme: 'bearer',
+                    type: 'http'
+                }
+            ],
+            url: '/umbraco/ubookitbackoffice/api/v1/settings',
+            ...options
+        });
+    }
+    
+    public static resetSetting<ThrowOnError extends boolean = false>(options: Options<ResetSettingData, ThrowOnError>) {
+        return (options.client ?? client).delete<ResetSettingResponses, ResetSettingErrors, ThrowOnError>({
+            security: [
+                {
+                    scheme: 'bearer',
+                    type: 'http'
+                }
+            ],
+            url: '/umbraco/ubookitbackoffice/api/v1/settings/{key}',
+            ...options
+        });
+    }
+    
+    public static putSetting<ThrowOnError extends boolean = false>(options: Options<PutSettingData, ThrowOnError>) {
+        return (options.client ?? client).put<PutSettingResponses, PutSettingErrors, ThrowOnError>({
+            security: [
+                {
+                    scheme: 'bearer',
+                    type: 'http'
+                }
+            ],
+            url: '/umbraco/ubookitbackoffice/api/v1/settings/{key}',
+            ...options,
+            headers: {
+                'Content-Type': 'application/json',
+                ...options.headers
             }
         });
     }

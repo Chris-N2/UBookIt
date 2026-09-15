@@ -1,26 +1,33 @@
-# permissions Specification
+<!--
+GUARANTEE DIFF for the two wholesale replacements below.
 
-## Purpose
+"Access within the section is decided by three verbs" — 3 SHALL blocks, 4 scenarios:
+  SHALL 1  exactly three verbs, assigned via the group editor  → CARRIED, amended to four.
+                                                                 Each existing verb's definition
+                                                                 restated verbatim.
+  SHALL 2  Manage implies Read, in the rule not by copying      → CARRIED unchanged
+  SHALL 3  verbs are the union across groups; no own store      → CARRIED unchanged
+  Scenarios 1-4 ALL CARRIED verbatim. Three ADDED for the new verb's isolation.
+  NOTE: the new verb implies nothing and is implied by nothing — stated explicitly, because
+  "Manage implies Read" establishes that implication is a thing this package does.
 
-Who may do what within the uBookIt section, decided by four permission verbs a site
-assigns to its Umbraco user groups through the ordinary group editor: seeing bookings,
-acting on them (which includes seeing them — the implication is a rule of the
-authorization, never data on a group), configuring resources, services and
-responsibility, and changing the site's own settings. The section grant stays the
-unremovable outer gate that no verb can substitute for, and the Sensitive data group
-stays the decisive control over contact details, joined by the read verb and replaced by
-nothing.
+"Existing section-granted groups are seeded once" — 2 SHALL blocks, 3 scenarios:
+  SHALL 1  seed all three verbs once to section-granted groups   → CARRIED, amended to name the
+             holding no UBookIt. verb; record completion;          three verbs as a closed set that
+             never run again                                       the settings verb is outside of
+  SHALL 2  touch nothing else; report failure without failing    → CARRIED unchanged
+             startup; leave unrecorded so retry is idempotent
+  Scenarios 1-3 ALL CARRIED. Two ADDED for the settings verb's exclusion, fresh and upgraded.
 
-The verbs live in Umbraco's own group permission storage; the package stores only a
-one-shot marker recording that existing section-granted groups were seeded at upgrade,
-so nobody loses access by upgrading and the toggles thereafter mean exactly what they
-show — empty is nothing. **The seeded set is the first three; the settings verb is never
-seeded**, on upgrade or on a fresh install and not for administrators either, because
-granting it to every group that happened to hold the configure verb would widen privilege
-into exactly what it exists to separate. The client hides what a user's verbs do not cover
-as a courtesy; the server decides every request.
+  DELIBERATE DROPS: none.
+-->
 
-## Requirements
+## RENAMED Requirements
+
+- FROM: `### Requirement: Access within the section is decided by three verbs`
+- TO: `### Requirement: Access within the section is decided by four verbs`
+
+## MODIFIED Requirements
 
 ### Requirement: Access within the section is decided by four verbs
 
@@ -91,53 +98,6 @@ own.
   `UBookIt.Settings`, requests the settings
 - **THEN** the request is refused
 
-### Requirement: The section grant remains the outer gate
-
-Access to the package's section SHALL remain required for every management endpoint,
-exactly as before this capability existed, and a verb SHALL never substitute for it: a
-user whose groups hold every verb but not the section reaches nothing. An endpoint that
-has not been classified into a verb SHALL remain section-gated — never anonymous — and
-the classification SHALL be total: an unclassified management endpoint SHALL be a
-reported failure naming it, not a silently looser or tighter gate.
-
-#### Scenario: Verbs without the section grant nothing
-
-- **WHEN** a user whose groups hold every uBookIt verb but no uBookIt section access calls
-  any management endpoint
-- **THEN** the request is refused on the same terms as before this capability existed
-
-#### Scenario: The section alone shows the shell
-
-- **WHEN** a user holds the section grant and their groups hold no uBookIt verb, and the
-  one-time seed has already run
-- **THEN** the section is visible and every verb-gated endpoint refuses them
-
-#### Scenario: Every endpoint is classified
-
-- **WHEN** the management endpoints are enumerated
-- **THEN** each is classified into exactly one verb, and an unclassified endpoint is
-  reported as a failure naming it
-
-### Requirement: Sensitive-data gates are joined by verbs, never replaced
-
-The endpoints gated by the **Sensitive data** group — reading contact details, searching
-by booker, erasure — SHALL keep that gate unchanged and SHALL additionally require
-`UBookIt.Bookings.Read`. Sensitive-data access SHALL remain the decisive control over
-contact details; a verb SHALL never disclose what that group withholds.
-
-#### Scenario: Sensitive data without the read verb reaches no bookings
-
-- **WHEN** a user with sensitive-data access whose groups hold no uBookIt booking verb
-  calls the find-by-booker endpoint
-- **THEN** the request is refused
-
-#### Scenario: The read verb without sensitive data still withholds
-
-- **WHEN** a user whose groups hold `UBookIt.Bookings.Read` but who lacks sensitive-data
-  access lists bookings
-- **THEN** the response withholds contact details exactly as the `sensitive-data`
-  capability requires
-
 ### Requirement: Existing section-granted groups are seeded once
 
 At startup, exactly once per installation, the package SHALL grant the three verbs
@@ -191,30 +151,3 @@ only-groups-with-no-uBookIt-verb condition SHALL make that retry idempotent.
 - **WHEN** the seed runs for the first time on an installation with section-granted groups
   holding no uBookIt verbs
 - **THEN** those groups hold the three seeded verbs and not `UBookIt.Settings`
-
-### Requirement: The client hides what the server would refuse, and the server remains the truth
-
-The backoffice client SHALL surface each verb as a toggle in the user group editor's
-default-permissions pane, using Umbraco's own extension surface and no custom management
-UI, with the verb strings identical to the server's — a guard SHALL fail when the two
-vocabularies disagree. The section's own views SHALL hide surfaces and actions the
-current user's verbs do not cover, as convenience: the authorization decision SHALL be
-the server's for every request, so a deep link or direct call against a hidden surface
-is refused regardless of what the client shows.
-
-#### Scenario: The toggles appear in the group editor
-
-- **WHEN** an administrator opens a user group in the backoffice
-- **THEN** the three uBookIt permissions can be toggled in the default-permissions pane
-  and persist with the group
-
-#### Scenario: Hidden is not the control
-
-- **WHEN** a user without `UBookIt.Configure` requests a resource-management endpoint
-  directly
-- **THEN** the request is refused by the server, whatever the client did or did not show
-
-#### Scenario: One vocabulary
-
-- **WHEN** the client manifest's verbs and the server's verb constants are compared
-- **THEN** they are identical, and a difference is a reported failure

@@ -32,7 +32,6 @@ namespace UBookIt.Persistence.Jobs;
 /// </remarks>
 internal sealed class BookerRetentionJob(
     IServiceScopeFactory scopeFactory,
-    SiteBookingSettings settings,
     TimeProvider timeProvider,
     ILogger<BookerRetentionJob> logger) : IDistributedBackgroundJob
 {
@@ -73,12 +72,33 @@ internal sealed class BookerRetentionJob(
     /// <inheritdoc />
     public async Task ExecuteAsync(CancellationToken cancellationToken)
     {
-        if (settings.RetentionDays is not int retentionDays)
+        // RESOLVED PER RUN, from a scope, and NOT held on this job.
+        //
+        // SiteBookingSettings is scoped since the settings screen made it live, so taking it in
+        // the constructor would make this singleton hold a scoped service — and through it one
+        // DbContext for the life of the application, silently, since the first sweep would work
+        // perfectly. The captive-dependency guard derives what is scoped from the container's own
+        // registrations precisely so that this cannot be reintroduced.
+        //
+        // Reading it per run rather than per batch is deliberate: the period is the definition of
+        // the cutoff, and a sweep whose cutoff moved underneath it would page against a set it
+        // had already partly measured. A change to the period therefore takes effect on the next
+        // run, which is within the hour.
+        int retentionDays;
+
+        using (var settingsScope = scopeFactory.CreateScope())
         {
-            // Off, which is the default. No query, no scope, no log line — a feature nobody has
-            // turned on should cost nothing observable, or its absence becomes noise every hour
-            // on every site that will never use it.
-            return;
+            var settings = settingsScope.ServiceProvider.GetRequiredService<SiteBookingSettings>();
+
+            if (settings.RetentionDays is not int configured)
+            {
+                // Off, which is the default. No query, no further scope, no log line — a feature
+                // nobody has turned on should cost nothing observable, or its absence becomes
+                // noise every hour on every site that will never use it.
+                return;
+            }
+
+            retentionDays = configured;
         }
 
         // From the injected clock, never DateTimeOffset.UtcNow. The whole feature is one

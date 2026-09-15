@@ -247,6 +247,25 @@ export type ServiceRoleModel = {
     visitorSelectable: boolean;
 };
 
+export type SettingResponseModel = {
+    key: string;
+    tier: string;
+    valueKind: string;
+    effectiveValue?: string | null;
+    configuredValue?: string | null;
+    isOverridden: boolean;
+    isConfigured: boolean;
+    requiresRestart: boolean;
+};
+
+export type SettingWriteModel = {
+    value: string;
+};
+
+export type SettingsResponseModel = {
+    settings: Array<SettingResponseModel>;
+};
+
 export type ShortfallRoleModel = {
     roleIndex: number;
     resourceType: string;
@@ -412,7 +431,7 @@ export type EraseBookerErrors = {
      */
     401: unknown;
     /**
-     * Forbidden
+     * The authenticated user does not have access to this resource
      */
     403: unknown;
     /**
@@ -447,7 +466,7 @@ export type FindBookingsByBookerErrors = {
      */
     401: unknown;
     /**
-     * Forbidden
+     * The authenticated user does not have access to this resource
      */
     403: unknown;
 };
@@ -959,3 +978,92 @@ export type PreviewServiceConfigurationResponses = {
 };
 
 export type PreviewServiceConfigurationResponse = PreviewServiceConfigurationResponses[keyof PreviewServiceConfigurationResponses];
+
+export type GetSettingsData = {
+    body?: never;
+    path?: never;
+    query?: never;
+    url: '/umbraco/ubookitbackoffice/api/v1/settings';
+};
+
+export type GetSettingsErrors = {
+    /**
+     * The resource is protected and requires an authentication token
+     */
+    401: unknown;
+};
+
+export type GetSettingsResponses = {
+    /**
+     * OK
+     */
+    200: SettingsResponseModel;
+};
+
+export type GetSettingsResponse = GetSettingsResponses[keyof GetSettingsResponses];
+
+export type ResetSettingData = {
+    body?: never;
+    path: {
+        key: string;
+    };
+    query?: never;
+    url: '/umbraco/ubookitbackoffice/api/v1/settings/{key}';
+};
+
+export type ResetSettingErrors = {
+    /**
+     * Bad Request
+     */
+    400: ProblemDetails;
+    /**
+     * The resource is protected and requires an authentication token
+     */
+    401: unknown;
+    /**
+     * Not Found
+     */
+    404: ProblemDetails;
+};
+
+export type ResetSettingError = ResetSettingErrors[keyof ResetSettingErrors];
+
+export type ResetSettingResponses = {
+    /**
+     * OK
+     */
+    200: unknown;
+};
+
+export type PutSettingData = {
+    body?: SettingWriteModel;
+    path: {
+        key: string;
+    };
+    query?: never;
+    url: '/umbraco/ubookitbackoffice/api/v1/settings/{key}';
+};
+
+export type PutSettingErrors = {
+    /**
+     * Bad Request
+     */
+    400: ProblemDetails;
+    /**
+     * The resource is protected and requires an authentication token
+     */
+    401: unknown;
+    /**
+     * Not Found
+     */
+    404: ProblemDetails;
+};
+
+export type PutSettingError = PutSettingErrors[keyof PutSettingErrors];
+
+export type PutSettingResponses = {
+    /**
+     * OK
+     */
+    200: unknown;
+};

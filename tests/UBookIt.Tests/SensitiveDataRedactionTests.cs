@@ -460,6 +460,18 @@ public class SensitiveDataRedactionTests
             "ServiceRoleCapabilityRow: Key,ServiceRoleId",
             "ServiceRoleRow: Capabilities,Count,Id,ResourceType,ServiceId,VisitorSelectable",
             "ServiceRow: DurationKind,Id,MaxDurationMinutes,MinDurationMinutes,Name,Roles",
+
+            // Decision, admin-settings-screen (roadmap 17.1.0): one row per setting a site has
+            // overridden through the backoffice — the CONFIGURATION KEY, its value as text, and
+            // when it was last written. No personal data can reach it, and the reason is
+            // structural rather than a promise: the key side is a fixed vocabulary of the
+            // package's own setting names, and the server refuses a write to any key outside it,
+            // so no caller can invent a key naming a person. The value side is a site's own
+            // configuration — its time zone, whether bookings auto-confirm, its privacy policy
+            // link. The one value that is an address at all is the INTERNAL recipient list, which
+            // is the site's own staff distribution list, already in appsettings today, and
+            // deliberately not a booker's.
+            "SettingRow: Key,UpdatedUtc,Value",
         ];
 
         Assert.True(
@@ -666,6 +678,15 @@ public class SensitiveDataRedactionTests
             "ResponsibilityController.PutServiceResponsibility",
             "ServicesController.CreateService",
             "ServicesController.UpdateService",
+            // Genuine writes: each changes what the package stores for a setting — PutSetting
+            // adds or replaces a stored override, ResetSetting removes one. Recorded as writes
+            // deliberately rather than left to the default, because the default is "read" and a
+            // write misfiled as a read is exempt from nothing but is described wrongly. Neither
+            // takes a booker's details: the key side is a fixed vocabulary of the package's own
+            // setting names and the server refuses anything outside it, and the value side is the
+            // site's own configuration.
+            "SettingsController.PutSetting",
+            "SettingsController.ResetSetting",
             "ServicesController.DeleteService",
         ];
 
@@ -874,6 +895,9 @@ public class SensitiveDataRedactionTests
             "ServicesController.ListServices = read",
             "ServicesController.PreviewServiceConfiguration = read",
             "ServicesController.UpdateService = write",
+            "SettingsController.GetSettings = read",
+            "SettingsController.PutSetting = write",
+            "SettingsController.ResetSetting = write",
         ];
 
         Assert.True(
