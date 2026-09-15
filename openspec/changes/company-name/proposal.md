@@ -3,7 +3,7 @@
 ## Why
 
 The package names its publisher as **"Norwood Development"**. The company is **"Norwood Design
-& Development Ltd."** (Chris, 2026-09-16). This is wrong in the `.nupkg`'s `Authors`, `Company`
+& Development Ltd."** (Chris, 2026-09-15). This is wrong in the `.nupkg`'s `Authors`, `Company`
 and `Copyright`, in the `README`, and — the one that is not merely cosmetic — in the **`LICENSE`
 file's copyright line**, which names the entity granting the MIT rights.
 
