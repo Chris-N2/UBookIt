@@ -29,10 +29,10 @@
     -->
     <Version>17.0.0</Version>
 
-    <Authors>Norwood Development</Authors>
-    <Company>Norwood Development</Company>
+    <Authors>Norwood Design &amp; Development Ltd.</Authors>
+    <Company>Norwood Design &amp; Development Ltd.</Company>
     <Product>uBookIt</Product>
-    <Copyright>Copyright © Norwood Development</Copyright>
+    <Copyright>Copyright © Norwood Design &amp; Development Ltd.</Copyright>
 
     <PackageLicenseExpression>MIT</PackageLicenseExpression>
     <PackageReadmeFile>README.md</PackageReadmeFile>

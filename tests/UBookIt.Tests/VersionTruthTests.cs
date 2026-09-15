@@ -623,4 +623,111 @@ public class VersionTruthTests
         DocumentationAssert.Says(
             runbook, "When you publish, that guard will start failing. Do not delete it.");
     }
+
+    /// <summary>
+    /// The package names ONE publisher, declared once (packaging spec, "The package names one
+    /// publisher, declared once").
+    /// </summary>
+    /// <remarks>
+    /// <para>
+    /// <b>Derived from <c>&lt;Company&gt;</c>, never restated.</b> Writing the name literally
+    /// here would reproduce the defect this guard exists to close — five copies of a company
+    /// name with nothing comparing them, wrong in all five and shipped in every release build —
+    /// one file further along.
+    /// </para>
+    /// <para>
+    /// <b>The comparison is against the DECODED value.</b> The name contains an ampersand, so
+    /// the props file must spell it <c>&amp;amp;</c> (a bare <c>&amp;</c> is invalid XML and
+    /// fails the build) while <c>LICENSE</c> and <c>README.md</c> are plain text and carry a
+    /// literal <c>&amp;</c>. Comparing raw text would report a mismatch that is not one —
+    /// and, worse, could be "fixed" by putting an XML entity into a licence file.
+    /// </para>
+    /// <para>
+    /// What it does NOT do: check the name is the correct legal name. No test can know that.
+    /// It checks that the three places agree with the one declaration; correctness of the name
+    /// itself came from the person who owns it.
+    /// </para>
+    /// </remarks>
+    [Fact]
+    public void The_package_names_one_publisher()
+    {
+        var props = RepoFiles.Read("Directory.Build.props");
+
+        string Declared(string element)
+        {
+            var match = Regex.Match(props, $"<{element}>(?<value>[^<]+)</{element}>");
+
+            Assert.True(
+                match.Success,
+                $"Directory.Build.props declares no <{element}>. The publisher a consumer sees "
+                + "on the package listing comes from it.");
+
+            // Decoded, so the XML spelling and the plain-text spelling compare equal.
+            return System.Net.WebUtility.HtmlDecode(match.Groups["value"].Value).Trim();
+        }
+
+        var company = Declared("Company");
+
+        Assert.False(
+            string.IsNullOrWhiteSpace(company),
+            "<Company> is empty, so every check below would pass by comparing nothing.");
+
+        // Authors and Company are DIFFERENT NuGet fields — Authors is the publisher shown on
+        // the listing, Company lands in assembly metadata — and nothing else stops them
+        // drifting, which is how a listing and the assemblies inside it come to disagree.
+        Assert.True(
+            Declared("Authors") == company,
+            $"<Authors> is '{Declared("Authors")}' but <Company> is '{company}'. They name the "
+            + "same publisher on two surfaces and must agree.");
+
+        Assert.True(
+            Declared("Copyright").Contains(company, StringComparison.Ordinal),
+            $"<Copyright> is '{Declared("Copyright")}', which does not name '{company}'.");
+
+        // The first word of the declared name — the token that means "this sentence is about
+        // the publisher". Used below to find EVERY mention, not merely one.
+        var marker = company.Split(' ')[0];
+
+        foreach (var document in new[] { "LICENSE", "README.md" })
+        {
+            var text = RepoFiles.Read(document);
+
+            Assert.True(
+                text.Contains(company, StringComparison.Ordinal),
+                $"{document} does not name the publisher declared in Directory.Build.props "
+                + $"('{company}'). The licence names who grants the rights and the readme is "
+                + "packed into every .nupkg, so a disagreement here ships.");
+
+            // EVERY mention, not just one — QA round 1's MAJOR. The README named the publisher
+            // twice and only one spelling matched: a `Contains` check was satisfied by the
+            // good line while the footer said "Norwood Design & Development" without the
+            // "Ltd.". That is the ORIGINAL defect's exact shape — the correct name minus a
+            // component — reintroduced in the line added to fix something else.
+            //
+            // WHAT THIS REACHES, precisely: every mention that BEGINS WITH the declared name's
+            // first word, matching case. A case variant ("NORWOOD DESIGN & DEVELOPMENT") or an
+            // abbreviation ("NDD") shares no marker and passes — QA round 2 demonstrated both.
+            // It contains the near-miss that actually shipped, which is the class worth
+            // closing; it is not every possible way to misname the publisher, and saying so
+            // keeps the next reader from assuming cover they do not have.
+            //
+            // PRECONDITION: the declared name's first word does not otherwise appear in these
+            // files. It holds because "Norwood" is a proper noun absent from the prose. If a
+            // future name began with a common word, this would fail on a CORRECT tree —
+            // loudly, at rename time, with a file and an offset — and the right response
+            // would be to change the marker, not the prose.
+            for (var at = text.IndexOf(marker, StringComparison.Ordinal); at >= 0;
+                 at = text.IndexOf(marker, at + 1, StringComparison.Ordinal))
+            {
+                Assert.True(
+                    string.CompareOrdinal(text, at, company, 0, company.Length) == 0,
+                    $"{document} mentions '{marker}' at offset {at} without going on to say "
+                    + $"'{company}'. Either it is a near-miss spelling of the publisher — how "
+                    + "this was wrong in the first place — and it should become the declared "
+                    + $"name; or '{marker}' now occurs in ordinary prose, in which case the "
+                    + "marker is unsuitable for this name and the guard needs a different one. "
+                    + "Do not reword the prose to satisfy the test.");
+            }
+        }
+    }
 }

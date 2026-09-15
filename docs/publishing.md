@@ -6,7 +6,9 @@ mistakes below cost a version number rather than a commit.
 ## What nuget.org will not let you undo
 
 - **A pushed version's metadata cannot be edited.** Project URL, repository URL, licence,
-  description, icon — all of it is frozen at push. A wrong URL is fixed by publishing a *new
+  description, icon, **authors and copyright** — all of it is frozen at push. Authors and
+  copyright are named explicitly because they have been wrong in this repository before, and
+  a list that omits them is how that goes unnoticed. A wrong URL is fixed by publishing a *new
   version*, and the wrong one stays visible on the version history forever.
 - **A version number cannot be reused**, even after unlisting. uBookIt is at `17.0.0`, and
   that number is spent the moment it is pushed, successfully or not.
@@ -73,7 +75,7 @@ prevent, hiding inside its own instructions.
 
 ```bash
 # the packed metadata a consumer sees
-unzip -p src/UBookIt/bin/Release/UBookIt.*.nupkg UBookIt.nuspec | grep -iE "projectUrl|repository|license"
+unzip -p src/UBookIt/bin/Release/UBookIt.*.nupkg UBookIt.nuspec | grep -iE "projectUrl|repository|license|authors|copyright"
 
 # where a debugger will be sent for source
 cat src/UBookIt.Core/obj/Release/net10.0/UBookIt.Core.sourcelink.json

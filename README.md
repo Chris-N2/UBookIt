@@ -144,4 +144,6 @@ booking page renders nothing. Install `UBookIt`.
 
 ## Licence
 
-[MIT](LICENSE). Copyright © Norwood Development.
+[MIT](LICENSE). Copyright © Norwood Design & Development Ltd.
+
+Built by [Norwood Design & Development Ltd.](https://www.norwood-development.co.uk).
