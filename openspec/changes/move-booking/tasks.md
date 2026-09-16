@@ -1,21 +1,33 @@
+## 0. Wholesale replacements — diffed guarantee by guarantee at sync
+
+Seven requirements are replaced in full by this change's deltas. Each delta file opens with the
+guarantee diff; at sync time every line of it is re-read against `openspec/specs/` as it then
+stands, because a MODIFIED requirement deletes whatever it forgets to restate.
+
+- [ ] 0.1 `bookings` — "Availability and placement service ports" and "Placement and status changes are observable": verify each SHALL and scenario in the main spec is carried, superseded or explicitly dropped in `specs/bookings/spec.md`'s diff header
+- [ ] 0.2 `booking-emails` — "Which events produce messages, and for whom": same check against `specs/booking-emails/spec.md`
+- [ ] 0.3 `email-templates` — "Content is supplied as Razor views at a published path, one per message" and "What a view receives is published, typed, and fit to be frozen": same check against `specs/email-templates/spec.md`
+- [ ] 0.4 `permissions` — "Access within the section is decided by four verbs": same check against `specs/permissions/spec.md`
+- [ ] 0.5 `persistence` — "Store implementations honour Core semantics": same check against `specs/persistence/spec.md`
+
 ## 1. Placement terms — refactor first, prove nothing moved
 
 The pipeline gains an explicit terms value before any move code exists, so the visitor path can be
 shown unchanged on its own.
 
-- [ ] 1.1 Introduce `PlacementTerms` (lead time, optional horizon) with `Visitor(constraints)` and `Operator` constructors; thread it through `ValidateAgainst` so rules 5 and 6 read the terms and rules 2–4 and 7 still read the resource. Verify: the full existing suite passes unchanged, with no test edited
-- [ ] 1.2 Test: visitor terms for a resource equal that resource's configured lead time and horizon; operator terms are zero lead and no horizon. Verify: both tests pass, and a mutant that hard-codes zero lead in `ValidateAgainst` fails the visitor test
-- [ ] 1.3 Test: under operator terms a start one hour ahead on a resource requiring 24 hours passes rule 5, a start in the past fails rule 5 with `lead-time`, and a start 120 days out on a 90-day horizon passes rule 6. Verify: all three pass
+- [x] 1.1 Introduce `PlacementTerms` (lead time, optional horizon) with `Visitor(constraints)` and `Operator` constructors; thread it through `ValidateAgainst` so rules 5 and 6 read the terms and rules 2–4 and 7 still read the resource. Verify: the full existing suite passes unchanged, with no test edited
+- [x] 1.2 Test: visitor terms for a resource equal that resource's configured lead time and horizon; operator terms are zero lead and no horizon. Verify: both tests pass, and a mutant that hard-codes zero lead in `ValidateAgainst` fails the visitor test
+- [x] 1.3 Test: under operator terms a start one hour ahead on a resource requiring 24 hours passes rule 5, a start in the past fails rule 5 with `lead-time`, and a start 120 days out on a 90-day horizon passes rule 6. Verify: all three pass
 
 ## 2. Domain
 
-- [ ] 2.1 Add `FailureCodes.IntervalUnchanged = "interval-unchanged"` and `Booking.MoveTo(BookingInterval)`: refuses with `invalid-status-transition` unless Requested or Confirmed, refuses with `interval-unchanged` when equal to the current interval, otherwise sets the interval and nothing else. Verify: unit tests for each status × changed/unchanged, asserting reference, status, booker, service and claims are untouched
-- [ ] 2.2 Add `IBookingStore.MoveAsync(bookingId, newInterval, permittedFrom, ct)` with remarks on the same terms as `UpdateAsync` (fourth narrow write, own columns, condition in the statement). Verify: the solution compiles with the in-memory double updated (2.3)
-- [ ] 2.3 Implement the move in `InMemoryBookingStore`: lock, conflict check excluding the booking's own claims, status predicate, interval write. Verify: the *Atomic move contract* scenarios in 2.5 pass against the double
-- [ ] 2.4 Add `IBookingObserver.BookingMovedAsync(booking, previousInterval, ct)` with no default, and implement it in `NullBookingObserver` and every test recorder. Verify: compiles; `BookingObservationTests` recorder captures the previous interval
-- [ ] 2.5 Add `IBookingService.MoveAsync(id, newStart, newLength, ct)` per design Decision 2: load, window, per-resource `ValidateAgainst` under operator terms, `MoveTo`, store move, observe. Verify: tests for every scenario of *Moving a booking* against the in-memory store — free interval, requested stays requested, cancelled refused, inside lead time succeeds, past refused with `lead-time`, beyond horizon succeeds, outside open hours, conflict, unchanged, service booking keeps claims, busy resource is not swapped, erased booker moves, unknown id
-- [ ] 2.6 Tests for *Placement and status changes are observable*: a successful move reports once with the previous interval; every refusal reports nothing; a throwing observer does not break the move. Verify: all pass, and a mutant that reports before the store write fails the "after storage" assertion
-- [ ] 2.7 Tests for *Atomic move contract* against the in-memory double: move-vs-placement race on the new interval, placement on the old interval only after commit, self-overlap succeeds, cancel between read and write wins, two moves of one booking, stale aggregate leaves status and booker alone. Verify: all pass
+- [x] 2.1 Add `FailureCodes.IntervalUnchanged = "interval-unchanged"` and `Booking.MoveTo(BookingInterval)`: refuses with `invalid-status-transition` unless Requested or Confirmed, refuses with `interval-unchanged` when equal to the current interval, otherwise sets the interval and nothing else. Verify: unit tests for each status × changed/unchanged, asserting reference, status, booker, service and claims are untouched
+- [x] 2.2 Add `IBookingStore.MoveAsync(bookingId, newInterval, permittedFrom, ct)` with remarks on the same terms as `UpdateAsync` (fourth narrow write, own columns, condition in the statement). Verify: the solution compiles with the in-memory double updated (2.3)
+- [x] 2.3 Implement the move in `InMemoryBookingStore`: lock, conflict check excluding the booking's own claims, status predicate, interval write. Verify: the *Atomic move contract* scenarios in 2.5 pass against the double
+- [x] 2.4 Add `IBookingObserver.BookingMovedAsync(booking, previousInterval, ct)` with no default, and implement it in `NullBookingObserver` and every test recorder. Verify: compiles; `BookingObservationTests` recorder captures the previous interval
+- [x] 2.5 Add `IBookingService.MoveAsync(id, newStart, newLength, ct)` per design Decision 2: load, window, per-resource `ValidateAgainst` under operator terms, `MoveTo`, store move, observe. Verify: tests for every scenario of *Moving a booking* against the in-memory store — free interval, requested stays requested, cancelled refused, inside lead time succeeds, past refused with `lead-time`, beyond horizon succeeds, outside open hours, conflict, unchanged, service booking keeps claims, busy resource is not swapped, erased booker moves, unknown id
+- [x] 2.6 Tests for *Placement and status changes are observable*: a successful move reports once with the previous interval; every refusal reports nothing; a throwing observer does not break the move. Verify: all pass, and a mutant that reports before the store write fails the "after storage" assertion
+- [x] 2.7 Tests for *Atomic move contract* against the in-memory double: move-vs-placement race on the new interval, placement on the old interval only after commit, self-overlap succeeds, cancel between read and write wins, two moves of one booking, stale aggregate leaves status and booker alone. Verify: all pass
 
 ## 3. Persistence
 

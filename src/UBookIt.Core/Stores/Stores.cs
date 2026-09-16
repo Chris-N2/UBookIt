@@ -194,6 +194,47 @@ public interface IBookingStore
     Task UpdateAsync(Booking booking, CancellationToken cancellationToken = default);
 
     /// <summary>
+    /// Moves a booking to <paramref name="newInterval"/>: releases its claim on the interval it
+    /// holds and takes its claim on the new one, in one atomic step with respect to conflict
+    /// detection (bookings spec, "Atomic move contract").
+    /// </summary>
+    /// <remarks>
+    /// <para>
+    /// <b>The fourth narrow write, on the same terms as the other three.</b> It writes the
+    /// interval columns — start, end and the zone they were validated against — and nothing
+    /// else: not the status, not the booker. It takes an id and values rather than an
+    /// aggregate, the erasure write's shape, so there is no stale copy of any other column to
+    /// write back.
+    /// </para>
+    /// <para>
+    /// <b>The conflict check excludes the booking being moved.</b> A booking's own claim rows
+    /// overlap its own new interval whenever the two intervals overlap; a check that counted
+    /// them would refuse every small shift. Everything else about the check is placement's:
+    /// half-open overlap, blocking statuses only, every claimed resource, under the same locks
+    /// in the same order.
+    /// </para>
+    /// <para>
+    /// <b>The status condition is inside the write.</b> The service reads the booking, decides,
+    /// and then calls this; a cancellation committing between the two would otherwise let a
+    /// cancelled booking move. An implementation SHALL make the write conditional on the stored
+    /// status being one of <paramref name="permittedFrom"/>, as a predicate of the same statement
+    /// and not a read before it, and SHALL report a write that changed no row for that reason as
+    /// <see cref="FailureCodes.InvalidStatusTransition"/>.
+    /// </para>
+    /// </remarks>
+    /// <returns>
+    /// Success; <see cref="FailureCodes.Conflict"/> when a blocking claim on one of the booking's
+    /// resources overlaps the new interval; <see cref="FailureCodes.InvalidStatusTransition"/>
+    /// when the stored status no longer permits a move; <see cref="FailureCodes.BookingNotFound"/>
+    /// when no booking has the id.
+    /// </returns>
+    Task<DomainResult> MoveAsync(
+        Guid bookingId,
+        BookingInterval newInterval,
+        IReadOnlyCollection<BookingStatus> permittedFrom,
+        CancellationToken cancellationToken = default);
+
+    /// <summary>
     /// Removes a booking's booker contact details and member key, recording when.
     /// </summary>
     /// <remarks>

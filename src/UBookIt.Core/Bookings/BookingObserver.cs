@@ -67,7 +67,26 @@ public interface IBookingObserver
     /// become cancelled. Cancelling an already-cancelled booking fails and tells nobody.
     /// </remarks>
     Task BookingCancelledAsync(Booking booking, CancellationToken cancellationToken = default);
+
+    /// <summary>
+    /// Called after a booking has been moved and the new interval stored. Never on failure.
+    /// </summary>
+    /// <remarks>
+    /// <b>This is the one report that must describe what changed.</b> A move changes no
+    /// status: the booking after is in every respect the booking before except its interval, so
+    /// "this booking has just moved" is meaningless without the interval it left — and a
+    /// message to the booker that could only say where they now are, not where they were,
+    /// would leave them to work out which of two times in their inbox is real. The previous
+    /// interval is not a derivation; it is a fact the booking no longer holds and nothing else
+    /// records. The exception is named in the spec so it cannot be read as licence for any
+    /// other report to grow a before-and-after.
+    /// </remarks>
+    Task BookingMovedAsync(
+        Booking booking, BookingInterval previousInterval, CancellationToken cancellationToken = default);
 }
+
+// BREAKING (17.1.0, called out in the spec): the port gained a moved member, again with no
+// default implementation, on the reasoning above.
 
 // BREAKING (pre-17.0.0, called out in the spec): the port gained a confirmed and a declined
 // member, and there are deliberately no default implementations — an external observer
@@ -95,5 +114,9 @@ public sealed class NullBookingObserver : IBookingObserver
         => Task.CompletedTask;
 
     public Task BookingCancelledAsync(Booking booking, CancellationToken cancellationToken = default)
+        => Task.CompletedTask;
+
+    public Task BookingMovedAsync(
+        Booking booking, BookingInterval previousInterval, CancellationToken cancellationToken = default)
         => Task.CompletedTask;
 }

@@ -852,6 +852,9 @@ public class BookerRetentionTests
 
         public DomainResult CheckPlacementRules(Resource resource, DateTimeOffset start, TimeSpan duration)
             => throw new NotSupportedException();
+
+        public Task<DomainResult<Booking>> MoveAsync(Guid bookingId, DateTimeOffset newStart, TimeSpan newLength, CancellationToken cancellationToken = default)
+            => throw new NotSupportedException();
     }
 
     /// <summary>Cancels the run from inside the loop, once <paramref name="after"/> erasures have succeeded.</summary>
@@ -897,6 +900,9 @@ public class BookerRetentionTests
 
         public DomainResult CheckPlacementRules(Resource resource, DateTimeOffset start, TimeSpan duration)
             => inner.CheckPlacementRules(resource, start, duration);
+
+        public Task<DomainResult<Booking>> MoveAsync(Guid bookingId, DateTimeOffset newStart, TimeSpan newLength, CancellationToken cancellationToken = default)
+            => inner.MoveAsync(bookingId, newStart, newLength, cancellationToken);
     }
 
     /// <summary>Counts the scopes the job creates, delegating to the real factory.</summary>
@@ -951,6 +957,9 @@ public class BookerRetentionTests
 
         public DomainResult CheckPlacementRules(Resource resource, DateTimeOffset start, TimeSpan duration)
             => inner.CheckPlacementRules(resource, start, duration);
+
+        public Task<DomainResult<Booking>> MoveAsync(Guid bookingId, DateTimeOffset newStart, TimeSpan newLength, CancellationToken cancellationToken = default)
+            => inner.MoveAsync(bookingId, newStart, newLength, cancellationToken);
     }
 
     private sealed class ThrowsForOne(IBookingService inner, Guid throwsFor) : IBookingService
@@ -980,6 +989,9 @@ public class BookerRetentionTests
 
         public DomainResult CheckPlacementRules(Resource resource, DateTimeOffset start, TimeSpan duration)
             => inner.CheckPlacementRules(resource, start, duration);
+
+        public Task<DomainResult<Booking>> MoveAsync(Guid bookingId, DateTimeOffset newStart, TimeSpan newLength, CancellationToken cancellationToken = default)
+            => inner.MoveAsync(bookingId, newStart, newLength, cancellationToken);
     }
 
     private sealed class CapturingLogger : ILogger<BookerRetentionJob>

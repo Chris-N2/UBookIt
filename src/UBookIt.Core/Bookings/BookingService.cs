@@ -163,6 +163,33 @@ public interface IBookingService
     /// </para>
     /// </remarks>
     Task<DomainResult<Booking>> EraseBookerAsync(Guid bookingId, CancellationToken cancellationToken = default);
+
+    /// <summary>
+    /// Moves a booking to a new start and length: a placement of the booking it already is.
+    /// </summary>
+    /// <remarks>
+    /// <para>
+    /// The new interval runs the placement pipeline against every resource the booking claims —
+    /// the same rules, in the same order, with the same codes — under
+    /// <see cref="PlacementTerms.Operator"/>: a lead of zero (the start must not have passed)
+    /// and no horizon. Open hours, granularity, duration bounds and conflict bind exactly as they
+    /// bind a visitor. See <see cref="PlacementTerms"/> for why.
+    /// </para>
+    /// <para>
+    /// Permitted from <c>Requested</c> and <c>Confirmed</c> only, and the status is unchanged by
+    /// it. Every claim is kept: a service booking moves with the resources it was assigned, and
+    /// one that is busy at the new time produces <see cref="FailureCodes.Conflict"/> rather than
+    /// a substitution. A move to the interval already held fails with
+    /// <see cref="FailureCodes.IntervalUnchanged"/>; an unknown booking with
+    /// <see cref="FailureCodes.BookingNotFound"/>.
+    /// </para>
+    /// <para>
+    /// Reported through the observation port with the interval the booking held before, after
+    /// the store has agreed and only on success.
+    /// </para>
+    /// </remarks>
+    Task<DomainResult<Booking>> MoveAsync(
+        Guid bookingId, DateTimeOffset newStart, TimeSpan newLength, CancellationToken cancellationToken = default);
 }
 
 public sealed class BookingService(
@@ -375,7 +402,8 @@ public sealed class BookingService(
         // pipeline it has always been.
         foreach (var resource in resources)
         {
-            failures.AddRange(ValidateAgainst(resource, window, request.Duration));
+            failures.AddRange(ValidateAgainst(
+                resource, window, request.Duration, PlacementTerms.Visitor(resource.Availability.Constraints)));
         }
 
         if (failures.Count > 0)
@@ -515,6 +543,107 @@ public sealed class BookingService(
         return DomainResult<Booking>.Success(booking);
     }
 
+    /// <summary>The statuses a move is permitted from — handed to the store so the same set is checked inside the write.</summary>
+    private static readonly BookingStatus[] MovableFrom = [BookingStatus.Requested, BookingStatus.Confirmed];
+
+    public async Task<DomainResult<Booking>> MoveAsync(
+        Guid bookingId, DateTimeOffset newStart, TimeSpan newLength, CancellationToken cancellationToken = default)
+    {
+        var booking = await bookingStore.GetBookingAsync(bookingId, cancellationToken).ConfigureAwait(false);
+        if (booking is null)
+        {
+            return DomainResult<Booking>.Failure(
+                FailureCodes.BookingNotFound, $"No booking exists with id {bookingId}.");
+        }
+
+        // The status rule first, and from the aggregate, so a cancelled booking is refused
+        // before any resource is loaded or any rule run. The store checks it AGAIN inside the
+        // write — see IBookingStore.MoveAsync — because this read can be stale by then.
+        if (booking.Status is not (BookingStatus.Requested or BookingStatus.Confirmed))
+        {
+            return DomainResult<Booking>.Failure(
+                FailureCodes.InvalidStatusTransition, $"A {booking.Status} booking cannot be moved.");
+        }
+
+        var zoneResult = AvailabilityService.ResolveZone(settings);
+        if (!zoneResult.Succeeded)
+        {
+            return DomainResult<Booking>.Failure(zoneResult.Failures);
+        }
+
+        // Rule 1 and the calendar window, exactly as placement resolves them.
+        var windowResult = ResolveWindow(zoneResult.Value, newStart, newLength);
+        if (!windowResult.Succeeded)
+        {
+            return DomainResult<Booking>.Failure(windowResult.Failures);
+        }
+
+        var window = windowResult.Value;
+
+        // Rules 2–7 against EVERY claimed resource, on operator terms. The claims are the
+        // booking's own — a move keeps them — so a resource that has since been deleted is a
+        // genuine fault rather than a bad request, and is reported as such.
+        var failures = new List<DomainFailure>();
+
+        foreach (var claim in booking.Claims)
+        {
+            var resource = await resourceStore.GetAsync(claim.ResourceId, cancellationToken).ConfigureAwait(false);
+            if (resource is null)
+            {
+                return DomainResult<Booking>.Failure(
+                    FailureCodes.ResourceNotFound,
+                    $"Booking {bookingId} claims resource {claim.ResourceId}, which no longer exists.");
+            }
+
+            failures.AddRange(ValidateAgainst(resource, window, newLength, PlacementTerms.Operator));
+        }
+
+        if (failures.Count > 0)
+        {
+            return DomainResult<Booking>.Failure(OrderByPipeline(failures));
+        }
+
+        // After the pipeline, so "unchanged" is only ever said about an interval the rules
+        // accepted — an operator always hears the truth about the time they typed. Asked, not
+        // applied: the aggregate changes only once the store has agreed, below.
+        var permitted = booking.CanMoveTo(window.Interval);
+        if (!permitted.Succeeded)
+        {
+            return DomainResult<Booking>.Failure(permitted.Failures);
+        }
+
+        // Rule 8: conflict — checked atomically by the store across every claimed resource,
+        // excluding this booking's own claims, with the status re-checked inside the write.
+        var stored = await bookingStore
+            .MoveAsync(bookingId, window.Interval, MovableFrom, cancellationToken)
+            .ConfigureAwait(false);
+
+        if (!stored.Succeeded)
+        {
+            return DomainResult<Booking>.Failure(stored.Failures);
+        }
+
+        // The store has written it; now the aggregate says so too. CanMoveTo passed on this
+        // same instance a moment ago and nothing here has changed it since, so this cannot
+        // fail — and if it ever did, the answer is not "moved" and not "refused" but "the
+        // domain and the store disagree", which is reported as exactly that.
+        var previous = booking.Interval;
+        var applied = booking.MoveTo(window.Interval);
+        if (!applied.Succeeded)
+        {
+            throw new InvalidOperationException(
+                $"Booking {bookingId} was moved in storage but the aggregate refused the same move: "
+                + string.Join(", ", applied.Failures.Select(f => f.Code)));
+        }
+
+        // After the store agreed, and only then — carrying where the booking came from, which
+        // is the one thing a report of a move cannot do without.
+        await TellAsync(() => _observer.BookingMovedAsync(booking, previous, cancellationToken))
+            .ConfigureAwait(false);
+
+        return DomainResult<Booking>.Success(booking);
+    }
+
     public async Task<DomainResult<Booking>> EraseBookerAsync(
         Guid bookingId, CancellationToken cancellationToken = default)
     {
@@ -562,6 +691,20 @@ public sealed class BookingService(
     public DomainResult CheckPlacementRules(Resource resource, DateTimeOffset start, TimeSpan duration)
     {
         ArgumentNullException.ThrowIfNull(resource);
+        return CheckPlacementRules(resource, start, duration, PlacementTerms.Visitor(resource.Availability.Constraints));
+    }
+
+    /// <summary>
+    /// The same rules under explicit terms. Internal, so the terms a rule is evaluated on are
+    /// decided by an operation in this assembly rather than chosen by a caller — the public
+    /// member is the visitor's, and the operator's terms are reached only through an operator
+    /// operation.
+    /// </summary>
+    internal DomainResult CheckPlacementRules(
+        Resource resource, DateTimeOffset start, TimeSpan duration, PlacementTerms terms)
+    {
+        ArgumentNullException.ThrowIfNull(resource);
+        ArgumentNullException.ThrowIfNull(terms);
 
         var zoneResult = AvailabilityService.ResolveZone(settings);
         if (!zoneResult.Succeeded)
@@ -575,7 +718,7 @@ public sealed class BookingService(
             return DomainResult.Failure(windowResult.Failures);
         }
 
-        var failures = ValidateAgainst(resource, windowResult.Value, duration);
+        var failures = ValidateAgainst(resource, windowResult.Value, duration, terms);
 
         return failures.Count == 0 ? DomainResult.Success() : DomainResult.Failure(OrderByPipeline(failures));
     }
@@ -639,9 +782,14 @@ public sealed class BookingService(
     /// Rules 2–7 for one resource: duration, lead time, horizon, open hours and
     /// the window-relative grid. The single home of every rule that is a
     /// property of a resource rather than of the calendar as a whole.
+    /// <para>
+    /// Rules 5 and 6 read <paramref name="terms"/> rather than the resource: they are
+    /// policy about who is placing, and <see cref="PlacementTerms"/> says why. Every other
+    /// rule here reads the resource, as it always has.
+    /// </para>
     /// </summary>
     private static List<DomainFailure> ValidateAgainst(
-        Resource resource, PlacementWindow window, TimeSpan duration)
+        Resource resource, PlacementWindow window, TimeSpan duration, PlacementTerms terms)
     {
         var constraints = resource.Availability.Constraints;
         var interval = window.Interval;
@@ -650,25 +798,32 @@ public sealed class BookingService(
         // Rules 2–4: granularity (duration part), duration bounds
         failures.AddRange(AvailabilityService.ValidateDuration(duration, constraints));
 
-        // Rule 5: lead-time
-        if (interval.StartUtc < window.NowUtc + constraints.LeadTime)
+        // Rule 5: lead-time. Under operator terms the lead is zero, which makes this rule
+        // exactly "the start has not passed" — the one guard that survives for everybody.
+        if (interval.StartUtc < window.NowUtc + terms.LeadTime)
         {
             failures.Add(new DomainFailure(
                 FailureCodes.LeadTime,
-                $"Bookings require at least {constraints.LeadTime.TotalMinutes:0} minutes notice."));
+                terms.LeadTime > TimeSpan.Zero
+                    ? $"Bookings require at least {terms.LeadTime.TotalMinutes:0} minutes notice."
+                    : "The start time has already passed."));
         }
 
         // Rule 6: horizon. Saturating, because a horizon reaching past the end of
         // the calendar means "no effective limit" rather than an error — and
         // `HorizonDays` is only validated as positive, so a large one would
-        // otherwise throw for every request against that resource.
-        var lastLocalDate = CalendarBounds.AddDaysSaturating(
-            WallClockMapper.ToLocalDate(window.NowUtc, window.Zone), constraints.HorizonDays);
-        if (window.LocalStartDate > lastLocalDate)
+        // otherwise throw for every request against that resource. Absent under
+        // operator terms: there is nothing to saturate and nothing to refuse.
+        if (terms.HorizonDays is { } horizonDays)
         {
-            failures.Add(new DomainFailure(
-                FailureCodes.Horizon,
-                $"Bookings may be placed at most {constraints.HorizonDays} days ahead."));
+            var lastLocalDate = CalendarBounds.AddDaysSaturating(
+                WallClockMapper.ToLocalDate(window.NowUtc, window.Zone), horizonDays);
+            if (window.LocalStartDate > lastLocalDate)
+            {
+                failures.Add(new DomainFailure(
+                    FailureCodes.Horizon,
+                    $"Bookings may be placed at most {horizonDays} days ahead."));
+            }
         }
 
         // Rule 7: outside-open-hours — the interval must fit inside one open

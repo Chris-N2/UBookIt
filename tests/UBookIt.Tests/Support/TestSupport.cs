@@ -310,6 +310,72 @@ public sealed class InMemoryBookingStore : IBookingStore
         }
     }
 
+    /// <summary>The ids of every stored booking, for a test that has to find one it did not place.</summary>
+    public IReadOnlyList<Guid> Ids()
+    {
+        lock (_gate)
+        {
+            return [.. _bookings.Keys];
+        }
+    }
+
+    /// <summary>How many move writes this store has been asked for.</summary>
+    public int MoveCount { get; private set; }
+
+    /// <summary>
+    /// The fourth narrow write: the interval, and nothing else, under the same critical section
+    /// as placement, with the conflict check excluding the booking's own claims and the status
+    /// condition inside the write.
+    /// </summary>
+    /// <remarks>
+    /// Rebuilds the stored entry rather than mutating the caller's aggregate, so — as for
+    /// <c>UpdateAsync</c> — a stale aggregate's status or booker cannot reach storage through
+    /// this path. That is what lets the Core-level "stale aggregate leaves status and booker
+    /// alone" scenario mean something against this double.
+    /// </remarks>
+    public Task<DomainResult> MoveAsync(
+        Guid bookingId,
+        BookingInterval newInterval,
+        IReadOnlyCollection<BookingStatus> permittedFrom,
+        CancellationToken cancellationToken = default)
+    {
+        lock (_gate)
+        {
+            MoveCount++;
+
+            if (!_bookings.TryGetValue(bookingId, out var stored))
+            {
+                return Task.FromResult(DomainResult.Failure(
+                    FailureCodes.BookingNotFound, $"No booking exists with id {bookingId}."));
+            }
+
+            var resourceIds = stored.Claims.Select(c => c.ResourceId).ToHashSet();
+
+            var conflicts = _bookings.Values.Any(existing =>
+                existing.Id != bookingId
+                && existing.IsBlocking
+                && existing.Interval.Overlaps(newInterval)
+                && existing.Claims.Any(c => resourceIds.Contains(c.ResourceId)));
+
+            if (conflicts)
+            {
+                return Task.FromResult(DomainResult.Failure(
+                    FailureCodes.Conflict, "The requested interval conflicts with an existing booking."));
+            }
+
+            // The status predicate, evaluated against what is STORED inside the same critical
+            // section — never against the caller's copy. Mirrors the SQL statement's WHERE.
+            if (!permittedFrom.Contains(stored.Status))
+            {
+                return Task.FromResult(DomainResult.Failure(
+                    FailureCodes.InvalidStatusTransition, $"A {stored.Status} booking cannot be moved."));
+            }
+
+            _bookings[bookingId] = Rebuild(stored, stored.Status, newInterval);
+            return Task.FromResult(DomainResult.Success());
+        }
+    }
+
     /// <summary>How many times the due-for-erasure read was asked for.</summary>
     /// <remarks>
     /// Counted so a test can assert that retention, when it is switched off, issues <b>no query
@@ -369,12 +435,12 @@ public sealed class InMemoryBookingStore : IBookingStore
         }
     }
 
-    /// <summary>The stored booking with a different status, and everything else untouched.</summary>
-    private static Booking Rebuild(Booking stored, BookingStatus status)
+    /// <summary>The stored booking with a different status and/or interval, and everything else untouched.</summary>
+    private static Booking Rebuild(Booking stored, BookingStatus status, BookingInterval? interval = null)
         => Booking.Rehydrate(
             stored.Id,
             stored.Reference,
-            stored.Interval,
+            interval ?? stored.Interval,
             stored.Booker,
             stored.Claims,
             status,

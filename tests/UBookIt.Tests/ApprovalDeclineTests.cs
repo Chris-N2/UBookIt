@@ -49,6 +49,10 @@ public class ApprovalDeclineTests
         public Task BookingCancelledAsync(Booking booking, CancellationToken cancellationToken = default)
             => Record("cancelled", booking);
 
+        public Task BookingMovedAsync(
+            Booking booking, BookingInterval previousInterval, CancellationToken cancellationToken = default)
+            => Record("moved", booking);
+
         private Task Record(string what, Booking booking)
         {
             Told.Add((what, booking.Status, store.UpdateCount));
@@ -68,6 +72,10 @@ public class ApprovalDeclineTests
             => throw new InvalidOperationException("The site's handler is broken.");
 
         public Task BookingCancelledAsync(Booking booking, CancellationToken cancellationToken = default)
+            => throw new InvalidOperationException("The site's handler is broken.");
+
+        public Task BookingMovedAsync(
+            Booking booking, BookingInterval previousInterval, CancellationToken cancellationToken = default)
             => throw new InvalidOperationException("The site's handler is broken.");
     }
 

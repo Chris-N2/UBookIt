@@ -253,6 +253,10 @@ public class FindByBookerEndpointTests
             UBookIt.Core.Resources.Resource resource, DateTimeOffset start, TimeSpan duration)
             => throw Unexpected();
 
+        public Task<DomainResult<Booking>> MoveAsync(
+            Guid bookingId, DateTimeOffset newStart, TimeSpan newLength, CancellationToken cancellationToken = default)
+            => throw Unexpected();
+
         public Task<DomainResult<UBookIt.Core.Bookings.Booking>> CancelAsync(
             Guid bookingId, CancellationToken cancellationToken = default) => throw Unexpected();
 

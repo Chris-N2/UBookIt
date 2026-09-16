@@ -306,6 +306,10 @@ public class EraseBookerEndpointTests
 
         public DomainResult CheckPlacementRules(Resource resource, DateTimeOffset start, TimeSpan duration)
             => throw Unexpected();
+
+        public Task<DomainResult<Booking>> MoveAsync(
+            Guid bookingId, DateTimeOffset newStart, TimeSpan newLength, CancellationToken cancellationToken = default)
+            => throw Unexpected();
     }
 
     private sealed class EmptyStore : IBookingManagementStore

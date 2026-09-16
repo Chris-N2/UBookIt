@@ -100,6 +100,32 @@ public sealed class BookingCancelledNotification(Booking booking) : INotificatio
 }
 
 /// <summary>
+/// Raised after a booking has been moved to a new interval and the change stored.
+/// </summary>
+/// <remarks>
+/// <para>
+/// <b>The one notification that carries a before-and-after.</b> A move changes no status —
+/// the booking after is the booking before except for its interval — so being told "moved"
+/// says nothing without the interval it left. <see cref="PreviousInterval"/> is that fact;
+/// nothing else records it. The booking's reference, status, booker, service and claims are
+/// unchanged, and the booking still holds its time — at the new interval.
+/// </para>
+/// <para>
+/// The same two caveats apply as for placement: what the package tells the booker depends
+/// entirely on configuration and is nothing by default, and a handler that throws is a
+/// notification nobody receives.
+/// </para>
+/// </remarks>
+public sealed class BookingMovedNotification(Booking booking, BookingInterval previousInterval) : INotification
+{
+    /// <summary>The booking as it now stands, at its new interval.</summary>
+    public Booking Booking { get; } = booking;
+
+    /// <summary>The interval the booking held before the move.</summary>
+    public BookingInterval PreviousInterval { get; } = previousInterval;
+}
+
+/// <summary>
 /// Turns Core's observations into Umbraco notifications.
 /// </summary>
 /// <remarks>
@@ -131,6 +157,10 @@ public sealed class UmbracoBookingObserver(
 
     public Task BookingCancelledAsync(Booking booking, CancellationToken cancellationToken = default)
         => PublishAsync(new BookingCancelledNotification(booking), booking, "cancelled");
+
+    public Task BookingMovedAsync(
+        Booking booking, BookingInterval previousInterval, CancellationToken cancellationToken = default)
+        => PublishAsync(new BookingMovedNotification(booking, previousInterval), booking, "moved");
 
     /// <remarks>
     /// The caller's <c>CancellationToken</c> is deliberately not forwarded. It belongs to the

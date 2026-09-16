@@ -58,6 +58,16 @@ public class BookingObservationTests
             Told.Add(("cancelled", booking));
             return Task.CompletedTask;
         }
+
+        public List<BookingInterval> PreviousIntervals { get; } = [];
+
+        public Task BookingMovedAsync(
+            Booking booking, BookingInterval previousInterval, CancellationToken cancellationToken = default)
+        {
+            Told.Add(("moved", booking));
+            PreviousIntervals.Add(previousInterval);
+            return Task.CompletedTask;
+        }
     }
 
     /// <summary>The badly-behaved subscriber this design exists to survive.</summary>
@@ -73,6 +83,10 @@ public class BookingObservationTests
             => throw new InvalidOperationException("The site's handler is broken.");
 
         public Task BookingCancelledAsync(Booking booking, CancellationToken cancellationToken = default)
+            => throw new InvalidOperationException("The site's handler is broken.");
+
+        public Task BookingMovedAsync(
+            Booking booking, BookingInterval previousInterval, CancellationToken cancellationToken = default)
             => throw new InvalidOperationException("The site's handler is broken.");
     }
 
@@ -113,6 +127,21 @@ public class BookingObservationTests
 
         public Task BookingCancelledAsync(Booking booking, CancellationToken cancellationToken = default)
             => RecordAsync(booking.Id, cancellationToken);
+
+        /// <summary>The stored interval at the moment a move was reported.</summary>
+        public List<BookingInterval?> IntervalWhenTold { get; } = [];
+
+        /// <summary>How many move writes the store had taken when each move was reported.</summary>
+        public List<int> MovesWhenTold { get; } = [];
+
+        public async Task BookingMovedAsync(
+            Booking booking, BookingInterval previousInterval, CancellationToken cancellationToken = default)
+        {
+            var stored = await store.GetBookingAsync(booking.Id, cancellationToken);
+            IntervalWhenTold.Add(stored?.Interval);
+            MovesWhenTold.Add(store.MoveCount);
+            await RecordAsync(booking.Id, cancellationToken);
+        }
 
         private async Task RecordAsync(Guid bookingId, CancellationToken cancellationToken)
         {
