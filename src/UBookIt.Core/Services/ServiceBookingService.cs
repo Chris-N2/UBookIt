@@ -1346,9 +1346,12 @@ public sealed class ServiceBookingService(
     {
         var booking = await bookingStore.GetBookingAsync(bookingId, cancellationToken).ConfigureAwait(false);
 
-        // Not found, or placed directly: nothing here applies, and the booking service reports
-        // not-found itself so there is one message for it.
-        if (booking?.Service is not { } attribution)
+        // Not found, placed directly, or in a status that holds no time to move: nothing here
+        // applies, and the booking service reports each of those itself so there is one message
+        // for each. The status goes first, as the bookings spec orders it — a cancelled booking
+        // moved to an impossible length hears about its status, not its length.
+        if (booking?.Service is not { } attribution
+            || booking.Status is not (BookingStatus.Requested or BookingStatus.Confirmed))
         {
             return await bookingService.MoveAsync(bookingId, newStart, newLength, cancellationToken).ConfigureAwait(false);
         }

@@ -81,6 +81,7 @@ describe("what a refusal says", () => {
     expect(refusalTerm("duration-too-short")).toBe("moveRefusedDuration");
     expect(refusalTerm("interval-invalid")).toBe("moveRefusedInterval");
     expect(refusalTerm("booking-not-found")).toBe("moveRefusedNotFound");
+    expect(refusalTerm("service-unavailable")).toBe("moveRefusedServiceUnavailable");
   });
 
   it("says the generic sentence for a code it does not know, rather than the raw code", () => {
@@ -128,6 +129,7 @@ describe("what a refusal says", () => {
       "duration-too-long",
       "interval-invalid",
       "booking-not-found",
+      "service-unavailable",
       "anything-else",
     ]) {
       const key = refusalTerm(code);

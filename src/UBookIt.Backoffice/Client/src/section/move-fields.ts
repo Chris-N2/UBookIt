@@ -125,6 +125,8 @@ export function refusalTerm(code: string | undefined): string {
       return "moveRefusedInterval";
     case "booking-not-found":
       return "moveRefusedNotFound";
+    case "service-unavailable":
+      return "moveRefusedServiceUnavailable";
     default:
       return "moveFailed";
   }

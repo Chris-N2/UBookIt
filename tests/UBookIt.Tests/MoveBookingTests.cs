@@ -518,6 +518,21 @@ public class MoveBookingTests
     }
 
     [Fact]
+    public async Task A_cancelled_service_booking_hears_about_its_status_not_its_length()
+    {
+        // The bookings spec orders the status rule first; the service-aware path must not
+        // answer a length question for a booking that has no time to move at all.
+        var service = BoundedService(45, 120);
+        var h = Wire(service: service, resources: Res(1));
+        var booking = await PlaceForService(h, service);
+        Assert.True((await h.Bookings.CancelAsync(booking.Id)).Succeeded);
+
+        var moved = await h.Services.MoveAsync(booking.Id, TestData.Utc(Date, "14:00"), Mins(30));
+
+        AssertSingleFailure(moved, FailureCodes.InvalidStatusTransition);
+    }
+
+    [Fact]
     public async Task A_service_booking_cannot_be_moved_past_a_claimed_resources_ceiling()
     {
         // The service permits up to 240; the room's own maximum is 90. The resource ceiling is
