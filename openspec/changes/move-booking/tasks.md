@@ -60,7 +60,7 @@ shown unchanged on its own.
 - [x] 6.3 Wire submission to `moveBooking`; on refusal read the problem code and show the mapped term in an element referenced by `aria-describedby` on the inputs, keeping the modal open; on success close with `{ moved: true }`. Verify: tests for `outside-open-hours`, `conflict`, `lead-time`, `interval-unchanged`, `invalid-status-transition` each show their sentence and leave the row unchanged
 - [x] 6.4 On success refetch the page through `#applyRowAction`'s path so step-back and focus rules apply, and show a notice naming the new date so an operator whose booking left the window knows where it went. Verify: test — moving the only row on page 2 out of the window lands on page 1 with focus placed deliberately
 - [x] 6.5 Add every localisation term to `en-us.ts`, including one per failure code. Verify: the existing term-coverage test (or a new one) confirms every term the element references exists
-- [ ] 6.6 Keyboard and screen-reader pass in the browser: focus lands in the modal, all controls reachable, error announced with its control, Escape closes and returns focus to the Move button. Verify: recorded in the change's QA handover with what was checked
+- [x] 6.6 Keyboard and screen-reader pass in the browser: focus lands in the modal, all controls reachable, error announced with its control, Escape closes and returns focus to the Move button. Verify: recorded in the change's QA handover with what was checked
 
 ## 7. Documentation and the falsified-sentence sweep
 
@@ -71,6 +71,91 @@ shown unchanged on its own.
 
 ## 8. Verification
 
-- [ ] 8.1 `dotnet build -c Release` with zero warnings, `dotnet test` green, `npm test` and `npm run build` green in the client, `openspec validate move-booking --type change --strict` valid. Verify: outputs recorded in the QA handover
-- [ ] 8.2 Live check on the TestSite: move a Confirmed booking forward a day from the bookings list, see the row update, receive (or see logged) the booker message with both times, then move it to a taken slot and see the in-modal refusal. Verify: recorded in the QA handover with the reference used
-- [ ] 8.3 Sibling-spec sweep at sync time: grep `openspec/specs/` for "four events", "four members", "exactly four", "cancellation and a new booking", "no report", "describe what changed" and reconcile each hit. Verify: list of hits and dispositions recorded in the handover
+- [x] 8.1 `dotnet build -c Release` with zero warnings, `dotnet test` green, `npm test` and `npm run build` green in the client, `openspec validate move-booking --type change --strict` valid. Verify: outputs recorded in the QA handover
+- [x] 8.2 Live check on the TestSite: move a Confirmed booking forward a day from the bookings list, see the row update, receive (or see logged) the booker message with both times, then move it to a taken slot and see the in-modal refusal. Verify: recorded in the QA handover with the reference used
+- [x] 8.3 Sibling-spec sweep at sync time: grep `openspec/specs/` for "four events", "four members", "exactly four", "cancellation and a new booking", "no report", "describe what changed" and reconcile each hit. Verify: list of hits and dispositions recorded in the handover
+
+## 9. QA handover — what is claimed, and what is NOT
+
+**Branch `move-booking`, seven commits on top of `main` `2b6e932`.** Treat every round's fixes as
+new code. Verify each claim below rather than trusting it; this project has twice found a
+handover claim false.
+
+### Build and test state at handover (verify)
+
+| What | Claim |
+|---|---|
+| `dotnet build -c Release` | 0 warnings, 0 errors (after fixing one xUnit2031 in `MoveBookingTests`) |
+| `dotnet test` (Debug) | unit 1634 / integration 149 (LocalDB) / rendering 1086 — all green |
+| `npm test` (Client) | 192 green, 11 files |
+| `npm run build` (Client) | clean; bundle rebuilt into `wwwroot/App_Plugins/UBookItBackoffice` |
+| `openspec validate move-booking --type change --strict` | valid, under CLI **1.13.0** (upgraded this session) |
+| `openspec validate --all --strict` | 22/22 |
+| `dotnet ef migrations has-pending-model-changes` | none — no migration, no snapshot change |
+
+### Mutation results (verify by re-running if in doubt)
+
+- **Load-then-save mutant** in `SqlBookingStore.MoveAsync` (read the row, decide, `SaveChangesAsync`):
+  `MoveWriteShapeTests` 2 of 3 red, `MoveStorageTests.The_move_write_is_one_update_whose_predicate_is_the_status` red.
+  `MoveStorageTests.A_cancel_committed_between_the_read_and_the_write_wins` stayed GREEN under that
+  mutant — expected and worth knowing: it stages the cancel between the *service's* read and the
+  store's write, and the mutant re-reads inside the store after that. The wire-shape guard is what
+  covers the store-internal window; the interleaving test covers the service-level one.
+- The five in-memory "between read and write" scenarios first FAILED against the real code, and the
+  failure was a genuine design flaw: the service applied `MoveTo` to the aggregate *before* the store
+  agreed, which the in-memory double's instance sharing exposed. Fixed by splitting `CanMoveTo`
+  (check) from `MoveTo` (apply), applied only after the store write. Design.md Decision 2 was
+  amended in code, not in the artifact — **the artifact still describes the pre-fix order** (step 4
+  "calls MoveTo" before step 5 "calls the store"). Flagging rather than silently editing design.md.
+
+### Live check (TestSite, Debug, LocalDB, booker emails NOT configured)
+
+Done in the real backoffice via Chrome, operator logged in by Chris:
+
+- Bookings list shows **Move** on every Requested/Confirmed row, beside Cancel.
+- Opened Move on `QRX8-WFBD` (Sep 14 09:00–10:00, in the past): dialog pre-filled 14/09/2026, 09:00,
+  60. Submitted unchanged → in-dialog refusal "That time has already passed" (lead-time wins over
+  interval-unchanged, as the pipeline orders it). Set 17/09 10:00 → "outside opening hours" (the
+  resource is open on Mondays only). Set 21/09 10:00 → **moved**; dialog closed; notice above the
+  table "Booking QRX8-WFBD moved to Sep 21, 2026, 10:00 AM–11:00 AM (Europe/London)."; row left the
+  14–20 Sep window; focus on the `<h2>`. Site log shows no errors.
+- Opened Move on `CZWS-T72T`, set 21/09 10:00 → **conflict** refusal in place ("Something else is
+  booked at that time"), `aria-invalid="true"` on all three inputs, `aria-describedby` grew to
+  `ubookit-move-hint ubookit-move-refusal`, refusal is `role="alert"`, all three ids resolve in the
+  modal's shadow root, every input has a real `<label for>`.
+- **Focus, measured:** on open → `INPUT#ubookit-move-date`; after refusal → the same input; Escape →
+  `UUI-BUTTON label="Move booking CZWS-T72T"`. The first bundle left focus on `<body>` in all three
+  cases; the fix is the last commit (`22ca055`) and was re-verified live.
+- **NOT verified live:** the `BookerMoved` email (no SMTP/pickup on the TestSite) — covered by
+  `BookingEmailTests` and `BookingTemplateCompositionTests` only. A service (multi-claim) move — the
+  TestSite has no service booking in the window; covered by `MoveBookingTests` and
+  `MoveStorageTests.A_move_of_a_multi_claim_booking_locks_and_checks_every_resource`.
+- Residue left for the reviewer: `QRX8-WFBD` now sits at Sep 21 10:00–11:00 on resource "DBO
+  Granted"; the TestSite is still running on :44348.
+
+### Sibling-spec sweep (task 8.3), done before sync
+
+`grep` over `openspec/specs/` for "four events|four members|exactly four|cancellation and a new
+booking|no report|describe what changed|four booking events|six messages": three hits.
+`booking-emails:351` ("Four booking events") and `bookings:323` ("No status-change report SHALL
+need to describe what changed") are inside requirements this change's deltas replace wholesale —
+resolved at sync. `booking-emails:263` ("No report of a sending failure") is unrelated. The
+`booking-management` Purpose paragraph was edited directly (Purpose is not a delta operation) on the
+approval-decline precedent; `BackofficeDocumentationTests.The_capabilitys_own_summary_names_every_verb_the_capability_has`
+now requires the word "move" there.
+
+### Decisions made during apply that are not in the artifacts
+
+1. `CanMoveTo` / `MoveTo` split (above).
+2. `IBookingService.CheckPlacementRules(resource, start, duration, terms)` is `internal` — the public
+   member is the visitor's; operator terms are reachable only through an operator operation.
+3. The composer's `ForBookerAsync` gained an optional `previousInterval` parameter rather than a
+   third method, so the "exactly two message-producing methods" guard still holds; it throws if
+   asked for a move message without one.
+4. `BookerMessageModel.PreviousLocalStart/End` (not `PreviousStart/End` as tasks.md said) — named to
+   match `LocalStart/LocalEnd`.
+5. The endpoint validates shape (default start, non-positive length) itself with `interval-invalid`
+   against the field name, before the domain; a start inside a spring-forward gap is refused the same
+   way; a fall-back overlap takes the first occurrence (`BookingWindow.ResolveSiteLocal`).
+6. Three test guards had to be told about the new endpoint by hand: `PermissionsTests` classification,
+   `SensitiveDataRedactionTests` KnownWrites + recorded snapshot, and the capability-summary route map.
