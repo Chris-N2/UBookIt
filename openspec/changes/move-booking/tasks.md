@@ -31,12 +31,12 @@ shown unchanged on its own.
 
 ## 3. Persistence
 
-- [ ] 3.1 Implement `SqlBookingStore.MoveAsync` per design Decision 3: claims read by booking id, app-locks ascending, conflict query with `existing.Id != bookingId`, single `ExecuteUpdateAsync` over `StartUtc`/`EndUtc`/`TimeZoneId` predicated on `permittedFrom.Contains(Status)`, zero rows → `invalid-status-transition`. Verify: the 2.7 scenarios re-run against SQL Server in `ConcurrencyTests` and pass
-- [ ] 3.2 Concurrency proof: one move to interval I racing at least 10 placements at I on the same resource; exactly one succeeds and exactly one blocking booking holds I afterwards. Verify: passes repeatedly (run 5×)
-- [ ] 3.3 Test: cancel committed between the move's read and its update statement yields `invalid-status-transition` and the stored row is Cancelled at its original interval. Verify: passes, and a mutant that checks status in a separate query before the update goes red
-- [ ] 3.4 Test: an erasure between read and write leaves the booker erased with its original instant and the booking moved. Verify: passes
-- [ ] 3.5 Source-level guard for *Store implementations honour Core semantics*: the SQL move write contains no load-then-save of the booking row and its status predicate is inside the update statement; the three writes touch disjoint columns. Verify: guard passes, and fails against a load-then-save mutant
-- [ ] 3.6 Confirm no migration is added and the model snapshot is unchanged. Verify: `dotnet ef migrations has-pending-model-changes` (or the project's equivalent check) reports none
+- [x] 3.1 Implement `SqlBookingStore.MoveAsync` per design Decision 3: claims read by booking id, app-locks ascending, conflict query with `existing.Id != bookingId`, single `ExecuteUpdateAsync` over `StartUtc`/`EndUtc`/`TimeZoneId` predicated on `permittedFrom.Contains(Status)`, zero rows → `invalid-status-transition`. Verify: the 2.7 scenarios re-run against SQL Server in `ConcurrencyTests` and pass
+- [x] 3.2 Concurrency proof: one move to interval I racing at least 10 placements at I on the same resource; exactly one succeeds and exactly one blocking booking holds I afterwards. Verify: passes repeatedly (run 5×)
+- [x] 3.3 Test: cancel committed between the move's read and its update statement yields `invalid-status-transition` and the stored row is Cancelled at its original interval. Verify: passes, and a mutant that checks status in a separate query before the update goes red
+- [x] 3.4 Test: an erasure between read and write leaves the booker erased with its original instant and the booking moved. Verify: passes
+- [x] 3.5 Source-level guard for *Store implementations honour Core semantics*: the SQL move write contains no load-then-save of the booking row and its status predicate is inside the update statement; the three writes touch disjoint columns. Verify: guard passes, and fails against a load-then-save mutant
+- [x] 3.6 Confirm no migration is added and the model snapshot is unchanged. Verify: `dotnet ef migrations has-pending-model-changes` (or the project's equivalent check) reports none
 
 ## 4. Notifications and emails
 
