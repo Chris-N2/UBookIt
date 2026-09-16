@@ -159,3 +159,48 @@ now requires the word "move" there.
    way; a fall-back overlap takes the first occurrence (`BookingWindow.ResolveSiteLocal`).
 6. Three test guards had to be told about the new endpoint by hand: `PermissionsTests` classification,
    `SensitiveDataRedactionTests` KnownWrites + recorded snapshot, and the capability-summary route map.
+
+## 10. QA round 2 — what changed since round 1 (treat as NEW code)
+
+Round 1 verdict: REJECT (1 CRITICAL, 1 MAJOR, 3 MINOR, 2 NIT). Every finding acted on:
+
+- **CRITICAL, composer signature.** `ForBookerAsync(Booking, BookingEvent, CancellationToken)` is
+  back exactly as frozen at 17.0.0 and delegates to a new overload
+  `ForBookerAsync(Booking, BookingEvent, BookingInterval? previousInterval, CancellationToken)`.
+  The frozen shape throws `ArgumentException` for a move. The "exactly two methods" guard now
+  counts DISTINCT names, with the reason stated; a new test asserts the frozen overload exists by
+  exact parameter types and refuses a move. `BookingEmailTests:651` reverted to the positional call.
+  No other public signature changed; the proposal and `docs/configuration.md` say so.
+- **MAJOR, service length rule.** `IServiceBookingService.MoveAsync` is new (declared BREAKING,
+  third port). For a booking placed for a service it computes the highest floor / lowest ceiling of
+  `service.Duration.TryResolveAgainst(each claimed resource's constraints)` and refuses with
+  `duration-too-short` / `duration-too-long`; an empty intersection refuses `service-unavailable`;
+  a deleted service or a direct booking delegates straight to `IBookingService.MoveAsync`. The
+  endpoint now calls the service booking service, and every move endpoint test wires it while the
+  booking service stays the refusing double — so a regression to the short path fails loudly.
+  New delta `specs/service-booking/spec.md` (ADDED requirement, five scenarios); `bookings` delta
+  states the split; `booking-management` delta gains the scenario; proposal's "Deliberately
+  unmodified: service-booking" removed and the capability listed as modified. Six new unit tests
+  in `MoveBookingTests` (bounded service → too short; resource ceiling → too long; permitted
+  length moves; deleted service no longer binds; direct booking delegated untouched; unknown id).
+  **Not re-verified live** — the TestSite's `M97C-G9JJ` case from round 1 is the reviewer's to
+  repeat; the endpoint now routes through the new path.
+- **MINOR, offset-bearing start.** `Start.Kind != Unspecified` is refused with `interval-invalid`
+  against `Start` before the domain is asked; theory test for Utc and Local kinds; scenario added.
+- **MINOR, tasks 6.2–6.4 verify claims.** Disclosed here: there are NO element-rendering tests —
+  the client suite has no DOM environment (a recorded deferred obligation). `move-fields.test.ts`
+  and `booking-rows.test.ts` cover the pure functions only. The scenario *"Moving the last row of a
+  page out of the window does not strand the operator"* has no instrument: not a test, and the live
+  check moved a row off a 6-row page. The step-back logic is the shared `#settleAfterRowAction`,
+  which cancel's existing coverage exercises, but that is an argument, not a measurement.
+- **MINOR, design.md stale.** Decision 2 rewritten to the `CanMoveTo`-then-store-then-`MoveTo`
+  order with the amendment recorded; Decision 6 states the modal's real value shape and the focus
+  management; the write-count rule settled on "third narrow write over an existing row" in code
+  comments, design and the persistence delta header alike.
+- **NIT, "before any store access".** Reworded to "before any store write" in the `bookings` delta
+  (SHALL and scenario).
+- **NIT, aria-invalid.** Set only when the refusal concerns the fields (`refusalConcernsFields`
+  in `move-fields.ts`, tested); status/not-found/generic refusals keep `aria-describedby` but do not
+  mark the inputs invalid.
+
+Build/test state after round 2 is recorded in the commit message of the round-2 commit; verify it.

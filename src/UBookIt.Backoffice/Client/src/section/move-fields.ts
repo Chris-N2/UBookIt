@@ -131,6 +131,16 @@ export function refusalTerm(code: string | undefined): string {
 }
 
 /**
+ * Whether a refusal is about the fields the operator typed, so the inputs should be marked
+ * invalid — as opposed to a refusal about the booking itself (its status, or its absence), where
+ * no field is wrong and marking them all invalid would send the operator to fix a time that was
+ * fine.
+ */
+export function refusalConcernsFields(term: string): boolean {
+  return term !== "moveRefusedStatus" && term !== "moveRefusedNotFound" && term !== "moveFailed";
+}
+
+/**
  * The sentence the modal shows for a refusal: the FIRST error's own term, because the domain
  * orders failures by its pipeline and the first is the one to fix first. The endpoint's
  * message is not shown in its place — it is written for a developer reading a response, and

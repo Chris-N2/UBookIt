@@ -207,6 +207,7 @@ public class FindByBookerEndpointTests
             new BookingsController(
                 store,
                 new UnusedBookingService(),
+                new UnusedServiceBookingService(),
                 new UBookIt.Core.SiteBookingSettings { TimeZoneId = "UTC" },
                 Security(sensitiveData)),
             store);

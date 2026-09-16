@@ -200,7 +200,7 @@ public interface IBookingStore
     /// </summary>
     /// <remarks>
     /// <para>
-    /// <b>The fourth narrow write, on the same terms as the other three.</b> It writes the
+    /// <b>The third narrow write over an existing row, on the same terms as the other two.</b> It writes the
     /// interval columns — start, end and the zone they were validated against — and nothing
     /// else: not the status, not the booker. It takes an id and values rather than an
     /// aggregate, the erasure write's shape, so there is no stale copy of any other column to

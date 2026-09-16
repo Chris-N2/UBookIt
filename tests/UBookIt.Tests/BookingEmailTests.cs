@@ -651,7 +651,7 @@ public class BookingEmailTests
         await cancelled.CancelAsync();
 
         await Assert.ThrowsAnyAsync<OperationCanceledException>(
-            () => Composer().ForBookerAsync(Booking(direct: true), BookingEvent.Placed, cancellationToken: cancelled.Token));
+            () => Composer().ForBookerAsync(Booking(direct: true), BookingEvent.Placed, cancelled.Token));
     }
 
     /// <summary>

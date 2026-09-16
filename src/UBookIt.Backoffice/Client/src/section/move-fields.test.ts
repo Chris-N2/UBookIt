@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { isComplete, prefill, refusalTerm, refusalTermFor, toRequest } from "./move-fields.js";
+import { isComplete, prefill, refusalConcernsFields, refusalTerm, refusalTermFor, toRequest } from "./move-fields.js";
 
 describe("what the move modal opens showing", () => {
   it("is the booking's current interval, in the zone the booking records", () => {
@@ -99,6 +99,19 @@ describe("what a refusal says", () => {
       ]),
     ).toBe("moveRefusedOutsideOpenHours");
     expect(refusalTermFor([])).toBe("moveFailed");
+  });
+
+  it("marks the inputs invalid only when a field is what was refused", () => {
+    // A cancelled booking, or one that no longer exists, has nothing wrong with its date;
+    // aria-invalid on the inputs there would send the operator to fix a time that was fine.
+    expect(refusalConcernsFields("moveRefusedOutsideOpenHours")).toBe(true);
+    expect(refusalConcernsFields("moveRefusedConflict")).toBe(true);
+    expect(refusalConcernsFields("moveRefusedInThePast")).toBe(true);
+    expect(refusalConcernsFields("moveRefusedUnchanged")).toBe(true);
+    expect(refusalConcernsFields("moveIncomplete")).toBe(true);
+    expect(refusalConcernsFields("moveRefusedStatus")).toBe(false);
+    expect(refusalConcernsFields("moveRefusedNotFound")).toBe(false);
+    expect(refusalConcernsFields("moveFailed")).toBe(false);
   });
 
   it("has a string in the localisation for every term it can name", async () => {

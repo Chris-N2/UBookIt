@@ -3,8 +3,9 @@ GUARANTEE DIFF for the one wholesale replacement below.
 
 "Store implementations honour Core semantics" — 9 SHALL blocks, 11 scenarios:
   SHALL 1  SQL implementations; claims read by index; UpdateAsync   → CARRIED; the move write is
-           writes status, not booker; booker by erasure only          named as a THIRD narrow write
-                                                                      over the interval columns
+           writes status, not booker; booker by erasure only          named as the third narrow
+                                                                      write over an existing row
+                                                                      (placement is the insert)
   SHALL 2  the two writes touch disjoint columns, and why           → CARRIED, amended to three
                                                                       writes over three disjoint
                                                                       column sets

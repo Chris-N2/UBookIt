@@ -3,7 +3,7 @@ import { UmbModalBaseElement } from "@umbraco-cms/backoffice/modal";
 import { UBookItBackofficeService } from "../api/index.js";
 import { toApiErrors } from "./api-errors.js";
 import { bookingReference } from "./booking-rows.js";
-import { isComplete, prefill, refusalTermFor, toRequest, type MoveFields } from "./move-fields.js";
+import { isComplete, prefill, refusalConcernsFields, refusalTermFor, toRequest, type MoveFields } from "./move-fields.js";
 import type { MoveBookingModalData, MoveBookingModalValue } from "./move-booking-modal.token.js";
 
 /**
@@ -120,6 +120,9 @@ export class UBookItMoveBookingModalElement extends UmbModalBaseElement<MoveBook
   override render() {
     const booking = this.data?.booking;
     const describedBy = this._refusal ? "ubookit-move-hint ubookit-move-refusal" : "ubookit-move-hint";
+    // Invalid only when a FIELD was refused; a refusal about the booking's status or existence
+    // still describes the inputs (so it is reachable from them) but does not mark them wrong.
+    const invalid = this._refusal !== undefined && refusalConcernsFields(this._refusal) ? "true" : "false";
 
     return html`
       <uui-dialog-layout headline=${this.#term("moveHeadline")}>
@@ -142,7 +145,7 @@ export class UBookItMoveBookingModalElement extends UmbModalBaseElement<MoveBook
               type="date"
               required
               aria-describedby=${describedBy}
-              aria-invalid=${this._refusal ? "true" : "false"}
+              aria-invalid=${invalid}
               .value=${this._fields.date}
               @input=${(event: Event) => this.#set("date", (event.target as HTMLInputElement).value)}
             />
@@ -156,7 +159,7 @@ export class UBookItMoveBookingModalElement extends UmbModalBaseElement<MoveBook
               required
               step="60"
               aria-describedby=${describedBy}
-              aria-invalid=${this._refusal ? "true" : "false"}
+              aria-invalid=${invalid}
               .value=${this._fields.time}
               @input=${(event: Event) => this.#set("time", (event.target as HTMLInputElement).value)}
             />
@@ -171,7 +174,7 @@ export class UBookItMoveBookingModalElement extends UmbModalBaseElement<MoveBook
               min="1"
               step="1"
               aria-describedby=${describedBy}
-              aria-invalid=${this._refusal ? "true" : "false"}
+              aria-invalid=${invalid}
               .value=${String(this._fields.lengthMinutes || "")}
               @input=${(event: Event) =>
                 this.#set("lengthMinutes", Number((event.target as HTMLInputElement).value))}

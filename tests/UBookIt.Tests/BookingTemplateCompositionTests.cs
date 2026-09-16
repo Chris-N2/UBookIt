@@ -846,16 +846,50 @@ public class BookingMessageModelContractTests
         // recurring failure of this change was precisely a guard that covered the callers
         // somebody had thought of. This turns "a reviewer must remember" into "the build says
         // so".
+        // By NAME, distinct: an overload of ForBookerAsync is the same producer with a further
+        // argument (the move message's previous interval, 17.1.0), not a third message the cost
+        // theory has not measured. A third NAME is what this guard exists to refuse.
         var producers = typeof(BookingMessageComposer)
             .GetMethods(BindingFlags.Public | BindingFlags.Instance | BindingFlags.DeclaredOnly)
             .Where(m => m.ReturnType == typeof(Task<BookingMessage>))
             .Select(m => m.Name)
+            .Distinct(StringComparer.Ordinal)
             .Order(StringComparer.Ordinal)
             .ToList();
 
         Assert.Equal(
             [nameof(BookingMessageComposer.ForBookerAsync), nameof(BookingMessageComposer.ForSiteAsync)],
             producers);
+    }
+
+    [Fact]
+    public async Task The_frozen_booker_signature_still_binds_and_refuses_a_move()
+    {
+        // The 17.0.0 shape — (Booking, BookingEvent, CancellationToken) — must still exist as its
+        // own overload so a host compiled against it binds; QA round 1 found it had been widened in
+        // place, which is a MissingMethodException at runtime for such a host.
+        var frozen = typeof(BookingMessageComposer).GetMethod(
+            nameof(BookingMessageComposer.ForBookerAsync),
+            [typeof(Booking), typeof(BookingEvent), typeof(CancellationToken)]);
+
+        Assert.NotNull(frozen);
+
+        // And it cannot compose a move: that message needs the previous interval, which only the
+        // wider overload carries. Invoked through the frozen overload's own binding.
+        var composer = new BookingMessageComposer(
+            new InMemoryResourceStore(), NullLogger<BookingMessageComposer>.Instance);
+        var booking = Booking.Rehydrate(
+            Guid.NewGuid(),
+            References.Any(),
+            BookingInterval.Create(
+                TestData.Utc(TestData.BaseDate, "09:00"), TestData.Utc(TestData.BaseDate, "10:00"), TestData.LondonZoneId).Value,
+            Booker.Create(null, "Ada Lovelace", "ada@example.com").Value,
+            [new ResourceClaim(Guid.NewGuid())],
+            BookingStatus.Confirmed,
+            TestData.Now).Value;
+
+        await Assert.ThrowsAsync<ArgumentException>(
+            () => composer.ForBookerAsync(booking, BookingEvent.Moved, CancellationToken.None));
     }
 
     [Fact]

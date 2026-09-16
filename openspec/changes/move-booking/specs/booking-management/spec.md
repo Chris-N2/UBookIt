@@ -13,10 +13,17 @@ and length, in the same swagger group and under the same section authorization a
 uBookIt management endpoint, and gated by the same verb that gates cancelling, confirming and
 declining.
 
-**It SHALL apply the domain's move operation rather than its own rule.** Everything *Moving a
-booking* decides — which statuses permit a move, which rules the new interval runs and on
-whose terms, the refusal of an unchanged interval — is decided there; the endpoint adds no
-rule of its own and relaxes none.
+**It SHALL apply the domain's move operation rather than its own rule**, through the service
+booking service's move, so that a booking placed for a service has the service's length rule
+applied (`service-booking`, *Moving a booking placed for a service applies the service's length
+rules*). Everything *Moving a booking* decides — which statuses permit a move, which rules the
+new interval runs and on whose terms, the refusal of an unchanged interval — is decided there;
+the endpoint adds no rule of its own and relaxes none.
+
+**A start carrying an offset or a `Z` SHALL be refused** with `interval-invalid` against the
+start field, rather than reinterpreted. The contract is wall-clock time in the site's zone; a
+scheduler sending an instant would otherwise be given a booking at a time nobody typed, with no
+error.
 
 **The new start SHALL be expressed in the site's own time**, on the same terms as the list's
 window: the operator is looking at a screen in the site's zone, and a start typed there means
@@ -41,6 +48,14 @@ booking needs the code to say why a drop was refused.
 #### Scenario: The start is read in the site's zone
 - **WHEN** an operator submits a start of 09:00 on a date while the site's zone is one hour ahead of UTC
 - **THEN** the booking is moved to 08:00 UTC on that date
+
+#### Scenario: A start with an offset is refused
+- **WHEN** a caller submits a start of `2026-06-02T09:00:00Z`, or one carrying `+05:00`
+- **THEN** the request fails with `interval-invalid` against the start field, and no booking changes
+
+#### Scenario: A service booking's length is bound by its service
+- **WHEN** an operator moves a booking placed for a 45–120 minute service to a length of 30 minutes
+- **THEN** the response carries `duration-too-short`, and the booking is unchanged
 
 #### Scenario: A refused move names its reason
 - **WHEN** an operator moves a booking onto an interval the domain refuses

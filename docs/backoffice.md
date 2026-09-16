@@ -367,8 +367,9 @@ booked can go on quoting it), its status (a requested booking that has moved is 
 requested), the person who booked, the service it was placed for and the resources it claims.
 
 **The new time has to be one the resources could take.** The same rules as a visitor's
-booking apply — opening hours, the booking grid, the length limits, and nothing else already
-there — with two exceptions made for you: the resource's **minimum notice does not bind you**
+booking apply — opening hours, the booking grid, the length limits (the service's as well as
+the resources', for a booking placed for a service), and nothing else already there — with two
+exceptions made for you: the resource's **minimum notice does not bind you**
 (somebody rang to say they are running late; you are the one the site trusts to decide), and
 neither does its **booking horizon**. What still binds everyone is that a booking cannot be
 moved into the past.

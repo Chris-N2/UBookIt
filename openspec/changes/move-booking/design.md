@@ -34,8 +34,8 @@ See `proposal.md` for why. What shapes the how:
 
 - A move is a placement of the booking it already is: the same pipeline, the same locks, the same
   conflict semantics, and no second definition of "bookable" anywhere.
-- The move write is a fourth narrow write in the existing pattern, not a widening of the status
-  write.
+- The move write is a third narrow write over an existing row in the existing pattern, not a
+  widening of the status write.
 - Operator-versus-visitor terms are one explicit parameter of the pipeline, so booking-on-behalf
   reuses it rather than re-deriving it.
 - No new table, no new column, no migration.
@@ -73,7 +73,7 @@ so many words.
 rule-pipeline is the one thing every placement path already shares and that property is worth
 more than a shorter diff.
 
-### Decision 2: `MoveTo` on the aggregate, with the status check in the aggregate and the interval check before it
+### Decision 2: `CanMoveTo`/`MoveTo` on the aggregate — checked before the store write, applied after it
 
 `Booking.MoveTo(BookingInterval newInterval)` returns a `DomainResult`: refuses with
 `invalid-status-transition` unless `Requested` or `Confirmed`; refuses with `interval-unchanged`
@@ -82,30 +82,47 @@ returns success. It does not touch claims, status, booker, reference or service.
 
 The service's `MoveAsync(Guid id, DateTimeOffset newStart, TimeSpan newLength)`:
 
-1. loads the booking (`booking-not-found`);
+1. loads the booking (`booking-not-found`) and refuses a status that does not permit a move;
 2. resolves the zone and the window for the new interval (rule 1);
 3. loads every claimed resource and runs `ValidateAgainst` with operator terms per resource
    (rules 2–7), ordering failures as placement does;
-4. calls `booking.MoveTo(window.Interval)` — status and unchanged-interval checks;
+4. asks `booking.CanMoveTo(window.Interval)` — the unchanged-interval check, without changing
+   anything;
 5. calls the store's move write with the id, the new interval and the permitted statuses;
-6. on success, reports through the observer with the previous interval, wrapped so the observer
-   cannot break the move.
+6. only then applies `booking.MoveTo(window.Interval)` to the aggregate, and reports through the
+   observer with the previous interval, wrapped so the observer cannot break the move.
+
+*Amended during apply.* The first cut applied `MoveTo` before the store write, and the in-memory
+tests caught it: that store hands out the instance it holds, so a refused move left the stored
+aggregate claiming the refused interval. The split into `CanMoveTo` (check) and `MoveTo` (apply
+after the store agrees) mirrors placement, where the aggregate is built, the store decides, and
+only a stored booking is handed on.
+
+**Service bookings go through `IServiceBookingService.MoveAsync`.** Added after QA round 1: the
+booking service knows resources and nothing about services, exactly as direct placement does, so
+a 45–120 minute service booking could be moved to 30 minutes. The service booking service's move
+loads the booking, and for one placed for a service computes the highest floor and lowest ceiling
+of the service's specification intersected with each claimed resource's range (the same arithmetic
+as `ValidateAgainstPoolBounds`, over the booking's own claims), refuses with the placement codes,
+then delegates. A deleted service no longer binds; a direct booking is delegated untouched. The
+endpoint calls this and not the booking service. It is a third declared port break.
 
 *Why the interval check is after the pipeline, not before:* the pipeline's answer should be
 authoritative for every submitted interval, so an operator always hears the truth about the time
 they typed. An unchanged interval is one the pipeline accepted once already, so "unchanged" is
-then only ever said about a valid interval. The spec's "before any store access" is satisfied
-either way; the lock and the write come after both.
+then only ever said about a valid interval. The spec's "before any store write" is satisfied;
+the lock and the write come after both.
 
 *Why `MoveTo` takes the resolved interval rather than start+length:* the aggregate never resolves
 zones; the service does, exactly as for placement.
 
-### Decision 3: A fourth narrow write, `MoveAsync(bookingId, newInterval, permittedStatuses)`
+### Decision 3: A third narrow write over an existing row, `MoveAsync(bookingId, newInterval, permittedStatuses)`
 
 The store gains `Task<DomainResult> MoveAsync(Guid bookingId, BookingInterval newInterval,
 IReadOnlyCollection<BookingStatus> permittedFrom, CancellationToken)`. It takes an id and values,
 not the aggregate — the erasure write's shape — so there is no stale copy of any other column to
-write back.
+write back. (Counting rule, settled after QA: placement is the insert; status, erasure and move
+are the three narrow writes over an existing row, which is how the persistence spec counts them.)
 
 SQL implementation, one transaction:
 
@@ -160,10 +177,13 @@ above it gains the move alongside confirm and decline with the responsibility wr
 The client's only modal precedent is Umbraco's confirm modal. A move needs inputs, so this adds
 the first custom modal: a Lit element registered with a `modal` manifest entry and a
 `UmbModalToken` carrying `{ bookingId, reference, start, end, zone }` in and `{ moved: true }`
-out, opened with `umbOpenModal` like `confirmDestructive`. Inside: `uui-form` with a date input,
-a time input and a length input (minutes), each a native `<input>` inside a `uui-form-layout-item`
-with a real `<label for>` — **not** `uui-label`, which the bookings-screen handover records is
-not a label — plus the conditional-notification sentence and Cancel/Move buttons.
+out, opened with `umbOpenModal` like `confirmDestructive`. The token's value is the new interval
+(`{ startUtc, endUtc, timeZoneId }`), not a bare flag, so the list can say where the booking went.
+Inside: a `<form>` with a date input, a time input and a length input (minutes), each a native
+`<input>` with a real `<label for>` — **not** `uui-label`, which the bookings-screen handover
+records is not a label — plus the conditional-notification sentence and Cancel/Move buttons.
+Focus is managed explicitly (first input on open and after a refusal; the row's Move button on
+dismissal), because the modal container leaves it on `<body>` — measured live.
 
 Submission calls the generated SDK's `moveBooking`; a refused move reads the problem-details code
 via `api-errors.ts` and maps it to a localisation term shown in an element associated with the

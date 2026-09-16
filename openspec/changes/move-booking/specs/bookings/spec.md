@@ -78,13 +78,21 @@ visitor.
 **A move to the interval the booking already holds SHALL be refused** with a new stable code,
 `interval-unchanged`, on the same grounds as cancelling twice: a caller told "moved" when
 nothing changed cannot tell a completed action from a rejected one. The check SHALL run before
-any store access.
+any store write — the booking and its resources are necessarily read first.
 
 **Moving SHALL keep every claim.** A booking placed for a service moves with the resources it
 was assigned; no assignment is re-run, and a claimed resource that is unavailable at the new
 interval SHALL produce `conflict` (or the open-hours failure, as the pipeline decides) rather
 than a substitution. Changing which resources a booking claims is a different operation, not
 built here.
+
+**The booking service's move knows resources and nothing about services**, on the same split
+placement has. The length rule a service adds — the intersection of its duration specification
+with each claimed resource's range — is applied by the service booking service's move, which
+is the operator's entry point for both kinds of booking; see `service-booking`, *Moving a
+booking placed for a service applies the service's length rules*. A caller reaching the
+booking service's move directly for a service booking gets the resources' rules alone, and the
+port documents that.
 
 **An unknown booking SHALL fail with `booking-not-found`.** No other new failure code is
 introduced.
@@ -126,7 +134,7 @@ person's details, not the booking's claim on its time.
 
 #### Scenario: A move to the interval already held is refused
 - **WHEN** the move operation is called with the booking's own current start and length
-- **THEN** it fails with `interval-unchanged` and the store is not touched
+- **THEN** it fails with `interval-unchanged` and nothing is written
 
 #### Scenario: A service booking moves with its claims
 - **WHEN** a booking placed for a two-role service is moved to an interval at which both claimed resources are free

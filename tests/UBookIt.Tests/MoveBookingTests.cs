@@ -477,6 +477,124 @@ public class MoveBookingTests
         Assert.Equal(TestData.Utc(Date, "10:00"), stored.Interval.StartUtc);
     }
 
+    // ---------------------------------------------------------------------------------------
+    // service-booking — "Moving a booking placed for a service applies the service's length rules"
+    // (QA round 1: a 45–120 minute service booking was moved to 30 minutes live)
+    // ---------------------------------------------------------------------------------------
+
+    private static Service BoundedService(int minMinutes, int maxMinutes)
+        => Service.Create(
+            "Room hire",
+            ServiceDuration.Variable(Mins(minMinutes), Mins(maxMinutes)).Value,
+            [new ServiceRole(ResourceTypes.Room, 1)]).Value;
+
+    private static async Task<Booking> PlaceForService(Harness h, Service service, string start = "10:00", int minutes = 60)
+    {
+        var placed = await h.Services.PlaceAsync(new ServiceBookingRequest
+        {
+            ServiceId = service.Id,
+            Start = TestData.Utc(Date, start),
+            Duration = Mins(minutes),
+            Booker = TestData.Booker(),
+        });
+        Assert.True(placed.Succeeded, string.Join(", ", placed.Failures.Select(f => f.Code)));
+        return placed.Value;
+    }
+
+    [Fact]
+    public async Task A_service_booking_cannot_be_moved_to_a_length_the_service_forbids()
+    {
+        var service = BoundedService(45, 120);
+        var h = Wire(service: service, resources: Res(1));
+        var booking = await PlaceForService(h, service);
+
+        // THROUGH THE SERVICE BOOKING SERVICE — the operator's entry point. The booking service
+        // alone knows resources and would accept 30 (the room allows 30–480).
+        var moved = await h.Services.MoveAsync(booking.Id, TestData.Utc(Date, "14:00"), Mins(30));
+
+        AssertSingleFailure(moved, FailureCodes.DurationTooShort);
+        Assert.Equal(TestData.Utc(Date, "10:00"), (await h.Store.GetBookingAsync(booking.Id))!.Interval.StartUtc);
+        Assert.DoesNotContain("moved", h.Observer.Told);
+    }
+
+    [Fact]
+    public async Task A_service_booking_cannot_be_moved_past_a_claimed_resources_ceiling()
+    {
+        // The service permits up to 240; the room's own maximum is 90. The resource ceiling is
+        // never widened by the service — the same rule as placement.
+        var service = BoundedService(30, 240);
+        var room = Resource.Create(
+            ResourceTypes.Room, "Small room", directlyBookable: true,
+            availability: TestData.Config(
+                TestData.Weekly("08:00", "18:00", Date.DayOfWeek),
+                constraints: BookingConstraints.Create(granularity: Mins(30), minDuration: Mins(30), maxDuration: Mins(90)).Value),
+            id: Id(1)).Value;
+        var h = Wire(service: service, resources: room);
+        var booking = await PlaceForService(h, service);
+
+        var moved = await h.Services.MoveAsync(booking.Id, TestData.Utc(Date, "14:00"), Mins(120));
+
+        AssertSingleFailure(moved, FailureCodes.DurationTooLong);
+    }
+
+    [Fact]
+    public async Task A_service_booking_moves_to_a_length_both_permit()
+    {
+        var service = BoundedService(45, 120);
+        var h = Wire(service: service, resources: Res(1));
+        var booking = await PlaceForService(h, service);
+
+        var moved = await h.Services.MoveAsync(booking.Id, TestData.Utc(Date, "14:00"), Mins(90));
+
+        Assert.True(moved.Succeeded, string.Join(", ", moved.Failures.Select(f => f.Code)));
+        var stored = await h.Store.GetBookingAsync(booking.Id);
+        Assert.Equal(TestData.Utc(Date, "15:30"), stored!.Interval.EndUtc);
+        Assert.Equal(booking.Claims, stored.Claims);
+        Assert.Contains("moved", h.Observer.Told);
+    }
+
+    [Fact]
+    public async Task A_deleted_service_no_longer_binds_a_move()
+    {
+        // The attribution is a snapshot; a specification that has been deleted cannot bind.
+        var service = BoundedService(45, 120);
+        var h = Wire(service: service, resources: Res(1));
+        var booking = await PlaceForService(h, service);
+
+        var withoutService = Wire(resources: Res(1)); // same resource, no service in the store
+        Assert.True((await withoutService.Store.PlaceAsync(booking)).Succeeded);
+
+        var moved = await withoutService.Services.MoveAsync(booking.Id, TestData.Utc(Date, "14:00"), Mins(30));
+
+        Assert.True(moved.Succeeded, string.Join(", ", moved.Failures.Select(f => f.Code)));
+    }
+
+    [Fact]
+    public async Task A_direct_booking_is_delegated_untouched_by_the_service_booking_service()
+    {
+        var h = Wire();
+        var booking = await Place(h, "10:00");
+        await Place(h, "14:00");
+
+        // The same refusal the booking service gives, for the same arguments.
+        var viaService = await h.Services.MoveAsync(booking.Id, TestData.Utc(Date, "13:30"), Mins(60));
+        var direct = await h.Bookings.MoveAsync(booking.Id, TestData.Utc(Date, "13:30"), Mins(60));
+
+        AssertSingleFailure(viaService, FailureCodes.Conflict);
+        AssertSingleFailure(direct, FailureCodes.Conflict);
+
+        var moved = await h.Services.MoveAsync(booking.Id, TestData.Utc(Date, "15:00"), Mins(60));
+        Assert.True(moved.Succeeded);
+    }
+
+    [Fact]
+    public async Task An_unknown_booking_through_the_service_booking_service_is_not_found()
+    {
+        var h = Wire();
+
+        AssertSingleFailure(await h.Services.MoveAsync(Guid.NewGuid(), TestData.Utc(Date, "14:00"), Mins(60)), FailureCodes.BookingNotFound);
+    }
+
     [Fact]
     public async Task A_booking_with_an_erased_booker_can_move()
     {

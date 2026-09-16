@@ -162,6 +162,33 @@ public sealed class InMemoryServiceStore : IServiceStore, IServiceManagementStor
 }
 
 /// <summary>
+/// Stands in for the service booking service and refuses to be used — every endpoint but move
+/// goes nowhere near it, and move's own tests supply a recording one.
+/// </summary>
+public sealed class UnusedServiceBookingService : IServiceBookingService
+{
+    private static InvalidOperationException Unexpected([System.Runtime.CompilerServices.CallerMemberName] string member = "")
+        => new($"The endpoint reached {member} on the service booking service; it should not.");
+
+    public Task<ServiceResolution> ResolveAsync(
+        ServiceRole role, ServiceDuration duration, CancellationToken cancellationToken = default) => throw Unexpected();
+
+    public Task<DomainResult<IReadOnlyList<RoleCandidates>>> ResolveCandidatesAsync(
+        Guid serviceId, CancellationToken cancellationToken = default) => throw Unexpected();
+
+    public Task<DomainResult<IReadOnlyList<ServiceBookableStart>>> GetBookableStartsAsync(
+        Guid serviceId, DateOnly fromDate, DateOnly toDate, Guid? pinnedResourceId = null,
+        CancellationToken cancellationToken = default) => throw Unexpected();
+
+    public Task<DomainResult<Booking>> PlaceAsync(
+        ServiceBookingRequest request, CancellationToken cancellationToken = default) => throw Unexpected();
+
+    public Task<DomainResult<Booking>> MoveAsync(
+        Guid bookingId, DateTimeOffset newStart, TimeSpan newLength, CancellationToken cancellationToken = default)
+        => throw Unexpected();
+}
+
+/// <summary>
 /// In-memory IBookingStore honouring the atomic placement contract via a lock:
 /// the conflict check and the write happen as one critical section.
 /// </summary>

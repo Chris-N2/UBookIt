@@ -11,6 +11,7 @@ using Umbraco.Cms.Core.Security;
 using UBookIt.Core;
 using UBookIt.Core.Bookings;
 using UBookIt.Core.Common;
+using UBookIt.Core.Services;
 using UBookIt.Core.Stores;
 
 namespace UBookIt.Backoffice.Controllers;
@@ -47,6 +48,7 @@ namespace UBookIt.Backoffice.Controllers;
 public class BookingsController(
     IBookingManagementStore bookingStore,
     IBookingService bookingService,
+    IServiceBookingService serviceBooking,
     SiteBookingSettings settings,
     IBackOfficeSecurityAccessor backOfficeSecurityAccessor) : UBookItBackofficeApiControllerBase
 {
@@ -292,9 +294,19 @@ public class BookingsController(
     /// dragging a booking needs the code to say why a drop was refused, not only that it was.
     /// </para>
     /// <para>
+    /// <b>Through the service booking service, not the booking service directly.</b> A booking
+    /// placed for a service has a length rule the booking service cannot see — the service's
+    /// duration specification — and QA round 1 moved a 45–120 minute service booking to 30
+    /// minutes through the shorter path. The service-aware path applies that rule and delegates
+    /// everything else; for a direct booking it delegates straight away.
+    /// </para>
+    /// <para>
     /// <b>The start is read in the site's zone</b>, on the list window's convention, and
-    /// converted once here. The response carries identity, the unchanged status and the new
-    /// interval — not a list row, for the reason <see cref="CancelledBookingModel"/> states.
+    /// converted once here. A start carrying an offset or a <c>Z</c> is refused rather than
+    /// reinterpreted: the contract is wall-clock time, and a scheduler sending
+    /// <c>toISOString()</c> output would otherwise get a wrong instant with no error. The
+    /// response carries identity, the unchanged status and the new interval — not a list row,
+    /// for the reason <see cref="CancelledBookingModel"/> states.
     /// </para>
     /// </remarks>
     /// <param name="id">The booking to move.</param>
@@ -319,6 +331,17 @@ public class BookingsController(
             shapeFailures.Add(new DomainFailure(
                 FailureCodes.IntervalInvalid, "A start is required.", nameof(model.Start)));
         }
+        else if (model.Start.Kind != DateTimeKind.Unspecified)
+        {
+            // A value with an offset binds as Utc (for "Z") or Local (for "+05:00", after being
+            // rebased through the server's own zone) — either way not the site's wall-clock time
+            // this contract is defined over. Refused, so the caller fixes the shape rather than
+            // getting a booking at an instant nobody typed.
+            shapeFailures.Add(new DomainFailure(
+                FailureCodes.IntervalInvalid,
+                "The start must be a wall-clock time in the site's zone, with no offset or 'Z'.",
+                nameof(model.Start)));
+        }
 
         if (model.LengthMinutes <= 0)
         {
@@ -338,7 +361,7 @@ public class BookingsController(
             return start.Failures.ToProblemResult();
         }
 
-        var moved = await bookingService.MoveAsync(
+        var moved = await serviceBooking.MoveAsync(
             id, start.Value.Utc, TimeSpan.FromMinutes(model.LengthMinutes), cancellationToken);
 
         if (!moved.Succeeded)

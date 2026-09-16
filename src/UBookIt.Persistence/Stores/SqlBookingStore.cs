@@ -175,7 +175,8 @@ internal sealed class SqlBookingStore(UBookItDbContext db) : IBookingStore
         IReadOnlyCollection<BookingStatus> permittedFrom,
         CancellationToken cancellationToken = default)
     {
-        // THE FOURTH NARROW WRITE. Placement's transaction shape, with three differences that
+        // THE THIRD NARROW WRITE OVER AN EXISTING ROW (placement being the insert). Placement's
+        // transaction shape, with three differences that
         // are the whole of the move contract (persistence spec, "Atomic move on SQL Server"):
         // the lock set is read from the STORED claims, the conflict check excludes this
         // booking's own claims, and the status is a predicate of the update statement itself.

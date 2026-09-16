@@ -105,16 +105,30 @@ public sealed class BookingMessageComposer(
     /// booker's address requires establishing that the details are present, which the caller has
     /// necessarily already done.
     /// </summary>
+    /// <remarks>
+    /// <b>The signature frozen at 17.0.0, kept exactly.</b> A move message needs the interval the
+    /// booking left, which no event before 17.1.0 had; that is the overload below, and this one
+    /// delegates to it so a caller compiled against 17.0.x binds and runs unchanged. Asking THIS
+    /// overload for a move message throws, because it cannot be composed honestly without the
+    /// previous interval.
+    /// </remarks>
+    public Task<BookingMessage> ForBookerAsync(
+        Booking booking, BookingEvent bookingEvent, CancellationToken cancellationToken = default)
+        => ForBookerAsync(booking, bookingEvent, previousInterval: null, cancellationToken);
+
+    /// <param name="booking">The booking the message is about.</param>
+    /// <param name="bookingEvent">What just happened to it.</param>
     /// <param name="previousInterval">
     /// For <see cref="BookingEvent.Moved"/>, the interval the booking held before the move —
     /// required for that event and meaningless for every other. A move message that could not
     /// say where the booking moved <i>from</i> would leave a customer holding two confirmations
     /// to work out which is real.
     /// </param>
+    /// <param name="cancellationToken">Cancels the resource read the message may need.</param>
     public async Task<BookingMessage> ForBookerAsync(
         Booking booking,
         BookingEvent bookingEvent,
-        BookingInterval? previousInterval = null,
+        BookingInterval? previousInterval,
         CancellationToken cancellationToken = default)
     {
         if (bookingEvent == BookingEvent.Moved && previousInterval is null)

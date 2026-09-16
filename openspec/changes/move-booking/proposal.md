@@ -33,11 +33,15 @@ already gives a scheduler confirm, decline and cancel; move is the verb it lacks
   that no report needs to: a booker's message that could only say "you are now at Y" instead of
   "you have moved from X to Y" would be worse than the doctrine is valuable. The previous interval
   is not persisted anywhere — see Non-goals.
-- **BREAKING — published port.** `IBookingObserver` gains a moved member, with no default
-  implementation, by the port's own doctrine: an observer silently deaf to moves would be a worse
-  outcome than a compile error. A host supplying its own observer must add it. **`IBookingStore`
-  gains a move write**, on the same terms. Both land in a minor (17.1.0), which is where a break
-  belongs; neither can ship as `17.0.x`.
+- **BREAKING — published ports, three of them.** `IBookingObserver` gains a moved member, with no
+  default implementation, by the port's own doctrine: an observer silently deaf to moves would be
+  a worse outcome than a compile error. A host supplying its own observer must add it.
+  **`IBookingStore` gains a move write**, on the same terms. **`IServiceBookingService` gains a
+  move**, which is the operator's entry point for moving any booking and the only path that
+  applies a service's length rule (added after QA round 1 moved a 45–120 minute service booking
+  to 30 minutes). All three land in a minor (17.1.0), which is where a break belongs; none can
+  ship as `17.0.x`. **No other public signature changes**: the composer's `ForBookerAsync` keeps
+  its 17.0.0 shape and gains an overload.
 - **The booker is told, and only the booker.** A new message kind, `BookerMoved`, additive to the
   frozen kind set with its own view and its own template. The site's own recipients are not
   written to, on exactly the reasoning confirm and decline settled: the site performed the action,
@@ -108,6 +112,11 @@ already gives a scheduler confirm, decline and cancel; move is the verb it lacks
   nothing for the site's own recipients. The booker model gains the previous interval.
 - `permissions`: *"Access within the section is decided by four verbs"* defines Manage as
   "cancelling, confirming and declining"; move joins the definition. The verb count is unchanged.
+- `service-booking`: a new requirement, *"Moving a booking placed for a service applies the
+  service's length rules"* — the service booking service's move, the operator's single entry
+  point, binds a service booking's length by the intersection of the service's specification
+  with each claimed resource's range, as placement does. Without it, *"Service duration narrows
+  each candidate independently"* was falsified for moved bookings (QA round 1, live).
 - `persistence`: *"Store implementations honour Core semantics"* states that `UpdateAsync` writes
   the status and nothing else; the move write is a further narrow write over its own columns, and
   the requirement says so. A sibling requirement, *"Atomic move on SQL Server"*, is added for the
@@ -132,8 +141,6 @@ capability would split what `bookings` and `booking-management` already own betw
 
 - `availability`: *"Booking constraints"* defines lead time and horizon per resource; nothing about
   their definition changes, only which callers they bind, and that is stated in `bookings`.
-- `service-booking`: a service booking moves with its claims intact and re-runs no assignment.
-  Nothing there is falsified; the sweep at sync time confirms it.
 - `booker-erasure`, `booking-retention`: an erased booker's booking can move and sends nothing; a
   moved `EndUtc` moves the booking within the retention index, which is the index doing its job.
   Neither requirement changes.
