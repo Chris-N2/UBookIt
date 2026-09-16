@@ -72,9 +72,9 @@ migration time rather than quietly misbehave.
   protection belongs to your host's rate limiting or edge — uBookIt makes no
   DDoS-protection claim. The details, including the breaking change if you were already
   using the API, are in [the delivery API](https://github.com/Chris-N2/UBookIt/blob/main/docs/delivery-api.md).
-- **A Bookings section** in the backoffice for seeing bookings, cancelling them, and — where
-  you have asked for bookings to be approved rather than confirmed on the spot — confirming
-  or declining them. **With permissions per user group**: seeing bookings, acting on them,
+- **A Bookings section** in the backoffice for seeing bookings, cancelling them, moving them
+  to a new time, and — where you have asked for bookings to be approved rather than confirmed
+  on the spot — confirming or declining them. **With permissions per user group**: seeing bookings, acting on them,
   and configuring resources and services are separate grants within the section, ticked in
   the ordinary Umbraco group editor.
 - **Approval, if you want it.** `UBookIt:AutoConfirm` is on by default, so bookings confirm
@@ -106,7 +106,11 @@ yours the moment you override a token or supply a theme, is in
 
 On the record as decisions, not gaps somebody discovers:
 
-- **Amending** a booking's time, or **taking a booking on someone's behalf**.
+- **Taking a booking on someone's behalf.** Bookings arrive through the front-end flow. (A
+  booking can be **moved** to a new time from the backoffice, keeping its reference — but not
+  placed from it.)
+- **Changing which resources a booking claims.** A move changes when, not what: a booking
+  whose resource is busy at the new time is refused rather than given a different one.
 - **Finding a booking without knowing roughly when it is.** The backoffice list is windowed
   by date — but you can find every booking holding a given email address, which is how an
   erasure request is honoured. There is no search by name or reference.

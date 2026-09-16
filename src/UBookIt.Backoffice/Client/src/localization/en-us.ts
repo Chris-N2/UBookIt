@@ -486,7 +486,7 @@ export default {
       "View the Bookings list. Contact details still need the Sensitive data group on top.",
     bookingsManageLabel: "Act on bookings",
     bookingsManageDescription:
-      "Cancel, confirm and decline bookings. Includes seeing them — acting on what you cannot see makes no sense, so this does not need 'See bookings' ticked as well.",
+      "Cancel, confirm, decline and move bookings. Includes seeing them — acting on what you cannot see makes no sense, so this does not need 'See bookings' ticked as well.",
     configureLabel: "Configure resources and services",
     configureDescription:
       "Create, edit and delete resources and services, and assign who is responsible for them.",

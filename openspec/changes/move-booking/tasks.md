@@ -64,10 +64,10 @@ shown unchanged on its own.
 
 ## 7. Documentation and the falsified-sentence sweep
 
-- [ ] 7.1 Retire the eight statements that a booking cannot be moved: README not-yet list, `docs/backoffice.md` (two places), `docs/mvp.md`, `docs/notifications.md`, `openspec/specs/booking-management/spec.md` Purpose paragraph (edited directly, as approval-decline did), `BookingsController.cs` remarks, `bookings-list.element.ts` comment. Verify: `grep -rn "cancellation and a new booking"` over src, docs and README returns nothing
-- [ ] 7.2 Document the move in `docs/backoffice.md` (what it changes, what it keeps, operator terms, no history, no availability picker, booker-only notification) and add `BookerMoved` to the message table in `docs/notifications.md` with the previous-interval model members. Verify: docs tests in 7.3
-- [ ] 7.3 Turn `BackofficeDocumentationTests` around: assert the docs say a booking can be moved and name what a move does not do; add the retired sentence to `NotificationDocumentationTests`' falsified-claims sweep. Verify: both pass, and the retired sentence re-inserted anywhere fails the sweep
-- [ ] 7.4 Write the upgrade note for the two port additions (`IBookingObserver.BookingMovedAsync`, `IBookingStore.MoveAsync`) in the place the settings change's scoped-lifetime note lives. Verify: `VersionTruthTests` still pass (no version bump in this change)
+- [x] 7.1 Retire the eight statements that a booking cannot be moved: README not-yet list, `docs/backoffice.md` (two places), `docs/mvp.md`, `docs/notifications.md`, `openspec/specs/booking-management/spec.md` Purpose paragraph (edited directly, as approval-decline did), `BookingsController.cs` remarks, `bookings-list.element.ts` comment. Verify: `grep -rn "cancellation and a new booking"` over src, docs and README returns nothing
+- [x] 7.2 Document the move in `docs/backoffice.md` (what it changes, what it keeps, operator terms, no history, no availability picker, booker-only notification) and add `BookerMoved` to the message table in `docs/notifications.md` with the previous-interval model members. Verify: docs tests in 7.3
+- [x] 7.3 Turn `BackofficeDocumentationTests` around: assert the docs say a booking can be moved and name what a move does not do; add the retired sentence to `NotificationDocumentationTests`' falsified-claims sweep. Verify: both pass, and the retired sentence re-inserted anywhere fails the sweep
+- [x] 7.4 Write the upgrade note for the two port additions (`IBookingObserver.BookingMovedAsync`, `IBookingStore.MoveAsync`) in the place the settings change's scoped-lifetime note lives. Verify: `VersionTruthTests` still pass (no version bump in this change)
 
 ## 8. Verification
 

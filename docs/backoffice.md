@@ -15,7 +15,7 @@ all. The permissions decide what within it:
 | Permission | What it allows |
 |---|---|
 | **See bookings** | The Bookings list and its reads. Contact details still need the Sensitive data group on top — see below. |
-| **Act on bookings** | Cancel, confirm and decline. Includes seeing them: acting on what you cannot see makes no sense, so this needs no second tick. |
+| **Act on bookings** | Cancel, confirm, decline and move. Includes seeing them: acting on what you cannot see makes no sense, so this needs no second tick. |
 | **Configure resources and services** | Create, edit and delete resources and services, and assign who is responsible for them. |
 | **Change site settings** | The Settings screen — how bookings behave and who is told about them. See [Configuration](configuration.md). **Not granted automatically, including on upgrade.** |
 
@@ -316,8 +316,8 @@ When somebody telephones, that is what they are holding, so it is what you match
 assigned when the booking is placed and never changes.
 
 From the Bookings view **you can see bookings, cancel them, and — where a booking awaits
-approval — confirm or decline it**. It does not amend a booking's time or take a booking on
-someone's behalf.
+approval — confirm or decline it**, and you can **move a booking to a new date, time or
+length**. It does not take a booking on someone's behalf.
 
 ### Approving bookings
 
@@ -355,6 +355,48 @@ declined booking is one tick away rather than missing**.
 Ticking statuses shows **only** those, rather than adding them to what is already listed:
 tick Cancelled on its own and you get the cancelled bookings, not the confirmed ones with
 the cancelled ones added.
+
+### Moving a booking
+
+Every booking that still holds its time — confirmed or requested — has a **Move** control on
+its row. It opens a small dialog with the booking's current date, start time and length filled
+in; change any of them and press Move.
+
+**A move changes when, and nothing else.** The booking keeps its reference (the person who
+booked can go on quoting it), its status (a requested booking that has moved is still
+requested), the person who booked, the service it was placed for and the resources it claims.
+
+**The new time has to be one the resources could take.** The same rules as a visitor's
+booking apply — opening hours, the booking grid, the length limits, and nothing else already
+there — with two exceptions made for you: the resource's **minimum notice does not bind you**
+(somebody rang to say they are running late; you are the one the site trusts to decide), and
+neither does its **booking horizon**. What still binds everyone is that a booking cannot be
+moved into the past.
+
+**If the time cannot be taken, the dialog says why and stays open**, so you change the time
+rather than start again. It tells you whether the time was outside opening hours, already
+booked, in the past, off the booking grid, or the time the booking already holds.
+
+**There is no picker showing where a booking could go.** You choose a time and are told
+whether it can be taken. That is a known limitation of this screen rather than a promise
+about the future; if you need to see free time first, the front end's availability is the
+place to look.
+
+**A service booking moves with the resources it was given.** If one of them is busy at the new
+time, the move is refused — it is not quietly handed a different room or a different person.
+Swapping a resource is a different operation, and it is not built.
+
+**Nothing records where a booking used to be.** After a move, the booking shows only where it
+is now. Your site can keep its own record by subscribing to the moved notification, which is
+the one notification that carries the previous time — see [reacting to bookings](notifications.md).
+
+**Moving tells the person who booked only if booking emails are configured** — the same
+condition as cancelling — and the message says both the old time and the new one. Your own
+recipients are not told: you, or a colleague, just did it from this screen. If the person who
+booked will not get an email, telling them is yours to do.
+
+A moved booking may leave the window you are looking at. The list says where it went, above
+the table, so a row that vanishes is one you moved rather than one you lost.
 
 ## Responsibility
 
@@ -398,11 +440,12 @@ one a resource allows is the *booked directly* setting on the resource itself.
 
 - **It does not place bookings.** Recording a booking on someone's behalf — a phone
   booking — is not built. Bookings arrive through the front-end flow.
-- **It does not amend a booking's time.** There is no reschedule; the shape of that
-  operation is a cancellation and a new booking.
+- **It does not change which resources a booking claims.** A move keeps every resource; a
+  busy one refuses the move rather than being swapped. See [moving a booking](#moving-a-booking).
+- **It does not keep a history of where a booking has been.** A booking shows where it is now.
 - **It does not find a person across bookings.** Erasure works on one booking at a time; see
   above.
 
 These are stated because a management section invites the assumption that it manages
 everything. It configures what can be booked, reads what has been, decides a pending request,
-calls a booking off, and erases a booker's details on request.
+moves a booking to a new time, calls a booking off, and erases a booker's details on request.

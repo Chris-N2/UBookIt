@@ -645,7 +645,7 @@ public class MoveBookingTests
 
         // Exactly one blocking booking holds 14:00 afterwards.
         var claims = await h.Store.GetClaimsAsync(Id(1), TestData.Utc(Date, "14:00"), TestData.Utc(Date, "15:00"));
-        Assert.Single(claims.Where(c => c.Status is BookingStatus.Requested or BookingStatus.Confirmed));
+        Assert.Single(claims, c => c.Status is BookingStatus.Requested or BookingStatus.Confirmed);
     }
 
     [Fact]

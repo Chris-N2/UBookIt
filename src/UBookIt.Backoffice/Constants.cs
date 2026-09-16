@@ -47,7 +47,7 @@ namespace UBookIt.Backoffice
             /// <summary>The bookings list and every read over bookings.</summary>
             public const string BookingsRead = "UBookIt.Bookings.Read";
 
-            /// <summary>Cancelling, confirming and declining bookings. Implies <see cref="BookingsRead"/> — in the authorization rule, never by copying verbs onto groups.</summary>
+            /// <summary>Cancelling, confirming, declining and moving bookings. Implies <see cref="BookingsRead"/> — in the authorization rule, never by copying verbs onto groups.</summary>
             public const string BookingsManage = "UBookIt.Bookings.Manage";
 
             /// <summary>Resources, services, their supporting reads, and responsibility assignment.</summary>

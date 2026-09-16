@@ -16,11 +16,18 @@ pipeline.
 
 **What "management" means is narrower than the word suggests, and the boundary is
 deliberate.** The verbs are *see*, *find a subject's bookings by their email address*,
-*confirm* or *decline* a requested booking, *cancel* and *erase a booker's contact details*.
-Amending a booking's time is a change to the domain rather than a screen over an existing
-one, and is still not here. This capability is about those verbs and the path each takes — the ports, the authorized endpoints over them, and the backoffice
-views an operator works in — and the requirements below, not this paragraph, say what
-exists.
+*confirm* or *decline* a requested booking, *move* a booking to a new interval, *cancel* and
+*erase a booker's contact details*. Recording a booking on somebody's behalf, and changing
+which resources a booking claims, are not here. This capability is about those verbs and the
+path each takes — the ports, the authorized endpoints over them, and the backoffice views an
+operator works in — and the requirements below, not this paragraph, say what exists.
+
+*Moving joined the list with the `move-booking` change. It is a change to the domain on
+exactly the terms erasure was — a named operation on the aggregate, defined in `bookings`,
+not a screen over an existing one — and it is here rather than elsewhere for the same reason:
+the endpoint an operator reaches it through is one of this capability's, gated by this
+capability's authorization. This paragraph previously said amending a booking's time "is still
+not here"; it is.*
 
 *Confirm and decline joined the list with the `approval-decline` change, which made
 `Requested` reachable: placement under `AutoConfirm` off produces a booking that waits for an

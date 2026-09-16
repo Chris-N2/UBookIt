@@ -85,8 +85,11 @@ somebody discovers.
   produced them. (That changed in 0.6.0, which added an `UBookIt:AutoConfirm` setting — on
   by default, so the v1 behaviour is still what an unconfigured site gets — and the
   confirm/decline routes into the statuses that were waiting for them.)
-- **Amending a booking's time.** The shape of that operation is a cancellation and a new
-  booking.
+- **Amending a booking's time.** In v1 the only way to change when a booking was happened
+  to be cancelling it and booking again, which lost the reference the customer was holding.
+  *(That changed in 17.1.0: an operator can move a booking from the bookings screen, keeping
+  its reference, status, resources and booker. Changing which resources it claims is still
+  not built.)*
 - **Taking a booking on someone's behalf** — a phone booking. Bookings arrive through the
   front-end flow.
 - **Finding a booking without knowing its date.** The management read port is windowed by
