@@ -542,6 +542,13 @@ export class UBookItBookingsListElement extends UmbLitElement {
         this._error = this.#term("moveDialogFailed");
       }
 
+      // Backed out, nothing changed: focus returns to the control that opened the dialog,
+      // which is still in the DOM because the row is unchanged.
+      await this.updateComplete;
+      this.shadowRoot
+        ?.querySelector<HTMLElement>(`uui-button[label="${this.#term("move")} ${bookingReference(booking)}"]`)
+        ?.focus();
+
       return;
     }
 

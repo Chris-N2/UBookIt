@@ -51,6 +51,26 @@ export class UBookItMoveBookingModalElement extends UmbModalBaseElement<MoveBook
     }
   }
 
+  /**
+   * Focus lands on the first input when the dialog opens, and returns to the first input
+   * after a refusal.
+   *
+   * Measured rather than assumed: with nothing here, the live backoffice reported
+   * `document.activeElement` as `<body>` both on open and after a refusal — the modal
+   * container does not move focus into the content it hosts, and a keyboard operator would
+   * have been left outside the dialog they had just opened. After a refusal the input is the
+   * right place too: the alert has announced the sentence, and the input's description now
+   * carries it, so focusing the control puts the operator where the fix is made.
+   */
+  override firstUpdated() {
+    void this.#focusFirstInput();
+  }
+
+  async #focusFirstInput() {
+    await this.updateComplete;
+    this.shadowRoot?.querySelector<HTMLInputElement>("#ubookit-move-date")?.focus();
+  }
+
   #set<K extends keyof MoveFields>(key: K, value: MoveFields[K]) {
     this._fields = { ...this._fields, [key]: value };
     // A refusal is about the time that was refused; editing any field retires it.
@@ -66,6 +86,7 @@ export class UBookItMoveBookingModalElement extends UmbModalBaseElement<MoveBook
 
     if (!isComplete(this._fields)) {
       this._refusal = "moveIncomplete";
+      void this.#focusFirstInput();
       return;
     }
 
@@ -82,6 +103,7 @@ export class UBookItMoveBookingModalElement extends UmbModalBaseElement<MoveBook
         // Stays open, and says which rule refused — in the operator's words, associated
         // with the inputs, so they change the time rather than start over.
         this._refusal = refusalTermFor(toApiErrors(error, this.#term("moveFailed")));
+        void this.#focusFirstInput();
         return;
       }
 
@@ -89,6 +111,7 @@ export class UBookItMoveBookingModalElement extends UmbModalBaseElement<MoveBook
       this._submitModal();
     } catch (thrown) {
       this._refusal = refusalTermFor(toApiErrors(thrown, this.#term("moveFailed")));
+      void this.#focusFirstInput();
     } finally {
       this._pending = false;
     }
