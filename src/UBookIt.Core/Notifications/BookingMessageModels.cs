@@ -112,6 +112,31 @@ public sealed record BookerMessageModel : BookingMessageModel
 
     /// <summary>The telephone number the booker gave, or <c>null</c> where they gave none.</summary>
     public string? BookerPhone { get; init; }
+
+    /// <summary>
+    /// For the <see cref="BookingMessageKind.BookerMoved"/> message: the start the booking held
+    /// before it was moved, in the time zone the booking is expressed in. <c>null</c> for every
+    /// other message.
+    /// </summary>
+    /// <remarks>
+    /// <para>
+    /// <b><c>null</c> means "this message is not about a move"</b>, not "not recorded". Added in
+    /// 17.1.0; a view written before it existed renders unchanged, because nothing it read has
+    /// moved.
+    /// </para>
+    /// <para>
+    /// Held to the same terms as <see cref="BookingMessageModel.LocalStart"/>: an instant already
+    /// converted to the booking's zone, never a formatted string.
+    /// </para>
+    /// </remarks>
+    public DateTimeOffset? PreviousLocalStart { get; init; }
+
+    /// <summary>
+    /// For the <see cref="BookingMessageKind.BookerMoved"/> message: the end the booking held
+    /// before it was moved, in the time zone the booking is expressed in. <c>null</c> for every
+    /// other message.
+    /// </summary>
+    public DateTimeOffset? PreviousLocalEnd { get; init; }
 }
 
 /// <summary>

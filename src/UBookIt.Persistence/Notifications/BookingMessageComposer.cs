@@ -27,6 +27,13 @@ public enum BookingEvent
 
     /// <summary>The booking has just been cancelled.</summary>
     Cancelled,
+
+    /// <summary>The booking has just been moved to a new interval by an operator.</summary>
+    /// <remarks>
+    /// The one event whose message needs a before-and-after: the booking's status is unchanged,
+    /// so what the message has to say is where the booking was and where it now is.
+    /// </remarks>
+    Moved,
 }
 
 /// <summary>A composed message: a subject, a body, and what kind of body it is.</summary>
@@ -98,21 +105,46 @@ public sealed class BookingMessageComposer(
     /// booker's address requires establishing that the details are present, which the caller has
     /// necessarily already done.
     /// </summary>
+    /// <param name="previousInterval">
+    /// For <see cref="BookingEvent.Moved"/>, the interval the booking held before the move —
+    /// required for that event and meaningless for every other. A move message that could not
+    /// say where the booking moved <i>from</i> would leave a customer holding two confirmations
+    /// to work out which is real.
+    /// </param>
     public async Task<BookingMessage> ForBookerAsync(
-        Booking booking, BookingEvent bookingEvent, CancellationToken cancellationToken = default)
+        Booking booking,
+        BookingEvent bookingEvent,
+        BookingInterval? previousInterval = null,
+        CancellationToken cancellationToken = default)
     {
+        if (bookingEvent == BookingEvent.Moved && previousInterval is null)
+        {
+            throw new ArgumentException(
+                "A move message needs the interval the booking held before the move.", nameof(previousInterval));
+        }
+
         var what = await DescribeAsync(booking, SupportsTemplates, cancellationToken).ConfigureAwait(false);
         var subject = SubjectFor(booking, bookingEvent);
 
         var body = new StringBuilder()
             .AppendLine(subject)
-            .AppendLine()
-            .Append(Details(booking, what.Text))
-            .AppendLine()
-            .AppendLine(ClosingLineFor(booking, bookingEvent))
-            .ToString();
+            .AppendLine();
 
-        var fallback = new BookingMessage(subject, body);
+        // WHERE IT MOVED FROM, before the details of where it now is. The previous time is the
+        // one fact this message has that no other does, and it is stated in the booking's own
+        // zone on the same terms as the new time.
+        if (bookingEvent == BookingEvent.Moved)
+        {
+            var (previousDate, previousTime, previousZone) = LocalParts(previousInterval!);
+            body.AppendLine($"Your booking has been moved from {previousDate} at {previousTime} ({previousZone}). It is now:")
+                .AppendLine();
+        }
+
+        body.Append(Details(booking, what.Text))
+            .AppendLine()
+            .AppendLine(ClosingLineFor(booking, bookingEvent));
+
+        var fallback = new BookingMessage(subject, body.ToString());
 
         if (!SupportsTemplates)
         {
@@ -133,6 +165,11 @@ public sealed class BookingMessageComposer(
         }
         var (localStart, localEnd) = LocalInterval(booking.Interval);
 
+        // The previous interval, converted on the same terms as the current one — and only for a
+        // move. Absent means "not a move", which is the meaning the model documents.
+        (DateTimeOffset Start, DateTimeOffset End)? previousLocal =
+            bookingEvent == BookingEvent.Moved ? LocalInterval(previousInterval!) : null;
+
         var model = new BookerMessageModel
         {
             Kind = BookerKindFor(bookingEvent),
@@ -146,6 +183,8 @@ public sealed class BookingMessageComposer(
             BookerName = contact.Name,
             BookerEmail = contact.Email,
             BookerPhone = contact.Phone,
+            PreviousLocalStart = previousLocal?.Start,
+            PreviousLocalEnd = previousLocal?.End,
         };
 
         return await ApplyTemplateAsync(model, fallback, booking, cancellationToken).ConfigureAwait(false);
@@ -245,20 +284,24 @@ public sealed class BookingMessageComposer(
     /// every arm is now reachable, and nothing here had to move.
     /// </remarks>
     private static string SubjectFor(Booking booking, BookingEvent bookingEvent)
-        => bookingEvent == BookingEvent.Cancelled
-            ? "Your booking has been cancelled"
-            : booking.Status switch
+        => bookingEvent switch
+        {
+            BookingEvent.Cancelled => "Your booking has been cancelled",
+            BookingEvent.Moved => "Your booking has moved",
+            _ => booking.Status switch
             {
                 BookingStatus.Confirmed => "Your booking is confirmed",
                 BookingStatus.Requested => "We have received your booking",
                 BookingStatus.Declined => "Your booking could not be accepted",
                 BookingStatus.Cancelled => "Your booking has been cancelled",
                 _ => "Your booking",
-            };
+            },
+        };
 
     /// <summary>
     /// The sentence after the details, derived from the booking's state on the same terms as
-    /// <see cref="SubjectFor"/>.
+    /// <see cref="SubjectFor"/>. A moved booking gets the line its STATUS earns — a requested
+    /// booking that has moved is still not confirmed, and the message still says so.
     /// </summary>
     /// <remarks>
     /// The <c>Requested</c> arm promises another message, and that promise is kept by the same
@@ -350,6 +393,7 @@ public sealed class BookingMessageComposer(
         BookingEvent.Confirmed => BookingMessageKind.BookerConfirmed,
         BookingEvent.Declined => BookingMessageKind.BookerDeclined,
         BookingEvent.Cancelled => BookingMessageKind.BookerCancelled,
+        BookingEvent.Moved => BookingMessageKind.BookerMoved,
         _ => BookingMessageKind.BookerPlaced,
     };
 

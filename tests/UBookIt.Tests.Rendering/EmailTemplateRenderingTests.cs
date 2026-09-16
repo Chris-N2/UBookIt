@@ -282,6 +282,25 @@ public class EmailTemplateRenderingTests
     }
 
     [Fact]
+    public async Task A_moved_template_sees_where_the_booking_came_from()
+    {
+        // The one member no other message has, in the booking's own zone: 14:00 as the
+        // previous start, next to 09:00 as the current one.
+        var (renderer, _) = Rig();
+        var model = Booker(BookingMessageKind.BookerMoved) with
+        {
+            PreviousLocalStart = new DateTimeOffset(2026, 9, 15, 14, 0, 0, TimeSpan.FromHours(1)),
+            PreviousLocalEnd = new DateTimeOffset(2026, 9, 15, 15, 0, 0, TimeSpan.FromHours(1)),
+        };
+
+        var result = await renderer.RenderAsync(BookingMessageKind.BookerMoved, model);
+
+        Assert.Equal(BookingTemplateOutcome.Rendered, result.Outcome);
+        Assert.Equal("Your appointment at Acme has moved", result.Subject);
+        Assert.Contains("Moved from 14:00 to 09:00 (Europe/London)", result.Body!, StringComparison.Ordinal);
+    }
+
+    [Fact]
     public async Task An_internal_template_renders_the_approval_flag()
     {
         var (renderer, _) = Rig();
@@ -310,6 +329,7 @@ public class EmailTemplateRenderingTests
         Assert.Equal(Enum.GetValues<BookingMessageKind>().Length, report.Count);
 
         Assert.True(report.Single(r => r.Kind == BookingMessageKind.BookerPlaced).Supplied);
+        Assert.True(report.Single(r => r.Kind == BookingMessageKind.BookerMoved).Supplied);
         Assert.False(report.Single(r => r.Kind == BookingMessageKind.InternalCancelled).Supplied);
     }
 

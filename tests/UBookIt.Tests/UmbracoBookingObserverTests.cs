@@ -94,12 +94,16 @@ public class UmbracoBookingObserverTests
         var observer = new UmbracoBookingObserver(aggregator, new CapturingLogger());
         var booking = Booking();
 
+        var previous = BookingInterval.Create(
+            TestData.Utc(TestData.BaseDate, "14:00"), TestData.Utc(TestData.BaseDate, "15:00"), TestData.LondonZoneId).Value;
+
         await observer.BookingPlacedAsync(booking);
         await observer.BookingConfirmedAsync(booking);
         await observer.BookingDeclinedAsync(booking);
         await observer.BookingCancelledAsync(booking);
+        await observer.BookingMovedAsync(booking, previous);
 
-        // Type AND order AND count: four calls, four publications, none swapped and none
+        // Type AND order AND count: five calls, five publications, none swapped and none
         // doubled. A mapping test that only checked presence would pass with confirm and
         // decline crossed over.
         Assert.Collection(
@@ -107,7 +111,13 @@ public class UmbracoBookingObserverTests
             n => Assert.Same(booking, Assert.IsType<BookingPlacedNotification>(n).Booking),
             n => Assert.Same(booking, Assert.IsType<BookingConfirmedNotification>(n).Booking),
             n => Assert.Same(booking, Assert.IsType<BookingDeclinedNotification>(n).Booking),
-            n => Assert.Same(booking, Assert.IsType<BookingCancelledNotification>(n).Booking));
+            n => Assert.Same(booking, Assert.IsType<BookingCancelledNotification>(n).Booking),
+            n =>
+            {
+                var moved = Assert.IsType<BookingMovedNotification>(n);
+                Assert.Same(booking, moved.Booking);
+                Assert.Same(previous, moved.PreviousInterval);
+            });
     }
 
     [Fact]
@@ -118,14 +128,15 @@ public class UmbracoBookingObserverTests
         var observer = new UmbracoBookingObserver(aggregator, logger);
         var booking = Booking();
 
-        // None of the four may let the fault escape — the caller behind these is a placement
-        // or a transition that has already committed.
+        // None of the five may let the fault escape — the caller behind these is a placement,
+        // a transition or a move that has already committed.
         await observer.BookingPlacedAsync(booking);
         await observer.BookingConfirmedAsync(booking);
         await observer.BookingDeclinedAsync(booking);
         await observer.BookingCancelledAsync(booking);
+        await observer.BookingMovedAsync(booking, booking.Interval);
 
-        Assert.Equal(4, logger.Entries.Count);
+        Assert.Equal(5, logger.Entries.Count);
 
         foreach (var entry in logger.Entries)
         {

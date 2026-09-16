@@ -13,10 +13,11 @@ namespace UBookIt.Core.Notifications;
 /// </para>
 /// <para>
 /// <b>The set is exactly what the package sends, and nothing more.</b> There is no
-/// <c>InternalConfirmed</c> or <c>InternalDeclined</c> because no such message exists:
-/// confirming and declining are told to the booker only, since the site's own people just
-/// performed the action and the bookings screen is where its state lives. A name for a message
-/// that is never sent would be an invitation to write content that never renders.
+/// <c>InternalConfirmed</c>, <c>InternalDeclined</c> or <c>InternalMoved</c> because no such
+/// message exists: confirming, declining and moving are told to the booker only, since the
+/// site's own people just performed the action and the bookings screen is where its state
+/// lives. A name for a message that is never sent would be an invitation to write content that
+/// never renders.
 /// </para>
 /// <para>
 /// <b>It names the message, not the booking's state, and the two are not the same.</b> A
@@ -49,6 +50,16 @@ public enum BookingMessageKind
 
     /// <summary>To the booker, when their booking has been cancelled.</summary>
     BookerCancelled,
+
+    /// <summary>To the booker, when an operator has moved their booking to a new time.</summary>
+    /// <remarks>
+    /// <b>Added in 17.1.0, additively.</b> The set is frozen against renaming and removal, not
+    /// against growth: a site that supplied nothing for this name gets the package's own
+    /// wording, exactly as for every other. The model it receives carries the interval the
+    /// booking held before the move, which no other message has — a customer holding an older
+    /// confirmation needs to be told which of the two times in their inbox is real.
+    /// </remarks>
+    BookerMoved,
 
     /// <summary>To the site's own recipients, when a booking has been placed.</summary>
     InternalPlaced,

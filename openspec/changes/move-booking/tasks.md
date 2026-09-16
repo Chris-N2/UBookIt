@@ -40,12 +40,12 @@ shown unchanged on its own.
 
 ## 4. Notifications and emails
 
-- [ ] 4.1 Add `BookingMovedNotification(booking, previousInterval)`, map it in `UmbracoBookingObserver`, and add `BookingEvent.Moved` to the handler's subscriptions. Verify: `UmbracoBookingObserverTests` sees the notification with the previous interval
-- [ ] 4.2 Leave `siteEventApplies` as placement-or-cancellation and extend its comment to name the move with the responsibility wrinkle. Verify: test — a move with a responsibility assignment present and both directions enabled sends to the booker only
-- [ ] 4.3 Add `BookingMessageKind.BookerMoved` and `BookerMessageModel.PreviousStart`/`PreviousEnd` (nullable, converted to the booking's zone). Verify: `BookingTemplateCompositionTests` — previous interval present for the move and null for the other four events; existing composition tests unchanged
-- [ ] 4.4 Compose the moved message: subject "Your booking has moved", a line stating the previous time, the details block, the status-derived closing line. Verify: `BookingEmailTests` — the message carries reference, previous and new interval in the booking's zone, and for a Requested booking still states it is not yet confirmed
-- [ ] 4.5 Tests for the gating: a move on a site without booker emails sends nothing; a move of an erased booker succeeds and sends nothing. Verify: both pass
-- [ ] 4.6 Confirm the template boot check reports `BookerMoved` as a suppliable view and that a supplied `BookerMoved.cshtml` in the theme fixture is used. Verify: existing boot-check and theme-fixture tests extended and passing
+- [x] 4.1 Add `BookingMovedNotification(booking, previousInterval)`, map it in `UmbracoBookingObserver`, and add `BookingEvent.Moved` to the handler's subscriptions. Verify: `UmbracoBookingObserverTests` sees the notification with the previous interval
+- [x] 4.2 Leave `siteEventApplies` as placement-or-cancellation and extend its comment to name the move with the responsibility wrinkle. Verify: test — a move with a responsibility assignment present and both directions enabled sends to the booker only
+- [x] 4.3 Add `BookingMessageKind.BookerMoved` and `BookerMessageModel.PreviousStart`/`PreviousEnd` (nullable, converted to the booking's zone). Verify: `BookingTemplateCompositionTests` — previous interval present for the move and null for the other four events; existing composition tests unchanged
+- [x] 4.4 Compose the moved message: subject "Your booking has moved", a line stating the previous time, the details block, the status-derived closing line. Verify: `BookingEmailTests` — the message carries reference, previous and new interval in the booking's zone, and for a Requested booking still states it is not yet confirmed
+- [x] 4.5 Tests for the gating: a move on a site without booker emails sends nothing; a move of an erased booker succeeds and sends nothing. Verify: both pass
+- [x] 4.6 Confirm the template boot check reports `BookerMoved` as a suppliable view and that a supplied `BookerMoved.cshtml` in the theme fixture is used. Verify: existing boot-check and theme-fixture tests extended and passing
 
 ## 5. Management endpoint
 
