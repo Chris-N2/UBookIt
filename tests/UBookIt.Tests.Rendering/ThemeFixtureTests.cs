@@ -56,7 +56,7 @@ public class ThemeFixtureTests
         // so does a deleted one. Filtering by path prefix would have let the email fixtures grow
         // or vanish unwatched, which is precisely what this test exists to prevent.
         expected.AddRange(
-            new[] { "BookerPlaced", "BookerConfirmed", "BookerCancelled", "InternalPlaced" }
+            new[] { "BookerPlaced", "BookerConfirmed", "BookerCancelled", "BookerMoved", "InternalPlaced" }
                 .Select(name => $"/Views/Partials/UBookIt/Emails/{name}.cshtml"));
 
         var actual = DescriptorsOf(Fixture).Select(d => d.RelativePath);

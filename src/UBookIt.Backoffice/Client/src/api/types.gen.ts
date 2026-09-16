@@ -99,6 +99,19 @@ export type MisalignedRoleModel = {
     granularityMinutes: number;
 };
 
+export type MoveBookingRequestModel = {
+    start: string;
+    lengthMinutes: number;
+};
+
+export type MovedBookingModel = {
+    bookingId: string;
+    status: string;
+    startUtc: string;
+    endUtc: string;
+    timeZoneId: string;
+};
+
 export type OpeningHoursModel = {
     day: DayOfWeek;
     start: string;
@@ -448,6 +461,39 @@ export type EraseBookerResponses = {
 };
 
 export type EraseBookerResponse = EraseBookerResponses[keyof EraseBookerResponses];
+
+export type MoveBookingData = {
+    body?: MoveBookingRequestModel;
+    path: {
+        id: string;
+    };
+    query?: never;
+    url: '/umbraco/ubookitbackoffice/api/v1/bookings/{id}/move';
+};
+
+export type MoveBookingErrors = {
+    /**
+     * Bad Request
+     */
+    400: unknown;
+    /**
+     * The resource is protected and requires an authentication token
+     */
+    401: unknown;
+    /**
+     * Not Found
+     */
+    404: unknown;
+};
+
+export type MoveBookingResponses = {
+    /**
+     * OK
+     */
+    200: MovedBookingModel;
+};
+
+export type MoveBookingResponse = MoveBookingResponses[keyof MoveBookingResponses];
 
 export type FindBookingsByBookerData = {
     body?: FindBookingsByBookerModel;

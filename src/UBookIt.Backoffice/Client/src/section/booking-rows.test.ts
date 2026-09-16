@@ -13,6 +13,7 @@ import {
   canCancel,
   actionFor,
   canConfirmOrDecline,
+  canMove,
   currentWeek,
   formatInterval,
   listQuery,
@@ -361,6 +362,51 @@ describe("which bookings offer confirm and decline", () => {
     expect(canConfirmOrDecline("Rescheduled")).toBe(false);
     expect(canConfirmOrDecline("")).toBe(false);
     expect(canConfirmOrDecline("requested")).toBe(false);
+  });
+});
+
+describe("which bookings offer a move", () => {
+  it("offers it for the statuses that hold time", () => {
+    // Exactly the statuses that can be cancelled: only a booking holding time has a time
+    // to move.
+    expect(canMove("Requested")).toBe(true);
+    expect(canMove("Confirmed")).toBe(true);
+  });
+
+  it("does not offer it where the domain would refuse", () => {
+    expect(canMove("Cancelled")).toBe(false);
+    expect(canMove("Declined")).toBe(false);
+  });
+
+  it("does not offer it for a status it does not recognise", () => {
+    // Closed rather than open, on canCancel's terms.
+    expect(canMove("Rescheduled")).toBe(false);
+    expect(canMove("")).toBe(false);
+    expect(canMove("confirmed")).toBe(false);
+  });
+
+  it("has a string for every key the move flow can emit", async () => {
+    const { default: terms } = await import("../localization/en-us.js");
+    const bookings = (terms as Record<string, Record<string, string>>).ubookitBookings;
+
+    for (const key of [
+      "move",
+      "moveHeadline",
+      "moveIntro",
+      "moveNotificationHint",
+      "moveDate",
+      "moveTime",
+      "moveLength",
+      "moveCancel",
+      "moveSubmit",
+      "moveIncomplete",
+      "moveFailed",
+      "moveDialogFailed",
+      "movedNotice",
+    ]) {
+      expect(typeof bookings[key], key).toBe("string");
+      expect(bookings[key].length, key).toBeGreaterThan(0);
+    }
   });
 });
 

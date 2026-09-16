@@ -1,11 +1,13 @@
 import { css, html, customElement, state, nothing } from "@umbraco-cms/backoffice/external/lit";
 import { UmbLitElement } from "@umbraco-cms/backoffice/lit-element";
 import { UMB_CURRENT_USER_CONTEXT } from "@umbraco-cms/backoffice/current-user";
+import { umbOpenModal } from "@umbraco-cms/backoffice/modal";
 import { UBookItBackofficeService } from "../api/index.js";
 import type { BookingModel } from "../api/index.js";
 import { toApiErrors } from "./api-errors.js";
 import { confirmDestructive } from "./confirm.js";
 import { canManageBookings } from "./permission-verbs.js";
+import { UBOOKIT_MOVE_BOOKING_MODAL } from "./move-booking-modal.token.js";
 import {
   actionFor,
   bookerCell,
@@ -13,6 +15,7 @@ import {
   bookingReference,
   canCancel,
   canConfirmOrDecline,
+  canMove,
   currentWeek,
   formatInterval,
   listQuery,
@@ -44,10 +47,12 @@ const STATUSES = ["Requested", "Confirmed", "Cancelled", "Declined"] as const;
  *
  * Every management verb is a row action rather than a workspace — there is
  * still nothing to open a booking into, because the list already shows
- * everything the read port carries. Cancel works on anything still holding its
- * time; confirm and decline appear only on a Requested row, which exists only
- * on a site that has turned AutoConfirm off. Amending a booking's time remains
- * not a thing — its shape is a cancellation and a new booking.
+ * everything the read port carries. Cancel and Move work on anything still
+ * holding its time; confirm and decline appear only on a Requested row, which
+ * exists only on a site that has turned AutoConfirm off. Move opens a small
+ * dialog from the row rather than a workspace: the dialog is the first thing
+ * that has needed a form over one booking, and a workspace built for one form
+ * would be the seam this view deliberately did not guess at.
  */
 @customElement("ubookit-bookings-list")
 export class UBookItBookingsListElement extends UmbLitElement {
@@ -84,6 +89,16 @@ export class UBookItBookingsListElement extends UmbLitElement {
 
   @state()
   private _error?: string;
+
+  /**
+   * Where the last moved booking went, shown above the table until the next action.
+   *
+   * A moved booking may leave the current window and vanish from the table, and a row that
+   * disappears without a word reads as a booking that was lost. role=status rather than
+   * alert: it is a confirmation, not an interruption.
+   */
+  @state()
+  private _notice?: string;
 
   @state()
   private _statuses: string[] = [];
@@ -228,6 +243,7 @@ export class UBookItBookingsListElement extends UmbLitElement {
         things: "nothing is booked this week" versus "we could not find out".
       -->
       ${this._error ? html`<div role="alert" class="error">${this._error}</div>` : nothing}
+      ${this._notice ? html`<p role="status" class="notice">${this._notice}</p>` : nothing}
       ${this._loading
         ? html`<uui-loader-bar aria-label=${this.#term("loadingList")}></uui-loader-bar>`
         : this.#renderTable(pageEnd)}
@@ -480,6 +496,13 @@ export class UBookItBookingsListElement extends UmbLitElement {
                   @click=${() => this.#decline(booking)}
                 ></uui-button>`
             : nothing}
+          ${canMove(booking.status)
+            ? html`<uui-button
+                look="secondary"
+                label="${this.#term("move")} ${bookingReference(booking)}"
+                @click=${() => this.#move(booking)}
+              ></uui-button>`
+            : nothing}
           ${canCancel(booking.status)
             ? html`<uui-button
                 look="secondary"
@@ -491,6 +514,49 @@ export class UBookItBookingsListElement extends UmbLitElement {
         </uui-table-cell>` : nothing}
       </uui-table-row>
     `;
+  }
+
+  /**
+   * Opens the move dialog for a row. The dialog does the request itself and stays open on a
+   * refusal, so all that arrives here is the outcome: moved (with where to), backed out, or
+   * a dialog that could not be shown — which is reported, not treated as a refusal.
+   */
+  async #move(booking: BookingModel) {
+    this._error = undefined;
+    this._notice = undefined;
+
+    let moved: { startUtc: string; endUtc: string; timeZoneId: string };
+
+    try {
+      moved = await umbOpenModal(this, UBOOKIT_MOVE_BOOKING_MODAL, { data: { booking } });
+    } catch (reason) {
+      // The same two shapes confirmDestructive treats as a user-initiated dismissal; anything
+      // else is the dialog failing to appear, which an operator must be told about because
+      // the alternative is pressing Move and seeing nothing happen.
+      const dismissed =
+        reason === undefined ||
+        (typeof reason === "object" && reason !== null && (reason as { type?: unknown }).type === "close");
+
+      if (!dismissed) {
+        console.error("[uBookIt] Move dialog could not be shown", reason);
+        this._error = this.#term("moveDialogFailed");
+      }
+
+      // Backed out, nothing changed: focus returns to the control that opened the dialog,
+      // which is still in the DOM because the row is unchanged.
+      await this.updateComplete;
+      this.shadowRoot
+        ?.querySelector<HTMLElement>(`uui-button[label="${this.#term("move")} ${bookingReference(booking)}"]`)
+        ?.focus();
+
+      return;
+    }
+
+    // Where it went, in the booking's own zone, before the reload — the row may not survive it.
+    const { text, zone } = formatInterval({ ...booking, ...moved });
+    this._notice = this.localize.term("ubookitBookings_movedNotice", bookingReference(booking), `${text} (${zone})`);
+
+    await this.#settleAfterRowAction();
   }
 
   async #cancel(booking: BookingModel) {
@@ -601,10 +667,20 @@ export class UBookItBookingsListElement extends UmbLitElement {
       return;
     }
 
+    await this.#settleAfterRowAction();
+  }
+
+  /**
+   * What every row action does once the server has agreed: reload, step back off an
+   * emptied page, and put focus somewhere deliberate. Shared by cancel, confirm, decline
+   * and move.
+   */
+  async #settleAfterRowAction() {
     // Reload rather than patch the row in place. The action changes what the query
-    // matches — the default filter excludes cancelled and declined bookings, and a
-    // confirmed one leaves a Requested-only filter — and the total changes with it.
-    // Editing the row would show a booking the current filter no longer selects.
+    // matches — the default filter excludes cancelled and declined bookings, a
+    // confirmed one leaves a Requested-only filter, and a moved one may leave the
+    // window — and the total changes with it. Editing the row would show a booking
+    // the current query no longer selects.
     await this.#load();
 
     // Removing the last row on a page leaves `skip` past the end: the table renders
@@ -710,6 +786,9 @@ export class UBookItBookingsListElement extends UmbLitElement {
     }
     .error {
       color: var(--uui-color-danger, #d42054);
+      margin: var(--uui-size-space-3) 0;
+    }
+    .notice {
       margin: var(--uui-size-space-3) 0;
     }
     .paging {

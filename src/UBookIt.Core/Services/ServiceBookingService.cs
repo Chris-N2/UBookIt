@@ -139,6 +139,34 @@ public interface IServiceBookingService
     /// </summary>
     Task<DomainResult<Booking>> PlaceAsync(
         ServiceBookingRequest request, CancellationToken cancellationToken = default);
+
+    /// <summary>
+    /// Moves a booking, applying the service's length rules where the booking was placed for
+    /// one, and the booking service's move otherwise.
+    /// </summary>
+    /// <remarks>
+    /// <para>
+    /// <b>The operator's single entry point for a move</b>, direct and service bookings alike.
+    /// <see cref="IBookingService.MoveAsync"/> knows resources and nothing about services — the
+    /// same split placement has, where direct placement never sees a service — so a service
+    /// booking's length must be checked here against the intersection of the service's duration
+    /// specification with each claimed resource's range, exactly as service placement checks it
+    /// (`service-booking`, "Service duration narrows each candidate independently"). A move
+    /// through the booking service alone would let a 45–120 minute service be moved to 30.
+    /// </para>
+    /// <para>
+    /// A booking whose recorded service no longer exists is moved on the resources' rules
+    /// alone: the attribution is a snapshot, and a specification that has been deleted cannot
+    /// bind anything. A claimed resource that can no longer provide the service at any length
+    /// refuses the move as <see cref="FailureCodes.ServiceUnavailable"/>.
+    /// </para>
+    /// <para>
+    /// <b>BREAKING — published port (17.1.0, declared).</b> A host implementing this interface
+    /// must add this member.
+    /// </para>
+    /// </remarks>
+    Task<DomainResult<Booking>> MoveAsync(
+        Guid bookingId, DateTimeOffset newStart, TimeSpan newLength, CancellationToken cancellationToken = default);
 }
 
 public sealed class ServiceBookingService(
@@ -1311,6 +1339,73 @@ public sealed class ServiceBookingService(
                 .Where(candidate => Check(candidate).Succeeded)
                 .Select(candidate => candidate.ResourceId)
                 .ToList())];
+    }
+
+    public async Task<DomainResult<Booking>> MoveAsync(
+        Guid bookingId, DateTimeOffset newStart, TimeSpan newLength, CancellationToken cancellationToken = default)
+    {
+        var booking = await bookingStore.GetBookingAsync(bookingId, cancellationToken).ConfigureAwait(false);
+
+        // Not found, placed directly, or in a status that holds no time to move: nothing here
+        // applies, and the booking service reports each of those itself so there is one message
+        // for each. The status goes first, as the bookings spec orders it — a cancelled booking
+        // moved to an impossible length hears about its status, not its length.
+        if (booking?.Service is not { } attribution
+            || booking.Status is not (BookingStatus.Requested or BookingStatus.Confirmed))
+        {
+            return await bookingService.MoveAsync(bookingId, newStart, newLength, cancellationToken).ConfigureAwait(false);
+        }
+
+        var service = await serviceStore.GetAsync(attribution.ServiceId, cancellationToken).ConfigureAwait(false);
+
+        // The attribution is a snapshot; a specification that has since been deleted cannot bind.
+        if (service is null)
+        {
+            return await bookingService.MoveAsync(bookingId, newStart, newLength, cancellationToken).ConfigureAwait(false);
+        }
+
+        // The same bounds placement decides from — the intersection of the service's
+        // specification with each claimed resource's range, highest floor and lowest ceiling —
+        // over the booking's OWN claims rather than a candidate pool, because a move keeps them.
+        var shortest = TimeSpan.Zero;
+        var longest = TimeSpan.MaxValue;
+
+        foreach (var claim in booking.Claims)
+        {
+            var resource = await resourceStore.GetAsync(claim.ResourceId, cancellationToken).ConfigureAwait(false);
+            if (resource is null)
+            {
+                // The booking service reports a vanished resource; let it.
+                return await bookingService.MoveAsync(bookingId, newStart, newLength, cancellationToken).ConfigureAwait(false);
+            }
+
+            if (!service.Duration.TryResolveAgainst(resource.Availability.Constraints, out var range))
+            {
+                return Unavailable(
+                    $"Resource {claim.ResourceId} can no longer provide this service at any length.");
+            }
+
+            shortest = DurationMath.MaxOf(shortest, range.Min);
+            longest = DurationMath.MinOf(longest, range.Max);
+        }
+
+        if (newLength < shortest)
+        {
+            return DomainResult<Booking>.Failure(
+                FailureCodes.DurationTooShort,
+                $"This service must be booked for at least {shortest.TotalMinutes:0} minutes.");
+        }
+
+        if (newLength > longest)
+        {
+            return DomainResult<Booking>.Failure(
+                FailureCodes.DurationTooLong,
+                $"This service may be booked for at most {longest.TotalMinutes:0} minutes.");
+        }
+
+        // Everything else — the grid, open hours, the past, conflict, the status, an unchanged
+        // interval — is the booking service's, on operator terms.
+        return await bookingService.MoveAsync(bookingId, newStart, newLength, cancellationToken).ConfigureAwait(false);
     }
 
     private static DomainResult<Booking> Unavailable(string message)

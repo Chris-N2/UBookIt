@@ -11,6 +11,7 @@ using Umbraco.Cms.Core.Security;
 using UBookIt.Core;
 using UBookIt.Core.Bookings;
 using UBookIt.Core.Common;
+using UBookIt.Core.Services;
 using UBookIt.Core.Stores;
 
 namespace UBookIt.Backoffice.Controllers;
@@ -26,11 +27,12 @@ namespace UBookIt.Backoffice.Controllers;
 /// its own verb policy on top (see <see cref="Constants.VerbPolicies"/>).
 /// </para>
 /// <para>
-/// Reads through the management port and changes a booking's status through the Core booking
-/// service. The status verbs are <b>cancel</b>, and — for a booking placed while the site's
+/// Reads through the management port and changes a booking through the Core booking service.
+/// The status verbs are <b>cancel</b>, and — for a booking placed while the site's
 /// <c>AutoConfirm</c> setting is off, so that it awaits a decision — <b>confirm</b> and
-/// <b>decline</b>. Amending a booking's time is a domain change rather than an endpoint and is
-/// not here; its shape is a cancellation and a new booking.
+/// <b>decline</b>. <b>Move</b> changes a booking's time and nothing else: its reference, status,
+/// booker, service and resources are what they were, and the new interval runs the placement
+/// rules on an operator's terms.
 /// </para>
 /// <para>
 /// <b>Three gates, answering different questions.</b> The base controller's section policy
@@ -46,6 +48,7 @@ namespace UBookIt.Backoffice.Controllers;
 public class BookingsController(
     IBookingManagementStore bookingStore,
     IBookingService bookingService,
+    IServiceBookingService serviceBooking,
     SiteBookingSettings settings,
     IBackOfficeSecurityAccessor backOfficeSecurityAccessor) : UBookItBackofficeApiControllerBase
 {
@@ -276,6 +279,103 @@ public class BookingsController(
         {
             BookingId = declined.Value.Id,
             Status = declined.Value.Status.ToString(),
+        });
+    }
+
+    /// <summary>
+    /// Moves a booking to a new start and length.
+    /// </summary>
+    /// <remarks>
+    /// <para>
+    /// <b>The domain is the rule, not this endpoint.</b> Which statuses permit a move, which
+    /// placement rules the new interval runs and on whose terms, and the refusal of an interval
+    /// the booking already holds are all decided by the booking service; nothing here adds a
+    /// rule or relaxes one. A refusal comes back as the domain's stable code — a scheduler
+    /// dragging a booking needs the code to say why a drop was refused, not only that it was.
+    /// </para>
+    /// <para>
+    /// <b>Through the service booking service, not the booking service directly.</b> A booking
+    /// placed for a service has a length rule the booking service cannot see — the service's
+    /// duration specification — and QA round 1 moved a 45–120 minute service booking to 30
+    /// minutes through the shorter path. The service-aware path applies that rule and delegates
+    /// everything else; for a direct booking it delegates straight away.
+    /// </para>
+    /// <para>
+    /// <b>The start is read in the site's zone</b>, on the list window's convention, and
+    /// converted once here. A start carrying an offset or a <c>Z</c> is refused rather than
+    /// reinterpreted: the contract is wall-clock time, and a scheduler sending
+    /// <c>toISOString()</c> output would otherwise get a wrong instant with no error. The
+    /// response carries identity, the unchanged status and the new interval — not a list row,
+    /// for the reason <see cref="CancelledBookingModel"/> states.
+    /// </para>
+    /// </remarks>
+    /// <param name="id">The booking to move.</param>
+    /// <param name="model">Where it should now be.</param>
+    [Authorize(Policy = Constants.VerbPolicies.BookingsManage)]
+    [HttpPost("bookings/{id:guid}/move")]
+    [ProducesResponseType<MovedBookingModel>(StatusCodes.Status200OK)]
+    [ProducesResponseType(StatusCodes.Status400BadRequest)]
+    [ProducesResponseType(StatusCodes.Status404NotFound)]
+    public async Task<IActionResult> MoveBooking(
+        Guid id, MoveBookingRequestModel model, CancellationToken cancellationToken = default)
+    {
+        ArgumentNullException.ThrowIfNull(model);
+
+        // Shape before substance: a start that was never supplied binds as the default
+        // DateTime, and a zero or negative length is not an interval. Both are refused with
+        // the domain's own code against the field, before the domain is asked anything.
+        var shapeFailures = new List<DomainFailure>();
+
+        if (model.Start == default)
+        {
+            shapeFailures.Add(new DomainFailure(
+                FailureCodes.IntervalInvalid, "A start is required.", nameof(model.Start)));
+        }
+        else if (model.Start.Kind != DateTimeKind.Unspecified)
+        {
+            // A value with an offset binds as Utc (for "Z") or Local (for "+05:00", after being
+            // rebased through the server's own zone) — either way not the site's wall-clock time
+            // this contract is defined over. Refused, so the caller fixes the shape rather than
+            // getting a booking at an instant nobody typed.
+            shapeFailures.Add(new DomainFailure(
+                FailureCodes.IntervalInvalid,
+                "The start must be a wall-clock time in the site's zone, with no offset or 'Z'.",
+                nameof(model.Start)));
+        }
+
+        if (model.LengthMinutes <= 0)
+        {
+            shapeFailures.Add(new DomainFailure(
+                FailureCodes.IntervalInvalid, "The length must be a positive number of minutes.", nameof(model.LengthMinutes)));
+        }
+
+        if (shapeFailures.Count > 0)
+        {
+            return shapeFailures.ToProblemResult();
+        }
+
+        var start = BookingWindow.ResolveSiteLocal(model.Start, settings, nameof(model.Start));
+
+        if (!start.Succeeded)
+        {
+            return start.Failures.ToProblemResult();
+        }
+
+        var moved = await serviceBooking.MoveAsync(
+            id, start.Value.Utc, TimeSpan.FromMinutes(model.LengthMinutes), cancellationToken);
+
+        if (!moved.Succeeded)
+        {
+            return moved.Failures.ToProblemResult();
+        }
+
+        return Ok(new MovedBookingModel
+        {
+            BookingId = moved.Value.Id,
+            Status = moved.Value.Status.ToString(),
+            StartUtc = moved.Value.Interval.StartUtc,
+            EndUtc = moved.Value.Interval.EndUtc,
+            TimeZoneId = moved.Value.Interval.TimeZoneId,
         });
     }
 

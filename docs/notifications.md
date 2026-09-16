@@ -34,8 +34,8 @@ Sending needs both: a uBookIt setting *and* a working mail configuration.
 
 | Setting | What it does |
 |---|---|
-| `SendBookerEmails` | Sends the person who booked a plain-text message when their booking is placed, when a requested booking is confirmed or declined, and when one is cancelled. What the placement message says follows the booking's state: confirmed under auto-confirm, received-and-awaiting-confirmation when the site requires approval (see below). Off unless set to `true`. |
-| `InternalRecipients` | Sends your own people a message when a booking is placed or cancelled. **The list being non-empty is the switch** — there is no separate on/off. These addresses hear about **every** booking; for different people per resource or service, see [responsibility](#telling-the-people-responsible) below, which adds recipients rather than replacing this list. Confirming or declining sends this list nothing — you, or a colleague, just did it from the bookings screen, which is where its state lives. |
+| `SendBookerEmails` | Sends the person who booked a plain-text message when their booking is placed, when a requested booking is confirmed or declined, when one is cancelled, and when an operator moves one to a new time. What the placement message says follows the booking's state: confirmed under auto-confirm, received-and-awaiting-confirmation when the site requires approval (see below). Off unless set to `true`. |
+| `InternalRecipients` | Sends your own people a message when a booking is placed or cancelled. **The list being non-empty is the switch** — there is no separate on/off. These addresses hear about **every** booking; for different people per resource or service, see [responsibility](#telling-the-people-responsible) below, which adds recipients rather than replacing this list. Confirming, declining or moving sends this list nothing — you, or a colleague, just did it from the bookings screen, which is where its state lives. |
 
 The two are independent: you can be told about bookings without anything being sent to your
 customers, and the other way round. Both also require Umbraco to be able to send mail — an SMTP
@@ -132,7 +132,7 @@ nobody is watching for. If you meant to require approval, the value must be a re
 it and uses it in place of its own wording. Nothing else changes: whether a message is sent, who
 receives it, and under what configuration are still decided by the settings above.
 
-There are six messages, and each file is optional — supply one and the other five keep uBookIt's
+There are seven messages, and each file is optional — supply one and the other six keep uBookIt's
 wording:
 
 | File | Sent to | When |
@@ -141,11 +141,20 @@ wording:
 | `BookerConfirmed.cshtml` | the booker | you confirmed their requested booking |
 | `BookerDeclined.cshtml` | the booker | you declined their requested booking |
 | `BookerCancelled.cshtml` | the booker | their booking has been cancelled |
+| `BookerMoved.cshtml` | the booker | you moved their booking to a new time |
 | `InternalPlaced.cshtml` | your recipients | a booking has been placed |
 | `InternalCancelled.cshtml` | your recipients | a booking has been cancelled |
 
-There is no `InternalConfirmed` or `InternalDeclined` because no such message exists — you
-confirmed or declined it yourself, and the bookings screen is where its state lives.
+There is no `InternalConfirmed`, `InternalDeclined` or `InternalMoved` because no such message
+exists — you confirmed, declined or moved it yourself, and the bookings screen is where its state
+lives.
+
+`BookerMoved` is the one message whose model carries something no other does: the interval the
+booking held **before** the move, as `Model.PreviousLocalStart` and `Model.PreviousLocalEnd`, in the
+booking's own zone alongside the current `LocalStart` and `LocalEnd`. Both are `null` for every
+other message — a view written before they existed renders unchanged. A customer holding an older
+confirmation needs to be told which of the two times in their inbox is real, so uBookIt's own
+wording states the old time before the new one; yours should too.
 
 A template inherits uBookIt's email page, which gives it the model and two properties it may
 set:
@@ -271,8 +280,9 @@ customer will turn up.
 | `BookingConfirmedNotification` | A requested booking has been confirmed and the change stored | `Booking` — the booking, now confirmed |
 | `BookingDeclinedNotification` | A requested booking has been declined and the change stored | `Booking` — the booking, now declined |
 | `BookingCancelledNotification` | A booking has been cancelled and the change stored | `Booking` — the booking, now cancelled |
+| `BookingMovedNotification` | A booking has been moved to a new time and the change stored | `Booking` — the booking at its new interval — and `PreviousInterval`, the interval it held before |
 
-All four live in `UBookIt.Persistence.Notifications`.
+All five live in `UBookIt.Persistence.Notifications`.
 
 Each is raised **after** the change is committed and **only** when it succeeded. A failed
 placement raises nothing, and so does an attempt at a transition the booking's status does not
@@ -281,6 +291,12 @@ permit — so being told at all means it happened.
 None of the status-change notifications needs a before-and-after: cancellation succeeds only
 from `Requested` or `Confirmed`, and confirmation and decline only from `Requested`, so
 receiving one means the booking has just become what its status says.
+
+**`BookingMovedNotification` is the one that does carry a before-and-after, and it is the only
+one.** A move changes no status — the booking after is the booking before except for its time —
+so "moved" says nothing without the interval it left. `PreviousInterval` is that fact, and nothing
+else records it: the package keeps no history of where a booking used to be, so if you need one,
+this notification is where to take it from.
 
 **A booking placed under auto-confirm raises `BookingPlacedNotification` and nothing else.**
 Auto-confirmation is not an event; it is what placement produced, and the placed notification's
@@ -393,8 +409,6 @@ person who performed it — never the address that was erased.
 ## What does not raise a notification
 
 - Editing resources or services. They are configuration, not events.
-- Amending a booking's time. There is no such operation; the shape of it is a cancellation
-  and a new booking.
 - **Erasing a booker's details.** It changes a booking and raises nothing — which matters most
   to whoever read the section above and is now wondering how to erase their own copy. There is
   no notification to subscribe to, so a system holding contact details must be reconciled some

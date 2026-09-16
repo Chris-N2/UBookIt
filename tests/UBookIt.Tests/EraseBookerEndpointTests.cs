@@ -52,6 +52,7 @@ public class EraseBookerEndpointTests
         => new(
             new EmptyStore(),
             bookingService,
+            new UnusedServiceBookingService(),
             new SiteBookingSettings { TimeZoneId = "UTC" },
             new StubAccessor());
 
@@ -305,6 +306,10 @@ public class EraseBookerEndpointTests
             CancellationToken cancellationToken = default) => throw Unexpected();
 
         public DomainResult CheckPlacementRules(Resource resource, DateTimeOffset start, TimeSpan duration)
+            => throw Unexpected();
+
+        public Task<DomainResult<Booking>> MoveAsync(
+            Guid bookingId, DateTimeOffset newStart, TimeSpan newLength, CancellationToken cancellationToken = default)
             => throw Unexpected();
     }
 

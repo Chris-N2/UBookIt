@@ -2,7 +2,7 @@
 
 import type { Client, Options as Options2, TDataShape } from './client';
 import { client } from './client.gen';
-import type { CancelBookingData, CancelBookingErrors, CancelBookingResponses, ConfirmBookingData, ConfirmBookingErrors, ConfirmBookingResponses, CreateResourceData, CreateResourceErrors, CreateResourceResponses, CreateServiceData, CreateServiceErrors, CreateServiceResponses, DeclineBookingData, DeclineBookingErrors, DeclineBookingResponses, DeleteResourceData, DeleteResourceErrors, DeleteResourceResponses, DeleteServiceData, DeleteServiceErrors, DeleteServiceResponses, EraseBookerData, EraseBookerErrors, EraseBookerResponses, FindBookingsByBookerData, FindBookingsByBookerErrors, FindBookingsByBookerResponses, GetResourceData, GetResourceErrors, GetResourceResponses, GetResourceResponsibilityData, GetResourceResponsibilityErrors, GetResourceResponsibilityResponses, GetServiceData, GetServiceErrors, GetServiceResponses, GetServiceResponsibilityData, GetServiceResponsibilityErrors, GetServiceResponsibilityResponses, GetSettingsData, GetSettingsErrors, GetSettingsResponses, ListBookingsData, ListBookingsErrors, ListBookingsResponses, ListCapabilitiesData, ListCapabilitiesErrors, ListCapabilitiesResponses, ListResourcesData, ListResourcesErrors, ListResourcesResponses, ListResourceTypesData, ListResourceTypesErrors, ListResourceTypesResponses, ListServicesData, ListServicesErrors, ListServicesResponses, PreviewServiceConfigurationData, PreviewServiceConfigurationErrors, PreviewServiceConfigurationResponses, PutResourceResponsibilityData, PutResourceResponsibilityErrors, PutResourceResponsibilityResponses, PutServiceResponsibilityData, PutServiceResponsibilityErrors, PutServiceResponsibilityResponses, PutSettingData, PutSettingErrors, PutSettingResponses, ResetSettingData, ResetSettingErrors, ResetSettingResponses, UpdateResourceData, UpdateResourceErrors, UpdateResourceResponses, UpdateServiceData, UpdateServiceErrors, UpdateServiceResponses } from './types.gen';
+import type { CancelBookingData, CancelBookingErrors, CancelBookingResponses, ConfirmBookingData, ConfirmBookingErrors, ConfirmBookingResponses, CreateResourceData, CreateResourceErrors, CreateResourceResponses, CreateServiceData, CreateServiceErrors, CreateServiceResponses, DeclineBookingData, DeclineBookingErrors, DeclineBookingResponses, DeleteResourceData, DeleteResourceErrors, DeleteResourceResponses, DeleteServiceData, DeleteServiceErrors, DeleteServiceResponses, EraseBookerData, EraseBookerErrors, EraseBookerResponses, FindBookingsByBookerData, FindBookingsByBookerErrors, FindBookingsByBookerResponses, GetResourceData, GetResourceErrors, GetResourceResponses, GetResourceResponsibilityData, GetResourceResponsibilityErrors, GetResourceResponsibilityResponses, GetServiceData, GetServiceErrors, GetServiceResponses, GetServiceResponsibilityData, GetServiceResponsibilityErrors, GetServiceResponsibilityResponses, GetSettingsData, GetSettingsErrors, GetSettingsResponses, ListBookingsData, ListBookingsErrors, ListBookingsResponses, ListCapabilitiesData, ListCapabilitiesErrors, ListCapabilitiesResponses, ListResourcesData, ListResourcesErrors, ListResourcesResponses, ListResourceTypesData, ListResourceTypesErrors, ListResourceTypesResponses, ListServicesData, ListServicesErrors, ListServicesResponses, MoveBookingData, MoveBookingErrors, MoveBookingResponses, PreviewServiceConfigurationData, PreviewServiceConfigurationErrors, PreviewServiceConfigurationResponses, PutResourceResponsibilityData, PutResourceResponsibilityErrors, PutResourceResponsibilityResponses, PutServiceResponsibilityData, PutServiceResponsibilityErrors, PutServiceResponsibilityResponses, PutSettingData, PutSettingErrors, PutSettingResponses, ResetSettingData, ResetSettingErrors, ResetSettingResponses, UpdateResourceData, UpdateResourceErrors, UpdateResourceResponses, UpdateServiceData, UpdateServiceErrors, UpdateServiceResponses } from './types.gen';
 
 export type Options<TData extends TDataShape = TDataShape, ThrowOnError extends boolean = boolean> = Options2<TData, ThrowOnError> & {
     /**
@@ -81,6 +81,23 @@ export class UBookItBackofficeService {
             ],
             url: '/umbraco/ubookitbackoffice/api/v1/bookings/{id}/erase-booker',
             ...options
+        });
+    }
+    
+    public static moveBooking<ThrowOnError extends boolean = false>(options: Options<MoveBookingData, ThrowOnError>) {
+        return (options.client ?? client).post<MoveBookingResponses, MoveBookingErrors, ThrowOnError>({
+            security: [
+                {
+                    scheme: 'bearer',
+                    type: 'http'
+                }
+            ],
+            url: '/umbraco/ubookitbackoffice/api/v1/bookings/{id}/move',
+            ...options,
+            headers: {
+                'Content-Type': 'application/json',
+                ...options.headers
+            }
         });
     }
     

@@ -28,11 +28,15 @@ The package SHALL define exactly four permission verbs, assigned to Umbraco user
 through the backoffice group editor's default-permissions surface:
 
 - **`UBookIt.Bookings.Read`** — the bookings list and every read over bookings;
-- **`UBookIt.Bookings.Manage`** — cancelling, confirming and declining bookings;
+- **`UBookIt.Bookings.Manage`** — cancelling, confirming, declining and moving bookings;
 - **`UBookIt.Configure`** — creating, editing and deleting resources and services,
   their supporting reads (types, capabilities, configuration preview), and
   responsibility assignment;
 - **`UBookIt.Settings`** — reading and changing the site's own settings.
+
+*Moving joined Manage rather than becoming a fifth verb because the verb already means "may act
+on a booking", and moving a booking is a smaller act than cancelling one: it keeps the booking,
+its time is still held, and the customer's reference still stands.*
 
 **Manage SHALL imply Read**, in the authorization rule and not by copying verbs onto
 groups: a group holding only Manage reads bookings, because managing what cannot be seen
@@ -54,6 +58,11 @@ own.
 - **WHEN** a user whose groups hold only `UBookIt.Bookings.Read` lists bookings and then
   attempts to cancel one
 - **THEN** the list is served and the cancellation is refused
+
+#### Scenario: Read without Manage cannot move
+
+- **WHEN** a user whose groups hold only `UBookIt.Bookings.Read` attempts to move a booking
+- **THEN** the move is refused and the booking is unchanged
 
 #### Scenario: Manage implies Read
 

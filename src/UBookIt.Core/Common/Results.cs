@@ -24,6 +24,13 @@ public static class FailureCodes
     public const string InvalidStatusTransition = "invalid-status-transition";
 
     /// <summary>
+    /// A move was asked for to the interval the booking already holds. Refused rather than
+    /// reported as success, on the same grounds as cancelling twice: a caller told "moved"
+    /// when nothing changed cannot tell a completed action from a rejected one.
+    /// </summary>
+    public const string IntervalUnchanged = "interval-unchanged";
+
+    /// <summary>
     /// A caller named a booking status that does not exist. Distinct from
     /// <see cref="InvalidStatusTransition"/>, which is about a status that exists being
     /// unreachable from the current one.

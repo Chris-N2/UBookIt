@@ -1,0 +1,5 @@
+@inherits UBookIt.Web.Emails.UBookItEmailPage<UBookIt.Core.Notifications.BookerMessageModel>
+@{
+    Subject = "Your appointment at Acme has moved";
+}
+Moved from @Model.PreviousLocalStart!.Value.ToString("HH:mm") to @Model.LocalStart.ToString("HH:mm") (@Model.TimeZoneId).

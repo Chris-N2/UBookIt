@@ -119,6 +119,7 @@ public sealed class UBookItPersistenceComposer : IComposer
         builder.AddNotificationAsyncHandler<BookingConfirmedNotification, BookingEmailHandler>();
         builder.AddNotificationAsyncHandler<BookingDeclinedNotification, BookingEmailHandler>();
         builder.AddNotificationAsyncHandler<BookingCancelledNotification, BookingEmailHandler>();
+        builder.AddNotificationAsyncHandler<BookingMovedNotification, BookingEmailHandler>();
 
         builder.AddNotificationAsyncHandler<UmbracoApplicationStartedNotification, RunUBookItMigrations>();
     }

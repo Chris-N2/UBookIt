@@ -169,6 +169,96 @@ internal sealed class SqlBookingStore(UBookItDbContext db) : IBookingStore
         await db.SaveChangesAsync(cancellationToken).ConfigureAwait(false);
     }
 
+    public async Task<DomainResult> MoveAsync(
+        Guid bookingId,
+        BookingInterval newInterval,
+        IReadOnlyCollection<BookingStatus> permittedFrom,
+        CancellationToken cancellationToken = default)
+    {
+        // THE THIRD NARROW WRITE OVER AN EXISTING ROW (placement being the insert). Placement's
+        // transaction shape, with three differences that
+        // are the whole of the move contract (persistence spec, "Atomic move on SQL Server"):
+        // the lock set is read from the STORED claims, the conflict check excludes this
+        // booking's own claims, and the status is a predicate of the update statement itself.
+        var permitted = permittedFrom.Select(status => (int)status).ToArray();
+
+        await using var transaction = await db.Database
+            .BeginTransactionAsync(cancellationToken).ConfigureAwait(false);
+
+        // The stored claims, not the caller's aggregate: the lock set must be what the booking
+        // actually holds. Claims are immutable after placement, so there is no race on this read.
+        var resourceIds = await db.Claims
+            .AsNoTracking()
+            .Where(c => c.BookingId == bookingId)
+            .Select(c => c.ResourceId)
+            .OrderBy(id => id)
+            .ToArrayAsync(cancellationToken)
+            .ConfigureAwait(false);
+
+        if (resourceIds.Length == 0)
+        {
+            await transaction.RollbackAsync(cancellationToken).ConfigureAwait(false);
+            return DomainResult.Failure(FailureCodes.BookingNotFound, $"No booking exists with id {bookingId}.");
+        }
+
+        // Ascending, exactly as placement takes them, so a move and a placement sharing a
+        // resource — or two moves — cannot deadlock.
+        foreach (var resourceId in resourceIds)
+        {
+            await AcquireResourceLockAsync(resourceId, cancellationToken).ConfigureAwait(false);
+        }
+
+        // Placement's conflict query plus ONE predicate: not this booking. Its own claim rows
+        // overlap its own new interval whenever the intervals overlap, and without this a
+        // thirty-minute shift would refuse itself.
+        var hasConflict = await (
+            from claim in db.Claims
+            join existing in db.Bookings on claim.BookingId equals existing.Id
+            where resourceIds.Contains(claim.ResourceId)
+                && existing.Id != bookingId
+                && BlockingStatuses.Contains(existing.Status)
+                && existing.StartUtc < newInterval.EndUtc
+                && newInterval.StartUtc < existing.EndUtc
+            select claim.Id)
+            .AnyAsync(cancellationToken)
+            .ConfigureAwait(false);
+
+        if (hasConflict)
+        {
+            await transaction.RollbackAsync(cancellationToken).ConfigureAwait(false);
+            return DomainResult.Failure(
+                FailureCodes.Conflict, "The requested interval conflicts with an existing booking.");
+        }
+
+        // ONE STATEMENT, AND THE STATUS TEST IS INSIDE IT. The service read this booking some
+        // time ago and found it movable; a cancellation may have committed since. A SELECT here
+        // followed by an UPDATE would leave that window open — the same shape erasure rejected
+        // — so the permitted statuses are the WHERE clause, and zero rows affected means the
+        // status moved on. The interval columns and nothing else: not the status, not the
+        // booker.
+        var affected = await db.Bookings
+            .Where(b => b.Id == bookingId && permitted.Contains(b.Status))
+            .ExecuteUpdateAsync(
+                setters => setters
+                    .SetProperty(b => b.StartUtc, newInterval.StartUtc)
+                    .SetProperty(b => b.EndUtc, newInterval.EndUtc)
+                    .SetProperty(b => b.TimeZoneId, newInterval.TimeZoneId),
+                cancellationToken)
+            .ConfigureAwait(false);
+
+        if (affected == 0)
+        {
+            await transaction.RollbackAsync(cancellationToken).ConfigureAwait(false);
+
+            // The claims existed, so the booking does; the status is what refused it.
+            return DomainResult.Failure(
+                FailureCodes.InvalidStatusTransition, "The booking's status no longer permits a move.");
+        }
+
+        await transaction.CommitAsync(cancellationToken).ConfigureAwait(false);
+        return DomainResult.Success();
+    }
+
     public async Task<bool> EraseBookerAsync(
         Guid bookingId, DateTimeOffset erasedUtc, CancellationToken cancellationToken = default)
     {

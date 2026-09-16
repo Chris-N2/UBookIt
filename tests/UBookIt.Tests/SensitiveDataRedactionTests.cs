@@ -666,6 +666,10 @@ public class SensitiveDataRedactionTests
             // free-text or contact-detail parameter; each takes a booking id alone.
             "BookingsController.ConfirmBooking",
             "BookingsController.DeclineBooking",
+            // A genuine write: moves a booking's interval through the domain and persists it
+            // (move-booking change). Takes a booking id, a wall-clock start and a length in
+            // minutes — no free text and no contact detail.
+            "BookingsController.MoveBooking",
             "BookingsController.EraseBooker",
             "ResourcesController.CreateResource",
             "ResourcesController.UpdateResource",
@@ -869,6 +873,7 @@ public class SensitiveDataRedactionTests
             "BookingsController.CancelBooking = write",
             "BookingsController.ConfirmBooking = write",
             "BookingsController.DeclineBooking = write",
+            "BookingsController.MoveBooking = write",
             "BookingsController.EraseBooker = write",
             "BookingsController.FindBookingsByBooker = read",
             "BookingsController.ListBookings = read",

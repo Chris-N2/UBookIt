@@ -142,11 +142,38 @@ public class BackofficeDocumentationTests
 
         // And the verbs the section genuinely lacks are named, because "management
         // section" invites the assumption that it manages everything. Approve/decline left
-        // this list with the approval-decline change — the section does both now — and the
-        // falsified-claims sweep in NotificationDocumentationTests holds the retired
-        // sentence out.
+        // this list with the approval-decline change, and amend left it with move-booking —
+        // the section does both now — and the falsified-claims sweep in
+        // NotificationDocumentationTests holds the retired sentences out. What a MOVE does
+        // not do is what the list now names in their place, because "you can move a booking"
+        // invites exactly the assumptions those two sentences refuse.
         DocumentationAssert.Says(docs, "It does not place bookings");
-        DocumentationAssert.Says(docs, "It does not amend a booking's time");
+        DocumentationAssert.Says(docs, "It does not change which resources a booking claims");
+        DocumentationAssert.Says(docs, "It does not keep a history of where a booking has been");
+        DocumentationAssert.DoesNotSay(docs, "It does not amend a booking's time");
+    }
+
+    [Fact]
+    public void The_move_is_documented_with_its_terms_and_its_limits()
+    {
+        // Each of these is a fact an operator would otherwise discover by being refused, or —
+        // worse — by NOT being refused: the notice and horizon exceptions are the two rules
+        // that bind a visitor and not them, and an operator who does not know that will
+        // apologise to a customer for a move they could have made.
+        var docs = Docs();
+
+        DocumentationAssert.Says(docs, "move a booking to a new date, time or length");
+        DocumentationAssert.Says(docs, "A move changes when, and nothing else");
+        DocumentationAssert.Says(docs, "minimum notice does not bind you");
+        DocumentationAssert.Says(docs, "a booking cannot be moved into the past");
+        DocumentationAssert.Says(docs, "There is no picker showing where a booking could go");
+        DocumentationAssert.Says(docs, "A service booking moves with the resources it was given");
+        DocumentationAssert.Says(docs, "Nothing records where a booking used to be");
+
+        // The truthful conditional, on cancel's and decline's terms: never an unconditional
+        // claim in either direction.
+        DocumentationAssert.Says(docs, "Moving tells the person who booked only if booking emails are configured");
+        DocumentationAssert.Says(docs, "Your own recipients are not told");
     }
 
     [Fact]
@@ -421,6 +448,7 @@ public class BackofficeDocumentationTests
             ["bookings/{id:guid}/confirm"] = "confirm",
             ["bookings/{id:guid}/decline"] = "decline",
             ["bookings/{id:guid}/cancel"] = "cancel",
+            ["bookings/{id:guid}/move"] = "move",
             ["bookings/{id:guid}/erase-booker"] = "erase a booker's contact details",
         };
 

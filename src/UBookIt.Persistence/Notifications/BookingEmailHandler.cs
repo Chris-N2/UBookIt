@@ -10,8 +10,8 @@ using Umbraco.Cms.Core.Models.Email;
 namespace UBookIt.Persistence.Notifications;
 
 /// <summary>
-/// Sends what a site has asked to be sent when a booking is placed, confirmed, declined or
-/// cancelled.
+/// Sends what a site has asked to be sent when a booking is placed, confirmed, declined,
+/// cancelled or moved.
 /// </summary>
 /// <remarks>
 /// <para>
@@ -54,7 +54,8 @@ public sealed class BookingEmailHandler(
     : INotificationAsyncHandler<BookingPlacedNotification>,
       INotificationAsyncHandler<BookingConfirmedNotification>,
       INotificationAsyncHandler<BookingDeclinedNotification>,
-      INotificationAsyncHandler<BookingCancelledNotification>
+      INotificationAsyncHandler<BookingCancelledNotification>,
+      INotificationAsyncHandler<BookingMovedNotification>
 {
     /// <summary>
     /// Identifies the package's booking mail on Umbraco's outgoing-mail notification, so a site
@@ -75,16 +76,28 @@ public sealed class BookingEmailHandler(
     public Task HandleAsync(BookingCancelledNotification notification, CancellationToken cancellationToken)
         => SendAsync(notification.Booking, BookingEvent.Cancelled, cancellationToken);
 
+    public Task HandleAsync(BookingMovedNotification notification, CancellationToken cancellationToken)
+        => SendAsync(notification.Booking, BookingEvent.Moved, cancellationToken, notification.PreviousInterval);
+
     private async Task SendAsync(
-        Booking booking, BookingEvent bookingEvent, CancellationToken cancellationToken)
+        Booking booking,
+        BookingEvent bookingEvent,
+        CancellationToken cancellationToken,
+        BookingInterval? previousInterval = null)
     {
         var notifications = settings.Notifications;
 
-        // CONFIRM AND DECLINE ARE TOLD TO THE BOOKER ONLY. The site's own people — or a
+        // CONFIRM, DECLINE AND MOVE ARE TOLD TO THE BOOKER ONLY. The site's own people — or a
         // colleague — performed the action, and the bookings screen is where its state lives;
         // a message telling the site what it just did would be noise that trains recipients to
         // skim. Placement and cancellation keep both directions, as they always have —
         // responsibility changes WHO the site's direction reaches, never WHEN it applies.
+        //
+        // A MOVE SITS HERE DELIBERATELY, AND THE CASE THAT WOULD MOVE IT IS RECORDED: a party
+        // responsible for a resource did not perform an operator's move of a booking on it, and
+        // would reasonably want to know their diary changed. That bites hardest when a move
+        // changes WHICH resource is claimed; a move today changes only when. Whichever change
+        // lets a booking change resource decides this again (booking-emails spec).
         var siteEventApplies = bookingEvent is BookingEvent.Placed or BookingEvent.Cancelled;
 
         // The site's direction is asked for through EITHER tier: the configured list, or a
@@ -177,7 +190,7 @@ public sealed class BookingEmailHandler(
         if (toBooker && booking.Booker.Contact is { } contact)
         {
             var message = await composer
-                .ForBookerAsync(booking, bookingEvent, cancellationToken)
+                .ForBookerAsync(booking, bookingEvent, previousInterval, cancellationToken)
                 .ConfigureAwait(false);
 
             await SendAsync(message, [contact.Email], booking).ConfigureAwait(false);

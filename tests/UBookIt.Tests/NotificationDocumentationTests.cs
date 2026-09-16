@@ -468,6 +468,14 @@ public class NotificationDocumentationTests
             // Falsified by 0.3.0's find-by-booker, same class, same reason it survived: README
             // was in no guard.
             DocumentationAssert.DoesNotSay(text, "there is no search by name, email or reference");
+
+            // Falsified by move-booking. This sentence stood in EIGHT places, on the record as
+            // a decision; the decision was reversed, and a sentence that survives in one of
+            // them tells an operator the screen cannot do what it can. docs/mvp.md's
+            // historical account paraphrases rather than quotes it, so this can cover it.
+            DocumentationAssert.DoesNotSay(text, "the shape of that operation is a cancellation and a new booking");
+            DocumentationAssert.DoesNotSay(text, "There is no reschedule");
+            DocumentationAssert.DoesNotSay(text, "Amending a booking's time. There is no such operation");
         }
     }
 

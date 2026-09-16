@@ -683,6 +683,10 @@ public class MultiRolePlacementTests
 
         public Task BookingCancelledAsync(Booking booking, CancellationToken cancellationToken = default)
             => Task.CompletedTask;
+
+        public Task BookingMovedAsync(
+            Booking booking, BookingInterval previousInterval, CancellationToken cancellationToken = default)
+            => Task.CompletedTask;
     }
 
     [Fact]
@@ -760,6 +764,10 @@ public class MultiRolePlacementTests
         public DomainResult CheckPlacementRules(Resource resource, DateTimeOffset start, TimeSpan duration)
             => inner.CheckPlacementRules(resource, start, duration);
 
+        public Task<DomainResult<Booking>> MoveAsync(
+            Guid bookingId, DateTimeOffset newStart, TimeSpan newLength, CancellationToken cancellationToken = default)
+            => inner.MoveAsync(bookingId, newStart, newLength, cancellationToken);
+
         public Task<DomainResult<Booking>> CancelAsync(
             Guid bookingId, CancellationToken cancellationToken = default)
             => inner.CancelAsync(bookingId, cancellationToken);
@@ -806,6 +814,10 @@ public class MultiRolePlacementTests
 
         public DomainResult CheckPlacementRules(Resource resource, DateTimeOffset start, TimeSpan duration)
             => inner.CheckPlacementRules(resource, start, duration);
+
+        public Task<DomainResult<Booking>> MoveAsync(
+            Guid bookingId, DateTimeOffset newStart, TimeSpan newLength, CancellationToken cancellationToken = default)
+            => inner.MoveAsync(bookingId, newStart, newLength, cancellationToken);
 
         public Task<DomainResult<Booking>> CancelAsync(
             Guid bookingId, CancellationToken cancellationToken = default)

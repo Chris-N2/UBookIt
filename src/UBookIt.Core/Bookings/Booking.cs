@@ -84,7 +84,12 @@ public sealed class Booking
     /// </summary>
     public BookingReference Reference { get; }
 
-    public BookingInterval Interval { get; }
+    /// <summary>
+    /// When the booking is. Set at placement and changed afterwards only by
+    /// <see cref="MoveTo"/> — a booking has exactly one way to change its time, it is named
+    /// after what it does, and it applies the status rule rather than trusting a caller to.
+    /// </summary>
+    public BookingInterval Interval { get; private set; }
 
     /// <summary>
     /// Who the booking is for. Always present — erasure removes the person's details, not
@@ -240,6 +245,87 @@ public sealed class Booking
         }
 
         Booker = Booker.Erased(erasedUtc);
+    }
+
+    /// <summary>
+    /// Moves the booking to <paramref name="newInterval"/>: a placement of the booking it
+    /// already is, at a different time.
+    /// </summary>
+    /// <remarks>
+    /// <para>
+    /// <b>Nothing else about the booking changes.</b> Its id, reference, booker, status,
+    /// creation time, claims and service attribution are exactly what they were. The
+    /// reference in particular: the customer is holding it, and a move is the case its
+    /// immutability was written for.
+    /// </para>
+    /// <para>
+    /// <b>Permitted from <see cref="BookingStatus.Requested"/> and
+    /// <see cref="BookingStatus.Confirmed"/> and from nothing else.</b> A cancelled or declined
+    /// booking holds no time to move. This is not a transition — the status after is the status
+    /// before — but it borrows the status machine's failure code because the refusal is the
+    /// same kind of fact: the booking's status does not permit the operation.
+    /// </para>
+    /// <para>
+    /// <b>A move to the interval already held is refused</b> with
+    /// <see cref="FailureCodes.IntervalUnchanged"/>, on the same grounds as cancelling twice.
+    /// </para>
+    /// <para>
+    /// <b>This changes the aggregate and NOTHING ELSE — it does not persist</b>, and
+    /// <see cref="Stores.IBookingStore.UpdateAsync"/> will not persist it either: that method
+    /// writes the status and deliberately nothing else. The interval is written by the store's
+    /// own move operation, which takes the id and the interval and checks the status again
+    /// inside the write. Validation against the resources' rules is the service's, not this
+    /// method's; here the interval is taken as already validated.
+    /// </para>
+    /// <para>
+    /// <b>Applied only after storage has agreed.</b> The service asks <see cref="CanMoveTo"/>
+    /// first, writes through the store, and calls this last — so an aggregate never claims an
+    /// interval the store refused. Placement has the same shape: the aggregate is built, the
+    /// store decides, and only a stored booking is handed on.
+    /// </para>
+    /// </remarks>
+    public DomainResult MoveTo(BookingInterval newInterval)
+    {
+        var permitted = CanMoveTo(newInterval);
+        if (!permitted.Succeeded)
+        {
+            return permitted;
+        }
+
+        Interval = newInterval;
+        return DomainResult.Success();
+    }
+
+    /// <summary>
+    /// Whether <see cref="MoveTo"/> would succeed, without changing anything: the status rule
+    /// and the unchanged-interval rule, and nothing else.
+    /// </summary>
+    /// <remarks>
+    /// Separated from <see cref="MoveTo"/> so a caller can apply the rules before a write and
+    /// the change after it, with one definition of the rules between them. A caller that
+    /// mutated first and wrote second would hold an aggregate claiming an interval the store
+    /// may have refused — harmless against a store that hands out copies, and a stored
+    /// falsehood against one that does not.
+    /// </remarks>
+    public DomainResult CanMoveTo(BookingInterval newInterval)
+    {
+        ArgumentNullException.ThrowIfNull(newInterval);
+
+        if (Status is not (BookingStatus.Requested or BookingStatus.Confirmed))
+        {
+            return DomainResult.Failure(
+                FailureCodes.InvalidStatusTransition,
+                $"A {Status} booking cannot be moved.");
+        }
+
+        if (newInterval == Interval)
+        {
+            return DomainResult.Failure(
+                FailureCodes.IntervalUnchanged,
+                "The booking already holds that interval.");
+        }
+
+        return DomainResult.Success();
     }
 
     public DomainResult Confirm() => Transition(BookingStatus.Confirmed, BookingStatus.Requested);

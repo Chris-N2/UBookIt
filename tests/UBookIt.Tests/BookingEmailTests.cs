@@ -269,6 +269,74 @@ public class BookingEmailTests
         Assert.Empty(sent);
     }
 
+    // ---- move (move-booking) ------------------------------------------------------------------
+
+    /// <summary>
+    /// A move is told to the booker only, on the terms confirm and decline set. Both directions
+    /// are enabled AND a responsibility assignment is present, so an internal message — to the
+    /// configured list or to a responsible party — had every opportunity to appear.
+    /// </summary>
+    [Fact]
+    public async Task A_move_writes_to_the_booker_only_and_says_where_from()
+    {
+        var responsible = new FakeResponsibleRecipients(hasAssignments: true, addresses: ["therapist@example.com"]);
+
+        var sent = (await Send(
+            Notifications(true, ["desk@example.com"]),
+            bookingEvent: BookingEvent.Moved,
+            responsibility: responsible)).Sent;
+
+        var message = Assert.Single(sent);
+        Assert.Equal("ada@example.com", Assert.Single(message.To));
+        Assert.Equal("Your booking has moved", message.Subject);
+
+        // Where from, and where to, both in the booking's own zone; and the reference.
+        Assert.Contains("moved from Tuesday 15 September 2026 at 2:00 PM (Europe/London)", message.Body, StringComparison.Ordinal);
+        Assert.Contains("at 9:00 AM (Europe/London)", message.Body, StringComparison.Ordinal);
+        Assert.Contains("Reference:", message.Body, StringComparison.Ordinal);
+        Assert.Equal(0, responsible.ResolveCalls);
+    }
+
+    [Fact]
+    public async Task A_moved_requested_booking_still_says_it_is_not_confirmed()
+    {
+        var message = await Composer().ForBookerAsync(
+            Booking(status: BookingStatus.Requested), BookingEvent.Moved, PreviousInterval);
+
+        Assert.Equal("Your booking has moved", message.Subject);
+        Assert.Contains("not confirmed yet", message.Body, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public async Task A_move_on_a_site_without_booker_emails_sends_nothing_at_all()
+    {
+        var sent = (await Send(
+            Notifications(sendBooker: false, recipients: ["desk@example.com"]),
+            bookingEvent: BookingEvent.Moved)).Sent;
+
+        Assert.Empty(sent);
+    }
+
+    [Fact]
+    public async Task Moving_an_erased_booker_sends_nothing_to_anyone()
+    {
+        var erased = Booking().Tap(b => b.EraseBooker(TestData.Now));
+
+        var sent = (await Send(
+            Notifications(true, ["desk@example.com"]), booking: erased, bookingEvent: BookingEvent.Moved)).Sent;
+
+        Assert.Empty(sent);
+    }
+
+    [Fact]
+    public async Task A_move_message_without_where_it_came_from_is_refused()
+    {
+        // The composer cannot honestly write "moved" without the previous time, so a caller
+        // that forgets it is told at the call site rather than shipping a message that omits it.
+        await Assert.ThrowsAsync<ArgumentException>(
+            () => Composer().ForBookerAsync(Booking(), BookingEvent.Moved));
+    }
+
     [Fact]
     public async Task An_auto_confirmed_placement_is_one_booker_message_not_two()
     {
@@ -730,7 +798,8 @@ public class BookingEmailTests
         BookingNotificationSettings notifications,
         RecordingEmailSender? sender = null,
         Booking? booking = null,
-        BookingEvent bookingEvent = BookingEvent.Placed)
+        BookingEvent bookingEvent = BookingEvent.Placed,
+        FakeResponsibleRecipients? responsibility = null)
     {
         sender ??= new RecordingEmailSender();
 
@@ -738,7 +807,7 @@ public class BookingEmailTests
             new SiteBookingSettings { TimeZoneId = TestData.LondonZoneId, Notifications = notifications },
             sender,
             Composer(),
-            NoResponsibility.Instance,
+            responsibility ?? NoResponsibility.Instance,
             new StubHostingEnvironment(),
             NullLogger<BookingEmailHandler>.Instance);
 
@@ -748,6 +817,10 @@ public class BookingEmailTests
         {
             case BookingEvent.Cancelled:
                 await handler.HandleAsync(new BookingCancelledNotification(booking), CancellationToken.None);
+                break;
+            case BookingEvent.Moved:
+                await handler.HandleAsync(
+                    new BookingMovedNotification(booking, PreviousInterval), CancellationToken.None);
                 break;
             case BookingEvent.Confirmed:
                 await handler.HandleAsync(new BookingConfirmedNotification(booking), CancellationToken.None);
@@ -808,6 +881,12 @@ public class BookingEmailTests
             new StubResourceStore(resourceExists, resourceThrows),
             NullLogger<BookingMessageComposer>.Instance,
             renderer);
+
+    /// <summary>Where a moved booking came from: 14:00–15:00 London on the fixture date, an hour after where it now is.</summary>
+    private static readonly BookingInterval PreviousInterval = BookingInterval.Create(
+        TestData.Utc(TestData.BaseDate, "14:00"),
+        TestData.Utc(TestData.BaseDate, "15:00"),
+        TestData.LondonZoneId).Value;
 
     private static Booking Booking(
         BookingStatus status = BookingStatus.Confirmed,

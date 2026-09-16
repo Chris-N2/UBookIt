@@ -582,6 +582,44 @@ public class BookingTemplateCompositionTests
     }
 
     [Fact]
+    public async Task The_move_model_carries_the_previous_interval_in_the_bookings_zone()
+    {
+        var renderer = new StubRenderer(BookingTemplateResult.NotSupplied);
+        var previous = BookingInterval.Create(
+            TestData.Utc(TestData.BaseDate, "14:00"), TestData.Utc(TestData.BaseDate, "15:00"), TestData.LondonZoneId).Value;
+
+        await Composer(renderer).ForBookerAsync(Booking(), BookingEvent.Moved, previous);
+
+        var (kind, model) = Assert.Single(renderer.Asked);
+        var booker = Assert.IsType<BookerMessageModel>(model);
+
+        Assert.Equal(BookingMessageKind.BookerMoved, kind);
+        Assert.Equal(14, booker.PreviousLocalStart!.Value.Hour);
+        Assert.Equal(1, booker.PreviousLocalStart.Value.Offset.Hours);
+        Assert.Equal(15, booker.PreviousLocalEnd!.Value.Hour);
+        // And the CURRENT interval is still the booking's own.
+        Assert.Equal(9, booker.LocalStart.Hour);
+    }
+
+    [Theory]
+    [InlineData(BookingEvent.Placed)]
+    [InlineData(BookingEvent.Confirmed)]
+    [InlineData(BookingEvent.Declined)]
+    [InlineData(BookingEvent.Cancelled)]
+    public async Task Every_other_booker_model_carries_no_previous_interval(BookingEvent bookingEvent)
+    {
+        // Absent means "not a move", which is what the model documents — and what lets a view
+        // written before the member existed render unchanged.
+        var renderer = new StubRenderer(BookingTemplateResult.NotSupplied);
+
+        await Composer(renderer).ForBookerAsync(Booking(), bookingEvent);
+
+        var booker = Assert.IsType<BookerMessageModel>(Assert.Single(renderer.Asked).Model);
+        Assert.Null(booker.PreviousLocalStart);
+        Assert.Null(booker.PreviousLocalEnd);
+    }
+
+    [Fact]
     public async Task The_model_reports_the_status_separately_from_the_message()
     {
         // Kind and Status answer different questions and can disagree: this is a BookerPlaced
@@ -808,16 +846,50 @@ public class BookingMessageModelContractTests
         // recurring failure of this change was precisely a guard that covered the callers
         // somebody had thought of. This turns "a reviewer must remember" into "the build says
         // so".
+        // By NAME, distinct: an overload of ForBookerAsync is the same producer with a further
+        // argument (the move message's previous interval, 17.1.0), not a third message the cost
+        // theory has not measured. A third NAME is what this guard exists to refuse.
         var producers = typeof(BookingMessageComposer)
             .GetMethods(BindingFlags.Public | BindingFlags.Instance | BindingFlags.DeclaredOnly)
             .Where(m => m.ReturnType == typeof(Task<BookingMessage>))
             .Select(m => m.Name)
+            .Distinct(StringComparer.Ordinal)
             .Order(StringComparer.Ordinal)
             .ToList();
 
         Assert.Equal(
             [nameof(BookingMessageComposer.ForBookerAsync), nameof(BookingMessageComposer.ForSiteAsync)],
             producers);
+    }
+
+    [Fact]
+    public async Task The_frozen_booker_signature_still_binds_and_refuses_a_move()
+    {
+        // The 17.0.0 shape — (Booking, BookingEvent, CancellationToken) — must still exist as its
+        // own overload so a host compiled against it binds; QA round 1 found it had been widened in
+        // place, which is a MissingMethodException at runtime for such a host.
+        var frozen = typeof(BookingMessageComposer).GetMethod(
+            nameof(BookingMessageComposer.ForBookerAsync),
+            [typeof(Booking), typeof(BookingEvent), typeof(CancellationToken)]);
+
+        Assert.NotNull(frozen);
+
+        // And it cannot compose a move: that message needs the previous interval, which only the
+        // wider overload carries. Invoked through the frozen overload's own binding.
+        var composer = new BookingMessageComposer(
+            new InMemoryResourceStore(), NullLogger<BookingMessageComposer>.Instance);
+        var booking = Booking.Rehydrate(
+            Guid.NewGuid(),
+            References.Any(),
+            BookingInterval.Create(
+                TestData.Utc(TestData.BaseDate, "09:00"), TestData.Utc(TestData.BaseDate, "10:00"), TestData.LondonZoneId).Value,
+            Booker.Create(null, "Ada Lovelace", "ada@example.com").Value,
+            [new ResourceClaim(Guid.NewGuid())],
+            BookingStatus.Confirmed,
+            TestData.Now).Value;
+
+        await Assert.ThrowsAsync<ArgumentException>(
+            () => composer.ForBookerAsync(booking, BookingEvent.Moved, CancellationToken.None));
     }
 
     [Fact]
@@ -832,15 +904,16 @@ public class BookingMessageModelContractTests
                 BookingMessageKind.BookerConfirmed,
                 BookingMessageKind.BookerDeclined,
                 BookingMessageKind.BookerCancelled,
+                BookingMessageKind.BookerMoved,
                 BookingMessageKind.InternalPlaced,
                 BookingMessageKind.InternalCancelled,
             },
             Enum.GetValues<BookingMessageKind>());
 
-        // Named explicitly, because these two are the ones somebody will eventually "notice are
+        // Named explicitly, because these three are the ones somebody will eventually "notice are
         // missing" and add without checking whether such a message exists. They do not.
         Assert.DoesNotContain(
             Enum.GetNames<BookingMessageKind>(),
-            name => name is "InternalConfirmed" or "InternalDeclined");
+            name => name is "InternalConfirmed" or "InternalDeclined" or "InternalMoved");
     }
 }

@@ -207,6 +207,7 @@ public class FindByBookerEndpointTests
             new BookingsController(
                 store,
                 new UnusedBookingService(),
+                new UnusedServiceBookingService(),
                 new UBookIt.Core.SiteBookingSettings { TimeZoneId = "UTC" },
                 Security(sensitiveData)),
             store);
@@ -251,6 +252,10 @@ public class FindByBookerEndpointTests
 
         public DomainResult CheckPlacementRules(
             UBookIt.Core.Resources.Resource resource, DateTimeOffset start, TimeSpan duration)
+            => throw Unexpected();
+
+        public Task<DomainResult<Booking>> MoveAsync(
+            Guid bookingId, DateTimeOffset newStart, TimeSpan newLength, CancellationToken cancellationToken = default)
             => throw Unexpected();
 
         public Task<DomainResult<UBookIt.Core.Bookings.Booking>> CancelAsync(

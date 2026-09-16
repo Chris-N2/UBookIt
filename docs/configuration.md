@@ -106,6 +106,20 @@ resolve the settings inside a scope per unit of work, as uBookIt's own retention
 Nothing in uBookIt itself is affected, and nothing else about the upgrade changes behaviour: with
 no stored settings, every value resolves exactly as it did before.
 
+**If your own code implements `IBookingObserver`, `IBookingStore` or `IServiceBookingService`, it
+will no longer compile** until it adds one member each. Moving a booking is new in this version,
+and all three ports gained a member for it — `BookingMovedAsync(booking, previousInterval, …)` on
+the observer, `MoveAsync(bookingId, newInterval, permittedFrom, …)` on the store, and
+`MoveAsync(bookingId, newStart, newLength, …)` on the service booking service, which is the entry
+point that applies a service's length rules to a move. There is deliberately no default
+implementation on any of them: an observer silently deaf to moves, or a store that could not move,
+would be a worse outcome than a compile error on ports whose purpose is that a host hears what
+happened and stores what was asked. A store implementation must honour the move contract the port
+documents — the conflict check excludes the booking being moved, and the permitted statuses are a
+predicate of the write itself. No other public signature changed: `BookingMessageComposer.ForBookerAsync`
+keeps its shape and gains an overload. Sites that use the shipped implementations, which is every
+site that has not written its own, are unaffected.
+
 ## Permissions
 
 The settings screen and its endpoints require the **`UBookIt.Settings`** verb, granted in
