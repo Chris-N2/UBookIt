@@ -400,6 +400,188 @@ public class BookingsEndpointTests
             => throw new NotSupportedException();
     }
 
+    // ---- move (move-booking) ----------------------------------------------------------------
+    //
+    // "Read without Manage cannot move" and "the endpoint is not anonymous" are discharged
+    // structurally: PermissionsTests' classification snapshot names MoveBooking under the
+    // Manage policy, and UBookItSectionAccessTests covers the authorized base for every action.
+
+    /// <summary>Answers a move with whatever the test needs, recording exactly what it was asked.</summary>
+    private sealed class MovingBookingService(DomainResult<Booking> answer) : IBookingService
+    {
+        public (Guid Id, DateTimeOffset Start, TimeSpan Length)? Asked { get; private set; }
+
+        public Task<DomainResult<Booking>> MoveAsync(
+            Guid bookingId, DateTimeOffset newStart, TimeSpan newLength, CancellationToken cancellationToken = default)
+        {
+            Asked = (bookingId, newStart, newLength);
+            return Task.FromResult(answer);
+        }
+
+        private static InvalidOperationException Unexpected([CallerMemberName] string member = "")
+            => new($"The move endpoint reached {member} on the booking service; it should not.");
+
+        public Task<DomainResult<Booking>> ConfirmAsync(
+            Guid bookingId, CancellationToken cancellationToken = default) => throw Unexpected();
+
+        public Task<DomainResult<Booking>> DeclineAsync(
+            Guid bookingId, CancellationToken cancellationToken = default) => throw Unexpected();
+
+        public Task<DomainResult<Booking>> CancelAsync(
+            Guid bookingId, CancellationToken cancellationToken = default) => throw Unexpected();
+
+        public Task<DomainResult<Booking>> EraseBookerAsync(
+            Guid bookingId, CancellationToken cancellationToken = default) => throw Unexpected();
+
+        public Task<DomainResult<Booking>> PlaceAsync(
+            BookingRequest request, CancellationToken cancellationToken = default) => throw Unexpected();
+
+        public Task<DomainResult<Booking>> PlaceAsync(
+            MultiClaimBookingRequest request, CancellationToken cancellationToken = default) => throw Unexpected();
+
+        public Task<DomainResult<Booking>> PlaceForServiceAsync(
+            ServiceAttribution service,
+            MultiClaimBookingRequest request,
+            CancellationToken cancellationToken = default) => throw Unexpected();
+
+        public DomainResult CheckPlacementRules(Resource resource, DateTimeOffset start, TimeSpan duration)
+            => throw Unexpected();
+    }
+
+    private static Booking MovedTo(DateTimeOffset startUtc, int minutes, BookingStatus status = BookingStatus.Confirmed)
+        => Booking.Rehydrate(
+            Guid.NewGuid(),
+            References.Any(),
+            BookingInterval.Create(startUtc, startUtc.AddMinutes(minutes), "Europe/London").Value,
+            Booker.Create(null, "Ada Lovelace", "ada@example.com", null).Value,
+            [new ResourceClaim(Guid.NewGuid())],
+            status,
+            new DateTimeOffset(2026, 5, 1, 0, 0, 0, TimeSpan.Zero)).Value;
+
+    [Fact]
+    public async Task Moving_returns_identity_status_and_the_new_interval()
+    {
+        var eightZ = new DateTimeOffset(2026, 6, 2, 8, 0, 0, TimeSpan.Zero);
+        var booking = MovedTo(eightZ, 90, BookingStatus.Requested);
+        var service = new MovingBookingService(DomainResult<Booking>.Success(booking));
+        var (controller, _) = Endpoint(zone: "Europe/London", bookingService: service);
+
+        var model = Payload<MovedBookingModel>(await controller.MoveBooking(
+            booking.Id, new MoveBookingRequestModel { Start = new DateTime(2026, 6, 2, 9, 0, 0), LengthMinutes = 90 }));
+
+        Assert.Equal(booking.Id, model.BookingId);
+        // UNCHANGED by the move, and reported so: "moved" is not "confirmed" on an approval site.
+        Assert.Equal("Requested", model.Status);
+        Assert.Equal(eightZ, model.StartUtc);
+        Assert.Equal(eightZ.AddMinutes(90), model.EndUtc);
+        Assert.Equal("Europe/London", model.TimeZoneId);
+    }
+
+    [Fact]
+    public async Task The_start_is_read_in_the_sites_zone_and_converted_once()
+    {
+        // 09:00 on a BST date in London is 08:00Z. The domain is asked for the instant, not the
+        // wall-clock time — the conversion happens here, once, because the zone is a server setting.
+        var service = new MovingBookingService(DomainResult<Booking>.Success(MovedTo(default, 60)));
+        var (controller, _) = Endpoint(zone: "Europe/London", bookingService: service);
+        var id = Guid.NewGuid();
+
+        await controller.MoveBooking(id, new MoveBookingRequestModel { Start = new DateTime(2026, 6, 2, 9, 0, 0), LengthMinutes = 60 });
+
+        Assert.NotNull(service.Asked);
+        Assert.Equal(id, service.Asked.Value.Id);
+        Assert.Equal(new DateTimeOffset(2026, 6, 2, 8, 0, 0, TimeSpan.Zero), service.Asked.Value.Start);
+        Assert.Equal(TimeSpan.FromMinutes(60), service.Asked.Value.Length);
+    }
+
+    [Theory]
+    [InlineData(FailureCodes.OutsideOpenHours)]
+    [InlineData(FailureCodes.Conflict)]
+    [InlineData(FailureCodes.LeadTime)]
+    [InlineData(FailureCodes.IntervalUnchanged)]
+    [InlineData(FailureCodes.InvalidStatusTransition)]
+    public async Task A_refused_move_is_a_400_carrying_the_domains_code(string code)
+    {
+        var service = new MovingBookingService(DomainResult<Booking>.Failure(code, "Refused."));
+        var (controller, _) = Endpoint(bookingService: service);
+
+        var result = Assert.IsType<ObjectResult>(await controller.MoveBooking(
+            Guid.NewGuid(), new MoveBookingRequestModel { Start = new DateTime(2026, 6, 2, 9, 0, 0), LengthMinutes = 60 }));
+
+        Assert.Equal(StatusCodes.Status400BadRequest, result.StatusCode);
+        Assert.Contains(code, Codes(result));
+    }
+
+    [Fact]
+    public async Task Moving_an_unknown_booking_is_a_404()
+    {
+        var service = new MovingBookingService(DomainResult<Booking>.Failure(
+            FailureCodes.BookingNotFound, "No booking exists with that id."));
+        var (controller, _) = Endpoint(bookingService: service);
+
+        var result = Assert.IsType<ObjectResult>(await controller.MoveBooking(
+            Guid.NewGuid(), new MoveBookingRequestModel { Start = new DateTime(2026, 6, 2, 9, 0, 0), LengthMinutes = 60 }));
+
+        Assert.Equal(StatusCodes.Status404NotFound, result.StatusCode);
+        Assert.Contains(FailureCodes.BookingNotFound, Codes(result));
+    }
+
+    [Theory]
+    [InlineData(0)]
+    [InlineData(-30)]
+    public async Task A_non_positive_length_is_refused_before_the_domain_is_asked(int lengthMinutes)
+    {
+        var service = new MovingBookingService(DomainResult<Booking>.Success(MovedTo(default, 60)));
+        var (controller, _) = Endpoint(bookingService: service);
+
+        var result = Assert.IsType<ObjectResult>(await controller.MoveBooking(
+            Guid.NewGuid(), new MoveBookingRequestModel { Start = new DateTime(2026, 6, 2, 9, 0, 0), LengthMinutes = lengthMinutes }));
+
+        Assert.Equal(StatusCodes.Status400BadRequest, result.StatusCode);
+        Assert.Contains(FailureCodes.IntervalInvalid, Codes(result));
+        Assert.Null(service.Asked);
+    }
+
+    [Fact]
+    public async Task A_missing_start_is_refused_before_the_domain_is_asked()
+    {
+        var service = new MovingBookingService(DomainResult<Booking>.Success(MovedTo(default, 60)));
+        var (controller, _) = Endpoint(bookingService: service);
+
+        var result = Assert.IsType<ObjectResult>(await controller.MoveBooking(
+            Guid.NewGuid(), new MoveBookingRequestModel { LengthMinutes = 60 }));
+
+        Assert.Equal(StatusCodes.Status400BadRequest, result.StatusCode);
+        Assert.Contains(FailureCodes.IntervalInvalid, Codes(result));
+        Assert.Null(service.Asked);
+    }
+
+    [Fact]
+    public async Task A_start_the_clocks_skip_is_refused_against_the_start_field()
+    {
+        // 01:30 on 29 March 2026 does not exist in London: the clocks go from 01:00 to 02:00.
+        var service = new MovingBookingService(DomainResult<Booking>.Success(MovedTo(default, 60)));
+        var (controller, _) = Endpoint(zone: "Europe/London", bookingService: service);
+
+        var result = Assert.IsType<ObjectResult>(await controller.MoveBooking(
+            Guid.NewGuid(), new MoveBookingRequestModel { Start = new DateTime(2026, 3, 29, 1, 30, 0), LengthMinutes = 60 }));
+
+        Assert.Equal(StatusCodes.Status400BadRequest, result.StatusCode);
+        var problem = Assert.IsType<ProblemDetails>(result.Value);
+        var error = Assert.Single(Assert.IsType<ApiErrorModel[]>(problem.Extensions["errors"]));
+        Assert.Equal(FailureCodes.IntervalInvalid, error.Code);
+        Assert.Equal("Start", error.Field);
+        Assert.Null(service.Asked);
+    }
+
+    [Fact]
+    public void The_move_response_carries_the_interval_and_does_not_imitate_a_list_row()
+    {
+        Assert.Equal(
+            ["BookingId", "EndUtc", "StartUtc", "Status", "TimeZoneId"],
+            typeof(MovedBookingModel).GetProperties().Select(p => p.Name).Order());
+    }
+
     private static Booking WithStatus(BookingStatus status)
         => Booking.Rehydrate(
             Guid.NewGuid(),

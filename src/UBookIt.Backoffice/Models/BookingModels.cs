@@ -266,6 +266,63 @@ public class DeclinedBookingModel
 }
 
 /// <summary>
+/// What a move asks for: where the booking should now be.
+/// </summary>
+/// <remarks>
+/// <para>
+/// <b>The start is the site's own wall-clock time, with no offset</b> — <c>2026-09-20T09:00</c>
+/// — on the same convention as the list's window dates: the operator is looking at a screen in
+/// the site's zone, and a time typed there means that time in that zone. The server converts,
+/// once, because the site's zone is a server setting and a headless client is not one client.
+/// </para>
+/// <para>
+/// The length is in minutes rather than an ISO duration, because the client is a number input
+/// and the domain is minute-granular. Both are validated before the domain is asked: a missing
+/// start or a non-positive length is answered with the domain's <c>interval-invalid</c> code
+/// against the offending field, so a caller learns which of the two to fix.
+/// </para>
+/// </remarks>
+public class MoveBookingRequestModel
+{
+    /// <summary>The new start, as a wall-clock time in the site's zone. No offset.</summary>
+    public DateTime Start { get; set; }
+
+    /// <summary>The new length, in minutes. Must be positive.</summary>
+    public int LengthMinutes { get; set; }
+}
+
+/// <summary>
+/// What a move returns: the booking's identity, its status, and the interval it now holds.
+/// </summary>
+/// <remarks>
+/// <para>
+/// <b>Deliberately not a whole <see cref="BookingModel"/></b>, on <see cref="CancelledBookingModel"/>'s
+/// terms: this path reaches the booking through the domain, which knows resource ids and not
+/// their names. It carries what the operation knows — and the interval is what a move is about,
+/// so the caller can see where the booking landed without reading it back.
+/// </para>
+/// <para>
+/// The status is carried because it is <i>unchanged</i> by a move, and a caller that assumed
+/// otherwise — "moved means confirmed" — would be wrong on an approval site. Instants are UTC
+/// with the zone id alongside, as the list carries them.
+/// </para>
+/// </remarks>
+public class MovedBookingModel
+{
+    public Guid BookingId { get; set; }
+
+    /// <summary>The booking's status by name — unchanged by the move.</summary>
+    public string Status { get; set; } = string.Empty;
+
+    public DateTimeOffset StartUtc { get; set; }
+
+    public DateTimeOffset EndUtc { get; set; }
+
+    /// <summary>The IANA zone the new interval was validated against.</summary>
+    public string TimeZoneId { get; set; } = string.Empty;
+}
+
+/// <summary>
 /// What an erasure returns: the booking's identity and when its booker was erased.
 /// </summary>
 /// <remarks>

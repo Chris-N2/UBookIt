@@ -219,6 +219,20 @@ export function canConfirmOrDecline(status: string): boolean {
 }
 
 /**
+ * Whether the view offers to move this booking.
+ *
+ * The same statuses as {@link canCancel}, and for the same reason: a booking holds time
+ * while it is `Requested` or `Confirmed`, and only a booking holding time has a time to
+ * move. A move changes no status — a requested booking that has moved is still requested.
+ *
+ * The same caveat, verbatim: **this is a convenience, not the rule.** The endpoint refuses
+ * independently, so a stale list cannot talk the domain into moving a cancelled booking.
+ */
+export function canMove(status: string): boolean {
+  return status === "Requested" || status === "Confirmed";
+}
+
+/**
  * Where paging should be after a query changes.
  *
  * Always the first page when the *query* changed — a page number counts into

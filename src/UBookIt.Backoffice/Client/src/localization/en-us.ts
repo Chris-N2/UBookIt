@@ -439,6 +439,40 @@ export default {
     declineConfirmFailed: "The confirmation could not be shown, so nothing was declined.",
     confirmBookingFailed: "The booking could not be confirmed.",
     declineBookingFailed: "The booking could not be declined.",
+
+    // ------------------------------------------------------------------ move
+    //
+    // Offered wherever cancel is: a booking holding time has a time to move. The dialog
+    // carries the same truthful notification conditional as cancel and decline, for the
+    // same reason. The refusal sentences are written for an operator holding a telephone,
+    // one per stable code the domain can answer with — not the endpoint's message, which is
+    // written for a developer reading a response. There is deliberately no sentence
+    // promising where the booking COULD go: this dialog has no availability read, and a
+    // sentence implying one would be a promise the screen cannot keep.
+    move: "Move booking",
+    moveHeadline: "Move booking",
+    moveIntro: "Move booking %0% to a new date, time or length. Its reference stays the same.",
+    moveNotificationHint:
+      "uBookIt only tells the person who booked about the new time if booking emails are "
+      + "configured — otherwise, if they should know, you will need to contact them.",
+    moveDate: "Date",
+    moveTime: "Start time",
+    moveLength: "Length (minutes)",
+    moveCancel: "Cancel",
+    moveSubmit: "Move",
+    moveIncomplete: "Enter a date, a start time and a length in minutes.",
+    moveFailed: "The booking could not be moved.",
+    moveDialogFailed: "The move dialog could not be shown, so nothing was moved.",
+    moveRefusedOutsideOpenHours: "That time is outside the resource's opening hours. Choose another.",
+    moveRefusedConflict: "Something else is booked at that time. Choose another.",
+    moveRefusedInThePast: "That time has already passed. Choose a time that has not.",
+    moveRefusedUnchanged: "The booking already holds that time. Change the date, time or length to move it.",
+    moveRefusedStatus: "This booking no longer holds a time to move — it may have been cancelled or declined.",
+    moveRefusedGranularity: "That start time is not on the resource's booking grid. Choose a start that is.",
+    moveRefusedDuration: "That length is outside what the resource allows. Choose another.",
+    moveRefusedInterval: "That date and time could not be read. Check them and try again.",
+    moveRefusedNotFound: "This booking could not be found. It may have been removed; reload the list.",
+    movedNotice: "Booking %0% moved to %1%.",
   },
   // Extends Umbraco's own "user" localization section: the group editor derives the
   // heading for each entity type's permission group as user_permissionsEntityGroup_<type>,

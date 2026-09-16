@@ -48,6 +48,7 @@ public class PermissionsTests
         ["BookingsController.CancelBooking"] = Constants.VerbPolicies.BookingsManage,
         ["BookingsController.ConfirmBooking"] = Constants.VerbPolicies.BookingsManage,
         ["BookingsController.DeclineBooking"] = Constants.VerbPolicies.BookingsManage,
+        ["BookingsController.MoveBooking"] = Constants.VerbPolicies.BookingsManage,
         ["ResourcesController.ListResources"] = Constants.VerbPolicies.Configure,
         ["ResourcesController.GetResource"] = Constants.VerbPolicies.Configure,
         ["ResourcesController.CreateResource"] = Constants.VerbPolicies.Configure,

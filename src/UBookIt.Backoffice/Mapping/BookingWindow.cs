@@ -74,6 +74,57 @@ internal static class BookingWindow
     }
 
     /// <summary>
+    /// Resolves a wall-clock time in the site's zone to the instant it names, or explains why it
+    /// cannot — the convention the window dates already follow, applied to a time of day.
+    /// </summary>
+    /// <remarks>
+    /// <para>
+    /// A local time inside a spring-forward gap does not exist and is refused with
+    /// <see cref="FailureCodes.IntervalInvalid"/> against the start field: the operator typed a
+    /// time no clock in the site's zone will show, and moving them silently to the next valid
+    /// minute would book a time they did not ask for.
+    /// </para>
+    /// <para>
+    /// A local time inside a fall-back overlap happens twice; the FIRST occurrence is taken, on
+    /// the same reasoning <see cref="StartOfDayUtc"/> records — the earliest instant, which is the
+    /// largest offset. The converted result carries the site's zone id, because the caller is
+    /// placing against it.
+    /// </para>
+    /// </remarks>
+    public static DomainResult<(DateTimeOffset Utc, string TimeZoneId)> ResolveSiteLocal(
+        DateTime siteLocal, SiteBookingSettings settings, string field)
+    {
+        ArgumentNullException.ThrowIfNull(settings);
+
+        if (!TryFindZone(settings.TimeZoneId, out var zone))
+        {
+            return DomainResult<(DateTimeOffset, string)>.Failure(
+                FailureCodes.TimeZoneInvalid,
+                $"The site's configured time zone '{settings.TimeZoneId}' could not be resolved.",
+                field: null);
+        }
+
+        var local = DateTime.SpecifyKind(siteLocal, DateTimeKind.Unspecified);
+
+        if (zone.IsInvalidTime(local))
+        {
+            return DomainResult<(DateTimeOffset, string)>.Failure(
+                FailureCodes.IntervalInvalid,
+                $"{local:yyyy-MM-dd HH:mm} does not exist in {settings.TimeZoneId}; the clocks go forward over it.",
+                field);
+        }
+
+        if (zone.IsAmbiguousTime(local))
+        {
+            return DomainResult<(DateTimeOffset, string)>.Success(
+                (new DateTimeOffset(local - zone.GetAmbiguousTimeOffsets(local).Max(), TimeSpan.Zero), settings.TimeZoneId));
+        }
+
+        return DomainResult<(DateTimeOffset, string)>.Success(
+            (new DateTimeOffset(TimeZoneInfo.ConvertTimeToUtc(local, zone), TimeSpan.Zero), settings.TimeZoneId));
+    }
+
+    /// <summary>
     /// The instant a date <b>begins</b> in the site's zone.
     /// <para>
     /// Midnight is neither guaranteed to exist nor guaranteed to be unique, and a
