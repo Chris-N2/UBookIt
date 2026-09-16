@@ -3,7 +3,9 @@
 ## Purpose
 
 Defines the SQL Server persistence layer for uBookIt: the required database backend, schema shape and naming, startup migrations into a package-private history table, store implementations honouring Core semantics, atomic placement on SQL Server, package composition, and integration test coverage against a real SQL Server instance.
+
 ## Requirements
+
 ### Requirement: SQL Server is the required backend
 The package SHALL require SQL Server 2019 or later (including LocalDB and Azure SQL). No other database provider SHALL be supported or abstracted for. This requirement SHALL be stated in package documentation.
 
@@ -139,14 +141,16 @@ EF Core migrations SHALL be applied automatically during Umbraco application sta
 - **THEN** no error occurs and the schema is unchanged
 
 ### Requirement: Store implementations honour Core semantics
-`UBookIt.Persistence` SHALL provide SQL Server implementations of `IResourceStore` and `IBookingStore`. `GetClaimsAsync` SHALL return claims of any status whose booking interval overlaps the queried half-open range for the resource, and SHALL be served by an index on the booking interval (no table scan of bookings by date). **`UpdateAsync` SHALL persist a booking's status, and SHALL NOT write its booker.** A booking's
-booker is written by the erasure operation below and by nothing else.
+`UBookIt.Persistence` SHALL provide SQL Server implementations of `IResourceStore` and `IBookingStore`. `GetClaimsAsync` SHALL return claims of any status whose booking interval overlaps the queried half-open range for the resource, and SHALL be served by an index on the booking interval (no table scan of bookings by date). **`UpdateAsync` SHALL persist a booking's status, and SHALL NOT write its booker or its interval.** A booking's
+booker is written by the erasure operation below and by nothing else; a booking's interval is
+written by the move write, per *Atomic move on SQL Server*, and by nothing else after placement.
 
-**The two SHALL touch disjoint columns.** Callers read, mutate and write back with no re-read,
-so an aggregate handed to a store can be older than the stored row. A write that carries columns
-its caller did not change makes that staleness everyone's problem: a cancellation would restore
-a person somebody erased in between, and an erasure would revert a cancellation and re-block a
-slot that had been released. Bounding each write to what its verb actually changes removes the
+**The three writes SHALL touch disjoint columns.** Callers read, mutate and write back with no
+re-read, so an aggregate handed to a store can be older than the stored row. A write that
+carries columns its caller did not change makes that staleness everyone's problem: a
+cancellation would restore a person somebody erased in between, an erasure would revert a
+cancellation and re-block a slot that had been released, and a move written from a stale
+aggregate would do either. Bounding each write to what its verb actually changes removes the
 interaction rather than defending against it.
 
 **A store SHALL expose an operation that erases a booking's booker, taking the booking's id and
@@ -161,7 +165,9 @@ restore a person would falsify it while every test written against the port pass
 **The check SHALL NOT be a read followed by a write.** An implementation that reads the stored
 state, decides, and then writes leaves a window in which an erasure can commit between the two
 statements — which is not a smaller version of the guarantee but the absence of it. The
-condition belongs inside the write.
+condition belongs inside the write. The same holds for the move write's status condition: the
+status the move is permitted from SHALL be a predicate of the update statement, not a read
+before it.
 
 **A change SHALL be observable by re-reading.** Verification SHALL read the booking back from
 storage rather than inspecting the instance that was passed in, because the instance carries the
@@ -200,6 +206,14 @@ The type-filtered resource listing SHALL be a single query filtered on the resou
 #### Scenario: The two writes touch disjoint columns
 - **WHEN** the booking store's write surface is inspected
 - **THEN** the status write does not write the booker, and the erasure write does not write the status
+
+#### Scenario: The three writes touch disjoint columns
+- **WHEN** the booking store's write surface is inspected
+- **THEN** the move write writes the interval columns only, and neither the status write nor the erasure write writes the interval
+
+#### Scenario: The move write's condition is inside the statement
+- **WHEN** the SQL move write is inspected
+- **THEN** the permitted-status predicate is part of the update statement rather than a query issued before it
 
 #### Scenario: The erasure write takes an id and an instant
 - **WHEN** the erasure operation's signature is inspected
@@ -568,3 +582,39 @@ schema change.
 #### Scenario: One row per key
 - **WHEN** a setting already holding a stored value is stored again
 - **THEN** the table holds one row for that key, carrying the new value
+
+### Requirement: Atomic move on SQL Server
+The move write SHALL execute within a single database transaction that (1) acquires the same
+exclusive per-resource application lock placement acquires, for every resource the booking
+claims, in ascending resource-id order, (2) checks conflicts for the new interval — half-open
+overlap against blocking-status claims — **excluding the claims of the booking being moved**,
+under those locks, and (3) updates the booking's interval columns in one statement whose
+predicate requires the stored status to be one the move is permitted from. A detected conflict
+SHALL produce the structured `conflict` failure and leave the database unchanged. A statement
+that updates no row because the status no longer permits a move SHALL be reported as
+`invalid-status-transition` and leave the database unchanged. The write SHALL touch no column
+but the interval's — not the status, not the booker.
+
+**No new table, and no new column.** The interval columns exist; the move writes them. The
+retention index is keyed on the interval's end, so a moved booking is found by the sweep at its
+new end, which is the index doing its job.
+
+#### Scenario: Concurrency proof against real SQL Server
+- **WHEN** a move of one booking to interval I and at least 10 placements at interval I on the same resource execute concurrently against a real SQL Server database
+- **THEN** exactly one of them succeeds, every other fails with code `conflict`, and afterwards exactly one blocking booking holds I
+
+#### Scenario: A move does not conflict with its own claims
+- **WHEN** a booking holding 09:00–10:00 is moved to 09:30–10:30 on a resource with no other booking
+- **THEN** the move succeeds and the booking holds 09:30–10:30
+
+#### Scenario: A failed move leaves the old interval
+- **WHEN** a move fails with `conflict`
+- **THEN** the booking's stored interval is the one it held before, and its claims are unchanged
+
+#### Scenario: The status condition is inside the statement
+- **WHEN** the booking is cancelled after the move has read it and before the move's update statement runs
+- **THEN** the update changes no row, the move reports `invalid-status-transition`, and the stored booking is `Cancelled` at its original interval
+
+#### Scenario: The move write leaves the booker alone
+- **WHEN** a booking's booker is erased between the move's read and its write
+- **THEN** the booking moves and the booker remains erased with its original instant

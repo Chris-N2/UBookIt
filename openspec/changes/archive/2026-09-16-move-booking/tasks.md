@@ -4,11 +4,37 @@ Seven requirements are replaced in full by this change's deltas. Each delta file
 guarantee diff; at sync time every line of it is re-read against `openspec/specs/` as it then
 stands, because a MODIFIED requirement deletes whatever it forgets to restate.
 
-- [ ] 0.1 `bookings` — "Availability and placement service ports" and "Placement and status changes are observable": verify each SHALL and scenario in the main spec is carried, superseded or explicitly dropped in `specs/bookings/spec.md`'s diff header
-- [ ] 0.2 `booking-emails` — "Which events produce messages, and for whom": same check against `specs/booking-emails/spec.md`
-- [ ] 0.3 `email-templates` — "Content is supplied as Razor views at a published path, one per message" and "What a view receives is published, typed, and fit to be frozen": same check against `specs/email-templates/spec.md`
-- [ ] 0.4 `permissions` — "Access within the section is decided by four verbs": same check against `specs/permissions/spec.md`
-- [ ] 0.5 `persistence` — "Store implementations honour Core semantics": same check against `specs/persistence/spec.md`
+- [x] 0.1 `bookings` — "Availability and placement service ports" and "Placement and status changes are observable": verify each SHALL and scenario in the main spec is carried, superseded or explicitly dropped in `specs/bookings/spec.md`'s diff header
+- [x] 0.2 `booking-emails` — "Which events produce messages, and for whom": same check against `specs/booking-emails/spec.md`
+- [x] 0.3 `email-templates` — "Content is supplied as Razor views at a published path, one per message" and "What a view receives is published, typed, and fit to be frozen": same check against `specs/email-templates/spec.md`
+- [x] 0.4 `permissions` — "Access within the section is decided by four verbs": same check against `specs/permissions/spec.md`
+- [x] 0.5 `persistence` — "Store implementations honour Core semantics": same check against `specs/persistence/spec.md`
+
+**Done at sync, 2026-09-16, mechanically and then by hand.** A script extracted every
+`#### Scenario:` heading and every SHALL sentence from each main spec before and after the sync
+and diffed the sets. **It was proven able to see a deletion first** — run with `--selftest` it
+renamed one scenario and one SHALL in `permissions` and reported both as lost, which is the check
+this project requires before believing such a tool.
+
+Result: **no scenario lost in any of the seven capabilities** (counts rose: bookings 79→101,
+booking-management 120→136, booking-emails 48→51, email-templates 23→26, permissions 20→21,
+persistence 72→78, service-booking 133→138). Twelve SHALL sentences differ, every one a
+deliberate widening already recorded in the delta headers: "four"→"five" events and observers,
+the two service-port enumerations, "confirmation and decline"→"confirmation, decline and a
+move" (×4), "the two SHALL touch disjoint columns"→"the three", `UpdateAsync`'s "SHALL NOT write
+its booker"→"its booker or its interval", and the superseded "no status-change report SHALL need
+to describe what changed", which the proposal records as the change's one supersession. The
+twelfth, `permissions`' "Manage SHALL imply Read", is a splitter artifact — the new italic
+paragraph above it shifted the sentence boundary; the line itself is untouched in the diff and
+the SHALL count is 21→21.
+
+QA round 2 independently read all seven headers line by line against `openspec/specs/` and
+reported every SHALL and scenario carried, none dropped.
+
+**Sync-time outward sweep re-run after the sync** (CLAUDE.md requires both before and after):
+clean. The one candidate, `permissions`' "the package SHALL grant the three verbs", is the
+seeding set — three of the four, excluding Settings — and a move rides on Manage without adding
+a verb, so it stands.
 
 ## 1. Placement terms — refactor first, prove nothing moved
 
