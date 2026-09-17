@@ -47,7 +47,14 @@ This change is that arrival. It spends the value rather than adding a second one
 - **A new management endpoint**, gated on the section, on `UBookIt.Bookings.Manage`, **and
   on sensitive-data access**, since it accepts a booker's contact details as input.
 
-- **No new message kind, no new failure code, no migration, no schema change.**
+- **No new message kind, no new failure code, no migration, no schema change.** The booker
+  receives the message a placement has always sent.
+
+- **The observation port gains one member, `BookingPlacedOnBehalfAsync`, with a default
+  implementation that reports an ordinary placement** — so it is additive rather than breaking,
+  and a host that implemented the port before this change keeps compiling and keeps being told
+  that a booking was placed. It is needed because the booking deliberately carries no marker of
+  who placed it, which makes the moment of placing the only moment that fact exists.
 
 ### Deliberately not changed
 

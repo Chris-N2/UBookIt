@@ -380,6 +380,162 @@ public class BookingsController(
     }
 
     /// <summary>
+    /// Records a booking on a booker's behalf — an operator taking one by telephone or at a desk.
+    /// </summary>
+    /// <remarks>
+    /// <para>
+    /// <b>Two gates, and neither is sufficient alone.</b> The manage verb, because this acts on
+    /// bookings; and sensitive-data access, because the body carries a booker's name, address
+    /// and telephone number. The second is carried as the endpoint's own authorization rather
+    /// than checked in the handler, for the reason the <c>sensitive-data</c> capability states
+    /// outright — a gate that is a condition inside a handler leaves a route that reaches the
+    /// work having established nothing.
+    /// </para>
+    /// <para>
+    /// <b>Wider than the disclosure rule strictly needs, deliberately and temporarily.</b> This
+    /// endpoint accepts contact details to STORE them; it answers no question about a value it
+    /// was given, so the oracle the sensitive-data rule exists to prevent is not reachable
+    /// through it. Narrowing that rule to distinguish a query term from a stored value is its
+    /// own change, and until then a group trusted to take a telephone booking is also trusted
+    /// with the customer list. Recorded in the change rather than left to be rediscovered.
+    /// </para>
+    /// <para>
+    /// <b>It applies the domain's operator placement and adds no rule of its own.</b> Through
+    /// the service booking service, because a booking placed for a service has a length rule
+    /// <c>IBookingService</c> cannot see; that path delegates a direct booking straight through.
+    /// Which rules run, on whose terms, and the status the booking lands in are all decided
+    /// there.
+    /// </para>
+    /// <para>
+    /// <b>The start is read in the site's zone</b>, on the move endpoint's convention and
+    /// through the same helper — two parsers is how two screens come to disagree about what a
+    /// trailing <c>Z</c> means.
+    /// </para>
+    /// </remarks>
+    /// <param name="model">What to book, when, and for whom.</param>
+    [Authorize(Policy = Constants.VerbPolicies.BookingsManage)]
+    [Authorize(Policy = Constants.SensitiveDataAccessPolicy)]
+    [HttpPost("bookings")]
+    [ProducesResponseType<PlacedBookingModel>(StatusCodes.Status200OK)]
+    [ProducesResponseType(StatusCodes.Status400BadRequest)]
+    public async Task<IActionResult> PlaceBookingOnBehalf(
+        PlaceBookingOnBehalfRequestModel model, CancellationToken cancellationToken = default)
+    {
+        ArgumentNullException.ThrowIfNull(model);
+
+        // Shape before substance, as the move endpoint does: what the caller sent is checked
+        // against the domain's own codes before the domain is asked anything.
+        var shapeFailures = new List<DomainFailure>();
+
+        // EXACTLY ONE of the two. Neither resolved by precedence nor defaulted: a caller that
+        // named both did not mean one of them, and a caller that named neither has not said
+        // what to book. Either way the right answer is to say so, not to choose.
+        if ((model.ServiceId is null) == (model.ResourceId is null))
+        {
+            shapeFailures.Add(new DomainFailure(
+                FailureCodes.IntervalInvalid,
+                "Name exactly one of a service or a resource to book.",
+                nameof(model.ServiceId)));
+        }
+
+        if (model.Start == default)
+        {
+            shapeFailures.Add(new DomainFailure(
+                FailureCodes.IntervalInvalid, "A start is required.", nameof(model.Start)));
+        }
+        else if (model.Start.Kind != DateTimeKind.Unspecified)
+        {
+            shapeFailures.Add(new DomainFailure(
+                FailureCodes.IntervalInvalid,
+                "The start must be a wall-clock time in the site's zone, with no offset or 'Z'.",
+                nameof(model.Start)));
+        }
+
+        if (model.LengthMinutes <= 0)
+        {
+            shapeFailures.Add(new DomainFailure(
+                FailureCodes.IntervalInvalid,
+                "The length must be a positive number of minutes.",
+                nameof(model.LengthMinutes)));
+        }
+
+        if (shapeFailures.Count > 0)
+        {
+            return shapeFailures.ToProblemResult();
+        }
+
+        // The booker is built by the domain's own factory, so an operator's details are
+        // validated by exactly the rules a visitor's are — and a bad address is reported
+        // against the field that carries it rather than as a refusal of the time.
+        var booker = Booker.Create(
+            memberKey: null,
+            model.BookerName,
+            model.BookerEmail,
+            string.IsNullOrWhiteSpace(model.BookerPhone) ? null : model.BookerPhone);
+
+        if (!booker.Succeeded)
+        {
+            return booker.Failures
+                .Select(failure => new DomainFailure(
+                    failure.Code,
+                    failure.Message,
+                    failure.Field switch
+                    {
+                        nameof(BookerContact.Name) => nameof(model.BookerName),
+                        nameof(BookerContact.Email) => nameof(model.BookerEmail),
+                        nameof(BookerContact.Phone) => nameof(model.BookerPhone),
+                        _ => failure.Field,
+                    }))
+                .ToList()
+                .ToProblemResult();
+        }
+
+        var start = BookingWindow.ResolveSiteLocal(model.Start, settings, nameof(model.Start));
+
+        if (!start.Succeeded)
+        {
+            return start.Failures.ToProblemResult();
+        }
+
+        var length = TimeSpan.FromMinutes(model.LengthMinutes);
+
+        var placed = model.ServiceId is { } serviceId
+            ? await serviceBooking.PlaceOnBehalfAsync(
+                new ServiceBookingRequest
+                {
+                    ServiceId = serviceId,
+                    Start = start.Value.Utc,
+                    Duration = length,
+                    Booker = booker.Value,
+                },
+                cancellationToken)
+            : await serviceBooking.PlaceOnBehalfAsync(
+                new BookingRequest
+                {
+                    ResourceId = model.ResourceId!.Value,
+                    Start = start.Value.Utc,
+                    Duration = length,
+                    Booker = booker.Value,
+                },
+                cancellationToken);
+
+        if (!placed.Succeeded)
+        {
+            return placed.Failures.ToProblemResult();
+        }
+
+        return Ok(new PlacedBookingModel
+        {
+            BookingId = placed.Value.Id,
+            Reference = placed.Value.Reference.Display,
+            Status = placed.Value.Status.ToString(),
+            StartUtc = placed.Value.Interval.StartUtc,
+            EndUtc = placed.Value.Interval.EndUtc,
+            TimeZoneId = placed.Value.Interval.TimeZoneId,
+        });
+    }
+
+    /// <summary>
     /// Finds every booking whose booker holds a given email address.
     /// </summary>
     /// <remarks>

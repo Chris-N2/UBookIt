@@ -53,19 +53,19 @@ measurement nobody re-ran is a claim.
 
 ## 6. Management endpoint (D6)
 
-- [ ] 6.1 Add the action to `BookingsController`, carrying the `Manage` verb policy **and** `[Authorize(Policy = …SensitiveDataAccessPolicy)]` on the action itself; verify a handler-level check would not satisfy it by confirming the attribute is present on the method
-- [ ] 6.2 Request model binding exactly one of `serviceId` / `resourceId`; verify both-or-neither is refused before the domain is reached
-- [ ] 6.3 Reuse the move endpoint's existing zoneless start parsing rather than writing a second one; verify a start carrying `Z` or an offset fails with `interval-invalid` against the start field
-- [ ] 6.4 Response model carrying id, reference, status and interval and **no booker member**; verify by reflecting over the model, so the guarantee is structural rather than dependent on the caller's access
-- [ ] 6.5 Verify refusals carry the domain's stable code, and that a malformed booker address is distinguishable from a pipeline refusal
-- [ ] 6.6 Verify the authorization matrix live: Manage-without-sensitive-data refused, sensitive-data-with-Read-only refused, unauthenticated 401
+- [x] 6.1 Add the action to `BookingsController`, carrying the `Manage` verb policy **and** `[Authorize(Policy = …SensitiveDataAccessPolicy)]` on the action itself; verify a handler-level check would not satisfy it by confirming the attribute is present on the method
+- [x] 6.2 Request model binding exactly one of `serviceId` / `resourceId`; verify both-or-neither is refused before the domain is reached
+- [x] 6.3 Reuse the move endpoint's existing zoneless start parsing rather than writing a second one; verify a start carrying `Z` or an offset fails with `interval-invalid` against the start field
+- [x] 6.4 Response model carrying id, reference, status and interval and **no booker member**; verify by reflecting over the model, so the guarantee is structural rather than dependent on the caller's access
+- [x] 6.5 Verify refusals carry the domain's stable code, and that a malformed booker address is distinguishable from a pipeline refusal
+- [x] 6.6 Verify the authorization matrix live: Manage-without-sensitive-data refused, sensitive-data-with-Read-only refused, unauthenticated 401
 
 ## 7. The three guards that must be told by hand, and do not fail helpfully
 
-- [ ] 7.1 `PermissionsTests` classification map — add the new endpoint; verify the test fails first with the entry absent
-- [ ] 7.2 `SensitiveDataRedactionTests`: add the action to `recordedActions` as a **write**, add the booker parameters to `recordedContactParameters`, and update the recorded redaction snapshot string. Add a note beside the new entries stating that this endpoint **stores** rather than matches, so the "matches the whole value exactly" obligation is vacuous for it — per D6's second risk
-- [ ] 7.3 `BackofficeDocumentationTests` capability-summary route map — add the route; verify the test fails first with it absent
-- [ ] 7.4 Confirm no field was renamed to evade the name-based contact scan: the request model binds a parameter the scan recognises, and it is gated
+- [x] 7.1 `PermissionsTests` classification map — add the new endpoint; verify the test fails first with the entry absent
+- [x] 7.2 `SensitiveDataRedactionTests`: add the action to `recordedActions` as a **write**, add the booker parameters to `recordedContactParameters`, and update the recorded redaction snapshot string. Add a note beside the new entries stating that this endpoint **stores** rather than matches, so the "matches the whole value exactly" obligation is vacuous for it — per D6's second risk
+- [x] 7.3 `BackofficeDocumentationTests` capability-summary route map — add the route; verify the test fails first with it absent
+- [x] 7.4 Confirm no field was renamed to evade the name-based contact scan: the request model binds a parameter the scan recognises, and it is gated
 
 ## 8. Backoffice client (D7)
 

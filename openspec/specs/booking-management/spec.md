@@ -16,11 +16,19 @@ pipeline.
 
 **What "management" means is narrower than the word suggests, and the boundary is
 deliberate.** The verbs are *see*, *find a subject's bookings by their email address*,
-*confirm* or *decline* a requested booking, *move* a booking to a new interval, *cancel* and
-*erase a booker's contact details*. Recording a booking on somebody's behalf, and changing
-which resources a booking claims, are not here. This capability is about those verbs and the
+*confirm* or *decline* a requested booking, *move* a booking to a new interval, *record a
+booking on a booker's behalf*, *cancel* and
+*erase a booker's contact details*. Changing
+which resources a booking claims is not here. This capability is about those verbs and the
 path each takes — the ports, the authorized endpoints over them, and the backoffice views an
 operator works in — and the requirements below, not this paragraph, say what exists.
+
+*Recording a booking on a booker's behalf joined the list with the `booking-on-behalf` change —
+an operator taking a booking somebody made by telephone or at a desk. This paragraph previously
+said it was "not here", which the paragraph above had always expected it to become: the
+capability is named for the actor, and an operator placing a booking is an operator's verb. The
+domain operation is defined in `bookings` and `service-booking`, on exactly the terms moving and
+erasure are; what lives here is the authorized endpoint and the screen.*
 
 *Moving joined the list with the `move-booking` change. It is a change to the domain on
 exactly the terms erasure was — a named operation on the aggregate, defined in `bookings`,
