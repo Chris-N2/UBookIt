@@ -69,15 +69,15 @@ measurement nobody re-ran is a claim.
 
 ## 8. Backoffice client (D7)
 
-- [ ] 8.1 Rebuild the client **before** starting any site, and rebuild `UBookIt.Backoffice` `--no-incremental` after; a stale hashed bundle name fails `dotnet build` with "No file exists for the asset"
-- [ ] 8.2 Add the placement modal element and token, following `move-booking-modal.element.ts`: native inputs with real `<label for>`, never `uui-*` for a labelled control
-- [ ] 8.3 Manage focus explicitly — first field on open, the offending field or error summary after a refusal, the opening control on dismissal — because Umbraco's modal container does not move focus into the content it hosts
-- [ ] 8.4 Offer the control from the view rather than a row, hidden unless the user's verbs and sensitive-data access permit it; verify the endpoint still refuses independently
-- [ ] 8.5 "What to book" as one `<select>` with services and resources in two `<optgroup>`s, resources including those withheld from visitors
-- [ ] 8.6 Show the reference on success; show a refusal in place **keeping the booker's details the operator typed**
-- [ ] 8.7 State that the package writes to the person who booked only where booking emails are configured
-- [ ] 8.8 Where the placed booking falls outside the list's window, say so rather than leaving the table unchanged; verify by placing next month's booking on a screen showing this week
-- [ ] 8.9 Client unit tests for the row/modal logic, and verify the client test count rises
+- [x] 8.1 Rebuild the client **before** starting any site, and rebuild `UBookIt.Backoffice` `--no-incremental` after; a stale hashed bundle name fails `dotnet build` with "No file exists for the asset"
+- [x] 8.2 Add the placement modal element and token, following `move-booking-modal.element.ts`: native inputs with real `<label for>`, never `uui-*` for a labelled control
+- [x] 8.3 Manage focus explicitly — first field on open, the offending field or error summary after a refusal, the opening control on dismissal — because Umbraco's modal container does not move focus into the content it hosts
+- [x] 8.4 Offer the control from the view rather than a row, hidden unless the user's verbs and sensitive-data access permit it; verify the endpoint still refuses independently
+- [x] 8.5 "What to book" as one `<select>` with services and resources in two `<optgroup>`s, resources including those withheld from visitors
+- [x] 8.6 Show the reference on success; show a refusal in place **keeping the booker's details the operator typed**
+- [x] 8.7 State that the package writes to the person who booked only where booking emails are configured
+- [x] 8.8 Where the placed booking falls outside the list's window, say so rather than leaving the table unchanged; verify by placing next month's booking on a screen showing this week
+- [x] 8.9 Client unit tests for the row/modal logic, and verify the client test count rises
 
 ## 9. Documentation
 

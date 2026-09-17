@@ -9,6 +9,16 @@ export type AvailabilityExceptionModel = {
     windows: Array<TimeWindowModel>;
 };
 
+export type BookableSubjectModel = {
+    id: string;
+    name: string;
+};
+
+export type BookableSubjectsModel = {
+    services: Array<BookableSubjectModel>;
+    resources: Array<BookableSubjectModel>;
+};
+
 export type BookedResourceModel = {
     resourceId: string;
     displayName: string;
@@ -131,6 +141,25 @@ export type PagedResourcesModel = {
 export type PagedServicesModel = {
     total: number;
     items: Array<ServiceResponseModel>;
+};
+
+export type PlaceBookingOnBehalfRequestModel = {
+    serviceId?: string | null;
+    resourceId?: string | null;
+    start: string;
+    lengthMinutes: number;
+    bookerName: string;
+    bookerEmail: string;
+    bookerPhone?: string | null;
+};
+
+export type PlacedBookingModel = {
+    bookingId: string;
+    reference: string;
+    status: string;
+    startUtc: string;
+    endUtc: string;
+    timeZoneId: string;
 };
 
 export type PoolShortfallModel = {
@@ -330,6 +359,37 @@ export type ListBookingsResponses = {
 
 export type ListBookingsResponse = ListBookingsResponses[keyof ListBookingsResponses];
 
+export type PlaceBookingOnBehalfData = {
+    body?: PlaceBookingOnBehalfRequestModel;
+    path?: never;
+    query?: never;
+    url: '/umbraco/ubookitbackoffice/api/v1/bookings';
+};
+
+export type PlaceBookingOnBehalfErrors = {
+    /**
+     * Bad Request
+     */
+    400: unknown;
+    /**
+     * The resource is protected and requires an authentication token
+     */
+    401: unknown;
+    /**
+     * The authenticated user does not have access to this resource
+     */
+    403: unknown;
+};
+
+export type PlaceBookingOnBehalfResponses = {
+    /**
+     * OK
+     */
+    200: PlacedBookingModel;
+};
+
+export type PlaceBookingOnBehalfResponse = PlaceBookingOnBehalfResponses[keyof PlaceBookingOnBehalfResponses];
+
 export type CancelBookingData = {
     body?: never;
     path: {
@@ -494,6 +554,29 @@ export type MoveBookingResponses = {
 };
 
 export type MoveBookingResponse = MoveBookingResponses[keyof MoveBookingResponses];
+
+export type ListBookableSubjectsData = {
+    body?: never;
+    path?: never;
+    query?: never;
+    url: '/umbraco/ubookitbackoffice/api/v1/bookings/bookable';
+};
+
+export type ListBookableSubjectsErrors = {
+    /**
+     * The resource is protected and requires an authentication token
+     */
+    401: unknown;
+};
+
+export type ListBookableSubjectsResponses = {
+    /**
+     * OK
+     */
+    200: BookableSubjectsModel;
+};
+
+export type ListBookableSubjectsResponse = ListBookableSubjectsResponses[keyof ListBookableSubjectsResponses];
 
 export type FindBookingsByBookerData = {
     body?: FindBookingsByBookerModel;
