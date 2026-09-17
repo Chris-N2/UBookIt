@@ -174,11 +174,26 @@ access by a condition evaluated inside a handler that would otherwise proceed. A
 a parameter to an endpoint gated only on section access violates this, whatever check its handler
 performs.
 
-**Such an endpoint SHALL match exactly.** It SHALL offer no partial, prefix, substring, fuzzy or
+**An endpoint that MATCHES ON a contact detail SHALL match exactly.** It SHALL offer no partial,
+prefix, substring, fuzzy or
 wildcard form, no ordering by a contact detail, and no count-only or existence-only response. An
 exact match answers whether a given person is in the records; a partial match answers *which
 people match a fragment*, which is an enumeration facility rather than a lookup, and no request
 this package serves needs one.
+
+**An endpoint that accepts a contact detail in order to STORE it has nothing to match, and the
+exactness obligation binds it vacuously rather than not at all.** The two are distinguished here
+because a placement taking a booker's name and address would otherwise have to claim an exact
+match over a value it never compares, and a requirement satisfied by nothing is a requirement a
+later reader will discard. **What binds such an endpoint instead:**
+
+- it SHALL carry the sensitive-data gate exactly as a matching endpoint does — the sentence above
+  is unchanged and covers both, and the reason it is not relaxed for a write is recorded below;
+- it SHALL NOT report the detail back, in its response or in an error; and
+- **its outcome SHALL NOT depend on whether any existing record holds the value it was given.**
+  An endpoint that refused a booking because that address already had one, or that differed in
+  timing or wording according to whether it did, would be an oracle over exactly the values this
+  capability protects, wearing a write's clothes.
 
 **A response SHALL NOT reveal more than the caller could already read.** A caller permitted to
 see contact details may be told which bookings carry a given one, because they could reach the
@@ -189,6 +204,14 @@ miss.
 **This constraint is stated rather than left as an accident of what has been built.** The point
 of writing it down is that adding an ungated filter later would silently undo this capability,
 and nothing in the code would look like a removal.
+
+*The distinction between matching on a detail and storing one is drawn here rather than left
+implicit, and the gate is deliberately NOT relaxed for the storing case even though such an
+endpoint discloses nothing. Relaxing it is arguable — the stated reason for this requirement is
+entirely about a caller learning a value they were not given — but it would let a group trusted
+only to take bookings be assembled without the site deciding anything about personal data, and
+that is a judgement for a change that examines it rather than a side effect of one that needed a
+placement endpoint. Recorded so it is revisited rather than rediscovered.*
 
 *Previously this forbade any filter, search, sort or count over contact details, at any endpoint.
 That was broader than its own stated reason, which is entirely about a caller who may not read the
@@ -212,6 +235,19 @@ subject's erasure request arrives as an email address and the package otherwise 
 #### Scenario: A withheld booking still appears in results
 - **WHEN** a user without sensitive-data access lists bookings
 - **THEN** every booking matching the query is returned with its total unchanged, withheld details being removed from each row rather than the rows being removed
+
+#### Scenario: An endpoint that stores a contact detail is gated like one that matches
+- **WHEN** a caller without sensitive-data access reaches an endpoint that accepts a booker's name and email address in order to store them
+- **THEN** the request is refused by the endpoint's own authorization, not by a check inside a handler that would otherwise proceed
+
+#### Scenario: A storing endpoint reports no contact detail back
+- **WHEN** an endpoint that accepts a booker's contact details succeeds, and when it fails
+- **THEN** neither its response nor its error carries the name, email address or telephone number it was given
+
+#### Scenario: A storing endpoint is not an oracle over existing records
+- **WHEN** the same request is made twice, once with an email address no booking holds and once with one that several bookings hold
+- **THEN** the outcome is decided by the booking's own rules alone, and nothing in the response distinguishes the two cases
+
 ### Requirement: The membership requirement is documented, including who is in the group by default
 
 The package's documentation SHALL state that booker contact details are visible only to
