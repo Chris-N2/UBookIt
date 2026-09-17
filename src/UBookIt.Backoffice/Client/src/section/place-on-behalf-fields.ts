@@ -125,6 +125,15 @@ export function refusalTerm(code: string | undefined): string {
       return "placeRefusedServiceUnavailable";
     case "resource-not-eligible":
       return "placeRefusedResourceNotEligible";
+
+    // THE BOOKER'S OWN DETAILS, and these were missing until the live probe found them: the
+    // dialog marked the right field invalid and moved focus to it, and then said only "The
+    // booking could not be recorded" — so an operator saw an outlined box and no reason. The
+    // discrimination worked; the sentence did not.
+    case "email-invalid":
+      return "placeRefusedEmail";
+    case "name-required":
+      return "placeRefusedName";
     default:
       return "placeFailed";
   }

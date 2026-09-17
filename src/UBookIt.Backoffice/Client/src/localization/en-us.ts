@@ -514,6 +514,8 @@ export default {
       "What you chose could not be found. It may have been removed; close this and try again.",
     placeRefusedServiceUnavailable: "Nothing that can provide this service is free at that time. Choose another.",
     placeRefusedResourceNotEligible: "That resource cannot provide this service.",
+    placeRefusedEmail: "That email address is not one we can send to. Check it and try again.",
+    placeRefusedName: "The booker's name is required.",
     placedNotice: "Booking recorded. Its reference is %0%.",
     placedOutsideWindowNotice:
       "Booking recorded — its reference is %0%. It is on %1%, which is outside the dates shown, "

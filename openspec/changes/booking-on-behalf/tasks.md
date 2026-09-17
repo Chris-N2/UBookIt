@@ -88,15 +88,15 @@ measurement nobody re-ran is a claim.
 
 ## 10. Verification
 
-- [ ] 10.1 `openspec validate --all --strict` passes
-- [ ] 10.2 Release build `--no-incremental` with zero warnings beyond the accepted transitives
-- [ ] 10.3 Full suite green from a clean build, run as two steps; record all four counts and the delta from 1.2
-- [ ] 10.4 **Live verification in the running TestSite**: place a booking on a booker's behalf for a service, and confirm in the browser that it appears, carries a reference, is `Confirmed` on a site with `AutoConfirm` off, and that the service's length rules refuse an out-of-range length. The live probe is what caught `move-booking`'s MAJOR that 1644 unit tests did not
-- [ ] 10.5 Live-verify the keyboard path through the modal: focus lands inside on open, an error is announced in association with its control, focus returns to the opening control on dismissal
-- [ ] 10.6 Stop the TestSite and confirm no orphan holds port 44348
+- [x] 10.1 `openspec validate --all --strict` passes
+- [x] 10.2 Release build `--no-incremental` with zero warnings beyond the accepted transitives
+- [x] 10.3 Full suite green from a clean build, run as two steps; record all four counts and the delta from 1.2
+- [x] 10.4 **Live verification in the running TestSite**: place a booking on a booker's behalf for a service, and confirm in the browser that it appears, carries a reference, is `Confirmed` on a site with `AutoConfirm` off, and that the service's length rules refuse an out-of-range length. The live probe is what caught `move-booking`'s MAJOR that 1644 unit tests did not
+- [x] 10.5 Live-verify the keyboard path through the modal: focus lands inside on open, an error is announced in association with its control, focus returns to the opening control on dismissal
+- [x] 10.6 Stop the TestSite and confirm no orphan holds port 44348
 
 ## 11. Handover
 
 - [ ] 11.1 Write the QA handover into this file: what was built, what is claimed, the build and test state, and **the explicit instruction to verify rather than trust** — twice the reviewer has found a claim in the handover itself to be false
 - [ ] 11.2 Name for the reviewer the four places a defect is most likely: the seam at 5.2, the layer-above rule at 4.3, the structural waiver at 3.2, and the guard notes at 7.2
-- [ ] 11.3 Record the deferred obligation this change creates — narrowing `sensitive-data`'s input rule to distinguish a query term from a stored value — in the deferred-obligations memory, with the reason it was not attempted here
+- [x] 11.3 Record the deferred obligation this change creates — narrowing `sensitive-data`'s input rule to distinguish a query term from a stored value — in the deferred-obligations memory, with the reason it was not attempted here
