@@ -474,6 +474,53 @@ export default {
     moveRefusedInterval: "That date and time could not be read. Check them and try again.",
     moveRefusedNotFound: "This booking could not be found. It may have been removed; reload the list.",
     movedNotice: "Booking %0% moved to %1%.",
+
+    // Recording a booking on somebody's behalf. The refusal sentences are one per stable code
+    // the domain can answer with, and — as for a move — there is deliberately no sentence
+    // promising where a booking COULD go: this dialog has no availability read, and implying
+    // one would be a promise the screen cannot keep.
+    place: "New booking",
+    placeHeadline: "Record a booking",
+    placeNotificationHint:
+      "uBookIt only tells the person who booked about it if booking emails are configured — "
+      + "otherwise, read them the reference shown when the booking is made.",
+    placeSubject: "What to book",
+    placeSubjectUnchosen: "Choose a service or a resource",
+    placeServices: "Services",
+    placeResources: "Resources",
+    placeDate: "Date",
+    placeTime: "Start time",
+    placeLength: "Length (minutes)",
+    placeBookerName: "Booker's name",
+    placeBookerEmail: "Booker's email address",
+    placeBookerPhone: "Booker's telephone number (optional)",
+    placeCancel: "Cancel",
+    placeSubmit: "Record booking",
+    placeIncomplete:
+      "Choose what to book, then enter a date, a start time, a length in minutes, and the "
+      + "booker's name and email address.",
+    placeFailed: "The booking could not be recorded.",
+    placeDialogFailed: "The booking dialog could not be shown, so nothing was recorded.",
+    placeSubjectsFailed:
+      "The list of what can be booked could not be loaded, so nothing can be recorded yet. "
+      + "Close this and try again.",
+    placeRefusedOutsideOpenHours: "That time is outside the opening hours. Choose another.",
+    placeRefusedConflict: "Something else is booked at that time. Choose another.",
+    placeRefusedInThePast: "That time has already passed. Choose a time that has not.",
+    placeRefusedGranularity: "That start time is not on the booking grid. Choose a start that is.",
+    placeRefusedDuration: "That length is outside what the service or resource allows. Choose another.",
+    placeRefusedInterval: "That date and time could not be read. Check them and try again.",
+    placeRefusedSubjectNotFound:
+      "What you chose could not be found. It may have been removed; close this and try again.",
+    placeRefusedServiceUnavailable: "Nothing that can provide this service is free at that time. Choose another.",
+    placeRefusedResourceNotEligible: "That resource cannot provide this service.",
+    placeRefusedSubject: "Choose one service or one resource to book.",
+    placeRefusedEmail: "That email address is not one we can send to. Check it and try again.",
+    placeRefusedName: "The booker's name is required.",
+    placedNotice: "Booking recorded. Its reference is %0%.",
+    placedOutsideWindowNotice:
+      "Booking recorded — its reference is %0%. It is on %1%, which is outside the dates shown, "
+      + "so it is not in the list below.",
   },
   // Extends Umbraco's own "user" localization section: the group editor derives the
   // heading for each entity type's permission group as user_permissionsEntityGroup_<type>,

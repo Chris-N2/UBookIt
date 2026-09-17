@@ -430,8 +430,8 @@ public class BackofficeDocumentationTests
         var routes = System.Text.RegularExpressions.Regex
             .Matches(
                 Support.RepoFiles.Read("src/UBookIt.Backoffice/Controllers/BookingsController.cs"),
-                @"\[Http(?:Get|Post|Put|Delete|Patch)\(""([^""]+)""\)\]")
-            .Select(match => match.Groups[1].Value)
+                @"\[Http(Get|Post|Put|Delete|Patch)\(""([^""]+)""\)\]")
+            .Select(match => $"{match.Groups[1].Value.ToUpperInvariant()} {match.Groups[2].Value}")
             .ToList();
 
         // The fixture is load-bearing: a regex that stopped matching would make the loop below
@@ -442,17 +442,26 @@ public class BackofficeDocumentationTests
 
         // Each verb the capability offers is named in the paragraph that summarises it. Keyed
         // off the route, so a FOURTH endpoint fails here until somebody says what it is.
+        // KEYED ON THE METHOD AS WELL AS THE ROUTE, and that is a fix rather than a flourish.
+        // The exclusion below was written as `route != "bookings"` when the only thing at that
+        // route was the list — so when `booking-on-behalf` added POST at the same route, its
+        // endpoint was silently exempt from this guard and the whole suite stayed green. A
+        // route alone stopped identifying an endpoint the moment two verbs shared one.
         var described = new Dictionary<string, string>
         {
-            ["bookings/find-by-booker"] = "find a subject's bookings by their email address",
-            ["bookings/{id:guid}/confirm"] = "confirm",
-            ["bookings/{id:guid}/decline"] = "decline",
-            ["bookings/{id:guid}/cancel"] = "cancel",
-            ["bookings/{id:guid}/move"] = "move",
-            ["bookings/{id:guid}/erase-booker"] = "erase a booker's contact details",
+            ["POST bookings"] = "record a booking on a booker's behalf",
+            ["GET bookings/bookable"] = "see what there is to book",
+            ["POST bookings/find-by-booker"] = "find a subject's bookings by their email address",
+            ["POST bookings/{id:guid}/confirm"] = "confirm",
+            ["POST bookings/{id:guid}/decline"] = "decline",
+            ["POST bookings/{id:guid}/cancel"] = "cancel",
+            ["POST bookings/{id:guid}/move"] = "move",
+            ["POST bookings/{id:guid}/erase-booker"] = "erase a booker's contact details",
         };
 
-        foreach (var route in routes.Where(route => route != "bookings"))
+        // Only the LIST is exempt, named precisely: it is the read the whole capability is
+        // about, described by the Purpose paragraph in its own words rather than by a verb.
+        foreach (var route in routes.Where(route => route != "GET bookings"))
         {
             Assert.True(
                 described.TryGetValue(route, out var phrase),

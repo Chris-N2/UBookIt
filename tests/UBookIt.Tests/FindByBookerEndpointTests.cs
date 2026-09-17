@@ -208,6 +208,8 @@ public class FindByBookerEndpointTests
                 store,
                 new UnusedBookingService(),
                 new UnusedServiceBookingService(),
+                new InMemoryResourceStore(),
+                new InMemoryServiceStore(),
                 new UBookIt.Core.SiteBookingSettings { TimeZoneId = "UTC" },
                 Security(sensitiveData)),
             store);
@@ -246,6 +248,15 @@ public class FindByBookerEndpointTests
             => throw Unexpected();
 
         public Task<DomainResult<UBookIt.Core.Bookings.Booking>> PlaceForServiceAsync(
+            UBookIt.Core.Bookings.ServiceAttribution service,
+            UBookIt.Core.Bookings.MultiClaimBookingRequest request,
+            CancellationToken cancellationToken = default) => throw Unexpected();
+
+        public Task<DomainResult<UBookIt.Core.Bookings.Booking>> PlaceOnBehalfAsync(
+            UBookIt.Core.Bookings.BookingRequest request,
+            CancellationToken cancellationToken = default) => throw Unexpected();
+
+        public Task<DomainResult<UBookIt.Core.Bookings.Booking>> PlaceForServiceOnBehalfAsync(
             UBookIt.Core.Bookings.ServiceAttribution service,
             UBookIt.Core.Bookings.MultiClaimBookingRequest request,
             CancellationToken cancellationToken = default) => throw Unexpected();

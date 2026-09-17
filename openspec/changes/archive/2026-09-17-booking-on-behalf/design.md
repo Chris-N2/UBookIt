@@ -44,8 +44,12 @@ break — until 17.1.0 publishes.
 
 ## Non-Goals
 
-Beyond the proposal's: no change to `IBookingStore`, no change to the observer port, no
-change to `UBookIt.Web` or `UBookIt.Persistence`, and no new failure code.
+Beyond the proposal's: no change to `IBookingStore`, no change to `UBookIt.Web`, and no new
+failure code.
+
+*An earlier draft listed "no change to the observer port" and "no change to
+`UBookIt.Persistence`" here. Both were wrong, and D5 records why — an operator's placement has
+to be distinguishable at the moment of placing or not at all.*
 
 ## Decisions
 
@@ -116,10 +120,18 @@ carries **no marker** of how it was taken (`bookings`, *Placing a booking on a b
 behalf*), which is deliberate — so the recipient decision cannot be recovered from the row and
 must be made at the moment of placing.
 
-The observer already receives "a booking was placed". The internal-recipient send is suppressed
-by the placement path rather than by the observer inspecting the booking. The seam to watch:
-**the observer must still fire**, because a host's own subscriber has no reason to care who
-placed it; only the package's own internal-email recipient list is skipped.
+**This forced a correction to an earlier draft of this design, recorded rather than quietly
+fixed.** That draft said the observation port must gain nothing *and* that the booking carries no
+marker — which left the email layer no way to know, and the two cannot both hold. The resolution
+follows the shape already in the code: confirm, decline and move each have their own observation
+because each is a distinct **act**, and "the site's own people just did this" is a fact about the
+act. So `IBookingObserver` gains `BookingPlacedOnBehalfAsync`, **with a default implementation
+delegating to `BookingPlacedAsync`** — an addition rather than a break, and one whose default
+under-reports a distinction instead of inventing one.
+
+The package's own adapter overrides it to publish `BookingPlacedOnBehalfNotification`, which the
+email handler treats as a placement for the booker and as nothing at all for internal
+recipients.
 
 *This is a seam between two well-tested halves, which `testing-both-halves-is-not-testing-the-seam`
 says is tested by neither.* The guard therefore runs through the production entry point and

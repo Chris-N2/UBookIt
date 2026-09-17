@@ -323,6 +323,138 @@ public class MovedBookingModel
 }
 
 /// <summary>
+/// What an operator may book on somebody's behalf: the site's services and its resources, by
+/// name, for the dialog's picker.
+/// </summary>
+/// <remarks>
+/// <para>
+/// <b>It exists because the configuration listings are gated on a verb an operator need not
+/// hold.</b> <c>GET resources</c> and <c>GET services</c> require <c>UBookIt.Configure</c> — the
+/// verb for adding a meeting room — and the person taking a telephone booking holds
+/// <c>UBookIt.Bookings.Manage</c>. Without this read their picker is empty and the feature does
+/// not work; with it, the verb that may take a booking may also see what there is to book, which
+/// is the smallest grant that makes the act possible.
+/// </para>
+/// <para>
+/// <b>It is a name and an id and nothing else.</b> Not a projection of the configuration models:
+/// open hours, constraints, capabilities and role structure are <c>Configure</c>'s business, and
+/// a picker needs none of them. Keeping it this thin is what stops it becoming a way to read the
+/// configuration without the verb for it.
+/// </para>
+/// <para>
+/// <b>It carries no booker and no booking</b>, so it discloses nothing about anybody: a resource
+/// is a room and a service is something the site sells, both of which a visitor can already see
+/// on the public site.
+/// </para>
+/// </remarks>
+public class BookableSubjectsModel
+{
+    public IReadOnlyList<BookableSubjectModel> Services { get; set; } = [];
+
+    public IReadOnlyList<BookableSubjectModel> Resources { get; set; } = [];
+}
+
+/// <summary>One thing an operator can book, as the picker needs it.</summary>
+public class BookableSubjectModel
+{
+    public Guid Id { get; set; }
+
+    public string Name { get; set; } = string.Empty;
+}
+
+/// <summary>
+/// What an operator supplies to record a booking somebody made by telephone or at a desk.
+/// </summary>
+/// <remarks>
+/// <para>
+/// <b>Exactly one of <see cref="ServiceId"/> and <see cref="ResourceId"/>.</b> Both, or
+/// neither, is refused as a malformed request rather than resolved by a precedence rule: a
+/// caller that supplied both did not mean one of them, and choosing for them would commit the
+/// site's time to a booking nobody asked for.
+/// </para>
+/// <para>
+/// The start and the length carry <see cref="MoveBookingRequestModel"/>'s convention exactly —
+/// wall-clock time in the site's zone with no offset, and minutes — because an operator typing
+/// into this modal and into the move modal is doing the same thing, and two conventions would
+/// be a trap on whichever screen they used second.
+/// </para>
+/// <para>
+/// <b>The booker's details are carried here and reported nowhere.</b> The endpoint accepts them
+/// to store them; <see cref="PlacedBookingModel"/> has no member for any of them, so a write
+/// cannot become a read of personal data wearing a write's authorization.
+/// </para>
+/// </remarks>
+public class PlaceBookingOnBehalfRequestModel
+{
+    /// <summary>The service to book, when booking one. Mutually exclusive with <see cref="ResourceId"/>.</summary>
+    public Guid? ServiceId { get; set; }
+
+    /// <summary>The resource to book, when booking one directly. Mutually exclusive with <see cref="ServiceId"/>.</summary>
+    public Guid? ResourceId { get; set; }
+
+    /// <summary>The start, as a wall-clock time in the site's zone. No offset.</summary>
+    public DateTime Start { get; set; }
+
+    /// <summary>The length, in minutes. Must be positive.</summary>
+    public int LengthMinutes { get; set; }
+
+    /// <summary>The booker's name. Required, as for any placement.</summary>
+    public string BookerName { get; set; } = string.Empty;
+
+    /// <summary>The booker's email address. Required and validated exactly as a visitor's is.</summary>
+    public string BookerEmail { get; set; } = string.Empty;
+
+    /// <summary>The booker's telephone number, where they gave one.</summary>
+    public string? BookerPhone { get; set; }
+}
+
+/// <summary>
+/// What a placement on a booker's behalf returns: the booking's identity, the reference an
+/// operator will read out, its status, and the interval it holds.
+/// </summary>
+/// <remarks>
+/// <para>
+/// <b>Deliberately not a whole <see cref="BookingModel"/></b>, on <see cref="MovedBookingModel"/>'s
+/// terms: this path reaches the booking through the domain, which knows resource ids and not
+/// their names.
+/// </para>
+/// <para>
+/// <b>It carries the reference, and that is the one thing it adds over a move's response.</b> An
+/// operator is holding somebody on the telephone; the reference is what they say next, and
+/// making them read the booking back to find it would be a worse screen for no reason.
+/// </para>
+/// <para>
+/// <b>It carries no booker.</b> Not "the booker with the details omitted" — no member for a
+/// name, an address or a telephone number at all, so content cannot render what this response
+/// has promised not to route back. The guarantee is structural rather than dependent on the
+/// caller happening to hold sensitive-data access, because the gate on the endpoint is under
+/// review and the guarantee is not.
+/// </para>
+/// <para>
+/// The status is carried because an operator's placement is <c>Confirmed</c> whatever the site's
+/// approval setting says, and a caller that assumed otherwise would be wrong on an approval
+/// site — the same reason a move carries its unchanged status.
+/// </para>
+/// </remarks>
+public class PlacedBookingModel
+{
+    public Guid BookingId { get; set; }
+
+    /// <summary>The quotable reference, as a person would read it out.</summary>
+    public string Reference { get; set; } = string.Empty;
+
+    /// <summary>The booking's status by name.</summary>
+    public string Status { get; set; } = string.Empty;
+
+    public DateTimeOffset StartUtc { get; set; }
+
+    public DateTimeOffset EndUtc { get; set; }
+
+    /// <summary>The IANA zone the interval was validated against.</summary>
+    public string TimeZoneId { get; set; } = string.Empty;
+}
+
+/// <summary>
 /// What an erasure returns: the booking's identity and when its booker was erased.
 /// </summary>
 /// <remarks>

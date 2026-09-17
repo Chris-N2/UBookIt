@@ -36,6 +36,34 @@ public interface IBookingObserver
     Task BookingPlacedAsync(Booking booking, CancellationToken cancellationToken = default);
 
     /// <summary>
+    /// Called after a booking has been placed <b>on a booker's behalf</b> — by an operator
+    /// recording one taken by telephone or at a desk — and stored. Never on failure.
+    /// </summary>
+    /// <remarks>
+    /// <para>
+    /// <b>It is a separate event because it is a separate act, not a different kind of
+    /// booking.</b> The booking produced is indistinguishable from any other afterwards and
+    /// deliberately carries no marker, so who placed it cannot be recovered from the row. It
+    /// has to be reported at the moment of placing or not at all — the same reason confirming,
+    /// declining and moving are events of their own rather than states a subscriber infers.
+    /// </para>
+    /// <para>
+    /// <b>It defaults to reporting an ordinary placement, so this is an addition and not a
+    /// break.</b> A host that implemented this port before operator placement existed keeps
+    /// compiling and keeps hearing "a booking was placed", which is true and is what such a
+    /// host meant. Only a subscriber that must treat the two differently — the package's own
+    /// notification adapter, because the site's internal recipients are not told about an
+    /// action their colleague just performed — needs to override it.
+    /// </para>
+    /// <para>
+    /// The default is safe in the direction that matters: forgetting to override it under-reports
+    /// a distinction, never invents one, and never loses the placement itself.
+    /// </para>
+    /// </remarks>
+    Task BookingPlacedOnBehalfAsync(Booking booking, CancellationToken cancellationToken = default)
+        => BookingPlacedAsync(booking, cancellationToken);
+
+    /// <summary>
     /// Called after a booking has been confirmed and the change stored. Never on failure.
     /// </summary>
     /// <remarks>

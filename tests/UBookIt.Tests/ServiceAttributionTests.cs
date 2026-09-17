@@ -53,19 +53,77 @@ public class ServiceAttributionTests
         Assert.NotNull(entryPoint);
         Assert.Equal(typeof(ServiceAttribution), entryPoint!.GetParameters()[0].ParameterType);
 
-        // And no OTHER member of the contract accepts one, so this stays the single door.
-        var others = typeof(IBookingService)
+        // THE DOORS ARE RECORDED, not merely counted.
+        //
+        // This asserted a single door until `booking-on-behalf` added the operator's, and the
+        // widening is legitimate: what the rule protects is that an attribution is a PARAMETER
+        // OF PLACING THROUGH A SERVICE, never a field a caller can set on a request — which is
+        // why the sibling test above forbids it on `MultiClaimBookingRequest`. One door per set
+        // of placement terms does not weaken that; a door that took an attribution without
+        // placing through a service would.
+        //
+        // Recorded as a set rather than relaxed to a count, because "at most two" would let the
+        // third one in silently, and the third is the one nobody will have thought about.
+        string[] recordedDoors =
+        [
+            nameof(IBookingService.PlaceForServiceAsync),
+            nameof(IBookingService.PlaceForServiceOnBehalfAsync),
+        ];
+
+        var doors = typeof(IBookingService)
             .GetMethods()
-            .Where(method => method.Name != nameof(IBookingService.PlaceForServiceAsync))
             .Where(method => method.GetParameters()
                 .Any(parameter => parameter.ParameterType == typeof(ServiceAttribution)))
             .Select(method => method.Name)
+            .Distinct()
+            .Order(StringComparer.Ordinal)
             .ToList();
 
         Assert.True(
-            others.Count == 0,
-            "A second way to name a service has appeared on IBookingService: "
-            + string.Join(", ", others));
+            doors.SequenceEqual(recordedDoors.Order(StringComparer.Ordinal)),
+            "The members of IBookingService that name a service have changed."
+            + Environment.NewLine
+            + $"  recorded: {string.Join(", ", recordedDoors.Order(StringComparer.Ordinal))}"
+            + Environment.NewLine
+            + $"  actual:   {string.Join(", ", doors)}"
+            + Environment.NewLine
+            + "An attribution may be a parameter of placing THROUGH a service and nothing else. "
+            + "If a genuine new placement path needs one, record it here and say why in the "
+            + "change; if a member has merely acquired one, that is the fault this guards.");
+    }
+
+    [Fact]
+    public void The_operators_door_names_a_service_the_same_way()
+    {
+        var entryPoint = typeof(IBookingService)
+            .GetMethod(nameof(IBookingService.PlaceForServiceOnBehalfAsync));
+
+        Assert.NotNull(entryPoint);
+        Assert.Equal(typeof(ServiceAttribution), entryPoint!.GetParameters()[0].ParameterType);
+    }
+
+    [Fact]
+    public async Task The_operators_door_refuses_a_missing_service_the_same_way()
+    {
+        // The same guarantee as the visitor's door above, asserted behaviourally rather than
+        // by reflection: a second entry point is a second chance to place a booking that
+        // succeeded, looks ordinary, and records an attribution nobody made.
+        var service = new BookingService(
+            new InMemoryResourceStore(),
+            new InMemoryBookingStore(),
+            new FixedTimeProvider(TestData.Now),
+            TestData.Settings);
+
+        await Assert.ThrowsAsync<ArgumentNullException>(
+            () => service.PlaceForServiceOnBehalfAsync(
+                null!,
+                new MultiClaimBookingRequest
+                {
+                    ResourceIds = [Guid.NewGuid()],
+                    Start = TestData.Utc(TestData.BaseDate, "09:00"),
+                    Duration = TimeSpan.FromMinutes(60),
+                    Booker = TestData.Booker(),
+                }));
     }
 
     [Fact]

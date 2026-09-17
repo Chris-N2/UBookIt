@@ -14,6 +14,18 @@ public enum BookingEvent
     /// <summary>The booking has just been placed and stored.</summary>
     Placed,
 
+    /// <summary>
+    /// The booking has just been placed <b>on a booker's behalf</b> by an operator, and stored.
+    /// </summary>
+    /// <remarks>
+    /// Distinct from <see cref="Placed"/> for one reason: the site's own recipients are not told
+    /// about it, because a colleague performed the action and the bookings screen already lists
+    /// it. What the BOOKER is told is identical — the same message kind, the same subject and
+    /// the same closing line, derived from the booking's state exactly as a visitor's placement
+    /// is. A booking taken at the desk reads to its customer like any other.
+    /// </remarks>
+    PlacedOnBehalf,
+
     /// <summary>The booking has just been confirmed by an operator.</summary>
     /// <remarks>
     /// Only an operator's confirmation of a <c>Requested</c> booking. A booking placed as
@@ -408,6 +420,12 @@ public sealed class BookingMessageComposer(
         BookingEvent.Declined => BookingMessageKind.BookerDeclined,
         BookingEvent.Cancelled => BookingMessageKind.BookerCancelled,
         BookingEvent.Moved => BookingMessageKind.BookerMoved,
+
+        // Stated rather than left to the default arm. An operator's placement sends the booker
+        // the placement message — there is no `BookerPlacedOnBehalf` kind and there must not
+        // be, because the customer did not do anything differently and content written for
+        // "you have booked" is the content this wants.
+        BookingEvent.PlacedOnBehalf => BookingMessageKind.BookerPlaced,
         _ => BookingMessageKind.BookerPlaced,
     };
 

@@ -931,6 +931,102 @@ public class BookingEmailTests
             => throw new NotSupportedException();
     }
 
+
+    // ---- an operator's placement --------------------------------------------------------------
+
+    /// <summary>
+    /// Sends a placement through the handler, as either kind of placement, and reports what
+    /// reached the sender. The two differ ONLY in the notification type, so a difference in the
+    /// result is a difference the event caused.
+    /// </summary>
+    private static async Task<RecordingEmailSender> PlacementSentAsync(
+        bool onBehalf, bool internalRecipients = true, Booking? booking = null)
+    {
+        var sender = new RecordingEmailSender();
+        var handler = new BookingEmailHandler(
+            new SiteBookingSettings
+            {
+                TimeZoneId = TestData.LondonZoneId,
+                Notifications = Notifications(true, internalRecipients ? ["desk@example.com"] : []),
+            },
+            sender,
+            Composer(),
+            NoResponsibility.Instance,
+            new StubHostingEnvironment(),
+            NullLogger<BookingEmailHandler>.Instance);
+
+        booking ??= Booking(direct: true);
+
+        await (onBehalf
+            ? handler.HandleAsync(new BookingPlacedOnBehalfNotification(booking), CancellationToken.None)
+            : handler.HandleAsync(new BookingPlacedNotification(booking), CancellationToken.None));
+
+        return sender;
+    }
+
+    [Fact]
+    public async Task Spec_scenario_an_operators_placement_is_told_to_the_booker_only()
+    {
+        var sender = await PlacementSentAsync(onBehalf: true);
+
+        var message = Assert.Single(sender.Sent);
+        Assert.Contains(
+            "ada@example.com",
+            string.Join(",", message.To),
+            StringComparison.OrdinalIgnoreCase);
+    }
+
+    [Fact]
+    public async Task Spec_scenario_a_visitors_placement_still_tells_both()
+    {
+        // The differential that makes the test above about the EVENT rather than about the
+        // fixture: same handler, same settings, same booking, two messages.
+        var sender = await PlacementSentAsync(onBehalf: false);
+
+        Assert.Equal(2, sender.Sent.Count);
+    }
+
+    [Fact]
+    public async Task An_operators_placement_on_a_site_with_no_internal_recipients_is_unchanged()
+    {
+        // Nothing about the suppression may depend on the site having configured recipients: a
+        // site with none must behave identically, or the rule is really about configuration.
+        var sender = await PlacementSentAsync(onBehalf: true, internalRecipients: false);
+
+        Assert.Single(sender.Sent);
+    }
+
+    /// <summary>
+    /// The one message addressed to the booker. Fails loudly where there is not exactly one,
+    /// rather than picking a plausible message and comparing the wrong thing.
+    /// </summary>
+    private static EmailMessage BookerMessage(RecordingEmailSender sender)
+        => Assert.Single(
+            sender.Sent,
+            m => string.Join(",", m.To).Contains("ada@example.com", StringComparison.OrdinalIgnoreCase));
+
+    [Fact]
+    public async Task An_operators_placement_tells_the_booker_what_a_placement_tells_them()
+    {
+        // The customer did nothing differently, so their message must not read differently.
+        // Compared against the visitor's message rather than asserted phrase by phrase, which
+        // would pass while the two drifted apart in some other sentence.
+        //
+        // Selected BY RECIPIENT, not by index: a visitor's placement sends two messages and the
+        // site's own is first, so comparing Sent[0] compared the internal message with the
+        // booker's and failed for a reason that had nothing to do with the claim.
+        // THE SAME booking down both paths. Two fixtures would differ by their references
+        // alone, which is exactly how this first failed — a difference the claim is not about.
+        var booking = Booking(direct: true);
+        var viaOperator = await PlacementSentAsync(onBehalf: true, booking: booking);
+        var viaVisitor = await PlacementSentAsync(onBehalf: false, booking: booking);
+
+        var operatorMessage = BookerMessage(viaOperator);
+        var visitorMessage = BookerMessage(viaVisitor);
+
+        Assert.Equal(visitorMessage.Subject, operatorMessage.Subject);
+        Assert.Equal(visitorMessage.Body, operatorMessage.Body);
+    }
 }
 
 internal sealed class CapturingLoggerProvider : ILoggerProvider

@@ -670,6 +670,18 @@ public class SensitiveDataRedactionTests
             // (move-booking change). Takes a booking id, a wall-clock start and a length in
             // minutes — no free text and no contact detail.
             "BookingsController.MoveBooking",
+            // A genuine write, and the FIRST ONE THAT CARRIES A BOOKER'S DETAILS INBOUND
+            // (booking-on-behalf change): it places a booking for a person who telephoned, so
+            // the body carries their name, address and telephone number in order to store them.
+            //
+            // Being on this list exempts it from the free-text rule below, and that exemption
+            // is the decision rather than a formality. It is justified because the rule below
+            // is about a READ answering questions about values the caller was not given, and
+            // this action answers nothing: it persists what it was handed, reports no contact
+            // detail back, and its outcome does not vary with whether any existing booking
+            // holds the same address. Were any of those three to change, the exemption would
+            // no longer hold and this entry would have to be revisited rather than kept.
+            "BookingsController.PlaceBookingOnBehalf",
             "BookingsController.EraseBooker",
             "ResourcesController.CreateResource",
             "ResourcesController.UpdateResource",
@@ -805,6 +817,23 @@ public class SensitiveDataRedactionTests
         string[] recordedContactParameters =
         [
             "BookingsController.FindBookingsByBooker: Email",
+
+            // THESE THREE ARE STORED, NOT MATCHED, and the distinction matters to what this
+            // guard's own failure message claims. The message above says a recorded parameter
+            // must carry the gate AND match the whole value exactly; `PlaceBookingOnBehalf`
+            // carries the gate and matches NOTHING — it accepts a booker's details in order to
+            // persist them, and compares them with nothing. The exactness half is vacuous for
+            // it rather than satisfied by it, so do not read its presence here as evidence that
+            // any matching was checked: there is none to check.
+            //
+            // What IS checked for it, and where: the gate is on the action itself (the loop
+            // below, and PermissionsTests for the verb beside it); that its response carries no
+            // booker at all is PlaceOnBehalfEndpointTests; and that its outcome does not depend
+            // on whether any existing booking holds the address — the oracle this capability
+            // exists to prevent — is asserted there too.
+            "BookingsController.PlaceBookingOnBehalf: BookerEmail",
+            "BookingsController.PlaceBookingOnBehalf: BookerName",
+            "BookingsController.PlaceBookingOnBehalf: BookerPhone",
         ];
 
         var contactParameters = allIdentifiers
@@ -874,9 +903,15 @@ public class SensitiveDataRedactionTests
             "BookingsController.ConfirmBooking = write",
             "BookingsController.DeclineBooking = write",
             "BookingsController.MoveBooking = write",
+            "BookingsController.PlaceBookingOnBehalf = write",
             "BookingsController.EraseBooker = write",
             "BookingsController.FindBookingsByBooker = read",
             "BookingsController.ListBookings = read",
+            // A READ, and deliberately not on KnownWrites: it changes nothing, so the
+            // free-text rule below SHOULD apply to it. It carries no parameters at all — no
+            // filter, no search term, no contact detail — and returns names of rooms and
+            // services, never a booker or a booking.
+            "BookingsController.ListBookableSubjects = read",
             "ResourcesController.CreateResource = write",
             "ResourcesController.DeleteResource = write",
             "ResourcesController.GetResource = read",

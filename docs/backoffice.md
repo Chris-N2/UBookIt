@@ -358,6 +358,49 @@ the cancelled ones added.
 
 ### Moving a booking
 
+### Recording a booking somebody made by telephone
+
+Above the list there is a **New booking** button. It opens a dialog: choose a service or a
+resource, set the date, start time and length, and enter the booker's name, email address and —
+if they gave one — telephone number.
+
+**You need two things to see it**: the *"Act on bookings"* permission, and membership of
+Umbraco's **Sensitive data** group. The second is because you are typing somebody's name and
+address, which is personal data, and the endpoint requires it whatever the screen shows.
+
+**A booking you record is confirmed**, even on a site that otherwise holds bookings for
+approval. Approval is there so a stranger's request can be reviewed before the time is
+committed; you reviewed it by taking it.
+
+**The same rules apply as to a visitor's booking**, with the same exceptions the Move dialog
+gets: the resource's **minimum notice does not bind you**, and neither does its **booking
+horizon** — somebody is on the telephone asking for this afternoon, and you are the one the site
+trusts to decide. Opening hours, the booking grid, the length limits (the service's as well as
+the resource's) and anything already booked all still bind, and you cannot record a booking in
+the past. A resource your site does not offer for direct booking on the website **is** offered to
+you here, for the same reason: that setting stops a visitor assembling something the business
+cannot deliver, and you are the person who can judge that.
+
+**The person whose details you are typing is told nothing by uBookIt.** The privacy notice the
+booking page shows is addressed to somebody entering their own details, and showing it to you
+would inform nobody — so this screen does not. Their placement email does not carry it either.
+If your site needs that person told what is held about them, why, for how long and who can see
+it, that is yours to do — by saying it on the telephone, or by putting it in the content you
+supply for the placement message. Stated here rather than left to be inferred from a screen that
+simply does not mention it.
+
+**Read the reference back to them.** When the booking is recorded, the screen shows its
+reference. If the site has booking emails switched on they will also receive a message; if it
+does not, that reference is the only thing they will have.
+
+**If the booking lands outside the dates you are looking at, the screen says so.** It will not be
+in the list below — that is the window, not a failure — and the message tells you the date it
+went to.
+
+**There is no picker showing when things are free**, exactly as on the Move dialog: you choose a
+time and are told whether it can be taken. If you need to see free time first, the front end's
+availability is the place to look.
+
 Every booking that still holds its time — confirmed or requested — has a **Move** control on
 its row. It opens a small dialog with the booking's current date, start time and length filled
 in; change any of them and press Move.

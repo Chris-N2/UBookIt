@@ -53,6 +53,8 @@ public class EraseBookerEndpointTests
             new EmptyStore(),
             bookingService,
             new UnusedServiceBookingService(),
+            new InMemoryResourceStore(),
+            new InMemoryServiceStore(),
             new SiteBookingSettings { TimeZoneId = "UTC" },
             new StubAccessor());
 
@@ -301,6 +303,14 @@ public class EraseBookerEndpointTests
             => throw Unexpected();
 
         public Task<DomainResult<Booking>> PlaceForServiceAsync(
+            ServiceAttribution service,
+            MultiClaimBookingRequest request,
+            CancellationToken cancellationToken = default) => throw Unexpected();
+
+        public Task<DomainResult<Booking>> PlaceOnBehalfAsync(
+            BookingRequest request, CancellationToken cancellationToken = default) => throw Unexpected();
+
+        public Task<DomainResult<Booking>> PlaceForServiceOnBehalfAsync(
             ServiceAttribution service,
             MultiClaimBookingRequest request,
             CancellationToken cancellationToken = default) => throw Unexpected();

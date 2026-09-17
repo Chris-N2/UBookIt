@@ -102,6 +102,7 @@ public class UmbracoBookingObserverTests
         await observer.BookingDeclinedAsync(booking);
         await observer.BookingCancelledAsync(booking);
         await observer.BookingMovedAsync(booking, previous);
+        await observer.BookingPlacedOnBehalfAsync(booking);
 
         // Type AND order AND count: five calls, five publications, none swapped and none
         // doubled. A mapping test that only checked presence would pass with confirm and
@@ -117,7 +118,14 @@ public class UmbracoBookingObserverTests
                 var moved = Assert.IsType<BookingMovedNotification>(n);
                 Assert.Same(booking, moved.Booking);
                 Assert.Same(previous, moved.PreviousInterval);
-            });
+            },
+
+            // An operator's placement publishes its OWN type, not the ordinary placement one.
+            // IsType is exact, so this fails if the adapter falls through to the interface's
+            // default implementation — which would publish BookingPlacedNotification and tell
+            // the site's internal recipients about a booking their colleague just took.
+            n => Assert.Same(
+                booking, Assert.IsType<BookingPlacedOnBehalfNotification>(n).Booking));
     }
 
     [Fact]

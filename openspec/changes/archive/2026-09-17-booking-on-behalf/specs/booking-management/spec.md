@@ -93,6 +93,57 @@ somebody on the telephone needs to know whether to change the time or correct an
 - **WHEN** the endpoint is called without backoffice authentication
 - **THEN** the response is 401 and no booking is placed
 
+### Requirement: An operator can see what there is to book
+The package SHALL expose a versioned backoffice endpoint that lists, by name and id, the
+services and the resources a booking may be placed for, in the same swagger group and under the
+same section authorization as every other uBookIt management endpoint, **gated by the same verb
+that gates placing a booking**.
+
+**It exists because the configuration listings are gated on a different verb.** Listing
+resources and listing services require `UBookIt.Configure` — the privilege for creating and
+editing them — which a person taking a telephone booking has no reason to hold. Without a read
+of its own, the placement dialog is empty for exactly the user it was built for, and the only
+alternatives are to grant receptionists the configuration privilege or to abandon the feature.
+Offering the manage verb the smallest read that makes its own act possible is neither.
+
+**It SHALL carry a name and an identifier and nothing else.** Open hours, constraints,
+capabilities, role structure and every other property of a resource or a service SHALL remain
+behind `UBookIt.Configure`. A picker needs none of them, and the thinness is what stops this
+read becoming a way to read the configuration without the verb for it.
+
+**It SHALL NOT require sensitive-data access**, because it discloses nothing about any person:
+it carries no booker, no booking and no contact detail. A resource is a room and a service is
+something the site offers, both of which a visitor can already see.
+
+**It SHALL list every resource, including those the site withholds from direct booking by
+visitors.** That permission does not bind an operator (`bookings`, *Booking a single resource
+requires that resource to permit it*), so filtering here would state the rule in a second place
+and disagree with the placement that follows.
+
+**It SHALL be unpaged.** Its consumer is a picker that must offer everything bookable, and a
+truncated list silently omits a resource rather than reporting anything — the same reasoning the
+candidate-pool listing records.
+
+#### Scenario: An operator who may place a booking may see what to book
+- **WHEN** a user whose groups hold the bookings manage verb requests the list
+- **THEN** it is served, naming every service and every resource
+
+#### Scenario: Read alone cannot see it
+- **WHEN** a user whose groups hold only the bookings read verb requests the list
+- **THEN** the request is refused
+
+#### Scenario: It carries no configuration
+- **WHEN** the response model is inspected
+- **THEN** each entry carries an identifier and a name, and no open hours, constraints, capabilities or roles
+
+#### Scenario: It carries nothing about any person
+- **WHEN** the response model is inspected
+- **THEN** it has no member for a booker, a booking or any contact detail
+
+#### Scenario: A resource withheld from visitors is still listed
+- **WHEN** a site withholds direct booking from a resource and an operator requests the list
+- **THEN** that resource appears, because the permission does not bind an operator
+
 ### Requirement: The bookings view can place a booking on a booker's behalf
 The bookings view SHALL offer placing a booking on a booker's behalf from the view itself
 rather than from a row, since the booking does not yet exist. The control SHALL be offered

@@ -55,7 +55,8 @@ public sealed class BookingEmailHandler(
       INotificationAsyncHandler<BookingConfirmedNotification>,
       INotificationAsyncHandler<BookingDeclinedNotification>,
       INotificationAsyncHandler<BookingCancelledNotification>,
-      INotificationAsyncHandler<BookingMovedNotification>
+      INotificationAsyncHandler<BookingMovedNotification>,
+      INotificationAsyncHandler<BookingPlacedOnBehalfNotification>
 {
     /// <summary>
     /// Identifies the package's booking mail on Umbraco's outgoing-mail notification, so a site
@@ -66,6 +67,10 @@ public sealed class BookingEmailHandler(
 
     public Task HandleAsync(BookingPlacedNotification notification, CancellationToken cancellationToken)
         => SendAsync(notification.Booking, BookingEvent.Placed, cancellationToken);
+
+    public Task HandleAsync(
+        BookingPlacedOnBehalfNotification notification, CancellationToken cancellationToken)
+        => SendAsync(notification.Booking, BookingEvent.PlacedOnBehalf, cancellationToken);
 
     public Task HandleAsync(BookingConfirmedNotification notification, CancellationToken cancellationToken)
         => SendAsync(notification.Booking, BookingEvent.Confirmed, cancellationToken);
@@ -98,6 +103,15 @@ public sealed class BookingEmailHandler(
         // would reasonably want to know their diary changed. That bites hardest when a move
         // changes WHICH resource is claimed; a move today changes only when. Whichever change
         // lets a booking change resource decides this again (booking-emails spec).
+        //
+        // AN OPERATOR'S PLACEMENT JOINS THAT SIDE, and the same case is recorded against it: a
+        // responsible party for a resource did not take the booking either, and would reasonably
+        // want to know their diary has gained one. It bites HARDER here than for a move, because
+        // a placement adds a commitment rather than shifting one that was already theirs to see.
+        // It is decided the same way regardless, because the alternative tells every internal
+        // recipient about an action a colleague performed deliberately, seconds earlier, on the
+        // screen that already lists it. Whichever change gives responsible parties a diary of
+        // their own decides this again (booking-emails spec).
         var siteEventApplies = bookingEvent is BookingEvent.Placed or BookingEvent.Cancelled;
 
         // The site's direction is asked for through EITHER tier: the configured list, or a

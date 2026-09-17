@@ -218,9 +218,19 @@ public class BookingsViewReferenceTests
         // from whether details may be shown. The guarantee is that the DETAIL-rendering
         // path consults no second source, so the absence is asserted over the booker
         // cell's own code, anchored the way the note guard above anchors.
+        // THE SAME NARROWING, A SECOND TIME, and it is the same fault climbing a rung rather
+        // than a new one. `hasAccessToSensitiveData` was still banned from the WHOLE FILE after
+        // `currentUser` had been narrowed to the cell — and `booking-on-behalf` falsified that
+        // ban exactly as the permissions model falsified the first: the view now asks whether
+        // this user may handle personal data in order to hide a CONTROL the endpoint would
+        // refuse, which is again a different question from whether a row's details may be
+        // shown. A control the server always refuses teaches an operator to ignore failures.
+        //
+        // So the identifier is banned where the guarantee lives — the cell — and nowhere else.
+        // A file-wide ban checks the MECHANISM (does this word appear?) rather than the
+        // GUARANTEE (does the detail path have one source?), which is the fault this
+        // repository has now paid for twice in this one test.
         var source = RepoFiles.Read(Element);
-
-        Assert.DoesNotContain("hasAccessToSensitiveData", source, StringComparison.OrdinalIgnoreCase);
 
         var cell = source.IndexOf("#bookerCell(", StringComparison.Ordinal);
         Assert.True(cell > 0, "The booker cell has moved and this guard is measuring nothing.");
@@ -231,7 +241,19 @@ public class BookingsViewReferenceTests
         var cellBody = source[cell..nextMember];
         Assert.DoesNotContain("currentUser", cellBody, StringComparison.OrdinalIgnoreCase);
         Assert.DoesNotContain("fallbackPermissions", cellBody, StringComparison.OrdinalIgnoreCase);
+        Assert.DoesNotContain("hasAccessToSensitiveData", cellBody, StringComparison.OrdinalIgnoreCase);
         Assert.DoesNotContain("_canManage", cellBody, StringComparison.Ordinal);
+        Assert.DoesNotContain("_canSeePersonalData", cellBody, StringComparison.Ordinal);
+
+        // AND the cell is called with the ROW AND NOTHING ELSE, asserted positively so that
+        // "the cell mentions no user state" cannot be satisfied by passing that state in as an
+        // argument.
+        //
+        // The closing brace is load-bearing: "#bookerCell(booking)" alone is a SUBSTRING of
+        // "#bookerCell(booking, this._canSeePersonalData)", so without it this assertion passes
+        // against the very mutant it was written to catch. Caught by mutating the call and
+        // finding the guard still green.
+        Assert.Contains("#bookerCell(booking)}", source, StringComparison.Ordinal);
     }
 
     [Fact]

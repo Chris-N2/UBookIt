@@ -171,6 +171,18 @@ public static class FailureCodes
     public const string ResourceNotDirectlyBookable = "resource-not-directly-bookable";
 
     /// <summary>
+    /// A placement on a booker's behalf named both a service and a resource, or neither.
+    /// </summary>
+    /// <remarks>
+    /// <b>Its own code rather than <see cref="IntervalInvalid"/>, which it briefly shared.</b>
+    /// A caller branching on a stable code could not tell "you named two things to book" from
+    /// "your date and time were malformed" — two mistakes with nothing in common and different
+    /// corrections. The endpoint is required to distinguish causes an operator can act on, and a
+    /// code that describes an interval cannot describe this one.
+    /// </remarks>
+    public const string BookingSubjectInvalid = "booking-subject-invalid";
+
+    /// <summary>
     /// A service placement named a resource that is eligible, but no saturating
     /// assignment at that instant could include it. The caller chose that
     /// resource; confirming a booking on a different one would answer a question

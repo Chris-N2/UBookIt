@@ -180,6 +180,12 @@ export const manifests: Array<UmbExtensionManifest> = [
     js: () => import("./move-booking-modal.element.js"),
   },
   {
+    type: "modal",
+    alias: "UBookIt.Modal.PlaceOnBehalf",
+    name: "uBookIt Place Booking On Behalf Modal",
+    js: () => import("./place-on-behalf-modal.element.js"),
+  },
+  {
     type: "localization",
     alias: "UBookIt.Localization.EnUS",
     name: "uBookIt English (United States)",

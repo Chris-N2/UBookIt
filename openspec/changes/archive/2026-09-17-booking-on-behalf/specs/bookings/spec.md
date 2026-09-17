@@ -1,9 +1,14 @@
 ## ADDED Requirements
 
 ### Requirement: Placing a booking on a booker's behalf
-The booking service SHALL expose an operation that places a booking **on a booker's behalf**:
-given a resource, a start instant, a length and the booker's details, it SHALL place a booking
-for that booker exactly as a visitor's placement would, save for the terms named below. The
+The booking service SHALL expose placement **on a booker's behalf**: given a resource, a start
+instant, a length and the booker's details, it SHALL place a booking for that booker exactly as
+a visitor's placement would, save for the terms named below.
+
+**It SHALL be TWO members, not one**, mirroring the two the visitor path already has: one
+naming a resource, and one naming the service a booking was placed for. A host implementing
+this port must add both, and the count is stated because a change that declares port breaks
+must count them. The
 booking it produces SHALL be an ordinary booking in every later respect — the same reference
 format drawn from the same port, the same status machine, the same claims, and the same
 cancellation, confirmation, decline, move and erasure operate on it unchanged.
@@ -47,10 +52,20 @@ unchanged, and placement still reaches only the first of them.
 that the person holding it is a member of the site, and recording one on the operator's say-so
 would attach a booking to an identity nobody verified.
 
-**Placement SHALL be reported as a placement.** The observation port SHALL see a placed booking
-as it sees any other, and SHALL NOT gain a member, a flag or a second event for this one: an
-observer that must treat an operator's booking differently can read the booking, and one that
-must not is spared a decision it has no basis to make.
+**An operator's placement SHALL be reported as its own observation.** The observation port
+SHALL gain a member for it, for the reason confirming, declining and moving each have one: they
+are distinct **acts**, not distinct kinds of booking. Because the booking carries no marker of
+who placed it, who placed it is knowable at the moment of placing and at no other — an observer
+told only "a booking was placed" could not recover it afterwards, and the package's own
+notification adapter must, since the site's internal recipients are not written to.
+
+**That member SHALL default to reporting an ordinary placement, so it is an addition and not a
+break.** An implementation written before operator placement existed SHALL keep compiling and
+SHALL keep being told that a booking was placed — which is true, and is what such an
+implementation meant. The default SHALL err in the direction of under-reporting the
+distinction: it SHALL never invent one, and SHALL never lose the placement itself.
+
+**A refused placement SHALL report nothing at all**, exactly as a refused placement always has.
 
 #### Scenario: An operator places a booking for a booker
 - **WHEN** the operation is called with a resource, a start and length that resource would accept, and a booker's name and email
@@ -100,9 +115,21 @@ must not is spared a decision it has no basis to make.
 - **WHEN** a booking placed on a booker's behalf is subsequently confirmed, declined, cancelled, moved or erased
 - **THEN** each operation behaves exactly as it does for a booking a visitor placed, and the booking carries no marker distinguishing how it was taken
 
-#### Scenario: The observation port gains nothing
-- **WHEN** the observation port's surface is inspected
-- **THEN** it reports an operator's placement through the member that reports any placement, and carries no member, flag or event peculiar to one
+#### Scenario: An operator's placement is reported as its own observation
+- **WHEN** a booking is placed on a booker's behalf and an observer is attached
+- **THEN** the observer is told of an operator's placement, and not of an ordinary one
+
+#### Scenario: A visitor's placement is reported as it always was
+- **WHEN** a visitor places a booking and an observer is attached
+- **THEN** the observer is told of a placement, exactly as before
+
+#### Scenario: An observer written before this change still hears the placement
+- **WHEN** a booking is placed on a booker's behalf and the attached observer implements only the members that existed before operator placement
+- **THEN** it compiles unchanged and is told that a booking was placed
+
+#### Scenario: A refused operator placement reports nothing
+- **WHEN** an operator's placement is refused by any rule
+- **THEN** no observation of any kind is made
 
 ## MODIFIED Requirements
 

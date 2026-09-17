@@ -8,6 +8,8 @@ import { toApiErrors } from "./api-errors.js";
 import { confirmDestructive } from "./confirm.js";
 import { canManageBookings } from "./permission-verbs.js";
 import { UBOOKIT_MOVE_BOOKING_MODAL } from "./move-booking-modal.token.js";
+import { UBOOKIT_PLACE_ON_BEHALF_MODAL } from "./place-on-behalf-modal.token.js";
+import { placedInsideWindow, placedLocalDate } from "./place-on-behalf-fields.js";
 import {
   actionFor,
   bookerCell,
@@ -66,11 +68,27 @@ export class UBookItBookingsListElement extends UmbLitElement {
   @state()
   private _canManage = false;
 
+  /**
+   * Whether the current user may handle a booker's personal data.
+   *
+   * Read from the SAME context the verbs come from, and for the same reason: recording a booking
+   * takes a name and an address, so the endpoint requires this alongside the manage verb. A
+   * control that is always refused teaches an operator to ignore failures, which is the
+   * reasoning the move requirement already records — so an operator who cannot place a booking
+   * is not offered the control.
+   *
+   * Convenience only. The endpoint refuses independently, so a stale value here can never
+   * authorize anything.
+   */
+  @state()
+  private _canSeePersonalData = false;
+
   constructor() {
     super();
     this.consumeContext(UMB_CURRENT_USER_CONTEXT, (context) => {
       this.observe(context?.currentUser, (currentUser) => {
         this._canManage = canManageBookings(currentUser?.fallbackPermissions);
+        this._canSeePersonalData = currentUser?.hasAccessToSensitiveData === true;
       });
     });
   }
@@ -233,6 +251,22 @@ export class UBookItBookingsListElement extends UmbLitElement {
           focus lands on <body> instead.
         -->
         <h2 tabindex="-1">${this.#term("label")}</h2>
+
+        <!--
+          Offered from the VIEW rather than from a row, because the booking does not exist yet.
+          Hidden unless the user holds both gates the endpoint requires — the manage verb and
+          sensitive-data access — so that a control which would always be refused is not shown
+          at all. The server refuses independently regardless; this is convenience, never the
+          rule.
+        -->
+        ${this._canManage && this._canSeePersonalData
+          ? html`<uui-button
+              look="primary"
+              color="positive"
+              label=${this.#term("place")}
+              @click=${() => this.#place()}
+            ></uui-button>`
+          : nothing}
       </div>
 
       ${this.#renderControls()}
@@ -555,6 +589,62 @@ export class UBookItBookingsListElement extends UmbLitElement {
     // Where it went, in the booking's own zone, before the reload — the row may not survive it.
     const { text, zone } = formatInterval({ ...booking, ...moved });
     this._notice = this.localize.term("ubookitBookings_movedNotice", bookingReference(booking), `${text} (${zone})`);
+
+    await this.#settleAfterRowAction();
+  }
+
+  /**
+   * Opens the placement dialog. The dialog does the request itself and stays open on a refusal,
+   * so all that arrives here is the outcome: placed (with its reference and interval), backed
+   * out, or a dialog that could not be shown — which is reported, not treated as a refusal.
+   */
+  async #place() {
+    this._error = undefined;
+    this._notice = undefined;
+
+    let placed: { reference: string; startUtc: string; endUtc: string; timeZoneId: string };
+
+    try {
+      placed = await umbOpenModal(this, UBOOKIT_PLACE_ON_BEHALF_MODAL, {
+        data: { from: this._window.from, to: this._window.to },
+      });
+    } catch (reason) {
+      const dismissed =
+        reason === undefined ||
+        (typeof reason === "object" && reason !== null && (reason as { type?: unknown }).type === "close");
+
+      if (!dismissed) {
+        console.error("[uBookIt] Booking dialog could not be shown", reason);
+        this._error = this.#term("placeDialogFailed");
+      }
+
+      // Backed out, nothing placed: focus returns to the control that opened the dialog.
+      //
+      // Matched on the LABEL ATTRIBUTE's value rather than interpolated into a selector: a
+      // translation containing a double quote makes an attribute selector invalid, the query
+      // throws, and focus is lost to the document — which is the exact failure this block
+      // exists to prevent, arriving through the code meant to prevent it.
+      await this.updateComplete;
+      const label = this.#term("place");
+      [...(this.shadowRoot?.querySelectorAll<HTMLElement>("uui-button") ?? [])]
+        .find((button) => button.getAttribute("label") === label)
+        ?.focus();
+
+      return;
+    }
+
+    // THE REFERENCE, ALWAYS — it is what the operator reads out to the person on the telephone,
+    // and making them find it by reading the booking back would be a worse screen for no reason.
+    //
+    // AND WHERE IT WENT, when it went somewhere this list is not showing. Every other action on
+    // this screen operates on a row already in front of the operator; this one can produce a
+    // booking for next month on a screen showing this week, and a table that does not change is
+    // indistinguishable from a failure.
+    const localDate = placedLocalDate(placed.startUtc, placed.timeZoneId);
+
+    this._notice = placedInsideWindow(localDate, this._window.from, this._window.to)
+      ? this.localize.term("ubookitBookings_placedNotice", placed.reference)
+      : this.localize.term("ubookitBookings_placedOutsideWindowNotice", placed.reference, localDate);
 
     await this.#settleAfterRowAction();
   }

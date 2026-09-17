@@ -114,6 +114,10 @@ public class BookingsEndpointTests
                 store,
                 bookingService ?? new UnusedBookingService(),
                 serviceBooking ?? new UnusedServiceBookingService(),
+                // The catalogues the bookable-subjects read uses. Empty, because no test in
+                // this file asks what there is to book.
+                new InMemoryResourceStore(),
+                new InMemoryServiceStore(),
                 Settings(zone),
                 // Defaults to a user who may see contact details, so that every test written
                 // before withholding existed still asserts what it was written to assert. The
@@ -208,6 +212,12 @@ public class BookingsEndpointTests
 
         public Task<DomainResult<Booking>> PlaceAsync(
             ServiceBookingRequest request, CancellationToken cancellationToken = default) => throw Unexpected();
+
+        public Task<DomainResult<Booking>> PlaceOnBehalfAsync(
+            ServiceBookingRequest request, CancellationToken cancellationToken = default) => throw Unexpected();
+
+        public Task<DomainResult<Booking>> PlaceOnBehalfAsync(
+            BookingRequest request, CancellationToken cancellationToken = default) => throw Unexpected();
     }
 
     /// <summary>
@@ -230,6 +240,14 @@ public class BookingsEndpointTests
             MultiClaimBookingRequest request, CancellationToken cancellationToken = default) => throw Unexpected();
 
         public Task<DomainResult<Booking>> PlaceForServiceAsync(
+            ServiceAttribution service,
+            MultiClaimBookingRequest request,
+            CancellationToken cancellationToken = default) => throw Unexpected();
+
+        public Task<DomainResult<Booking>> PlaceOnBehalfAsync(
+            BookingRequest request, CancellationToken cancellationToken = default) => throw Unexpected();
+
+        public Task<DomainResult<Booking>> PlaceForServiceOnBehalfAsync(
             ServiceAttribution service,
             MultiClaimBookingRequest request,
             CancellationToken cancellationToken = default) => throw Unexpected();
@@ -289,6 +307,14 @@ public class BookingsEndpointTests
             => throw new NotSupportedException();
 
         public Task<DomainResult<Booking>> PlaceForServiceAsync(
+            ServiceAttribution service,
+            MultiClaimBookingRequest request,
+            CancellationToken cancellationToken = default) => throw new NotSupportedException();
+
+        public Task<DomainResult<Booking>> PlaceOnBehalfAsync(
+            BookingRequest request, CancellationToken cancellationToken = default) => throw new NotSupportedException();
+
+        public Task<DomainResult<Booking>> PlaceForServiceOnBehalfAsync(
             ServiceAttribution service,
             MultiClaimBookingRequest request,
             CancellationToken cancellationToken = default) => throw new NotSupportedException();
@@ -425,6 +451,14 @@ public class BookingsEndpointTests
             => throw new NotSupportedException();
 
         public Task<DomainResult<Booking>> PlaceForServiceAsync(
+            ServiceAttribution service,
+            MultiClaimBookingRequest request,
+            CancellationToken cancellationToken = default) => throw new NotSupportedException();
+
+        public Task<DomainResult<Booking>> PlaceOnBehalfAsync(
+            BookingRequest request, CancellationToken cancellationToken = default) => throw new NotSupportedException();
+
+        public Task<DomainResult<Booking>> PlaceForServiceOnBehalfAsync(
             ServiceAttribution service,
             MultiClaimBookingRequest request,
             CancellationToken cancellationToken = default) => throw new NotSupportedException();

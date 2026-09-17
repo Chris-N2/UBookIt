@@ -59,6 +59,61 @@ public interface IBookingService
     Task<DomainResult<Booking>> PlaceAsync(BookingRequest request, CancellationToken cancellationToken = default);
 
     /// <summary>
+    /// Places a booking for a named resource <b>on a booker's behalf</b> — an operator
+    /// recording a booking somebody made by telephone or at a desk.
+    /// </summary>
+    /// <remarks>
+    /// <para>
+    /// The same pipeline, evaluated on <see cref="PlacementTerms.Operator"/>: a lead of zero
+    /// (the start must not have passed) and no horizon, with the site's approval setting
+    /// waived, so the booking is <c>Confirmed</c> whatever that setting says. Open hours,
+    /// granularity, duration bounds and conflict bind an operator exactly as they bind a
+    /// visitor — they are facts about what is physically bookable rather than policy about
+    /// who is asking.
+    /// </para>
+    /// <para>
+    /// <b>This overload does not apply the direct-bookability rule</b>, and that is the whole
+    /// difference between it and <see cref="PlaceAsync(BookingRequest, CancellationToken)"/>.
+    /// The permission exists so that a stranger cannot assemble a combination the business
+    /// cannot deliver; an operator is the person trusted to make that judgement. The waiver is
+    /// structural — this method does not contain the check — rather than a flag either method
+    /// reads, for the reason the direct overload's own remarks give.
+    /// </para>
+    /// <para>
+    /// <b>It knows resources and nothing about services.</b> A booking placed for a service
+    /// has a length rule this layer cannot see, so an operator's single entry point is
+    /// <c>IServiceBookingService</c>'s on-behalf placement, which applies it and then delegates
+    /// here. A caller reaching this method directly gets the resources' rules alone.
+    /// </para>
+    /// </remarks>
+    Task<DomainResult<Booking>> PlaceOnBehalfAsync(
+        BookingRequest request, CancellationToken cancellationToken = default);
+
+    /// <summary>
+    /// The same placement on a booker's behalf, recording the service it was placed for —
+    /// the overload a service booking placed by an operator runs through.
+    /// </summary>
+    /// <remarks>
+    /// <para>
+    /// It exists rather than letting a caller hand <see cref="PlacementTerms"/> to the
+    /// existing service overload, and the reason is not tidiness. A terms parameter on a
+    /// published port is a parameter the anonymous delivery endpoint could pass
+    /// <see cref="PlacementTerms.Operator"/> to — turning a visitor's request into an
+    /// operator's by supplying an argument. Naming the operator's placements instead means
+    /// the anonymous path cannot ask for operator terms at all, whatever it passes.
+    /// </para>
+    /// <para>
+    /// As with the visitor's service overload, a null attribution throws rather than placing:
+    /// a caller reaching here has asked for a service booking, and an unattributed one would
+    /// be a booking that succeeded, looks ordinary, and is permanently wrong.
+    /// </para>
+    /// </remarks>
+    Task<DomainResult<Booking>> PlaceForServiceOnBehalfAsync(
+        ServiceAttribution service,
+        MultiClaimBookingRequest request,
+        CancellationToken cancellationToken = default);
+
+    /// <summary>
     /// The same pipeline for a booking claiming several resources: every
     /// resource is validated against its own constraints, and one booking
     /// carrying a claim for each is placed through the store's all-or-nothing
@@ -198,7 +253,7 @@ public sealed class BookingService(
     TimeProvider timeProvider,
     SiteBookingSettings settings,
     IBookingObserver? observer = null,
-    IBookingReferenceFactory? referenceFactory = null) : IBookingService
+    IBookingReferenceFactory? referenceFactory = null) : IBookingService, IPlacementRuleCheck
 {
     /// <summary>
     /// Where a booking's quotable reference comes from. Never null.
@@ -326,9 +381,48 @@ public sealed class BookingService(
             cancellationToken).ConfigureAwait(false);
     }
 
+    public Task<DomainResult<Booking>> PlaceOnBehalfAsync(
+        BookingRequest request, CancellationToken cancellationToken = default)
+    {
+        ArgumentNullException.ThrowIfNull(request);
+
+        // A SIBLING of the direct overload above, deliberately not a caller of it.
+        //
+        // That overload carries the direct-bookability guard, and an operator is not subject
+        // to it. Reaching the pipeline without passing through it is what makes the waiver
+        // structural: there is no branch here reading a flag, there is a call that does not go
+        // past the guard. The cost is the three lines of request composition below, duplicated.
+        // Sharing them would mean hoisting the guard down into the shared path, which is
+        // exactly what the direct overload's remarks forbid.
+        //
+        // It also means the visitor overload is untouched by this change, so "the visitor path
+        // is unchanged" is a property of the diff rather than a claim about it.
+        return PlaceAsync(
+            new MultiClaimBookingRequest
+            {
+                ResourceIds = [request.ResourceId],
+                Start = request.Start,
+                Duration = request.Duration,
+                Booker = request.Booker,
+            },
+            service: null,
+            PlacementTerms.Operator,
+            cancellationToken);
+    }
+
+    public Task<DomainResult<Booking>> PlaceForServiceOnBehalfAsync(
+        ServiceAttribution service,
+        MultiClaimBookingRequest request,
+        CancellationToken cancellationToken = default)
+    {
+        ArgumentNullException.ThrowIfNull(service);
+
+        return PlaceAsync(request, service, PlacementTerms.Operator, cancellationToken);
+    }
+
     public Task<DomainResult<Booking>> PlaceAsync(
         MultiClaimBookingRequest request, CancellationToken cancellationToken = default)
-        => PlaceAsync(request, service: null, cancellationToken);
+        => PlaceAsync(request, service: null, operatorTerms: null, cancellationToken);
 
     public Task<DomainResult<Booking>> PlaceForServiceAsync(
         ServiceAttribution service,
@@ -342,17 +436,31 @@ public sealed class BookingService(
         // overload is what "no service" means, and it is one call away.
         ArgumentNullException.ThrowIfNull(service);
 
-        return PlaceAsync(request, service, cancellationToken);
+        return PlaceAsync(request, service, operatorTerms: null, cancellationToken);
     }
 
     /// <summary>
-    /// The one multi-claim pipeline. Both public entry points delegate here and differ only
-    /// in what they pass for <paramref name="service"/> — duplicating the pipeline is how
-    /// the two would drift into placing different bookings for the same request.
+    /// The one multi-claim pipeline. Every public entry point delegates here and they differ
+    /// only in what they pass for <paramref name="service"/> and
+    /// <paramref name="operatorTerms"/> — duplicating the pipeline is how they would drift
+    /// into placing different bookings for the same request.
     /// </summary>
+    /// <param name="operatorTerms">
+    /// The terms an operator is placing under, or <c>null</c> for a visitor's placement.
+    /// <para>
+    /// <b><c>null</c> is not a missing argument; it is what a visitor's terms look like from
+    /// here.</b> A visitor's lead and horizon ARE each claimed resource's own configuration,
+    /// so there is no single value to hand in — the loop below resolves them per resource, as
+    /// it always has. An operator's are one value for the whole placement, which is why only
+    /// that case has something to pass. The parameter carries no default deliberately: every
+    /// call site states which kind of placement it is making, and none can acquire the wrong
+    /// one by forgetting.
+    /// </para>
+    /// </param>
     private async Task<DomainResult<Booking>> PlaceAsync(
         MultiClaimBookingRequest request,
         ServiceAttribution? service,
+        PlacementTerms? operatorTerms,
         CancellationToken cancellationToken)
     {
         var zoneResult = AvailabilityService.ResolveZone(settings);
@@ -403,7 +511,10 @@ public sealed class BookingService(
         foreach (var resource in resources)
         {
             failures.AddRange(ValidateAgainst(
-                resource, window, request.Duration, PlacementTerms.Visitor(resource.Availability.Constraints)));
+                resource,
+                window,
+                request.Duration,
+                operatorTerms ?? PlacementTerms.Visitor(resource.Availability.Constraints)));
         }
 
         if (failures.Count > 0)
@@ -418,6 +529,10 @@ public sealed class BookingService(
         // taken reference cannot be swapped in place — a new booking has to be built. Every
         // other outcome, success or failure, leaves immediately, so a rejected placement is
         // never retried and the pipeline above never runs twice.
+        // Read from the terms rather than from the entry point, so that the status decision
+        // below stays the single place a new booking's status is chosen.
+        var approvalApplies = operatorTerms?.ApprovalApplies ?? true;
+
         DomainResult<Booking> placed;
         var attempt = 0;
 
@@ -429,9 +544,17 @@ public sealed class BookingService(
                 interval,
                 request.Booker,
                 [.. resources.Select(r => new ResourceClaim(r.Id))],
-                // The one site that decides what a new booking IS, for the direct and the
-                // service path alike — both funnel through here, so they cannot disagree.
-                settings.AutoConfirm ? BookingStatus.Confirmed : BookingStatus.Requested,
+                // The one site that decides what a new booking IS, for the direct, the
+                // service AND the operator path alike — all three funnel through here, so
+                // they cannot disagree.
+                //
+                // An operator's terms waive approval (PlacementTerms.ApprovalApplies): the
+                // person placing the booking reviewed it by placing it. A visitor's terms
+                // never waive it, which is what the absence of operator terms means here. The
+                // setting is read exactly once, and no caller chooses a status of its own.
+                approvalApplies && !settings.AutoConfirm
+                    ? BookingStatus.Requested
+                    : BookingStatus.Confirmed,
                 window.NowUtc,
                 service);
 
@@ -458,7 +581,13 @@ public sealed class BookingService(
         // booking that may not exist; announcing on failure would report one that does not.
         if (placed.Succeeded)
         {
-            await TellAsync(() => _observer.BookingPlacedAsync(placed.Value, cancellationToken))
+            // Which event, decided from the terms the placement was made under — the only
+            // moment it CAN be decided. The booking carries no marker of who placed it, so a
+            // subscriber reading the row later cannot tell, and this distinction would be lost
+            // if it were not reported here.
+            await TellAsync(() => operatorTerms is null
+                    ? _observer.BookingPlacedAsync(placed.Value, cancellationToken)
+                    : _observer.BookingPlacedOnBehalfAsync(placed.Value, cancellationToken))
                 .ConfigureAwait(false);
         }
 
@@ -693,6 +822,22 @@ public sealed class BookingService(
         ArgumentNullException.ThrowIfNull(resource);
         return CheckPlacementRules(resource, start, duration, PlacementTerms.Visitor(resource.Availability.Constraints));
     }
+
+    /// <summary>
+    /// <see cref="IPlacementRuleCheck"/>, implemented <b>explicitly</b> so that satisfying an
+    /// internal interface from a public class does not publish the member.
+    /// </summary>
+    /// <remarks>
+    /// <b>Implicit implementation made this public and QA caught it.</b> An internal interface
+    /// does not keep a member internal: a `public` method on a `public` class is public API
+    /// whatever satisfies it, so the terms-taking check briefly became callable by anything
+    /// holding this type — including, in principle, the anonymous delivery path — which is the
+    /// one thing <see cref="IPlacementRuleCheck"/>'s own remarks say must not happen. The
+    /// interface member is reached through the interface; the method below stays internal.
+    /// </remarks>
+    DomainResult IPlacementRuleCheck.CheckPlacementRules(
+        Resource resource, DateTimeOffset start, TimeSpan duration, PlacementTerms terms)
+        => CheckPlacementRules(resource, start, duration, terms);
 
     /// <summary>
     /// The same rules under explicit terms. Internal, so the terms a rule is evaluated on are
