@@ -10,6 +10,7 @@ import { canManageBookings } from "./permission-verbs.js";
 import { UBOOKIT_MOVE_BOOKING_MODAL } from "./move-booking-modal.token.js";
 import { UBOOKIT_PLACE_ON_BEHALF_MODAL } from "./place-on-behalf-modal.token.js";
 import { placedInsideWindow, placedLocalDate } from "./place-on-behalf-fields.js";
+import { classify, refusalTermFor, windowControlsApply, type FindMode } from "./find-fields.js";
 import {
   actionFor,
   bookerCell,
@@ -125,6 +126,24 @@ export class UBookItBookingsListElement extends UmbLitElement {
   private _window = currentWeek(new Date());
 
   /**
+   * Which read the table shows: the windowed list, or one of the two lookups.
+   *
+   * A lookup REPLACES the list rather than filtering it, because neither lookup has a window and
+   * pretending the window still applied would be a lie the filters told. Everything that reloads
+   * — a row action, a page change — reloads whatever this says, so a booking found by its
+   * reference and moved to another date is still the booking that was found.
+   */
+  @state()
+  private _mode: FindMode = { mode: "window" };
+
+  @state()
+  private _findText = "";
+
+  /** A refusal of the Find control's own input, before or after a round trip. */
+  @state()
+  private _findError?: string;
+
+  /**
    * Which load is allowed to write state.
    *
    * Requests can finish out of order, and an operator changing From and then To
@@ -172,31 +191,35 @@ export class UBookItBookingsListElement extends UmbLitElement {
     this._error = undefined;
 
     try {
-      // The window travels as two DATES. No instant is computed here and no
-      // zone is applied: the endpoint resolves them against the site's zone,
-      // which is where that rule lives precisely so it is not reimplemented
-      // once per client and got differently wrong at a daylight-saving edge.
-      // The query is built by `listQuery` so that shape is assertable — it is a
-      // guarantee that fails invisibly, since a wrong window still returns a
-      // perfectly plausible list.
-      const { data, error } = await UBookItBackofficeService.listBookings({
-        query: listQuery(this._window, this._statuses, this._skip, PAGE_SIZE),
-      });
+      // Which read depends on the mode; see #fetch, which carries the window's own
+      // note about dates and zones.
+      const { data, error } = await this.#fetch();
 
       if (!current()) {
         return;
       }
 
       if (error || !data) {
-        // The endpoint reports an over-wide window in terms of the dates that
-        // were sent, so the message is shown rather than replaced by a generic
-        // one — it names something the operator can act on, and the dates it
-        // names are the ones in the two controls above.
-        this._error = toApiErrors(error, this.#term("listLoadFailed"))
-          .map((failure) => failure.message)
-          .filter(Boolean)
-          .join(" ") || this.#term("listLoadFailed");
-
+        if (windowControlsApply(this._mode)) {
+          // The endpoint reports an over-wide window in terms of the dates that
+          // were sent, so the message is shown rather than replaced by a generic
+          // one — it names something the operator can act on, and the dates it
+          // names are the ones in the two controls above.
+          this._error = toApiErrors(error, this.#term("listLoadFailed"))
+            .map((failure) => failure.message)
+            .filter(Boolean)
+            .join(" ") || this.#term("listLoadFailed");
+        } else {
+          // A lookup the server refused is a fault in what was TYPED, in the operator's words,
+          // associated with the control that took it, not a list that failed to load.
+          const subject =
+            this._mode.mode === "reference" ? this._mode.canonical : this._mode.mode === "email" ? this._mode.email : "";
+          this._findError = this.localize.term(
+            `ubookitBookings_${refusalTermFor(toApiErrors(error, this.#term("findFailed")))}`,
+            subject,
+          );
+          this._mode = { mode: "window" };
+        }
         this._items = [];
         this._total = 0;
       } else {
@@ -225,6 +248,121 @@ export class UBookItBookingsListElement extends UmbLitElement {
   }
 
   /** A window change makes the current page number meaningless, so paging resets. */
+  /**
+   * One read per mode, all answering in the list's page shape so `#load` has one branch.
+   *
+   * The reference lookup answers with ONE row or a 404; both become a page here — one item, or
+   * none with a total of zero — so the table, the pager and the empty state need no third case.
+   * A miss is not an error: the status line says "no booking has that reference", and `_error`
+   * stays for a request that actually failed.
+   */
+  async #fetch(): Promise<{ data?: { items: BookingModel[]; total: number }; error?: unknown }> {
+    switch (this._mode.mode) {
+      case "window":
+        // The window travels as two DATES. No instant is computed here and no zone is
+        // applied: the endpoint resolves them against the site's zone, which is where that
+        // rule lives precisely so it is not reimplemented once per client and got
+        // differently wrong at a daylight-saving edge. The query is built by `listQuery`
+        // so that shape is assertable — a wrong window still returns a plausible list.
+        return UBookItBackofficeService.listBookings({
+          query: listQuery(this._window, this._statuses, this._skip, PAGE_SIZE),
+        });
+      case "email":
+        return UBookItBackofficeService.findBookingsByBooker({
+          body: { email: this._mode.email, skip: this._skip, take: PAGE_SIZE },
+        });
+      case "reference": {
+        const { data, error, response } = await UBookItBackofficeService.findBookingByReference({
+          path: { reference: this._mode.canonical },
+        });
+        if (data) {
+          return { data: { items: [data], total: 1 } };
+        }
+        // 404 is a miss, not a failure. Anything else is.
+        return response?.status === 404 ? { data: { items: [], total: 0 } } : { error };
+      }
+    }
+  }
+
+  /**
+   * Runs whichever lookup the typed text calls for — decided from its SHAPE, never from a mode
+   * the operator picked. The classification is a convenience: a value that passes here and fails
+   * on the server is shown the server's code.
+   */
+  #find(event: Event) {
+    event.preventDefault();
+    this._findError = undefined;
+
+    const kind = classify(this._findText, this._canSeePersonalData);
+
+    switch (kind.kind) {
+      case "neither":
+        this._findError = this.#term("findNeither");
+        return;
+      case "email-not-offered":
+        // Told WHY, and who can — the same courtesy the withheld-details note pays a row.
+        this._findError = this.#term("findEmailNotOffered");
+        return;
+      case "reference":
+        this._mode = { mode: "reference", canonical: kind.canonical };
+        break;
+      case "email":
+        this._mode = { mode: "email", email: kind.email };
+        break;
+    }
+
+    this._skip = 0;
+    this._notice = undefined;
+    void this.#load();
+  }
+
+  /**
+   * Restores the windowed list and puts focus on its first control. Focus is placed rather than
+   * left, because the controls this returns to were hidden a moment ago and the document is
+   * where focus goes by default.
+   */
+  async #backToDates() {
+    this._mode = { mode: "window" };
+    this._findError = undefined;
+    this._skip = 0;
+    void this.#load();
+    await this.updateComplete;
+    this.shadowRoot?.querySelector<HTMLElement>("#ubookit-bookings-from")?.focus();
+  }
+
+  /** The status line for a lookup mode, including the miss. */
+  #renderLookupStatus() {
+    if (this._mode.mode === "window") {
+      return nothing;
+    }
+
+    const shown =
+      this._mode.mode === "reference"
+        ? this.localize.term("ubookitBookings_findShowingReference", this._mode.canonical)
+        : this.localize.term("ubookitBookings_findShowingEmail", this._mode.email);
+
+    // A miss is a SENTENCE, not an empty table: an empty table under a window means "nothing
+    // booked", under a lookup it would mean "no such booking", and the two look identical.
+    const miss =
+      !this._loading && this._total === 0 && this._error === undefined
+        ? this._mode.mode === "reference"
+          ? this.localize.term("ubookitBookings_findNotFoundReference", this._mode.canonical)
+          : this.localize.term("ubookitBookings_findNotFoundEmail", this._mode.email)
+        : undefined;
+
+    return html`
+      <p role="status" class="notice lookup-status">
+        ${miss ?? shown}
+        <uui-button
+          look="secondary"
+          compact
+          label=${this.#term("findBackToDates")}
+          @click=${() => this.#backToDates()}
+        ></uui-button>
+      </p>
+    `;
+  }
+
   #setWindow(end: "from" | "to", value: string) {
     this._window = { ...this._window, [end]: value };
     this._skip = skipAfter("query", this._skip);
@@ -269,7 +407,37 @@ export class UBookItBookingsListElement extends UmbLitElement {
           : nothing}
       </div>
 
-      ${this.#renderControls()}
+      <!--
+        ONE control for both lookups, dispatched by the shape of what was typed: a reference has
+        no "@", an address always does, so the operator never chooses a mode. A native input with
+        a real label, for the reason every dialog in this client records. The label narrows for a
+        user not offered the email route, and an address typed anyway is answered with the
+        sentence naming the group, which tells them who to ask.
+      -->
+      <form class="find" @submit=${(event: Event) => this.#find(event)} novalidate>
+        <label for="ubookit-bookings-find">
+          ${this.#term(this._canSeePersonalData ? "findLabel" : "findLabelReferenceOnly")}
+        </label>
+        <input
+          id="ubookit-bookings-find"
+          type="text"
+          autocomplete="off"
+          aria-describedby=${this._findError ? "ubookit-bookings-find-error" : nothing}
+          aria-invalid=${this._findError ? "true" : "false"}
+          .value=${this._findText}
+          @input=${(event: Event) => {
+            this._findText = (event.target as HTMLInputElement).value;
+            this._findError = undefined;
+          }}
+        />
+        <uui-button look="secondary" label=${this.#term("findSubmit")} type="submit"></uui-button>
+        ${this._findError
+          ? html`<p id="ubookit-bookings-find-error" role="alert" class="error">${this._findError}</p>`
+          : nothing}
+      </form>
+
+      ${this.#renderLookupStatus()}
+      ${windowControlsApply(this._mode) ? this.#renderControls() : nothing}
 
       <!--
         role=alert so a failed load is ANNOUNCED, not merely rendered. An empty
@@ -375,6 +543,12 @@ export class UBookItBookingsListElement extends UmbLitElement {
 
   #renderTable(pageEnd: number) {
     if (this._total === 0) {
+      // In a lookup mode the miss is already stated by the status line; rendering the window's
+      // "nothing booked" sentence under it would say two different things about one absence.
+      if (!windowControlsApply(this._mode)) {
+        return nothing;
+      }
+
       // "No bookings in this window" is a claim about the site, and after a
       // failed request the view does not know whether it is true. The alert
       // above already says what happened; saying "none" as well would answer a
@@ -796,6 +970,35 @@ export class UBookItBookingsListElement extends UmbLitElement {
   }
 
   static override styles = css`
+    .find {
+      display: flex;
+      flex-wrap: wrap;
+      align-items: end;
+      gap: var(--uui-size-space-3);
+      margin-bottom: var(--uui-size-space-4);
+    }
+    .find label {
+      flex-basis: 100%;
+      font-weight: 700;
+    }
+    .find input {
+      font: inherit;
+      padding: var(--uui-size-space-2);
+      border: 1px solid var(--uui-color-border);
+      border-radius: var(--uui-border-radius);
+      background: var(--uui-color-surface);
+      color: inherit;
+      min-width: 20rem;
+    }
+    .find .error {
+      flex-basis: 100%;
+      margin: 0;
+    }
+    .lookup-status {
+      display: flex;
+      align-items: center;
+      gap: var(--uui-size-space-3);
+    }
     .header {
       display: flex;
       justify-content: space-between;

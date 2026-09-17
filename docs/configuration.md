@@ -130,6 +130,12 @@ interfaces**, not three. These have no default implementation
 for the reason the move members have none: a booking service that could not place on an operator's
 terms would be a worse outcome than a compile error.
 
+**If your own code implements `IBookingManagementStore`, it will no longer compile** until it adds
+`FindByReferenceAsync(reference, …)` — the read behind finding a booking by its reference. It
+returns the list's own summary row, or nothing, and is expected to be a seek on the reference's
+unique index: that is what makes answering without a window legitimate, and an implementation
+that scanned would reintroduce the cost the list's window exists to bound.
+
 **`IBookingObserver` is the exception, and deliberately.** It gains
 `BookingPlacedOnBehalfAsync(booking, …)` **with a default implementation** that reports an ordinary
 placement, so an existing observer keeps compiling and keeps being told that a booking was placed —
