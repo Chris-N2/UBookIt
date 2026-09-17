@@ -442,5 +442,9 @@ public class PlaceOnBehalfEndpointTests
         public Task<BookingPage> FindByBookerEmailAsync(
             BookerEmailQuery query, CancellationToken cancellationToken = default)
             => throw new InvalidOperationException("The placement endpoint does not search bookings.");
+
+        public Task<BookingSummary?> FindByReferenceAsync(
+            BookingReference reference, CancellationToken cancellationToken = default)
+            => throw new InvalidOperationException("The placement endpoint does not look up by reference.");
     }
 }

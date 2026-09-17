@@ -230,6 +230,10 @@ public class FindByBookerEndpointTests
             return Task.FromResult(page);
         }
 
+        public Task<BookingSummary?> FindByReferenceAsync(
+            BookingReference reference, CancellationToken cancellationToken = default)
+            => throw new InvalidOperationException("The search endpoint does not look up by reference.");
+
         public Task<BookingPage> ListAsync(BookingQuery query, CancellationToken cancellationToken = default)
             => throw new InvalidOperationException("The search endpoint does not list bookings.");
     }

@@ -331,6 +331,10 @@ public class EraseBookerEndpointTests
         public Task<BookingPage> FindByBookerEmailAsync(
             BookerEmailQuery query, CancellationToken cancellationToken = default)
             => throw new InvalidOperationException("The erase endpoint does not search for bookings.");
+
+        public Task<BookingSummary?> FindByReferenceAsync(
+            BookingReference reference, CancellationToken cancellationToken = default)
+            => throw new InvalidOperationException("The erase endpoint does not look up by reference.");
     }
 
     private sealed class StubAccessor : Umbraco.Cms.Core.Security.IBackOfficeSecurityAccessor

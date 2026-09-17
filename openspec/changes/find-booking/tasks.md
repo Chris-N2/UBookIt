@@ -4,42 +4,42 @@ Specs: `specs/booking-management/spec.md`. Design decisions referenced as D1–D
 
 ## 1. Baseline
 
-- [ ] 1.1 Confirm no TestSite holds port 44348, then build Release `--no-incremental` and record the warning count — the baseline is **zero**
-- [ ] 1.2 Full suite from a clean build as two steps (`dotnet build`, then `dotnet test --no-build`) and record all four counts — the baseline is 1706 / 149 / 1086 / 235
-- [ ] 1.3 Branch `change/find-booking` from `main` and push with `-u`
+- [x] 1.1 Confirm no TestSite holds port 44348, then build Release `--no-incremental` and record the warning count — the baseline is **zero**
+- [x] 1.2 Full suite from a clean build as two steps (`dotnet build`, then `dotnet test --no-build`) and record all four counts — the baseline is 1706 / 149 / 1086 / 235
+- [x] 1.3 Branch `change/find-booking` from `main` and push with `-u`
 
 ### The guarantee diff of every replaced requirement
 
 Two requirements are replaced wholesale. Each was extracted **verbatim by script**, edited
 surgically, then `diff`ed back. Re-verify before trusting; a measurement nobody re-ran is a claim.
 
-- [ ] 1.4 `booking-management` — **The list is windowed, and the window is bounded**: 2 lines removed, both the sentence being corrected ("…from a booker's name or reference is a different query… and is not provided by it") — the name clause is kept, the reference clause replaced by a paragraph mirroring the email one. 6 → 7 scenarios. Verify the window's non-optionality, its bound, the whole-day count, the backwards-window refusal and all six original scenarios survive verbatim
-- [ ] 1.5 `booking-management` — **A subject's bookings can be found by their email address**: **zero lines removed**, purely additive (purpose widened to operator lookup; the view SHALL reach it). 9 → 10 scenarios. Verify the gate, exactness, unwindowed, paged, indexed and erased-not-found guarantees are byte-identical
+- [x] 1.4 `booking-management` — **The list is windowed, and the window is bounded**: 2 lines removed, both the sentence being corrected ("…from a booker's name or reference is a different query… and is not provided by it") — the name clause is kept, the reference clause replaced by a paragraph mirroring the email one. 6 → 7 scenarios. Verify the window's non-optionality, its bound, the whole-day count, the backwards-window refusal and all six original scenarios survive verbatim
+- [x] 1.5 `booking-management` — **A subject's bookings can be found by their email address**: **zero lines removed**, purely additive (purpose widened to operator lookup; the view SHALL reach it). 9 → 10 scenarios. Verify the gate, exactness, unwindowed, paged, indexed and erased-not-found guarantees are byte-identical
 
 ## 2. Core — the read (D1)
 
-- [ ] 2.1 Add `IBookingManagementStore.FindByReferenceAsync(BookingReference, CancellationToken)` returning `BookingSummary?`, with the port-break remark; verify the existing members are byte-identical to `main`
-- [ ] 2.2 Add `FailureCodes.ReferenceInvalid = "reference-invalid"` with remarks on why it is distinct from `booking-not-found`
-- [ ] 2.3 Update every `IBookingManagementStore` double in the test suite; verify by building
+- [x] 2.1 Add `IBookingManagementStore.FindByReferenceAsync(BookingReference, CancellationToken)` returning `BookingSummary?`, with the port-break remark; verify the existing members are byte-identical to `main`
+- [x] 2.2 Add `FailureCodes.ReferenceInvalid = "reference-invalid"` with remarks on why it is distinct from `booking-not-found`
+- [x] 2.3 Update every `IBookingManagementStore` double in the test suite; verify by building
 
 ## 3. Persistence — the seek
 
-- [ ] 3.1 Implement `FindByReferenceAsync` in `SqlBookingManagementStore` as an equality on the indexed `Reference` column, composing the row through the **same** summary projection the list uses; verify by an integration test that a found row equals the list's row for the same booking
-- [ ] 3.2 Integration test: the emitted SQL is an equality on `Reference` and never a `LIKE` — the same shape `FindByBookerStoreTests` uses for the address
-- [ ] 3.3 Integration tests for the spec scenarios: lower case and with/without separator find the same booking; a cancelled booking is found; an erased booking is found and shows erased; a fragment finds nothing
+- [x] 3.1 Implement `FindByReferenceAsync` in `SqlBookingManagementStore` as an equality on the indexed `Reference` column, composing the row through the **same** summary projection the list uses; verify by an integration test that a found row equals the list's row for the same booking
+- [x] 3.2 Integration test: the emitted SQL is an equality on `Reference` and never a `LIKE` — the same shape `FindByBookerStoreTests` uses for the address
+- [x] 3.3 Integration tests for the spec scenarios: lower case and with/without separator find the same booking; a cancelled booking is found; an erased booking is found and shows erased; a fragment finds nothing
 
 ## 4. Management endpoint (D2)
 
-- [ ] 4.1 `GET bookings/by-reference/{reference}` on `BookingsController`, gated on `Constants.VerbPolicies.BookingsRead`, parsing via `BookingReference.TryParse`; 400 `reference-invalid` / 404 `booking-not-found` / 200 with the list's `BookingModel` through the list's mapper
-- [ ] 4.2 Endpoint tests, driven through the controller with a real store: found row withheld for a caller without sensitive-data access and shown for one with it — the *same* withholding path the list uses, not a second one; malformed vs missing distinguishable by code
-- [ ] 4.3 Verify by reflection that the action carries the Read policy and **not** the sensitive-data policy, with the reason in the test
+- [x] 4.1 `GET bookings/by-reference/{reference}` on `BookingsController`, gated on `Constants.VerbPolicies.BookingsRead`, parsing via `BookingReference.TryParse`; 400 `reference-invalid` / 404 `booking-not-found` / 200 with the list's `BookingModel` through the list's mapper
+- [x] 4.2 Endpoint tests, driven through the controller with a real store: found row withheld for a caller without sensitive-data access and shown for one with it — the *same* withholding path the list uses, not a second one; malformed vs missing distinguishable by code
+- [x] 4.3 Verify by reflection that the action carries the Read policy and **not** the sensitive-data policy, with the reason in the test
 
 ## 5. The three guards that must be told by hand
 
-- [ ] 5.1 `PermissionsTests` classification map — `BookingsController.FindBookingByReference = UBookItBookingsRead`; verify it fails first with the entry absent
-- [ ] 5.2 `SensitiveDataRedactionTests` — record the action as a **read** in `recordedActions`. **Do NOT add `reference` to `recordedContactParameters`**: it is not a contact detail, and recording it as one would teach the next reader that it needs the sensitive-data gate. Say so in a note beside the entry
-- [ ] 5.3 `BackofficeDocumentationTests` route map — `["GET bookings/by-reference/{reference}"] = "find a booking by its reference"`; and edit the `booking-management` Purpose paragraph directly so the verb list names it; verify the guard fails first
-- [ ] 5.4 `booker-erasure/spec.md`'s HTML comment cites the "not provided" sentence as the reason a scenario was reworded; edit the comment directly (it is not a requirement) so it no longer describes a lookup the package now has
+- [x] 5.1 `PermissionsTests` classification map — `BookingsController.FindBookingByReference = UBookItBookingsRead`; verify it fails first with the entry absent
+- [x] 5.2 `SensitiveDataRedactionTests` — record the action as a **read** in `recordedActions`. **Do NOT add `reference` to `recordedContactParameters`**: it is not a contact detail, and recording it as one would teach the next reader that it needs the sensitive-data gate. Say so in a note beside the entry
+- [x] 5.3 `BackofficeDocumentationTests` route map — `["GET bookings/by-reference/{reference}"] = "find a booking by its reference"`; and edit the `booking-management` Purpose paragraph directly so the verb list names it; verify the guard fails first
+- [x] 5.4 `booker-erasure/spec.md`'s HTML comment cites the "not provided" sentence as the reason a scenario was reworded; edit the comment directly (it is not a requirement) so it no longer describes a lookup the package now has
 
 ## 6. Backoffice client (D3–D6)
 

@@ -56,6 +56,11 @@ public class PermissionsTests
         // Both must hold; neither is sufficient alone.
         ["BookingsController.PlaceBookingOnBehalf"] = Constants.VerbPolicies.BookingsManage,
 
+        // Read, and deliberately NOT the sensitive-data gate: a reference is the identifier
+        // designed to be quoted, not a contact detail, and the row it returns is the list's row
+        // under the list's own withholding decision.
+        ["BookingsController.FindBookingByReference"] = Constants.VerbPolicies.BookingsRead,
+
         // The picker's read, on the manage verb rather than Configure. The configuration
         // listings require Configure — the verb for adding a meeting room — which the person
         // taking a telephone booking need not hold; without this read their picker is empty.

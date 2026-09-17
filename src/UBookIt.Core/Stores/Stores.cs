@@ -639,6 +639,38 @@ public interface IBookingManagementStore
     /// </remarks>
     Task<BookingPage> FindByBookerEmailAsync(
         BookerEmailQuery query, CancellationToken cancellationToken = default);
+
+    /// <summary>
+    /// The booking holding <paramref name="reference"/>, as the list would return it, or
+    /// <c>null</c> where none does.
+    /// </summary>
+    /// <remarks>
+    /// <para>
+    /// <b>Unwindowed, and legitimately so.</b> The list's window bounds the cost of a scan over
+    /// a table that grows without limit. A reference is a unique key served by a unique index;
+    /// this is a seek, and a seek incurs none of that cost. That is the difference between
+    /// bypassing the window here and relaxing it there, and it is why this is a read of its own
+    /// beside <see cref="ListAsync"/> rather than a nullable window on <see cref="BookingQuery"/>.
+    /// </para>
+    /// <para>
+    /// <b>It returns the list's own row</b> — the same <see cref="BookingSummary"/>, the booker in
+    /// the same three stated conditions — so a found booking withholds or shows contact details
+    /// by the identical rule, and no second description of a booking exists to disagree with the
+    /// first. A reference is not a contact detail: it is the identifier designed to be quoted,
+    /// and this read discloses nothing the list would not.
+    /// </para>
+    /// <para>
+    /// <b>Canonical form in, exact match, no status filter.</b> The caller parses what a person
+    /// typed; this compares the canonical value and nothing looser — a partial reference is not
+    /// a reference. A cancelled or erased booking is still the booking that was asked about.
+    /// </para>
+    /// <para>
+    /// <b>BREAKING — published port (17.1.0, declared).</b> A host implementing this interface
+    /// must add this member.
+    /// </para>
+    /// </remarks>
+    Task<BookingSummary?> FindByReferenceAsync(
+        BookingReference reference, CancellationToken cancellationToken = default);
 }
 
 /// <summary>

@@ -56,13 +56,12 @@ key would leave the identity intact and the erasure a gesture.
 - **WHEN** an erased booking is read back from storage and listed for management
 - **THEN** its reference is unchanged and still identifies it, so an operator can match what a caller reads out
 
-<!-- This scenario said "looked up BY the reference", which names an operation the package does
-     not have: there is no lookup-by-reference on any port, and `booking-management` records
-     that finding a booking from a reference "is a different query with different indexing, and
-     is not provided here". A scenario describing behaviour that does not exist cannot be
-     verified and quietly asserts the feature is there. What erasure actually guarantees — that
-     the reference is untouched and the row stays findable through the reads that do exist — is
-     what is stated now. -->
+<!-- This scenario once said "looked up BY the reference" at a time when no such lookup existed,
+     and was reworded to what erasure itself guarantees: the reference is untouched and the row
+     stays findable through the reads that exist. The `find-booking` change then added that
+     lookup — `booking-management`, "A booking can be found by its reference" — and its own
+     scenario "An erased booking is still found" is where the by-reference behaviour is now
+     verified. This scenario stays as the erasure-side statement; it does not need to grow. -->
 
 ### Requirement: An erased booker is a state, not a blank
 

@@ -589,7 +589,15 @@ public class SensitiveDataRedactionTests
             }
         }
 
-        string[] recorded = ["BookingModelMapper.cs", "BookingModels.cs"];
+        // BookingsController.cs joined the set with `find-booking`: the by-reference action
+        // names BookingModel in a ProducesResponseType attribute because it returns ONE row
+        // rather than a page. It composes that row through BookingModelMapper.ToModel under
+        // ResolveBookerVisibility() — the same call the list makes — so the decision is taken
+        // once, by the one member that requires it. Behaviourally proven by
+        // FindByReferenceEndpointTests: a caller without sensitive-data access gets the row with
+        // its contact withheld. Recording the file is the guard's demand; the mapper call is
+        // the guarantee, and the test is what makes the second more than a claim.
+        string[] recorded = ["BookingModelMapper.cs", "BookingModels.cs", "BookingsController.cs"];
 
         // POSITIVE CONTROL, and it comes first. The version this replaces reported a clean bill
         // of health precisely because it matched nothing at all; a scan that has lost sight of
@@ -907,6 +915,13 @@ public class SensitiveDataRedactionTests
             "BookingsController.EraseBooker = write",
             "BookingsController.FindBookingsByBooker = read",
             "BookingsController.ListBookings = read",
+            // A READ that takes a booking REFERENCE — which is not a contact detail, and is
+            // deliberately NOT recorded in `recordedContactParameters` above: recording it
+            // there would teach the next reader that a reference needs the sensitive-data
+            // gate, and it does not. The parameter name `reference` contains neither
+            // "booker" nor "email", so the scan does not mistake it; that is by design, not
+            // by luck, and this note is here so nobody "fixes" it.
+            "BookingsController.FindBookingByReference = read",
             // A READ, and deliberately not on KnownWrites: it changes nothing, so the
             // free-text rule below SHOULD apply to it. It carries no parameters at all — no
             // filter, no search term, no contact detail — and returns names of rooms and

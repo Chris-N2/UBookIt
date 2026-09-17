@@ -63,6 +63,10 @@ public class BookingsEndpointTests
             LastEmailQuery = query;
             return Task.FromResult(page);
         }
+
+        public Task<BookingSummary?> FindByReferenceAsync(
+            BookingReference reference, CancellationToken cancellationToken = default)
+            => throw new InvalidOperationException("The listing endpoint does not look up by reference.");
     }
 
     [Fact]
