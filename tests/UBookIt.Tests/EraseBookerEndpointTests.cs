@@ -53,6 +53,8 @@ public class EraseBookerEndpointTests
             new EmptyStore(),
             bookingService,
             new UnusedServiceBookingService(),
+            new InMemoryResourceStore(),
+            new InMemoryServiceStore(),
             new SiteBookingSettings { TimeZoneId = "UTC" },
             new StubAccessor());
 

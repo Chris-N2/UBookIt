@@ -55,6 +55,11 @@ public class PermissionsTests
         // action, and the sensitive-data gate is recorded by SensitiveDataRedactionTests.
         // Both must hold; neither is sufficient alone.
         ["BookingsController.PlaceBookingOnBehalf"] = Constants.VerbPolicies.BookingsManage,
+
+        // The picker's read, on the manage verb rather than Configure. The configuration
+        // listings require Configure — the verb for adding a meeting room — which the person
+        // taking a telephone booking need not hold; without this read their picker is empty.
+        ["BookingsController.ListBookableSubjects"] = Constants.VerbPolicies.BookingsManage,
         ["ResourcesController.ListResources"] = Constants.VerbPolicies.Configure,
         ["ResourcesController.GetResource"] = Constants.VerbPolicies.Configure,
         ["ResourcesController.CreateResource"] = Constants.VerbPolicies.Configure,

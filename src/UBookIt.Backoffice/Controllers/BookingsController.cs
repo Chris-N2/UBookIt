@@ -49,6 +49,8 @@ public class BookingsController(
     IBookingManagementStore bookingStore,
     IBookingService bookingService,
     IServiceBookingService serviceBooking,
+    IResourceManagementStore resourceCatalogue,
+    IServiceManagementStore serviceCatalogue,
     SiteBookingSettings settings,
     IBackOfficeSecurityAccessor backOfficeSecurityAccessor) : UBookItBackofficeApiControllerBase
 {
@@ -376,6 +378,62 @@ public class BookingsController(
             StartUtc = moved.Value.Interval.StartUtc,
             EndUtc = moved.Value.Interval.EndUtc,
             TimeZoneId = moved.Value.Interval.TimeZoneId,
+        });
+    }
+
+    /// <summary>
+    /// What an operator may book on somebody's behalf: services and resources, by name.
+    /// </summary>
+    /// <remarks>
+    /// <para>
+    /// <b>Gated on the manage verb, and it exists because the configuration listings are not.</b>
+    /// <c>GET resources</c> and <c>GET services</c> require <c>UBookIt.Configure</c>, which is
+    /// the verb for adding a meeting room; the person taking a telephone booking holds
+    /// <c>UBookIt.Bookings.Manage</c>. Without this read, their picker is empty and recording a
+    /// booking is impossible — so the choice was between granting <c>Configure</c> to
+    /// receptionists and offering the manage verb the smallest read that makes its own act
+    /// possible. This is the second.
+    /// </para>
+    /// <para>
+    /// <b>Names and ids only</b>, deliberately thin: open hours, constraints, capabilities and
+    /// role structure stay behind <c>Configure</c>. A picker needs none of them, and keeping this
+    /// to a name is what stops it becoming a way to read the configuration without the verb.
+    /// </para>
+    /// <para>
+    /// <b>No sensitive-data gate, because there is nothing sensitive here.</b> It carries no
+    /// booker, no booking and no contact detail — a resource is a room and a service is something
+    /// the site sells, both already visible to any visitor on the public site.
+    /// </para>
+    /// <para>
+    /// <b>Unpaged.</b> Its consumer is a picker that must offer everything bookable; a truncated
+    /// list silently hides a resource rather than erroring, which is the failure a page size
+    /// would introduce. Sites with more resources than a select can hold are the scheduler's
+    /// problem, not this endpoint's.
+    /// </para>
+    /// </remarks>
+    [Authorize(Policy = Constants.VerbPolicies.BookingsManage)]
+    [HttpGet("bookings/bookable")]
+    [ProducesResponseType<BookableSubjectsModel>(StatusCodes.Status200OK)]
+    public async Task<IActionResult> ListBookableSubjects(CancellationToken cancellationToken = default)
+    {
+        // Unpaged by asking for everything: the stores page, and this read must not.
+        var services = await serviceCatalogue.ListAsync(0, int.MaxValue, cancellationToken);
+        var resources = await resourceCatalogue.ListAsync(0, int.MaxValue, cancellationToken);
+
+        return Ok(new BookableSubjectsModel
+        {
+            Services = [.. services.Items
+                .Select(s => new BookableSubjectModel { Id = s.Id, Name = s.Name })
+                .OrderBy(s => s.Name, StringComparer.CurrentCultureIgnoreCase)],
+
+            // EVERY resource, including those a site withholds from direct booking by visitors.
+            // That permission polices strangers assembling a combination the business cannot
+            // deliver; an operator is the person trusted to judge that, and the domain waives it
+            // for them. Filtering here would put the rule in a second place and disagree with
+            // the placement that follows.
+            Resources = [.. resources.Items
+                .Select(r => new BookableSubjectModel { Id = r.Id, Name = r.DisplayName })
+                .OrderBy(r => r.Name, StringComparer.CurrentCultureIgnoreCase)],
         });
     }
 

@@ -17,7 +17,8 @@ pipeline.
 **What "management" means is narrower than the word suggests, and the boundary is
 deliberate.** The verbs are *see*, *find a subject's bookings by their email address*,
 *confirm* or *decline* a requested booking, *move* a booking to a new interval, *record a
-booking on a booker's behalf*, *cancel* and
+booking on a booker's behalf* — and, so that an operator can, *see what there is to book* —
+*cancel* and
 *erase a booker's contact details*. Changing
 which resources a booking claims is not here. This capability is about those verbs and the
 path each takes — the ports, the authorized endpoints over them, and the backoffice views an

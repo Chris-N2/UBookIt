@@ -114,6 +114,10 @@ public class BookingsEndpointTests
                 store,
                 bookingService ?? new UnusedBookingService(),
                 serviceBooking ?? new UnusedServiceBookingService(),
+                // The catalogues the bookable-subjects read uses. Empty, because no test in
+                // this file asks what there is to book.
+                new InMemoryResourceStore(),
+                new InMemoryServiceStore(),
                 Settings(zone),
                 // Defaults to a user who may see contact details, so that every test written
                 // before withholding existed still asserts what it was written to assert. The

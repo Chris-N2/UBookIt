@@ -208,6 +208,8 @@ public class FindByBookerEndpointTests
                 store,
                 new UnusedBookingService(),
                 new UnusedServiceBookingService(),
+                new InMemoryResourceStore(),
+                new InMemoryServiceStore(),
                 new UBookIt.Core.SiteBookingSettings { TimeZoneId = "UTC" },
                 Security(sensitiveData)),
             store);

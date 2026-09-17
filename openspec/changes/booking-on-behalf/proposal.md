@@ -47,6 +47,15 @@ This change is that arrival. It spends the value rather than adding a second one
 - **A new management endpoint**, gated on the section, on `UBookIt.Bookings.Manage`, **and
   on sensitive-data access**, since it accepts a booker's contact details as input.
 
+- **A second, small management read — what there is to book — gated on `UBookIt.Bookings.Manage`
+  alone.** Found necessary during apply and recorded here rather than left as an implementation
+  detail, because it is a permissions decision: listing resources and listing services both
+  require `UBookIt.Configure`, which the person taking a telephone booking has no reason to
+  hold, so without it the placement dialog is empty for exactly the user it exists for. The
+  alternatives were to grant receptionists the configuration privilege or to drop the feature.
+  It carries names and ids only — no open hours, constraints, capabilities or roles — and
+  nothing about any person, so it needs no sensitive-data gate.
+
 - **No new message kind, no new failure code, no migration, no schema change.** The booker
   receives the message a placement has always sent.
 

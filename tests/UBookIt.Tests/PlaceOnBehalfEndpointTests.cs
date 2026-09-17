@@ -82,6 +82,8 @@ public class PlaceOnBehalfEndpointTests
                 new UnusedManagementStore(),
                 bookings,
                 services,
+                resourceStore,
+                serviceStore,
                 settings,
                 NoSecurity.Instance),
             Bookings = bookingStore,
@@ -282,6 +284,81 @@ public class PlaceOnBehalfEndpointTests
         Assert.Equal(nameof(BookingStatus.Confirmed), a.Status);
         Assert.Equal(nameof(BookingStatus.Confirmed), b.Status);
         Assert.NotEqual(a.Reference, b.Reference);
+    }
+
+    // ---- what there is to book ----------------------------------------------------------------
+
+    [Fact]
+    public async Task Spec_scenario_an_operator_who_may_place_a_booking_may_see_what_to_book()
+    {
+        var harness = Wire();
+
+        var listed = Assert.IsType<BookableSubjectsModel>(
+            Assert.IsType<OkObjectResult>(await harness.Controller.ListBookableSubjects()).Value);
+
+        // The fixture's only resource WITHHOLDS direct booking from visitors, so its presence
+        // here is the spec scenario: the permission does not bind an operator, and filtering it
+        // out would state that rule in a second place and disagree with the placement.
+        var resource = Assert.Single(listed.Resources);
+        Assert.Equal(Id(1), resource.Id);
+        Assert.Equal("Meeting Room A", resource.Name);
+    }
+
+    [Fact]
+    public void Spec_scenario_it_carries_no_configuration_and_nothing_about_any_person()
+    {
+        // Structural, over the whole type: the thinness is the guarantee. A member carrying
+        // open hours, constraints or capabilities would make this a way to read the
+        // configuration without the verb for it; one carrying a booker would make it a
+        // disclosure.
+        var members = typeof(BookableSubjectModel)
+            .GetProperties(BindingFlags.Public | BindingFlags.Instance)
+            .Select(p => p.Name)
+            .Order(StringComparer.Ordinal)
+            .ToList();
+
+        Assert.Equal(new[] { "Id", "Name" }, members);
+
+        var envelope = typeof(BookableSubjectsModel)
+            .GetProperties(BindingFlags.Public | BindingFlags.Instance)
+            .Select(p => p.Name)
+            .Order(StringComparer.Ordinal)
+            .ToList();
+
+        Assert.Equal(new[] { "Resources", "Services" }, envelope);
+    }
+
+    [Fact]
+    public void The_bookable_read_is_gated_on_manage_and_not_on_sensitive_data()
+    {
+        // It discloses nothing about any person, so the sensitive-data gate would be a grant
+        // nobody needs — and a gate applied where it is not warranted teaches that the gate is
+        // decoration.
+        var action = typeof(BookingsController)
+            .GetMethod(nameof(BookingsController.ListBookableSubjects));
+
+        Assert.NotNull(action);
+
+        var policies = action!
+            .GetCustomAttributes<AuthorizeAttribute>()
+            .Select(a => a.Policy)
+            .ToList();
+
+        Assert.Contains(UBookIt.Backoffice.Constants.VerbPolicies.BookingsManage, policies);
+        Assert.DoesNotContain(UBookIt.Backoffice.Constants.SensitiveDataAccessPolicy, policies);
+    }
+
+    [Fact]
+    public void The_bookable_read_takes_no_parameters_that_could_filter_it()
+    {
+        // Unpaged, and with no filter of any kind: a picker that silently omitted a resource
+        // would send an operator to tell a customer the site cannot do something it can.
+        var action = typeof(BookingsController)
+            .GetMethod(nameof(BookingsController.ListBookableSubjects))!;
+
+        Assert.All(
+            action.GetParameters(),
+            parameter => Assert.Equal(typeof(CancellationToken), parameter.ParameterType));
     }
 
     // ---- the gates ----------------------------------------------------------------------------

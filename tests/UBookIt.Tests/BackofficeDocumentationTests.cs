@@ -450,6 +450,7 @@ public class BackofficeDocumentationTests
         var described = new Dictionary<string, string>
         {
             ["POST bookings"] = "record a booking on a booker's behalf",
+            ["GET bookings/bookable"] = "see what there is to book",
             ["POST bookings/find-by-booker"] = "find a subject's bookings by their email address",
             ["POST bookings/{id:guid}/confirm"] = "confirm",
             ["POST bookings/{id:guid}/decline"] = "decline",

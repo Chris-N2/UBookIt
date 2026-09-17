@@ -907,6 +907,11 @@ public class SensitiveDataRedactionTests
             "BookingsController.EraseBooker = write",
             "BookingsController.FindBookingsByBooker = read",
             "BookingsController.ListBookings = read",
+            // A READ, and deliberately not on KnownWrites: it changes nothing, so the
+            // free-text rule below SHOULD apply to it. It carries no parameters at all — no
+            // filter, no search term, no contact detail — and returns names of rooms and
+            // services, never a booker or a booking.
+            "BookingsController.ListBookableSubjects = read",
             "ResourcesController.CreateResource = write",
             "ResourcesController.DeleteResource = write",
             "ResourcesController.GetResource = read",

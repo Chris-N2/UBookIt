@@ -344,6 +344,46 @@ public class MovedBookingModel
 /// cannot become a read of personal data wearing a write's authorization.
 /// </para>
 /// </remarks>
+/// <summary>
+/// What an operator may book on somebody's behalf: the site's services and its resources, by
+/// name, for the dialog's picker.
+/// </summary>
+/// <remarks>
+/// <para>
+/// <b>It exists because the configuration listings are gated on a verb an operator need not
+/// hold.</b> <c>GET resources</c> and <c>GET services</c> require <c>UBookIt.Configure</c> — the
+/// verb for adding a meeting room — and the person taking a telephone booking holds
+/// <c>UBookIt.Bookings.Manage</c>. Without this read their picker is empty and the feature does
+/// not work; with it, the verb that may take a booking may also see what there is to book, which
+/// is the smallest grant that makes the act possible.
+/// </para>
+/// <para>
+/// <b>It is a name and an id and nothing else.</b> Not a projection of the configuration models:
+/// open hours, constraints, capabilities and role structure are <c>Configure</c>'s business, and
+/// a picker needs none of them. Keeping it this thin is what stops it becoming a way to read the
+/// configuration without the verb for it.
+/// </para>
+/// <para>
+/// <b>It carries no booker and no booking</b>, so it discloses nothing about anybody: a resource
+/// is a room and a service is something the site sells, both of which a visitor can already see
+/// on the public site.
+/// </para>
+/// </remarks>
+public class BookableSubjectsModel
+{
+    public IReadOnlyList<BookableSubjectModel> Services { get; set; } = [];
+
+    public IReadOnlyList<BookableSubjectModel> Resources { get; set; } = [];
+}
+
+/// <summary>One thing an operator can book, as the picker needs it.</summary>
+public class BookableSubjectModel
+{
+    public Guid Id { get; set; }
+
+    public string Name { get; set; } = string.Empty;
+}
+
 public class PlaceBookingOnBehalfRequestModel
 {
     /// <summary>The service to book, when booking one. Mutually exclusive with <see cref="ResourceId"/>.</summary>
