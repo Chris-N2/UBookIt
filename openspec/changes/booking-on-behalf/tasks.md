@@ -97,6 +97,90 @@ measurement nobody re-ran is a claim.
 
 ## 11. Handover
 
-- [ ] 11.1 Write the QA handover into this file: what was built, what is claimed, the build and test state, and **the explicit instruction to verify rather than trust** — twice the reviewer has found a claim in the handover itself to be false
-- [ ] 11.2 Name for the reviewer the four places a defect is most likely: the seam at 5.2, the layer-above rule at 4.3, the structural waiver at 3.2, and the guard notes at 7.2
+- [x] 11.1 Write the QA handover into this file: what was built, what is claimed, the build and test state, and **the explicit instruction to verify rather than trust** — twice the reviewer has found a claim in the handover itself to be false
+- [x] 11.2 Name for the reviewer the four places a defect is most likely: the seam at 5.2, the layer-above rule at 4.3, the structural waiver at 3.2, and the guard notes at 7.2
 - [x] 11.3 Record the deferred obligation this change creates — narrowing `sensitive-data`'s input rule to distinguish a query term from a stored value — in the deferred-obligations memory, with the reason it was not attempted here
+
+## 12. QA handover
+
+**Verify rather than trust.** Twice on this project the reviewer has found a claim in the
+handover itself to be false — including one it had made in its own previous round. Everything
+below is a claim, including the numbers.
+
+### State as handed over
+
+| | |
+|---|---|
+| Branch | `change/booking-on-behalf`, merge-base `c3f54f2` |
+| Release build | `--no-incremental`, **0 warnings** (baseline before this change was also 0) |
+| Unit | 1703 (baseline 1644) |
+| Integration | 149 (unchanged) · Rendering 1086 (unchanged) · Client 234 (baseline 193) |
+| `openspec validate --all --strict` | 22/22 |
+| TestSite | stopped; port 44348 confirmed free |
+
+### The four places a defect is most likely
+
+1. **The email seam (§5.2).** Core → observation port → notification → registered handler →
+   sender. Four links, no single test sees all of them, and a guard over each side of a seam
+   stays green through the regression that breaks it. The registration link in particular fails
+   *silently* — an unregistered handler compiles, passes its own tests, and sends nothing.
+2. **The rule that lives one layer up (§4.3).** A service's length rules are invisible to
+   `IBookingService`. `move-booking` shipped exactly this and 1644 unit tests missed it.
+3. **The structural waiver (§3.2).** `PlaceOnBehalfAsync` must be a *sibling* of the direct
+   overload, not a caller of it. If it ever becomes a caller, the waiver silently stops working
+   — and the only thing making it structural is that call site.
+4. **The guard notes (§7.2).** `recordedContactParameters`' failure message claims a recorded
+   parameter "matches the whole value exactly". This change's three parameters match *nothing*
+   — they are stored. The note says so; check it still does, and check the note is true.
+
+### Claims made by this change that are worth attacking
+
+- **`PlacementTerms` carries approval but deliberately NOT direct bookability.** Guarded by a
+  reflection test over the type's whole public surface. Attack: is that guard reachable, and
+  does it fail if a member is added?
+- **The observer member has a default implementation.** That makes it additive rather than
+  breaking. Attack: does the default actually fire for a host that does not override it, and
+  does the package's own adapter actually override it? If the adapter ever stopped overriding,
+  internal recipients would start being told, and only one test would notice.
+- **Two mutants were run and killed** (status ignores terms; operator path routes through the
+  direct overload). Attack: were they the *right* mutants, and are there obvious ones I did not
+  try?
+- **Three guards were narrowed or re-keyed by this change** — `BackofficeDocumentationTests`
+  (route → method+route), `BookingsViewReferenceTests` (file-wide ban → cell-scoped), and
+  `ServiceAttributionTests` (one door → a recorded set of two). **Each narrowing is a place I
+  could have weakened a guard to make my own code pass.** Re-derive each from its stated
+  guarantee rather than from my reasoning about it.
+
+### Corrections I made to my own artifacts during apply — check I did not paper over them
+
+- The spec originally said the booking carries no marker of who placed it **and** that the
+  observation port gains nothing. Both cannot hold; the email layer had no way to know.
+  Resolved by the observer member above, and proposal/design/spec all amended.
+- I claimed the service-placement rule check was a candidate **pre-filter**. It is not — it runs
+  only after a failed attempt. A lead-time test passed with the terms wired wrong, which is how
+  the false claim was caught. The real divergence is the *refusal*: a busy candidate was
+  reported `service-unavailable` rather than `conflict`. Now guarded by a test proven to fail
+  against the visitor-terms version.
+- A positive assertion I added was a **substring** of the mutant it was written to catch.
+
+### Scope added during apply, deliberately and with sign-off pending
+
+`GET bookings/bookable` — a second endpoint, names and ids only, gated on `Manage` alone. The
+configuration listings require `UBookIt.Configure`, so without it the dialog is empty for
+exactly the user it exists for. It is in the proposal and has its own spec requirement. **This
+is a permissions decision and Chris has not yet reviewed it.**
+
+### Known gap, stated rather than implied
+
+`sensitive-data`'s input rule still conflates *storing* a contact detail with *querying* one, so
+this endpoint carries a broader gate than its own reasoning requires. Deliberately not narrowed
+here (Chris: "probably deserves its own change"); recorded in the deferred-obligations memory.
+
+### Live verification performed (against the running backoffice, not asserted from tests)
+
+Meeting Room A — a **Service only** resource — placed directly at 90 min; the same room via
+**Massage** (1 × room, 60 minutes fixed) refused at 90 and placed at 60; `AutoConfirm` off
+yielding **Confirmed**; a booking outside the shown window reported with its date; a past start
+refused with the lead-time sentence; focus measured on open, on refusal and on dismissal; all
+seven labels and every `aria-describedby` target resolved. The live probe found one real defect
+(the generic sentence for a refused booker address), now fixed with tests.
