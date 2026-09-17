@@ -56,8 +56,14 @@ This change is that arrival. It spends the value rather than adding a second one
   It carries names and ids only — no open hours, constraints, capabilities or roles — and
   nothing about any person, so it needs no sensitive-data gate.
 
-- **No new message kind, no new failure code, no migration, no schema change.** The booker
-  receives the message a placement has always sent.
+- **No new message kind, no migration, no schema change.** The booker receives the message a
+  placement has always sent.
+
+- **One new stable failure code, `booking-subject-invalid`**, for a request naming both a
+  service and a resource or neither. An earlier draft of this proposal said "no new failure
+  code" and the endpoint reused `interval-invalid` — which left a caller unable to tell "you
+  named two things to book" from "your date and time were unreadable", two mistakes with
+  different corrections. Codes are additive public surface; this one lands in the minor.
 
 - **The observation port gains one member, `BookingPlacedOnBehalfAsync`, with a default
   implementation that reports an ordinary placement** — so it is additive rather than breaking,
@@ -92,6 +98,16 @@ This change is that arrival. It spends the value rather than adding a second one
 - **No narrowing of the sensitive-data input rule.** See below.
 - **No back-dating.** A start that has already passed is refused with `lead-time`, as for a
   move. Recording a booking that already happened is not placement.
+
+### An open question this change leaves, stated rather than implied
+
+**What is a booker told when their details were taken by telephone?** Narrowing `privacy-notice`
+to self-completed flows is right about *where* a notice belongs, and says nothing about what that
+person should learn. Today they learn nothing: the placement message they receive carries no
+statement about what is held, why, for how long, or who can see it. The natural home is that
+message — it is the first thing that actually reaches them — which makes it a `booking-emails`
+and `email-templates` question rather than one this change can answer on the way past. Raised
+here so a requirement narrowed with a reason is not mistaken later for one that never applied.
 
 ### A deferred obligation this change creates
 
@@ -130,6 +146,12 @@ None. Every behaviour here extends a capability the package already has.
   addresses the booker only.
 - `permissions`: `UBookIt.Bookings.Manage` gains creating a booking on a booker's behalf,
   and that endpoint's sensitive-data gate joins the verb rather than replacing it.
+- `privacy-notice`: *The booking form states what happens to the details it collects* — narrowed
+  to flows a person completes **about themselves**. Found by QA's sibling sweep, not by mine.
+  An operator's screen collects a third party's details, and a notice addressed to the data
+  subject rendered to a member of staff informs nobody; showing it would make the guarantee look
+  kept while the person learned nothing. **The narrowing locates the obligation, it does not
+  discharge it** — see the open question below.
 - `sensitive-data`: *Withheld data SHALL NOT be reachable by asking about it* — the exact-match
   obligation is stated as binding an endpoint that **matches on** a contact detail, since an
   endpoint that accepts one **to store** has nothing to match. The gate itself is unchanged
@@ -139,10 +161,21 @@ None. Every behaviour here extends a capability the package already has.
 
 **Code**
 
-- `UBookIt.Core`: `PlacementTerms` gains an approval member; `IBookingService` and
-  `IServiceBookingService` each gain an operator placement operation — **two declared port
-  breaks**, additive in shape but new members on published interfaces, landing in a minor
-  with the upgrade note in `docs/configuration.md` beside `move`'s three.
+- `UBookIt.Core`: `PlacementTerms` gains an approval member. **Four new members across two
+  published interfaces, not two** — `IBookingService` gains `PlaceOnBehalfAsync` *and*
+  `PlaceForServiceOnBehalfAsync`, and `IServiceBookingService` gains `PlaceOnBehalfAsync` in
+  both its resource and service forms. A host implementing either interface must add both of
+  its members; an earlier draft counted one per interface and under-declared the break, in a
+  change whose whole versioning story is declaring breaks precisely. `IBookingObserver` gains a
+  fifth member **with a default implementation**, so it is additive rather than breaking. All
+  land in a minor with the upgrade note in `docs/configuration.md` beside `move`'s three.
+
+- An **internal** seam, `IPlacementRuleCheck`, carries the placement rules under explicit terms
+  so that a rule waived by the pipeline is not re-imposed when a refusal is explained. It is
+  internal deliberately, and the consequence is stated rather than left to be discovered: a host
+  that substitutes its own `IBookingService` cannot satisfy it, so an operator's **service**
+  placement through a substituted service fails loudly rather than silently applying a visitor's
+  rules. Documented in the upgrade note.
 - `UBookIt.Backoffice`: a new action on `BookingsController`; a request model carrying the
   booker's details; the client's second custom modal, opened from a toolbar control rather
   than a row.

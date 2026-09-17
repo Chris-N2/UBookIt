@@ -136,6 +136,14 @@ override it. The default errs towards under-reporting a distinction rather than 
 never loses the placement itself; a move, by contrast, has no ordinary event to fall back to, which
 is why that member has no default.
 
+**If you substitute your own `IBookingService`, operator placement for a SERVICE will refuse
+loudly.** The rules that decide *why* a service placement failed are evaluated under explicit
+terms through an internal seam, so that a rule an operator is exempt from cannot come back and
+explain a refusal. A substituted implementation cannot provide that seam, and uBookIt throws
+rather than quietly evaluating a visitor's rules — a booking refused as "this service cannot be
+booked at that time" when the resource was merely busy is a worse outcome than an error you can
+see. Operator placement for a *resource*, and everything else, is unaffected.
+
 **What an operator's placement sends is not what a visitor's sends.** The person who booked is
 written to exactly as for any placement; the addresses in `InternalRecipients` are not, because one
 of your own people just recorded it on the screen that already lists it. See

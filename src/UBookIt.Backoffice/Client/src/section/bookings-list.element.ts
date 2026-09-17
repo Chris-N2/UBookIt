@@ -619,9 +619,15 @@ export class UBookItBookingsListElement extends UmbLitElement {
       }
 
       // Backed out, nothing placed: focus returns to the control that opened the dialog.
+      //
+      // Matched on the LABEL ATTRIBUTE's value rather than interpolated into a selector: a
+      // translation containing a double quote makes an attribute selector invalid, the query
+      // throws, and focus is lost to the document — which is the exact failure this block
+      // exists to prevent, arriving through the code meant to prevent it.
       await this.updateComplete;
-      this.shadowRoot
-        ?.querySelector<HTMLElement>(`uui-button[label="${this.#term("place")}"]`)
+      const label = this.#term("place");
+      [...(this.shadowRoot?.querySelectorAll<HTMLElement>("uui-button") ?? [])]
+        .find((button) => button.getAttribute("label") === label)
         ?.focus();
 
       return;

@@ -120,6 +120,7 @@ describe("refusalTerm", () => {
     ["service-not-found", "placeRefusedSubjectNotFound"],
     ["service-unavailable", "placeRefusedServiceUnavailable"],
     ["resource-not-eligible", "placeRefusedResourceNotEligible"],
+    ["booking-subject-invalid", "placeRefusedSubject"],
 
     // Found live: the dialog marked the email invalid and focused it while saying only the
     // generic sentence, so an operator got an outlined box and no reason.

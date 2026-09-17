@@ -823,14 +823,29 @@ public sealed class BookingService(
         return CheckPlacementRules(resource, start, duration, PlacementTerms.Visitor(resource.Availability.Constraints));
     }
 
-    /// <inheritdoc />
+    /// <summary>
+    /// <see cref="IPlacementRuleCheck"/>, implemented <b>explicitly</b> so that satisfying an
+    /// internal interface from a public class does not publish the member.
+    /// </summary>
+    /// <remarks>
+    /// <b>Implicit implementation made this public and QA caught it.</b> An internal interface
+    /// does not keep a member internal: a `public` method on a `public` class is public API
+    /// whatever satisfies it, so the terms-taking check briefly became callable by anything
+    /// holding this type — including, in principle, the anonymous delivery path — which is the
+    /// one thing <see cref="IPlacementRuleCheck"/>'s own remarks say must not happen. The
+    /// interface member is reached through the interface; the method below stays internal.
+    /// </remarks>
+    DomainResult IPlacementRuleCheck.CheckPlacementRules(
+        Resource resource, DateTimeOffset start, TimeSpan duration, PlacementTerms terms)
+        => CheckPlacementRules(resource, start, duration, terms);
+
     /// <summary>
     /// The same rules under explicit terms. Internal, so the terms a rule is evaluated on are
     /// decided by an operation in this assembly rather than chosen by a caller — the public
     /// member is the visitor's, and the operator's terms are reached only through an operator
     /// operation.
     /// </summary>
-    public DomainResult CheckPlacementRules(
+    internal DomainResult CheckPlacementRules(
         Resource resource, DateTimeOffset start, TimeSpan duration, PlacementTerms terms)
     {
         ArgumentNullException.ThrowIfNull(resource);

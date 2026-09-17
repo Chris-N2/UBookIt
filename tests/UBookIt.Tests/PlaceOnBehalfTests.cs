@@ -108,6 +108,45 @@ public class PlaceOnBehalfTests
             names.Order(StringComparer.Ordinal));
     }
 
+    [Fact]
+    public void The_terms_taking_rule_check_is_not_public_api()
+    {
+        // FOUND BY QA, AFTER I SHIPPED IT. `IPlacementRuleCheck` is internal — but an internal
+        // interface does NOT keep an implementing member internal, and satisfying it implicitly
+        // from a public sealed class published the terms-taking check. Anything holding a
+        // `BookingService` could then ask what an OPERATOR would be allowed, which is the exact
+        // question that interface's own remarks say no caller outside an operator operation has
+        // any business asking — and it is an undeclared addition to a surface frozen at 17.0.0.
+        //
+        // Asserted over the whole public surface rather than by naming the method: the next way
+        // in will be an overload, or a differently-named member, not this signature again.
+        var leaked = typeof(BookingService)
+            .GetMethods(BindingFlags.Public | BindingFlags.Instance | BindingFlags.Static | BindingFlags.DeclaredOnly)
+            .Where(method => method.GetParameters().Any(p => p.ParameterType == typeof(PlacementTerms)))
+            .Select(method => method.Name)
+            .ToList();
+
+        Assert.True(
+            leaked.Count == 0,
+            "BookingService publishes a member taking PlacementTerms: "
+            + string.Join(", ", leaked)
+            + Environment.NewLine
+            + "Which terms a rule is evaluated on is decided by an operation in this assembly, "
+            + "never chosen by a caller. Implement IPlacementRuleCheck EXPLICITLY — an internal "
+            + "interface does not make an implicitly-implemented member internal.");
+    }
+
+    [Fact]
+    public void The_terms_taking_rule_check_is_still_reachable_through_the_internal_seam()
+    {
+        // The other direction, so the guard above cannot be satisfied by deleting the capability.
+        // A member that vanished would take operator placement's refusal classification with it.
+        Assert.NotNull(typeof(IPlacementRuleCheck).GetMethod(
+            nameof(IPlacementRuleCheck.CheckPlacementRules)));
+        Assert.True(typeof(IPlacementRuleCheck).IsAssignableFrom(typeof(BookingService)));
+        Assert.False(typeof(IPlacementRuleCheck).IsPublic);
+    }
+
     // ------------------------------------------------------------------
     // The waiver that is structural, not a flag
     // ------------------------------------------------------------------

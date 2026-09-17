@@ -1,9 +1,14 @@
 ## ADDED Requirements
 
 ### Requirement: Placing a booking on a booker's behalf
-The booking service SHALL expose an operation that places a booking **on a booker's behalf**:
-given a resource, a start instant, a length and the booker's details, it SHALL place a booking
-for that booker exactly as a visitor's placement would, save for the terms named below. The
+The booking service SHALL expose placement **on a booker's behalf**: given a resource, a start
+instant, a length and the booker's details, it SHALL place a booking for that booker exactly as
+a visitor's placement would, save for the terms named below.
+
+**It SHALL be TWO members, not one**, mirroring the two the visitor path already has: one
+naming a resource, and one naming the service a booking was placed for. A host implementing
+this port must add both, and the count is stated because a change that declares port breaks
+must count them. The
 booking it produces SHALL be an ordinary booking in every later respect — the same reference
 format drawn from the same port, the same status machine, the same claims, and the same
 cancellation, confirmation, decline, move and erasure operate on it unchanged.

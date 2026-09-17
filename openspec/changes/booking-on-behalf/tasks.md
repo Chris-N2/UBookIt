@@ -24,6 +24,8 @@ measurement nobody re-ran is a claim.
 - [x] 1.9 `permissions` — **Sensitive-data gates are joined by verbs, never replaced**: 2 lines changed. 2 → 4 scenarios. Verify "a verb SHALL never disclose what that group withholds" survives verbatim — it is the sentence the whole requirement exists for
 - [x] 1.10 `sensitive-data` — **Withheld data SHALL NOT be reachable by asking about it**: 1 line changed (the exactness obligation is scoped to an endpoint that *matches on* a detail). 4 → 7 scenarios. Verify the gate sentence, the no-partial-form rule, the reveal-nothing rule and the historical note are all intact — this requirement is a security constraint and the narrowing must not have reached them
 
+- [x] 1.11 `privacy-notice` — **The booking form states what happens to the details it collects**: 2 lines changed, narrowing "every booking flow the package ships" to those a person completes **about themselves**. 3 → 5 scenarios, 5 → 6 SHALLs. **Added in QA round 1** — my own sibling sweep missed it and QA's found it. Verify the four statements, the at-the-point-of-collection rule and the does-not-gate-submission rule all survive verbatim, and that the added paragraph LOCATES the obligation to tell a telephone booker rather than quietly discharging it
+
 ## 2. Core — the terms (D1)
 
 - [x] 2.1 Add `ApprovalApplies` to `PlacementTerms`, `true` on `Visitor` and `false` on `Operator`, with the rationale in XML docs; verify existing `PlacementTerms` tests still pass unchanged
@@ -47,7 +49,7 @@ measurement nobody re-ran is a claim.
 
 ## 5. Emails (D5)
 
-- [x] 5.1 Send `BookerPlaced` and suppress the internal recipients for an operator placement, decided at the placement path rather than by inspecting the booking; verify with a recording mail sender **through the production entry point** that the booker got exactly one message and internal recipients got none
+- [x] 5.1 Send `BookerPlaced` and suppress the internal recipients for an operator placement, decided at the placement path rather than by inspecting the booking; verify with a recording mail sender that the booker got exactly one message and internal recipients got none. **CORRECTED AFTER QA:** this task and the handover both claimed the verification ran "through the production entry point". It does not — it enters at the handler. What exists instead is each of the four links pinned by exact identity (see §12); that is a chain, not a single traversal, and the original wording overclaimed it
 - [x] 5.2 Verify the observer still fires for an operator placement — only the package's internal recipient list is skipped, never the port a host subscribes to. This is the seam D5 names; a guard over each half will stay green through the regression
 - [x] 5.3 Verify a visitor's placement still writes to both directions, and that an operator's placement on a site without booker emails enabled is silent and still succeeds
 
@@ -58,7 +60,7 @@ measurement nobody re-ran is a claim.
 - [x] 6.3 Reuse the move endpoint's existing zoneless start parsing rather than writing a second one; verify a start carrying `Z` or an offset fails with `interval-invalid` against the start field
 - [x] 6.4 Response model carrying id, reference, status and interval and **no booker member**; verify by reflecting over the model, so the guarantee is structural rather than dependent on the caller's access
 - [x] 6.5 Verify refusals carry the domain's stable code, and that a malformed booker address is distinguishable from a pipeline refusal
-- [x] 6.6 Verify the authorization matrix live: Manage-without-sensitive-data refused, sensitive-data-with-Read-only refused, unauthenticated 401
+- [x] 6.6 Verify the authorization matrix: Manage-without-sensitive-data refused, sensitive-data-with-Read-only refused, unauthenticated 401. **CORRECTED AFTER QA:** asserted by attribute reflection, not live. A policy is refused by the framework before the action runs, so an in-process call never meets it — which is why `FindByBookerEndpointTests` asserts its gate the same way. The word "live" in the original task was wrong, and no live authorization check was performed
 
 ## 7. The three guards that must be told by hand, and do not fail helpfully
 
@@ -82,7 +84,7 @@ measurement nobody re-ran is a claim.
 ## 9. Documentation
 
 - [x] 9.1 `docs/notifications.md`: the operator-placement case — the booker is written to, the internal recipients are not
-- [x] 9.2 **Discharge the deferred obligation** this change's touch of `notifications` brings due: "Confirming or declining sends this list nothing" appears **twice** in that document, so its `DocumentationAssert.Says` pin at `NotificationDocumentationTests.cs:233` pins nothing. Introduce `SaysOnce` and paraphrase one occurrence; verify by deleting the table row and confirming the guard now fails
+- [x] 9.2 **Discharge the deferred obligation** this change's touch of `notifications` brings due: "Confirming or declining sends this list nothing" appears **twice** in that document, so its `DocumentationAssert.Says` pin at `NotificationDocumentationTests.cs:233` pins nothing. Pin it with `SaysOnce`; verify by deleting the table row and confirming the guard now fails. **CORRECTED AFTER QA:** this task said "introduce `SaysOnce`". It already existed — `release-17-0-1` built it and `DocumentationAssertTests` normalises it — and this change only *called* it. Reusing a tested helper is the better outcome, but the record was wrong; third inaccurate claim QA found in these artifacts
 - [x] 9.3 `docs/configuration.md`: the two port additions, beside `move`'s three
 - [x] 9.4 Document that there is no availability picker in this view, as the move requirement's counterpart does
 
@@ -106,6 +108,12 @@ measurement nobody re-ran is a claim.
 **Verify rather than trust.** Twice on this project the reviewer has found a claim in the
 handover itself to be false — including one it had made in its own previous round. Everything
 below is a claim, including the numbers.
+
+**Round 1 verified every number here as true and still returned REJECT on five MAJOR findings.**
+Two of those were claims in this very document that did not survive checking; both are corrected
+in place above and repeated here so the correction is not itself buried: the email verification
+does **not** run through the production entry point, and the authorization matrix was **not**
+verified live.
 
 ### State as handed over
 

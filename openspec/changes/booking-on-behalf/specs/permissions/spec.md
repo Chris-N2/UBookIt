@@ -7,10 +7,17 @@ through the backoffice group editor's default-permissions surface:
 
 - **`UBookIt.Bookings.Read`** — the bookings list and every read over bookings;
 - **`UBookIt.Bookings.Manage`** — cancelling, confirming, declining and moving bookings,
-  and placing one on a booker's behalf;
+  placing one on a booker's behalf, and **seeing the services and resources a booking may be
+  placed for**, by name;
 - **`UBookIt.Configure`** — creating, editing and deleting resources and services,
   their supporting reads (types, capabilities, configuration preview), and
   responsibility assignment;
+
+  *`Configure` remains the verb for every read that returns a resource or a service as a
+  configured thing — its open hours, constraints, capabilities and roles. What `Manage` reaches
+  is a **name and an identifier**, and nothing else. The two are not a hierarchy and neither
+  implies the other: a receptionist who may take a telephone booking must be able to see what
+  there is to book, and must not thereby acquire the privilege to reconfigure it.*
 - **`UBookIt.Settings`** — reading and changing the site's own settings.
 
 *Moving joined Manage rather than becoming a fifth verb because the verb already means "may act
@@ -94,6 +101,10 @@ own.
 #### Scenario: Read alone cannot place on a booker's behalf
 - **WHEN** a user whose groups hold only `UBookIt.Bookings.Read` attempts to place a booking on a booker's behalf
 - **THEN** the request is refused
+
+#### Scenario: Manage reaches what there is to book, and Configure still owns the configuration
+- **WHEN** a user whose groups hold only `UBookIt.Bookings.Manage` asks what may be booked, and then asks a resource-management endpoint for the same resource
+- **THEN** the first is served, carrying names and identifiers alone, and the second is refused
 
 #### Scenario: The verb count is unchanged
 - **WHEN** the package's permission verbs are enumerated

@@ -141,31 +141,6 @@ public interface IServiceBookingService
         ServiceBookingRequest request, CancellationToken cancellationToken = default);
 
     /// <summary>
-    /// Moves a booking, applying the service's length rules where the booking was placed for
-    /// one, and the booking service's move otherwise.
-    /// </summary>
-    /// <remarks>
-    /// <para>
-    /// <b>The operator's single entry point for a move</b>, direct and service bookings alike.
-    /// <see cref="IBookingService.MoveAsync"/> knows resources and nothing about services — the
-    /// same split placement has, where direct placement never sees a service — so a service
-    /// booking's length must be checked here against the intersection of the service's duration
-    /// specification with each claimed resource's range, exactly as service placement checks it
-    /// (`service-booking`, "Service duration narrows each candidate independently"). A move
-    /// through the booking service alone would let a 45–120 minute service be moved to 30.
-    /// </para>
-    /// <para>
-    /// A booking whose recorded service no longer exists is moved on the resources' rules
-    /// alone: the attribution is a snapshot, and a specification that has been deleted cannot
-    /// bind anything. A claimed resource that can no longer provide the service at any length
-    /// refuses the move as <see cref="FailureCodes.ServiceUnavailable"/>.
-    /// </para>
-    /// <para>
-    /// <b>BREAKING — published port (17.1.0, declared).</b> A host implementing this interface
-    /// must add this member.
-    /// </para>
-    /// </remarks>
-    /// <summary>
     /// Places a booking for a service <b>on a booker's behalf</b> — an operator recording a
     /// booking taken by telephone or at a desk.
     /// </summary>
@@ -192,9 +167,39 @@ public interface IServiceBookingService
     /// length rule for one and refuses nothing; it delegates to the booking service's operator
     /// placement unchanged, so that an operator has one collaborator rather than two.
     /// </summary>
+    /// <remarks>
+    /// <b>BREAKING — published port (17.1.0, declared).</b> With the overload above, this
+    /// interface gains <b>two</b> members for operator placement, not one. A host implementing
+    /// it must add both.
+    /// </remarks>
     Task<DomainResult<Booking>> PlaceOnBehalfAsync(
         BookingRequest request, CancellationToken cancellationToken = default);
 
+    /// <summary>
+    /// Moves a booking, applying the service's length rules where the booking was placed for
+    /// one, and the booking service's move otherwise.
+    /// </summary>
+    /// <remarks>
+    /// <para>
+    /// <b>The operator's single entry point for a move</b>, direct and service bookings alike.
+    /// <see cref="IBookingService.MoveAsync"/> knows resources and nothing about services — the
+    /// same split placement has, where direct placement never sees a service — so a service
+    /// booking's length must be checked here against the intersection of the service's duration
+    /// specification with each claimed resource's range, exactly as service placement checks it
+    /// (`service-booking`, "Service duration narrows each candidate independently"). A move
+    /// through the booking service alone would let a 45–120 minute service be moved to 30.
+    /// </para>
+    /// <para>
+    /// A booking whose recorded service no longer exists is moved on the resources' rules
+    /// alone: the attribution is a snapshot, and a specification that has been deleted cannot
+    /// bind anything. A claimed resource that can no longer provide the service at any length
+    /// refuses the move as <see cref="FailureCodes.ServiceUnavailable"/>.
+    /// </para>
+    /// <para>
+    /// <b>BREAKING — published port (17.1.0, declared).</b> A host implementing this interface
+    /// must add this member.
+    /// </para>
+    /// </remarks>
     Task<DomainResult<Booking>> MoveAsync(
         Guid bookingId, DateTimeOffset newStart, TimeSpan newLength, CancellationToken cancellationToken = default);
 }

@@ -52,6 +52,8 @@ public class PlaceOnBehalfEndpointTests
         public required BookingsController Controller { get; init; }
 
         public required InMemoryBookingStore Bookings { get; init; }
+
+        public required InMemoryServiceStore Services { get; init; }
     }
 
     private static Harness Wire(string zone = TestData.LondonZoneId, bool autoConfirm = true)
@@ -87,6 +89,7 @@ public class PlaceOnBehalfEndpointTests
                 settings,
                 NoSecurity.Instance),
             Bookings = bookingStore,
+            Services = serviceStore,
         };
     }
 
@@ -147,6 +150,31 @@ public class PlaceOnBehalfEndpointTests
     }
 
     [Fact]
+    public async Task Spec_scenario_an_operator_places_a_booking_for_a_service()
+    {
+        // The spec scenario had no endpoint-level test — only a domain-level one — which QA
+        // recorded as an unverified criterion. The endpoint must route a SERVICE through the
+        // service booking service and record the attribution, and a controller that named the
+        // wrong collaborator would still place a plausible booking.
+        var harness = Wire();
+        var service = Service.Create(
+            "Endpoint Treatment",
+            ServiceDuration.Fixed(TimeSpan.FromMinutes(60)).Value,
+            [ServiceRole.Create(ResourceTypes.Room, null).Value]).Value;
+        harness.Services.Add(service);
+
+        var placed = Placed(await harness.Controller.PlaceBookingOnBehalf(
+            Request(serviceId: service.Id, minutes: 60)));
+
+        Assert.False(string.IsNullOrWhiteSpace(placed.Reference));
+
+        var stored = await harness.Bookings.GetBookingAsync(placed.BookingId);
+        Assert.NotNull(stored);
+        Assert.Equal(service.Id, stored!.Service?.ServiceId);
+        Assert.Equal(Id(1), Assert.Single(stored.Claims).ResourceId);
+    }
+
+    [Fact]
     public async Task Spec_scenario_the_start_is_read_in_the_sites_zone()
     {
         // 10:00 London on a BST date is 09:00Z. Asserted as a differential rather than against a
@@ -192,8 +220,11 @@ public class PlaceOnBehalfEndpointTests
                 BookerEmail = "ada@example.com",
             });
 
-        Assert.NotEmpty(Failures(both));
-        Assert.NotEmpty(Failures(neither));
+        // The CODE, not merely that it refused. Sharing `interval-invalid` with a malformed
+        // date left a caller unable to tell "you named two things to book" from "your time was
+        // unreadable" — two mistakes with different corrections.
+        Assert.Contains(Failures(both), f => f.Code == FailureCodes.BookingSubjectInvalid);
+        Assert.Contains(Failures(neither), f => f.Code == FailureCodes.BookingSubjectInvalid);
         Assert.Empty(await harness.Bookings.GetClaimsAsync(
             [Id(1)], TestData.Utc(Date, "00:00"), TestData.Utc(Date.AddDays(1), "00:00")));
     }

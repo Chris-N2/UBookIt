@@ -323,28 +323,6 @@ public class MovedBookingModel
 }
 
 /// <summary>
-/// What an operator supplies to record a booking somebody made by telephone or at a desk.
-/// </summary>
-/// <remarks>
-/// <para>
-/// <b>Exactly one of <see cref="ServiceId"/> and <see cref="ResourceId"/>.</b> Both, or
-/// neither, is refused as a malformed request rather than resolved by a precedence rule: a
-/// caller that supplied both did not mean one of them, and choosing for them would commit the
-/// site's time to a booking nobody asked for.
-/// </para>
-/// <para>
-/// The start and the length carry <see cref="MoveBookingRequestModel"/>'s convention exactly —
-/// wall-clock time in the site's zone with no offset, and minutes — because an operator typing
-/// into this modal and into the move modal is doing the same thing, and two conventions would
-/// be a trap on whichever screen they used second.
-/// </para>
-/// <para>
-/// <b>The booker's details are carried here and reported nowhere.</b> The endpoint accepts them
-/// to store them; <see cref="PlacedBookingModel"/> has no member for any of them, so a write
-/// cannot become a read of personal data wearing a write's authorization.
-/// </para>
-/// </remarks>
-/// <summary>
 /// What an operator may book on somebody's behalf: the site's services and its resources, by
 /// name, for the dialog's picker.
 /// </summary>
@@ -384,6 +362,28 @@ public class BookableSubjectModel
     public string Name { get; set; } = string.Empty;
 }
 
+/// <summary>
+/// What an operator supplies to record a booking somebody made by telephone or at a desk.
+/// </summary>
+/// <remarks>
+/// <para>
+/// <b>Exactly one of <see cref="ServiceId"/> and <see cref="ResourceId"/>.</b> Both, or
+/// neither, is refused as a malformed request rather than resolved by a precedence rule: a
+/// caller that supplied both did not mean one of them, and choosing for them would commit the
+/// site's time to a booking nobody asked for.
+/// </para>
+/// <para>
+/// The start and the length carry <see cref="MoveBookingRequestModel"/>'s convention exactly —
+/// wall-clock time in the site's zone with no offset, and minutes — because an operator typing
+/// into this modal and into the move modal is doing the same thing, and two conventions would
+/// be a trap on whichever screen they used second.
+/// </para>
+/// <para>
+/// <b>The booker's details are carried here and reported nowhere.</b> The endpoint accepts them
+/// to store them; <see cref="PlacedBookingModel"/> has no member for any of them, so a write
+/// cannot become a read of personal data wearing a write's authorization.
+/// </para>
+/// </remarks>
 public class PlaceBookingOnBehalfRequestModel
 {
     /// <summary>The service to book, when booking one. Mutually exclusive with <see cref="ResourceId"/>.</summary>

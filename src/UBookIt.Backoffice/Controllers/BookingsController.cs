@@ -491,7 +491,7 @@ public class BookingsController(
         if ((model.ServiceId is null) == (model.ResourceId is null))
         {
             shapeFailures.Add(new DomainFailure(
-                FailureCodes.IntervalInvalid,
+                FailureCodes.BookingSubjectInvalid,
                 "Name exactly one of a service or a resource to book.",
                 nameof(model.ServiceId)));
         }
