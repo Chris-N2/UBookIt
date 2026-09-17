@@ -24,7 +24,7 @@ measurement nobody re-ran is a claim.
 - [x] 1.9 `permissions` — **Sensitive-data gates are joined by verbs, never replaced**: 2 lines changed. 2 → 4 scenarios. Verify "a verb SHALL never disclose what that group withholds" survives verbatim — it is the sentence the whole requirement exists for
 - [x] 1.10 `sensitive-data` — **Withheld data SHALL NOT be reachable by asking about it**: 1 line changed (the exactness obligation is scoped to an endpoint that *matches on* a detail). 4 → 7 scenarios. Verify the gate sentence, the no-partial-form rule, the reveal-nothing rule and the historical note are all intact — this requirement is a security constraint and the narrowing must not have reached them
 
-- [x] 1.11 `privacy-notice` — **The booking form states what happens to the details it collects**: 2 lines changed, narrowing "every booking flow the package ships" to those a person completes **about themselves**. 3 → 5 scenarios, 5 → 6 SHALLs. **Added in QA round 1** — my own sibling sweep missed it and QA's found it. Verify the four statements, the at-the-point-of-collection rule and the does-not-gate-submission rule all survive verbatim, and that the added paragraph LOCATES the obligation to tell a telephone booker rather than quietly discharging it
+- [x] 1.11 `privacy-notice` — **The booking form states what happens to the details it collects**: 2 lines changed, narrowing "every booking flow the package ships" to those a person completes **about themselves**. 3 → 4 scenarios (the three originals kept, one of them requalified in place, plus the operator exemption), 5 → 6 SHALLs. **Added in QA round 1** — my own sibling sweep missed it and QA's found it. Verify the four statements, the at-the-point-of-collection rule and the does-not-gate-submission rule all survive verbatim, and that the added paragraph LOCATES the obligation to tell a telephone booker rather than quietly discharging it
 
 ## 2. Core — the terms (D1)
 
@@ -85,7 +85,7 @@ measurement nobody re-ran is a claim.
 
 - [x] 9.1 `docs/notifications.md`: the operator-placement case — the booker is written to, the internal recipients are not
 - [x] 9.2 **Discharge the deferred obligation** this change's touch of `notifications` brings due: "Confirming or declining sends this list nothing" appears **twice** in that document, so its `DocumentationAssert.Says` pin at `NotificationDocumentationTests.cs:233` pins nothing. Pin it with `SaysOnce`; verify by deleting the table row and confirming the guard now fails. **CORRECTED AFTER QA:** this task said "introduce `SaysOnce`". It already existed — `release-17-0-1` built it and `DocumentationAssertTests` normalises it — and this change only *called* it. Reusing a tested helper is the better outcome, but the record was wrong; third inaccurate claim QA found in these artifacts
-- [x] 9.3 `docs/configuration.md`: the two port additions, beside `move`'s three
+- [x] 9.3 `docs/configuration.md`: the four port additions and the observer's defaulted fifth, beside `move`'s three
 - [x] 9.4 Document that there is no availability picker in this view, as the move requirement's counterpart does
 
 ## 10. Verification

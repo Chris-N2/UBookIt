@@ -39,7 +39,7 @@ tickbox would misrepresent that as consent — which would also imply a right to
 make the site's own records revocable.
 
 #### Scenario: The notice appears where the details are asked for
-- **WHEN** a visitor reaches a step that asks for contact details, in any flow the package ships
+- **WHEN** a visitor reaches a step that asks for their own contact details, in any flow the package ships for a person to complete about themselves
 - **THEN** the privacy notice is present in that same form, ahead of the control that submits it
 
 #### Scenario: All four statements are made
@@ -53,7 +53,3 @@ make the site's own records revocable.
 #### Scenario: An operator's screen presents no visitor notice
 - **WHEN** an operator records a booking on somebody's behalf and enters that person's name, email address and telephone number
 - **THEN** the package presents no privacy notice on that screen, because the person it addresses is not the one reading it
-
-#### Scenario: The visitor-facing flows are unchanged
-- **WHEN** a visitor reaches a step that asks for their own contact details, in any flow the package ships for them to complete
-- **THEN** the notice is present in that same form, ahead of the control that submits it, stating all four things, exactly as before

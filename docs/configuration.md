@@ -123,8 +123,10 @@ site that has not written its own, are unaffected.
 **If your own code implements `IBookingService` or `IServiceBookingService`, it will no longer
 compile** until it adds the members for recording a booking on somebody's behalf —
 `PlaceOnBehalfAsync(request, …)` and `PlaceForServiceOnBehalfAsync(service, request, …)` on the
-booking service, and `PlaceOnBehalfAsync(…)` on the service booking service, which is the entry
-point that applies a service's length rules to a placement. These have no default implementation
+booking service, and **two** overloads of `PlaceOnBehalfAsync` on the service booking service —
+one taking a service request and one taking a resource request — that being the entry point
+which applies a service's length rules to a placement. **Four members across the two
+interfaces**, not three. These have no default implementation
 for the reason the move members have none: a booking service that could not place on an operator's
 terms would be a worse outcome than a compile error.
 

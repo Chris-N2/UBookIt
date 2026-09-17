@@ -120,6 +120,14 @@ public class PlaceOnBehalfTests
         //
         // Asserted over the whole public surface rather than by naming the method: the next way
         // in will be an overload, or a differently-named member, not this signature again.
+        //
+        // **THIS GUARD IS HALF OF A PAIR AND CANNOT STAND ALONE.** An explicit interface
+        // implementation compiles to a PRIVATE method, so `BindingFlags.Public` cannot see it —
+        // which means that if `IPlacementRuleCheck` were ever made public and implemented
+        // explicitly, the capability would be published and this assertion would stay green. The
+        // only thing forbidding that is the interface-visibility assertion in
+        // `The_terms_taking_rule_check_is_still_reachable_through_the_internal_seam`. Do not
+        // tidy that test away as a redundant sanity check; it is the other half of this one.
         var leaked = typeof(BookingService)
             .GetMethods(BindingFlags.Public | BindingFlags.Instance | BindingFlags.Static | BindingFlags.DeclaredOnly)
             .Where(method => method.GetParameters().Any(p => p.ParameterType == typeof(PlacementTerms)))
@@ -139,8 +147,15 @@ public class PlaceOnBehalfTests
     [Fact]
     public void The_terms_taking_rule_check_is_still_reachable_through_the_internal_seam()
     {
-        // The other direction, so the guard above cannot be satisfied by deleting the capability.
-        // A member that vanished would take operator placement's refusal classification with it.
+        // The other direction, so the guard above cannot be satisfied by deleting the capability:
+        // a member that vanished would take operator placement's refusal classification with it.
+        //
+        // **AND it carries half of that guard's own guarantee**, which is why this reads like a
+        // sanity check and is not one. `The_terms_taking_rule_check_is_not_public_api` reflects
+        // over PUBLIC members, and an explicit interface implementation is private — so making
+        // `IPlacementRuleCheck` public would publish the terms-taking check with that guard
+        // still green. `Assert.False(typeof(IPlacementRuleCheck).IsPublic)` below is what
+        // forbids it. Deleting this test halves the protection silently.
         Assert.NotNull(typeof(IPlacementRuleCheck).GetMethod(
             nameof(IPlacementRuleCheck.CheckPlacementRules)));
         Assert.True(typeof(IPlacementRuleCheck).IsAssignableFrom(typeof(BookingService)));

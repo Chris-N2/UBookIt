@@ -381,6 +381,14 @@ the past. A resource your site does not offer for direct booking on the website 
 you here, for the same reason: that setting stops a visitor assembling something the business
 cannot deliver, and you are the person who can judge that.
 
+**The person whose details you are typing is told nothing by uBookIt.** The privacy notice the
+booking page shows is addressed to somebody entering their own details, and showing it to you
+would inform nobody — so this screen does not. Their placement email does not carry it either.
+If your site needs that person told what is held about them, why, for how long and who can see
+it, that is yours to do — by saying it on the telephone, or by putting it in the content you
+supply for the placement message. Stated here rather than left to be inferred from a screen that
+simply does not mention it.
+
 **Read the reference back to them.** When the booking is recorded, the screen shows its
 reference. If the site has booking emails switched on they will also receive a message; if it
 does not, that reference is the only thing they will have.
