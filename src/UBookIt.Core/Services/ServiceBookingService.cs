@@ -165,6 +165,36 @@ public interface IServiceBookingService
     /// must add this member.
     /// </para>
     /// </remarks>
+    /// <summary>
+    /// Places a booking for a service <b>on a booker's behalf</b> — an operator recording a
+    /// booking taken by telephone or at a desk.
+    /// </summary>
+    /// <remarks>
+    /// <para>
+    /// <b>This is the operator's single entry point for placing any booking</b>, on the same
+    /// terms its move is. <see cref="IBookingService"/> knows resources and nothing about
+    /// services, so an operator placement routed only through it would apply the resources'
+    /// duration bounds and silently not the service's — the same split, and the same remedy,
+    /// as <see cref="MoveAsync"/>.
+    /// </para>
+    /// <para>
+    /// Role resolution, eligibility, assignment and the pinning rule are exactly a visitor's.
+    /// What differs is the terms the placement runs under: a lead of zero, no horizon, and the
+    /// site's approval setting waived. Those terms reach the candidate exclusion as well as the
+    /// placement, because a rule waived by one and applied by the other has not been waived.
+    /// </para>
+    /// </remarks>
+    Task<DomainResult<Booking>> PlaceOnBehalfAsync(
+        ServiceBookingRequest request, CancellationToken cancellationToken = default);
+
+    /// <summary>
+    /// The same, for a booking that names a resource rather than a service. This layer adds no
+    /// length rule for one and refuses nothing; it delegates to the booking service's operator
+    /// placement unchanged, so that an operator has one collaborator rather than two.
+    /// </summary>
+    Task<DomainResult<Booking>> PlaceOnBehalfAsync(
+        BookingRequest request, CancellationToken cancellationToken = default);
+
     Task<DomainResult<Booking>> MoveAsync(
         Guid bookingId, DateTimeOffset newStart, TimeSpan newLength, CancellationToken cancellationToken = default);
 }
@@ -177,6 +207,17 @@ public sealed class ServiceBookingService(
     IBookingService bookingService,
     SiteBookingSettings settings) : IServiceBookingService
 {
+    /// <summary>
+    /// The terms-aware rule check, when the booking service in use offers it.
+    /// <para>
+    /// <b>Absent only for a substituted implementation</b>, and an operator placement asked of
+    /// one fails loudly rather than quietly running the visitor's rules: silently narrowing an
+    /// operator's placement to a visitor's lead time is the exact defect this seam exists to
+    /// prevent, and a fallback would reintroduce it wearing the look of robustness.
+    /// </para>
+    /// </summary>
+    private readonly IPlacementRuleCheck? ruleCheck = bookingService as IPlacementRuleCheck;
+
     /// <summary>
     /// The single evaluation. Every other resolution entry point on this service
     /// projects from what this returns, so a diagnostic view and the pool the
@@ -773,9 +814,40 @@ public sealed class ServiceBookingService(
             && outer.Min <= inner.Min
             && outer.Max >= inner.Max;
 
-    public async Task<DomainResult<Booking>> PlaceAsync(
+    public Task<DomainResult<Booking>> PlaceAsync(
         ServiceBookingRequest request, CancellationToken cancellationToken = default)
+        => PlaceAsync(request, operatorTerms: null, cancellationToken);
+
+    public Task<DomainResult<Booking>> PlaceOnBehalfAsync(
+        ServiceBookingRequest request, CancellationToken cancellationToken = default)
+        => PlaceAsync(request, PlacementTerms.Operator, cancellationToken);
+
+    public Task<DomainResult<Booking>> PlaceOnBehalfAsync(
+        BookingRequest request, CancellationToken cancellationToken = default)
+        // A direct booking has no service, so this layer has no length rule to add and
+        // refuses nothing — exactly as the move does for one.
+        => bookingService.PlaceOnBehalfAsync(request, cancellationToken);
+
+    /// <summary>
+    /// The one service-placement pipeline. <paramref name="operatorTerms"/> is <c>null</c> for a
+    /// visitor's placement and <see cref="PlacementTerms.Operator"/> for an operator's; it
+    /// reaches both the candidate exclusion and the placement itself, because a rule waived by
+    /// one and applied by the other is a rule that has not been waived.
+    /// </summary>
+    private async Task<DomainResult<Booking>> PlaceAsync(
+        ServiceBookingRequest request,
+        PlacementTerms? operatorTerms,
+        CancellationToken cancellationToken)
     {
+        if (operatorTerms is not null && ruleCheck is null)
+        {
+            throw new InvalidOperationException(
+                $"Placing on a booker's behalf needs a booking service that evaluates the "
+                + $"placement rules under explicit terms ({nameof(IPlacementRuleCheck)}). The "
+                + "one supplied does not, and running the visitor's rules instead would "
+                + "exclude every candidate inside its own lead time before any attempt ran.");
+        }
+
         var candidateResult = await ResolveServiceAndCandidatesAsync(request.ServiceId, cancellationToken)
             .ConfigureAwait(false);
         if (!candidateResult.Succeeded)
@@ -878,7 +950,8 @@ public sealed class ServiceBookingService(
         // outcome has to be reasoned about rather than observed. The reasoning is
         // in RuleClassification, which asks the placement service the same
         // questions an attempt would have answered.
-        var rules = new RuleClassification(bookingService, request, pools, attemptableSlots, freeSlots);
+        var rules = new RuleClassification(
+            bookingService, ruleCheck, operatorTerms, request, pools, attemptableSlots, freeSlots);
 
         // Whether any assignment that actually ran reached the conflict check and
         // lost. The classification below adds what the excluded ones would have
@@ -898,17 +971,17 @@ public sealed class ServiceBookingService(
             // either every claim is persisted or none is, so attempting
             // assignments in sequence is safe (bookings spec, atomic placement
             // contract).
-            var placed = await bookingService
-                .PlaceForServiceAsync(
-                    attribution,
-                    new MultiClaimBookingRequest
-                    {
-                        ResourceIds = [.. assignment.Select(c => c.ResourceId)],
-                        Start = request.Start,
-                        Duration = request.Duration,
-                        Booker = request.Booker,
-                    },
-                    cancellationToken)
+            var claims = new MultiClaimBookingRequest
+            {
+                ResourceIds = [.. assignment.Select(c => c.ResourceId)],
+                Start = request.Start,
+                Duration = request.Duration,
+                Booker = request.Booker,
+            };
+
+            var placed = await (operatorTerms is null
+                    ? bookingService.PlaceForServiceAsync(attribution, claims, cancellationToken)
+                    : bookingService.PlaceForServiceOnBehalfAsync(attribution, claims, cancellationToken))
                 .ConfigureAwait(false);
 
             if (placed.Succeeded)
@@ -1084,6 +1157,8 @@ public sealed class ServiceBookingService(
     /// </summary>
     private sealed class RuleClassification(
         IBookingService bookingService,
+        IPlacementRuleCheck? ruleCheck,
+        PlacementTerms? operatorTerms,
         ServiceBookingRequest request,
         IReadOnlyList<RoleCandidates> pools,
         List<List<ServiceCandidate>> shortlists,
@@ -1112,8 +1187,22 @@ public sealed class ServiceBookingService(
         {
             if (!_checked.TryGetValue(candidate.ResourceId, out var result))
             {
-                result = bookingService.CheckPlacementRules(
-                    candidate.Resource, request.Start, request.Duration);
+                // Checked on the SAME terms the placement runs under.
+                //
+                // This is not a pre-filter — it is consulted when an attempt has already
+                // failed, to decide which candidates to condemn and what an all-fail tells
+                // the caller. That is precisely where the visitor's terms mislead an
+                // operator: a candidate refused for `lead-time` is condemned as a
+                // deterministic refusal, so a service whose only therapist is merely BUSY is
+                // reported as `service-unavailable` ("this service cannot be booked at that
+                // time") rather than `conflict` ("already booked at that time"). The operator
+                // is told not to retry, on the strength of a rule they are not subject to.
+                // Measured, both ways, by the test named below.
+                result = operatorTerms is null
+                    ? bookingService.CheckPlacementRules(
+                        candidate.Resource, request.Start, request.Duration)
+                    : ruleCheck!.CheckPlacementRules(
+                        candidate.Resource, request.Start, request.Duration, operatorTerms);
 
                 _checked[candidate.ResourceId] = result;
             }

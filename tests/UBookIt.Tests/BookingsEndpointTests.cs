@@ -208,6 +208,12 @@ public class BookingsEndpointTests
 
         public Task<DomainResult<Booking>> PlaceAsync(
             ServiceBookingRequest request, CancellationToken cancellationToken = default) => throw Unexpected();
+
+        public Task<DomainResult<Booking>> PlaceOnBehalfAsync(
+            ServiceBookingRequest request, CancellationToken cancellationToken = default) => throw Unexpected();
+
+        public Task<DomainResult<Booking>> PlaceOnBehalfAsync(
+            BookingRequest request, CancellationToken cancellationToken = default) => throw Unexpected();
     }
 
     /// <summary>
@@ -230,6 +236,14 @@ public class BookingsEndpointTests
             MultiClaimBookingRequest request, CancellationToken cancellationToken = default) => throw Unexpected();
 
         public Task<DomainResult<Booking>> PlaceForServiceAsync(
+            ServiceAttribution service,
+            MultiClaimBookingRequest request,
+            CancellationToken cancellationToken = default) => throw Unexpected();
+
+        public Task<DomainResult<Booking>> PlaceOnBehalfAsync(
+            BookingRequest request, CancellationToken cancellationToken = default) => throw Unexpected();
+
+        public Task<DomainResult<Booking>> PlaceForServiceOnBehalfAsync(
             ServiceAttribution service,
             MultiClaimBookingRequest request,
             CancellationToken cancellationToken = default) => throw Unexpected();
@@ -289,6 +303,14 @@ public class BookingsEndpointTests
             => throw new NotSupportedException();
 
         public Task<DomainResult<Booking>> PlaceForServiceAsync(
+            ServiceAttribution service,
+            MultiClaimBookingRequest request,
+            CancellationToken cancellationToken = default) => throw new NotSupportedException();
+
+        public Task<DomainResult<Booking>> PlaceOnBehalfAsync(
+            BookingRequest request, CancellationToken cancellationToken = default) => throw new NotSupportedException();
+
+        public Task<DomainResult<Booking>> PlaceForServiceOnBehalfAsync(
             ServiceAttribution service,
             MultiClaimBookingRequest request,
             CancellationToken cancellationToken = default) => throw new NotSupportedException();
@@ -425,6 +447,14 @@ public class BookingsEndpointTests
             => throw new NotSupportedException();
 
         public Task<DomainResult<Booking>> PlaceForServiceAsync(
+            ServiceAttribution service,
+            MultiClaimBookingRequest request,
+            CancellationToken cancellationToken = default) => throw new NotSupportedException();
+
+        public Task<DomainResult<Booking>> PlaceOnBehalfAsync(
+            BookingRequest request, CancellationToken cancellationToken = default) => throw new NotSupportedException();
+
+        public Task<DomainResult<Booking>> PlaceForServiceOnBehalfAsync(
             ServiceAttribution service,
             MultiClaimBookingRequest request,
             CancellationToken cancellationToken = default) => throw new NotSupportedException();

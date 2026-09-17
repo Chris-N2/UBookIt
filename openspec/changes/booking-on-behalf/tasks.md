@@ -5,30 +5,45 @@ Design decisions referenced below as D1–D7.
 
 ## 1. Baseline
 
-- [ ] 1.1 Confirm no TestSite is running and no orphan holds port 44348, then build Release `--no-incremental` and record the warning count — the baseline is **zero** beyond the accepted NU1903 transitives; a lock failure here is an earlier session's orphan, not a code fault
-- [ ] 1.2 Run the full suite from a clean build as two steps (`dotnet build`, then `dotnet test --no-build`) and record the four counts, so every later claim about "the suite is green" has a baseline to be measured against
-- [ ] 1.3 Branch `change/booking-on-behalf` from `main` and push with `-u`
+- [x] 1.1 Confirm no TestSite is running and no orphan holds port 44348, then build Release `--no-incremental` and record the warning count — the baseline is **zero** beyond the accepted NU1903 transitives; a lock failure here is an earlier session's orphan, not a code fault
+- [x] 1.2 Run the full suite from a clean build as two steps (`dotnet build`, then `dotnet test --no-build`) and record the four counts, so every later claim about "the suite is green" has a baseline to be measured against
+- [x] 1.3 Branch `change/booking-on-behalf` from `main` and push with `-u`
+
+### The guarantee diff of every replaced requirement
+
+Seven requirements are replaced wholesale. Each was extracted **verbatim by script** from
+`openspec/specs/`, edited surgically, then `diff`ed back so every removed line is accounted for —
+prose diffed for guarantees, not read for sense. Re-verify each before trusting the table; a
+measurement nobody re-ran is a claim.
+
+- [x] 1.4 `bookings` — **Availability and placement service ports**: 1 line changed (the service's verb enumeration gains operator placement). 12 → 13 scenarios; every SHALL and every BREAKING note carried forward. Verify no store-port addition crept in — this widening adds none, which is why it carries no BREAKING note of its own
+- [x] 1.5 `bookings` — **Booking a single resource requires that resource to permit it**: 4 lines changed, all narrowing "the single-resource entry point" to "the visitor's". 6 → 9 scenarios, 7 → 12 SHALLs. Verify the three original guarantees survive verbatim: the refusal is evaluated in Core before claim composition, service-derived claims are exempt, and the distinction stays structural
+- [x] 1.6 `bookings` — **Booking status machine**: 6 lines changed. 6 → 9 scenarios. **This is the one the sibling sweep found**, not the delta review — verify the four transitions and the `Declined`/`Requested` provenance sentence are intact, since only the `AutoConfirm` derivation was meant to move
+- [x] 1.7 `booking-emails` — **Which events produce messages, and for whom**: 3 lines changed. 8 → 12 scenarios. Verify the auto-confirm one-message rule, the erased-booker silence, and the unconditional gating sentence all survive — none of them was meant to change
+- [x] 1.8 `permissions` — **Access within the section is decided by four verbs**: 1 line changed (Manage's bullet). 8 → 11 scenarios. Verify "exactly four verbs", Manage-implies-Read, and the Settings-implies-nothing sentence are untouched
+- [x] 1.9 `permissions` — **Sensitive-data gates are joined by verbs, never replaced**: 2 lines changed. 2 → 4 scenarios. Verify "a verb SHALL never disclose what that group withholds" survives verbatim — it is the sentence the whole requirement exists for
+- [x] 1.10 `sensitive-data` — **Withheld data SHALL NOT be reachable by asking about it**: 1 line changed (the exactness obligation is scoped to an endpoint that *matches on* a detail). 4 → 7 scenarios. Verify the gate sentence, the no-partial-form rule, the reveal-nothing rule and the historical note are all intact — this requirement is a security constraint and the narrowing must not have reached them
 
 ## 2. Core — the terms (D1)
 
-- [ ] 2.1 Add `ApprovalApplies` to `PlacementTerms`, `true` on `Visitor` and `false` on `Operator`, with the rationale in XML docs; verify existing `PlacementTerms` tests still pass unchanged
-- [ ] 2.2 Add a unit test asserting `PlacementTerms` carries **no** member concerning direct bookability (`bookings`, *…the waiver is not a member of the operator's terms*), so D1's second half is guarded rather than intended
-- [ ] 2.3 Thread `PlacementTerms` through the private `PlaceAsync` to the status decision, so `Booking.Create` reads `terms.ApprovalApplies && !settings.AutoConfirm`; verify by a test that a visitor placement under `AutoConfirm` off is still `Requested`
+- [x] 2.1 Add `ApprovalApplies` to `PlacementTerms`, `true` on `Visitor` and `false` on `Operator`, with the rationale in XML docs; verify existing `PlacementTerms` tests still pass unchanged
+- [x] 2.2 Add a unit test asserting `PlacementTerms` carries **no** member concerning direct bookability (`bookings`, *…the waiver is not a member of the operator's terms*), so D1's second half is guarded rather than intended
+- [x] 2.3 Thread `PlacementTerms` through the private `PlaceAsync` to the status decision, so `Booking.Create` reads `terms.ApprovalApplies && !settings.AutoConfirm`; verify by a test that a visitor placement under `AutoConfirm` off is still `Requested`
 
 ## 3. Core — operator placement of a resource (D2, D3, D4)
 
-- [ ] 3.1 Add `IBookingService.PlaceOnBehalfAsync(BookingRequest, CancellationToken)` as a **new member**, never by widening `PlaceAsync`; verify the existing `PlaceAsync` signatures are byte-identical to `main` (`git diff` on the interface shows additions only)
-- [ ] 3.2 Implement it as a sibling of the direct overload — composing its own `MultiClaimBookingRequest` and calling the private pipeline with `PlacementTerms.Operator`, **not** calling `PlaceAsync(BookingRequest)`; verify by a test that a resource withholding `DirectlyBookable` is placeable on behalf and still refused to a visitor
-- [ ] 3.3 Cover the pipeline scenarios from `bookings`, *Placing a booking on a booker's behalf*: lead time waived, past refused with `lead-time`, horizon waived, and open hours / conflict / duration bounds / granularity each still binding
-- [ ] 3.4 Cover the status scenarios from `bookings`, *Booking status machine*: an operator's placement is `Confirmed` under `AutoConfirm` both off and on, and a visitor's is unchanged under both
-- [ ] 3.5 Verify the booker is validated exactly as a visitor's (missing or malformed email refused) and that no member key is set
+- [x] 3.1 Add `IBookingService.PlaceOnBehalfAsync(BookingRequest, CancellationToken)` as a **new member**, never by widening `PlaceAsync`; verify the existing `PlaceAsync` signatures are byte-identical to `main` (`git diff` on the interface shows additions only)
+- [x] 3.2 Implement it as a sibling of the direct overload — composing its own `MultiClaimBookingRequest` and calling the private pipeline with `PlacementTerms.Operator`, **not** calling `PlaceAsync(BookingRequest)`; verify by a test that a resource withholding `DirectlyBookable` is placeable on behalf and still refused to a visitor
+- [x] 3.3 Cover the pipeline scenarios from `bookings`, *Placing a booking on a booker's behalf*: lead time waived, past refused with `lead-time`, horizon waived, and open hours / conflict / duration bounds / granularity each still binding
+- [x] 3.4 Cover the status scenarios from `bookings`, *Booking status machine*: an operator's placement is `Confirmed` under `AutoConfirm` both off and on, and a visitor's is unchanged under both
+- [x] 3.5 Verify the booker is validated exactly as a visitor's (missing or malformed email refused) and that no member key is set
 
 ## 4. Core — operator placement of a service (D2)
 
-- [ ] 4.1 Add `IServiceBookingService.PlaceOnBehalfAsync` as a new member, delegating to the booking service's operator placement when a resource is named rather than a service
-- [ ] 4.2 Apply the service's length rules exactly as `PlaceAsync` does — the intersection of the duration specification with each candidate's range, same stable codes, no substitution of a permitted length; verify with the 45–120 service refused at 30 minutes and at a candidate's 90-minute ceiling
-- [ ] 4.3 **Verify operator terms are not re-imposed by resolution**: a service whose resources require 24 hours' notice is placeable one hour out. This is the rule that lives one layer up and is the exact defect class `move-booking` shipped — test it through the service entry point, not the booking service's
-- [ ] 4.4 Verify a visitor's service placement is unchanged: same rules, codes and assignment behaviour, lead time and horizon included
+- [x] 4.1 Add `IServiceBookingService.PlaceOnBehalfAsync` as a new member, delegating to the booking service's operator placement when a resource is named rather than a service
+- [x] 4.2 Apply the service's length rules exactly as `PlaceAsync` does — the intersection of the duration specification with each candidate's range, same stable codes, no substitution of a permitted length; verify with the 45–120 service refused at 30 minutes and at a candidate's 90-minute ceiling
+- [x] 4.3 **Verify operator terms are not re-imposed by resolution**: a service whose resources require 24 hours' notice is placeable one hour out. This is the rule that lives one layer up and is the exact defect class `move-booking` shipped — test it through the service entry point, not the booking service's
+- [x] 4.4 Verify a visitor's service placement is unchanged: same rules, codes and assignment behaviour, lead time and horizon included
 
 ## 5. Emails (D5)
 

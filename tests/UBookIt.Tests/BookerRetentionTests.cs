@@ -838,6 +838,12 @@ public class BookerRetentionTests
         public Task<DomainResult<Booking>> PlaceForServiceAsync(ServiceAttribution service, MultiClaimBookingRequest request, CancellationToken cancellationToken = default)
             => throw new NotSupportedException();
 
+        public Task<DomainResult<Booking>> PlaceOnBehalfAsync(BookingRequest request, CancellationToken cancellationToken = default)
+            => throw new NotSupportedException();
+
+        public Task<DomainResult<Booking>> PlaceForServiceOnBehalfAsync(ServiceAttribution service, MultiClaimBookingRequest request, CancellationToken cancellationToken = default)
+            => throw new NotSupportedException();
+
         public Task<DomainResult<Booking>> CancelAsync(Guid bookingId, CancellationToken cancellationToken = default)
             => throw new NotSupportedException();
 
@@ -874,6 +880,12 @@ public class BookerRetentionTests
 
         public Task<DomainResult<Booking>> PlaceForServiceAsync(ServiceAttribution service, MultiClaimBookingRequest request, CancellationToken cancellationToken = default)
             => inner.PlaceForServiceAsync(service, request, cancellationToken);
+
+        public Task<DomainResult<Booking>> PlaceOnBehalfAsync(BookingRequest request, CancellationToken cancellationToken = default)
+            => inner.PlaceOnBehalfAsync(request, cancellationToken);
+
+        public Task<DomainResult<Booking>> PlaceForServiceOnBehalfAsync(ServiceAttribution service, MultiClaimBookingRequest request, CancellationToken cancellationToken = default)
+            => inner.PlaceForServiceOnBehalfAsync(service, request, cancellationToken);
 
         public Task<DomainResult<Booking>> CancelAsync(Guid bookingId, CancellationToken cancellationToken = default)
             => inner.CancelAsync(bookingId, cancellationToken);
@@ -934,6 +946,12 @@ public class BookerRetentionTests
         public Task<DomainResult<Booking>> PlaceForServiceAsync(ServiceAttribution service, MultiClaimBookingRequest request, CancellationToken cancellationToken = default)
             => inner.PlaceForServiceAsync(service, request, cancellationToken);
 
+        public Task<DomainResult<Booking>> PlaceOnBehalfAsync(BookingRequest request, CancellationToken cancellationToken = default)
+            => inner.PlaceOnBehalfAsync(request, cancellationToken);
+
+        public Task<DomainResult<Booking>> PlaceForServiceOnBehalfAsync(ServiceAttribution service, MultiClaimBookingRequest request, CancellationToken cancellationToken = default)
+            => inner.PlaceForServiceOnBehalfAsync(service, request, cancellationToken);
+
         public Task<DomainResult<Booking>> CancelAsync(Guid bookingId, CancellationToken cancellationToken = default)
             => inner.CancelAsync(bookingId, cancellationToken);
 
@@ -972,6 +990,12 @@ public class BookerRetentionTests
 
         public Task<DomainResult<Booking>> PlaceForServiceAsync(ServiceAttribution service, MultiClaimBookingRequest request, CancellationToken cancellationToken = default)
             => inner.PlaceForServiceAsync(service, request, cancellationToken);
+
+        public Task<DomainResult<Booking>> PlaceOnBehalfAsync(BookingRequest request, CancellationToken cancellationToken = default)
+            => inner.PlaceOnBehalfAsync(request, cancellationToken);
+
+        public Task<DomainResult<Booking>> PlaceForServiceOnBehalfAsync(ServiceAttribution service, MultiClaimBookingRequest request, CancellationToken cancellationToken = default)
+            => inner.PlaceForServiceOnBehalfAsync(service, request, cancellationToken);
 
         public Task<DomainResult<Booking>> CancelAsync(Guid bookingId, CancellationToken cancellationToken = default)
             => inner.CancelAsync(bookingId, cancellationToken);

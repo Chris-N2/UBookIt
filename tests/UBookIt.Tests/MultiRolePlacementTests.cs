@@ -761,6 +761,26 @@ public class MultiRolePlacementTests
             return inner.PlaceForServiceAsync(service, request, cancellationToken);
         }
 
+        // Counted on the operator's overloads for the same reason, and delegating to the
+        // inner service's OPERATOR members rather than its visitor ones: delegating to the
+        // visitor members would apply visitor terms under an operator's placement, so a
+        // future on-behalf test would exercise the wrong rules and still pass.
+        public Task<DomainResult<Booking>> PlaceOnBehalfAsync(
+            BookingRequest request, CancellationToken cancellationToken = default)
+        {
+            Attempts++;
+            return inner.PlaceOnBehalfAsync(request, cancellationToken);
+        }
+
+        public Task<DomainResult<Booking>> PlaceForServiceOnBehalfAsync(
+            ServiceAttribution service,
+            MultiClaimBookingRequest request,
+            CancellationToken cancellationToken = default)
+        {
+            Attempts++;
+            return inner.PlaceForServiceOnBehalfAsync(service, request, cancellationToken);
+        }
+
         public DomainResult CheckPlacementRules(Resource resource, DateTimeOffset start, TimeSpan duration)
             => inner.CheckPlacementRules(resource, start, duration);
 
@@ -806,6 +826,20 @@ public class MultiRolePlacementTests
         // racing at all, and it would still pass — it asserts on the reported outcome,
         // which a successful placement also produces a plausible-looking version of.
         public Task<DomainResult<Booking>> PlaceForServiceAsync(
+            ServiceAttribution service,
+            MultiClaimBookingRequest request,
+            CancellationToken cancellationToken = default)
+            => Task.FromResult(DomainResult<Booking>.Failure(
+                FailureCodes.Conflict, "Another booking took it first."));
+
+        public Task<DomainResult<Booking>> PlaceOnBehalfAsync(
+            BookingRequest request, CancellationToken cancellationToken = default)
+            => inner.PlaceOnBehalfAsync(request, cancellationToken);
+
+        // Lost on the operator's service overload too, for the reason given above: an
+        // on-behalf service placement calls THIS one, so leaving it to the real service
+        // would stop a future test racing at all while it continued to pass.
+        public Task<DomainResult<Booking>> PlaceForServiceOnBehalfAsync(
             ServiceAttribution service,
             MultiClaimBookingRequest request,
             CancellationToken cancellationToken = default)

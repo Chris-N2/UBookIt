@@ -305,6 +305,14 @@ public class EraseBookerEndpointTests
             MultiClaimBookingRequest request,
             CancellationToken cancellationToken = default) => throw Unexpected();
 
+        public Task<DomainResult<Booking>> PlaceOnBehalfAsync(
+            BookingRequest request, CancellationToken cancellationToken = default) => throw Unexpected();
+
+        public Task<DomainResult<Booking>> PlaceForServiceOnBehalfAsync(
+            ServiceAttribution service,
+            MultiClaimBookingRequest request,
+            CancellationToken cancellationToken = default) => throw Unexpected();
+
         public DomainResult CheckPlacementRules(Resource resource, DateTimeOffset start, TimeSpan duration)
             => throw Unexpected();
 

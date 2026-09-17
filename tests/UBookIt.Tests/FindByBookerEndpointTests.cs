@@ -250,6 +250,15 @@ public class FindByBookerEndpointTests
             UBookIt.Core.Bookings.MultiClaimBookingRequest request,
             CancellationToken cancellationToken = default) => throw Unexpected();
 
+        public Task<DomainResult<UBookIt.Core.Bookings.Booking>> PlaceOnBehalfAsync(
+            UBookIt.Core.Bookings.BookingRequest request,
+            CancellationToken cancellationToken = default) => throw Unexpected();
+
+        public Task<DomainResult<UBookIt.Core.Bookings.Booking>> PlaceForServiceOnBehalfAsync(
+            UBookIt.Core.Bookings.ServiceAttribution service,
+            UBookIt.Core.Bookings.MultiClaimBookingRequest request,
+            CancellationToken cancellationToken = default) => throw Unexpected();
+
         public DomainResult CheckPlacementRules(
             UBookIt.Core.Resources.Resource resource, DateTimeOffset start, TimeSpan duration)
             => throw Unexpected();

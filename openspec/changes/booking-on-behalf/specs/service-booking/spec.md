@@ -26,10 +26,16 @@ visitor's does, refuses a pinned resource that appears in no pool on the same te
 reports an unfulfillable service with the same classification of failures. Who is placing
 changes the placement terms and nothing about what the service *is*.
 
-**Operator terms SHALL reach the placement itself, not the resolution.** Lead time and horizon
-are evaluated by the booking service's pipeline, which this entry point places through; nothing
-in resolution, candidate shortlisting or the advisory free-claims read applies either rule. An
-operator's placement SHALL therefore not be narrowed by a rule the pipeline was told to waive.
+**Operator terms SHALL reach every part of the placement that evaluates a rule — not only the
+attempt.** Lead time and horizon are evaluated by the booking service's pipeline, which this
+entry point places through; nothing in resolution, candidate shortlisting or the advisory
+free-claims read applies either rule.
+
+**They SHALL also reach the refusal.** When an attempt fails, service placement asks each
+candidate's own rules which candidates to condemn and what to report; a rule the operator is not
+subject to SHALL NOT take part in that answer. Otherwise a service whose only candidate is
+merely **busy** is refused as though the service could not be booked at that time at all — the
+operator is told not to retry, on the strength of a waived rule, when another time would work.
 
 **A booking placed this way SHALL record the service that produced it**, on the same terms as
 any service placement: the attribution is the snapshot taken when the booking was placed.
@@ -57,6 +63,10 @@ and the store and observer additions do.
 #### Scenario: Lead time is waived for a service placement too
 - **WHEN** an operator places a booking on a booker's behalf for a service whose resources require 24 hours' notice, one hour from now
 - **THEN** placement succeeds, because the pipeline evaluates lead time as zero for an operator
+
+#### Scenario: A busy candidate is reported as a conflict, not as an unbookable service
+- **WHEN** an operator places a booking on a booker's behalf for a service whose only candidate is already booked at that interval, at a time inside that resource's configured lead time
+- **THEN** the refusal is `conflict` — the resource is taken — and not `service-unavailable`, because the lead time does not bind an operator and so cannot contribute to the explanation
 
 #### Scenario: An unfulfillable service is reported as it always was
 - **WHEN** an operator places a booking on a booker's behalf for a service no resource can currently fulfil

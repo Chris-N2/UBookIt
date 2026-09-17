@@ -183,6 +183,12 @@ public sealed class UnusedServiceBookingService : IServiceBookingService
     public Task<DomainResult<Booking>> PlaceAsync(
         ServiceBookingRequest request, CancellationToken cancellationToken = default) => throw Unexpected();
 
+    public Task<DomainResult<Booking>> PlaceOnBehalfAsync(
+        ServiceBookingRequest request, CancellationToken cancellationToken = default) => throw Unexpected();
+
+    public Task<DomainResult<Booking>> PlaceOnBehalfAsync(
+        BookingRequest request, CancellationToken cancellationToken = default) => throw Unexpected();
+
     public Task<DomainResult<Booking>> MoveAsync(
         Guid bookingId, DateTimeOffset newStart, TimeSpan newLength, CancellationToken cancellationToken = default)
         => throw Unexpected();
