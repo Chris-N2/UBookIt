@@ -81,10 +81,10 @@ measurement nobody re-ran is a claim.
 
 ## 9. Documentation
 
-- [ ] 9.1 `docs/notifications.md`: the operator-placement case — the booker is written to, the internal recipients are not
-- [ ] 9.2 **Discharge the deferred obligation** this change's touch of `notifications` brings due: "Confirming or declining sends this list nothing" appears **twice** in that document, so its `DocumentationAssert.Says` pin at `NotificationDocumentationTests.cs:233` pins nothing. Introduce `SaysOnce` and paraphrase one occurrence; verify by deleting the table row and confirming the guard now fails
-- [ ] 9.3 `docs/configuration.md`: the two port additions, beside `move`'s three
-- [ ] 9.4 Document that there is no availability picker in this view, as the move requirement's counterpart does
+- [x] 9.1 `docs/notifications.md`: the operator-placement case — the booker is written to, the internal recipients are not
+- [x] 9.2 **Discharge the deferred obligation** this change's touch of `notifications` brings due: "Confirming or declining sends this list nothing" appears **twice** in that document, so its `DocumentationAssert.Says` pin at `NotificationDocumentationTests.cs:233` pins nothing. Introduce `SaysOnce` and paraphrase one occurrence; verify by deleting the table row and confirming the guard now fails
+- [x] 9.3 `docs/configuration.md`: the two port additions, beside `move`'s three
+- [x] 9.4 Document that there is no availability picker in this view, as the move requirement's counterpart does
 
 ## 10. Verification
 

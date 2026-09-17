@@ -34,8 +34,8 @@ Sending needs both: a uBookIt setting *and* a working mail configuration.
 
 | Setting | What it does |
 |---|---|
-| `SendBookerEmails` | Sends the person who booked a plain-text message when their booking is placed, when a requested booking is confirmed or declined, when one is cancelled, and when an operator moves one to a new time. What the placement message says follows the booking's state: confirmed under auto-confirm, received-and-awaiting-confirmation when the site requires approval (see below). Off unless set to `true`. |
-| `InternalRecipients` | Sends your own people a message when a booking is placed or cancelled. **The list being non-empty is the switch** — there is no separate on/off. These addresses hear about **every** booking; for different people per resource or service, see [responsibility](#telling-the-people-responsible) below, which adds recipients rather than replacing this list. Confirming, declining or moving sends this list nothing — you, or a colleague, just did it from the bookings screen, which is where its state lives. |
+| `SendBookerEmails` | Sends the person who booked a plain-text message when their booking is placed, when a requested booking is confirmed or declined, when one is cancelled, when an operator moves one to a new time, and when an operator records a booking on somebody's behalf. What the placement message says follows the booking's state: confirmed under auto-confirm, received-and-awaiting-confirmation when the site requires approval (see below). Off unless set to `true`. |
+| `InternalRecipients` | Sends your own people a message when a booking is placed or cancelled. **The list being non-empty is the switch** — there is no separate on/off. These addresses hear about **every** booking; for different people per resource or service, see [responsibility](#telling-the-people-responsible) below, which adds recipients rather than replacing this list. Confirming, declining, moving, or recording a booking on somebody's behalf sends this list nothing — you, or a colleague, just did it from the bookings screen, which is where its state lives. |
 
 The two are independent: you can be told about bookings without anything being sent to your
 customers, and the other way round. Both also require Umbraco to be able to send mail — an SMTP
@@ -111,6 +111,22 @@ The messages follow the booking rather than the setting:
 - The message to `InternalRecipients` says the booking **awaits approval**, alongside the
   backoffice link it already carries. Confirming or declining sends this list nothing — you
   just did it, from the screen where its state lives.
+
+### Bookings your own people record
+
+An operator can record a booking somebody made by telephone or at a desk, from the bookings
+screen. The person who booked is written to exactly as for a booking they made themselves — the
+same message, saying the same things — because from their side nothing about it was different.
+
+`InternalRecipients` hears nothing about it. One of your own people recorded it, seconds earlier,
+on the screen that lists it; a message telling you what you just did is noise that trains people
+to skim. If somebody who is *not* the operator needs to know — the person responsible for that
+room, say — that is [responsibility](#telling-the-people-responsible), and it is a case worth
+raising if it bites, because the decision is recorded rather than accidental.
+
+A booking recorded this way is **confirmed**, whatever `AutoConfirm` says: approval exists so a
+stranger's request can be reviewed, and the operator recording it has done that by recording it.
+So the booker gets one message, not two.
 
 **If you have built your own front end against the delivery API, read this one.** A successful
 `POST /bookings` or `POST /services/{id}/bookings` returns the booking's `status`, and on a site

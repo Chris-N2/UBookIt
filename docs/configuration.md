@@ -120,6 +120,27 @@ predicate of the write itself. No other public signature changed: `BookingMessag
 keeps its shape and gains an overload. Sites that use the shipped implementations, which is every
 site that has not written its own, are unaffected.
 
+**If your own code implements `IBookingService` or `IServiceBookingService`, it will no longer
+compile** until it adds the members for recording a booking on somebody's behalf —
+`PlaceOnBehalfAsync(request, …)` and `PlaceForServiceOnBehalfAsync(service, request, …)` on the
+booking service, and `PlaceOnBehalfAsync(…)` on the service booking service, which is the entry
+point that applies a service's length rules to a placement. These have no default implementation
+for the reason the move members have none: a booking service that could not place on an operator's
+terms would be a worse outcome than a compile error.
+
+**`IBookingObserver` is the exception, and deliberately.** It gains
+`BookingPlacedOnBehalfAsync(booking, …)` **with a default implementation** that reports an ordinary
+placement, so an existing observer keeps compiling and keeps being told that a booking was placed —
+which is true, and is what it meant. Only an observer that must tell the two apart needs to
+override it. The default errs towards under-reporting a distinction rather than inventing one, and
+never loses the placement itself; a move, by contrast, has no ordinary event to fall back to, which
+is why that member has no default.
+
+**What an operator's placement sends is not what a visitor's sends.** The person who booked is
+written to exactly as for any placement; the addresses in `InternalRecipients` are not, because one
+of your own people just recorded it on the screen that already lists it. See
+[notifications](notifications.md).
+
 ## Permissions
 
 The settings screen and its endpoints require the **`UBookIt.Settings`** verb, granted in

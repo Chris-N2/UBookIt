@@ -230,7 +230,23 @@ public class NotificationDocumentationTests
         // Confirm/decline are booker-only, and the docs must say so where the recipient list
         // is configured — an internal recipient wondering why they heard nothing is the
         // predictable reader.
-        DocumentationAssert.Says(docs, "Confirming or declining sends this list nothing");
+        //
+        // SaysOnce, AND PINNED ON THE TABLE ROW'S OWN WORDING, and both halves were needed.
+        //
+        // This pin was recorded as a deferred obligation because the sentence appeared TWICE —
+        // in the `InternalRecipients` row and again in the approval section — so `Says` was
+        // satisfied by either and the row it was written to hold could be deleted with the
+        // suite green. `move-booking` then reworded the row to "Confirming, declining or
+        // moving...", which removed the duplication by accident and left the pin matching
+        // ONLY the approval section: the defect did not go away, it moved to the other end.
+        // A pin that holds a sentence other than the one its comment names is worse than no
+        // pin, because the comment is what the next reader trusts.
+        //
+        // So there are now two pins, each unique and each holding its own location.
+        DocumentationAssert.SaysOnce(
+            docs,
+            "recording a booking on somebody's behalf sends this list nothing");
+        DocumentationAssert.SaysOnce(docs, "Confirming or declining sends this list nothing");
 
         // A booking placed under auto-confirm raises placement only — the double-message
         // question every subscriber will ask.
