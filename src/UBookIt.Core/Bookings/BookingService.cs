@@ -581,7 +581,13 @@ public sealed class BookingService(
         // booking that may not exist; announcing on failure would report one that does not.
         if (placed.Succeeded)
         {
-            await TellAsync(() => _observer.BookingPlacedAsync(placed.Value, cancellationToken))
+            // Which event, decided from the terms the placement was made under — the only
+            // moment it CAN be decided. The booking carries no marker of who placed it, so a
+            // subscriber reading the row later cannot tell, and this distinction would be lost
+            // if it were not reported here.
+            await TellAsync(() => operatorTerms is null
+                    ? _observer.BookingPlacedAsync(placed.Value, cancellationToken)
+                    : _observer.BookingPlacedOnBehalfAsync(placed.Value, cancellationToken))
                 .ConfigureAwait(false);
         }
 

@@ -33,6 +33,36 @@ public sealed class BookingPlacedNotification(Booking booking) : INotification
 }
 
 /// <summary>
+/// Raised after a booking has been placed <b>on a booker's behalf</b> — by an operator recording
+/// one taken by telephone or at a desk — and stored.
+/// </summary>
+/// <remarks>
+/// <para>
+/// <b>A site that does not care who placed a booking should subscribe to
+/// <see cref="BookingPlacedNotification"/> only</b> — it is raised for a visitor's placement, and
+/// for an operator's on any host that has not asked to tell them apart. This notification is
+/// raised <em>instead</em> of that one, so a handler that wants every placement and wants to
+/// distinguish them subscribes to both; one that wants every placement and does not care needs
+/// nothing new.
+/// </para>
+/// <para>
+/// It exists because the booking itself carries no marker of who placed it, deliberately: an
+/// operator's booking is an ordinary booking in every later respect. Who placed it is therefore
+/// knowable at this moment and at no other.
+/// </para>
+/// <para>
+/// The package's own use of it is narrow: the booker is written to exactly as for any placement,
+/// and the site's own recipients are not, because a colleague performed the action and the
+/// bookings screen already lists it.
+/// </para>
+/// </remarks>
+public sealed class BookingPlacedOnBehalfNotification(Booking booking) : INotification
+{
+    /// <summary>The booking as it was stored.</summary>
+    public Booking Booking { get; } = booking;
+}
+
+/// <summary>
 /// Raised after a booking has been confirmed and the change stored.
 /// </summary>
 /// <remarks>
@@ -148,6 +178,11 @@ public sealed class UmbracoBookingObserver(
 {
     public Task BookingPlacedAsync(Booking booking, CancellationToken cancellationToken = default)
         => PublishAsync(new BookingPlacedNotification(booking), booking, "placed");
+
+    public Task BookingPlacedOnBehalfAsync(
+        Booking booking, CancellationToken cancellationToken = default)
+        => PublishAsync(
+            new BookingPlacedOnBehalfNotification(booking), booking, "placed-on-behalf");
 
     public Task BookingConfirmedAsync(Booking booking, CancellationToken cancellationToken = default)
         => PublishAsync(new BookingConfirmedNotification(booking), booking, "confirmed");

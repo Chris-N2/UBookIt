@@ -47,9 +47,9 @@ measurement nobody re-ran is a claim.
 
 ## 5. Emails (D5)
 
-- [ ] 5.1 Send `BookerPlaced` and suppress the internal recipients for an operator placement, decided at the placement path rather than by inspecting the booking; verify with a recording mail sender **through the production entry point** that the booker got exactly one message and internal recipients got none
-- [ ] 5.2 Verify the observer still fires for an operator placement — only the package's internal recipient list is skipped, never the port a host subscribes to. This is the seam D5 names; a guard over each half will stay green through the regression
-- [ ] 5.3 Verify a visitor's placement still writes to both directions, and that an operator's placement on a site without booker emails enabled is silent and still succeeds
+- [x] 5.1 Send `BookerPlaced` and suppress the internal recipients for an operator placement, decided at the placement path rather than by inspecting the booking; verify with a recording mail sender **through the production entry point** that the booker got exactly one message and internal recipients got none
+- [x] 5.2 Verify the observer still fires for an operator placement — only the package's internal recipient list is skipped, never the port a host subscribes to. This is the seam D5 names; a guard over each half will stay green through the regression
+- [x] 5.3 Verify a visitor's placement still writes to both directions, and that an operator's placement on a site without booker emails enabled is silent and still succeeds
 
 ## 6. Management endpoint (D6)
 
