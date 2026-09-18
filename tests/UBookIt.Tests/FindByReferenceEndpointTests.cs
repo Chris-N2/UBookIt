@@ -271,8 +271,20 @@ public class FindByReferenceEndpointTests
         // failure to this action and the client will report it to an operator as
         // "No booking has the reference X." — a false statement about the site's data. This test
         // fails first.
-        var source = File.ReadAllText(
-            Path.Combine(RepoFiles.Root, "src", "UBookIt.Backoffice", "Controllers", "BookingsController.cs"));
+        // COMMENTS AND STRING LITERALS GO FIRST, and both removals earn their place.
+        //
+        // Comments: a future `// unlike FailureCodes.ServiceNotFound` in this action would fail
+        // this test spuriously — a test dictating prose, which is the exact fault
+        // `BookingsControllerContractTests` records as its reason for moving the old
+        // status-default grep out of itself.
+        //
+        // String literals: the brace matcher below would otherwise count braces inside them. The
+        // action already contains `$"No booking has the reference {parsed.Display}."`, whose one
+        // `{` and one `}` happen to cancel — it balanced by luck, and a future `"{"` or `$"{{"`
+        // would have silently truncated the extracted body and left this guard reading the wrong
+        // text.
+        var source = Sanitize(File.ReadAllText(
+            Path.Combine(RepoFiles.Root, "src", "UBookIt.Backoffice", "Controllers", "BookingsController.cs")));
 
         var action = ActionBody(source, nameof(BookingsController.FindBookingByReference));
 
@@ -282,11 +294,12 @@ public class FindByReferenceEndpointTests
             .Order(StringComparer.Ordinal)
             .ToArray();
 
-        Assert.Equal(new[] { nameof(FailureCodes.BookingNotFound), nameof(FailureCodes.ReferenceInvalid) }, codes);
-
-        // POSITIVE CONTROL: the scan must be able to see codes at all, or an action that stopped
-        // producing failures would pass by producing an empty set.
+        // POSITIVE CONTROL, AND IT COMES FIRST. Placed after the equality it was useless: the
+        // equality already fails on an empty set, so the control could never be the assertion
+        // that fired and its comment claimed a job the line above had done.
         Assert.NotEmpty(codes);
+
+        Assert.Equal(new[] { nameof(FailureCodes.BookingNotFound), nameof(FailureCodes.ReferenceInvalid) }, codes);
 
         // And of the codes this action can actually produce, exactly one maps to 404.
         var mapsTo404 = codes
@@ -305,6 +318,26 @@ public class FindByReferenceEndpointTests
         var result = (ObjectResult)new List<DomainFailure> { new(code, "probe", null) }.ToProblemResult();
 
         return result.StatusCode!.Value;
+    }
+
+    /// <summary>
+    /// Source with comments and string literals removed, so a scan reads CODE.
+    /// </summary>
+    private static string Sanitize(string source)
+    {
+        // Verbatim strings first (they may contain backslashes and doubled quotes), then
+        // ordinary and interpolated ones, then block and line comments. Each is replaced by an
+        // empty literal rather than deleted, so nothing either side of it runs together.
+        var withoutStrings = Regex.Replace(source, @"@""(?:[^""]|"""")*""", @"""""");
+        withoutStrings = Regex.Replace(withoutStrings, @"""(?:\\.|[^""\\])*""", @"""""");
+
+        var withoutBlockComments = Regex.Replace(withoutStrings, @"/\*.*?\*/", string.Empty, RegexOptions.Singleline);
+
+        return string.Join(
+            '\n',
+            withoutBlockComments
+                .Split('\n')
+                .Select(line => Regex.Replace(line, @"//.*$", string.Empty)));
     }
 
     /// <summary>The body of one action, brace-matched from its signature.</summary>

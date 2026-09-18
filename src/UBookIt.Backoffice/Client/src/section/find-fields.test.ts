@@ -11,6 +11,7 @@ import {
   refusalTermFor,
   reloadsLookup,
   windowControlsApply,
+  windowPageToKeep,
 } from "./find-fields.js";
 
 describe("canonicalReference — a port of BookingReference.TryParse", () => {
@@ -199,6 +200,22 @@ describe("after a row action", () => {
 
   it("reloads the window in the window mode", () => {
     expect(reloadsLookup({ mode: "window" })).toBe(false);
+  });
+});
+
+describe("the page Back to dates returns to", () => {
+  // The spec says the window, filters and list return "exactly as they were". They did not, for
+  // anyone who had paged: the capture was written after the mode had already changed, so its own
+  // guard was necessarily false and the field was never written at all. Both branches are
+  // asserted here, and the one that matters is the FIRST — starting from the window.
+  it("keeps the window's own page when a lookup starts from the window", () => {
+    expect(windowPageToKeep({ mode: "window" }, 25, 0)).toBe(25);
+  });
+
+  it("keeps what it already had when one lookup follows another", () => {
+    // Otherwise the second lookup would save a LOOKUP's page as the window's.
+    expect(windowPageToKeep({ mode: "reference", canonical: "BJQ4ZP5C" }, 0, 25)).toBe(25);
+    expect(windowPageToKeep({ mode: "email", email: "ada@example.com" }, 0, 25)).toBe(25);
   });
 });
 

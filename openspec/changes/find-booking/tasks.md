@@ -253,3 +253,45 @@ population.** Anchor on the doc block **and** the member, never the member alone
   has no DOM environment, so nothing can drive the element through a failed lookup and assert what
   renders. The reasoning is recorded at the `_loadFailed` declaration and at its use. Treat it as
   the seam of this round.
+
+## 12. QA round 2 — REJECT (one must-fix): what changed
+
+**The must-fix was a fifth guard placed where it could not fire**, and QA was right to name the
+pattern rather than the instance. `#windowSkip`'s capture sat *after* the switch that reassigns
+`_mode`, so `windowControlsApply(this._mode)` was necessarily false: the field was never written,
+stayed `0` for the element's lifetime, and `#backToDates` restored page 1 exactly as the line it
+replaced did. Round 1's record claimed the opposite — a documented dead branch, which is worse
+than the unfixed state, because the next reader believes it.
+
+**Fixed by removing the hazard, not by reordering it.** The two refusals became early returns, and
+the capture and the mode change are now one adjacent pair, in order, with the decision extracted as
+`windowPageToKeep(modeBeforeFind, skip, kept)` — a pure function whose PARAMETER NAME states the
+requirement, unit-tested on both branches. The write is now **unconditional**: no `if` remains that
+could make it unreachable. Mutating it to the inert behaviour QA rejected (`return kept`) fails the
+test that matters.
+
+### Nits, all four fixed
+
+- **The positive control was dead.** `Assert.NotEmpty(codes)` ran *after* an equality that already
+  fails on an empty set. Moved first, as `Only_recorded_files_can_compose_a_booking_row` does.
+- **`ActionBody` counted braces inside string literals** — it balanced by luck on
+  `$"...{parsed.Display}."`. Sanitised first now.
+- **The 404 scan read comments**, so a future `// unlike FailureCodes.ServiceNotFound` would have
+  failed it spuriously — a test dictating prose. Same sanitiser. Both proven: with that comment
+  AND a lone `"{"` planted in the action, the test passes; before the fix the first failed it and
+  the second truncated the extracted body.
+- **`#renderLookupStatus` still asked `_error === undefined`** while `#renderTable` asked
+  `_loadFailed`. Unreachable today, but two answers to one question in one file is the condition
+  `_loadFailed` exists to end. Unified.
+
+**State:** unit **1718**, integration **158**, rendering **1086**, client **287** (+2), 0 warnings
+in a clean Release build, `openspec validate --all --strict` 22/22.
+
+**QA closed the "1 Error(s)" caveat from §10** by reproducing it and capturing the line:
+`StaticWebAssets.targets(706,5)` holding the *previous* bundle's content hashes after a client
+rebuild renamed the files — a build-ordering artefact, not a defect. **Build the client, then
+`dotnet build`; never interleave.** A recurrence of that specific line is not a real error; any
+other one is.
+
+**The four element-level behaviours resting on the absent DOM harness** are now named together in
+the deferred obligation, at QA's request, so whoever installs the harness knows what it owes first.

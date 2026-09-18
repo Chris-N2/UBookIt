@@ -205,6 +205,23 @@ export function reloadsLookup(mode: FindMode): mode is LookupMode {
   return mode.mode !== "window";
 }
 
+/**
+ * The page to remember as the window's, given the mode the view is in **before** a lookup starts.
+ *
+ * <b>The parameter is named `modeBeforeFind` because reading it after the mode has changed is a
+ * defect that shipped.</b> The first version of this decision was written inline, guarded by
+ * `windowControlsApply(this._mode)`, and placed after the statement that reassigns `_mode` — so
+ * the test was necessarily false, the field was never written, and "Back to dates" went on
+ * restoring page 1 while a comment above it said otherwise. A guard placed where it cannot fire
+ * is worse than no guard, because the next reader believes it.
+ *
+ * `kept` is returned unchanged when a lookup is already running: the second of two lookups must
+ * not overwrite the window's page with a lookup's own.
+ */
+export function windowPageToKeep(modeBeforeFind: FindMode, skip: number, kept: number): number {
+  return windowControlsApply(modeBeforeFind) ? skip : kept;
+}
+
 /** Whether the window and filter controls apply, and so should be shown. */
 export function windowControlsApply(mode: FindMode): mode is { mode: "window" } {
   return mode.mode === "window";

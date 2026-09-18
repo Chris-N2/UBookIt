@@ -17,6 +17,7 @@ import {
   refusalTermFor,
   reloadsLookup,
   windowControlsApply,
+  windowPageToKeep,
   type FindMode,
 } from "./find-fields.js";
 import {
@@ -379,27 +380,27 @@ export class UBookItBookingsListElement extends UmbLitElement {
 
     const kind = classify(this._findText, this._canSeePersonalData);
 
-    switch (kind.kind) {
-      case "neither":
-        this._findError = this.#term("findNeither");
-        return;
-      case "email-not-offered":
-        // Told WHY, and who can — the same courtesy the withheld-details note pays a row.
-        this._findError = this.#term("findEmailNotOffered");
-        return;
-      case "reference":
-        this._mode = { mode: "reference", canonical: kind.canonical };
-        break;
-      case "email":
-        this._mode = { mode: "email", email: kind.email };
-        break;
+    if (kind.kind === "neither") {
+      this._findError = this.#term("findNeither");
+      return;
     }
 
-    // Remember where the window was, so returning to it returns to the page it was on. Guarded
-    // by the mode test: two lookups in a row must not overwrite it with a lookup's own page.
-    if (windowControlsApply(this._mode)) {
-      this.#windowSkip = this._skip;
+    if (kind.kind === "email-not-offered") {
+      // Told WHY, and who can — the same courtesy the withheld-details note pays a row.
+      this._findError = this.#term("findEmailNotOffered");
+      return;
     }
+
+    // THESE TWO WRITES BELONG TOGETHER AND IN THIS ORDER. `windowPageToKeep` reads the mode the
+    // view is in BEFORE the lookup replaces it; computing it after would make its test
+    // necessarily false, which is exactly what shipped last round — the field was never written
+    // and "Back to dates" silently restored page 1. Kept adjacent so the ordering is visible in
+    // one glance rather than spread across a switch.
+    this.#windowSkip = windowPageToKeep(this._mode, this._skip, this.#windowSkip);
+    this._mode =
+      kind.kind === "reference"
+        ? { mode: "reference", canonical: kind.canonical }
+        : { mode: "email", email: kind.email };
 
     this._skip = 0;
     this._notice = undefined;
@@ -439,8 +440,13 @@ export class UBookItBookingsListElement extends UmbLitElement {
 
     // A miss is a SENTENCE, not an empty table: an empty table under a window means "nothing
     // booked", under a lookup it would mean "no such booking", and the two look identical.
+    // `_loadFailed`, the SAME question `#renderTable` asks. This read used to be
+    // `_error === undefined`, which was unreachable-but-wrong: a failed lookup resets the mode so
+    // this returns `nothing` before reaching here — but two different answers to "did a request
+    // fail?" living in one file is the condition `_loadFailed` was introduced to end, and the
+    // unreachability was luck rather than design.
     const miss =
-      !this._loading && this._total === 0 && this._error === undefined
+      !this._loading && this._total === 0 && !this._loadFailed
         ? this._mode.mode === "reference"
           ? this.localize.term("ubookitBookings_findNotFoundReference", displayReference(this._mode.canonical))
           : this.localize.term("ubookitBookings_findNotFoundEmail", this._mode.email)
