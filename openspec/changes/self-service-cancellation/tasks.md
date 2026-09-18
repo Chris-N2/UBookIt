@@ -258,7 +258,7 @@ Unit **1770**, client **290** (+3).
 - [x] 9.3 Full suite green from a clean build; record all four counts and the deltas from 1.2
 - [x] 9.4 **Live**: place a booking on the TestSite with the feature on and booker emails on; follow the link from the message, confirm the page names the right booking and shows no contact details, cancel, and confirm the booking is cancelled and the cancellation message sent
 - [x] 9.5 **Live**: retrieve the link a second time and confirm the uniform refusal; confirm a fetch without submitting changes nothing
-- [ ] 9.6 **Live**: with the feature on and booker emails off, confirm the settings screen states why it cannot run
+- [x] 9.6 **Live**: with the feature on and booker emails off, confirm the settings screen states why it cannot run
 - [x] 9.7 Stop the TestSite and confirm port 44348 is free
 
 **§8–§9 notes. The live run, end to end, on the TestSite.**
@@ -308,6 +308,44 @@ clean Release build; `openspec validate --all --strict` 22/22. TestSite stopped,
 
 - [x] 10.1 Write the QA handover: what was built, what is claimed, build and test state, and the instruction to **verify rather than trust**
 - [x] 10.2 Name for the reviewer where a defect is most likely, and say plainly that this is the package's first authentication primitive
+
+**9.6, run by Chris — and it found a defect nothing else could.** The setting appeared on the
+settings screen rendering its **raw localisation keys**:
+
+```
+ubookitSettings_selfServiceCancellationEnabledLabel
+ubookitSettings_selfServiceCancellationEnabledDescription
+True
+Changing this in configuration takes effect when the site restarts.
+```
+
+Everything around it was right — catalogued, read-only, restart-bound, value correct, the server
+refusing writes — and **every test passed**. The defect lived entirely in the gap between a C#
+catalogue and a TypeScript dictionary, which nothing joined. This is the same shape as ㊱'s
+"the live check found what 2770 tests could not".
+
+Fixed, and **guarded**: `SettingLocalisationTests` is a C# test that reads the client's `en-us.ts`
+and asserts every catalogued setting has a `…Label` and a `…Description` declared as dictionary
+keys — matched as declarations rather than as text, so a term appearing only inside somebody's prose
+does not satisfy it. It crosses the language boundary the same way `BookingReferenceAlphabetTests`
+does, because only the test project sees both halves. Mutation-proven: removing the label again
+fails with *"Catalogued but not localised, so the screen renders the raw key:
+selfServiceCancellationEnabledLabel"*.
+
+The slug rule is a hand-port of the client's `settingSlug`, so it is pinned against four keys that
+already render correctly on screen.
+
+**Still unconfirmed on screen: the dependency sentence itself.** Chris's site showed no note, which
+is *correct* if `SendBookerEmails` resolves true there — the settings store overrides configuration,
+and that value may be stored from earlier work. What the screenshot establishes is the label defect;
+whether the note renders, and whether it is associated with the control by `aria-describedby`, has
+still not been seen. Both halves remain unit-tested.
+
+**One unexplained test failure, recorded rather than swallowed.** A single run reported
+`Failed: 1, Passed: 1776` without my capturing the name; three subsequent runs were clean at 1777.
+It coincided with a localisation file being restored mid-run, so the likeliest explanation is that
+the run read the file between two writes — but that is a guess, and a deferred obligation already
+records a flaky perf threshold in this suite. Treat a recurrence as real.
 
 **A defect found by a question, after apply was otherwise complete.** Chris asked what he would see
 if he ran the TestSite as it stands. Answering it meant reading `UnmetDependency` again, and it
