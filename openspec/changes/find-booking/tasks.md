@@ -97,10 +97,30 @@ surgically, then `diff`ed back. Re-verify before trusting; a measurement nobody 
 **Verify rather than trust.** Three claims in ㊳'s handover were false and QA found all three;
 every number and every claim below is a claim until you re-run it.
 
-**STOPPED BEFORE QA, DELIBERATELY.** Chris asked for the session to pause at the QA point
-(token budget, late evening). This handover is written; no reviewer has been spawned. The two
-live tasks — 8.4 and 8.5 — are **NOT done**, because they need Chris logged in to the backoffice.
-They are unticked above, and nothing below claims them.
+**UPDATED 2026-09-18 — read this before the table below.** The session resumed. **8.4 and 8.5
+are now DONE**, and running them found **three live defects, one of which was inside the fix for
+another**. All three are fixed and committed (`91bf29e`, `dc75cd5`). The state table below has
+been corrected; the old row said Client 277 and is now 283.
+
+**The third defect is the one to attack, because I got it wrong twice.** A miss was first keyed on
+`response?.status === 404`, which never ran because the generated client THROWS on non-2xx. The
+fix re-keyed it on the domain code `booking-not-found`, justified in a code comment by the claim
+that *"the code travels in the problem body either way"* — a claim I never measured, and which is
+false. Measured against the running backoffice:
+
+| Refusal | Status | `errors` extension | `title` |
+| --- | --- | --- | --- |
+| `reference-invalid` | 400 | **kept**, code intact | ours |
+| `booking-not-found` | 404 | **DISCARDED** | replaced with "The requested resource was not found." |
+
+`isMiss` now keys on the 404 status. **Attack that**: it cannot distinguish our 404 from a routing
+404, nor from a second 404-mapped failure added to `FindBookingByReference` later. Both are stated
+in the code rather than guarded. Decide whether stating is enough.
+
+Its test also passed while the screen was wrong, because **the fixture was an `errors` array I had
+typed** — fixture and assertion agreed with each other and both disagreed with the interceptor.
+The fixtures are now objects captured from the live client. Check that they really were captured
+and not reverse-engineered from the implementation.
 
 ### State as handed over
 
@@ -109,9 +129,10 @@ They are unticked above, and nothing below claims them.
 | Branch | `change/find-booking`, merge-base `4106a73` (the proposal commit on `main`) |
 | Release build | `--no-incremental` **0 warnings / 0 errors** — but see the note below |
 | Unit | 1716 (baseline 1706; +9 endpoint tests, +1 alphabet guard) |
-| Integration | 158 (baseline 149; +9) · Rendering 1086 (unchanged) · Client 277 (baseline 235; +42) |
+| Integration | 158 (baseline 149; +9) · Rendering 1086 (unchanged) · Client **283** (baseline 235; +48) |
 | `openspec validate --all --strict` | 22/22 |
-| TestSite | stopped; port 44348 confirmed free after the client regeneration |
+| TestSite | **RUNNING** — 8.6 is ticked from the earlier session and MUST be redone at the end |
+| Branch HEAD | `dc75cd5` (was `0d4f6c2` when this handover was first written) |
 
 **A `--no-incremental` build failed ONCE with "1 Error(s)" and I did not capture the error line**
 (my filter matched only `error CS`). The immediate incremental rebuild and a second
@@ -125,8 +146,10 @@ treat a second occurrence as real.
    `#settleAfterRowAction` is unchanged and simply calls `#load`, so "the lookup re-runs, not the
    window" is a property of that dispatch, not a separate branch. The client test covers
    `reloadsLookup` as a pure decision; **no test drives the element through a row action in a
-   lookup mode** (no DOM environment), and the live check that would (8.4's move-then-still-shown)
-   was not run. This is the seam.
+   lookup mode** (no DOM environment). The live check that would has now been RUN: the booking was
+   moved to 15 Oct 2026, far outside the window, and remained displayed; the email lookup returned
+   that same out-of-window booking. Still the seam — a live pass is one observation, not a guard,
+   and nothing stops a later edit from reintroducing the window.
 2. **The shape rule's agreement with the parser (§6.3).** Done as the design's *fallback*: the
    TypeScript quotes the alphabet, `BookingReferenceAlphabetTests` asserts the quoted constant and
    length equal `BookingReference.Alphabet`/`.Length`, and the client test runs the same
@@ -161,8 +184,9 @@ treat a second occurrence as real.
 
 ### Not done, and why
 
-- **8.4, 8.5 live verification** — needs Chris logged in. Everything the live probe would
-  exercise is described in the task; none of it has been seen in a browser.
+- ~~8.4, 8.5 live verification~~ **DONE 2026-09-18**; results recorded under §8.4 above,
+  including the non-holder run as Perm Tester. Note the method failure recorded there: the first
+  attempt measured the ADMIN session by mistake and concluded the opposite of the truth.
 - **The `email-invalid` refusal term** is mapped, but the find-by-email endpoint refuses a
   malformed address before any query, and the client's `looksLikeEmail` is looser than the
   server's — so it is reachable and untested live.
