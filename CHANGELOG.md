@@ -7,7 +7,9 @@ afford to skim. Where a release changes nothing you must act on, it says so.
 
 **An entry for a release that has happened is never edited.** Those versions are on nuget.org and
 cannot be changed; a changelog that gets rewritten backwards records nothing. If an entry is wrong,
-the correction belongs in the next release's entry, saying what was wrong.
+the correction belongs in the next release's entry, saying what was wrong. An entry is *finished*
+when its release date is stamped at publication — that stamp completes the entry rather than
+revising it, and nothing else about it moves afterwards.
 
 The major tracks the **Umbraco** major, not uBookIt's own breaking changes — uBookIt `17.x` is for
 Umbraco 17. That means the major cannot signal a break, so a break lands in a **minor** and never in
@@ -15,42 +17,61 @@ a patch. See [the versioning note](README.md#what-the-version-number-means).
 
 ---
 
-## 17.1.0 — 2026-09-18
+## 17.1.0
 
 ### What you have to do
 
 **If your site implements any of uBookIt's ports, it will not compile until you add the new
-members.** Four published interfaces gained members, and **none of them has a default
-implementation**. That is deliberate rather than an oversight: an observer that was silently deaf to
-a booking being moved would be a worse outcome than a compile error.
+members.** Five published interfaces gained members, and **none of the members below has a default
+implementation**. That is deliberate rather than an oversight: an observer silently deaf to a
+booking being moved would be a worse outcome than a compile error.
 
-| Interface | What it gained |
+| Interface | Members added |
 |---|---|
-| `IBookingObserver` | a member called when a booking is **moved** |
-| `IBookingStore` | a **move** write |
-| `IServiceBookingService` | a **move** — the operator's entry point, and the only path that applies a service's length rule |
-| `IBookingService` | `CancelAsVisitorAsync` — cancellation initiated by the booker rather than by an operator |
+| `IBookingObserver` | `BookingMovedAsync` |
+| `IBookingStore` | `MoveAsync` |
+| `IBookingManagementStore` | `FindByReferenceAsync` |
+| `IServiceBookingService` | `MoveAsync`, and **two** `PlaceOnBehalfAsync` overloads — one taking a `BookingRequest`, one a `ServiceBookingRequest` |
+| `IBookingService` | `MoveAsync`, `PlaceOnBehalfAsync`, `PlaceForServiceOnBehalfAsync`, `CancelAsVisitorAsync` |
 
-If you implement none of these — which is the case for a site that uses uBookIt as shipped — **this
-release needs no action at all.**
+`IBookingObserver` also gained `BookingPlacedOnBehalfAsync`, which **does** have a default
+implementation — you do not have to add it, and an observer that ignores it keeps working.
 
-Nothing else changes on upgrade. Every feature below is off until you turn it on, so no site's
-behaviour moves by installing this version.
+`ICancellationSecretStore` is new in this release. A new interface breaks nothing, and the package
+ships an implementation; you only need your own if you want one.
+
+**Three of the new backoffice features are live as soon as you upgrade**, for users who already
+hold the relevant permission. Nothing new is granted, but the verbs your groups already have now
+reach further:
+
+| Feature | Who gets it on upgrade |
+|---|---|
+| Move a booking | any group holding **Manage Bookings** |
+| Book on behalf of someone | any group holding **Manage Bookings** *and* Umbraco's **Sensitive data** |
+| Look a booking up by reference | any group holding **Read Bookings** |
+
+If that is not what you want, review those groups before upgrading. Moving a booking also sends the
+booker an email that did not exist before (`BookerMoved`), so a site with booker emails on will
+start sending it the first time an operator moves something.
+
+The other two features are off until you act: the settings screen needs a permission nobody holds
+yet, and self-service cancellation needs configuration. Both are below.
 
 ### What you gain
 
 - **A settings screen in the backoffice.** uBookIt's configuration is visible in one place rather
   than only in `appsettings.json`. Settings that can only come from configuration are shown
-  read-only, with where to set them, instead of being hidden.
-- **An operator can move a booking**, keeping its reference. The booker is emailed about the move;
-  your own internal recipients are not, because the move happened in your backoffice and the
-  bookings screen is where its state lives. A service's length rules are enforced on the move, not
-  just on the original booking.
+  read-only, with where to set them, instead of being hidden. **You will not see it until you grant
+  the new *Settings* permission to a group** — it is deliberately not granted to anyone on upgrade.
+- **An operator can move a booking**, keeping its reference. The booker is emailed; your own
+  internal recipients are not, because the move happened in your backoffice and the bookings screen
+  is where its state lives. A service's length rules are enforced on the move, not only on the
+  original booking.
 - **An operator can book on behalf of someone** — the telephone booking case, where the person
   booking is not the person at a keyboard.
 - **An operator can look a booking up** by reference from the bookings screen.
 - **A booker can cancel their own booking** from a link in their confirmation email, without
-  contacting you. **Off by default**, and it needs two things to be on:
+  contacting you. **Off by default**, and it needs two settings:
 
   ```
   UBookIt:SelfServiceCancellation:Enabled = true
@@ -58,7 +79,8 @@ behaviour moves by installing this version.
   ```
 
   The second is not optional: the link rides the confirmation email, so with booker emails off
-  there is nowhere for it to go and the feature stays absent rather than half-working.
+  there is nowhere for it to go and the feature stays absent rather than half-working. This is the
+  only new configuration key in this release.
 
   Read [the configuration notes](docs/configuration.md) before enabling it. Three consequences are
   worth knowing in advance: **the link is the credential**, so anyone holding it can cancel that
@@ -68,8 +90,7 @@ behaviour moves by installing this version.
 
 ### Upgrading
 
-`17.0.1` → `17.1.0` needs no database work. Schema changes are additive and applied by the
-package's own migrations.
+No database work. Schema changes are additive and applied by the package's own migrations.
 
 ---
 
@@ -93,6 +114,13 @@ corrected in place — a new version was the only fix.
 ---
 
 ## 17.0.0 — 2026-09-15
+
+### What you have to do
+
+Nothing — this is the first release, so there is nothing to upgrade from and no contract it can
+break.
+
+### What changed
 
 The first release, and the point at which the public API became a promise: leaving `0.x` is that
 promise, and the contracts are settled from here.

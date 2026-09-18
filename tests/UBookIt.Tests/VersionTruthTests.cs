@@ -140,7 +140,13 @@ public class VersionTruthTests
     {
         var root = RepoFiles.Root;
 
-        foreach (var file in new[] { "README.md", "CLAUDE.md" })
+        // CHANGELOG.md joined this list in release-17-1-0, and the omission was the whole point:
+        // a third consumer-facing root document was added and every documentation guard in this
+        // repository was blind to it, including the accounting guard below — which found three
+        // unregistered nuget.org claims the moment it could see the file. "A file list is a sample
+        // of the documents that make the claim, and a sample is not the population" is this class's
+        // own lesson, and adding a root document without adding it here repeats it exactly.
+        foreach (var file in new[] { "README.md", "CLAUDE.md", "CHANGELOG.md" })
         {
             yield return file;
         }
@@ -583,6 +589,22 @@ public class VersionTruthTests
             + "nuget.org. It was carried here for a year as a sentence waiting to become "
             + "correct; it no longer needs excusing, only counting. The entry stays because "
             + "this guard accounts for every mention, not only the doubtful ones."),
+
+        ("CHANGELOG.md", "nuget.org", 3,
+            "Added in `release-17-1-0`, and all three VERIFIED against the feed rather than "
+            + "reasoned about: GET https://api.nuget.org/v3-flatcontainer/ubookit/index.json and "
+            + "…/ubookit.core/index.json both return exactly [17.0.0, 17.0.1] — so \"those versions "
+            + "are on nuget.org and cannot be changed\" is true, and 17.1.0 is correctly absent "
+            + "until it is pushed. The other two describe what nuget.org DOES as a host: it "
+            + "resolves a relative link against the package page (which is why 17.0.1 exists), and "
+            + "it serves the latest listed version by default (which is why 17.0.0 was not "
+            + "unlisted). This file is now in LiveDocuments(), which it was not when it was "
+            + "written — that omission is what let three unregistered claims exist at all.\n"
+            + "MEASURED, not assumed, because the first draft of this note overstated it: the "
+            + "count catches a FOURTH mention (a later release adding a publication claim here "
+            + "goes red) and catches all three going away (a dead allowance goes red). It does "
+            + "NOT catch a drop from three to two — a partially consumed allowance passes. So "
+            + "this number bounds the claims, it does not pin them one to one."),
 
         ("openspec/specs/packaging/spec.md", "nuget.org", 4,
             "Arrived at SYNC, not written by hand — `release-17-0-1`'s requirements moved into "

@@ -2,14 +2,16 @@
 
 `17.1.0` is the first uBookIt release a consumer has to *read* before taking. `17.0.0` was the
 first release and `17.0.1` fixed nine broken README links — neither asked anything of anybody.
-This one carries five features, three new settings and, between `move-booking` and
-`self-service-cancellation`, **four additions to published interfaces, none with a default
-implementation**. A site that implements any of those ports stops compiling on upgrade.
+This one carries five features, one new setting and **ten additions to published interfaces
+across five of them, none with a default implementation**. A site that implements any of those
+ports stops compiling on upgrade. Three of the five features are also **live the moment a site
+upgrades**, for groups that already hold the relevant permission — nothing is granted, but existing
+verbs reach further.
 
 The package already promises to handle this. `README.md` says a breaking change "is called out
 explicitly rather than left to be discovered", and `packaging`'s version requirement makes the
 *policy* a SHALL. **Neither produces a place where an actual break is named.** The archived
-proposals record all four precisely, but they are written for us, live under
+proposals record most of them, but they are written for us, live under
 `openspec/changes/archive/`, and are invisible from nuget.org. So today a consumer discovers the
 compile error by hitting it — which is the exact outcome the README says will not happen.
 
@@ -24,8 +26,9 @@ it are history.
   version-reuse warning. The history anchors — "the first release is `17.0.0`", "`17.0.1` exists
   because of it" — **do not move**, and the suite fails if they do.
 - **A `CHANGELOG.md` is introduced**, consumer-facing and per release. It names what a site must do
-  to upgrade before it names what it gains. `17.1.0`'s entry states all four interface additions by
+  to upgrade before it names what it gains. `17.1.0`'s entry states every interface addition by
   member, and that an existing implementation of those ports will not compile until each is added.
+  It also states which features are live on upgrade without anyone turning anything on.
   Earlier releases get short honest entries rather than a reconstruction.
 - **The changelog is guarded, not merely written.** A new test asserts the declared version has a
   non-empty entry, so a future bump that forgets the changelog fails the suite exactly as a bump
@@ -33,10 +36,11 @@ it are history.
 - **The README's API-promise callout gains the pointer.** The sentence that says breaks are called
   out explicitly should be next to the place they are called out.
 - **BREAKING — nothing new breaks here.** This change declares no break of its own. It *publishes*
-  four that were each declared, QA'd and approved in their own change, and that have been sitting
-  unreleased: `IBookingObserver` gains a moved member; `IBookingStore` gains a move write;
-  `IServiceBookingService` gains a move; `IBookingService` gains `CancelAsVisitorAsync`. All four
-  land in a minor, which is where this project's policy puts a break.
+  ten that were each declared, QA'd and approved in their own change, and that have been sitting
+  unreleased, across `IBookingObserver`, `IBookingStore`, `IBookingManagementStore`,
+  `IServiceBookingService` and `IBookingService`. **The set is derived by diffing the compiled
+  interface surface against the `17.0.1` release commit, not transcribed from the proposals** — see
+  design D7. All ten land in a minor, which is where this project's policy puts a break.
 
 ## Capabilities
 
@@ -81,10 +85,15 @@ five approved changes into a release rather than releasing each.
 **Files:** `Directory.Build.props` (the declaration), `README.md`, `docs/publishing.md`, a new
 `CHANGELOG.md`, a new guard in `tests/UBookIt.Tests/`, and the `packaging` delta.
 
-**Consumers:** a site upgrading `17.0.1` → `17.1.0` that implements `IBookingObserver`,
-`IBookingStore`, `IServiceBookingService` or `IBookingService` **will not compile** until it adds
-the new members. Every other site upgrades without action; the new features are behind flags that
-default off, and `self-service-cancellation` additionally requires booker emails to be on.
+**Consumers:** a site upgrading `17.0.1` → `17.1.0` that implements any of the five ports above
+**will not compile** until it adds the new members.
+
+Every other site compiles, but **three features become available immediately**: moving a booking
+and booking on behalf for groups holding *Manage Bookings* (on-behalf additionally requires
+Umbraco's *Sensitive data*), and booking lookup for groups holding *Read Bookings*. A moved booking
+also sends the booker a `BookerMoved` email that did not exist before. Only the settings screen
+(which needs a verb granted to nobody on upgrade) and self-service cancellation (flag, default off,
+and requiring booker emails) are genuinely inert until a site acts.
 
 **Risk:** a spent version number is unrecoverable. `17.1.0` cannot be reused if it ships wrong, and
 the packed README and metadata are frozen at push — which is why verification happens against the

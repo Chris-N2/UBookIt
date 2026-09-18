@@ -15,12 +15,15 @@
 
 - [x] 2.1 Write `CHANGELOG.md` with an entry for `17.1.0` that **opens with what upgrading asks of
       the reader** (design D2), then what they gain.
-- [x] 2.2 In that entry, name all four contract changes by interface and member, transcribed from
-      the archived proposals rather than recalled: `IBookingObserver` gains a moved member;
-      `IBookingStore` gains a move write; `IServiceBookingService` gains a move (all three from
-      `2026-09-16-move-booking`); `IBookingService` gains `CancelAsVisitorAsync`
-      (`2026-09-18-self-service-cancellation`). State that **none has a default implementation**, so
-      a site implementing any of them will not compile until it adds the new members.
+- [x] 2.2 In that entry, name every contract change by interface and member, **derived by diffing
+      the compiled interface surface against `f831986` (the 17.0.1 release commit)** — not
+      transcribed from the archived proposals. QA round 1 rejected the transcribed version: it named
+      four interfaces where there are five, missing `IBookingManagementStore.FindByReferenceAsync`
+      entirely, because `find-booking`'s proposal contains no BREAKING line for a guard to find.
+      The compiled surface is the authority; prose about it is not. State that **none of the members
+      has a default implementation**, so a site implementing any of those ports will not compile
+      until it adds them — and that `IBookingObserver.BookingPlacedOnBehalfAsync`, which *is*
+      defaulted, does not need adding.
 - [x] 2.3 State the non-breaking upgrade path in the same entry: every new feature is behind a flag
       that defaults off, and self-service cancellation additionally requires booker emails to be on,
       so a site that implements no ports upgrades without action.
@@ -85,10 +88,15 @@
 ## 7. Handover
 
 - [ ] 7.1 Do **not** pack or push. Publishing is a non-goal; the runbook is Chris's.
-- [ ] 7.2 Confirm the tree is committed and pushed before he packs — SourceLink embeds the commit
+- [ ] 7.2 Stamp the release date on `17.1.0`'s heading at publication — `## 17.1.0 — YYYY-MM-DD`.
+      The heading ships undated deliberately (QA round 1): a date written before the push is a
+      claim nuget.org can contradict if publication slips, and the file's own never-edit rule then
+      makes the correction awkward. The changelog says the stamp completes an entry rather than
+      revising it, so this is the one edit a released entry may still receive.
+- [ ] 7.3 Confirm the tree is committed and pushed before he packs — SourceLink embeds the commit
       SHA, and packing an uncommitted tree names the wrong one. `git branch -r --contains HEAD` must
       list `origin/main`.
-- [ ] 7.3 Record the deferred items so they are decisions rather than omissions: release tags,
+- [ ] 7.4 Record the deferred items so they are decisions rather than omissions: release tags,
       `<PackageReleaseNotes>` linking the changelog, and CI.
 
 ## 8. The outward sibling sweep — what it found, and why nothing
@@ -117,3 +125,58 @@ null is recorded per candidate rather than assumed:
   documentation links. Noise, not candidates.
 - **Version-shaped sentences in `bookings`, `booking-management`, `permissions`.** All use "version"
   to mean a prior release's behaviour or an installation upgrading, none states a version number.
+
+## 9. QA round 1 — REJECT (1 CRITICAL, 2 MAJOR, 4 MINOR, 2 NIT)
+
+**The CRITICAL was the defect this change exists to prevent, shipped by this change.** The 17.1.0
+entry named four interfaces; there are five, and `IBookingManagementStore.FindByReferenceAsync` was
+absent entirely.
+
+- [x] 9.1 **[CRITICAL]** Rebuild the breaking table from the compiled interface surface diffed
+      against `f831986`, not from the archived proposals. Five interfaces, ten members:
+      `IBookingObserver.BookingMovedAsync`; `IBookingStore.MoveAsync`;
+      `IBookingManagementStore.FindByReferenceAsync`; `IServiceBookingService.MoveAsync` + **two**
+      `PlaceOnBehalfAsync` overloads; `IBookingService.MoveAsync`, `PlaceOnBehalfAsync`,
+      `PlaceForServiceOnBehalfAsync`, `CancelAsVisitorAsync`. Also state that
+      `IBookingObserver.BookingPlacedOnBehalfAsync` **is** defaulted and needs no action, and that
+      `ICancellationSecretStore` is new and therefore breaks nobody. Method recorded as design D7.
+- [x] 9.2 **Verified independently of QA's count.** QA's prose said nine members; its own table rows
+      sum to ten, and the diff confirms ten signatures (nine distinct names — `PlaceOnBehalfAsync`
+      appears twice on `IServiceBookingService`, which that file's own remarks call out as "two
+      members, not one"). Swept **every** `public interface` under `src/`, not only `UBookIt.Core`:
+      no port outside Core is affected.
+- [x] 9.3 **[MAJOR]** Correct "every feature is off until you turn it on" in `CHANGELOG.md`,
+      `proposal.md` and `design.md`. True of one feature in five. Move and book-on-behalf are live
+      on upgrade for groups holding `BookingsManage`, booking lookup for `BookingsRead` — verbs the
+      seed granted before this release. On-behalf additionally requires Umbraco's *Sensitive data*
+      (`BookingsController.cs:474-475`), which QA did not note. The settings screen's `Settings`
+      verb is deliberately outside the seeded set, so that one really is inert.
+- [x] 9.4 **[MAJOR]** Add `CHANGELOG.md` to `VersionTruthTests.LiveDocuments()` — every
+      documentation guard in the repository was blind to it. Register its three `nuget.org`
+      mentions, each **verified against the live feed** rather than reasoned about:
+      `GET api.nuget.org/v3-flatcontainer/{ubookit,ubookit.core}/index.json` both return exactly
+      `[17.0.0, 17.0.1]`.
+- [x] 9.5 **[MINOR]** Derive `Released_versions_keep_their_entries`' population from the archived
+      release changes instead of hardcoding `{17.0.0, 17.0.1}`. Proved derived by adding a
+      `release-17-2-0` directory to the archive and watching the guard demand a 17.2.0 entry;
+      directory removed, `git status` clean.
+- [x] 9.6 **[MINOR]** Give `17.0.0` a "What you have to do" section — the file's own opening rule
+      requires one of every entry, and the ordering guard only inspects the declared version.
+- [x] 9.7 **[MINOR]** `proposal.md` said "three new settings". One. The other two keys QA and I both
+      initially read as new pre-date `17.0.1`.
+- [x] 9.8 **[MINOR]** Ship `17.1.0`'s heading **undated**; the date is stamped at publication
+      (task 7.2). The changelog states that a stamp completes an entry rather than revising it.
+- [x] 9.9 **[NIT]** The round-1 handover reported a mutant that proved nothing — `17.1.10` against
+      a check for `17.1.0` is rejected by plain `Contains` too. The load-bearing case is `17.1.01`,
+      which was re-run and does fire. Reported accurately here.
+- [x] 9.10 **[NIT]** `CHANGELOG.md`'s two relative links are safe: only `README.md` is packed
+      (`Directory.Build.props:103-104`), so nothing resolves them against nuget.org. Checked rather
+      than assumed, because that is precisely the defect that cost `17.0.1`.
+
+### Found while fixing, not by QA
+
+- [x] 9.11 **My own registry note overstated the guard.** I wrote that the accepted-mention count is
+      "exact". Measured: a fourth mention fails, and all three disappearing fails, but **three
+      dropping to two passes** — the count bounds the claims, it does not pin them. Note corrected
+      to say what the mechanism does. Same shape as the CRITICAL one level down: a sentence
+      describing a property the code did not have.

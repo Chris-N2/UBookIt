@@ -54,6 +54,43 @@ public class ChangelogTests
         return next.Success ? body[..next.Index] : body;
     }
 
+    /// <summary>
+    /// Every version this repository's archive records as released, as they are written in a
+    /// heading.
+    /// </summary>
+    /// <remarks>
+    /// Derived from the archived release changes, which CLAUDE.md makes immutable — so a missing
+    /// entry cannot be made to pass by editing the record it is checked against.
+    /// <see cref="VersionTruthTests"/> pins the version anchors to the same place for the same
+    /// reason; the naming convention (<c>release-&lt;major&gt;-&lt;minor&gt;-&lt;patch&gt;</c>) is
+    /// read identically here.
+    /// <para>
+    /// A release currently in flight is deliberately absent: its change is not archived yet, so its
+    /// entry is not yet history and is covered by the declared-version rules instead. It joins this
+    /// set at archive time, which is the moment it stops being editable.
+    /// </para>
+    /// </remarks>
+    private static IReadOnlyList<string> ReleasedVersions()
+    {
+        var archive = Path.Combine(RepoFiles.Root, "openspec", "changes", "archive");
+
+        Assert.True(Directory.Exists(archive), $"No archive at {archive} to read releases from.");
+
+        return
+        [
+            .. Directory
+                .EnumerateDirectories(archive)
+                .Select(directory => Regex.Match(
+                    Path.GetFileName(directory) ?? string.Empty,
+                    @"release-(?<major>\d+)-(?<minor>\d+)-(?<patch>\d+)$"))
+                .Where(match => match.Success)
+                .Select(match =>
+                    $"{match.Groups["major"].Value}.{match.Groups["minor"].Value}.{match.Groups["patch"].Value}")
+                .Distinct(StringComparer.Ordinal)
+                .Order(StringComparer.Ordinal),
+        ];
+    }
+
     [Fact]
     public void The_declared_version_has_an_entry()
     {
@@ -123,15 +160,25 @@ public class ChangelogTests
         // docs/publishing.md: these versions are on nuget.org and cannot be changed, so an entry
         // that can be rewritten backwards records nothing.
         //
-        // Pinned by VERSION rather than by wording, deliberately. Pinning sentences would make
-        // ordinary copy-editing fail for no gain; pinning the entries' existence catches the thing
-        // that actually goes wrong, which is a release being dropped when the file is reorganised.
-        foreach (var released in new[] { "17.0.0", "17.0.1" })
+        // DERIVED, not listed. The first version of this hardcoded {17.0.0, 17.0.1}, which QA
+        // showed was a sample rather than the population: nothing would have added 17.1.0 when
+        // 17.1.0 became history, so at 17.2.0 the newest released entry could be deleted with the
+        // suite green — and every release after it, permanently.
+        //
+        // The population is every version the archive records as released. That record is
+        // immutable by CLAUDE.md's rule, so it cannot be edited to make a missing entry pass —
+        // the same pin `VersionTruthTests` uses for the history anchors, and for the same reason.
+        var released = ReleasedVersions();
+
+        Assert.NotEmpty(released);
+
+        foreach (var version in released)
         {
             Assert.True(
-                EntryFor(released) is not null,
-                $"{Changelog} no longer has an entry for {released}, which is published and "
-                + "immutable. Entries for released versions are history and are not removed.");
+                EntryFor(version) is not null,
+                $"{Changelog} has no entry for {version}, which this repository's archive records "
+                + "as released. Published versions are immutable, so their entries are history and "
+                + "are not removed.");
         }
     }
 
