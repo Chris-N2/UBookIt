@@ -644,3 +644,48 @@ Both cost real time and neither was a code defect:
   searched for `<BS>CancellationSecret<BS>` and failed for a reason with nothing to do with the
   code. Found with `cat -A`. A repo-wide sweep for control characters came back **0**. Heredocs have
   now corrupted source three times on this project; prefer the Write tool for anything with escapes.
+
+## 14. QA round 4 — APPROVED
+
+**Verdict: APPROVE.** Every number re-verified true. QA re-ran its own acceptance test in both
+directions, and re-mutated the rewritten cascade guard rather than reading it — because an
+`Assert.DoesNotContain` → `Assert.False(source.Contains(...))` rewrite is the kind of edit that
+inverts silently.
+
+It then swept every comment in the change that states a property and checked the code has it,
+establishing each by a mutant rather than by reading. Its conclusion: nothing left claims a property
+the code does not have.
+
+**The record it wrote of the four rounds is worth keeping:** round 1 was five MAJORs about *guards
+and published claims, never about the mechanism*. Rounds 2–4 were one fault climbing a ladder —
+the artifact (`UnmetDependency`), the guard's claim (the class vocabulary), the guard's scope (the
+localisation dictionary; the hardcoded controller list), and finally **the guard's own control**.
+
+### The one thing it carried forward, and what was done with it
+
+**A booking moved LATER silently kills its cancellation link.** The expiry is frozen at the start
+the booking had when the secret was issued, so moving Monday → Friday leaves the booker holding a
+link that dies on the Monday. Task 2.3 asked that whichever answer was chosen be recorded as
+deliberate; the *extension* direction was recorded and tested, and the *shortening* one — the half a
+site owner and a booker actually meet — was stated nowhere.
+
+QA raised it as a MINOR in round 1, did not re-raise it in round 2, and said so plainly. It offered
+"one sentence in `docs/configuration.md`" or a deferred obligation.
+
+**Documented rather than deferred**, with a guard, because `move-booking` ships in this same 17.1.0
+release and the two features meet on real sites from the first day. The doc says what happens in
+both directions, why the package does not re-issue on a move (a second live link in one mailbox with
+nothing to tell the reader which counts), and tells a site to warn the booker when moving a booking
+significantly later.
+
+### Environment, folded into the deferred obligations
+
+QA reproduced the build collision independently and identified a **second** mechanism. Between them,
+two ordinary races explain all three "unexplained" failures seen this session: solution-level
+`--no-build` racing the npm target, and a background build overlapping a foreground run. Recorded,
+with the reason it matters — two cheap explanations make it easy to dismiss a third that is real.
+
+**Final state:** unit **1798**, integration **167**, rendering **1168**, client **290**; 0 warnings
+in a clean Release build; `openspec validate --all --strict` 22/22. TestSite stopped, port free.
+
+**Awaiting Chris for sync, archive and merge.**

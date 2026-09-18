@@ -57,6 +57,23 @@ public class SelfServiceCancellationDocumentationTests
     }
 
     [Fact]
+    public void What_a_move_does_to_an_outstanding_link_is_documented()
+    {
+        // The expiry is frozen at the start the booking had when the secret was issued, which is
+        // deliberate — a link in an inbox must not have its life extended by a later change. The
+        // EXTENSION direction was recorded and tested; the SHORTENING one, which is the half a
+        // site owner and a booker actually meet, was stated nowhere.
+        //
+        // It arrives as a support call nobody can explain: a booking moved to next Friday, and a
+        // customer whose cancellation link stopped working on Monday. `move-booking` ships in the
+        // same 17.1.0 release, so the two features meet on real sites from the first day.
+        var docs = Configuration();
+
+        DocumentationAssert.Says(docs, "Moving a booking does not move its cancellation link");
+        DocumentationAssert.Says(docs, "tell the booker they will need to contact you to cancel it");
+    }
+
+    [Fact]
     public void What_the_package_cannot_keep_out_of_a_log_is_documented()
     {
         // THE BOUNDARY THE PACKAGE CANNOT CLOSE FROM INSIDE, and the one QA found missing. The

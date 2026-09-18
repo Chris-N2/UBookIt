@@ -95,6 +95,17 @@ screen says so rather than showing it as working.
   route stops being served, so an outstanding link stops working. The fallback is the position
   before the feature existed: the booker contacts you. Worth timing that change for a quiet period
   rather than mid-season.
+- **Moving a booking does not move its cancellation link.** The link stops working at the time the
+  booking had when the link was sent. Move a booking *later* — Monday to Friday — and the booker's
+  link stops working on the Monday, days before the booking itself, telling them only that the link
+  can no longer be used. Move it *earlier* and the link stops working at the new, earlier time,
+  which is the harmless direction.
+
+  This is deliberate: a link already sitting in somebody's inbox must not have its life quietly
+  extended by a later change, and re-issuing on a move would put a second live link in the same
+  mailbox with nothing to tell the reader which one counts. **If you move a booking significantly
+  later, tell the booker they will need to contact you to cancel it.** uBookIt does not currently
+  send a replacement link.
 - **The link's secret is in the URL, so it reaches your web server's access logs.** uBookIt does not
   write it anywhere itself — it is stored only as a one-way hash, and it is not in any uBookIt log
   line — but IIS, Azure App Service, and any reverse proxy or CDN in front of your site record the
