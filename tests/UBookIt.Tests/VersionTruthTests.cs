@@ -140,7 +140,13 @@ public class VersionTruthTests
     {
         var root = RepoFiles.Root;
 
-        foreach (var file in new[] { "README.md", "CLAUDE.md" })
+        // CHANGELOG.md joined this list in release-17-1-0, and the omission was the whole point:
+        // a third consumer-facing root document was added and every documentation guard in this
+        // repository was blind to it, including the accounting guard below — which found three
+        // unregistered nuget.org claims the moment it could see the file. "A file list is a sample
+        // of the documents that make the claim, and a sample is not the population" is this class's
+        // own lesson, and adding a root document without adding it here repeats it exactly.
+        foreach (var file in new[] { "README.md", "CLAUDE.md", "CHANGELOG.md" })
         {
             yield return file;
         }
@@ -238,8 +244,16 @@ public class VersionTruthTests
         }
     }
 
-    /// <summary>The version every package is built with.</summary>
-    private static string DeclaredVersion()
+    /// <summary>
+    /// The version every package is built with.
+    /// <para>
+    /// <b>Internal rather than private</b> so <see cref="ChangelogTests"/> reads the declared
+    /// version through the same parser, including the exactly-one assertion below. A second
+    /// `&lt;Version&gt;` parse elsewhere would be a second answer to "what version is this?",
+    /// which is the defect this whole class exists to prevent.
+    /// </para>
+    /// </summary>
+    internal static string DeclaredVersion()
     {
         var props = RepoFiles.Read("Directory.Build.props");
         var matches = Regex.Matches(props, @"<Version>(?<version>[^<]+)</Version>");
@@ -575,6 +589,34 @@ public class VersionTruthTests
             + "nuget.org. It was carried here for a year as a sentence waiting to become "
             + "correct; it no longer needs excusing, only counting. The entry stays because "
             + "this guard accounts for every mention, not only the doubtful ones."),
+
+        ("CHANGELOG.md", "nuget.org", 3,
+            "Added in `release-17-1-0`, and all three VERIFIED against the feed rather than "
+            + "reasoned about: GET https://api.nuget.org/v3-flatcontainer/ubookit/index.json and "
+            + "…/ubookit.core/index.json both return exactly [17.0.0, 17.0.1] — so \"those versions "
+            + "are on nuget.org and cannot be changed\" is true, and 17.1.0 is correctly absent "
+            + "until it is pushed. The other two describe what nuget.org DOES as a host: it "
+            + "resolves a relative link against the package page (which is why 17.0.1 exists), and "
+            + "it serves the latest listed version by default (which is why 17.0.0 was not "
+            + "unlisted). This file is now in LiveDocuments(), which it was not when it was "
+            + "written — that omission is what let three unregistered claims exist at all.\n"
+            + "THE COUNT IS EXACT: three and only three passes. A fourth mention is reported "
+            + "unclassified; a drop to two leaves an unconsumed allowance; all three going away "
+            + "leaves three. Measured in each direction, against a build that actually contained "
+            + "this entry.\n"
+            + "That sentence was briefly weakened to \"bounds rather than pins\" on the strength of "
+            + "a green run that measured nothing. TWO INDEPENDENT CAUSES were found, and NEITHER "
+            + "REMEDY CATCHES THE OTHER — which is the reason both are written here rather than "
+            + "the tidier one:\n"
+            + "(1) THE MUTATION NEVER APPLIED. The replacement string spanned a line wrap in "
+            + "CHANGELOG.md, str.replace matched nothing and returned the text unchanged. A "
+            + "rebuild cannot see this; only asserting the file changed can.\n"
+            + "(2) THE ASSEMBLY PREDATED THE GUARD. A binary built before CHANGELOG.md joined "
+            + "LiveDocuments() never reads the file, so it reports green however carefully the "
+            + "mutant is verified — reproduced with a mutation that provably applied. Asserting "
+            + "the change cannot see this; only a rebuild can.\n"
+            + "So a mutation result is evidence only when BOTH hold: the file demonstrably "
+            + "changed, and the assembly was built from the source under test."),
 
         ("openspec/specs/packaging/spec.md", "nuget.org", 4,
             "Arrived at SYNC, not written by hand — `release-17-0-1`'s requirements moved into "
