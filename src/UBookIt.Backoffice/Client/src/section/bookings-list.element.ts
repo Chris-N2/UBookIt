@@ -10,7 +10,14 @@ import { canManageBookings } from "./permission-verbs.js";
 import { UBOOKIT_MOVE_BOOKING_MODAL } from "./move-booking-modal.token.js";
 import { UBOOKIT_PLACE_ON_BEHALF_MODAL } from "./place-on-behalf-modal.token.js";
 import { placedInsideWindow, placedLocalDate } from "./place-on-behalf-fields.js";
-import { classify, refusalTermFor, windowControlsApply, type FindMode } from "./find-fields.js";
+import {
+  classify,
+  displayReference,
+  isMiss,
+  refusalTermFor,
+  windowControlsApply,
+  type FindMode,
+} from "./find-fields.js";
 import {
   actionFor,
   bookerCell,
@@ -210,15 +217,7 @@ export class UBookItBookingsListElement extends UmbLitElement {
             .filter(Boolean)
             .join(" ") || this.#term("listLoadFailed");
         } else {
-          // A lookup the server refused is a fault in what was TYPED, in the operator's words,
-          // associated with the control that took it, not a list that failed to load.
-          const subject =
-            this._mode.mode === "reference" ? this._mode.canonical : this._mode.mode === "email" ? this._mode.email : "";
-          this._findError = this.localize.term(
-            `ubookitBookings_${refusalTermFor(toApiErrors(error, this.#term("findFailed")))}`,
-            subject,
-          );
-          this._mode = { mode: "window" };
+          this.#reportLookupFailure(error);
         }
         this._items = [];
         this._total = 0;
@@ -231,10 +230,17 @@ export class UBookItBookingsListElement extends UmbLitElement {
         return;
       }
 
-      this._error = toApiErrors(thrown, this.#term("listLoadFailed"))
-        .map((failure) => failure.message)
-        .filter(Boolean)
-        .join(" ") || this.#term("listLoadFailed");
+      // MODE-AWARE, exactly as the branch above. Making only one of the two failure paths aware
+      // of the mode is how a lookup that threw reported itself as a list that failed to load —
+      // which is what a live check found.
+      if (windowControlsApply(this._mode)) {
+        this._error = toApiErrors(thrown, this.#term("listLoadFailed"))
+          .map((failure) => failure.message)
+          .filter(Boolean)
+          .join(" ") || this.#term("listLoadFailed");
+      } else {
+        this.#reportLookupFailure(thrown);
+      }
 
       this._items = [];
       this._total = 0;
@@ -272,16 +278,53 @@ export class UBookItBookingsListElement extends UmbLitElement {
           body: { email: this._mode.email, skip: this._skip, take: PAGE_SIZE },
         });
       case "reference": {
-        const { data, error, response } = await UBookItBackofficeService.findBookingByReference({
-          path: { reference: this._mode.canonical },
-        });
-        if (data) {
-          return { data: { items: [data], total: 1 } };
+        // A MISS MUST BE CAUGHT FROM A THROW, and recognised by its STATUS. The generated client
+        // inherits Umbraco's HTTP client configuration, which throws on a non-2xx — so the first
+        // version's `response?.status === 404` never ran — and which, for a 404 specifically,
+        // discards the problem body's `errors` so the domain's `booking-not-found` never arrives.
+        // Both facts were measured against the running backoffice; see `isMiss`, whose own first
+        // version asserted the opposite and shipped a miss reported as a failure.
+        //
+        // The raw value goes to `isMiss`, NOT `toApiErrors`: the status lives on the thrown
+        // object, and normalising it to an error list throws that status away.
+        try {
+          const { data, error } = await UBookItBackofficeService.findBookingByReference({
+            path: { reference: this._mode.canonical },
+          });
+
+          if (data) {
+            return { data: { items: [data], total: 1 } };
+          }
+
+          return isMiss(error) ? { data: { items: [], total: 0 } } : { error };
+        } catch (thrown) {
+          if (isMiss(thrown)) {
+            return { data: { items: [], total: 0 } };
+          }
+
+          throw thrown;
         }
-        // 404 is a miss, not a failure. Anything else is.
-        return response?.status === 404 ? { data: { items: [], total: 0 } } : { error };
       }
     }
+  }
+
+  /**
+   * A lookup the server refused, in the operator's words, against the control that took it —
+   * never as a list that failed to load. Shared by both failure paths so they cannot disagree.
+   */
+  #reportLookupFailure(thrown: unknown) {
+    const subject =
+      this._mode.mode === "reference"
+        ? displayReference(this._mode.canonical)
+        : this._mode.mode === "email"
+          ? this._mode.email
+          : "";
+
+    this._findError = this.localize.term(
+      `ubookitBookings_${refusalTermFor(toApiErrors(thrown, this.#term("findFailed")))}`,
+      subject,
+    );
+    this._mode = { mode: "window" };
   }
 
   /**
@@ -338,7 +381,7 @@ export class UBookItBookingsListElement extends UmbLitElement {
 
     const shown =
       this._mode.mode === "reference"
-        ? this.localize.term("ubookitBookings_findShowingReference", this._mode.canonical)
+        ? this.localize.term("ubookitBookings_findShowingReference", displayReference(this._mode.canonical))
         : this.localize.term("ubookitBookings_findShowingEmail", this._mode.email);
 
     // A miss is a SENTENCE, not an empty table: an empty table under a window means "nothing
@@ -346,7 +389,7 @@ export class UBookItBookingsListElement extends UmbLitElement {
     const miss =
       !this._loading && this._total === 0 && this._error === undefined
         ? this._mode.mode === "reference"
-          ? this.localize.term("ubookitBookings_findNotFoundReference", this._mode.canonical)
+          ? this.localize.term("ubookitBookings_findNotFoundReference", displayReference(this._mode.canonical))
           : this.localize.term("ubookitBookings_findNotFoundEmail", this._mode.email)
         : undefined;
 

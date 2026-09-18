@@ -4,6 +4,8 @@ import {
   REFERENCE_LENGTH,
   canonicalReference,
   classify,
+  displayReference,
+  isMiss,
   looksLikeEmail,
   looksLikeReference,
   refusalTerm,
@@ -54,6 +56,65 @@ describe("canonicalReference — a port of BookingReference.TryParse", () => {
       expect(REFERENCE_ALPHABET).not.toContain(forbidden);
     }
     expect(REFERENCE_LENGTH).toBe(8);
+  });
+});
+
+describe("displayReference", () => {
+  it("groups a canonical reference the way a person reads it", () => {
+    // FOUND LIVE: the status line showed BJQ4ZP5C beside a row showing BJQ4-ZP5C. One reference,
+    // two forms, adjacent on screen — which reads as two different bookings.
+    expect(displayReference("BJQ4ZP5C")).toBe("BJQ4-ZP5C");
+  });
+
+  it("leaves anything that is not a canonical reference alone", () => {
+    // Defensive: the caller always holds a canonical value, and a formatter that invented a dash
+    // in the middle of something else would make a wrong value look official.
+    expect(displayReference("BJQ4")).toBe("BJQ4");
+  });
+});
+
+describe("isMiss", () => {
+  // THESE TWO OBJECTS WERE CAPTURED FROM THE RUNNING BACKOFFICE, not composed here — by calling
+  // the generated client against the live endpoint and printing what it threw. That matters:
+  // the first version of `isMiss` read `booking-not-found` out of an `errors` array, and passed a
+  // test whose fixture was an `errors` array somebody had typed. The fixture agreed with the
+  // assertion and both disagreed with the interceptor, so the suite stayed green while the screen
+  // reported every miss as a failure. Re-capture these if Umbraco's client changes; do not edit
+  // them to make a test pass.
+  const thrownFor404 = { status: 404, title: "The requested resource was not found.", type: "NotFound" };
+  const thrownFor400 = {
+    status: 400,
+    title: "Validation failed",
+    type: "ValidationFailed",
+    errors: [
+      {
+        code: "reference-invalid",
+        message: "That is not a booking reference: eight letters and digits, with or without a dash.",
+        field: "reference",
+      },
+    ],
+  };
+
+  it("is true for the 404 the miss arrives as", () => {
+    expect(isMiss(thrownFor404)).toBe(true);
+  });
+
+  it("is false for a refusal that is not a miss", () => {
+    expect(isMiss(thrownFor400)).toBe(false);
+  });
+
+  it("is false for anything with no status at all", () => {
+    expect(isMiss(undefined)).toBe(false);
+    expect(isMiss(new Error("network down"))).toBe(false);
+    expect(isMiss({})).toBe(false);
+  });
+
+  it("records that the 404 arrives with its errors extension STRIPPED", () => {
+    // This is the measurement the implementation rests on, asserted so a change in Umbraco's
+    // interceptor that restores the body breaks a test rather than passing silently — at which
+    // point keying on the domain code becomes available again, and preferable.
+    expect(thrownFor404).not.toHaveProperty("errors");
+    expect(thrownFor400.errors[0].code).toBe("reference-invalid");
   });
 });
 

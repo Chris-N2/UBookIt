@@ -65,7 +65,13 @@ surgically, then `diff`ed back. Re-verify before trusting; a measurement nobody 
 - [x] 8.2 Release build `--no-incremental`, zero warnings
 - [x] 8.3 Full suite green from a clean build, two steps; record all four counts and the deltas from 1.2
 - [ ] 8.4 **Live**: find `BJQ4-ZP5C` (a ㊳ residue booking on 18 Sep) from a window showing another week — it appears alone under the status line; find it in lower case with the separator; find `behalf.probe@example.com` — its bookings, all dates; type `not-a-thing` — refused in place; type an email as a user without the group — told why. Then **move the found booking to a date outside the original window and confirm it is still shown** (the D5 seam)
-- [ ] 8.5 Live keyboard path: Find input labelled and reachable; an error associated with it; Back to dates puts focus on the From input — measured with `document.activeElement`, not eyeballed
+  - Verified live 2026-09-18: miss renders as the sentence "No booking has the reference ZZZZ-2222."
+    with **Back to dates** and no table; `not-a-thing` refused in place with the window untouched;
+    `behalf.probe@example.com` returned `BJQ4-ZP5C` dated **Oct 15 2026** under a window showing
+    14–20 Sep, which is the D5 seam proved from the email side as well as the reference side.
+  - **STILL OWED**: "type an email as a user without the group — told why" needs a second sign-in
+    (Perm Tester, who lacks Sensitive data). It is the only live check outstanding.
+- [x] 8.5 Live keyboard path: Find input labelled and reachable; an error associated with it; Back to dates puts focus on the From input — measured with `document.activeElement`, not eyeballed
 - [x] 8.6 Stop the TestSite and confirm port 44348 is free
 
 ## 9. Handover

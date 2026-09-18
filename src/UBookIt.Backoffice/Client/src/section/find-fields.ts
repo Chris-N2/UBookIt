@@ -60,6 +60,48 @@ export function looksLikeReference(text: string): boolean {
 }
 
 /**
+ * A canonical reference as a person reads it — grouped, as `BookingReference.Display` groups it.
+ *
+ * **The screen must not show one reference two ways.** The row, the action buttons and the move
+ * dialog all render the grouped form; a status line saying `BJQ4ZP5C` beside a row saying
+ * `BJQ4-ZP5C` reads as two different bookings, which a live check caught.
+ */
+export function displayReference(canonical: string): string {
+  return canonical.length === REFERENCE_LENGTH
+    ? `${canonical.slice(0, REFERENCE_LENGTH / 2)}-${canonical.slice(REFERENCE_LENGTH / 2)}`
+    : canonical;
+}
+
+/**
+ * Whether a refusal means "no booking has that reference" rather than "the lookup failed".
+ *
+ * **Keyed on the 404 status, because the domain's code does not survive the journey** — which was
+ * MEASURED against the running backoffice, not reasoned about. An earlier version of this function
+ * read `booking-not-found` out of the problem body and was justified in this comment by the claim
+ * that "the code travels in the problem body either way". That claim was false, and it shipped a
+ * miss reported as a failure.
+ *
+ * What the backoffice's HTTP client actually does with our problem details, by status:
+ *
+ * | Refusal              | Status | `errors` extension | `title`                     |
+ * | -------------------- | ------ | ------------------ | --------------------------- |
+ * | `reference-invalid`  | 400    | **kept**, code intact | ours                     |
+ * | `booking-not-found`  | 404    | **discarded**      | replaced by Umbraco's canned |
+ *
+ * So every other refusal on this screen is still read by its domain code — see {@link refusalTerm}
+ * — and this one cannot be. It also THROWS rather than returning, so both call sites must catch.
+ *
+ * **The status is unambiguous here only because this endpoint maps exactly one failure to 404.**
+ * That is a property of `FindBookingByReference`, not a general rule: a second 404-mapped failure
+ * added to that endpoint would silently join this branch, and a routing 404 (the package not
+ * installed) would read as a miss. Both are stated rather than guarded, because neither is
+ * distinguishable once the body has been stripped.
+ */
+export function isMiss(thrown: unknown): boolean {
+  return (thrown as { status?: number } | undefined)?.status === 404;
+}
+
+/**
  * Whether the text is an email address, for the purpose of choosing a lookup.
  *
  * Deliberately no stricter than "has an @ with something either side": the server's own
