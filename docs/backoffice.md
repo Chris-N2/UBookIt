@@ -116,6 +116,13 @@ name cannot destroy it, and one who may not see bookings at all reaches neither.
 permission, no group and no support call brings them back — which is the whole point, and the
 reason the next three limits matter.
 
+**Erasure does not withdraw a cancellation link already issued.** On a site running self-service
+cancellation, the booker may still hold the link sent with their confirmation, and it will still
+cancel that booking until it expires at the booking's start. This is deliberate: the link carries no
+contact detail and discloses none, erasure keeps the booking itself, and cancelling is something the
+booker was told they could do — withdrawing it would remove a promised ability while protecting
+nothing. If you need the booking gone as well, cancel it yourself.
+
 **On a site that sends email, erasure does not reach what has already left.** A confirmation or
 cancellation message delivered before the erasure is in somebody's mailbox, and if a mail server
 rejected the address it may have quoted it into this site's own error log. Neither is a store

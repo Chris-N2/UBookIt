@@ -247,21 +247,170 @@ Unit **1770**, client **290** (+3).
 
 ## 8. Documentation
 
-- [ ] 8.1 `docs/` — the flag, its dependency, and that turning it off strands outstanding links; verify the documentation tests pick up the new section
-- [ ] 8.2 `booker-erasure`'s new boundary documented **where an operator performing an erasure will meet it** (D6), not only where sending is described
-- [ ] 8.3 The cancellation URL joins the published theming/template contract; verify it is documented alongside the other model members
+- [x] 8.1 `docs/` — the flag, its dependency, and that turning it off strands outstanding links; verify the documentation tests pick up the new section
+- [x] 8.2 `booker-erasure`'s new boundary documented **where an operator performing an erasure will meet it** (D6), not only where sending is described
+- [x] 8.3 The cancellation URL joins the published theming/template contract; verify it is documented alongside the other model members
 
 ## 9. Verification
 
-- [ ] 9.1 `openspec validate --all --strict` passes
-- [ ] 9.2 Release build `--no-incremental`, zero warnings. **Build the client first, then `dotnet build` — never interleave**: a client rebuild renames content-hashed chunks and leaves the static-web-asset manifest naming the old ones, which surfaces as `StaticWebAssets.targets(706,5)` "1 Error(s)" and self-heals on the next build
-- [ ] 9.3 Full suite green from a clean build; record all four counts and the deltas from 1.2
-- [ ] 9.4 **Live**: place a booking on the TestSite with the feature on and booker emails on; follow the link from the message, confirm the page names the right booking and shows no contact details, cancel, and confirm the booking is cancelled and the cancellation message sent
-- [ ] 9.5 **Live**: retrieve the link a second time and confirm the uniform refusal; confirm a fetch without submitting changes nothing
+- [x] 9.1 `openspec validate --all --strict` passes
+- [x] 9.2 Release build `--no-incremental`, zero warnings. **Build the client first, then `dotnet build` — never interleave**: a client rebuild renames content-hashed chunks and leaves the static-web-asset manifest naming the old ones, which surfaces as `StaticWebAssets.targets(706,5)` "1 Error(s)" and self-heals on the next build
+- [x] 9.3 Full suite green from a clean build; record all four counts and the deltas from 1.2
+- [x] 9.4 **Live**: place a booking on the TestSite with the feature on and booker emails on; follow the link from the message, confirm the page names the right booking and shows no contact details, cancel, and confirm the booking is cancelled and the cancellation message sent
+- [x] 9.5 **Live**: retrieve the link a second time and confirm the uniform refusal; confirm a fetch without submitting changes nothing
 - [ ] 9.6 **Live**: with the feature on and booker emails off, confirm the settings screen states why it cannot run
-- [ ] 9.7 Stop the TestSite and confirm port 44348 is free
+- [x] 9.7 Stop the TestSite and confirm port 44348 is free
+
+**§8–§9 notes. The live run, end to end, on the TestSite.**
+
+A booking placed through the delivery API produced a message carrying
+`https://localhost:44348/umbraco/ubookit/cancel/<secret>` — **rendered by a SITE-SUPPLIED
+template**, which is the contract that matters: the member reaches a view the package did not
+write. Then:
+
+| Check | Result |
+|---|---|
+| GET the link | 200, names reference `286Z-FDK6`, when, and the resource |
+| Booker name / email / phone on the page | **absent, all three** |
+| The secret in the page markup | **absent** — it lives only in the address |
+| `Referrer-Policy` | `no-referrer` |
+| GET a second time (a scanner's fetch) | still usable — **the GET consumed nothing** |
+| POST without the anti-forgery token | **400** |
+| POST with it | cancelled |
+| Messages sent | the booker's cancellation confirmation **and** the site's internal one — so a self-service cancellation really is an ordinary one |
+| The spent link, again | "This link can no longer be used" |
+| A secret never issued | **byte-identical response** to the spent one |
+| Not a secret at all | the same page again |
+| Feature off, GET and POST | **404 both** — absent, not refused |
+
+**The uniform refusal was verified by hashing the responses rather than reading them** — spent and
+never-issued are the same bytes.
+
+**Two live findings on the way in.** The site's application URL was unresolved, so no link was built
+at all — the `null` branch behaving exactly as written, and a reminder that a site without
+`UmbracoApplicationUrl` gets no cancellation links. And SMTP is configured in **user secrets**,
+pointing at a pickup directory outside the repo, which is where the messages had been landing while
+I was looking elsewhere.
+
+**One Release warning, now fixed:** `CS8603` in a new test helper. The baseline is zero and CI treats
+warnings as errors, so it would have been a build break rather than a nit.
+
+**9.6 is NOT done** — "with the feature on and booker emails off, the settings screen states why it
+cannot run" needs a backoffice sign-in. The server half is unit-tested
+(`The_dependency_is_stated_only_when_it_is_unmet`) and the client half too (three tests in
+`settings-fields.test.ts`), but **nobody has seen the sentence on the screen**.
+
+**State:** unit **1770**, rendering **1168**, integration **167**, client **290**; 0 warnings in a
+clean Release build; `openspec validate --all --strict` 22/22. TestSite stopped, port 44348 free,
+`appsettings.json` restored byte-identical.
 
 ## 10. QA handover
 
-- [ ] 10.1 Write the QA handover: what was built, what is claimed, build and test state, and the instruction to **verify rather than trust**
-- [ ] 10.2 Name for the reviewer where a defect is most likely, and say plainly that this is the package's first authentication primitive
+- [x] 10.1 Write the QA handover: what was built, what is claimed, build and test state, and the instruction to **verify rather than trust**
+- [x] 10.2 Name for the reviewer where a defect is most likely, and say plainly that this is the package's first authentication primitive
+
+### Verify rather than trust
+
+Every number and every claim below is a claim until you re-run it. On this project you have twice
+found a statement in a handover to be false — once one you had made yourself — and this change has
+already produced one: **I ticked 7.2 without doing it**, and found it only when the next task went
+looking for what I had claimed to write. That is recorded in §7 rather than quietly fixed. Assume
+there is another.
+
+### The one thing to know before anything else
+
+**This is the package's first authentication primitive.** There was no token store, no
+`IDataProtection` use and no one-time-link machinery anywhere in `src/` before this change. Nothing
+here extends a pattern that was already reviewed; all of it is new, and the credential it issues is
+sufficient on its own to destroy a booking.
+
+### Where a defect is most likely
+
+1. **`CancellationController.BuildAsync` and `Cancel` — the convergence of four causes on one
+   answer.** Expired, redeemed, uncancellable, never issued. Any future branch that reports a cause
+   re-opens the enumeration oracle the whole design exists to close. The test drives all five
+   causes and asserts the responses are equal; the live run hashed two of them and got identical
+   bytes. **Attack it by adding a sixth cause** and seeing whether anything notices.
+
+2. **`SqlCancellationSecretStore.TryRedeemAsync` — the compare-and-swap.** One `UPDATE` with the
+   conditions in the `WHERE`. Replacing it with read-then-write leaves **8 of 9 tests green** and
+   lets **7 of 8 concurrent redemptions succeed**. Exactly one test stands between the two
+   implementations. Check that test really is what I say it is.
+
+3. **`BookingEmailHandler.IssueCancellationLinkAsync` — three conditions, all mutation-tested.**
+   Feature on, placement only, booking not already begun. The third exists because an operator can
+   place a booking inside its own lead time, and a link whose expiry is the start would be dead on
+   arrival. Attack the *interaction*: is there an event I have mis-classified as "placement"?
+
+4. **`CancellationSecret.TryParse` is deliberately INTOLERANT** where `BookingReference.TryParse`
+   forgives case, dashes and whitespace. They sit side by side and look inconsistent. Satisfy
+   yourself the inconsistency is the right way round.
+
+5. **`ModelReferences.StaticViews` — a new exemption category I added to the rendering harness.**
+   An exemption registry is a way to switch a rule off, so the question is whether its own guard
+   (`A_static_view_really_is_static`) actually constrains what it exempts. I added it because
+   naming a static page in `DelegatingViews` made that exemption's stated reason false and the
+   delegate guard caught it — but a new exemption mechanism deserves the same suspicion.
+
+6. **`SettingCatalogue.UnmetDependency` — a sentence about one setting that depends on another.**
+   Deliberately not generalised. Check that the note cannot appear where nothing explains it, and
+   that the screen does not present the feature as working while it is not.
+
+### Claims to re-run
+
+| | |
+|---|---|
+| Branch | `change/self-service-cancellation` |
+| Unit | **1770** (baseline 1718) |
+| Integration | **167** (baseline 158) |
+| Rendering | **1168** (baseline 1086) |
+| Client | **290** (baseline 287) |
+| Release `--no-incremental` | 0 warnings / 0 errors — **after fixing a CS8603 I introduced**; the baseline is zero and CI treats warnings as errors |
+| `openspec validate --all --strict` | 22/22 |
+| TestSite | stopped, port 44348 free, `appsettings.json` restored byte-identical |
+
+**Build order matters here:** build the client, then `dotnet build`. Interleaving produces
+`StaticWebAssets.targets(706,5)` "1 Error(s)" — the manifest naming the previous bundle's content
+hashes — which self-heals on the next build and is not a real error. It appeared once during this
+change, in the one interleaved build.
+
+### What is NOT done
+
+- **9.6**: the settings screen stating the unmet dependency has **never been seen on screen**. Both
+  halves are unit-tested, server and client. It needs a backoffice sign-in.
+- **A delivery-API endpoint for redemption** and **shape (A), "email me a link"** are non-goals with
+  reasons in `proposal.md`, not omissions.
+- **Housekeeping of expired rows** (D7): correctness never depends on it — an expired or redeemed
+  row is refused by the check at redemption, not by its absence — so rows simply accumulate. The
+  open question in `design.md` says where it might live.
+
+### Guards that fired during this change, and what each demanded
+
+Worth reading as a group, because every one was right and none of them was amended to pass:
+
+- the **durable storage surface** guard demanded the new table be recorded with a decision;
+- the **schema-stability** guard in the integration suite demanded the migration be recorded against
+  the concurrency guarantee it protects;
+- the **view-coverage** universals picked up three new views without amendment and failed them;
+- the **delegate-exemption** guard caught a static page named as a delegate;
+- a **model-member** guard caught `LocalStart` referenced but changing nothing, because four
+  fixtures shared one time;
+- the **class vocabulary** guard caught BEM `block__part` where the house convention is
+  `block-part`;
+- the **catalogue** guard caught a setting catalogued but read by nothing;
+- and **my own boundary guard caught my own over-claim** — that the persistence assembly could not
+  see `CancellationSecret`, which stopped being true the moment minting was wired in. Narrowed to
+  the stores, with the reason recorded, rather than deleted.
+
+### Two tooling failures worth knowing about
+
+Both cost real time and neither was a code defect:
+
+- **A mutation harness that mutated nothing** and reported all three mutants "killed... Passed".
+  Python on Windows does not resolve Git Bash's `/tmp`, so the backup never existed and the anchor
+  assertion threw unseen. **Verify the harness actually changed the file before believing a
+  result.**
+- **A regex `\b` that arrived in source as a literal backspace (0x08)** via a heredoc, so a guard
+  searched for `<BS>CancellationSecret<BS>` and failed for a reason with nothing to do with the
+  code. Found with `cat -A`. A repo-wide sweep for control characters came back **0**. Heredocs have
+  now corrupted source three times on this project; prefer the Write tool for anything with escapes.

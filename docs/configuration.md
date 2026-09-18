@@ -65,11 +65,40 @@ Shown on the settings screen so you can see what is in effect, never editable th
 | `UBookIt:MaxQueryRangeDays` | int | `31` | **Cost.** A guardrail on availability queries, which walk their range day by day. Too high does not look broken; it just makes the site slower. |
 | `UBookIt:DeliveryApi:EnableReads` | bool | `false` | **Exposure, and restart-bound.** Decided while the application starts — a disabled direction is *absent*, not refused. |
 | `UBookIt:DeliveryApi:EnablePlacement` | bool | `false` | As above, for anonymous booking placement. |
+| `UBookIt:SelfServiceCancellation:Enabled` | bool | `false` | **Exposure, and restart-bound.** Opens a public route that cancels bookings for a caller identified only by a secret. Like the delivery API's switches, it is decided while the application starts, so a disabled feature has no route at all. |
 | `UBookIt:Frontend:PreservedQueryParameters` | string[] | empty | A developer's setting about their own page's URLs. Not presented at all. |
 
-The delivery API settings are **restart-bound**: changing them takes effect when the site restarts.
-The other two take effect immediately, and are read-only for policy reasons rather than technical
-ones — the screen distinguishes the two cases.
+The delivery API settings and self-service cancellation are **restart-bound**: changing them takes
+effect when the site restarts. The other two take effect immediately, and are read-only for policy
+reasons rather than technical ones — the screen distinguishes the two cases.
+
+### Self-service cancellation
+
+With `UBookIt:SelfServiceCancellation:Enabled` set to `true`, the message sent to a booker when they
+place a booking carries a link that cancels it. Following the link shows which booking it is —
+reference, when, and what was booked — and asks for confirmation; cancelling happens on that
+confirmation, never on merely opening the link, because mail scanners open every link in a message
+before a person reads it.
+
+**It needs `UBookIt:Notifications:SendBookerEmails` to be on**, and that is mechanical rather than a
+second rule: the link travels in the booker's message, so where no message is sent there is no
+vehicle and no link. Turning the feature on without booker emails does nothing, and the settings
+screen says so rather than showing it as working.
+
+**Three things are worth knowing before you turn it on:**
+
+- **The link is the credential.** Anyone holding it can cancel that booking, so it is as sensitive
+  as the mailbox it was sent to. It is single use, and it stops working when the booking starts.
+- **A booker cannot cancel a booking that has already started.** An operator still can, from the
+  backoffice — that is ordinary no-show tidying, and the two routes deliberately differ.
+- **Turning it off later strands anyone still holding a link.** New links stop being issued and the
+  route stops being served, so an outstanding link stops working. The fallback is the position
+  before the feature existed: the booker contacts you. Worth timing that change for a quiet period
+  rather than mid-season.
+
+There is deliberately **no "email me a cancellation link" form**. A route that takes a booking
+reference and sends mail on a stranger's say-so would let anybody make the site write to a customer,
+and would tell an attacker which references are real by whether anything happened.
 
 **The active theme is not a setting and is not shown.** It has no configuration key: a site calls
 `AddUBookItTheme(...)` in its own composer. See [Theming](theming.md).

@@ -92,7 +92,15 @@ public class CancellationLinkIssuanceTests
     }
 
     private static string BodyTo(RecordingEmailSender sender, string address)
-        => sender.Sent.Single(message => message.To.Contains(address)).Body;
+    {
+        // Asserted rather than null-forgiven: a message with no body is a real failure of the
+        // composer, and "!" here would report it as a confusing NullReferenceException three
+        // frames away instead of as the thing that went wrong.
+        var body = sender.Sent.Single(message => message.To.Contains(address)).Body;
+
+        Assert.NotNull(body);
+        return body;
+    }
 
     [Fact]
     public async Task With_the_feature_off_nothing_is_issued_and_no_message_mentions_cancelling()
