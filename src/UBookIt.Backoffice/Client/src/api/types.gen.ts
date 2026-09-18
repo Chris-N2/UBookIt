@@ -578,6 +578,39 @@ export type ListBookableSubjectsResponses = {
 
 export type ListBookableSubjectsResponse = ListBookableSubjectsResponses[keyof ListBookableSubjectsResponses];
 
+export type FindBookingByReferenceData = {
+    body?: never;
+    path: {
+        reference: string;
+    };
+    query?: never;
+    url: '/umbraco/ubookitbackoffice/api/v1/bookings/by-reference/{reference}';
+};
+
+export type FindBookingByReferenceErrors = {
+    /**
+     * Bad Request
+     */
+    400: unknown;
+    /**
+     * The resource is protected and requires an authentication token
+     */
+    401: unknown;
+    /**
+     * Not Found
+     */
+    404: unknown;
+};
+
+export type FindBookingByReferenceResponses = {
+    /**
+     * OK
+     */
+    200: BookingModel;
+};
+
+export type FindBookingByReferenceResponse = FindBookingByReferenceResponses[keyof FindBookingByReferenceResponses];
+
 export type FindBookingsByBookerData = {
     body?: FindBookingsByBookerModel;
     path?: never;

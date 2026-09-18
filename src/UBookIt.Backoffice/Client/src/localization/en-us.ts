@@ -521,6 +521,25 @@ export default {
     placedOutsideWindowNotice:
       "Booking recorded — its reference is %0%. It is on %1%, which is outside the dates shown, "
       + "so it is not in the list below.",
+
+    // Finding a booking from what a caller can say. One control, dispatched by the SHAPE of
+    // what was typed; the email route is offered only to sensitive-data holders, and an address
+    // typed by anyone else is answered with the sentence that says who can.
+    findLabel: "Find a booking by reference or email address",
+    findLabelReferenceOnly: "Find a booking by reference",
+    findSubmit: "Find",
+    findNeither: "That is not a booking reference or an email address.",
+    findEmailNotOffered:
+      "Finding by email address needs the Sensitive data group — ask a colleague who is in it, "
+      + "or find the booking by its reference.",
+    findFailed: "The booking could not be looked up.",
+    findRefusedReferenceInvalid: "That is not a booking reference: eight letters and digits, with or without a dash.",
+    findNotFoundReference: "No booking has the reference %0%.",
+    findRefusedEmailInvalid: "That email address is not one a booking could hold. Check it and try again.",
+    findNotFoundEmail: "No bookings hold the address %0%.",
+    findShowingReference: "Booking %0%",
+    findShowingEmail: "Bookings for %0%, all dates",
+    findBackToDates: "Back to dates",
   },
   // Extends Umbraco's own "user" localization section: the group editor derives the
   // heading for each entity type's permission group as user_permissionsEntityGroup_<type>,

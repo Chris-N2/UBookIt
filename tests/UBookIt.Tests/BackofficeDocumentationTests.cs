@@ -451,6 +451,7 @@ public class BackofficeDocumentationTests
         {
             ["POST bookings"] = "record a booking on a booker's behalf",
             ["GET bookings/bookable"] = "see what there is to book",
+            ["GET bookings/by-reference/{reference}"] = "find a booking by its reference",
             ["POST bookings/find-by-booker"] = "find a subject's bookings by their email address",
             ["POST bookings/{id:guid}/confirm"] = "confirm",
             ["POST bookings/{id:guid}/decline"] = "decline",

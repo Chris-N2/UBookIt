@@ -594,6 +594,66 @@ public class BookingsController(
     }
 
     /// <summary>
+    /// Finds the booking holding a reference, as the list would show it.
+    /// </summary>
+    /// <remarks>
+    /// <para>
+    /// <b>Read-gated, and the reference travels in the route.</b> A reference is not personal
+    /// data — it is the identifier designed to be read down a telephone and written on things —
+    /// so it may appear in a URL where an email address may not (the address search is
+    /// POST-for-a-read for exactly that reason). The read discloses nothing the list would not:
+    /// the row is the list's row, mapped by the list's mapper, under the list's visibility
+    /// decision, so contact details are withheld or shown by the identical rule.
+    /// </para>
+    /// <para>
+    /// <b>Unwindowed, legitimately.</b> The list's window bounds the cost of a scan; a reference
+    /// is served by a unique index, so this is a seek and incurs none of it. It is a separate
+    /// read rather than a parameter on the list, because the window there is not optional and
+    /// is not made so to serve this.
+    /// </para>
+    /// <para>
+    /// <b>Two refusals, distinguishable.</b> A value that is not a well-formed reference fails
+    /// with <c>reference-invalid</c>; a well-formed one no booking holds fails with
+    /// <c>booking-not-found</c>. "You mistyped it" and "there is no such booking" call for
+    /// different corrections. Parsing is <see cref="BookingReference.TryParse"/> — any case,
+    /// with or without the separator — and nothing looser: a partial reference is not one.
+    /// </para>
+    /// </remarks>
+    /// <param name="reference">The reference as a person typed it.</param>
+    [Authorize(Policy = Constants.VerbPolicies.BookingsRead)]
+    [HttpGet("bookings/by-reference/{reference}")]
+    [ProducesResponseType<BookingModel>(StatusCodes.Status200OK)]
+    [ProducesResponseType(StatusCodes.Status400BadRequest)]
+    [ProducesResponseType(StatusCodes.Status404NotFound)]
+    public async Task<IActionResult> FindBookingByReference(
+        string reference, CancellationToken cancellationToken = default)
+    {
+        if (!BookingReference.TryParse(reference, out var parsed))
+        {
+            return new List<DomainFailure>
+            {
+                new(
+                    FailureCodes.ReferenceInvalid,
+                    "That is not a booking reference: eight letters and digits, with or without a dash.",
+                    nameof(reference)),
+            }.ToProblemResult();
+        }
+
+        var summary = await bookingStore.FindByReferenceAsync(parsed, cancellationToken);
+
+        if (summary is null)
+        {
+            return new List<DomainFailure>
+            {
+                new(FailureCodes.BookingNotFound, $"No booking has the reference {parsed.Display}.", nameof(reference)),
+            }.ToProblemResult();
+        }
+
+        // The list's decision and the list's mapper — not a second visibility path.
+        return Ok(BookingModelMapper.ToModel(summary, ResolveBookerVisibility()));
+    }
+
+    /// <summary>
     /// Finds every booking whose booker holds a given email address.
     /// </summary>
     /// <remarks>

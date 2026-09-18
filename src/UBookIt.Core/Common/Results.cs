@@ -41,6 +41,18 @@ public static class FailureCodes
     public const string ResourceNotFound = "resource-not-found";
     public const string ResourceInUse = "resource-in-use";
     public const string BookingNotFound = "booking-not-found";
+
+    /// <summary>
+    /// The value offered as a booking reference is not one: wrong length, or a character outside
+    /// the reference alphabet once separators and case are discarded.
+    /// </summary>
+    /// <remarks>
+    /// Distinct from <see cref="BookingNotFound"/> because the two call for different
+    /// corrections — "you mistyped it" against "no booking has that reference" — and an
+    /// operator on the telephone needs to know which. Collapsing them into not-found would
+    /// send somebody to re-check a date when the fault was a transcribed letter.
+    /// </remarks>
+    public const string ReferenceInvalid = "reference-invalid";
     public const string DateRangeInvalid = "date-range-invalid";
     public const string DateRangeTooLarge = "date-range-too-large";
     public const string TimeZoneInvalid = "time-zone-invalid";

@@ -79,6 +79,46 @@ internal sealed class SqlBookingManagementStore(UBookItDbContext db) : IBookingM
     }
 
     /// <summary>
+    /// The booking holding a reference, or <c>null</c> — a seek on the unique index, with no
+    /// window and no status filter.
+    /// </summary>
+    /// <remarks>
+    /// The absence of a window is the point: the caller quoted a reference and wants THAT
+    /// booking, wherever it sits in time and whatever became of it. That is legitimate here, and
+    /// not on the list, because the column is unique-indexed — this is an index lookup rather
+    /// than the unbounded scan a windowless list would be.
+    /// <para>
+    /// It answers through <see cref="PageAsync"/>, so a found booking is the list's own row:
+    /// same shape, same booker conditions, same withholding downstream. There is deliberately no
+    /// second description of a booking for this read to disagree with.
+    /// </para>
+    /// </remarks>
+    public async Task<BookingSummary?> FindByReferenceAsync(
+        BookingReference reference, CancellationToken cancellationToken = default)
+    {
+        ArgumentNullException.ThrowIfNull(reference);
+
+        // A SEEK, not a scan. The column carries the canonical form and is unique-indexed, so
+        // an equality on it is an index lookup — which is what makes answering without a window
+        // legitimate here where relaxing the window on the list would not be. No status filter:
+        // the caller quoted a reference and wants THAT booking, cancelled or not.
+        //
+        // Through the same projection the list and the email search use, so a found booking is
+        // the list's row — same shape, same booker conditions, same withholding downstream — and
+        // there is no second description of a booking to disagree with the first.
+        var rows = await PageAsync(
+                db.Bookings
+                    .AsNoTracking()
+                    .Where(booking => booking.Reference == reference.Value),
+                cancellationToken)
+            .ConfigureAwait(false);
+
+        // The index is unique, so more than one row is a corrupted store rather than a result
+        // set; SingleOrDefault says so rather than quietly returning the first.
+        return rows.SingleOrDefault();
+    }
+
+    /// <summary>
     /// Materializes a page of bookings into summaries — <b>the one projection both reads
     /// share.</b>
     /// </summary>

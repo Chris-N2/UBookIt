@@ -358,6 +358,33 @@ the cancelled ones added.
 
 ### Moving a booking
 
+### Finding a booking
+
+Above the list there is a **Find** box. Type what the caller can tell you and press Find:
+
+- **a booking reference** — `BJQ4-ZP5C`, in any case, with or without the dash. The booking is
+  shown on its own, whatever dates the list was showing, with a line above it saying which
+  booking that is. You need the *"See bookings"* permission and nothing more: a reference is not
+  personal data, and the row shows or withholds contact details exactly as the list does.
+- **an email address** — every booking made with that address, all dates, paged like the list.
+  This needs membership of Umbraco's **Sensitive data** group, because it asks about a person's
+  contact details; if you are not in it the box says so and tells you to ask a colleague who is,
+  or to find the booking by its reference instead.
+
+You do not choose which: the box works it out from what you typed. Something that is neither is
+refused in place. A reference that no booking has, or an address no booking holds, is stated in
+the line above the table rather than shown as an empty table — an empty table under a date window
+means "nothing booked", and that is not what a miss means.
+
+**Every action works on a found booking** — move, cancel, confirm, decline, erase — and after one
+the lookup runs again, not the dates: a booking you found by its reference and moved to next month
+is still the booking you found, and stays on screen. **Back to dates** returns to the window you
+had, filters and all.
+
+**Searching by a person's name is not offered.** Exact-match on a name is nearly useless, and
+anything looser is a search over personal data that this package deliberately does not provide;
+the two routes above cover what a caller can actually tell you.
+
 ### Recording a booking somebody made by telephone
 
 Above the list there is a **New booking** button. It opens a dialog: choose a service or a
