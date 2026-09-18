@@ -65,6 +65,16 @@ must be told why nothing happens.
   to own the cancellation screen needs the endpoint; that is a later, additive change.
 - **Cancellation windows** ("no cancelling within 24 hours"), which the roadmap already holds for
   a later minor. This change ships one rule — not after it has started — and no configuration.
+
+  *Considered and deferred during the proposal, with the reasoning kept because the idea is a good
+  one:* deriving the cut-off from the booking's `LeadTime` — *"if you need that much notice to book
+  it you should need at least that much to cancel it"* — is elegant, needs no new setting and varies
+  correctly per service. It was set aside because it **is** a cancellation window rather than a
+  coherence rule, and this change has no vocabulary for what happens below the line; because it
+  would overload one value with two policies a site may want set differently; and because
+  *preventing* a late cancellation converts it into a no-show, which is worse for the site than
+  being told. **The shape the later feature should take is a separate setting that defaults to
+  `LeadTime`** — some sites will want more notice to cancel than to book, and some less.
 - **Rate limiting.** Without a request step there is nothing to flood: the token is unguessable and
   redemption discloses nothing. Shape (A) is where this becomes load-bearing.
 - **Amending a booking**, self-service. Cancel only.
