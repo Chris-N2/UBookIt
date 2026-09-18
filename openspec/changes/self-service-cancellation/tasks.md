@@ -12,9 +12,9 @@ memory and `ubookit-guard-correctness`.
 
 ## 1. Baseline
 
-- [ ] 1.1 Confirm `main` is in sync with origin and the tree is clean; record the starting commit
-- [ ] 1.2 Record the four baseline test counts (unit / integration / rendering / client) from a green run, so every later delta is measured rather than claimed
-- [ ] 1.3 Branch `change/self-service-cancellation` from `main` and push with `-u` (push from **Bash** — the PowerShell tool opens the GitHub account chooser and hangs)
+- [x] 1.1 Confirm `main` is in sync with origin and the tree is clean; record the starting commit
+- [x] 1.2 Record the four baseline test counts (unit / integration / rendering / client) from a green run, so every later delta is measured rather than claimed
+- [x] 1.3 Branch `change/self-service-cancellation` from `main` and push with `-u` (push from **Bash** — the PowerShell tool opens the GitHub account chooser and hangs)
 
 ### Guarantee diffs — one per MODIFIED requirement
 
@@ -23,17 +23,61 @@ SHALL and every scenario in the version on `main`, decide *carried forward / del
 superseded*, and record the count both ways. A drop with no entry here is a deletion nothing in the
 diff looks like.
 
-- [ ] 1.4 `booking-emails` — *What a message tells the booker*: diff guarantees; confirm the seven existing scenarios survive verbatim and the three added ones are additions, not replacements
-- [ ] 1.5 `email-templates` — *What a view receives is published, typed, and fit to be frozen*: diff guarantees; confirm the move message's previous-interval member and all five existing scenarios survive
-- [ ] 1.6 `site-settings` — *Settings are tiered, and the tier is enforced by the server*: diff guarantees; confirm both deliberate omissions (`PreservedQueryParameters`, the theme), the no-destructive-editable rule and all four existing scenarios survive
-- [ ] 1.7 `booker-erasure` — *What erasure does not reach is documented*: diff guarantees; confirm the four existing bullets and four existing scenarios survive, and that the closing "left unstated" sentence still enumerates every bullet
-- [ ] 1.8 Record each diff's result in this file (lines removed, scenarios before → after), so QA can re-run rather than re-derive
+- [x] 1.4 `booking-emails` — *What a message tells the booker*: diff guarantees; confirm the seven existing scenarios survive verbatim and the three added ones are additions, not replacements
+- [x] 1.5 `email-templates` — *What a view receives is published, typed, and fit to be frozen*: diff guarantees; confirm the move message's previous-interval member and all five existing scenarios survive
+- [x] 1.6 `site-settings` — *Settings are tiered, and the tier is enforced by the server*: diff guarantees; confirm both deliberate omissions (`PreservedQueryParameters`, the theme), the no-destructive-editable rule and all four existing scenarios survive
+- [x] 1.7 `booker-erasure` — *What erasure does not reach is documented*: diff guarantees; confirm the four existing bullets and four existing scenarios survive, and that the closing "left unstated" sentence still enumerates every bullet
+- [x] 1.8 Record each diff's result in this file (lines removed, scenarios before → after), so QA can re-run rather than re-derive
+
+**Baseline (1.2), from a green run on `main` at `168aee7`:** unit **1718**, integration **158**,
+rendering **1086**, client **287**; 0 warnings in a clean Release build; `openspec validate --all
+--strict` 21/21 (22 with this change present).
+
+**Guarantee diffs (1.4–1.7), scripted rather than eyeballed.** The instrument normalises before
+comparing — emphasis stripped, lines unwrapped — because a wrapped line and a bold word have each
+defeated this check before (㉛, ㉙). It compares scenario titles and every SHALL-bearing sentence.
+Re-runnable: `scratchpad/gdiff.py`.
+
+| Requirement | Scenarios | SHALL sentences | Dropped |
+|---|---|---|---|
+| `booking-emails` — What a message tells the booker | 7 → 10 | 7 → 12 | **none** (one superseded, below) |
+| `email-templates` — What a view receives… | 5 → 7 | 9 → 11 | **none** |
+| `site-settings` — Settings are tiered… | 4 → 6 | 4 → 6 | **none** |
+| `booker-erasure` — What erasure does not reach… | 4 → 5 | 6 → 7 | **none** |
+
+**The one sentence the instrument flagged, and its triage.** In `booking-emails`, the narrowing
+sentence changed:
+
+- was: *"…SHALL NOT claim that supplied content states the booking's state correctly, presents the
+  reference in the quotable form, **or expresses times in any particular zone.**"*
+- now: *"…presents the reference in the quotable form, expresses times in any particular zone,
+  **or carries the cancellation link.**"*
+
+**Superseded by a stronger claim**, not dropped: the package disclaims one more thing than before,
+and the three original disclaimers are intact. Recorded rather than waved through, because a
+flagged sentence that turns out to be fine is exactly the case this discipline exists to make
+somebody look at.
 
 ## 2. The secret, in Core
 
-- [ ] 2.1 A value type for the cancellation secret: generated from a cryptographically secure source, with its one-way hash as a separate operation; verify by test that two generations differ and that the hash is stable for a given secret
-- [ ] 2.2 A Core port for storing and reading secrets — issue, find-by-hash, mark redeemed; verify the port's contract is stated in XML docs and that nothing on it accepts or returns the plaintext secret except at issue
+- [x] 2.1 A value type for the cancellation secret: generated from a cryptographically secure source, with its one-way hash as a separate operation; verify by test that two generations differ and that the hash is stable for a given secret
+- [x] 2.2 A Core port for storing and reading secrets — issue, find-by-hash, mark redeemed; verify the port's contract is stated in XML docs and that nothing on it accepts or returns the plaintext secret except at issue
 - [ ] 2.3 Expiry derived from the booking's start (D2), computed where the secret is issued rather than stored as policy; verify by test that a booking moved later does **not** extend an already-issued secret's life, and record whichever answer is chosen as deliberate
+
+**§2 notes.** `CancellationSecret` is 256 bits, base64url, hashed to lower-case hex; **no member of
+`ICancellationSecretStore` accepts or returns the plaintext** — even `IssueAsync` takes the hash — so
+an implementation cannot persist what it is never given. `TryParse` is deliberately **intolerant**
+where `BookingReference.TryParse` is tolerant: nothing types a secret, so every tolerance would only
+widen what counts as a match.
+
+Three guards mutation-tested, each killed: `ToString` leaking the value, `Hash` returning the value,
+and `TryParse` gaining a `Trim()`.
+
+**A method note worth keeping.** The first mutation run reported all three mutants "Passed" — a
+false green in the instrument built to catch false greens. Python on Windows does not resolve Git
+Bash's `/tmp`, so the backup never existed, the anchor assertion threw, and **no mutant was ever
+applied**. The lesson is the change's own: *a guard that cannot fire reports success*. Verify the
+harness mutated the file before believing the result.
 
 ## 3. The visitor's cancellation entry point
 
