@@ -39,6 +39,10 @@ rather than assumed:
 
 ### D1 — A stored, hashed secret, not a signed stateless one
 
+**Ratified by Chris 2026-09-18**, on the trade-off rather than on the absence of cost: *"it seems
+to come with significant benefits and not too much downside; certainly the trade-off seems
+positive."* The costs are real and named below — one additive migration and rows to age out.
+
 **Chosen:** a random value, delivered in the email, stored only as a SHA-256 hash against the
 booking with an expiry and a redeemed flag.
 
@@ -128,6 +132,11 @@ enabling the feature on a non-sending site must be told why nothing happens, whi
 dependency is stated on the settings screen rather than `&&`-ed away at runtime.
 
 ### D6 — Erasure does not revoke an outstanding link
+
+**Ratified by Chris 2026-09-18.** Recorded here with its history because the recommendation
+**reversed**: during the explore, "erasure can revoke the token" was offered as a point in favour of
+storing it (D1). Reading `booker-erasure` properly inverted that conclusion. D1 stands on its other
+three grounds, none of which depended on revocation.
 
 Considered and rejected: deleting rows on erasure. The link carries no contact detail, discloses
 none when followed, and cancelling is the one thing the booker was told they could do. Erasure
