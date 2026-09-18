@@ -20,8 +20,9 @@ question, answered by Umbraco's built-in **Sensitive data** group — and note t
 site's original super user is in that group to begin with, so a newly created administrator
 sees those details hidden until you add them. See [the backoffice docs](https://github.com/Chris-N2/UBookIt/blob/main/docs/backoffice.md).
 
-> **uBookIt is at `17.0.1`, and the public API is now a promise.** Leaving `0.x` is that
-> promise — treat the contracts as settled from here.
+> **uBookIt is at `17.1.0`, and the public API is now a promise.** Leaving `0.x` is that
+> promise — treat the contracts as settled from here. What each release asks of a site that is
+> upgrading is in [the changelog](https://github.com/Chris-N2/UBookIt/blob/main/CHANGELOG.md).
 
 ### What the version number means
 
@@ -43,6 +44,10 @@ additions are preferred to changes. Where one is genuinely unavoidable it lands 
 release, is called out explicitly rather than left to be discovered, and ships with sensible
 defaults or a documented upgrade path so a site that already works keeps working. A patch
 release never carries a breaking change.
+
+**"Called out explicitly" means
+[the changelog](https://github.com/Chris-N2/UBookIt/blob/main/CHANGELOG.md)**, where each release
+opens with what upgrading asks of you before it says what you gain.
 
 ## Requirements
 

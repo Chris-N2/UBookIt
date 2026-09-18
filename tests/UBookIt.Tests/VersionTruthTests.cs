@@ -238,8 +238,16 @@ public class VersionTruthTests
         }
     }
 
-    /// <summary>The version every package is built with.</summary>
-    private static string DeclaredVersion()
+    /// <summary>
+    /// The version every package is built with.
+    /// <para>
+    /// <b>Internal rather than private</b> so <see cref="ChangelogTests"/> reads the declared
+    /// version through the same parser, including the exactly-one assertion below. A second
+    /// `&lt;Version&gt;` parse elsewhere would be a second answer to "what version is this?",
+    /// which is the defect this whole class exists to prevent.
+    /// </para>
+    /// </summary>
+    internal static string DeclaredVersion()
     {
         var props = RepoFiles.Read("Directory.Build.props");
         var matches = Regex.Matches(props, @"<Version>(?<version>[^<]+)</Version>");
