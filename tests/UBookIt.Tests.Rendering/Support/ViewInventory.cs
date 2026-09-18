@@ -26,6 +26,19 @@ public static class ViewInventory
     public const string ServiceUnavailable =
         "~/Views/Shared/Components/BookingFlow/ServiceUnavailable.cshtml";
 
+    /// <summary>
+    /// The cancellation pages: standalone documents rather than fragments, because the route they
+    /// serve has no Umbraco page behind it — the link has to work on every installation, including
+    /// one whose visitor-facing front end is headless.
+    /// </summary>
+    public const string CancellationIndex = "~/Views/Cancellation/Index.cshtml";
+
+    /// <summary>What a booker sees once the cancellation has gone through.</summary>
+    public const string CancellationCancelled = "~/Views/Cancellation/Cancelled.cshtml";
+
+    /// <summary>The one answer every unusable secret gets.</summary>
+    public const string CancellationUnusable = "~/Views/Cancellation/Unusable.cshtml";
+
     public const string DateAndLength = "~/Views/Shared/UBookIt/_DateAndLength.cshtml";
 
     public const string Times = "~/Views/Shared/UBookIt/_Times.cshtml";

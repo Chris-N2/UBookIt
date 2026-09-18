@@ -1,0 +1,84 @@
+@model UBookIt.Web.Rendering.CancellationPageModel
+@{
+    Layout = null;
+    var zone = Model.TimeZoneId;
+}
+@*
+    WHAT THIS PAGE MAY SAY, and what it structurally cannot.
+
+    It names the booking — reference, what was booked, when — because the secret that reached here
+    is already sufficient to DESTROY the booking, so withholding a description of what is about to
+    be destroyed protects nothing and costs the reader the one fact they need: which booking this
+    is. Somebody holding three bookings and three messages cannot otherwise tell which link they
+    followed.
+
+    It cannot name the BOOKER. Not by restraint — the model has no member for a name, an address or
+    a telephone number, so this holds however the view is written, including by a theme.
+
+    The action is a POST. Mail scanners fetch every URL in a message unattended; a GET that
+    cancelled would let robots cancel bookings before the person had read the message.
+*@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <meta name="robots" content="noindex, nofollow" />
+    <title>Cancel your booking</title>
+</head>
+<body>
+    <main class="ubookit ubookit-cancel">
+        <h1>Cancel this booking?</h1>
+
+        <dl class="ubookit-cancel-booking">
+            <dt>Reference</dt>
+            <dd>@Model.Reference</dd>
+
+            <dt>When</dt>
+            <dd>
+                <time datetime="@Model.LocalStart.ToString("o")">
+                    @Model.LocalStart.ToString("dddd d MMMM yyyy, HH:mm")
+                </time>
+                &ndash;
+                <time datetime="@Model.LocalEnd.ToString("o")">
+                    @Model.LocalEnd.ToString("HH:mm")
+                </time>
+                <span class="ubookit-cancel-zone">(@zone)</span>
+            </dd>
+
+            @if (!string.IsNullOrWhiteSpace(Model.ServiceName))
+            {
+                <dt>Service</dt>
+                <dd>@Model.ServiceName</dd>
+            }
+
+            @if (Model.ResourceNames.Count > 0)
+            {
+                <dt>@(Model.ResourceNames.Count == 1 ? "Resource" : "Resources")</dt>
+                <dd>
+                    <ul class="ubookit-cancel-resources">
+                        @foreach (var name in Model.ResourceNames)
+                        {
+                            <li>@name</li>
+                        }
+                    </ul>
+                </dd>
+            }
+        </dl>
+
+        <p>This cannot be undone. If you still want the booking, you can simply close this page.</p>
+
+        @*
+            NO ACTION ATTRIBUTE, deliberately. An empty action posts to the URL this page was
+            fetched from, which is the same route with the same secret — so the secret never
+            appears in the MARKUP, only in the address. A hidden field carrying it would put a
+            credential into the document body, where a copied page source or a "save page as"
+            carries it too.
+        *@
+        <form method="post">
+            @Html.AntiForgeryToken()
+            <button type="submit" class="ubookit-submit">Cancel this booking</button>
+        </form>
+    </main>
+</body>
+</html>

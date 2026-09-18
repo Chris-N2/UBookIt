@@ -166,18 +166,54 @@ Unit **1755** (baseline 1718; +37).
 
 ## 6. The landing page
 
-- [ ] 6.1 A package route serving the cancellation page; verify it is served only while the feature is on, and is absent — not refused — while it is off
-- [ ] 6.2 `GET` is safe: verify by test that retrieving the page neither cancels the booking nor marks the secret redeemed
-- [ ] 6.3 The page states reference, what was booked and when, in the booking's own zone, and **cannot** express booker contact details; verify structurally (the model has no member for them), not by asserting absence from rendered text
-- [ ] 6.4 Anti-forgery-protected `POST` that redeems and cancels; verify a submission without valid protection is refused and the booking is unaffected
-- [ ] 6.5 One indistinguishable response for expired / redeemed / uncancellable / never-issued; verify with a single test that drives all four and asserts the responses are equal, rather than four tests asserting four sentences
-- [ ] 6.6 `Referrer-Policy: no-referrer` on the page's response; verify by asserting the header
-- [ ] 6.7 The new views satisfy `default-frontend`'s universals — every state the model expresses, every branch reachable, every view exercised, markup resolving its own references; verify the existing view-coverage guards pick the new views up **without amendment**, and if they do not, find out why before changing them
+- [x] 6.1 A package route serving the cancellation page; verify it is served only while the feature is on, and is absent — not refused — while it is off
+- [x] 6.2 `GET` is safe: verify by test that retrieving the page neither cancels the booking nor marks the secret redeemed
+- [x] 6.3 The page states reference, what was booked and when, in the booking's own zone, and **cannot** express booker contact details; verify structurally (the model has no member for them), not by asserting absence from rendered text
+- [x] 6.4 Anti-forgery-protected `POST` that redeems and cancels; verify a submission without valid protection is refused and the booking is unaffected
+- [x] 6.5 One indistinguishable response for expired / redeemed / uncancellable / never-issued; verify with a single test that drives all four and asserts the responses are equal, rather than four tests asserting four sentences
+- [x] 6.6 `Referrer-Policy: no-referrer` on the page's response; verify by asserting the header
+- [x] 6.7 The new views satisfy `default-frontend`'s universals — every state the model expresses, every branch reachable, every view exercised, markup resolving its own references; verify the existing view-coverage guards pick the new views up **without amendment**, and if they do not, find out why before changing them
+
+**§6 notes.** A plain controller at `umbraco/ubookit/cancel/{secret}`, removed from the
+application model entirely when the feature is off (`CancellationExposureConvention`, on the
+delivery API's "absent, not refused" terms). GET is safe, POST redeems and cancels, anti-forgery on
+the form. Three mutants killed: GET redeeming, a refused cancellation getting its own page, and the
+expiry ignored on the read.
+
+**The form has no `action` attribute**, which turned out better than the `Url.Action` it replaced:
+an empty action posts to the URL the page was fetched from, so the **secret never enters the
+markup** — only the address. `CancellationPageModel` therefore has no member for it, alongside
+having none for the booker.
+
+**§6.7 answered: the view guards picked the new views up WITHOUT amendment**, and promptly failed
+them — which is the universals working. What followed is the substance of this section:
+
+- The rendering harness classifies every shipped view as a **document** or a **partial**; these are
+  standalone documents, so they needed fixtures and states, not an exemption.
+- Two of them are **static by design**, and `ModelReferences.DelegatingViews` is for *delegates* —
+  views that hand their model to exactly one other view. Naming a static page there made the
+  exemption's own stated reason false, and **the delegate guard caught it**. So `StaticViews` is a
+  new category with its own guard (`A_static_view_really_is_static`, asserted against rendered
+  output), rather than a bent one. Bending it would have disarmed the check that an exempted view
+  really is the harmless shape its exemption describes.
+- `LocalStart` was "referenced but changes nothing", because all four fixtures used the same time.
+  Correct finding; the fixtures now vary the interval.
+- The published **class vocabulary** is a stable contract and uses `block-part`, not BEM's
+  `block__part`. New classes recorded deliberately, and the submit-control count pinned 3 → 4.
+- The **schema-stability** guard in the integration suite required the new migration be recorded
+  with its reasoning against the concurrency guarantee it protects.
+
+**A repeat of my own mistake, worth naming:** a forbidden-substring assertion flagged `ServiceName`
+because it contains `Name`. That is the second loose-substring instrument in this change — the
+first flagged `CancellationSecretRecord` for containing `CancellationSecret`. Both now match
+precisely.
+
+Unit **1767**, rendering **1168** (+82), integration **167**.
 
 ## 7. The flag
 
 - [x] 7.1 `UBookIt:SelfServiceCancellation:Enabled`, bound at startup, default off; verify an unconfigured site issues nothing and serves no route
-- [ ] 7.2 Declare it in the read-only tier and as restart-bound; verify a write through the settings endpoint is refused **by the server**, not merely hidden by the client
+- [x] 7.2 Declare it in the read-only tier and as restart-bound; verify a write through the settings endpoint is refused **by the server**, not merely hidden by the client
 - [ ] 7.3 State the `SendBookerEmails` dependency on the settings screen when it is unmet; verify the screen says the feature cannot run and why, rather than showing it as on
 - [ ] 7.4 A test that the feature does nothing at all where booker emails are off — no row, no link, and the route still absent
 

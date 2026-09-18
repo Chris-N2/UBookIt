@@ -1,0 +1,25 @@
+@{
+    Layout = null;
+}
+@*
+    Deliberately carries NOTHING about the booking. The secret is spent by the time this renders,
+    so a reader arriving here again gets the Unusable page — but this page can also be reached by a
+    back-button replay in a browser that kept the response, and it must not become a way to read a
+    booking's details after the credential that permitted it is gone.
+*@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <meta name="robots" content="noindex, nofollow" />
+    <title>Booking cancelled</title>
+</head>
+<body>
+    <main class="ubookit ubookit-cancel">
+        <h1>Your booking has been cancelled</h1>
+        <p>If a confirmation was sent when you booked, one has been sent for the cancellation too.</p>
+        <p>This link has now been used and will not work again.</p>
+    </main>
+</body>
+</html>

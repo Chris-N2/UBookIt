@@ -57,6 +57,15 @@ public class ClassVocabularyTests
             "ubookit-booked-resources",
             "ubookit-booking",
             "ubookit-booking--service",
+
+            // self-service-cancellation: the cancellation pages. A NEW BLOCK on a published
+            // contract, so it is enumerated here deliberately — a site styling the flow can style
+            // these too, and the names will not move under it.
+            "ubookit-cancel",
+            "ubookit-cancel-booking",
+            "ubookit-cancel-resources",
+            "ubookit-cancel-zone",
+
             "ubookit-catalogue",
             "ubookit-catalogue-choice",
             "ubookit-catalogue-choices",
@@ -144,6 +153,7 @@ public class ClassVocabularyTests
         [
             "ubookit-booked-resources",
             "ubookit-booking",
+            "ubookit-cancel",
             "ubookit-catalogue",
             "ubookit-confirmation",
             "ubookit-date-form",
@@ -199,11 +209,13 @@ public class ClassVocabularyTests
         // Pinned counts, so removing a hook fails rather than quietly leaving a row
         // or a button unstyleable. Eight fields: five in _DateAndLength — including
         // the two wrappers that stand in when a control is replaced by settled text —
-        // and three in _YourDetails. Three submit controls, one per step.
+        // and three in _YourDetails. Four submit controls: one per booking step, plus
+        // the cancellation page's, which is a submit control for the same reason the
+        // others are — the action it performs must not be reachable by a GET.
         var classes = RenderedClasses();
 
         Assert.Equal(8, classes.Count(found => found.Class == "ubookit-field"));
-        Assert.Equal(3, classes.Count(found => found.Class == "ubookit-submit"));
+        Assert.Equal(4, classes.Count(found => found.Class == "ubookit-submit"));
 
         // Every button in the package is a submit control and carries the hook, so a
         // button added later without one fails here.
@@ -211,6 +223,6 @@ public class ClassVocabularyTests
             .Paths(ViewsRoot, "*.cshtml")
             .Sum(path => Regex.Matches(File.ReadAllText(path), @"<button\b").Count);
 
-        Assert.Equal(3, buttons);
+        Assert.Equal(4, buttons);
     }
 }

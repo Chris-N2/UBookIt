@@ -18,6 +18,33 @@ public class ViewInventoryTests
     private readonly ViewRenderer _renderer = new();
 
     [Fact]
+    public async Task A_static_view_really_is_static()
+    {
+        // THE COUNTERPART TO THE EXEMPTION. ModelReferences.StaticViews switches off the
+        // member-reference rule for whatever it names, so something has to check that a named view
+        // is the shape the exemption is written for — otherwise the registry becomes a way to
+        // silence a rule by adding a line, which is the fault the delegate guard already records.
+        //
+        // Asserted against RENDERED OUTPUT, not source: "this view has no model" is a source fact,
+        // and the claim being made is about what a reader receives.
+        Assert.NotEmpty(ModelReferences.StaticViews);
+
+        var renderer = new ViewRenderer();
+
+        foreach (var (view, reason) in ModelReferences.StaticViews)
+        {
+            Assert.NotEmpty(reason);
+            Assert.Contains(view, ViewInventory.All);
+
+            var first = await renderer.RenderAsync(view, new object());
+            var second = await renderer.RenderAsync(view, new object());
+
+            Assert.Equal(first, second);
+            Assert.NotEmpty(first);
+        }
+    }
+
+    [Fact]
     public void The_scan_finds_every_shipped_view()
     {
         // Counted, so a scan that quietly stopped finding things fails here rather
@@ -27,8 +54,11 @@ public class ViewInventoryTests
         // Both sets are counted. Counting only the governed set would let a view be
         // added AND excluded in one change without anything failing, which is the
         // decay this guard exists to prevent.
-        Assert.Equal(17, ViewInventory.Shipped.Count);
-        Assert.Equal(16, ViewInventory.All.Count);
+        // 17 -> 20 with self-service cancellation: Index, Cancelled and Unusable. Standalone
+        // documents rather than fragments, because the route they serve has no Umbraco page behind
+        // it — decided deliberately, which is what this assertion exists to make somebody do.
+        Assert.Equal(20, ViewInventory.Shipped.Count);
+        Assert.Equal(19, ViewInventory.All.Count);
     }
 
     [Fact]

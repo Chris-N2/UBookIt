@@ -1,0 +1,34 @@
+@{
+    Layout = null;
+}
+@*
+    ONE SENTENCE FOR FOUR CAUSES: expired, already used, belonging to a booking that can no longer
+    be cancelled, or never issued at all.
+
+    Telling them apart is exactly what an attacker wants — "already used" says a booking exists and
+    somebody cancelled it; "expired" says a booking exists and roughly when it was; "never issued"
+    says the guess was wrong. A page that distinguished them would rebuild, at the end of the flow,
+    the enumeration oracle this design removed at the start by never accepting a reference.
+
+    It costs a genuine booker some precision, and that is the trade: they are told to contact the
+    site, which is the position they were in before the feature existed.
+*@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <meta name="robots" content="noindex, nofollow" />
+    <title>This link can no longer be used</title>
+</head>
+<body>
+    <main class="ubookit ubookit-cancel">
+        <h1>This link can no longer be used</h1>
+        <p>
+            Cancellation links stop working once they have been used, and once the booking they
+            belong to has started.
+        </p>
+        <p>If you still need to change or cancel a booking, please contact us.</p>
+    </main>
+</body>
+</html>

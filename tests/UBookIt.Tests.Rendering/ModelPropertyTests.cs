@@ -136,6 +136,16 @@ public class ModelPropertyTests
             return;
         }
 
+        // A static page refers to nothing because it HAS nothing — a separate category with its
+        // own guard (ViewInventoryTests.A_static_view_really_is_static), because the delegate
+        // guards check a shape a static page does not have.
+        if (ModelReferences.StaticViews.TryGetValue(view, out var staticReason))
+        {
+            Assert.Empty(ModelReferences.Of(view));
+            Assert.NotEmpty(staticReason);
+            return;
+        }
+
         Assert.NotEmpty(ModelReferences.Of(view));
     }
 
