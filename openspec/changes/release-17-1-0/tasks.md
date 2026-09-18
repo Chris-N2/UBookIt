@@ -220,22 +220,49 @@ cannot be changed"` — so `str.replace` matched nothing, returned the
       and my commit message's "nine names" were wrong; the changelog's per-interface table was
       never wrong, which is why listing per interface is the right shape.
 
-### 10.6 [MINOR] `FindByReferenceAsync` is not declared in any spec — DEFERRED, with the reason
+### 10.6 [MAJOR, resized in round 3] Five of the ten breaks are declared in no spec — DEFERRED
 
-**The gap is real.** CLAUDE.md requires a breaking change to be called out explicitly in its spec.
-Nine of the ten breaks are; `IBookingManagementStore.FindByReferenceAsync` is declared only in a
-source comment in `Stores.cs`, and `find-booking`'s proposal carries no `BREAKING` line at all.
-`openspec/specs/booking-management/spec.md` has no callout for it.
+**Round 2 recorded this as "one member in `booking-management`". That was wrong, and I inherited
+the number rather than measuring it.** QA had checked one capability and reported the member it
+found; I verified the *breaking set* against the compiled surface but took the *declaration count*
+on trust. Same lesson as the round-1 CRITICAL, one level along: an enumeration is only as good as
+the population it was taken over.
 
-**Not closed here, deliberately.** Closing it means a `## MODIFIED Requirements` entry for *A
-booking can be found by its reference* — a ~60-line body with **8 scenarios** — replaced wholesale,
-which is this project's most expensive failure mode and the one thing that must not be done quickly
-or unsupervised. The gap predates this change: it was created when `find-booking` merged, not by
-the release.
+**Measured across every spec** (only five specs in the repository contain any `BREAKING` text):
 
-**What the release does instead:** the consumer-facing callout, which is the protection that
-actually matters to a site, now exists in `CHANGELOG.md` and is correct. The proposal no longer
-claims all ten were declared — it states that nine were and names the one that was not.
+| Signature | Declared? |
+| --- | --- |
+| `IBookingObserver.BookingMovedAsync` | ✓ `bookings` |
+| `IBookingStore.MoveAsync` | ✓ `bookings` |
+| `IServiceBookingService.MoveAsync` | ✓ `service-booking` |
+| `IServiceBookingService.PlaceOnBehalfAsync` ×2 | partial — `service-booking` says "the on-behalf placement **member**", singular, for two overloads |
+| `IBookingService.MoveAsync`, `PlaceOnBehalfAsync`, `PlaceForServiceOnBehalfAsync`, `CancelAsVisitorAsync` | ✗ **none, in any spec** |
+| `IBookingManagementStore.FindByReferenceAsync` | ✗ |
 
-**Owed to `booking-management`**, recorded in the deferred obligations. Whoever next touches that
-capability should add the declaration with a proper guarantee diff.
+**Five of ten generously, four strictly.** The undeclared debt spans **two** capabilities —
+`bookings` (all four `IBookingService` additions) and `booking-management` (the reference lookup) —
+plus a wording defect in `service-booking`, where a singular "member" covers two overloads.
+
+**Deferred, and QA ruled on the deferral rather than my sizing of it.** The reasons hold at the
+larger scope and are arguably stronger: this is other changes' spec hygiene, not the release's; a
+wholesale replacement of several requirements at the end of a release branch is the single failure
+mode CLAUDE.md singles out; and the protection that reaches a consumer — the `CHANGELOG.md`
+callout — is correct and was verified against the compiled surface, independently, by QA.
+
+**What the release does instead:** `proposal.md` now states the measured scope rather than claiming
+nine of ten were declared. The obligation is recorded against `bookings` and `booking-management`
+in the project's deferred obligations, sized as above, so the next person to touch either does not
+size the work from a sentence that was never true.
+
+## 11. QA round 3 — REJECT (1 MAJOR, 2 MINOR)
+
+- [x] 11.1 **[MAJOR]** §10.6 and `proposal.md` resized to the measured declaration scope (above).
+- [x] 11.2 **[MINOR]** `proposal.md` kept one *Manage Bookings* — and the sentence after it said
+      "those are the names the backoffice shows", so a corrected sentence was vouching for an
+      uncorrected label. Now *Act on bookings*. `CHANGELOG.md` was already fully correct.
+- [x] 11.3 **[MINOR]** The registry note in `VersionTruthTests` recorded only the line-wrap cause.
+      **QA reproduced the stale-assembly cause independently, with a mutation that provably
+      applied** — a binary built before `CHANGELOG.md` joined `LiveDocuments()` reports green
+      however carefully the mutant is verified. Both causes are now recorded, with the point that
+      **neither remedy catches the other**: a no-op mutation is invisible to a rebuild, and an
+      applied mutation is invisible to an applied-assertion when the binary predates the guard.

@@ -38,10 +38,13 @@ it are history.
 - **BREAKING — nothing new breaks here.** This change declares no break of its own. It *publishes*
   ten that were implemented and QA'd in their own changes and have been sitting unreleased, across
   `IBookingObserver`, `IBookingStore`, `IBookingManagementStore`, `IServiceBookingService` and
-  `IBookingService`. **Nine of the ten were declared in a spec; one was not** —
-  `IBookingManagementStore.FindByReferenceAsync` is declared only in a source comment, which is a
-  real gap against CLAUDE.md and is recorded as a deferral in §8 of `tasks.md` rather than closed
-  here. **The set is derived by diffing the compiled
+  `IBookingService`. **At most five of the ten are declared in a spec.** `bookings` declares the store and observer
+  additions; `service-booking` declares `IServiceBookingService`'s move, and its on-behalf
+  addition in the singular though there are two overloads. **`IBookingService`'s four additions are
+  declared in no spec at all, and neither is
+  `IBookingManagementStore.FindByReferenceAsync`** — five signatures across two capabilities,
+  declared only in proposals and source comments. That is a real gap against CLAUDE.md, it predates
+  this change, and it is recorded as a deferral in §10.6 of `tasks.md` rather than closed here. **The set is derived by diffing the compiled
   interface surface against the `17.0.1` release commit, not transcribed from the proposals** — see
   design D7. All ten land in a minor, which is where this project's policy puts a break.
 
@@ -92,7 +95,7 @@ five approved changes into a release rather than releasing each.
 **will not compile** until it adds the new members.
 
 Every other site compiles, but **three features become available immediately**: moving a booking
-and booking on behalf for groups holding *Manage Bookings* (on-behalf additionally requires
+and booking on behalf for groups holding *Act on bookings* (on-behalf additionally requires
 Umbraco's *Sensitive data*), and booking lookup for groups holding *See bookings*. Those are the
 names the backoffice shows; the verbs behind them are `BookingsManage` and `BookingsRead`. A moved booking
 also sends the booker a `BookerMoved` email that did not exist before. Only the settings screen

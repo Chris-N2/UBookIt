@@ -604,13 +604,19 @@ public class VersionTruthTests
             + "unclassified; a drop to two leaves an unconsumed allowance; all three going away "
             + "leaves three. Measured in each direction, against a build that actually contained "
             + "this entry.\n"
-            + "That sentence was briefly weakened to \"bounds rather than pins\" on the strength "
-            + "of a mutation that never happened: the replacement string spanned a line wrap in "
-            + "CHANGELOG.md, Python's str.replace matched nothing and returned the text unchanged, "
-            + "and the green run was read as evidence. ASSERT THAT A MUTANT CHANGED THE FILE. A "
-            + "mutation tool that silently no-ops does not report a passing guard, it reports "
-            + "nothing at all — and line wrapping has defeated an instrument in this repository "
-            + "before."),
+            + "That sentence was briefly weakened to \"bounds rather than pins\" on the strength of "
+            + "a green run that measured nothing. TWO INDEPENDENT CAUSES were found, and NEITHER "
+            + "REMEDY CATCHES THE OTHER — which is the reason both are written here rather than "
+            + "the tidier one:\n"
+            + "(1) THE MUTATION NEVER APPLIED. The replacement string spanned a line wrap in "
+            + "CHANGELOG.md, str.replace matched nothing and returned the text unchanged. A "
+            + "rebuild cannot see this; only asserting the file changed can.\n"
+            + "(2) THE ASSEMBLY PREDATED THE GUARD. A binary built before CHANGELOG.md joined "
+            + "LiveDocuments() never reads the file, so it reports green however carefully the "
+            + "mutant is verified — reproduced with a mutation that provably applied. Asserting "
+            + "the change cannot see this; only a rebuild can.\n"
+            + "So a mutation result is evidence only when BOTH hold: the file demonstrably "
+            + "changed, and the assembly was built from the source under test."),
 
         ("openspec/specs/packaging/spec.md", "nuget.org", 4,
             "Arrived at SYNC, not written by hand — `release-17-0-1`'s requirements moved into "
