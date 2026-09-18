@@ -38,10 +38,43 @@ public class SettingLocalisationTests
             index == 0 ? char.ToLowerInvariant(part[0]) + part[1..] : part));
     }
 
+    /// <summary>
+    /// The body of one top-level dictionary in the localisation file.
+    /// </summary>
+    /// <remarks>
+    /// <b>The block matters, and the first version of this guard ignored it.</b> The screen asks
+    /// for <c>ubookitSettings_&lt;slug&gt;Label</c>, so a term declared in a different dictionary
+    /// satisfies a whole-file scan and still renders a raw key on screen — which is the very defect
+    /// this file exists to prevent, wearing a different hat. Narrowing to the block is what makes
+    /// the assertion mean what it says.
+    /// </remarks>
+    private static string Block(string source, string name)
+    {
+        var start = source.IndexOf($"{name}: {{", StringComparison.Ordinal);
+        Assert.True(start >= 0, $"The localisation file no longer declares a '{name}' dictionary.");
+
+        var depth = 0;
+
+        for (var i = source.IndexOf('{', start); i < source.Length; i++)
+        {
+            if (source[i] == '{')
+            {
+                depth++;
+            }
+            else if (source[i] == '}' && --depth == 0)
+            {
+                return source[start..i];
+            }
+        }
+
+        throw new InvalidOperationException($"The '{name}' dictionary is unbalanced.");
+    }
+
     [Fact]
     public void Every_catalogued_setting_has_a_label_and_a_description()
     {
-        var source = RepoFiles.Read(LocalisationFile);
+        // Scoped to the dictionary the screen actually reads from.
+        var source = Block(RepoFiles.Read(LocalisationFile), "ubookitSettings");
 
         var missing = new List<string>();
 
@@ -71,11 +104,18 @@ public class SettingLocalisationTests
     {
         // POSITIVE CONTROL, and it comes first in spirit: a scan that matched nothing anywhere
         // would report every setting as localised. This project has shipped exactly that.
-        var source = RepoFiles.Read(LocalisationFile);
+        var whole = RepoFiles.Read(LocalisationFile);
+        var block = Block(whole, "ubookitSettings");
 
         Assert.NotEmpty(SettingCatalogue.All);
-        Assert.Matches(@"^\s*retentionDaysLabel:", source.Split('\n').First(l => l.Contains("retentionDaysLabel:")));
-        Assert.DoesNotMatch(@"^\s*aTermNobodyDeclared:", source);
+        Assert.Contains("retentionDaysLabel:", block, StringComparison.Ordinal);
+        Assert.DoesNotContain("aTermNobodyDeclared:", block, StringComparison.Ordinal);
+
+        // AND THE BLOCK IS A REAL NARROWING, not the whole file under another name. A term in a
+        // neighbouring dictionary must NOT satisfy the scan — that is the hole the first version
+        // had, and this is what holds it shut.
+        Assert.Contains("unnamedParty:", whole, StringComparison.Ordinal);
+        Assert.DoesNotContain("unnamedParty:", block, StringComparison.Ordinal);
     }
 
     [Fact]
