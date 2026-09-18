@@ -64,13 +64,26 @@ surgically, then `diff`ed back. Re-verify before trusting; a measurement nobody 
 - [x] 8.1 `openspec validate --all --strict` passes
 - [x] 8.2 Release build `--no-incremental`, zero warnings
 - [x] 8.3 Full suite green from a clean build, two steps; record all four counts and the deltas from 1.2
-- [ ] 8.4 **Live**: find `BJQ4-ZP5C` (a ㊳ residue booking on 18 Sep) from a window showing another week — it appears alone under the status line; find it in lower case with the separator; find `behalf.probe@example.com` — its bookings, all dates; type `not-a-thing` — refused in place; type an email as a user without the group — told why. Then **move the found booking to a date outside the original window and confirm it is still shown** (the D5 seam)
+- [x] 8.4 **Live**: find `BJQ4-ZP5C` (a ㊳ residue booking on 18 Sep) from a window showing another week — it appears alone under the status line; find it in lower case with the separator; find `behalf.probe@example.com` — its bookings, all dates; type `not-a-thing` — refused in place; type an email as a user without the group — told why. Then **move the found booking to a date outside the original window and confirm it is still shown** (the D5 seam)
   - Verified live 2026-09-18: miss renders as the sentence "No booking has the reference ZZZZ-2222."
     with **Back to dates** and no table; `not-a-thing` refused in place with the window untouched;
     `behalf.probe@example.com` returned `BJQ4-ZP5C` dated **Oct 15 2026** under a window showing
     14–20 Sep, which is the D5 seam proved from the email side as well as the reference side.
-  - **STILL OWED**: "type an email as a user without the group — told why" needs a second sign-in
-    (Perm Tester, who lacks Sensitive data). It is the only live check outstanding.
+  - Completed 2026-09-18 as **Perm Tester** (group `Perm Test`, whose only uBookIt grant is
+    *See Bookings*, and which is NOT in Umbraco's Sensitive data group). The two gates proved
+    independent, which is the point of the check:
+    - label narrowed to "Find a booking by reference"; `_canSeePersonalData` false; booker cells
+      read *Contact details hidden*; no Move/Cancel on any row;
+    - an email address typed anyway is refused **in place** with "Finding by email address needs
+      the Sensitive data group — ask a colleague who is in it, or find the booking by its
+      reference." — it names the group AND the route that is still open to them;
+    - **the reference lookup still works for them**: `bjq4-zp5c` found `BJQ4-ZP5C` dated Oct 15
+      2026, under the withheld-details note, with contact details hidden. That is the capability
+      the narrowing must not take away, since the endpoint is Read-gated and not
+      Sensitive-data-gated.
+    - Method note: the first attempt measured the ADMIN session by mistake. Verify identity from
+      the page (avatar initials, which sections render, whether row actions exist) BEFORE reading
+      any capability flag — Umbraco carries a prior session over in the same browser.
 - [x] 8.5 Live keyboard path: Find input labelled and reachable; an error associated with it; Back to dates puts focus on the From input — measured with `document.activeElement`, not eyeballed
 - [x] 8.6 Stop the TestSite and confirm port 44348 is free
 
