@@ -117,3 +117,39 @@ describe("what the tier permits", () => {
     expect(hasConsequence({ tier: "readOnly" })).toBe(false);
   });
 });
+
+describe("an unmet dependency", () => {
+  // A setting that reports itself as on while the rest of the configuration stops it working
+  // describes a state the site does not have. The note has to be REACHABLE from the control, not
+  // merely rendered near it: uui-* controls carry no aria-describedby of their own, so text beside
+  // a control is visually present and programmatically unrelated to it.
+  const base = { key: "UBookIt:SelfServiceCancellation:Enabled", tier: "readOnly", isOverridden: false };
+
+  it("is described by the control when present", () => {
+    const ids = describedByIds({ ...base, unmetDependency: "needs booker emails" }, { hasError: false });
+
+    expect(ids).toContain("setting-selfServiceCancellationEnabled-dependency");
+  });
+
+  it("is absent from the description when there is none", () => {
+    expect(describedByIds({ ...base, unmetDependency: null }, { hasError: false }))
+      .not.toContain("setting-selfServiceCancellationEnabled-dependency");
+
+    expect(describedByIds(base, { hasError: false }))
+      .not.toContain("setting-selfServiceCancellationEnabled-dependency");
+  });
+
+  it("is read before the override note and the error", () => {
+    // Reading order is the point: it explains why the value shown is not the behaviour the site
+    // has, so a reader who meets it after the error has already been misled.
+    const ids = describedByIds(
+      { ...base, isOverridden: true, unmetDependency: "needs booker emails" },
+      { hasError: true },
+    );
+
+    expect(ids.indexOf("setting-selfServiceCancellationEnabled-dependency"))
+      .toBeLessThan(ids.indexOf("setting-selfServiceCancellationEnabled-overridden"));
+    expect(ids.indexOf("setting-selfServiceCancellationEnabled-overridden"))
+      .toBeLessThan(ids.indexOf("setting-selfServiceCancellationEnabled-error"));
+  });
+});

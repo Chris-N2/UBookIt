@@ -38,6 +38,21 @@ namespace UBookIt.Backoffice.Models;
 /// setting can be read-only because an operator should not judge it, or because the value is
 /// consumed while the application is being built.
 /// </param>
+/// <param name="UnmetDependency">
+/// Why this setting cannot take effect on this site, or <c>null</c> where nothing stops it.
+/// <para>
+/// <b>A setting reporting itself as on while doing nothing describes a configuration the site does
+/// not have</b>, which is the failure this screen exists to avoid. Self-service cancellation is the
+/// first setting with a dependency of this shape: its link travels in the booker's message, so
+/// where the site sends the booker no message there is no vehicle and no link — and an
+/// administrator who enables it deserves to be told that rather than left wondering.
+/// </para>
+/// <para>
+/// A SENTENCE rather than a flag, because the client cannot compose an accurate one: the reason
+/// belongs to whoever knows which other setting is involved and why, and a client that assembled it
+/// would be a second place for the explanation to drift.
+/// </para>
+/// </param>
 public sealed record SettingResponseModel(
     string Key,
     string Tier,
@@ -46,7 +61,8 @@ public sealed record SettingResponseModel(
     string? ConfiguredValue,
     bool IsOverridden,
     bool IsConfigured,
-    bool RequiresRestart);
+    bool RequiresRestart,
+    string? UnmetDependency = null);
 
 /// <summary>Every setting the screen knows about.</summary>
 public sealed record SettingsResponseModel(IReadOnlyList<SettingResponseModel> Settings);

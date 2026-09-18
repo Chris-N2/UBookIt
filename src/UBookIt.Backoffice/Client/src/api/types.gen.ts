@@ -298,6 +298,7 @@ export type SettingResponseModel = {
     isOverridden: boolean;
     isConfigured: boolean;
     requiresRestart: boolean;
+    unmetDependency?: string | null;
 };
 
 export type SettingWriteModel = {

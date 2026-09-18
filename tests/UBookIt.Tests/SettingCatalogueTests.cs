@@ -1,6 +1,7 @@
 using System.Reflection;
 using UBookIt.Backoffice.Settings;
 using UBookIt.Persistence.Composing;
+using UBookIt.Core;
 
 namespace UBookIt.Tests;
 
@@ -76,6 +77,12 @@ public class SettingCatalogueTests
         [
             SettingCatalogue.DeliveryApiEnableReadsKey,
             SettingCatalogue.DeliveryApiEnablePlacementKey,
+
+            // Read in UBookIt.Persistence (to decide whether a link is issued) and in
+            // UBookIt.Web (to decide whether the route exists), neither of which this
+            // assembly's catalogue can reference. Tied back to the real constant by the guard
+            // below, on the same terms as the pair above.
+            SettingCatalogue.SelfServiceCancellationEnabledKey,
         ];
 
         var unread = SettingCatalogue.All
@@ -100,6 +107,67 @@ public class SettingCatalogueTests
         // And the property names the binder actually uses, so a rename on the record is caught too.
         Assert.NotNull(typeof(UBookIt.Web.DeliveryApiSettings).GetProperty("EnableReads"));
         Assert.NotNull(typeof(UBookIt.Web.DeliveryApiSettings).GetProperty("EnablePlacement"));
+    }
+
+    [Fact]
+    public void The_cancellation_key_matches_the_section_the_package_actually_binds()
+    {
+        // Spelled by hand in SettingCatalogue for the same reason the delivery API's are — the
+        // backoffice assembly does not reference Core's settings record by that path — so the
+        // hand-spelling is tied back to the real constant here, where both are visible.
+        var section = UBookIt.Core.SelfServiceCancellationSettings.SectionKey;
+
+        Assert.Equal(SettingCatalogue.SelfServiceCancellationEnabledKey, $"{section}:Enabled");
+
+        // And the property the binder uses, so a rename on the record is caught too.
+        Assert.NotNull(typeof(UBookIt.Core.SelfServiceCancellationSettings).GetProperty("Enabled"));
+    }
+
+    [Fact]
+    public void Self_service_cancellation_is_read_only_and_restart_bound()
+    {
+        // It is anonymous exposure — a route that cancels a site's bookings for a caller the
+        // package cannot identify beyond a secret — which is the boundary the read-only tier
+        // exists to hold, and the same class as the delivery API's switches.
+        Assert.True(SettingCatalogue.TryGet(
+            SettingCatalogue.SelfServiceCancellationEnabledKey, out var cancellation));
+
+        Assert.Equal(SettingTier.ReadOnly, cancellation.Tier);
+        Assert.False(cancellation.IsEditable);
+        Assert.True(cancellation.RequiresRestart);
+    }
+
+    [Fact]
+    public void The_dependency_is_stated_only_when_it_is_unmet()
+    {
+        // 7.4's other half: the feature does nothing where booker emails are off, and the screen
+        // SAYS so. A setting reporting itself as on while the configuration stops it working
+        // describes a state the site does not have — which is the failure this screen exists to
+        // avoid, and the one ⑧a shipped.
+        var off = new SiteBookingSettings
+        {
+            TimeZoneId = "UTC",
+            Notifications = new BookingNotificationSettings { SendBookerEmails = false },
+        };
+
+        var on = off with
+        {
+            Notifications = new BookingNotificationSettings { SendBookerEmails = true },
+        };
+
+        var unmet = SettingCatalogue.UnmetDependency(SettingCatalogue.SelfServiceCancellationEnabledKey, off);
+
+        Assert.NotNull(unmet);
+        Assert.Contains("booker emails", unmet, StringComparison.OrdinalIgnoreCase);
+
+        Assert.Null(SettingCatalogue.UnmetDependency(SettingCatalogue.SelfServiceCancellationEnabledKey, on));
+
+        // And no other setting claims one, so the note cannot appear where nothing explains it.
+        foreach (var descriptor in SettingCatalogue.All
+                     .Where(s => !string.Equals(s.Key, SettingCatalogue.SelfServiceCancellationEnabledKey, StringComparison.Ordinal)))
+        {
+            Assert.Null(SettingCatalogue.UnmetDependency(descriptor.Key, off));
+        }
     }
 
     [Fact]

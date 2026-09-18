@@ -86,7 +86,11 @@ public class SettingsController(
                     // it changes whether a later deployment can move the setting.
                     IsOverridden: overriddenKeys.Count > 0,
                     IsConfigured: SettingText.IsConfigured(descriptor, configuration),
-                    descriptor.RequiresRestart);
+                    descriptor.RequiresRestart,
+
+                    // Resolved against the EFFECTIVE settings, not the configured ones: what the
+                    // operator needs to know is whether it works on this site as it stands.
+                    UnmetDependency: SettingCatalogue.UnmetDependency(descriptor.Key, effectiveSettings));
             })
             .ToList();
 

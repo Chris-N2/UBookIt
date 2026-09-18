@@ -214,8 +214,36 @@ Unit **1767**, rendering **1168** (+82), integration **167**.
 
 - [x] 7.1 `UBookIt:SelfServiceCancellation:Enabled`, bound at startup, default off; verify an unconfigured site issues nothing and serves no route
 - [x] 7.2 Declare it in the read-only tier and as restart-bound; verify a write through the settings endpoint is refused **by the server**, not merely hidden by the client
-- [ ] 7.3 State the `SendBookerEmails` dependency on the settings screen when it is unmet; verify the screen says the feature cannot run and why, rather than showing it as on
-- [ ] 7.4 A test that the feature does nothing at all where booker emails are off — no row, no link, and the route still absent
+- [x] 7.3 State the `SendBookerEmails` dependency on the settings screen when it is unmet; verify the screen says the feature cannot run and why, rather than showing it as on
+- [x] 7.4 A test that the feature does nothing at all where booker emails are off — no row, no link, and the route still absent
+
+**§7 notes, including a correction to this file.** **7.2 was ticked prematurely in the §6 batch** —
+the config binding was registered but the setting had never been declared in `SettingCatalogue`, so
+the tier and the server-side refusal did not exist. Unticked and done properly. Recording it because
+a false claim in the task file is exactly what QA has caught before, and catching it myself does not
+make it less worth writing down.
+
+Now declared **read-only and restart-bound**, beside the delivery API's two switches and for the
+same reason: anonymous exposure, not a judgement about operators. Two existing guards had to be
+satisfied — the catalogue may name no setting the package does not read (it is read in Persistence
+and in Web, neither of which the backoffice assembly can reference, so it joins the delivery pair as
+a recorded exception), and the hand-spelled key is tied back to
+`SelfServiceCancellationSettings.SectionKey` by a guard, so the two cannot drift.
+
+**The dependency is stated, not silently `&&`-ed away** (7.3). `SettingCatalogue.UnmetDependency`
+returns the *sentence* — from the server, because the reason involves another setting and a client
+that assembled it would be a second place for the explanation to drift. It joins
+`aria-describedby` **before** the override note and the error, since it explains why the value shown
+is not the behaviour the site has; a reader meeting it after the error has already been misled.
+Deliberately not generalised into a dependency graph: one case is not a pattern.
+
+**Build-order note.** Regenerating the typed client needs the site running, and the site would not
+build because the client did not typecheck against a model that did not exist yet. Broken by parking
+the element change, building **client then server separately** (QA's rule), starting the site,
+regenerating, and restoring. The `StaticWebAssets(706,5)` error appeared exactly once on the way, in
+the interleaved build, which is the artefact QA identified.
+
+Unit **1770**, client **290** (+3).
 
 ## 8. Documentation
 

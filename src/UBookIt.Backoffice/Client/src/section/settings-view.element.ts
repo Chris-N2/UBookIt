@@ -245,6 +245,19 @@ export class UBookItSettingsViewElement extends UmbLitElement {
 
         ${this.#renderControl(setting, id, describedBy)}
 
+        <!--
+          WHY THIS SETTING IS NOT DOING ANYTHING, in the server's words. A setting that reports
+          itself as on while the rest of the configuration stops it working describes a state the
+          site does not have — and an administrator who enabled it deserves to be told, rather
+          than left to discover it from a customer.
+
+          The sentence is the server's because the reason involves another setting; a client that
+          assembled it would be a second place for the explanation to drift.
+        -->
+        ${setting.unmetDependency
+          ? html`<p class="dependency" id="${id}-dependency">${setting.unmetDependency}</p>`
+          : nothing}
+
         ${setting.isOverridden
           ? html`
               <p class="overridden" id=${overriddenId}>
