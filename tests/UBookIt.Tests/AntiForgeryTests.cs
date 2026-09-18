@@ -19,10 +19,11 @@ namespace UBookIt.Tests;
 /// not the population.
 /// </para>
 /// <para>
-/// <b>Derived, not listed.</b> The set is every public `[HttpPost]` on the package's
-/// visitor-facing controllers, found by reflection — so a POST added tomorrow is covered the day it
-/// exists rather than the day somebody remembers this file. A hardcoded list would pass forever
-/// while the thing it names drifts.
+/// <b>Derived, not listed — and that claim is now true of BOTH halves.</b> The first version
+/// derived the actions but hardcoded the three controllers, while its remark said it derived
+/// everything. QA disproved it by adding a fourth controller with an unprotected POST and watching
+/// every test pass. Both the controller set and its actions come from the assembly now, and the
+/// controller set is pinned in the positive control so a new one forces a decision.
 /// </para>
 /// <para>
 /// These are anonymous endpoints: nothing authenticates the caller, so anti-forgery is the only
@@ -33,20 +34,36 @@ namespace UBookIt.Tests;
 public class AntiForgeryTests
 {
     /// <summary>
-    /// The visitor-facing controllers — the ones a browser posts a form to.
+    /// Every visitor-facing controller in the package — <b>derived from the assembly</b>, not listed.
     /// </summary>
     /// <remarks>
-    /// The delivery API is deliberately excluded and that is not an oversight: it is a
+    /// <para>
+    /// <b>This was a hardcoded list of three types, under a remark claiming it was derived.</b> QA
+    /// disproved the claim the only way it could be disproved: by adding a new controller with an
+    /// unprotected <c>[HttpPost]</c> and watching all three tests pass. That is exactly how
+    /// <c>CancellationController.Cancel</c> itself arrived — on a NEW controller — which is why
+    /// nothing caught it for a whole round.
+    /// </para>
+    /// <para>
+    /// So the set is now every MVC controller in the Web assembly that is not a delivery-API
+    /// controller. A visitor-facing POST added tomorrow is covered the day it exists, rather than
+    /// the day somebody remembers this file.
+    /// </para>
+    /// <para>
+    /// <b>The delivery API is the stated exclusion, and it is not an oversight.</b> It is a
     /// machine-to-machine JSON API with no browser session and no cookie to forge against, it is
-    /// off by default, and anti-forgery on it would break every legitimate consumer. Stated here so
-    /// the absence reads as a decision rather than a gap.
+    /// off by default, and anti-forgery on it would break every legitimate consumer. Excluded by
+    /// its base type, so a new delivery endpoint inherits the exclusion and a new visitor-facing
+    /// controller does not.
+    /// </para>
     /// </remarks>
-    private static readonly Type[] VisitorFacing =
-    [
-        typeof(BookingSurfaceController),
-        typeof(ServiceBookingSurfaceController),
-        typeof(CancellationController),
-    ];
+    private static IReadOnlyList<Type> VisitorFacing()
+        => [.. typeof(CancellationController).Assembly
+            .GetTypes()
+            .Where(type => type is { IsAbstract: false, IsPublic: true }
+                && typeof(Controller).IsAssignableFrom(type)
+                && !typeof(UBookItDeliveryApiControllerBase).IsAssignableFrom(type))
+            .OrderBy(type => type.Name, StringComparer.Ordinal)];
 
     private static IEnumerable<MethodInfo> PostActions(Type controller)
         => controller
@@ -56,7 +73,7 @@ public class AntiForgeryTests
     [Fact]
     public void Every_visitor_facing_post_validates_an_anti_forgery_token()
     {
-        var unprotected = VisitorFacing
+        var unprotected = VisitorFacing()
             .SelectMany(controller => PostActions(controller)
                 .Where(method => !method.GetCustomAttributes<ValidateAntiForgeryTokenAttribute>().Any())
                 .Select(method => $"{controller.Name}.{method.Name}"))
@@ -74,7 +91,16 @@ public class AntiForgeryTests
         // POSITIVE CONTROL, and it earns its place: a reflection scan that found no actions would
         // report every controller protected. This project has shipped a scan that passed by
         // matching nothing, which is why every scan here now carries one of these.
-        var found = VisitorFacing
+        var controllers = VisitorFacing().Select(type => type.Name).ToArray();
+
+        // THE CONTROLLER SET IS PINNED, not just the actions. A new visitor-facing controller now
+        // forces a decision here rather than slipping past — which is the failure QA reproduced by
+        // adding one and watching every test pass.
+        Assert.Equal(
+            ["BookingSurfaceController", "CancellationController", "ServiceBookingSurfaceController"],
+            controllers);
+
+        var found = VisitorFacing()
             .SelectMany(controller => PostActions(controller).Select(method => $"{controller.Name}.{method.Name}"))
             .Order(StringComparer.Ordinal)
             .ToArray();
@@ -86,6 +112,12 @@ public class AntiForgeryTests
                 "ServiceBookingSurfaceController.Submit",
             ],
             found);
+
+        // And the exclusion really excludes something, or "not a delivery controller" would be a
+        // condition that never fires and the derivation would be the whole assembly by accident.
+        Assert.Contains(
+            typeof(CancellationController).Assembly.GetTypes(),
+            type => typeof(UBookItDeliveryApiControllerBase).IsAssignableFrom(type) && !type.IsAbstract);
     }
 
     [Fact]

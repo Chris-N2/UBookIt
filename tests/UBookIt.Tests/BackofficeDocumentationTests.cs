@@ -202,7 +202,7 @@ public class BackofficeDocumentationTests
     }
 
     [Fact]
-    public void The_two_things_erasure_does_not_reach_are_documented()
+    public void The_limits_of_one_erasure_are_documented()
     {
         // The `booker-erasure` capability makes these normative — "What erasure does not reach
         // is documented" — with a scenario each, and a spec requirement discharged only by
@@ -221,10 +221,14 @@ public class BackofficeDocumentationTests
     }
 
     [Fact]
-    public void The_third_thing_erasure_does_not_reach_is_documented()
+    public void Erasure_not_withdrawing_a_cancellation_link_is_documented()
     {
-        // `booker-erasure` → "What erasure does not reach is documented" gained a fourth bullet in
+        // `booker-erasure` → "What erasure does not reach is documented" gained a bullet in
         // self-service-cancellation: erasure does NOT withdraw a cancellation link already issued.
+        //
+        // Named for what it asserts rather than for its position in a list — a counted name goes
+        // wrong the next time somebody adds a boundary, which is how its sibling came to be called
+        // "the two things" about a requirement that now has four.
         //
         // Every sibling boundary in that requirement has a guard; this one shipped without one,
         // which QA found. A spec requirement discharged only by prose is discharged by nothing —

@@ -194,6 +194,5 @@ public sealed class CancellationController(
         // credential, must not be left to whatever a CDN, a proxy or a shared browser decides. The
         // change took this trouble for the referrer; this is the same pair's other half.
         Response.Headers["Cache-Control"] = "no-store, no-cache, must-revalidate";
-        Response.Headers["Pragma"] = "no-cache";
     }
 }

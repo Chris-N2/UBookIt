@@ -42,18 +42,28 @@ public class ClassVocabularyTests
     /// theme cannot replace them either. Both facts are stated in the proposal and the docs.
     /// </para>
     /// </remarks>
-    private static readonly string[] OutsideTheStylingContract =
-    [
-        "Index.cshtml", "Cancelled.cshtml", "Unusable.cshtml",
-    ];
+    /// <summary>
+    /// Whether a shipped view is outside the styling contract — <b>by directory, once.</b>
+    /// </summary>
+    /// <remarks>
+    /// It was specified twice and differently: the class scan filtered by directory while the
+    /// button count filtered by FILENAME, so a fourth cancellation view would have been excluded
+    /// from one and not the other. Worse, the filename list contained <c>Index.cshtml</c> — the
+    /// likeliest filename in any future <c>Views/&lt;Something&gt;/</c> folder — whose buttons
+    /// would then have been silently exempt. One predicate, and it names a place rather than a
+    /// file.
+    /// </remarks>
+    private static bool OutsideTheStylingContract(string path)
+        => path.Contains(
+            $"{Path.DirectorySeparatorChar}Cancellation{Path.DirectorySeparatorChar}",
+            StringComparison.Ordinal);
 
-    /// <summary>Every class the shipped views render, with the view that renders it.</summary>
+    /// <summary>Every <c>ubookit-</c> class the shipped views render, with the view that renders it.</summary>
     private static IReadOnlyList<(string View, string Class)> RenderedClasses()
     {
         var found = new List<(string, string)>();
 
-        foreach (var path in RepoFiles.Paths(ViewsRoot, "*.cshtml")
-                     .Where(path => !path.Contains($"{Path.DirectorySeparatorChar}Cancellation{Path.DirectorySeparatorChar}", StringComparison.Ordinal)))
+        foreach (var path in RepoFiles.Paths(ViewsRoot, "*.cshtml"))
         {
             var name = Path.GetFileName(path);
             var source = Regex.Replace(File.ReadAllText(path), @"@\*.*?\*@", " ", RegexOptions.Singleline);
@@ -221,6 +231,40 @@ public class ClassVocabularyTests
     }
 
     [Fact]
+    public void A_view_outside_the_contract_really_is_outside_the_cascade()
+    {
+        // THE COUNTERPART TO THE EXEMPTION, and without it this is simply a line you can add to
+        // switch the button-hook rule off. `ModelReferences.StaticViews` was accepted in the
+        // previous round BECAUSE its own guard constrains what it exempts; this one had none.
+        //
+        // "Outside the cascade" is three facts about the view, all checkable: it sets its own
+        // layout to null, it links no stylesheet, and it pulls in no shared styles partial. A view
+        // that did any of those would be reachable by a site's CSS, and exempting it would be
+        // hiding a contract class rather than recording a page that has none.
+        var exempted = RepoFiles.Paths(ViewsRoot, "*.cshtml").Where(OutsideTheStylingContract).ToList();
+
+        Assert.NotEmpty(exempted);
+
+        foreach (var path in exempted)
+        {
+            var source = File.ReadAllText(path);
+            var name = Path.GetFileName(path);
+
+            Assert.Contains("Layout = null", source, StringComparison.Ordinal);
+            Assert.DoesNotContain("<link", source, StringComparison.OrdinalIgnoreCase);
+            Assert.DoesNotContain("_Styles", source, StringComparison.Ordinal);
+
+            // AND IT EMITS NO CONTRACT-SHAPED CLASS. Every other `ubookit-*` class in the package
+            // is part of the published vocabulary, so one here would be indistinguishable from a
+            // contract class to anyone reading the page source — while being reachable by nothing.
+            Assert.DoesNotContain("ubookit-", source, StringComparison.Ordinal);
+            Assert.DoesNotContain("class=\"ubookit\"", source, StringComparison.Ordinal);
+
+            Assert.NotEqual(string.Empty, name);
+        }
+    }
+
+    [Fact]
     public void The_layout_hooks_are_on_every_field_and_every_submit_control()
     {
         // Pinned counts, so removing a hook fails rather than quietly leaving a row
@@ -240,7 +284,7 @@ public class ClassVocabularyTests
         // button added later without one fails here.
         var buttons = RepoFiles
             .Paths(ViewsRoot, "*.cshtml")
-            .Where(path => !OutsideTheStylingContract.Contains(Path.GetFileName(path), StringComparer.Ordinal))
+            .Where(path => !OutsideTheStylingContract(path))
             .Sum(path => Regex.Matches(File.ReadAllText(path), @"<button\b").Count);
 
         Assert.Equal(3, buttons);

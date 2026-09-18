@@ -363,6 +363,81 @@ Fixed, and the test is now a `[Theory]` over both axes (4 cases). Mutation-prove
 condition fails it.
 
 
+
+## 12. QA round 2 — REJECT (1 MAJOR, 2 MINORs): what changed
+
+**QA mutation-tested round 1's three new guards rather than trusting the table**, and all three
+killed their mutants as claimed. Then it disproved a claim I had written about one of them.
+
+### The MAJOR: a guard whose stated property was false, and QA proved it
+
+`AntiForgeryTests`'s remark said *"**Derived, not listed.** … a POST added tomorrow is covered the
+day it exists … A hardcoded list would pass forever while the thing it names drifts."* The actions
+were derived. **The controllers were a hardcoded list of three.**
+
+QA added a controller:
+
+```csharp
+[Route("umbraco/ubookit/mutant")]
+public sealed class MutantSurfaceController : Controller
+{
+    [HttpPost] public IActionResult Submit() => Ok();
+}
+```
+
+An anonymous, visitor-facing, unprotected form POST — and **all three tests passed**. That is
+exactly how `CancellationController.Cancel` itself arrived: on a *new controller*, which is why
+nothing caught it for a whole round.
+
+Now derived from the assembly — every non-abstract public `Controller` that is not a
+`UBookItDeliveryApiControllerBase` — with the **controller set pinned** in the positive control so a
+new one forces a decision, and with an assertion that the delivery-API exclusion actually excludes
+something (or "not a delivery controller" would be a condition that never fires). QA's mutant now
+fails with *"A visitor-facing POST accepts a submission without an anti-forgery token:
+MutantSurfaceController.Submit"*.
+
+**This is the fourth instance in this change of one shape** — a statement describing a property the
+thing does not have. `UnmetDependency` naming the wrong reason; the class-vocabulary comment; the
+localisation guard reading the whole file instead of the dictionary; and now this. It is the failure
+I was most explicitly warned about, in a guard for a security requirement, written in the round
+after QA found four guards that could not fire.
+
+### The MINORs
+
+- **`OutsideTheStylingContract` was specified twice and differently** — the class scan filtered by
+  *directory*, the button count by *filename* — so a fourth cancellation view would have been
+  excluded from one and not the other. Worse, the filename list contained `Index.cshtml`, the
+  likeliest filename in any future `Views/<Something>/` folder, whose buttons would then have been
+  silently exempt. **One predicate now, naming a place rather than a file.**
+- **The exemption had no counterpart guard**, which is precisely why round 1 accepted
+  `StaticViews` — because *that* one had one. `A_view_outside_the_contract_really_is_outside_the_cascade`
+  now asserts an exempted view genuinely sets `Layout = null`, links no stylesheet and pulls in no
+  styles partial. Mutation-proven: adding a `<link>` to one fails it.
+- **The pages still emitted `ubookit-` classes** that were no longer in the published vocabulary, so
+  a reader had no way to tell them from contract classes — every other `ubookit-*` class is one.
+  **Prefix dropped**, and the guard above asserts no exempted view emits one, so drift is prevented
+  in both directions rather than hidden by a filter.
+
+### Nits
+
+Counted test names renamed for what they assert — the sibling was still called
+`The_two_things_erasure_does_not_reach_are_documented` for a requirement that now has four, and a
+counted name goes wrong the next time somebody adds a boundary. `Pragma: no-cache` removed: it is a
+*request* directive and a no-op on a response, so it was a header making a claim it does not carry.
+The §11 SHALL count corrected to 17 → 17.
+
+### What QA verified and I had got right
+
+All five round-1 fixes, each re-mutated. **`CancellationExposureTests.Served()` builds real
+`ControllerActionDescriptor`s** through `AddControllers` + `AddApplicationPart`, so it proves the
+route is removed rather than that a model was mutated. The fifth delta re-diffed independently. And
+on finding 3 — *"you chose right"*: recording the pages as unstyleable and unthemable rather than
+designing stylesheet plumbing inside a REJECT round.
+
+**State:** unit **1797**, integration **167**, rendering **1168**, client **290**; 0 warnings in a
+clean Release build; 22/22.
+
+
 ## 11. QA round 1 — REJECT, 5 MAJOR: what changed
 
 **Every number re-ran true**, and QA re-did all four guarantee diffs itself and confirmed them pure
@@ -410,7 +485,8 @@ question behind it, not this change's.
   been appended to by `move-booking` and `booking-on-behalf` when each added one; this change had
   not, and a sentence that has been the record of Core's surface for two changes stops being that
   record the moment an addition skips it. Widened for the third time; 10 → 10 scenarios,
-  16 → 16 SHALLs, nothing dropped.
+  **17 → 17** SHALLs, nothing dropped (QA re-counted; my figure was one low, the equality it
+  stands for was right).
 - Wrong cross-reference (`DelegatingViews` where `StaticViews` was meant) — the same class as the
   `UnmetDependency` defect, corrected.
 - A duplicate `ViewRenderer` removed.
