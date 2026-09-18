@@ -569,6 +569,7 @@ public class SensitiveDataRedactionTests
         // control. An absence-assertion is satisfied by a scan that sees nothing, which is
         // exactly how the previous version certified a defect.
         var referencing = new List<string>();
+        var declaring = new List<string>();
 
         foreach (var path in RepoFiles.Paths("src", "*.cs"))
         {
@@ -582,22 +583,44 @@ public class SensitiveDataRedactionTests
                 '\n',
                 File.ReadAllLines(path).Where(line => !line.TrimStart().StartsWith("//", StringComparison.Ordinal)));
 
+            // DECLARING THE TYPE IS NOT COMPOSING A ROW, and the difference is the whole guard.
+            // `find-booking` made `BookingsController` a referencer for the first time, via
+            // `[ProducesResponseType<BookingModel>]` on the by-reference action — and an
+            // attribute cannot construct anything. Simply whitelisting the file would have
+            // reinstated exactly the blindness the comment above describes: a composition site
+            // added to that file, which is precisely where one would be added, would then change
+            // the set not at all. So the attribute is removed before matching, and what remains
+            // is a reference that could compose a row.
+            var composing = Regex.Replace(
+                Regex.Replace(code, @"ProducesResponseType<[^>]*>", string.Empty),
+                @"ProducesResponseType\(\s*typeof\([^)]*\)[^)]*\)",
+                string.Empty);
+
             // Word-bounded, so neither `BookingModelMapper` nor `PagedBookingsModel` matches.
-            if (Regex.IsMatch(code, @"\bBookingModel\b"))
+            if (Regex.IsMatch(composing, @"\bBookingModel\b"))
             {
                 referencing.Add(Path.GetFileName(path));
             }
+
+            if (Regex.IsMatch(code, @"\bBookingModel\b"))
+            {
+                declaring.Add(Path.GetFileName(path));
+            }
         }
 
-        // BookingsController.cs joined the set with `find-booking`: the by-reference action
-        // names BookingModel in a ProducesResponseType attribute because it returns ONE row
-        // rather than a page. It composes that row through BookingModelMapper.ToModel under
-        // ResolveBookerVisibility() — the same call the list makes — so the decision is taken
-        // once, by the one member that requires it. Behaviourally proven by
+        // The files that may COMPOSE a row. `BookingsController.cs` is deliberately NOT here:
+        // it only names the type in an attribute, and the day that stops being true this test
+        // fails — which is the point. It composes its row through BookingModelMapper.ToModel
+        // under ResolveBookerVisibility(), the same call the list makes, so the decision is taken
+        // once by the one member that requires it. Behaviourally proven by
         // FindByReferenceEndpointTests: a caller without sensitive-data access gets the row with
-        // its contact withheld. Recording the file is the guard's demand; the mapper call is
-        // the guarantee, and the test is what makes the second more than a claim.
-        string[] recorded = ["BookingModelMapper.cs", "BookingModels.cs", "BookingsController.cs"];
+        // its contact withheld.
+        string[] recorded = ["BookingModelMapper.cs", "BookingModels.cs"];
+
+        // The files that may so much as NAME the type, attribute included. Kept as a second and
+        // looser set so a new endpoint returning a row is still noticed and considered, rather
+        // than slipping in behind the attribute exemption.
+        string[] recordedDeclaring = ["BookingModelMapper.cs", "BookingModels.cs", "BookingsController.cs"];
 
         // POSITIVE CONTROL, and it comes first. The version this replaces reported a clean bill
         // of health precisely because it matched nothing at all; a scan that has lost sight of
@@ -614,6 +637,16 @@ public class SensitiveDataRedactionTests
             + "BookingModelMapper.ToModel requires it, and a row composed anywhere else reaches "
             + "every caller, including one with no sensitive-data access. Compose through the "
             + "mapper, then record the file here.");
+
+        Assert.True(
+            declaring.Order(StringComparer.Ordinal).SequenceEqual(recordedDeclaring.Order(StringComparer.Ordinal)),
+            "The set of files NAMING BookingModel has changed.\n"
+            + $"  recorded: {string.Join(", ", recordedDeclaring.Order(StringComparer.Ordinal))}\n"
+            + $"  actual:   {string.Join(", ", declaring.Order(StringComparer.Ordinal))}\n"
+            + "A file may name the type without composing a row — a ProducesResponseType "
+            + "attribute does exactly that. Record it here, then satisfy yourself that the row it "
+            + "returns is composed through BookingModelMapper.ToModel under a visibility "
+            + "decision.");
     }
 
     [Fact]

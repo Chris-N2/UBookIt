@@ -134,6 +134,24 @@ public class BookingsControllerContractTests
                 provider.GetMetadataForParameter(parameter).IsBindingRequired,
                 $"'{name}' became binding-required; the port treats it as optional.");
         }
+
+        // THE PARAMETER SET IS CLOSED, which is the half of the requirement the two loops above
+        // cannot reach. The spec says the window cannot be omitted **and that the list accepts no
+        // reference parameter**; only the first clause was covered, so adding an optional
+        // `reference` to this action — the alternative D1 explicitly rejects — passed the whole
+        // suite.
+        //
+        // It matters beyond tidiness. A reference filter on the LIST would be a windowed,
+        // status-filtered, paged read of a booking somebody quoted, which answers "is this
+        // reference in this window" — a question a caller can sweep. The by-reference endpoint
+        // exists precisely so that lookup is a seek on a unique index, answered once, under its
+        // own authorization. Two doors to one answer is how the second one stops being reviewed.
+        Assert.Equal(
+            new[] { "cancellationToken", "from", "resourceIds", "skip", "statuses", "take", "to" },
+            action.GetParameters()
+                .Select(parameter => parameter.Name!)
+                .Order(StringComparer.Ordinal)
+                .ToArray());
     }
 
     // The "status default is not restated" assertion that used to live here has moved to

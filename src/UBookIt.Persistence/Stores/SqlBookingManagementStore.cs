@@ -79,15 +79,19 @@ internal sealed class SqlBookingManagementStore(UBookItDbContext db) : IBookingM
     }
 
     /// <summary>
-    /// Materializes a page of bookings into summaries — <b>the one projection both reads
-    /// share.</b>
+    /// The booking holding a reference, or <c>null</c> — a seek on the unique index, with no
+    /// window and no status filter.
     /// </summary>
     /// <remarks>
-    /// Extracted rather than copied when the by-address search arrived. Two projections of the
-    /// same rows are two descriptions of a booking, free to disagree about the booker's
-    /// condition, a resource's name or a service attribution — and a caller meeting the
-    /// difference has no way to tell which is right. The screen renders both responses with the
-    /// same code, so they had better be the same shape.
+    /// The absence of a window is the point: the caller quoted a reference and wants THAT
+    /// booking, wherever it sits in time and whatever became of it. That is legitimate here, and
+    /// not on the list, because the column is unique-indexed — this is an index lookup rather
+    /// than the unbounded scan a windowless list would be.
+    /// <para>
+    /// It answers through <see cref="PageAsync"/>, so a found booking is the list's own row:
+    /// same shape, same booker conditions, same withholding downstream. There is deliberately no
+    /// second description of a booking for this read to disagree with.
+    /// </para>
     /// </remarks>
     public async Task<BookingSummary?> FindByReferenceAsync(
         BookingReference reference, CancellationToken cancellationToken = default)
@@ -114,6 +118,17 @@ internal sealed class SqlBookingManagementStore(UBookItDbContext db) : IBookingM
         return rows.SingleOrDefault();
     }
 
+    /// <summary>
+    /// Materializes a page of bookings into summaries — <b>the one projection both reads
+    /// share.</b>
+    /// </summary>
+    /// <remarks>
+    /// Extracted rather than copied when the by-address search arrived. Two projections of the
+    /// same rows are two descriptions of a booking, free to disagree about the booker's
+    /// condition, a resource's name or a service attribution — and a caller meeting the
+    /// difference has no way to tell which is right. The screen renders both responses with the
+    /// same code, so they had better be the same shape.
+    /// </remarks>
     private async Task<IReadOnlyList<BookingSummary>> PageAsync(
         IQueryable<Entities.BookingRow> page, CancellationToken cancellationToken)
     {

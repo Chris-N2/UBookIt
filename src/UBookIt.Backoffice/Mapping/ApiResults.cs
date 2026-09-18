@@ -41,6 +41,19 @@ internal static class ApiResults
             // substitutes a generic "A fatal server error occurred" problem, so
             // every validation failure reached the editor as an unactionable
             // server error.
+            //
+            // **THE 404 IS AN EXCEPTION, AND IT IS NOT OPTIONAL TO KNOW.** Setting `Type` is
+            // necessary but NOT sufficient: measured against a running backoffice by
+            // `find-booking`, a 404 reaches the client as `{ status, title, type }` with the
+            // `errors` extension DISCARDED and `Title` replaced by Umbraco's own
+            // "The requested resource was not found." — despite `Type = "NotFound"` being set
+            // by the switch just below. A 400 keeps `errors` intact, codes and all.
+            //
+            // So a client CANNOT read a domain code off a 404, and one that tries will silently
+            // fall through to its generic failure wording. That is exactly what shipped, and it
+            // was fixed by keying on the status instead — see `isMiss` in the backoffice client.
+            // Anything mapped to 404 here must be distinguishable by its STATUS alone, which is
+            // why it matters that only one failure on a given endpoint should map to it.
             Type = status switch
             {
                 StatusCodes.Status404NotFound => "NotFound",

@@ -7,7 +7,6 @@ import {
   displayReference,
   isMiss,
   looksLikeEmail,
-  looksLikeReference,
   refusalTerm,
   refusalTermFor,
   reloadsLookup,
@@ -24,6 +23,10 @@ describe("canonicalReference — a port of BookingReference.TryParse", () => {
     ["bjq4-zp5c", "BJQ4ZP5C"],
     ["  bjq4 zp5c  ", "BJQ4ZP5C"],
     ["b-j-q-4-z-p-5-c", "BJQ4ZP5C"],
+    // U+0085 (NEL) is whitespace to .NET and NOT to JavaScript's \s. While this client used
+    // \s it refused this in place, without a request, for a booking the server would have
+    // found. QA measured it; the separator set is now .NET's, held equal by a C# guard.
+    ["BJQ4ZP5C", "BJQ4ZP5C"],
   ])("accepts %s as %s", (typed, canonical) => {
     expect(canonicalReference(typed)).toBe(canonical);
   });
@@ -44,9 +47,11 @@ describe("canonicalReference — a port of BookingReference.TryParse", () => {
     ["an @, which makes it an address instead", "BJQ4@ZP5C"],
     ["nothing", ""],
     ["only separators", "- - -"],
+    // The converse of the NEL case: U+FEFF IS whitespace to JavaScript and is not to .NET, so
+    // while this client used \s it canonicalised this and the server then refused it.
+    ["a BOM, which .NET does not treat as whitespace", "BJQ4﻿ZP5C"],
   ])("refuses %s", (_, typed) => {
     expect(canonicalReference(typed)).toBeNull();
-    expect(looksLikeReference(typed)).toBe(false);
   });
 
   it("uses an alphabet with no vowels and none of the transcription confusions", () => {
@@ -178,6 +183,15 @@ describe("refusalTerm", () => {
 });
 
 describe("after a row action", () => {
+  // THIS GUARDS PRODUCTION because `#fetch` takes its window-vs-lookup branch by calling
+  // `reloadsLookup`, rather than restating the rule with its own comparison. It briefly did the
+  // latter — the function was exported, tested here, and imported by nothing — which made this
+  // suite a covering test that could not fail: `#fetch` could have been rewritten to reload the
+  // window and these assertions would have stayed green. QA found it.
+  //
+  // Verified by mutation: inverting the comparison in `reloadsLookup` fails these tests AND sends
+  // every lookup to the window read. A guard that stays green through the regression it names is
+  // not a guard.
   it("reloads the lookup in a lookup mode, never the window", () => {
     expect(reloadsLookup({ mode: "reference", canonical: "BJQ4ZP5C" })).toBe(true);
     expect(reloadsLookup({ mode: "email", email: "ada@example.com" })).toBe(true);

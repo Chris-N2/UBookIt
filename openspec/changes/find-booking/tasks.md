@@ -44,7 +44,7 @@ surgically, then `diff`ed back. Re-verify before trusting; a measurement nobody 
 ## 6. Backoffice client (D3–D6)
 
 - [x] 6.1 Rebuild the client before starting the TestSite; start it; regenerate the API client for the new endpoint; stop the site before rebuilding
-- [x] 6.2 `find-fields.ts`: pure functions — `classify(text)` → reference | email | neither; `looksLikeReference` as a port of `TryParse`'s rule; `refusalTerm` map for `reference-invalid`, `booking-not-found` and the find-by-email codes; the status-line term for each mode. Tests for each
+- [x] 6.2 `find-fields.ts`: pure functions — `classify(text)` → reference | email | neither; `canonicalReference` as a port of `TryParse`'s rule (its `looksLikeReference` wrapper was removed in QA round 1 — nothing in production called it); `refusalTerm` map for `reference-invalid`, `booking-not-found` and the find-by-email codes; the status-line term for each mode. Tests for each
 - [x] 6.3 **Assert the shape rule agrees with the parser** (spec scenario): the client test reads a fixture of accept/reject vectors that the C# suite writes from `BookingReference.TryParse`, or — if that plumbing is disproportionate — the client test quotes the alphabet and a server-side guard asserts the two constants are identical. Either way, state which in the handover
 - [x] 6.4 The Find control in `bookings-list.element.ts`: one labelled input, label narrowed for users without sensitive-data access (read from the same current-user context ㊳ uses, **outside** `#bookerCell`); one Find button; an email typed by a non-holder refused in place with the sentence naming the group
 - [x] 6.5 The mode: `window` | `reference` | `email`; lookup modes hide the window and filter controls, render a `role="status"` line with what is shown and a **Back to dates** control, and render rows through the existing `#renderRow`
@@ -196,3 +196,60 @@ treat a second occurrence as real.
 `git push` from the **PowerShell** tool hangs on a GitHub account-chooser prompt (Chris has two
 accounts); the **Bash** tool pushes straight through. Every push this session that worked was
 from Bash.
+
+## 11. QA round 1 — REJECT, 7 MAJOR: what changed
+
+**Every number QA re-ran came back true**, so the handover held; the defects were in the code.
+Counts after this round: unit **1718** (+2), integration 158, rendering 1086, client **285** (+2),
+0 warnings in a clean Release build, `openspec validate --all --strict` 22/22.
+
+**Each fix below was mutation-tested**, because on this change a fix has twice been the next
+defect. A guard that stays green through the regression it names is not a guard.
+
+| # | Finding | Fix | Mutant used to prove it |
+|---|---|---|---|
+| 1 | `PageAsync`'s doc block hijacked by inserting `FindByReferenceAsync` between it and its member | Block restored to `PageAsync`; `FindByReferenceAsync` given its own | Sweep script comparing doc-block→member pairs against `4106a73` |
+| 2 | A failed lookup rendered "No bookings in this window" about a window never queried | `_loadFailed` tracks whether a REQUEST failed, instead of inferring it from `_error` | — (reasoned from the render path QA traced; see below) |
+| 3 | `reloadsLookup` was dead code, so its test covered nothing | `#fetch` now TAKES its branch by calling it; made a type predicate so the switch stays exhaustive | Inverting the comparison fails 2 tests **and** sends every lookup to the window read |
+| 4 | `BookingsController.cs` whitelisted in the composition guard, reinstating its old blindness | `ProducesResponseType` stripped before matching, so only a reference that could COMPOSE counts; a second looser set records mere naming | `new BookingModel()` planted in the controller — now fails, previously passed |
+| 5 | `ApiResults` doc comment falsified by this change's own measurement | The 404 exception written in, with what it means for any future 404 | — (prose) |
+| 6 | `isMiss`'s "exactly one failure maps to 404" left as prose | `Exactly_one_failure_of_this_endpoint_maps_to_404` — scans the action's `FailureCodes`, maps each through `ToProblemResult` | A second 404-mapped failure added to the action — now fails |
+| 7 | Nothing asserted the list's parameter set is CLOSED | Full parameter-name assertion in the contract test | `[FromQuery] string? reference` added to `ListBookings` — now fails |
+
+### The sweep for finding 1 found a second instance QA did not report
+
+Running the doc-block sweep across every file the change touches — rather than fixing the one
+instance named — found `#setWindow`'s doc block in `bookings-list.element.ts` stranded above
+`#fetch`, by the same cause: a scripted insertion anchored on the member line alone, so it landed
+between the block and its member. Both are fixed and the sweep is now clean.
+**[[a-finding-enumerates-a-sample]]: the instance was the sample, the anchoring habit was the
+population.** Anchor on the doc block **and** the member, never the member alone.
+
+### Minors
+
+- **The shape rule genuinely disagreed with the parser.** QA measured it: JS `\s` omits U+0085
+  and includes U+FEFF; .NET's `char.IsWhiteSpace` is the other way round. So a reference pasted
+  with a NEL was refused in place for a booking the server would have found. The client now
+  declares .NET's set verbatim as `REFERENCE_WHITESPACE`, held equal by a new guard that
+  **enumerates every BMP code point** — a spot-check would have missed U+0085 exactly as the
+  original did. The spec scenario's claim is now true rather than narrowed.
+- `#backToDates` restores the window's PAGE (`#windowSkip`) instead of resetting to 0, so
+  "returns exactly as they were" holds for anyone who had paged; it also clears the spent lookup
+  from the box.
+- The **Back to dates** button moved OUT of the `role="status"` region — a live region announces
+  its whole subtree, so the button's label was re-read on every status change, burying the
+  sentence that actually changed.
+- `looksLikeReference` deleted: nothing in production called it.
+- `booking-management/spec.md` line reflowed so the new verb no longer reads as part of the
+  preceding aside.
+
+### Left alone deliberately
+
+- **`docs/backoffice.md`'s empty `### Moving a booking` heading.** Pre-existing at `4106a73`, a
+  ㊲ leftover. Filling it means writing move-booking's documentation, which is another change's
+  work; widening this one to reach it is the habit this project keeps out. Recorded as a deferred
+  obligation instead.
+- **Finding 2 has no automated guard**, and this is the honest gap in this round. The client suite
+  has no DOM environment, so nothing can drive the element through a failed lookup and assert what
+  renders. The reasoning is recorded at the `_loadFailed` declaration and at its use. Treat it as
+  the seam of this round.

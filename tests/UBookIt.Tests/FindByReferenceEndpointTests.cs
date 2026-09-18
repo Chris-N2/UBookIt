@@ -1,4 +1,7 @@
 using System.Reflection;
+using UBookIt.Backoffice.Mapping;
+using Microsoft.AspNetCore.Http;
+using System.Text.RegularExpressions;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using UBookIt.Backoffice.Controllers;
@@ -249,6 +252,83 @@ public class FindByReferenceEndpointTests
             hasAccessToAllLanguages: true));
 
         return new StubAccessor(new StubSecurity(user));
+    }
+
+    [Fact]
+    public void Exactly_one_failure_of_this_endpoint_maps_to_404()
+    {
+        // THE PREMISE THE CLIENT'S MISS RESTS ON, made mechanical.
+        //
+        // The backoffice client decides "no booking has that reference" from the HTTP STATUS,
+        // because it has no choice: measured against a running backoffice, Umbraco's HTTP client
+        // discards the `errors` extension on a 404 (it keeps it on a 400), so the domain's
+        // `booking-not-found` code never reaches the browser. `isMiss` in `find-fields.ts` says
+        // so, and says the status is only unambiguous because this endpoint maps exactly one
+        // failure to 404.
+        //
+        // That sentence was left as prose, which on this project is how an untested assertion
+        // gets mistaken for a fact — so it is asserted here instead. Add a second 404-mapped
+        // failure to this action and the client will report it to an operator as
+        // "No booking has the reference X." — a false statement about the site's data. This test
+        // fails first.
+        var source = File.ReadAllText(
+            Path.Combine(RepoFiles.Root, "src", "UBookIt.Backoffice", "Controllers", "BookingsController.cs"));
+
+        var action = ActionBody(source, nameof(BookingsController.FindBookingByReference));
+
+        var codes = Regex.Matches(action, @"FailureCodes\.(\w+)")
+            .Select(match => match.Groups[1].Value)
+            .Distinct(StringComparer.Ordinal)
+            .Order(StringComparer.Ordinal)
+            .ToArray();
+
+        Assert.Equal(new[] { nameof(FailureCodes.BookingNotFound), nameof(FailureCodes.ReferenceInvalid) }, codes);
+
+        // POSITIVE CONTROL: the scan must be able to see codes at all, or an action that stopped
+        // producing failures would pass by producing an empty set.
+        Assert.NotEmpty(codes);
+
+        // And of the codes this action can actually produce, exactly one maps to 404.
+        var mapsTo404 = codes
+            .Select(code => (Code: code, Status: StatusFor(code)))
+            .Where(mapped => mapped.Status == StatusCodes.Status404NotFound)
+            .Select(mapped => mapped.Code)
+            .ToArray();
+
+        Assert.Equal(new[] { nameof(FailureCodes.BookingNotFound) }, mapsTo404);
+    }
+
+    /// <summary>The status <see cref="ApiResults" /> gives a single failure carrying this code.</summary>
+    private static int StatusFor(string codeName)
+    {
+        var code = (string)typeof(FailureCodes).GetField(codeName)!.GetValue(null)!;
+        var result = (ObjectResult)new List<DomainFailure> { new(code, "probe", null) }.ToProblemResult();
+
+        return result.StatusCode!.Value;
+    }
+
+    /// <summary>The body of one action, brace-matched from its signature.</summary>
+    private static string ActionBody(string source, string actionName)
+    {
+        var start = source.IndexOf($"{actionName}(", StringComparison.Ordinal);
+        Assert.True(start >= 0, $"{actionName} was not found in BookingsController.cs.");
+
+        var open = source.IndexOf('{', start);
+        var depth = 0;
+
+        for (var i = open; i < source.Length; i++)
+        {
+            if (source[i] == '{')
+            {
+                depth++;
+            }
+            else if (source[i] == '}' && --depth == 0)
+            {
+                return source[open..(i + 1)];
+            }
+        }
+
+        throw new InvalidOperationException($"{actionName}'s body is unbalanced.");
     }
 
     private sealed class StubAccessor(IBackOfficeSecurity? security) : IBackOfficeSecurityAccessor
