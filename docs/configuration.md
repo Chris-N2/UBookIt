@@ -95,6 +95,24 @@ screen says so rather than showing it as working.
   route stops being served, so an outstanding link stops working. The fallback is the position
   before the feature existed: the booker contacts you. Worth timing that change for a quiet period
   rather than mid-season.
+- **The link's secret is in the URL, so it reaches your web server's access logs.** uBookIt does not
+  write it anywhere itself — it is stored only as a one-way hash, and it is not in any uBookIt log
+  line — but IIS, Azure App Service, and any reverse proxy or CDN in front of your site record the
+  full request path verbatim, keep it for as long as you keep those logs, and show it to whoever can
+  read them. **Anyone holding that line can cancel that booking** until the link expires at the
+  booking's start.
+
+  This is stated rather than promised away because it is the kind of thing a site repeats to a
+  customer. If your logs are retained long-term or widely readable, treat the cancellation route as
+  a reason to review that. It is the same class of boundary as a mail server quoting an address into
+  an error log — see *Notifications* — and it is the one the package cannot close from inside.
+
+**The cancellation pages cannot be styled or themed.** They are standalone pages the package
+serves on its own route, outside your site's layout — so your stylesheet, your tokens and any theme
+you have installed do not reach them. They are plain, semantic HTML and work with no CSS at all,
+which is deliberate; they will look unstyled next to the rest of your site. If that matters to you,
+say so — giving them a route to your CSS is a real feature rather than an oversight, and it has not
+been designed yet.
 
 There is deliberately **no "email me a cancellation link" form**. A route that takes a booking
 reference and sends mail on a stranger's say-so would let anybody make the site write to a customer,

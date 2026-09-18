@@ -161,10 +161,22 @@ to sweep a second table would trade a carefully-made promise for tidiness.
   fire?* Before asking whether a check is correct, grep the symbol for a production caller and a
   reachable write, then mutate it.
 - **A secret in a URL leaks more passively than it is acted on** — browser history, shoulder
-  surfing, and `Referer` if a *theme* adds analytics to the page (the shipped views load nothing
-  third-party). → `Referrer-Policy: no-referrer` on the response. The stronger pattern — redeem,
-  drop into a short-lived cookie, redirect to a tokenless URL — is noted and not taken, because it
-  adds machinery for a residual risk already bounded by single use and a short derived expiry.
+  surfing, `Referer` if a *theme* adds analytics, and — **the one this list originally missed** —
+  **the host's own access logs**. IIS, Azure App Service and any reverse proxy record the full path
+  verbatim, retain it for the life of the log, and show it to people. That is precisely the leak D1
+  spent a migration to prevent on the storage side, arriving by a route the package does not
+  control. → `Referrer-Policy: no-referrer` on the response, and the boundary **documented** where a
+  site owner configures the feature, on the same terms `booking-emails` already documents what it
+  cannot keep out of a log.
+
+  *The rejected alternative deserves restating now the risk is correctly stated.* Redeem on arrival,
+  drop into a short-lived cookie, redirect to a tokenless URL — that removes the secret from history,
+  from `Referer` **and from every access log downstream of the first hop**. It was rejected on the
+  grounds that single use and a short expiry bound the residual risk; against an access log that
+  argument is weaker, because the log outlives the link and is read by people rather than replayed
+  by machines. It is not taken here — a GET that redeems is exactly what the mail-scanner problem
+  forbids, so the pattern needs a third step to be safe at all — but the reason is now the real one,
+  and a later change that wants it starts from an honest statement of the risk.
 - **The uniform refusal is easy to write and easy to break.** Four distinguishable causes converge
   on one sentence; any future branch that reports a cause re-opens the oracle. → The requirement
   names all four together, and the test asserts they are indistinguishable rather than asserting

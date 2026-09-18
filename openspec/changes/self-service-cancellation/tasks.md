@@ -26,6 +26,7 @@ diff looks like.
 - [x] 1.4 `booking-emails` — *What a message tells the booker*: diff guarantees; confirm the seven existing scenarios survive verbatim and the three added ones are additions, not replacements
 - [x] 1.5 `email-templates` — *What a view receives is published, typed, and fit to be frozen*: diff guarantees; confirm the move message's previous-interval member and all five existing scenarios survive
 - [x] 1.6 `site-settings` — *Settings are tiered, and the tier is enforced by the server*: diff guarantees; confirm both deliberate omissions (`PreservedQueryParameters`, the theme), the no-destructive-editable rule and all four existing scenarios survive
+- [x] 1.9 `bookings` — *Availability and placement service ports*: diff guarantees; confirm all ten scenarios and every SHALL survive, and that the enumeration is WIDENED rather than replaced (added in QA round 1, at the reviewer's observation that two previous changes appended here and this one had not)
 - [x] 1.7 `booker-erasure` — *What erasure does not reach is documented*: diff guarantees; confirm the four existing bullets and four existing scenarios survive, and that the closing "left unstated" sentence still enumerates every bullet
 - [x] 1.8 Record each diff's result in this file (lines removed, scenarios before → after), so QA can re-run rather than re-derive
 
@@ -360,6 +361,70 @@ evidence about the thing it appears to cover.
 
 Fixed, and the test is now a `[Theory]` over both axes (4 cases). Mutation-proven: restoring the old
 condition fails it.
+
+
+## 11. QA round 1 — REJECT, 5 MAJOR: what changed
+
+**Every number re-ran true**, and QA re-did all four guarantee diffs itself and confirmed them pure
+additions. **The rejection was about guards and published claims, not the mechanism** — the
+reference never enters the flow, the compare-and-swap is real, the page model cannot name a booker,
+and the three placement conditions are correct. Each fix below is mutation-tested.
+
+| # | Finding | Fix | Mutant |
+|---|---|---|---|
+| 1 | The off-by-default route guarantee had **no test at all** | `CancellationExposureTests` — 7 tests, both halves: the convention's behaviour AND that the composer registers it | Dropping the `Configure<MvcOptions>` line fails 3 |
+| 2 | `[ValidateAntiForgeryToken]` unguarded — **and so were the two existing booking POSTs** | `AntiForgeryTests` derives the set by reflection over every visitor-facing `[HttpPost]` | Removing it from the new POST *and the old one* names both |
+| 3 | Four classes published as a styling contract no site CSS can reach | Reverted from the vocabulary; the pages recorded as **outside the styling and theming contracts**, in the proposal and the docs | — |
+| 4 | The secret travels in a URL path, so it lands in **access logs** — unnamed | Documented where a site owner configures the feature, on `booking-emails`' terms; `design.md`'s risk restated honestly | — |
+| 5 | Every documentation SHALL this change added was unguarded while its siblings were guarded | `SelfServiceCancellationDocumentationTests` (6) + `The_third_thing_erasure_does_not_reach_is_documented` | — |
+
+### Finding 2 was a sample, not the population
+
+The anti-forgery requirement has existed since the first Razor flow and was asserted by nothing.
+Fixing only the new POST would have left `BookingSurfaceController.Submit` and
+`ServiceBookingSurfaceController.Submit` exactly as they were. The guard **derives** the set by
+reflection rather than listing it, so a POST added tomorrow is covered the day it exists.
+
+### Finding 3 is the one worth reading
+
+The four `ubookit-cancel*` classes were added to the published vocabulary under the comment *"a site
+styling the flow can style these too"*. QA established that is **false**: the three pages set
+`Layout = null`, link no stylesheet, and `ubookit.css` contains no rule for them — **nothing a site
+writes can reach them**. They are also outside the theme-view set, so a theme RCL cannot supply
+them either, and nowhere said so.
+
+That is the same defect this change already caught itself on twice — a statement describing
+something the site does not have. Reverted, and recorded as a **removal with its reason** in
+`proposal.md` and `docs/configuration.md`: the pages are plain semantic HTML, operable with no
+stylesheet at all, and giving them a route to a site's CSS is a real feature with a real design
+question behind it, not this change's.
+
+### Minors and nits
+
+- **The page could offer a button the submission would refuse.** `BuildAsync` checked the stored
+  expiry but not the booking's own start, and the two disagree after a move *earlier*. Now checks
+  both; the visitor is never shown a confirmation form for a booking the POST will refuse.
+- **`Cache-Control: no-store`** added — the cheaper half of the pair the change already took
+  trouble over for `Referrer-Policy`.
+- **`bookings` gains a fifth delta.** The enumeration of Core's booking-service entry points has
+  been appended to by `move-booking` and `booking-on-behalf` when each added one; this change had
+  not, and a sentence that has been the record of Core's surface for two changes stops being that
+  record the moment an addition skips it. Widened for the third time; 10 → 10 scenarios,
+  16 → 16 SHALLs, nothing dropped.
+- Wrong cross-reference (`DelegatingViews` where `StaticViews` was meant) — the same class as the
+  `UnmetDependency` defect, corrected.
+- A duplicate `ViewRenderer` removed.
+- **The "TestSite stopped, port free" claim was false when QA read it** — Chris had restarted it
+  from VS to chase an unrelated Umbraco exception. QA predicted a third false claim in the handover
+  and found one; it was stale rather than wrong when written, which is the same problem.
+- **A solution-level `dotnet test --no-build` reported `Failed: 19`**, every failure preceded by
+  `MSB3073: "npm run build" exited with code 1` — parallel test projects each re-triggering the npm
+  target and racing. That is very likely the mechanism behind the single unexplained failure
+  recorded earlier. **Build the client first, then run the suites per project.**
+
+**State after this round:** unit **1796** (was 1777), integration **167**, rendering **1168**,
+client **290**; 0 warnings in a clean Release build; `openspec validate --all --strict` 22/22.
+
 
 ### Verify rather than trust
 

@@ -29,15 +29,13 @@ public class ViewInventoryTests
         // and the claim being made is about what a reader receives.
         Assert.NotEmpty(ModelReferences.StaticViews);
 
-        var renderer = new ViewRenderer();
-
         foreach (var (view, reason) in ModelReferences.StaticViews)
         {
             Assert.NotEmpty(reason);
             Assert.Contains(view, ViewInventory.All);
 
-            var first = await renderer.RenderAsync(view, new object());
-            var second = await renderer.RenderAsync(view, new object());
+            var first = await _renderer.RenderAsync(view, new object());
+            var second = await _renderer.RenderAsync(view, new object());
 
             Assert.Equal(first, second);
             Assert.NotEmpty(first);

@@ -221,6 +221,26 @@ public class BackofficeDocumentationTests
     }
 
     [Fact]
+    public void The_third_thing_erasure_does_not_reach_is_documented()
+    {
+        // `booker-erasure` → "What erasure does not reach is documented" gained a fourth bullet in
+        // self-service-cancellation: erasure does NOT withdraw a cancellation link already issued.
+        //
+        // Every sibling boundary in that requirement has a guard; this one shipped without one,
+        // which QA found. A spec requirement discharged only by prose is discharged by nothing —
+        // somebody tidies the page, the suite stays green, and an operator answering a
+        // right-to-be-forgotten request is told erasure did more than it did.
+        //
+        // The failure is specific: the booker still holds a working link, cancels days later, and
+        // a booking that "belonged to nobody" changes state with no actor anyone can account for.
+        var docs = Docs();
+
+        DocumentationAssert.Says(docs, "Erasure does not withdraw a cancellation link already issued");
+        DocumentationAssert.Says(docs, "until it expires at the booking's start");
+        DocumentationAssert.Says(docs, "If you need the booking gone as well, cancel it yourself");
+    }
+
+    [Fact]
     public void The_documentation_says_how_to_find_the_bookings_to_erase()
     {
         // `booker-erasure` → "What erasure does not reach is documented" was MODIFIED by

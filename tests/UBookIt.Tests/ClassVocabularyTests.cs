@@ -21,12 +21,39 @@ public class ClassVocabularyTests
 {
     private const string ViewsRoot = "src/UBookIt.Web/Views";
 
+    /// <summary>
+    /// Views outside the styling contract, with the reason.
+    /// </summary>
+    /// <remarks>
+    /// <b>The cancellation pages are standalone documents the package serves itself.</b> They set
+    /// <c>Layout = null</c>, link no stylesheet and are not composed into a site's page, so
+    /// <b>nothing a site writes can reach them</b> — no host layout, no cascade, no token override.
+    /// Their class attributes are internal markup hooks, NOT part of the published vocabulary.
+    /// <para>
+    /// They were briefly added to that vocabulary under a comment saying "a site styling the flow
+    /// can style these too". QA established that was false, and it is the same shape as the defect
+    /// this change already caught itself on: a readout describing something the site does not have.
+    /// Recorded as a removal rather than left silent, so a reader can tell a decision from an
+    /// oversight.
+    /// </para>
+    /// <para>
+    /// They are also outside the theme-view set — a theme RCL supplies views under
+    /// <c>Views/Shared/UBookIt/Themes/</c>, and these live at <c>Views/Cancellation/</c> — so a
+    /// theme cannot replace them either. Both facts are stated in the proposal and the docs.
+    /// </para>
+    /// </remarks>
+    private static readonly string[] OutsideTheStylingContract =
+    [
+        "Index.cshtml", "Cancelled.cshtml", "Unusable.cshtml",
+    ];
+
     /// <summary>Every class the shipped views render, with the view that renders it.</summary>
     private static IReadOnlyList<(string View, string Class)> RenderedClasses()
     {
         var found = new List<(string, string)>();
 
-        foreach (var path in RepoFiles.Paths(ViewsRoot, "*.cshtml"))
+        foreach (var path in RepoFiles.Paths(ViewsRoot, "*.cshtml")
+                     .Where(path => !path.Contains($"{Path.DirectorySeparatorChar}Cancellation{Path.DirectorySeparatorChar}", StringComparison.Ordinal)))
         {
             var name = Path.GetFileName(path);
             var source = Regex.Replace(File.ReadAllText(path), @"@\*.*?\*@", " ", RegexOptions.Singleline);
@@ -57,15 +84,6 @@ public class ClassVocabularyTests
             "ubookit-booked-resources",
             "ubookit-booking",
             "ubookit-booking--service",
-
-            // self-service-cancellation: the cancellation pages. A NEW BLOCK on a published
-            // contract, so it is enumerated here deliberately — a site styling the flow can style
-            // these too, and the names will not move under it.
-            "ubookit-cancel",
-            "ubookit-cancel-booking",
-            "ubookit-cancel-resources",
-            "ubookit-cancel-zone",
-
             "ubookit-catalogue",
             "ubookit-catalogue-choice",
             "ubookit-catalogue-choices",
@@ -153,7 +171,6 @@ public class ClassVocabularyTests
         [
             "ubookit-booked-resources",
             "ubookit-booking",
-            "ubookit-cancel",
             "ubookit-catalogue",
             "ubookit-confirmation",
             "ubookit-date-form",
@@ -209,20 +226,23 @@ public class ClassVocabularyTests
         // Pinned counts, so removing a hook fails rather than quietly leaving a row
         // or a button unstyleable. Eight fields: five in _DateAndLength — including
         // the two wrappers that stand in when a control is replaced by settled text —
-        // and three in _YourDetails. Four submit controls: one per booking step, plus
-        // the cancellation page's, which is a submit control for the same reason the
-        // others are — the action it performs must not be reachable by a GET.
+        // and three in _YourDetails. Three submit controls, one per booking step.
+        //
+        // The cancellation page's button is deliberately NOT among them: that page is outside the
+        // styling contract (see OutsideTheStylingContract), so a layout hook on it would be a hook
+        // no stylesheet can use — which is the claim QA found to be false.
         var classes = RenderedClasses();
 
         Assert.Equal(8, classes.Count(found => found.Class == "ubookit-field"));
-        Assert.Equal(4, classes.Count(found => found.Class == "ubookit-submit"));
+        Assert.Equal(3, classes.Count(found => found.Class == "ubookit-submit"));
 
         // Every button in the package is a submit control and carries the hook, so a
         // button added later without one fails here.
         var buttons = RepoFiles
             .Paths(ViewsRoot, "*.cshtml")
+            .Where(path => !OutsideTheStylingContract.Contains(Path.GetFileName(path), StringComparer.Ordinal))
             .Sum(path => Regex.Matches(File.ReadAllText(path), @"<button\b").Count);
 
-        Assert.Equal(4, buttons);
+        Assert.Equal(3, buttons);
     }
 }

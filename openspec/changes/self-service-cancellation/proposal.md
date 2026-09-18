@@ -78,6 +78,23 @@ must be told why nothing happens.
 - **Rate limiting.** Without a request step there is nothing to flood: the token is unguessable and
   redemption discloses nothing. Shape (A) is where this becomes load-bearing.
 - **Amending a booking**, self-service. Cancel only.
+- **Styling and theming of the cancellation pages.** They are standalone documents the package
+  serves itself — `Layout = null`, no stylesheet, not composed into a site's page — so **nothing a
+  site writes can reach them**: no host layout, no cascade, no token override. Their class
+  attributes are internal hooks, deliberately **not** added to the published class vocabulary, and
+  they sit outside the theme-view set (`Views/Cancellation/`, not
+  `Views/Shared/UBookIt/Themes/`), so a theme RCL cannot supply them either.
+
+  *Recorded as a removal rather than left silent.* The classes were briefly published as a new
+  block under the claim that "a site styling the flow can style these too", which QA established was
+  false — the same shape as the `UnmetDependency` defect this change already caught itself on: a
+  statement describing something the site does not have. Giving these pages a route to CSS is a
+  real feature with a real design question behind it (whose stylesheet, and how does a package-served
+  page reach it?), and it is not this change's.
+
+  What does **not** narrow is the part that matters: the markup is semantic and operable **with no
+  stylesheet at all**, which is the first bullet of invariant 5 and the clause the whole narrowing
+  rests on.
 
 ## Capabilities
 
@@ -97,6 +114,10 @@ must be told why nothing happens.
   responsibility assignments, the one-shot flag table and stored settings already follow.
 - `booker-erasure`: what erasure does **not** reach gains the outstanding cancellation link, which
   carries no contact detail and survives for the same reason the booking does.
+- `bookings`: the enumeration of Core's booking-service entry points gains the visitor-terms
+  cancellation. Widened rather than dropped, for the third time — `move-booking` and
+  `booking-on-behalf` each appended when they added one, and a sentence that has been the record of
+  Core's surface for two changes stops being that record the moment one addition skips it.
 
 ## Impact
 

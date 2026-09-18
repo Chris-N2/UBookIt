@@ -122,6 +122,17 @@ public sealed class CancellationController(
             return null;
         }
 
+        // THE BOOKING'S OWN START, not only the stored expiry — and the two can disagree. The
+        // expiry is frozen when the secret is issued, so an operator who moves a booking EARLIER
+        // leaves a secret whose expiry is now later than the booking it belongs to. Without this,
+        // the page would render a confirmation form, the submission would burn the secret, and the
+        // visitor would be answered "this link can no longer be used" for a booking they were just
+        // shown. Offering a button that cannot work is the failure this package has shipped before.
+        if (booking.Interval.StartUtc <= clock.GetUtcNow())
+        {
+            return null;
+        }
+
         var zone = ResolveZone(booking.Interval.TimeZoneId);
 
         // Names where they can be established, and nothing where they cannot — the same trade the
@@ -175,5 +186,14 @@ public sealed class CancellationController(
     /// add analytics, and a URL carrying a credential is exactly the one that must not travel in a
     /// header to somebody else's server. Cheap, and it does not depend on what a theme does.
     /// </remarks>
-    private void NoReferrer() => Response.Headers["Referrer-Policy"] = "no-referrer";
+    private void NoReferrer()
+    {
+        Response.Headers["Referrer-Policy"] = "no-referrer";
+
+        // AND NOT STORED ANYWHERE. A 200 carrying a booking's details, at a URL that carries a
+        // credential, must not be left to whatever a CDN, a proxy or a shared browser decides. The
+        // change took this trouble for the referrer; this is the same pair's other half.
+        Response.Headers["Cache-Control"] = "no-store, no-cache, must-revalidate";
+        Response.Headers["Pragma"] = "no-cache";
+    }
 }

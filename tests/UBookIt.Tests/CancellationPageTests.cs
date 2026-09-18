@@ -306,6 +306,48 @@ public class CancellationPageTests
     }
 
     [Fact]
+    public async Task A_booking_that_has_started_is_not_offered_a_button_that_cannot_work()
+    {
+        // THE TWO CLOCKS CAN DISAGREE. The expiry is frozen when the secret is issued, so an
+        // operator who moves a booking EARLIER leaves a secret whose stored expiry is later than
+        // the booking itself. Without checking the booking's own start, the page would render the
+        // confirmation form, the submission would burn the secret, and the visitor would be told
+        // the link no longer works for a booking they were just shown.
+        var booking = Sample();
+        var secrets = new Secrets
+        {
+            Record = new CancellationSecretRecord(booking.Id, Start.AddDays(7), Redeemed: false),
+        };
+
+        var result = await Controller(secrets, booking, new CancellingService(true), now: Start.AddMinutes(1))
+            .Index(CancellationSecret.Issue().Value);
+
+        Assert.Equal("Unusable", ViewNameOf(result));
+        Assert.Equal(0, secrets.Redemptions);
+    }
+
+    [Fact]
+    public async Task Neither_response_may_be_stored()
+    {
+        // A 200 carrying a booking's details, at a URL carrying a credential, must not be left to
+        // whatever a CDN, a proxy or a shared browser decides.
+        var booking = Sample();
+        var secrets = new Secrets
+        {
+            Record = new CancellationSecretRecord(booking.Id, Start, false),
+            RedeemsTo = booking.Id,
+        };
+
+        var get = Controller(secrets, booking, new CancellingService(true));
+        await get.Index(CancellationSecret.Issue().Value);
+        Assert.Contains("no-store", get.Response.Headers["Cache-Control"].ToString(), StringComparison.Ordinal);
+
+        var post = Controller(secrets, booking, new CancellingService(true));
+        await post.Cancel(CancellationSecret.Issue().Value);
+        Assert.Contains("no-store", post.Response.Headers["Cache-Control"].ToString(), StringComparison.Ordinal);
+    }
+
+    [Fact]
     public void The_route_the_link_is_built_for_is_the_route_that_is_served()
     {
         // A link built one way and routed another is broken only for the person who needs it,

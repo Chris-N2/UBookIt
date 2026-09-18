@@ -293,7 +293,7 @@ public static class ViewFixtures
         //
         // The states are the ones that change what Index renders: a service booking names a
         // service, a direct one does not, and a multi-resource booking lists more than one name.
-        // The other two pages take no model at all — see ModelReferences.DelegatingViews for why
+        // The other two pages take no model at all — see ModelReferences.StaticViews for why
         // that is the guarantee rather than an omission.
         foreach (var (state, model) in CancellationStates())
         {
