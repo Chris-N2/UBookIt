@@ -45,8 +45,9 @@ public class AntiForgeryTests
     /// nothing caught it for a whole round.
     /// </para>
     /// <para>
-    /// So the set is now every MVC controller in the Web assembly that is not a delivery-API
-    /// controller. A visitor-facing POST added tomorrow is covered the day it exists, rather than
+    /// So the set is now every MVC controller in the Web assembly — <c>ControllerBase</c> and up,
+    /// which is what makes the delivery-API exclusion below load-bearing rather than decorative —
+    /// that is not a delivery-API controller. A visitor-facing POST added tomorrow is covered the day it exists, rather than
     /// the day somebody remembers this file.
     /// </para>
     /// <para>
@@ -60,8 +61,13 @@ public class AntiForgeryTests
     private static IReadOnlyList<Type> VisitorFacing()
         => [.. typeof(CancellationController).Assembly
             .GetTypes()
+            // ControllerBase, NOT Controller — and that one word is the whole finding. The
+            // delivery-API base derives from ControllerBase, so filtering on Controller had
+            // already removed every delivery controller before the exclusion below was reached:
+            // the exclusion was inert, the remark describing it was false, and a visitor-facing
+            // POST on a ControllerBase-derived controller was invisible to this guard.
             .Where(type => type is { IsAbstract: false, IsPublic: true }
-                && typeof(Controller).IsAssignableFrom(type)
+                && typeof(ControllerBase).IsAssignableFrom(type)
                 && !typeof(UBookItDeliveryApiControllerBase).IsAssignableFrom(type))
             .OrderBy(type => type.Name, StringComparer.Ordinal)];
 
@@ -113,11 +119,30 @@ public class AntiForgeryTests
             ],
             found);
 
-        // And the exclusion really excludes something, or "not a delivery controller" would be a
-        // condition that never fires and the derivation would be the whole assembly by accident.
-        Assert.Contains(
-            typeof(CancellationController).Assembly.GetTypes(),
-            type => typeof(UBookItDeliveryApiControllerBase).IsAssignableFrom(type) && !type.IsAbstract);
+        // THE EXCLUSION CHANGES THE RESULT — asserted, not assumed.
+        //
+        // The previous version asserted only that a delivery controller EXISTS in the assembly,
+        // which was true while the exclusion was doing nothing at all. A control that cannot
+        // distinguish "the clause fired" from "the clause is dead" is not a control; it is the same
+        // defect one level up, which is exactly where this one was found.
+        var deliveryControllers = typeof(CancellationController).Assembly
+            .GetTypes()
+            .Where(type => typeof(UBookItDeliveryApiControllerBase).IsAssignableFrom(type)
+                && type is { IsAbstract: false, IsPublic: true })
+            .ToList();
+
+        Assert.NotEmpty(deliveryControllers);
+
+        foreach (var delivery in deliveryControllers)
+        {
+            // Each would be swept into the set by the ControllerBase filter above...
+            Assert.True(
+                typeof(ControllerBase).IsAssignableFrom(delivery),
+                $"{delivery.Name} is not a ControllerBase, so the exclusion has nothing to remove.");
+
+            // ...and each is kept out of it by the exclusion. Delete that clause and this fails.
+            Assert.DoesNotContain(delivery, VisitorFacing());
+        }
     }
 
     [Fact]

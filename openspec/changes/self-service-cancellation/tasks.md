@@ -364,6 +364,43 @@ condition fails it.
 
 
 
+
+## 13. QA round 3 — REJECT (1 MAJOR, mechanical): what changed
+
+**A condition that could not fire, and the control written to detect exactly that, passing anyway.**
+
+`VisitorFacing()` filtered on `typeof(Controller)`. `UBookItDeliveryApiControllerBase` derives from
+**`ControllerBase`**, so every delivery controller was already gone before the exclusion clause was
+reached: **the clause was inert**. Deleting it entirely left the suite green, which QA demonstrated.
+
+And the control at the bottom of the positive test — added in round 2, in its own words, *"or 'not a
+delivery controller' would be a condition that never fires"* — asserted only that a delivery
+controller **exists in the assembly**. That was true while the exclusion did nothing. It could not
+tell "the clause fired" from "the clause is dead".
+
+Two edits: filter on `ControllerBase`, and make the control assert the exclusion **changes the
+result** — every concrete delivery controller is a `ControllerBase` (so the filter would sweep it
+in) and is **not** in `VisitorFacing()` (so the exclusion took it out).
+
+**QA's acceptance test passes both ways.** Deleting the exclusion clause now fails two tests,
+naming `BookingsController.PlaceBooking` and `ServicesController.PlaceServiceBooking` — delivery
+endpoints that would wrongly be required to carry anti-forgery. And its round-2 mutant controller is
+still caught by name.
+
+**This was the fifth instance of the shape, and the first at the third rung of the ladder** — the
+fault moved from the artifact, to the guard, to the guard's own control. That ladder is a thing this
+project already has a name for, and it had not previously reached a control.
+
+### Nit
+
+`Assert.NotEqual(string.Empty, name)` could never fail — a filler assertion inside a guard whose
+entire subject is assertions that cannot fail. Removed; the view's name now travels in the failure
+messages of the three real assertions, where it is worth something.
+
+**State:** unit **1797**, integration **167**, rendering **1168**, client **290**; 0 warnings in a
+clean Release build; 22/22.
+
+
 ## 12. QA round 2 — REJECT (1 MAJOR, 2 MINORs): what changed
 
 **QA mutation-tested round 1's three new guards rather than trusting the table**, and all three

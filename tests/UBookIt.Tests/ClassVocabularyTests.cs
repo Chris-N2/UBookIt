@@ -250,17 +250,31 @@ public class ClassVocabularyTests
             var source = File.ReadAllText(path);
             var name = Path.GetFileName(path);
 
-            Assert.Contains("Layout = null", source, StringComparison.Ordinal);
-            Assert.DoesNotContain("<link", source, StringComparison.OrdinalIgnoreCase);
-            Assert.DoesNotContain("_Styles", source, StringComparison.Ordinal);
+            // The view's NAME travels in the failure messages rather than in an assertion of its
+            // own. `Assert.NotEqual(string.Empty, name)` could never fail — a filler assertion
+            // inside a guard whose entire subject is assertions that cannot fail, which is the
+            // shape this change has now produced five times.
+            Assert.True(
+                source.Contains("Layout = null", StringComparison.Ordinal),
+                $"{name} is exempted from the styling contract but does not set Layout = null.");
+
+            Assert.False(
+                source.Contains("<link", StringComparison.OrdinalIgnoreCase),
+                $"{name} is exempted from the styling contract but links a stylesheet, so a site's "
+                + "CSS reaches it after all.");
+
+            Assert.False(
+                source.Contains("_Styles", StringComparison.Ordinal),
+                $"{name} is exempted from the styling contract but pulls in the shared styles partial.");
 
             // AND IT EMITS NO CONTRACT-SHAPED CLASS. Every other `ubookit-*` class in the package
             // is part of the published vocabulary, so one here would be indistinguishable from a
             // contract class to anyone reading the page source — while being reachable by nothing.
-            Assert.DoesNotContain("ubookit-", source, StringComparison.Ordinal);
-            Assert.DoesNotContain("class=\"ubookit\"", source, StringComparison.Ordinal);
-
-            Assert.NotEqual(string.Empty, name);
+            Assert.False(
+                source.Contains("ubookit-", StringComparison.Ordinal)
+                || source.Contains("class=\"ubookit\"", StringComparison.Ordinal),
+                $"{name} emits a ubookit- class, which reads as a contract class to anyone looking "
+                + "at the page source while being reachable by no stylesheet.");
         }
     }
 
