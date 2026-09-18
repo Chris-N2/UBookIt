@@ -295,3 +295,43 @@ other one is.
 
 **The four element-level behaviours resting on the absent DOM harness** are now named together in
 the deferred obligation, at QA's request, so whoever installs the harness knows what it owes first.
+
+## 13. Sync — the sibling sweep, and why it found nothing
+
+**Guarantee diff on both MODIFIED requirements, re-done at sync time** (scripted, comparing
+scenario titles and SHALL counts between the delta and `main`):
+
+| Requirement | SHALLs | Scenarios | Dropped |
+|---|---|---|---|
+| The list is windowed, and the window is bounded | 9 → 10 | 6 → 7 | **none** |
+| A subject's bookings can be found by their email address | 13 → 16 | 9 → 10 | **none** |
+
+Purely additive both times, matching QA's independent diff. `booking-management` goes 26 → 28
+requirements; `openspec validate --all --strict` 22/22 after the sync.
+
+**The outward sweep found nothing to change — recorded with its reasoning, because this grep has
+found something on four consecutive changes and a null result is the one to distrust.** Text was
+normalised (emphasis stripped, lines unwrapped) before matching, since a wrapped line and a bold
+word have each defeated it before (㉛, ㉙).
+
+Candidates considered and dismissed, each with the reason:
+
+- **`permissions` — the closest call, and the one ㊳ got wrong.** There, `bookings/bookable` was a
+  genuinely new *kind* of thing and the verb list had to record it. Here it does not:
+  `UBookIt.Bookings.Read` is already defined as "the bookings list **and every read over
+  bookings**", which covers a by-reference lookup without amendment. The endpoint is Read-gated
+  exactly as that sentence anticipates.
+- **`sensitive-data` / `permissions` "an endpoint that accepts contact details as input"** — a
+  reference is not a contact detail, so the input rule is not engaged. This is already reasoned in
+  §5.2 and is the subject of its own deferred obligation.
+- **`booker-erasure` and `booking-retention` "SHALL accept no contact detail as input"** — both
+  describe the retention/erasure selection, not this endpoint.
+- **`booking-management` "Bookings can be enumerated for management" (NOT modified here)** — says
+  the package "SHALL provide a read port that **lists** bookings". Adding a seek to that port does
+  not contradict it, and there is prior art: ㉔ put `FindByBookerEmailAsync` on the same port, so
+  the port already held a non-list read before this change. Additive, not falsifying.
+- **`delivery-api` "a plain 404 says nothing"** — about the delivery API being off by default; this
+  endpoint is backoffice-only and authorized.
+
+**`docs/backoffice.md`'s "returns to the window you had, filters and all"** was an overstatement
+QA raised twice; it is now TRUE rather than softened, because `windowPageToKeep` restores the page.
