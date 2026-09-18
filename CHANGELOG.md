@@ -37,8 +37,9 @@ booking being moved would be a worse outcome than a compile error.
 `IBookingObserver` also gained `BookingPlacedOnBehalfAsync`, which **does** have a default
 implementation — you do not have to add it, and an observer that ignores it keeps working.
 
-`ICancellationSecretStore` is new in this release. A new interface breaks nothing, and the package
-ships an implementation; you only need your own if you want one.
+`ICancellationSecretStore` and `ISettingsStore` are both new in this release. A new interface
+breaks nothing — nobody can have been implementing it — and the package ships an implementation of
+each; you only need your own if you want one.
 
 **Three of the new backoffice features are live as soon as you upgrade**, for users who already
 hold the relevant permission. Nothing new is granted, but the verbs your groups already have now
@@ -46,9 +47,11 @@ reach further:
 
 | Feature | Who gets it on upgrade |
 |---|---|
-| Move a booking | any group holding **Manage Bookings** |
-| Book on behalf of someone | any group holding **Manage Bookings** *and* Umbraco's **Sensitive data** |
-| Look a booking up by reference | any group holding **Read Bookings** |
+| Move a booking | any group holding **Act on bookings** |
+| Book on behalf of someone | any group holding **Act on bookings** *and* Umbraco's **Sensitive data** |
+| Look a booking up by reference | any group holding **See bookings** |
+
+Those are the permission names as the backoffice shows them, under Users → User Groups.
 
 If that is not what you want, review those groups before upgrading. Moving a booking also sends the
 booker an email that did not exist before (`BookerMoved`), so a site with booker emails on will
@@ -62,7 +65,8 @@ yet, and self-service cancellation needs configuration. Both are below.
 - **A settings screen in the backoffice.** uBookIt's configuration is visible in one place rather
   than only in `appsettings.json`. Settings that can only come from configuration are shown
   read-only, with where to set them, instead of being hidden. **You will not see it until you grant
-  the new *Settings* permission to a group** — it is deliberately not granted to anyone on upgrade.
+  the new *Change site settings* permission to a group** — it is deliberately granted to nobody on
+  upgrade.
 - **An operator can move a booking**, keeping its reference. The booker is emailed; your own
   internal recipients are not, because the move happened in your backoffice and the bookings screen
   is where its state lives. A service's length rules are enforced on the move, not only on the

@@ -600,11 +600,17 @@ public class VersionTruthTests
             + "it serves the latest listed version by default (which is why 17.0.0 was not "
             + "unlisted). This file is now in LiveDocuments(), which it was not when it was "
             + "written — that omission is what let three unregistered claims exist at all.\n"
-            + "MEASURED, not assumed, because the first draft of this note overstated it: the "
-            + "count catches a FOURTH mention (a later release adding a publication claim here "
-            + "goes red) and catches all three going away (a dead allowance goes red). It does "
-            + "NOT catch a drop from three to two — a partially consumed allowance passes. So "
-            + "this number bounds the claims, it does not pin them one to one."),
+            + "THE COUNT IS EXACT: three and only three passes. A fourth mention is reported "
+            + "unclassified; a drop to two leaves an unconsumed allowance; all three going away "
+            + "leaves three. Measured in each direction, against a build that actually contained "
+            + "this entry.\n"
+            + "That sentence was briefly weakened to \"bounds rather than pins\" on the strength "
+            + "of a mutation that never happened: the replacement string spanned a line wrap in "
+            + "CHANGELOG.md, Python's str.replace matched nothing and returned the text unchanged, "
+            + "and the green run was read as evidence. ASSERT THAT A MUTANT CHANGED THE FILE. A "
+            + "mutation tool that silently no-ops does not report a passing guard, it reports "
+            + "nothing at all — and line wrapping has defeated an instrument in this repository "
+            + "before."),
 
         ("openspec/specs/packaging/spec.md", "nuget.org", 4,
             "Arrived at SYNC, not written by hand — `release-17-0-1`'s requirements moved into "

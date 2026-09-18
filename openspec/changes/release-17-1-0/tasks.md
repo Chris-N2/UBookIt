@@ -180,3 +180,62 @@ absent entirely.
       dropping to two passes** — the count bounds the claims, it does not pin them. Note corrected
       to say what the mechanism does. Same shape as the CRITICAL one level down: a sentence
       describing a property the code did not have.
+
+## 10. QA round 2 — REJECT (1 MAJOR, 4 MINOR, 1 NIT)
+
+Round 1's CRITICAL and both MAJORs were verified closed by the reviewer's own independent sweep —
+including that **no interface or member was REMOVED and no signature CHANGED** between `f831986`
+and HEAD, so nothing harder is hiding behind the additions. The round's own finding was that a
+round-1 *fix* had introduced a new false statement, which is this project's standing pattern.
+
+- [x] 10.1 **[MAJOR] My round-1 "correction" was itself wrong: the accepted-mention count IS exact.**
+      Restored, with the measurement in each direction (four → unclassified; two → unconsumed
+      allowance; zero → three unconsumed).
+
+      **The cause was NOT what either of us first said.** QA attributed it to a stale assembly
+      (`--no-build`); I reproduced the false pass on a *fresh* build, so that was not it either.
+      The real cause: my mutation string spanned a line wrap in `CHANGELOG.md` — the file reads
+      `"...on nuget.org and
+cannot be changed"` — so `str.replace` matched nothing, returned the
+      text unchanged, and I read the resulting green as evidence about the guard. **A mutation that
+      silently no-ops does not report a passing guard; it reports nothing at all.** Asserting the
+      file changed is now done in every mutant in this change, and line wrapping has defeated an
+      instrument in this repository before (㉛).
+- [x] 10.2 **[MINOR] Permission names.** The changelog and proposal used `Manage Bookings` /
+      `Read Bookings` / `Settings`; the backoffice shows **Act on bookings**, **See bookings** and
+      **Change site settings** (`Client/src/localization/en-us.ts:551,554,560`). The table exists so
+      a reader goes and reviews those groups — with the wrong vocabulary they would search for
+      permissions that do not exist. Gating logic was right; only the words were wrong.
+- [x] 10.3 **[MINOR] `ISettingsStore` is also new**, not just `ICancellationSecretStore`. The
+      "a new interface breaks nothing" sentence now names both. An enumeration whose job is
+      completeness, short by one — the CRITICAL's shape at small scale.
+- [x] 10.4 **[MINOR] The date stamp is now guarded**, using the heading capture that was taken and
+      never read. `Every_released_version_is_dated` requires a date on every version in
+      `ReleasedVersions()`; the declared version may ship undated because it is not yet archived.
+      This also **bounds the exception** the changelog grants its own never-edit rule: a released
+      entry may receive its date and nothing else. Mutation-checked both ways — removing `17.0.1`'s
+      date fails, and `17.1.0` undated still passes.
+- [x] 10.5 **[NIT] Counts.** Ten signatures, **six** distinct names (`MoveAsync` on three
+      interfaces, `PlaceOnBehalfAsync` on two), five interfaces. Both QA's round-1 "nine members"
+      and my commit message's "nine names" were wrong; the changelog's per-interface table was
+      never wrong, which is why listing per interface is the right shape.
+
+### 10.6 [MINOR] `FindByReferenceAsync` is not declared in any spec — DEFERRED, with the reason
+
+**The gap is real.** CLAUDE.md requires a breaking change to be called out explicitly in its spec.
+Nine of the ten breaks are; `IBookingManagementStore.FindByReferenceAsync` is declared only in a
+source comment in `Stores.cs`, and `find-booking`'s proposal carries no `BREAKING` line at all.
+`openspec/specs/booking-management/spec.md` has no callout for it.
+
+**Not closed here, deliberately.** Closing it means a `## MODIFIED Requirements` entry for *A
+booking can be found by its reference* — a ~60-line body with **8 scenarios** — replaced wholesale,
+which is this project's most expensive failure mode and the one thing that must not be done quickly
+or unsupervised. The gap predates this change: it was created when `find-booking` merged, not by
+the release.
+
+**What the release does instead:** the consumer-facing callout, which is the protection that
+actually matters to a site, now exists in `CHANGELOG.md` and is correct. The proposal no longer
+claims all ten were declared — it states that nine were and names the one that was not.
+
+**Owed to `booking-management`**, recorded in the deferred obligations. Whoever next touches that
+capability should add the declaration with a proper guarantee diff.

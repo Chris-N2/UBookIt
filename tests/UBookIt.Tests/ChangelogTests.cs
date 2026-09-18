@@ -9,11 +9,18 @@ namespace UBookIt.Tests;
 /// </summary>
 /// <remarks>
 /// <para>
-/// <b>What this guard proves: presence. What it does not prove: honesty.</b> No test can know
-/// that `17.1.0` contained four contract changes rather than five, so none of these asserts
-/// that an entry is complete or true. The boundary is named here rather than left to be
-/// assumed, because a guard whose name promises more than it reads is this project's most
-/// repeated defect — and the reader who assumes coverage is the one who stops checking.
+/// <b>What this guard proves: presence and shape. What it does not prove: honesty.</b> No test
+/// here knows whether an entry names every contract change the release actually made, so none
+/// asserts that one is complete or true. The boundary is named rather than left to be assumed,
+/// because a guard whose name promises more than it reads is this project's most repeated
+/// defect — and the reader who assumes coverage is the one who stops checking.
+/// <para>
+/// <b>That boundary is not hypothetical.</b> `17.1.0`'s entry shipped naming four affected
+/// interfaces when there were five, and every test in this class was green: the missing port was
+/// `IBookingManagementStore.FindByReferenceAsync`. QA found it by diffing the compiled interface
+/// surface, which is what the release change's design D7 now makes the standing method. If you
+/// are reading this while adding a release entry: derive the list, do not recall it.
+/// </para>
 /// </para>
 /// <para>
 /// What it does close is the failure mode a hand-written release note actually has: not being
@@ -34,7 +41,18 @@ public class ChangelogTests
     /// a check for <c>17.1.1</c>. Three loose-substring instruments in this repository have
     /// reported a result that was not true, one of them a pass.
     /// </remarks>
-    private static string? EntryFor(string version)
+    private static string? EntryFor(string version) => HeadingAndBodyFor(version)?.Body;
+
+    /// <summary>
+    /// The remainder of a version's heading line and the entry beneath it, or <c>null</c> when
+    /// there is no such heading.
+    /// </summary>
+    /// <remarks>
+    /// The heading remainder is returned rather than discarded because it carries the release
+    /// date, which <see cref="Every_released_version_is_dated"/> requires. It was previously
+    /// captured and never read — a capture nothing consumes is a guard nobody wrote.
+    /// </remarks>
+    private static (string Suffix, string Body)? HeadingAndBodyFor(string version)
     {
         var text = RepoFiles.Read(Changelog);
         var heading = new Regex(
@@ -51,7 +69,7 @@ public class ChangelogTests
         var body = text[(match.Index + match.Length)..];
         var next = Regex.Match(body, @"^##\s", RegexOptions.Multiline);
 
-        return next.Success ? body[..next.Index] : body;
+        return (match.Groups["rest"].Value, next.Success ? body[..next.Index] : body);
     }
 
     /// <summary>
@@ -179,6 +197,34 @@ public class ChangelogTests
                 $"{Changelog} has no entry for {version}, which this repository's archive records "
                 + "as released. Published versions are immutable, so their entries are history and "
                 + "are not removed.");
+        }
+    }
+
+    [Fact]
+    public void Every_released_version_is_dated()
+    {
+        // THE COUNTERPART TO SHIPPING A VERSION UNDATED. The declared version's heading carries no
+        // date, deliberately: a date written before the push is a claim nuget.org can contradict if
+        // publication slips. But "stamp it at publication" was a handover task and nothing else —
+        // an instruction that fails silently when somebody is busy, which is the same shape as
+        // every unguarded documentation SHALL this project has been caught by.
+        //
+        // Tying the stamp to ARCHIVE time rather than to the push is what makes it checkable: a
+        // release change is archived once its release has happened, so a version appearing in
+        // ReleasedVersions() without a date means the stamp was skipped. It also bounds the
+        // exception the changelog grants to its own never-edit rule — a released entry may still
+        // receive its date, and nothing else.
+        foreach (var version in ReleasedVersions())
+        {
+            var heading = HeadingAndBodyFor(version);
+
+            Assert.True(heading is not null, $"{Changelog} has no entry for {version}.");
+
+            Assert.True(
+                Regex.IsMatch(heading!.Value.Suffix, @"\d{4}-\d{2}-\d{2}"),
+                $"{Changelog}'s heading for {version} carries no release date. {version} is "
+                + "released, so the date is known — stamp it as `## " + version
+                + " — YYYY-MM-DD`. A version ships undated only while it is unpublished.");
         }
     }
 

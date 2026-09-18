@@ -36,9 +36,12 @@ it are history.
 - **The README's API-promise callout gains the pointer.** The sentence that says breaks are called
   out explicitly should be next to the place they are called out.
 - **BREAKING — nothing new breaks here.** This change declares no break of its own. It *publishes*
-  ten that were each declared, QA'd and approved in their own change, and that have been sitting
-  unreleased, across `IBookingObserver`, `IBookingStore`, `IBookingManagementStore`,
-  `IServiceBookingService` and `IBookingService`. **The set is derived by diffing the compiled
+  ten that were implemented and QA'd in their own changes and have been sitting unreleased, across
+  `IBookingObserver`, `IBookingStore`, `IBookingManagementStore`, `IServiceBookingService` and
+  `IBookingService`. **Nine of the ten were declared in a spec; one was not** —
+  `IBookingManagementStore.FindByReferenceAsync` is declared only in a source comment, which is a
+  real gap against CLAUDE.md and is recorded as a deferral in §8 of `tasks.md` rather than closed
+  here. **The set is derived by diffing the compiled
   interface surface against the `17.0.1` release commit, not transcribed from the proposals** — see
   design D7. All ten land in a minor, which is where this project's policy puts a break.
 
@@ -90,7 +93,8 @@ five approved changes into a release rather than releasing each.
 
 Every other site compiles, but **three features become available immediately**: moving a booking
 and booking on behalf for groups holding *Manage Bookings* (on-behalf additionally requires
-Umbraco's *Sensitive data*), and booking lookup for groups holding *Read Bookings*. A moved booking
+Umbraco's *Sensitive data*), and booking lookup for groups holding *See bookings*. Those are the
+names the backoffice shows; the verbs behind them are `BookingsManage` and `BookingsRead`. A moved booking
 also sends the booker a `BookerMoved` email that did not exist before. Only the settings screen
 (which needs a verb granted to nobody on upgrade) and self-service cancellation (flag, default off,
 and requiring booker emails) are genuinely inert until a site acts.
