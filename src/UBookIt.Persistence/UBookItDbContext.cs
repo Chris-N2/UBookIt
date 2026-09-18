@@ -37,6 +37,8 @@ public sealed class UBookItDbContext(DbContextOptions<UBookItDbContext> options)
 
     internal DbSet<SettingRow> Settings => Set<SettingRow>();
 
+    internal DbSet<CancellationSecretRow> CancellationSecrets => Set<CancellationSecretRow>();
+
     /// <summary>
     /// Single place that configures the SQL Server provider (uBookIt requires
     /// SQL Server 2019+) with the package-private migrations history table.
@@ -236,6 +238,21 @@ public sealed class UBookItDbContext(DbContextOptions<UBookItDbContext> options)
             setting.HasKey(s => s.Key);
             setting.Property(s => s.Key).HasMaxLength(256);
             setting.Property(s => s.Value).HasMaxLength(2048);
+        });
+
+        modelBuilder.Entity<CancellationSecretRow>(secret =>
+        {
+            secret.ToTable("uBookItCancellationSecret");
+
+            // The HASH is the primary key. One row per secret is then a property of the schema
+            // rather than of the store's code, and the lookup a redemption performs is a seek on
+            // the key — which matters, because that lookup happens on an anonymous request.
+            secret.HasKey(s => s.Hash);
+            secret.Property(s => s.Hash).HasMaxLength(64).IsFixedLength();
+
+            // Finding the outstanding secrets for a booking, which is what issuing a replacement
+            // and tidying after a cancellation both need.
+            secret.HasIndex(s => s.BookingId);
         });
     }
 }

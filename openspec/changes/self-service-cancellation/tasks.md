@@ -107,10 +107,28 @@ Unit suite **1740** (baseline 1718; +22).
 
 ## 4. Persistence
 
-- [ ] 4.1 Entity and additive migration for the secrets table; verify against a database from the previous version that nothing is altered or dropped
-- [ ] 4.2 Store implementation; verify the integration test suite covers issue, find, redeem, expired, and redeem-twice
-- [ ] 4.3 A guard that the stored row is **not** a credential: present everything the table holds to the flow and assert no booking is cancelled
-- [ ] 4.4 A guard that the plaintext secret appears in no table, no log and no other store; make it a scan that can fail rather than a claim in a comment
+- [x] 4.1 Entity and additive migration for the secrets table; verify against a database from the previous version that nothing is altered or dropped
+- [x] 4.2 Store implementation; verify the integration test suite covers issue, find, redeem, expired, and redeem-twice
+- [x] 4.3 A guard that the stored row is **not** a credential: present everything the table holds to the flow and assert no booking is cancelled
+- [x] 4.4 A guard that the plaintext secret appears in no table, no log and no other store; make it a scan that can fail rather than a claim in a comment
+
+**§4 notes.** `uBookItCancellationSecret`, migration `20260918132340_AddCancellationSecrets` —
+`CreateTable` and `CreateIndex` only, nothing altered or dropped. **The hash is the primary key**,
+so "one row per secret" is a property of the schema rather than of the store's code, and a
+redemption is a seek on the key (which matters: it runs on an anonymous request).
+
+**Redemption is a compare-and-swap in one statement**, the expiry inside the `WHERE` rather than
+checked around it. The mutation that matters: replacing it with read-then-write left 8 of 9 tests
+green and **7 of 8 concurrent redemptions succeeded** — a single-use credential usable seven times,
+with exactly one test standing between the two implementations.
+
+**Two structural guards**, both proven able to fire: the port deals only in hashes (type identity),
+and **the persistence assembly cannot see `CancellationSecret` at all** — mutated by making it
+reference the type, which failed the scan. The first version of the identity guard was too loose
+(substring matching flagged `CancellationSecretRecord`) and reported a violation that was not one;
+tightened to compare types, with the episode recorded in the test.
+
+Integration **167** (baseline 158; +9).
 
 ## 5. Issuing the link
 

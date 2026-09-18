@@ -113,6 +113,7 @@ public sealed class UBookItPersistenceComposer : IComposer
         builder.Services.AddScoped<IResponsibilityStore, SqlResponsibilityStore>();
         builder.Services.AddScoped<IFlagStore, SqlFlagStore>();
         builder.Services.AddScoped<ISettingsStore, SqlSettingsStore>();
+        builder.Services.AddScoped<ICancellationSecretStore, SqlCancellationSecretStore>();
         builder.Services.AddScoped<IUmbracoUserDirectory, UmbracoUserDirectory>();
         builder.Services.AddScoped<IResponsibleRecipientResolver, ResponsibleRecipientResolver>();
         builder.AddNotificationAsyncHandler<BookingPlacedNotification, BookingEmailHandler>();

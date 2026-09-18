@@ -298,3 +298,39 @@ internal sealed class SettingRow
 
     public DateTimeOffset UpdatedUtc { get; set; }
 }
+
+/// <summary>
+/// One outstanding cancellation secret, held as a hash.
+/// </summary>
+/// <remarks>
+/// <b>Nothing on this row is a credential.</b> The secret itself is never written here — only
+/// <see cref="Hash"/>, which a redemption is looked up by — so a database copy, a backup, or a
+/// person with read access holds nothing that can cancel a booking. That is the same reasoning
+/// that keeps booker contact details out of messages to a site's own recipients: a control built
+/// deliberately must not be reachable by a route around it.
+/// <para>
+/// <b>No personal data, ever.</b> A booking's identifier, a hash, two instants and a flag name
+/// nobody, which is why erasure does not reach this table and why <c>booker-erasure</c> records
+/// that consequence where an operator will meet it.
+/// </para>
+/// </remarks>
+internal sealed class CancellationSecretRow
+{
+    /// <summary>The hash IS the primary key: at most one row per secret, enforced by the schema.</summary>
+    public required string Hash { get; set; }
+
+    public Guid BookingId { get; set; }
+
+    /// <summary>
+    /// When the secret stops being usable — the booking's start, computed at issue and stored.
+    /// </summary>
+    /// <remarks>
+    /// Stored rather than derived at redemption so that moving the booking, or changing a site's
+    /// configuration, cannot silently extend or revoke a link already sitting in somebody's inbox.
+    /// </remarks>
+    public DateTimeOffset ExpiresUtc { get; set; }
+
+    public DateTimeOffset IssuedUtc { get; set; }
+
+    public DateTimeOffset? RedeemedUtc { get; set; }
+}
