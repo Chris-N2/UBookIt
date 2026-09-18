@@ -309,6 +309,20 @@ clean Release build; `openspec validate --all --strict` 22/22. TestSite stopped,
 - [x] 10.1 Write the QA handover: what was built, what is claimed, build and test state, and the instruction to **verify rather than trust**
 - [x] 10.2 Name for the reviewer where a defect is most likely, and say plainly that this is the package's first authentication primitive
 
+**A defect found by a question, after apply was otherwise complete.** Chris asked what he would see
+if he ran the TestSite as it stands. Answering it meant reading `UnmetDependency` again, and it
+checked only whether booker emails were off — **not whether the feature was on**. So on a site with
+the feature off (which is every site by default) the screen would have said *"this has no effect
+while booker emails are off"*, naming a reason that is not the reason: it has no effect because
+nobody turned it on.
+
+The spec scenario says *"enabled AND booker emails off"*. The implementation did not, and **the test
+could not fail on that axis** because it varied only the notification setting — a test that is not
+evidence about the thing it appears to cover.
+
+Fixed, and the test is now a `[Theory]` over both axes (4 cases). Mutation-proven: restoring the old
+condition fails it.
+
 ### Verify rather than trust
 
 Every number and every claim below is a claim until you re-run it. On this project you have twice

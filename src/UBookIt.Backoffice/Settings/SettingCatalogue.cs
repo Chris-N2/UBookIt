@@ -184,17 +184,26 @@ public static class SettingCatalogue
     /// at the shape of cases that do not exist.
     /// </para>
     /// </remarks>
-    public static string? UnmetDependency(string key, SiteBookingSettings effective)
+    public static string? UnmetDependency(
+        string key, SiteBookingSettings effective, SelfServiceCancellationSettings cancellation)
     {
         if (!string.Equals(key, SelfServiceCancellationEnabledKey, StringComparison.Ordinal))
         {
             return null;
         }
 
-        return effective.Notifications.SendBookerEmails
-            ? null
-            : "This has no effect while booker emails are off: the cancellation link travels in "
-              + "the message sent to the booker, so where no message is sent there is no link.";
+        // BOTH CONDITIONS, and the first one is the one that was missing. A note saying "this has
+        // no effect while booker emails are off" beside a feature that is ITSELF off states a
+        // reason that is not the reason — the feature is doing nothing because nobody turned it
+        // on. A readout naming the wrong cause is the same defect as one naming a configuration
+        // the site does not have, which is what this screen exists to avoid.
+        if (!cancellation.Enabled || effective.Notifications.SendBookerEmails)
+        {
+            return null;
+        }
+
+        return "This has no effect while booker emails are off: the cancellation link travels in "
+            + "the message sent to the booker, so where no message is sent there is no link.";
     }
 
     /// <summary>

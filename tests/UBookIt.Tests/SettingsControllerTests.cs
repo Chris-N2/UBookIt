@@ -57,12 +57,14 @@ public class SettingsControllerTests
     /// assert a property the shipped wiring does not have and could not fail when production
     /// stopped having it — which is exactly the defect QA found in the startup reports.
     /// </remarks>
-    private static SettingsController Controller(ISettingsStore store, IConfiguration configuration)
+    private static SettingsController Controller(
+        ISettingsStore store, IConfiguration configuration, bool selfServiceCancellation = false)
         => new(
             store,
             configuration,
             UBookItPersistenceComposer.ResolveSettings(
-                UBookItPersistenceComposer.EffectiveConfiguration(configuration, store)));
+                UBookItPersistenceComposer.EffectiveConfiguration(configuration, store)),
+            new SelfServiceCancellationSettings { Enabled = selfServiceCancellation });
 
     private static SettingsResponseModel Read(SettingsController controller)
         => Assert.IsType<SettingsResponseModel>(
