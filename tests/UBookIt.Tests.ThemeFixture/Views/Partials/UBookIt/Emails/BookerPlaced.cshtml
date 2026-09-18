@@ -1,3 +1,7 @@
 @inherits UBookIt.Web.Emails.UBookItEmailPage<UBookIt.Core.Notifications.BookerMessageModel>
 @* States nothing: the package's subject stands and the body is plain text. *@
 Dear @Model.BookerName, your reference is @Model.Reference.
+@if (Model.CancellationUrl is not null)
+{
+    @:To cancel: @Model.CancellationUrl
+}

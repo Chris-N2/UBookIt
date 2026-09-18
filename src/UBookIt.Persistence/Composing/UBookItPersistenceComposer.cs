@@ -113,6 +113,20 @@ public sealed class UBookItPersistenceComposer : IComposer
         builder.Services.AddScoped<IResponsibilityStore, SqlResponsibilityStore>();
         builder.Services.AddScoped<IFlagStore, SqlFlagStore>();
         builder.Services.AddScoped<ISettingsStore, SqlSettingsStore>();
+        builder.Services.AddScoped<ICancellationSecretStore, SqlCancellationSecretStore>();
+
+        // SINGLETON, bound from configuration only — deliberately NOT through the settings store.
+        // This is an exposure switch: it opens an anonymous route that changes a site's data, so it
+        // belongs to whoever deploys the site rather than to whoever runs the bookings, and
+        // `site-settings` puts it in the read-only tier for that reason. Reading it from the store
+        // would make it editable by anyone who can reach the settings endpoint.
+        //
+        // Bound once at startup, so a change needs a restart — which is what the settings screen
+        // tells an operator about it.
+        builder.Services.AddSingleton(serviceProvider =>
+            serviceProvider.GetRequiredService<IConfiguration>()
+                .GetSection(SelfServiceCancellationSettings.SectionKey)
+                .Get<SelfServiceCancellationSettings>() ?? new SelfServiceCancellationSettings());
         builder.Services.AddScoped<IUmbracoUserDirectory, UmbracoUserDirectory>();
         builder.Services.AddScoped<IResponsibleRecipientResolver, ResponsibleRecipientResolver>();
         builder.AddNotificationAsyncHandler<BookingPlacedNotification, BookingEmailHandler>();

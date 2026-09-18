@@ -4,6 +4,7 @@ using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.OpenApi;
 using Swashbuckle.AspNetCore.SwaggerGen;
+using UBookIt.Core;
 using UBookIt.Web.Controllers;
 using UBookIt.Web.Mapping;
 using Umbraco.Cms.Core.Composing;
@@ -39,6 +40,18 @@ public sealed class UBookItDeliveryApiComposer : IComposer
         builder.Services.AddSingleton(settings);
         builder.Services.Configure<MvcOptions>(options =>
             options.Conventions.Add(new DeliveryApiExposureConvention(settings)));
+
+        // SELF-SERVICE CANCELLATION, on the same terms and for the same reason: off unless the
+        // section says otherwise, and absent rather than refused when off. Bound here rather than
+        // through the settings store because it is an exposure switch — see
+        // SelfServiceCancellationSettings — and the application model is built once at startup,
+        // which is why the settings screen shows it as needing a restart.
+        var cancellation = builder.Config
+            .GetSection(SelfServiceCancellationSettings.SectionKey)
+            .Get<SelfServiceCancellationSettings>() ?? new SelfServiceCancellationSettings();
+
+        builder.Services.Configure<MvcOptions>(options =>
+            options.Conventions.Add(new CancellationExposureConvention(cancellation)));
 
         builder.Services.Configure<SwaggerGenOptions>(options =>
         {

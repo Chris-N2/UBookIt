@@ -21,7 +21,49 @@ public class ClassVocabularyTests
 {
     private const string ViewsRoot = "src/UBookIt.Web/Views";
 
-    /// <summary>Every class the shipped views render, with the view that renders it.</summary>
+    /// <summary>
+    /// Views outside the styling contract, with the reason.
+    /// </summary>
+    /// <remarks>
+    /// <b>The cancellation pages are standalone documents the package serves itself.</b> They set
+    /// <c>Layout = null</c>, link no stylesheet and are not composed into a site's page, so
+    /// <b>nothing a site writes can reach them</b> — no host layout, no cascade, no token override.
+    /// <b>So they render no classes at all</b>, and the published vocabulary still describes,
+    /// exactly and completely, everything the package renders.
+    /// <para>
+    /// They were briefly added to that vocabulary under a comment saying "a site styling the flow
+    /// can style these too". QA established that was false, and it is the same shape as the defect
+    /// this change already caught itself on: a readout describing something the site does not have.
+    /// The first correction dropped the <c>ubookit-</c> prefix, which answered the wrong question —
+    /// a class named <c>cancel-booking</c> is still a class this package renders, so
+    /// <c>default-frontend</c>'s "exactly and completely" was false either way. The sync-time sweep
+    /// caught that; the guard written for the first correction did not, because it forbade the
+    /// prefix rather than the thing. Recorded as a removal rather than left silent, so a reader can
+    /// tell a decision from an oversight.
+    /// </para>
+    /// <para>
+    /// They are also outside the theme-view set — a theme RCL supplies views under
+    /// <c>Views/Shared/UBookIt/Themes/</c>, and these live at <c>Views/Cancellation/</c> — so a
+    /// theme cannot replace them either. Both facts are stated in the proposal and the docs.
+    /// </para>
+    /// </remarks>
+    /// <summary>
+    /// Whether a shipped view is outside the styling contract — <b>by directory, once.</b>
+    /// </summary>
+    /// <remarks>
+    /// It was specified twice and differently: the class scan filtered by directory while the
+    /// button count filtered by FILENAME, so a fourth cancellation view would have been excluded
+    /// from one and not the other. Worse, the filename list contained <c>Index.cshtml</c> — the
+    /// likeliest filename in any future <c>Views/&lt;Something&gt;/</c> folder — whose buttons
+    /// would then have been silently exempt. One predicate, and it names a place rather than a
+    /// file.
+    /// </remarks>
+    private static bool OutsideTheStylingContract(string path)
+        => path.Contains(
+            $"{Path.DirectorySeparatorChar}Cancellation{Path.DirectorySeparatorChar}",
+            StringComparison.Ordinal);
+
+    /// <summary>Every <c>ubookit-</c> class the shipped views render, with the view that renders it.</summary>
     private static IReadOnlyList<(string View, string Class)> RenderedClasses()
     {
         var found = new List<(string, string)>();
@@ -194,12 +236,73 @@ public class ClassVocabularyTests
     }
 
     [Fact]
+    public void A_view_outside_the_contract_really_is_outside_the_cascade()
+    {
+        // THE COUNTERPART TO THE EXEMPTION, and without it this is simply a line you can add to
+        // switch the button-hook rule off. `ModelReferences.StaticViews` was accepted in the
+        // previous round BECAUSE its own guard constrains what it exempts; this one had none.
+        //
+        // "Outside the cascade" is three facts about the view, all checkable: it sets its own
+        // layout to null, it links no stylesheet, and it pulls in no shared styles partial. A view
+        // that did any of those would be reachable by a site's CSS, and exempting it would be
+        // hiding a contract class rather than recording a page that has none.
+        var exempted = RepoFiles.Paths(ViewsRoot, "*.cshtml").Where(OutsideTheStylingContract).ToList();
+
+        Assert.NotEmpty(exempted);
+
+        foreach (var path in exempted)
+        {
+            var source = File.ReadAllText(path);
+            var name = Path.GetFileName(path);
+
+            // The view's NAME travels in the failure messages rather than in an assertion of its
+            // own. `Assert.NotEqual(string.Empty, name)` could never fail — a filler assertion
+            // inside a guard whose entire subject is assertions that cannot fail, which is the
+            // shape this change has now produced five times.
+            Assert.True(
+                source.Contains("Layout = null", StringComparison.Ordinal),
+                $"{name} is exempted from the styling contract but does not set Layout = null.");
+
+            Assert.False(
+                source.Contains("<link", StringComparison.OrdinalIgnoreCase),
+                $"{name} is exempted from the styling contract but links a stylesheet, so a site's "
+                + "CSS reaches it after all.");
+
+            Assert.False(
+                source.Contains("_Styles", StringComparison.Ordinal),
+                $"{name} is exempted from the styling contract but pulls in the shared styles partial.");
+
+            // AND IT EMITS NO CLASS AT ALL — not merely no `ubookit-` one.
+            //
+            // `default-frontend` says the vocabulary "continues to describe, exactly and
+            // completely, whatever the package itself renders". These ARE the package's own views,
+            // so ANY class here is a class the package renders and the vocabulary does not
+            // describe: the sibling requirement is falsified by `cancel-booking` exactly as it
+            // would be by `ubookit-booking`. Dropping the prefix answered "does this read as a
+            // contract class?" and left "is it in the contract?" unanswered.
+            //
+            // A guard forbidding only the prefix therefore passed while the thing it existed to
+            // prevent was true — the shape this change has now produced six times. The classes are
+            // gone rather than renamed again, because no stylesheet can reach this page, so they
+            // were hooks for nothing.
+            Assert.False(
+                source.Contains("class=", StringComparison.OrdinalIgnoreCase),
+                $"{name} is exempted from the styling contract but renders a class, which the "
+                + "published vocabulary then does not describe.");
+        }
+    }
+
+    [Fact]
     public void The_layout_hooks_are_on_every_field_and_every_submit_control()
     {
         // Pinned counts, so removing a hook fails rather than quietly leaving a row
         // or a button unstyleable. Eight fields: five in _DateAndLength — including
         // the two wrappers that stand in when a control is replaced by settled text —
-        // and three in _YourDetails. Three submit controls, one per step.
+        // and three in _YourDetails. Three submit controls, one per booking step.
+        //
+        // The cancellation page's button is deliberately NOT among them: that page is outside the
+        // styling contract (see OutsideTheStylingContract), so a layout hook on it would be a hook
+        // no stylesheet can use — which is the claim QA found to be false.
         var classes = RenderedClasses();
 
         Assert.Equal(8, classes.Count(found => found.Class == "ubookit-field"));
@@ -209,6 +312,7 @@ public class ClassVocabularyTests
         // button added later without one fails here.
         var buttons = RepoFiles
             .Paths(ViewsRoot, "*.cshtml")
+            .Where(path => !OutsideTheStylingContract(path))
             .Sum(path => Regex.Matches(File.ReadAllText(path), @"<button\b").Count);
 
         Assert.Equal(3, buttons);

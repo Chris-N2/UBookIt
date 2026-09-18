@@ -1,3 +1,4 @@
+using System.Runtime.CompilerServices;
 using UBookIt.Core;
 using UBookIt.Core.Availability;
 using UBookIt.Core.Bookings;
@@ -495,6 +496,31 @@ public static class ResolutionResultExtensions
 
         return Assert.Single(result.Value).Candidates;
     }
+}
+
+/// <summary>
+/// A cancellation-secret store that refuses to be used.
+/// </summary>
+/// <remarks>
+/// Every handler built with it is built with self-service cancellation OFF, so reaching this store
+/// means the feature ran when it was disabled — which is the defect, not a detail. Throwing says so
+/// at the call site rather than letting a silent no-op pass for correct behaviour.
+/// </remarks>
+public sealed class NoCancellationSecrets : ICancellationSecretStore
+{
+    private static InvalidOperationException Unexpected([CallerMemberName] string member = "")
+        => new($"Self-service cancellation is off, yet the handler reached {member} on the secret store.");
+
+    public Task IssueAsync(
+        Guid bookingId, string hash, DateTimeOffset expiresUtc, CancellationToken cancellationToken = default)
+        => throw Unexpected();
+
+    public Task<CancellationSecretRecord?> FindAsync(string hash, CancellationToken cancellationToken = default)
+        => throw Unexpected();
+
+    public Task<Guid?> TryRedeemAsync(
+        string hash, DateTimeOffset nowUtc, CancellationToken cancellationToken = default)
+        => throw Unexpected();
 }
 
 public static class TestData

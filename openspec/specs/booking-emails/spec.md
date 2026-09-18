@@ -156,17 +156,39 @@ reference and the time without it. The reference and the time are the parts a pe
 reconstruct for themselves; withholding them because a name could not be resolved would be the
 wrong trade.
 
+**Where a cancellation link has been issued for the booking, the message SHALL carry it, and SHALL
+say that it is the means of cancelling.** A link a reader discards because nothing told them what it
+was for is a link they do not have when they need it, and the `self-service-cancellation` capability
+issues each one exactly once, through this message and no other route.
+
+**A message SHALL be sent whether or not a link exists**, and its absence SHALL mean exactly that —
+no self-service cancellation is available for this booking — rather than that one was expected and
+could not be built. A link is absent where the feature is off, and for a message about a booking
+that can no longer be cancelled this way.
+
+**Times, the reference and the link SHALL NOT be reconstructed by any other message.** Where a
+booking produces more than one message to its booker, only the message that carries a newly issued
+link states one; a later message SHALL NOT restate a link, because restating it would put the same
+single-use credential into a second mailbox copy without the reader being able to tell which is
+live.
+
 **Everything above describes the messages the package composes.** Where a site supplies its own
 content for a message — see the `email-templates` capability — the words are the site's, and so is
 their accuracy: the package SHALL NOT claim that supplied content states the booking's state
-correctly, presents the reference in the quotable form, or expresses times in any particular zone.
+correctly, presents the reference in the quotable form, expresses times in any particular zone, or
+carries the cancellation link.
 
 *This is a narrowing, not a lowering, and it is the same reasoning the accessibility narrowing
 records: we do not take responsibility for text we did not write. It is honest rather than an
 escape hatch because of what the package still supplies — the model a supplied view receives
-carries the booking's state, the reference in its quotable form, and instants already converted
-to the booking's own zone, so a correct message is what an author gets by rendering what they were
-given. The package makes accuracy available; it cannot make it compulsory.*
+carries the booking's state, the reference in its quotable form, instants already converted
+to the booking's own zone, and the cancellation link where one exists, so a correct message is what
+an author gets by rendering what they were given. The package makes accuracy available; it cannot
+make it compulsory.*
+
+*A site whose own content omits the link leaves its bookers without the self-service route, and that
+is the site's decision to make. The package SHALL NOT compensate by sending a second message, which
+would be the package overriding a choice a site made deliberately.*
 
 **The narrowing reaches supplied content and nothing else.** For every message a site has not
 supplied content for — which is all of them until it does — this requirement holds exactly as
@@ -199,6 +221,18 @@ written above.
 #### Scenario: What the package still supplies to a supplied view
 - **WHEN** a site supplies content for a message
 - **THEN** what it is given includes the booking's state, the reference in its quotable form, and the interval already expressed in the booking's own time zone
+
+#### Scenario: The link is carried and explained
+- **WHEN** a message is composed for a booking that has been issued a cancellation link
+- **THEN** the message carries the link and states that it is the means of cancelling the booking
+
+#### Scenario: A message without a link is still sent
+- **WHEN** a message is composed for a booking that has been issued no cancellation link
+- **THEN** the message is sent, carrying everything else it is due, and states nothing about cancelling this way
+
+#### Scenario: A later message does not restate the link
+- **WHEN** a booking that was issued a cancellation link produces a further message to its booker
+- **THEN** that message does not carry the link
 
 ### Requirement: A message to the site's own people carries no personal data
 

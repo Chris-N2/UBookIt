@@ -442,6 +442,9 @@ public class BookingEmailTests
             Composer(renderer: new HtmlDeclaringRenderer()),
             NoResponsibility.Instance,
             new StubHostingEnvironment(),
+            new SelfServiceCancellationSettings(),
+            new NoCancellationSecrets(),
+            TimeProvider.System,
             NullLogger<BookingEmailHandler>.Instance);
 
         await handler.HandleAsync(new BookingPlacedNotification(Booking()), CancellationToken.None);
@@ -625,6 +628,9 @@ public class BookingEmailTests
             Composer(resourceThrows: true),
             NoResponsibility.Instance,
             new StubHostingEnvironment(),
+            new SelfServiceCancellationSettings(),
+            new NoCancellationSecrets(),
+            TimeProvider.System,
             NullLogger<BookingEmailHandler>.Instance);
 
         await handler.HandleAsync(
@@ -749,7 +755,15 @@ public class BookingEmailTests
         // What actually happens when they book.
         var sender = new RecordingEmailSender { CanSend = hostCanSendMail };
         var handler = new BookingEmailHandler(
-            settings, sender, Composer(), NoResponsibility.Instance, new StubHostingEnvironment(), NullLogger<BookingEmailHandler>.Instance);
+            settings,
+            sender,
+            Composer(),
+            NoResponsibility.Instance,
+            new StubHostingEnvironment(),
+            new SelfServiceCancellationSettings(),
+            new NoCancellationSecrets(),
+            TimeProvider.System,
+            NullLogger<BookingEmailHandler>.Instance);
 
         await handler.HandleAsync(new BookingPlacedNotification(Booking()), CancellationToken.None);
 
@@ -777,7 +791,15 @@ public class BookingEmailTests
 
         var sender = new RecordingEmailSender();
         var handler = new BookingEmailHandler(
-            settings, sender, Composer(), NoResponsibility.Instance, new StubHostingEnvironment(), NullLogger<BookingEmailHandler>.Instance);
+            settings,
+            sender,
+            Composer(),
+            NoResponsibility.Instance,
+            new StubHostingEnvironment(),
+            new SelfServiceCancellationSettings(),
+            new NoCancellationSecrets(),
+            TimeProvider.System,
+            NullLogger<BookingEmailHandler>.Instance);
 
         await handler.HandleAsync(new BookingPlacedNotification(Booking()), CancellationToken.None);
 
@@ -809,6 +831,9 @@ public class BookingEmailTests
             Composer(),
             responsibility ?? NoResponsibility.Instance,
             new StubHostingEnvironment(),
+            new SelfServiceCancellationSettings(),
+            new NoCancellationSecrets(),
+            TimeProvider.System,
             NullLogger<BookingEmailHandler>.Instance);
 
         booking ??= Booking();
@@ -865,6 +890,13 @@ public class BookingEmailTests
         services.AddSingleton<IEmailSender>(sender);
         services.AddSingleton<UBookIt.Persistence.Responsibility.IResponsibleRecipientResolver>(NoResponsibility.Instance);
         services.AddSingleton<IHostingEnvironment>(new StubHostingEnvironment());
+
+        // Self-service cancellation OFF, which is what every assertion in this file assumes: the
+        // send path under test is the one a site has without the feature. NoCancellationSecrets
+        // throws if it is ever reached, so "off" is verified rather than presumed.
+        services.AddSingleton(new SelfServiceCancellationSettings());
+        services.AddSingleton<ICancellationSecretStore>(new NoCancellationSecrets());
+        services.AddSingleton(TimeProvider.System);
         services.AddSingleton<BookingMessageComposer>();
         services.AddSingleton<BookingEmailHandler>();
 
@@ -953,6 +985,9 @@ public class BookingEmailTests
             Composer(),
             NoResponsibility.Instance,
             new StubHostingEnvironment(),
+            new SelfServiceCancellationSettings(),
+            new NoCancellationSecrets(),
+            TimeProvider.System,
             NullLogger<BookingEmailHandler>.Instance);
 
         booking ??= Booking(direct: true);

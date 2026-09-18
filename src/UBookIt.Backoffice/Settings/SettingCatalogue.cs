@@ -1,5 +1,6 @@
 using System.Diagnostics.CodeAnalysis;
 using UBookIt.Persistence.Composing;
+using UBookIt.Core;
 
 namespace UBookIt.Backoffice.Settings;
 
@@ -105,6 +106,16 @@ public static class SettingCatalogue
     public const string DeliveryApiEnablePlacementKey = "UBookIt:DeliveryApi:EnablePlacement";
 
     /// <summary>
+    /// Whether a booker may cancel their own booking from the link in their message.
+    /// </summary>
+    /// <remarks>
+    /// Spelled here rather than referenced from <c>SelfServiceCancellationSettings</c> for the
+    /// same reason the delivery API keys are: the backoffice assembly does not reference the Web
+    /// one, and a guard holds the two spellings equal so they cannot drift.
+    /// </remarks>
+    public const string SelfServiceCancellationEnabledKey = "UBookIt:SelfServiceCancellation:Enabled";
+
+    /// <summary>
     /// Every setting the screen knows about, in the order it presents them: what an operator
     /// decides first, then what they are shown but do not decide.
     /// </summary>
@@ -150,7 +161,50 @@ public static class SettingCatalogue
 
         new(DeliveryApiEnablePlacementKey,
             SettingTier.ReadOnly, SettingValueKind.Boolean, RequiresRestart: true),
+
+        // Read-only for the SAME reason as the two above, and it is the exposure reason rather
+        // than a judgement about operators: this opens a route that cancels a site's bookings for
+        // a caller the package cannot identify beyond a secret. Restart-bound for the same reason
+        // too — the route is removed from the application model while it is being built, so a
+        // runtime toggle would not merely be unwise, it would not work.
+        new(SelfServiceCancellationEnabledKey,
+            SettingTier.ReadOnly, SettingValueKind.Boolean, RequiresRestart: true),
     ];
+
+    /// <summary>
+    /// Why a setting cannot take effect given the rest of the configuration, or <c>null</c>.
+    /// </summary>
+    /// <remarks>
+    /// <b>Stated here rather than computed in the client</b>, because the reason involves another
+    /// setting and a client that assembled the sentence would be a second place for the
+    /// explanation to drift from the behaviour it describes.
+    /// <para>
+    /// Only self-service cancellation has one today. It is deliberately not generalised into a
+    /// dependency graph: one case is not a pattern, and inventing the abstraction now would guess
+    /// at the shape of cases that do not exist.
+    /// </para>
+    /// </remarks>
+    public static string? UnmetDependency(
+        string key, SiteBookingSettings effective, SelfServiceCancellationSettings cancellation)
+    {
+        if (!string.Equals(key, SelfServiceCancellationEnabledKey, StringComparison.Ordinal))
+        {
+            return null;
+        }
+
+        // BOTH CONDITIONS, and the first one is the one that was missing. A note saying "this has
+        // no effect while booker emails are off" beside a feature that is ITSELF off states a
+        // reason that is not the reason — the feature is doing nothing because nobody turned it
+        // on. A readout naming the wrong cause is the same defect as one naming a configuration
+        // the site does not have, which is what this screen exists to avoid.
+        if (!cancellation.Enabled || effective.Notifications.SendBookerEmails)
+        {
+            return null;
+        }
+
+        return "This has no effect while booker emails are off: the cancellation link travels in "
+            + "the message sent to the booker, so where no message is sent there is no link.";
+    }
 
     /// <summary>
     /// The descriptor for <paramref name="key"/>, or <c>false</c> when the key is not a uBookIt

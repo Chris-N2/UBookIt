@@ -189,6 +189,59 @@ public static class ViewFixtures
         }
     }
 
+    /// <summary>A view that declares no model still needs something to render against.</summary>
+    private static readonly object NoModel = new();
+
+    /// <summary>
+    /// The states the cancellation page can be in — which are states of the BOOKING, since the
+    /// page has no other input.
+    /// </summary>
+    private static IEnumerable<(string State, CancellationPageModel Model)> CancellationStates()
+    {
+        var start = new DateTimeOffset(2026, 10, 15, 14, 0, 0, TimeSpan.Zero);
+
+        yield return ("service booking", new CancellationPageModel
+        {
+            Reference = "BJQ4-ZP5C",
+            LocalStart = start,
+            LocalEnd = start.AddHours(1),
+            TimeZoneId = "Europe/London",
+            ServiceName = "Massage",
+            ResourceNames = ["Meeting Room A"],
+        });
+
+        yield return ("booked directly, one resource", new CancellationPageModel
+        {
+            Reference = "DVNF-ZTHK",
+            LocalStart = start.AddDays(3).AddHours(2),
+            LocalEnd = start.AddDays(3).AddHours(3),
+            TimeZoneId = "Europe/London",
+            ServiceName = null,
+            ResourceNames = ["Meeting Room A"],
+        });
+
+        yield return ("several resources", new CancellationPageModel
+        {
+            Reference = "DXNG-Z7S4",
+            LocalStart = start.AddDays(9).AddHours(-5),
+            LocalEnd = start.AddDays(9).AddHours(-3),
+            TimeZoneId = "Europe/London",
+            ServiceName = "Team day",
+            ResourceNames = ["Meeting Room A", "Meeting Room B"],
+        });
+
+        // What was booked could not be established — the same trade the booker's message makes.
+        yield return ("nothing nameable", new CancellationPageModel
+        {
+            Reference = "FMZH-36GB",
+            LocalStart = start.AddDays(21).AddMinutes(45),
+            LocalEnd = start.AddDays(21).AddMinutes(105),
+            TimeZoneId = "Europe/London",
+            ServiceName = null,
+            ResourceNames = [],
+        });
+    }
+
     private static IEnumerable<ViewCase> Build()
     {
         foreach (var partial in new[]
@@ -234,6 +287,21 @@ public static class ViewFixtures
                     break;
             }
         }
+
+        // THE CANCELLATION PAGES. Standalone documents, so they reach rule 1 directly rather than
+        // through a flow view that includes them.
+        //
+        // The states are the ones that change what Index renders: a service booking names a
+        // service, a direct one does not, and a multi-resource booking lists more than one name.
+        // The other two pages take no model at all — see ModelReferences.StaticViews for why
+        // that is the guarantee rather than an omission.
+        foreach (var (state, model) in CancellationStates())
+        {
+            yield return new ViewCase(ViewInventory.CancellationIndex, state, model);
+        }
+
+        yield return new ViewCase(ViewInventory.CancellationCancelled, "cancelled", NoModel);
+        yield return new ViewCase(ViewInventory.CancellationUnusable, "unusable", NoModel);
 
         yield return new ViewCase(ViewInventory.Catalogue, "two entries", new CatalogueModel
         {

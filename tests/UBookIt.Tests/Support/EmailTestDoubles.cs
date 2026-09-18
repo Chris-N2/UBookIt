@@ -9,10 +9,21 @@ namespace UBookIt.Tests.Support;
 /// Shared doubles for the email send path, extracted from <c>BookingEmailTests</c> when
 /// the responsibility gate tests needed the same recording sender and hosting stub.
 /// </summary>
-internal sealed class StubHostingEnvironment(string applicationUrl = "https://site.example/")
+internal sealed class StubHostingEnvironment(string? applicationUrl = "https://site.example/")
     : IHostingEnvironment
 {
-    public Uri ApplicationMainUrl { get; } = new(applicationUrl);
+    /// <summary>
+    /// The site's own address, or <c>null</c> where Umbraco has not resolved one.
+    /// </summary>
+    /// <remarks>
+    /// <b>Null is a real state, which is why this stub can express it.</b> Umbraco declares
+    /// <see cref="IHostingEnvironment.ApplicationMainUrl"/> non-nullable and backs it with a
+    /// null-forgiving field that stays null until the application URL is resolved — from
+    /// configuration, or from an observed request. A site that has configured neither and has not
+    /// yet served one has no address to give out, and the package's link builders check for it.
+    /// A stub that could not be null would leave that branch untestable.
+    /// </remarks>
+    public Uri ApplicationMainUrl { get; } = applicationUrl is null ? null! : new Uri(applicationUrl);
 
     public string SiteName => "Test";
 

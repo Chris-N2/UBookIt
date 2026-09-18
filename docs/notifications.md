@@ -221,6 +221,34 @@ placement, and a **requested** one on a site that requires approval.
 `InternalMessageModel` adds `AwaitsApproval` and `BackofficeUrl` — and **carries no booker name,
 address or telephone number at all**, deliberately. See below.
 
+#### `CancellationUrl` — and what happens if your view leaves it out
+
+Where self-service cancellation is on, `BookerMessageModel.CancellationUrl` carries the link that
+cancels the booking. It is a complete address, ready to render:
+
+```razor
+@if (Model.CancellationUrl is not null)
+{
+    <p>
+        If you need to cancel this booking, use this link — you will need it, and it is the
+        only one you will be sent:
+        <a href="@Model.CancellationUrl">@Model.CancellationUrl</a>
+    </p>
+}
+```
+
+**`null` means there is no self-service cancellation for this booking**, not that one was expected
+and could not be built. It is null on a site with the feature off, on a site whose own address
+Umbraco has not resolved, and on **every message except the one that issued the link** — the
+placement message. A later confirmation or cancellation message does not restate it, because a
+single-use credential sitting in two mailbox copies leaves the reader nothing to tell them which is
+live.
+
+**If you supply your own view and omit it, your bookers have no self-service route.** The package
+will not compensate by sending a second message: that would be overriding a choice you made. This is
+the same narrowing that applies to everything else a supplied view says — the words are yours, and
+so is their completeness.
+
 #### HTML means no plain-text alternative
 
 If you set `IsHtml = true`, the message is sent as HTML **and nothing else**. There is no

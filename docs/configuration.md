@@ -65,11 +65,69 @@ Shown on the settings screen so you can see what is in effect, never editable th
 | `UBookIt:MaxQueryRangeDays` | int | `31` | **Cost.** A guardrail on availability queries, which walk their range day by day. Too high does not look broken; it just makes the site slower. |
 | `UBookIt:DeliveryApi:EnableReads` | bool | `false` | **Exposure, and restart-bound.** Decided while the application starts — a disabled direction is *absent*, not refused. |
 | `UBookIt:DeliveryApi:EnablePlacement` | bool | `false` | As above, for anonymous booking placement. |
+| `UBookIt:SelfServiceCancellation:Enabled` | bool | `false` | **Exposure, and restart-bound.** Opens a public route that cancels bookings for a caller identified only by a secret. Like the delivery API's switches, it is decided while the application starts, so a disabled feature has no route at all. |
 | `UBookIt:Frontend:PreservedQueryParameters` | string[] | empty | A developer's setting about their own page's URLs. Not presented at all. |
 
-The delivery API settings are **restart-bound**: changing them takes effect when the site restarts.
-The other two take effect immediately, and are read-only for policy reasons rather than technical
-ones — the screen distinguishes the two cases.
+The delivery API settings and self-service cancellation are **restart-bound**: changing them takes
+effect when the site restarts. The other two take effect immediately, and are read-only for policy
+reasons rather than technical ones — the screen distinguishes the two cases.
+
+### Self-service cancellation
+
+With `UBookIt:SelfServiceCancellation:Enabled` set to `true`, the message sent to a booker when they
+place a booking carries a link that cancels it. Following the link shows which booking it is —
+reference, when, and what was booked — and asks for confirmation; cancelling happens on that
+confirmation, never on merely opening the link, because mail scanners open every link in a message
+before a person reads it.
+
+**It needs `UBookIt:Notifications:SendBookerEmails` to be on**, and that is mechanical rather than a
+second rule: the link travels in the booker's message, so where no message is sent there is no
+vehicle and no link. Turning the feature on without booker emails does nothing, and the settings
+screen says so rather than showing it as working.
+
+**Three things are worth knowing before you turn it on:**
+
+- **The link is the credential.** Anyone holding it can cancel that booking, so it is as sensitive
+  as the mailbox it was sent to. It is single use, and it stops working when the booking starts.
+- **A booker cannot cancel a booking that has already started.** An operator still can, from the
+  backoffice — that is ordinary no-show tidying, and the two routes deliberately differ.
+- **Turning it off later strands anyone still holding a link.** New links stop being issued and the
+  route stops being served, so an outstanding link stops working. The fallback is the position
+  before the feature existed: the booker contacts you. Worth timing that change for a quiet period
+  rather than mid-season.
+- **Moving a booking does not move its cancellation link.** The link stops working at the time the
+  booking had when the link was sent. Move a booking *later* — Monday to Friday — and the booker's
+  link stops working on the Monday, days before the booking itself, telling them only that the link
+  can no longer be used. Move it *earlier* and the link stops working at the new, earlier time,
+  which is the harmless direction.
+
+  This is deliberate: a link already sitting in somebody's inbox must not have its life quietly
+  extended by a later change, and re-issuing on a move would put a second live link in the same
+  mailbox with nothing to tell the reader which one counts. **If you move a booking significantly
+  later, tell the booker they will need to contact you to cancel it.** uBookIt does not currently
+  send a replacement link.
+- **The link's secret is in the URL, so it reaches your web server's access logs.** uBookIt does not
+  write it anywhere itself — it is stored only as a one-way hash, and it is not in any uBookIt log
+  line — but IIS, Azure App Service, and any reverse proxy or CDN in front of your site record the
+  full request path verbatim, keep it for as long as you keep those logs, and show it to whoever can
+  read them. **Anyone holding that line can cancel that booking** until the link expires at the
+  booking's start.
+
+  This is stated rather than promised away because it is the kind of thing a site repeats to a
+  customer. If your logs are retained long-term or widely readable, treat the cancellation route as
+  a reason to review that. It is the same class of boundary as a mail server quoting an address into
+  an error log — see *Notifications* — and it is the one the package cannot close from inside.
+
+**The cancellation pages cannot be styled or themed.** They are standalone pages the package
+serves on its own route, outside your site's layout — so your stylesheet, your tokens and any theme
+you have installed do not reach them. They are plain, semantic HTML and work with no CSS at all,
+which is deliberate; they will look unstyled next to the rest of your site. If that matters to you,
+say so — giving them a route to your CSS is a real feature rather than an oversight, and it has not
+been designed yet.
+
+There is deliberately **no "email me a cancellation link" form**. A route that takes a booking
+reference and sends mail on a stranger's say-so would let anybody make the site write to a customer,
+and would tell an attacker which references are real by whether anything happened.
 
 **The active theme is not a setting and is not shown.** It has no configuration key: a site calls
 `AddUBookItTheme(...)` in its own composer. See [Theming](theming.md).

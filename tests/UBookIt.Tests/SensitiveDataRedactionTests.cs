@@ -440,6 +440,18 @@ public class SensitiveDataRedactionTests
         string[] recorded =
         [
             "BookingRow: BookerEmail,BookerErasedUtc,BookerName,BookerPhone,Claims,CreatedUtc,EndUtc,Id,MemberKey,Reference,ServiceId,ServiceName,StartUtc,Status,TimeZoneId",
+            // Decision, self-service-cancellation (roadmap 17.1.0): one row per outstanding
+            // cancellation secret. NOTHING HERE IS A CREDENTIAL and nothing here is personal data:
+            // a booking's identifier, a one-way HASH of the secret, two instants and a redemption
+            // flag. The secret itself is never written — it exists in the message sent to the
+            // booker and nowhere the package writes — so a database copy, a backup, or a person
+            // with read access holds nothing that can cancel a booking. That is the same reasoning
+            // that keeps booker contact details out of messages to a site's own recipients: a
+            // control built deliberately must not be reachable by a route around it.
+            //
+            // Because it names nobody, erasure does not reach this table, and `booker-erasure`
+            // records that consequence where an operator performing an erasure will meet it.
+            "CancellationSecretRow: BookingId,ExpiresUtc,Hash,IssuedUtc,RedeemedUtc",
             "ClaimRow: BookingId,Id,ResourceId",
             "ExceptionRow: Date,EndTime,Id,ResourceId,StartTime",
             // Decision, permissions-model (roadmap 0.10.0): a one-shot marker — an

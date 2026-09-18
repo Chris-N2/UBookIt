@@ -610,6 +610,9 @@ export default {
     deliveryApiEnablePlacementLabel: "Delivery API: booking placement",
     deliveryApiEnablePlacementDescription:
       "Whether anonymous booking placement is served. Changed in configuration only, for the same reason as reads.",
+    selfServiceCancellationEnabledLabel: "Let bookers cancel their own bookings",
+    selfServiceCancellationEnabledDescription:
+      "Whether the message sent to a booker carries a link that cancels their booking. Changed in configuration only — like the delivery API, it opens a public route, so it is decided as the application starts. The link is single use and stops working when the booking starts.",
   },
   ubookitResponsibility: {
     headline: "Responsibility",

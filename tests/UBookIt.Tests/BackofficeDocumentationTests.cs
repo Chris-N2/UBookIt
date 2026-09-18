@@ -202,7 +202,7 @@ public class BackofficeDocumentationTests
     }
 
     [Fact]
-    public void The_two_things_erasure_does_not_reach_are_documented()
+    public void The_limits_of_one_erasure_are_documented()
     {
         // The `booker-erasure` capability makes these normative — "What erasure does not reach
         // is documented" — with a scenario each, and a spec requirement discharged only by
@@ -218,6 +218,30 @@ public class BackofficeDocumentationTests
         DocumentationAssert.Says(docs, "It erases one booking, not a person");
         DocumentationAssert.Says(docs, "You can erase a booking that has not happened yet");
         DocumentationAssert.Says(docs, "unable to contact somebody who is going to turn up");
+    }
+
+    [Fact]
+    public void Erasure_not_withdrawing_a_cancellation_link_is_documented()
+    {
+        // `booker-erasure` → "What erasure does not reach is documented" gained a bullet in
+        // self-service-cancellation: erasure does NOT withdraw a cancellation link already issued.
+        //
+        // Named for what it asserts rather than for its position in a list — a counted name goes
+        // wrong the next time somebody adds a boundary, which is how its sibling came to be called
+        // "the two things" about a requirement that now has four.
+        //
+        // Every sibling boundary in that requirement has a guard; this one shipped without one,
+        // which QA found. A spec requirement discharged only by prose is discharged by nothing —
+        // somebody tidies the page, the suite stays green, and an operator answering a
+        // right-to-be-forgotten request is told erasure did more than it did.
+        //
+        // The failure is specific: the booker still holds a working link, cancels days later, and
+        // a booking that "belonged to nobody" changes state with no actor anyone can account for.
+        var docs = Docs();
+
+        DocumentationAssert.Says(docs, "Erasure does not withdraw a cancellation link already issued");
+        DocumentationAssert.Says(docs, "until it expires at the booking's start");
+        DocumentationAssert.Says(docs, "If you need the booking gone as well, cancel it yourself");
     }
 
     [Fact]

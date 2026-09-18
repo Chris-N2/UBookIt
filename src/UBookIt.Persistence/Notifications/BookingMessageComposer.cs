@@ -137,10 +137,28 @@ public sealed class BookingMessageComposer(
     /// to work out which is real.
     /// </param>
     /// <param name="cancellationToken">Cancels the resource read the message may need.</param>
+    public Task<BookingMessage> ForBookerAsync(
+        Booking booking,
+        BookingEvent bookingEvent,
+        BookingInterval? previousInterval,
+        CancellationToken cancellationToken = default)
+        => ForBookerAsync(booking, bookingEvent, previousInterval, cancellationUrl: null, cancellationToken);
+
+    /// <summary>
+    /// The booker's message, carrying the link that cancels the booking where one has been issued.
+    /// </summary>
+    /// <remarks>
+    /// <b><paramref name="cancellationUrl"/> is null wherever there is no self-service
+    /// cancellation</b> — the feature off, the site's address unresolved, or a message about a
+    /// booking that was not issued a link. Its absence means exactly that, and the message is sent
+    /// either way: the reference and the time are what a person cannot reconstruct, and withholding
+    /// them because a link could not be built would be the wrong trade.
+    /// </remarks>
     public async Task<BookingMessage> ForBookerAsync(
         Booking booking,
         BookingEvent bookingEvent,
         BookingInterval? previousInterval,
+        Uri? cancellationUrl,
         CancellationToken cancellationToken = default)
     {
         if (bookingEvent == BookingEvent.Moved && previousInterval is null)
@@ -169,6 +187,16 @@ public sealed class BookingMessageComposer(
         body.Append(Details(booking, what.Text))
             .AppendLine()
             .AppendLine(ClosingLineFor(booking, bookingEvent));
+
+        // NAMED AS THE MEANS OF CANCELLING, not left as a bare address. The secret is issued once
+        // and travels in this message alone, so a reader who discards it as decoration has no
+        // second copy — and telling them plainly is the cheapest thing that prevents it.
+        if (cancellationUrl is not null)
+        {
+            body.AppendLine()
+                .AppendLine("If you need to cancel this booking, use this link — you will need it, and it is the only one you will be sent:")
+                .AppendLine(cancellationUrl.AbsoluteUri);
+        }
 
         var fallback = new BookingMessage(subject, body.ToString());
 
@@ -211,6 +239,7 @@ public sealed class BookingMessageComposer(
             BookerPhone = contact.Phone,
             PreviousLocalStart = previousLocal?.Start,
             PreviousLocalEnd = previousLocal?.End,
+            CancellationUrl = cancellationUrl,
         };
 
         return await ApplyTemplateAsync(model, fallback, booking, cancellationToken).ConfigureAwait(false);

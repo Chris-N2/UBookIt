@@ -37,7 +37,13 @@ export function hasConsequence(setting: Pick<SettingResponseModel, "tier">): boo
  * screen did not render points assistive technology at nothing, which is its own defect.
  */
 export function describedByIds(
-  setting: Pick<SettingResponseModel, "key" | "tier" | "isOverridden">,
+  // `unmetDependency` is spelled structurally rather than taken from the generated model, so this
+  // function is usable before the client is regenerated against a running site — and so a caller
+  // that has not yet gained the member is a compile error about ITS type rather than about this
+  // signature.
+  setting: Pick<SettingResponseModel, "key" | "tier" | "isOverridden"> & {
+    unmetDependency?: string | null;
+  },
   options: { hasError: boolean },
 ): string[] {
   const base = `setting-${settingSlug(setting.key)}`;
@@ -45,6 +51,10 @@ export function describedByIds(
   return [
     `${base}-description`,
     hasConsequence(setting) ? `${base}-consequence` : undefined,
+    // BEFORE the override note and the error, because it is the one that explains why the value
+    // shown is not the behaviour the site has. A reader who never reaches it is left believing a
+    // setting is doing something it is not.
+    setting.unmetDependency ? `${base}-dependency` : undefined,
     setting.isOverridden ? `${base}-overridden` : undefined,
     options.hasError ? `${base}-error` : undefined,
   ].filter((id): id is string => id !== undefined);

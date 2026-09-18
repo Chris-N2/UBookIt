@@ -23,6 +23,37 @@ namespace UBookIt.Tests.Rendering.Support;
 public static class ModelReferences
 {
     /// <summary>
+    /// Views that refer to no model member because they <b>have no model</b>, with the reason.
+    /// </summary>
+    /// <remarks>
+    /// <para>
+    /// <b>A different category from <see cref="DelegatingViews"/>, and separated deliberately.</b>
+    /// A delegate hands its whole model to another view, and the guards check exactly that shape —
+    /// naming a static page there made the exemption's stated reason false, which the delegate
+    /// guard caught. Bending that category to fit would have disarmed the check that a named view
+    /// really is the harmless shape its exemption is written for.
+    /// </para>
+    /// <para>
+    /// A static page renders the same document every time, on purpose. That is a stronger claim
+    /// than "refers to nothing", and it is asserted rather than trusted: see
+    /// <c>ViewInventoryTests.A_static_view_really_is_static</c>.
+    /// </para>
+    /// </remarks>
+    public static IReadOnlyDictionary<string, string> StaticViews { get; } =
+        new Dictionary<string, string>(StringComparer.Ordinal)
+        {
+            ["~/Views/Cancellation/Cancelled.cshtml"] =
+                "it must say the same thing whatever booking was cancelled. Carrying a model would "
+                + "mean holding a booking's details after the credential that permitted reading "
+                + "them has been spent, and a back-button replay would then disclose them.",
+            ["~/Views/Cancellation/Unusable.cshtml"] =
+                "SAYING THE SAME THING IS THE GUARANTEE. Four causes converge here — expired, "
+                + "already redeemed, uncancellable, never issued — and a model would be the thing "
+                + "that let them start to differ, rebuilding the enumeration oracle this "
+                + "capability closed by never accepting a reference.",
+        };
+
+    /// <summary>
     /// Every form a Razor view can name a model member in:
     /// <c>Model.X</c>, <c>Model?.X</c>, and <c>Model!.X</c>.
     /// </summary>

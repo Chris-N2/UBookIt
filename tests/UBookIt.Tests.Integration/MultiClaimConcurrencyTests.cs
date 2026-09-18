@@ -294,6 +294,14 @@ public class MultiClaimConcurrencyTests(SqlServerFixture fixture)
                 // NOT touch the claims table, or any existing table: the migration is a single
                 // CreateTable and alters and drops nothing.
                 "20260915172610_AddSettings",
+
+                // self-service-cancellation: creates uBookItCancellationSecret, one row per
+                // outstanding cancellation secret (booking id, a one-way HASH of the secret, two
+                // instants, a redemption flag). Confirmed against the rule above — a single
+                // CreateTable plus one index on its own table; it neither references nor alters
+                // uBookItResourceClaim or uBookItBooking, so the concurrency guarantee this test
+                // exists for is untouched.
+                "20260918132340_AddCancellationSecrets",
             ],
             applied.OrderBy(name => name, StringComparer.Ordinal));
 

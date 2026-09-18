@@ -93,6 +93,32 @@ namespace UBookIt.Persistence.Migrations
                     b.ToTable("uBookItBooking", (string)null);
                 });
 
+            modelBuilder.Entity("UBookIt.Persistence.Entities.CancellationSecretRow", b =>
+                {
+                    b.Property<string>("Hash")
+                        .HasMaxLength(64)
+                        .HasColumnType("nchar(64)")
+                        .IsFixedLength();
+
+                    b.Property<Guid>("BookingId")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<DateTimeOffset>("ExpiresUtc")
+                        .HasColumnType("datetimeoffset");
+
+                    b.Property<DateTimeOffset>("IssuedUtc")
+                        .HasColumnType("datetimeoffset");
+
+                    b.Property<DateTimeOffset?>("RedeemedUtc")
+                        .HasColumnType("datetimeoffset");
+
+                    b.HasKey("Hash");
+
+                    b.HasIndex("BookingId");
+
+                    b.ToTable("uBookItCancellationSecret", (string)null);
+                });
+
             modelBuilder.Entity("UBookIt.Persistence.Entities.ClaimRow", b =>
                 {
                     b.Property<long>("Id")
