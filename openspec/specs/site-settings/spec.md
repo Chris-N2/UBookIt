@@ -75,7 +75,8 @@ Each setting SHALL belong to exactly one tier, declared once by the server:
   `UBookIt:Notifications:InternalRecipients`, `UBookIt:PrivacyPolicyUrl`.
 - **Editable with a stated consequence** — `UBookIt:TimeZoneId`.
 - **Read-only** — `UBookIt:RetentionDays`, `UBookIt:MaxQueryRangeDays`,
-  `UBookIt:DeliveryApi:EnableReads`, `UBookIt:DeliveryApi:EnablePlacement`.
+  `UBookIt:DeliveryApi:EnableReads`, `UBookIt:DeliveryApi:EnablePlacement`,
+  `UBookIt:SelfServiceCancellation:Enabled`.
 
 **`UBookIt:Frontend:PreservedQueryParameters` is deliberately not presented either.** It is a
 developer's setting about their own page's URLs — which query parameters the shipped forms carry
@@ -96,6 +97,11 @@ boundary exists to keep irreversible erasure and the package's anonymous exposur
 operator's reach, and a boundary the client alone holds is reachable by anyone who can call the
 endpoint.
 
+**`UBookIt:SelfServiceCancellation:Enabled` is read-only for the anonymous-exposure reason**, and
+not because an operator would judge it badly. It opens a route that cancels a site's bookings for a
+caller the package cannot identify beyond a secret, which is the same class of decision as whether
+the delivery API answers at all.
+
 **No editable setting SHALL be capable of destroying data**, and this SHALL be a property of which
 settings are editable rather than of any warning shown. `UBookIt:RetentionDays` is read-only for
 this reason: erasure is irreversible, its effect is deferred to a later sweep rather than visible
@@ -103,6 +109,14 @@ when the value is saved, and an accurate warning would have to compute a count t
 
 The read-only settings that cannot take effect without an application restart SHALL be shown as
 such, distinguished from those that are read-only by policy alone.
+
+**A setting whose effect depends on another setting SHALL be shown with that dependency stated when
+the dependency is not met.** `UBookIt:SelfServiceCancellation:Enabled` has no effect while
+`UBookIt:Notifications:SendBookerEmails` is off, because the cancellation link travels in the
+booker's message and there is then no message; the screen SHALL say so rather than presenting the
+feature as on and working. **Presenting a setting as enabled while the site's configuration prevents
+it from doing anything would be a readout describing a configuration the site does not have** —
+which is the failure this screen exists to avoid.
 
 #### Scenario: A read-only setting cannot be written
 - **WHEN** a write is submitted for a read-only setting by a user holding the settings verb
@@ -119,6 +133,14 @@ such, distinguished from those that are read-only by policy alone.
 #### Scenario: The theme is absent from the settings entirely
 - **WHEN** the settings are presented
 - **THEN** no theme setting appears, neither editable nor read-only
+
+#### Scenario: Self-service cancellation is read-only and restart-bound
+- **WHEN** the settings are presented
+- **THEN** self-service cancellation is shown as read-only and as requiring a restart, and no path through the screen stores a value for it
+
+#### Scenario: An unmet dependency is stated
+- **WHEN** the settings are presented on a site where self-service cancellation is enabled and booker emails are off
+- **THEN** the screen states that the feature cannot run, and that it needs booker emails
 
 ### Requirement: The screen shows what a stored value is overriding, and can restore it
 

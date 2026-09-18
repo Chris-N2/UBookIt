@@ -28,13 +28,18 @@ public class ClassVocabularyTests
     /// <b>The cancellation pages are standalone documents the package serves itself.</b> They set
     /// <c>Layout = null</c>, link no stylesheet and are not composed into a site's page, so
     /// <b>nothing a site writes can reach them</b> — no host layout, no cascade, no token override.
-    /// Their class attributes are internal markup hooks, NOT part of the published vocabulary.
+    /// <b>So they render no classes at all</b>, and the published vocabulary still describes,
+    /// exactly and completely, everything the package renders.
     /// <para>
     /// They were briefly added to that vocabulary under a comment saying "a site styling the flow
     /// can style these too". QA established that was false, and it is the same shape as the defect
     /// this change already caught itself on: a readout describing something the site does not have.
-    /// Recorded as a removal rather than left silent, so a reader can tell a decision from an
-    /// oversight.
+    /// The first correction dropped the <c>ubookit-</c> prefix, which answered the wrong question —
+    /// a class named <c>cancel-booking</c> is still a class this package renders, so
+    /// <c>default-frontend</c>'s "exactly and completely" was false either way. The sync-time sweep
+    /// caught that; the guard written for the first correction did not, because it forbade the
+    /// prefix rather than the thing. Recorded as a removal rather than left silent, so a reader can
+    /// tell a decision from an oversight.
     /// </para>
     /// <para>
     /// They are also outside the theme-view set — a theme RCL supplies views under
@@ -267,14 +272,23 @@ public class ClassVocabularyTests
                 source.Contains("_Styles", StringComparison.Ordinal),
                 $"{name} is exempted from the styling contract but pulls in the shared styles partial.");
 
-            // AND IT EMITS NO CONTRACT-SHAPED CLASS. Every other `ubookit-*` class in the package
-            // is part of the published vocabulary, so one here would be indistinguishable from a
-            // contract class to anyone reading the page source — while being reachable by nothing.
+            // AND IT EMITS NO CLASS AT ALL — not merely no `ubookit-` one.
+            //
+            // `default-frontend` says the vocabulary "continues to describe, exactly and
+            // completely, whatever the package itself renders". These ARE the package's own views,
+            // so ANY class here is a class the package renders and the vocabulary does not
+            // describe: the sibling requirement is falsified by `cancel-booking` exactly as it
+            // would be by `ubookit-booking`. Dropping the prefix answered "does this read as a
+            // contract class?" and left "is it in the contract?" unanswered.
+            //
+            // A guard forbidding only the prefix therefore passed while the thing it existed to
+            // prevent was true — the shape this change has now produced six times. The classes are
+            // gone rather than renamed again, because no stylesheet can reach this page, so they
+            // were hooks for nothing.
             Assert.False(
-                source.Contains("ubookit-", StringComparison.Ordinal)
-                || source.Contains("class=\"ubookit\"", StringComparison.Ordinal),
-                $"{name} emits a ubookit- class, which reads as a contract class to anyone looking "
-                + "at the page source while being reachable by no stylesheet.");
+                source.Contains("class=", StringComparison.OrdinalIgnoreCase),
+                $"{name} is exempted from the styling contract but renders a class, which the "
+                + "published vocabulary then does not describe.");
         }
     }
 

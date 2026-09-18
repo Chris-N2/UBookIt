@@ -115,6 +115,17 @@ member SHALL be absent for every message that is not a move, and its absence SHA
 that — this message is not about a move — rather than "not recorded". A view written before the
 member existed renders unchanged.
 
+**The booker's model likewise gains the cancellation link**, on the same terms. It SHALL be absent
+wherever no link has been issued — which is every message on a site with the feature off, and every
+message about a booking that can no longer be cancelled this way — and its absence SHALL mean
+exactly that: **there is no self-service cancellation for this booking**, rather than that a link
+was expected and could not be built. A view written before the member existed renders unchanged.
+
+**The link SHALL be supplied as a complete address the view can render without assembling it.**
+Unlike an instant, a link has no presentational choice worth leaving to an author: a view that had
+to build one from parts could build a wrong one, and a wrong cancellation link is indistinguishable
+from a working one until a customer needs it.
+
 **A model SHALL expose structure rather than pre-composed text** wherever a view might reasonably
 present it differently. Specifically: what was booked SHALL be available as the service's recorded
 name and as the **collection** of resource names, not as a single joined string; and the booking's
@@ -125,7 +136,8 @@ booking's zone, never formatted strings.
 
 **The package converts, the view formats.** Converting is the package's because the zone rule is a
 guarantee it already makes and getting it wrong is a real defect; formatting is the view's because
-presentation is the author's.
+presentation is the author's. *The cancellation link is the stated exception to the second half:
+there is nothing to format, only an address to render or omit.*
 
 **The models SHALL read as a vocabulary of the facts about a booking**, because a later
 editor-facing feature would expose exactly these as the values an editor may reference. Nothing in
@@ -150,6 +162,14 @@ this capability SHALL assume a supplied view is the only possible source of cont
 #### Scenario: The view chooses the format
 - **WHEN** two views render the same booking with different date formatting
 - **THEN** both are possible without the package changing, because what is supplied is an instant rather than a formatted string
+
+#### Scenario: The cancellation link arrives ready to render
+- **WHEN** a view renders a message for a booking that has been issued a cancellation link
+- **THEN** the link is available as a complete address, with nothing for the view to assemble
+
+#### Scenario: The link is absent where there is none
+- **WHEN** a view renders a message for a booking with no self-service cancellation
+- **THEN** the cancellation-link member is absent, and a view written before it existed renders exactly as before
 
 ### Requirement: The model for the site's own recipients cannot express a booker's contact details
 The model passed to a view for the **site's own recipients** SHALL have **no member carrying the

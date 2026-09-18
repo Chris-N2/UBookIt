@@ -27,10 +27,10 @@
     <title>Cancel your booking</title>
 </head>
 <body>
-    <main class="cancel">
+    <main>
         <h1>Cancel this booking?</h1>
 
-        <dl class="cancel-booking">
+        <dl>
             <dt>Reference</dt>
             <dd>@Model.Reference</dd>
 
@@ -43,7 +43,7 @@
                 <time datetime="@Model.LocalEnd.ToString("o")">
                     @Model.LocalEnd.ToString("HH:mm")
                 </time>
-                <span class="cancel-zone">(@zone)</span>
+                <span>(@zone)</span>
             </dd>
 
             @if (!string.IsNullOrWhiteSpace(Model.ServiceName))
@@ -56,7 +56,7 @@
             {
                 <dt>@(Model.ResourceNames.Count == 1 ? "Resource" : "Resources")</dt>
                 <dd>
-                    <ul class="cancel-resources">
+                    <ul>
                         @foreach (var name in Model.ResourceNames)
                         {
                             <li>@name</li>

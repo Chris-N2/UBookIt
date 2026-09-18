@@ -285,10 +285,54 @@ public class BranchReachabilityTests
 
         Assert.All(ViewInventory.All, view =>
         {
-            if (!ModelReferences.DelegatingViews.ContainsKey(view))
+            if (!ModelReferences.DelegatingViews.ContainsKey(view) && !RendersNoHooks(view))
             {
                 Assert.NotEmpty(LiteralsOf(view));
             }
         });
+
+        // AND THE EXEMPTED SET IS ENUMERATED, like every other exemption in this file.
+        //
+        // Asserting that an exempted view has no literals would restate `RendersNoHooks`'
+        // own definition and could not fail — the control shape this change has produced
+        // repeatedly. What can fail, and is worth failing, is a FOURTH view quietly joining the
+        // set: a flow view whose hooks were removed would stop being checked by rule 3 and nothing
+        // else would say so.
+        //
+        // Scoped to non-delegating views, because the three BookingFlow entry views render no
+        // hooks either — they delegate — and were already skipped by the clause above. Listing them
+        // here would say the cancellation pages and the delegating views are the same kind of
+        // thing, which they are not.
+        Assert.Equal(
+            [
+                "~/Views/Cancellation/Cancelled.cshtml",
+                "~/Views/Cancellation/Index.cshtml",
+                "~/Views/Cancellation/Unusable.cshtml",
+            ],
+            ViewInventory.All
+                .Where(view => !ModelReferences.DelegatingViews.ContainsKey(view) && RendersNoHooks(view))
+                .Order(StringComparer.Ordinal));
     }
+
+    /// <summary>
+    /// Whether a view renders no <c>id</c> and no <c>class</c> — the two anchors the extraction
+    /// reads. <b>Comments are stripped first, on the same terms as <see cref="LiteralsOf"/></b>, so
+    /// a class named only in prose cannot make a view look hooked when the extraction sees nothing
+    /// in it.
+    /// </summary>
+    /// <remarks>
+    /// The cancellation pages. They are standalone documents no stylesheet can reach, so they carry
+    /// no styling hooks, and <c>default-frontend</c>'s vocabulary requirement means they may not
+    /// carry classes the published contract does not describe. Two of the three have no branches at
+    /// all; the third's two branches emit distinct markup, so the branch rule found nothing in them
+    /// before the classes went either.
+    /// </remarks>
+    private static bool RendersNoHooks(string view)
+        => !Regex.IsMatch(
+            Regex.Replace(
+                RepoFiles.Read(ViewInventory.SourcePathOf(view)),
+                @"@\*.*?\*@",
+                string.Empty,
+                RegexOptions.Singleline),
+            @"\b(?:id|class)=""");
 }

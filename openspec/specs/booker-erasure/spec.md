@@ -268,6 +268,19 @@ what a single erasure achieves**:
   performing an erasure will meet it**, not only where sending is described — an operator
   honouring a right-to-be-forgotten request is reading about erasure, and being told there that
   erasure is complete when it is not is the failure this requirement exists to prevent.
+- **It does not withdraw a cancellation link already issued**, on a site running self-service
+  cancellation. The link is a credential held in the booker's mailbox; erasure removes the person's
+  details from the booking, and the booking itself survives erasure by design, so a link issued
+  before the erasure continues to do the one thing it does — cancel that booking — until it expires
+  at the booking's start. **The documentation SHALL state this where an operator performing an
+  erasure will meet it.**
+
+  *This is a deliberate decision rather than an omission, and the alternative was considered:
+  revoking outstanding links on erasure. It was rejected because the link carries no contact
+  detail, discloses none when followed, and cancelling is an action the booker was told they could
+  take — withdrawing it would take away an ability the package promised while protecting nothing.
+  The rule that erasure keeps the booking is what makes this coherent: a booking that still exists
+  is a booking that can still be cancelled.*
 
 **The documentation SHALL state that erasure also happens on a timer where a site has configured
 one**, so that a booking's details disappearing is not read as a fault or as somebody's action.
@@ -278,7 +291,8 @@ erasure is not exclusively something a person does.
 
 Left unstated, the first arrives as a data-protection failure, the second as a support call about
 a booking nobody can ring, the third as an answer given in good faith to a data subject that turns
-out to be untrue, and the fourth as a bug report about vanishing data.
+out to be untrue, the fourth as a bug report about vanishing data, and the fifth as a cancellation
+nobody can account for.
 
 #### Scenario: The limits of one erasure are documented
 - **WHEN** a reader consults the backoffice documentation
@@ -295,6 +309,10 @@ out to be untrue, and the fourth as a bug report about vanishing data.
 #### Scenario: What erasure cannot reach on a sending site is documented where erasure is
 - **WHEN** a reader consults the backoffice documentation on a site that has configured the package to send messages
 - **THEN** it states that erasure does not reach a message already delivered, nor a booker's address quoted by a mail server into the site's own logs
+
+#### Scenario: An outstanding cancellation link survives erasure, and is documented
+- **WHEN** a booking whose booker has been erased is cancelled by a cancellation link issued before the erasure
+- **THEN** the cancellation succeeds, and the documentation states that erasure does not withdraw a link already issued
 
 ### Requirement: An unattended erasure path handles no contact detail
 
