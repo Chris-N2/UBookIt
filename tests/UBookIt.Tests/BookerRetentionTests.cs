@@ -847,6 +847,9 @@ public class BookerRetentionTests
         public Task<DomainResult<Booking>> CancelAsync(Guid bookingId, CancellationToken cancellationToken = default)
             => throw new NotSupportedException();
 
+        public Task<DomainResult<Booking>> CancelAsVisitorAsync(
+            Guid bookingId, CancellationToken cancellationToken = default) => throw new NotSupportedException();
+
         public Task<DomainResult<Booking>> ConfirmAsync(Guid bookingId, CancellationToken cancellationToken = default)
             => throw new NotSupportedException();
 
@@ -889,6 +892,10 @@ public class BookerRetentionTests
 
         public Task<DomainResult<Booking>> CancelAsync(Guid bookingId, CancellationToken cancellationToken = default)
             => inner.CancelAsync(bookingId, cancellationToken);
+
+        public Task<DomainResult<Booking>> CancelAsVisitorAsync(
+            Guid bookingId, CancellationToken cancellationToken = default)
+            => inner.CancelAsVisitorAsync(bookingId, cancellationToken);
 
         public Task<DomainResult<Booking>> ConfirmAsync(Guid bookingId, CancellationToken cancellationToken = default)
             => inner.ConfirmAsync(bookingId, cancellationToken);
@@ -955,6 +962,10 @@ public class BookerRetentionTests
         public Task<DomainResult<Booking>> CancelAsync(Guid bookingId, CancellationToken cancellationToken = default)
             => inner.CancelAsync(bookingId, cancellationToken);
 
+        public Task<DomainResult<Booking>> CancelAsVisitorAsync(
+            Guid bookingId, CancellationToken cancellationToken = default)
+            => inner.CancelAsVisitorAsync(bookingId, cancellationToken);
+
         public Task<DomainResult<Booking>> ConfirmAsync(Guid bookingId, CancellationToken cancellationToken = default)
             => inner.ConfirmAsync(bookingId, cancellationToken);
 
@@ -999,6 +1010,10 @@ public class BookerRetentionTests
 
         public Task<DomainResult<Booking>> CancelAsync(Guid bookingId, CancellationToken cancellationToken = default)
             => inner.CancelAsync(bookingId, cancellationToken);
+
+        public Task<DomainResult<Booking>> CancelAsVisitorAsync(
+            Guid bookingId, CancellationToken cancellationToken = default)
+            => inner.CancelAsVisitorAsync(bookingId, cancellationToken);
 
         public Task<DomainResult<Booking>> ConfirmAsync(Guid bookingId, CancellationToken cancellationToken = default)
             => inner.ConfirmAsync(bookingId, cancellationToken);

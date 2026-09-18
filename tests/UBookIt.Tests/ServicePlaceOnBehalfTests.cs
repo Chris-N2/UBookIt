@@ -406,6 +406,10 @@ public class ServicePlaceOnBehalfTests
             Guid bookingId, CancellationToken cancellationToken = default)
             => inner.CancelAsync(bookingId, cancellationToken);
 
+        public Task<DomainResult<Booking>> CancelAsVisitorAsync(
+            Guid bookingId, CancellationToken cancellationToken = default)
+            => inner.CancelAsVisitorAsync(bookingId, cancellationToken);
+
         public Task<DomainResult<Booking>> ConfirmAsync(
             Guid bookingId, CancellationToken cancellationToken = default)
             => inner.ConfirmAsync(bookingId, cancellationToken);

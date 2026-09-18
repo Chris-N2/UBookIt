@@ -175,6 +175,40 @@ public interface IBookingService
     Task<DomainResult<Booking>> CancelAsync(Guid bookingId, CancellationToken cancellationToken = default);
 
     /// <summary>
+    /// Cancels a booking <b>on the terms a visitor gets</b> — refusing one that has already begun.
+    /// </summary>
+    /// <remarks>
+    /// <para>
+    /// <b>BREAKING: this member is new in 17.1.0.</b> An implementation of
+    /// <see cref="IBookingService"/> written against 17.0.x does not have it and will not compile
+    /// against this version. Declared rather than avoided, and landing in a minor as the versioning
+    /// policy requires: the major tracks the Umbraco major and so cannot signal a break.
+    /// </para>
+    /// <para>
+    /// <b>A sibling of <see cref="CancelAsync"/>, never a parameter on it.</b> The difference
+    /// between the two is one of <i>terms</i>, and terms are carried by which entry point a caller
+    /// reaches — exactly as <see cref="PlacementTerms.Visitor"/> and
+    /// <see cref="PlacementTerms.Operator"/> carry them for placement. A flag would mean the
+    /// operator's waiver was reachable by setting a value, which is the arrangement this package
+    /// deliberately does not have.
+    /// </para>
+    /// <para>
+    /// The only difference is the refusal: a booking whose start has passed fails with
+    /// <see cref="FailureCodes.BookingAlreadyStarted"/> and the store is not touched. Everything
+    /// after that is <see cref="CancelAsync"/> itself, because a booking cancelled by the person
+    /// who made it is not a different kind of cancelled — same status, same observer, same
+    /// messages. Two implementations here would be two things free to disagree.
+    /// </para>
+    /// <para>
+    /// <b>This member does not authenticate anybody.</b> It expresses the visitor's terms; proving
+    /// the caller is the booker is the web layer's job, through a cancellation secret. A caller
+    /// holding this interface is already inside the package.
+    /// </para>
+    /// </remarks>
+    Task<DomainResult<Booking>> CancelAsVisitorAsync(
+        Guid bookingId, CancellationToken cancellationToken = default);
+
+    /// <summary>
     /// Confirms a <see cref="BookingStatus.Requested"/> booking.
     /// </summary>
     /// <remarks>
@@ -620,6 +654,38 @@ public sealed class BookingService(
             .ConfigureAwait(false);
 
         return DomainResult<Booking>.Success(booking);
+    }
+
+    public async Task<DomainResult<Booking>> CancelAsVisitorAsync(
+        Guid bookingId, CancellationToken cancellationToken = default)
+    {
+        var booking = await bookingStore.GetBookingAsync(bookingId, cancellationToken).ConfigureAwait(false);
+        if (booking is null)
+        {
+            // The same answer CancelAsync gives, so that a caller cannot tell "no such booking"
+            // from "a booking somebody else's" by the code it gets back.
+            return DomainResult<Booking>.Failure(
+                FailureCodes.BookingNotFound, $"No booking exists with id {bookingId}.");
+        }
+
+        // THE ONE DIFFERENCE BETWEEN THE TWO ENTRY POINTS. An operator may cancel a booking that
+        // has begun — tidying a no-show is ordinary work — and a visitor may not, because they are
+        // asking to undo something that has already started happening.
+        //
+        // Compared against the booking's start as an instant. Not "today", not the site's zone:
+        // the booking carries its own interval and the clock is the clock.
+        if (booking.Interval.StartUtc <= timeProvider.GetUtcNow())
+        {
+            return DomainResult<Booking>.Failure(
+                FailureCodes.BookingAlreadyStarted,
+                "This booking has already started, so it can no longer be cancelled online.");
+        }
+
+        // AND EVERYTHING ELSE IS CancelAsync ITSELF, deliberately. A booking cancelled by the
+        // person who made it is not a different kind of cancelled: same status transition, same
+        // store write, same observer call, same messages. A second implementation here would be a
+        // second thing to keep in step, and the place a divergence would hide.
+        return await CancelAsync(bookingId, cancellationToken).ConfigureAwait(false);
     }
 
     public Task<DomainResult<Booking>> ConfirmAsync(

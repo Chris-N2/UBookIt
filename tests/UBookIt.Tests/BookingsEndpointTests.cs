@@ -266,6 +266,9 @@ public class BookingsEndpointTests
         public Task<DomainResult<Booking>> CancelAsync(
             Guid bookingId, CancellationToken cancellationToken = default) => throw Unexpected();
 
+        public Task<DomainResult<Booking>> CancelAsVisitorAsync(
+            Guid bookingId, CancellationToken cancellationToken = default) => throw Unexpected();
+
         public Task<DomainResult<Booking>> ConfirmAsync(
             Guid bookingId, CancellationToken cancellationToken = default) => throw Unexpected();
 
@@ -293,6 +296,9 @@ public class BookingsEndpointTests
             CancelledId = bookingId;
             return Task.FromResult(answer);
         }
+
+        public Task<DomainResult<Booking>> CancelAsVisitorAsync(
+            Guid bookingId, CancellationToken cancellationToken = default) => throw new NotSupportedException();
 
         public Task<DomainResult<Booking>> ConfirmAsync(
             Guid bookingId, CancellationToken cancellationToken = default) => throw new NotSupportedException();
@@ -442,6 +448,9 @@ public class BookingsEndpointTests
         }
 
         public Task<DomainResult<Booking>> CancelAsync(
+            Guid bookingId, CancellationToken cancellationToken = default) => throw new NotSupportedException();
+
+        public Task<DomainResult<Booking>> CancelAsVisitorAsync(
             Guid bookingId, CancellationToken cancellationToken = default) => throw new NotSupportedException();
 
         public Task<DomainResult<Booking>> EraseBookerAsync(

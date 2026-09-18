@@ -24,6 +24,21 @@ public static class FailureCodes
     public const string InvalidStatusTransition = "invalid-status-transition";
 
     /// <summary>
+    /// A booking cannot be cancelled by the person who made it because it has already begun.
+    /// </summary>
+    /// <remarks>
+    /// <b>Names the fact, not a policy.</b> "Already started" is a property of the booking and the
+    /// clock; "too late to cancel" would be a statement about a site's rules, and the package has
+    /// none — a cancellation window is a separate feature with its own vocabulary. Choosing the
+    /// factual name means that feature can arrive without this code becoming a lie.
+    /// <para>
+    /// Produced only by the visitor's entry point. An operator may cancel a booking that has
+    /// started, which is ordinary no-show tidying.
+    /// </para>
+    /// </remarks>
+    public const string BookingAlreadyStarted = "booking-already-started";
+
+    /// <summary>
     /// A move was asked for to the interval the booking already holds. Refused rather than
     /// reported as success, on the same grounds as cancelling twice: a caller told "moved"
     /// when nothing changed cannot tell a completed action from a rejected one.

@@ -62,7 +62,7 @@ somebody look at.
 
 - [x] 2.1 A value type for the cancellation secret: generated from a cryptographically secure source, with its one-way hash as a separate operation; verify by test that two generations differ and that the hash is stable for a given secret
 - [x] 2.2 A Core port for storing and reading secrets — issue, find-by-hash, mark redeemed; verify the port's contract is stated in XML docs and that nothing on it accepts or returns the plaintext secret except at issue
-- [ ] 2.3 Expiry derived from the booking's start (D2), computed where the secret is issued rather than stored as policy; verify by test that a booking moved later does **not** extend an already-issued secret's life, and record whichever answer is chosen as deliberate
+- [x] 2.3 Expiry derived from the booking's start (D2), computed where the secret is issued rather than stored as policy; verify by test that a booking moved later does **not** extend an already-issued secret's life, and record whichever answer is chosen as deliberate
 
 **§2 notes.** `CancellationSecret` is 256 bits, base64url, hashed to lower-case hex; **no member of
 `ICancellationSecretStore` accepts or returns the plaintext** — even `IssueAsync` takes the hash — so
@@ -81,10 +81,29 @@ harness mutated the file before believing the result.
 
 ## 3. The visitor's cancellation entry point
 
-- [ ] 3.1 Add the visitor-terms cancellation entry point to `IBookingService` as a **sibling** of `CancelAsync` (D3), with an XML doc carrying the **BREAKING** note and the reason it lands in a minor
-- [ ] 3.2 Implement it so a booking whose start has passed is refused, while `CancelAsync` remains able to reach one; verify with a test that cancels the *same* booking through both entry points and asserts they diverge
-- [ ] 3.3 Prove the waiver is structural: a test asserting no parameter on the operator entry point can produce visitor terms, and none on the visitor entry point can produce operator terms
-- [ ] 3.4 Confirm a successful self-service cancellation produces the identical booking state and the identical observer call as the operator route; verify through the production entry point, not by comparing two halves
+- [x] 3.1 Add the visitor-terms cancellation entry point to `IBookingService` as a **sibling** of `CancelAsync` (D3), with an XML doc carrying the **BREAKING** note and the reason it lands in a minor
+- [x] 3.2 Implement it so a booking whose start has passed is refused, while `CancelAsync` remains able to reach one; verify with a test that cancels the *same* booking through both entry points and asserts they diverge
+- [x] 3.3 Prove the waiver is structural: a test asserting no parameter on the operator entry point can produce visitor terms, and none on the visitor entry point can produce operator terms
+- [x] 3.4 Confirm a successful self-service cancellation produces the identical booking state and the identical observer call as the operator route; verify through the production entry point, not by comparing two halves
+
+**§3 notes.** `CancelAsVisitorAsync` is a sibling of `CancelAsync`, not a parameter on it, and the
+only difference is the refusal — everything after the time check *is* `CancelAsync`, so there is no
+second implementation to drift. The failure code is **`booking-already-started`**, naming the fact
+rather than a policy: "too late to cancel" would be a statement about a site's rules, and the
+package has none, so a cancellation-window feature can arrive later without making this code a lie.
+
+**The break is real and was visible immediately:** 12 test doubles implementing `IBookingService`
+stopped compiling. Each gained the member, matching whatever its local `CancelAsync` does (delegate,
+`throw Unexpected()`, or `NotSupportedException`). Inserted **after the complete member** rather than
+before the declaration, and swept afterwards: **0 doc blocks stranded** across the six files — ㊴
+stranded two by anchoring on a member line alone.
+
+Mutation-tested, both killed: removing the time check (3 tests fail), and loosening `<=` to `<` so a
+booking could be cancelled exactly at its start (1 test fails — the boundary theory, which is what
+it is for). §2.3's question is answered here too: the expiry is computed from the booking's start at
+issue time and **stored**, so a later move of the booking does not extend a link already in an inbox.
+
+Unit suite **1740** (baseline 1718; +22).
 
 ## 4. Persistence
 

@@ -276,6 +276,9 @@ public class FindByBookerEndpointTests
         public Task<DomainResult<UBookIt.Core.Bookings.Booking>> CancelAsync(
             Guid bookingId, CancellationToken cancellationToken = default) => throw Unexpected();
 
+        public Task<DomainResult<UBookIt.Core.Bookings.Booking>> CancelAsVisitorAsync(
+            Guid bookingId, CancellationToken cancellationToken = default) => throw Unexpected();
+
         public Task<DomainResult<UBookIt.Core.Bookings.Booking>> ConfirmAsync(
             Guid bookingId, CancellationToken cancellationToken = default) => throw Unexpected();
 
