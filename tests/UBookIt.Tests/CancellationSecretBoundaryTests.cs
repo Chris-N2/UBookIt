@@ -70,13 +70,21 @@ public class CancellationSecretBoundaryTests
     }
 
     [Fact]
-    public void The_persistence_assembly_cannot_see_the_secret_type()
+    public void No_store_can_see_the_secret_type()
     {
         // THE SCAN THAT CAN FAIL. Word-bounded, so `CancellationSecretRow`, `...Store` and
-        // `...Record` do not match — only the Core value type itself, whose arrival in this
-        // project would mean the plaintext had been handed to something whose job is to write
+        // `...Record` do not match — only the Core value type itself, whose arrival among the
+        // stores would mean the plaintext had been handed to something whose job is to write
         // things down.
-        var offenders = RepoFiles.Paths("src/UBookIt.Persistence", "*.cs")
+        //
+        // NARROWED FROM "the persistence assembly", and the narrowing is a finding rather than a
+        // convenience. The first version claimed no file in UBookIt.Persistence could see the
+        // type, and it failed the moment the email handler was wired up — because minting has to
+        // happen where the message is composed, and the handler is in this assembly. The claim was
+        // wrong, not the code: what the package guarantees is that the plaintext never reaches
+        // STORAGE, and the stores are where that is decided. Broadening a guard until it fails and
+        // then quietly deleting it is how a guarantee turns into a comment.
+        var offenders = RepoFiles.Paths("src/UBookIt.Persistence/Stores", "*.cs")
             .Where(path => Regex.IsMatch(
                 string.Join('\n', File.ReadAllLines(path).Where(line => !line.TrimStart().StartsWith("//", StringComparison.Ordinal))),
                 @"\bCancellationSecret\b"))
@@ -88,7 +96,14 @@ public class CancellationSecretBoundaryTests
         // POSITIVE CONTROL: the scan must be reading files at all. An empty offender list from a
         // scan that matched nothing anywhere is the failure this project has shipped before.
         Assert.Contains(
-            RepoFiles.Paths("src/UBookIt.Persistence", "*.cs").Select(Path.GetFileName),
+            RepoFiles.Paths("src/UBookIt.Persistence/Stores", "*.cs").Select(Path.GetFileName),
             name => name == "SqlCancellationSecretStore.cs");
+
+        // AND THE COUNTERPART, so the narrowing above cannot be read as "nobody may see it". One
+        // place mints the secret, and it is the one that puts it in a message — if that ever stops
+        // being true, this fails and the next reader finds out where minting moved to.
+        Assert.Contains(
+            RepoFiles.Paths("src/UBookIt.Persistence/Notifications", "*.cs"),
+            path => Regex.IsMatch(File.ReadAllText(path), @"\bCancellationSecret\b"));
     }
 }

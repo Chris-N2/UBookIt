@@ -137,6 +137,30 @@ public sealed record BookerMessageModel : BookingMessageModel
     /// other message.
     /// </summary>
     public DateTimeOffset? PreviousLocalEnd { get; init; }
+
+    /// <summary>
+    /// Where the booker may cancel this booking themselves, or <c>null</c> where they may not.
+    /// </summary>
+    /// <remarks>
+    /// <para>
+    /// <b><c>null</c> means "there is no self-service cancellation for this booking"</b>, not "a
+    /// link was expected and could not be built". It is absent on a site with the feature off, on
+    /// a site that cannot establish its own address, and on every message about a booking that was
+    /// not issued a link. Added in 17.1.0; a view written before it existed renders unchanged.
+    /// </para>
+    /// <para>
+    /// <b>A complete address, not parts to assemble</b> — the stated exception to "the package
+    /// converts, the view formats". There is no presentational choice worth leaving to an author
+    /// here, and a view that built its own link could build a wrong one, which is
+    /// indistinguishable from a working one until a customer needs it.
+    /// </para>
+    /// <para>
+    /// <b>Only the message that issued a link carries one.</b> A later message about the same
+    /// booking has this absent, because restating a single-use credential would put it in a second
+    /// mailbox copy with nothing to tell the reader which is live.
+    /// </para>
+    /// </remarks>
+    public Uri? CancellationUrl { get; init; }
 }
 
 /// <summary>

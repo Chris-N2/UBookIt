@@ -1,6 +1,7 @@
 using Microsoft.Extensions.Logging;
 using UBookIt.Core;
 using UBookIt.Core.Bookings;
+using UBookIt.Core.Stores;
 using UBookIt.Persistence.Responsibility;
 using Umbraco.Cms.Core.Events;
 using Umbraco.Cms.Core.Hosting;
@@ -50,6 +51,9 @@ public sealed class BookingEmailHandler(
     BookingMessageComposer composer,
     IResponsibleRecipientResolver responsibleRecipients,
     IHostingEnvironment hostingEnvironment,
+    SelfServiceCancellationSettings selfServiceCancellation,
+    ICancellationSecretStore cancellationSecrets,
+    TimeProvider clock,
     ILogger<BookingEmailHandler> logger)
     : INotificationAsyncHandler<BookingPlacedNotification>,
       INotificationAsyncHandler<BookingConfirmedNotification>,
@@ -203,12 +207,88 @@ public sealed class BookingEmailHandler(
         // period after their booking ends, and it can still be cancelled afterwards.
         if (toBooker && booking.Booker.Contact is { } contact)
         {
+            var cancellationUrl = await IssueCancellationLinkAsync(booking, bookingEvent, cancellationToken)
+                .ConfigureAwait(false);
+
             var message = await composer
-                .ForBookerAsync(booking, bookingEvent, previousInterval, cancellationToken)
+                .ForBookerAsync(booking, bookingEvent, previousInterval, cancellationUrl, cancellationToken)
                 .ConfigureAwait(false);
 
             await SendAsync(message, [contact.Email], booking).ConfigureAwait(false);
         }
+    }
+
+    /// <summary>
+    /// Issues a cancellation secret and returns the link, or <c>null</c> where there is to be none.
+    /// </summary>
+    /// <remarks>
+    /// <para>
+    /// <b>PLACEMENT ONLY.</b> The link rides the message that announces the booking, and no later
+    /// message restates it: a single-use credential sent twice sits in two mailbox copies with
+    /// nothing to tell the reader which is live. A booking placed as <c>Requested</c> gets one too
+    /// — somebody may well want to withdraw a request before it is answered.
+    /// </para>
+    /// <para>
+    /// <b>Nothing is issued for a booking that has already begun.</b> An operator can place one
+    /// inside the lead time — a booking taken at the desk minutes before it starts — and the
+    /// expiry derived from its start would then already be past. Issuing there would put a link in
+    /// an inbox that was dead before it arrived, which is the failure this package has shipped
+    /// once already.
+    /// </para>
+    /// <para>
+    /// <b>A failure to issue must not stop the message.</b> The booking is already placed and the
+    /// reference and time are what the reader cannot reconstruct; losing them because a row could
+    /// not be written would be the wrong trade, and it is the same rule the capability applies to
+    /// a failure to send.
+    /// </para>
+    /// </remarks>
+    private async Task<Uri?> IssueCancellationLinkAsync(
+        Booking booking, BookingEvent bookingEvent, CancellationToken cancellationToken)
+    {
+        if (!selfServiceCancellation.Enabled)
+        {
+            return null;
+        }
+
+        if (bookingEvent is not (BookingEvent.Placed or BookingEvent.PlacedOnBehalf))
+        {
+            return null;
+        }
+
+        if (booking.Interval.StartUtc <= clock.GetUtcNow())
+        {
+            return null;
+        }
+
+        var secret = CancellationSecret.Issue();
+        var link = CancellationLink.For(hostingEnvironment, secret.Value);
+
+        if (link is null)
+        {
+            // No address, so no link a person could follow from an inbox. Nothing is stored
+            // either: a secret nobody can be given is a row that can only ever be refused.
+            return null;
+        }
+
+        try
+        {
+            await cancellationSecrets
+                .IssueAsync(booking.Id, secret.Hash, booking.Interval.StartUtc, cancellationToken)
+                .ConfigureAwait(false);
+        }
+        catch (Exception exception)
+        {
+            // NO SECRET IN THE LOG, and no booker either — the same rule the send path already
+            // applies. What is recorded is which booking, which is the package's own identifier.
+            logger.LogError(
+                exception,
+                "uBookIt could not issue a cancellation link for booking {BookingId}; the message will be sent without one.",
+                booking.Id);
+
+            return null;
+        }
+
+        return link;
     }
 
     private async Task SendAsync(BookingMessage message, string[] to, Booking booking)

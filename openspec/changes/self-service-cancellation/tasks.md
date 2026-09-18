@@ -132,11 +132,37 @@ Integration **167** (baseline 158; +9).
 
 ## 5. Issuing the link
 
-- [ ] 5.1 Issue a secret at the point a booker message is due, only where the feature is on; verify that a site with the feature off writes no row
-- [ ] 5.2 Add the cancellation URL to the booker's email model, absent where no link exists (D1 in `email-templates`); verify a view written before the member existed renders unchanged
-- [ ] 5.3 Build the absolute URL on the shape `BackofficeBookingLink` uses; verify the built URL resolves against the site's configured address rather than a request's host
-- [ ] 5.4 The shipped booker templates carry the link and say what it is for; verify the rendering suite asserts both the link and the sentence
-- [ ] 5.5 A later message about the same booking does **not** restate the link; verify with a test that places, then confirms, and asserts only one message carries a secret
+- [x] 5.1 Issue a secret at the point a booker message is due, only where the feature is on; verify that a site with the feature off writes no row
+- [x] 5.2 Add the cancellation URL to the booker's email model, absent where no link exists (D1 in `email-templates`); verify a view written before the member existed renders unchanged
+- [x] 5.3 Build the absolute URL on the shape `BackofficeBookingLink` uses; verify the built URL resolves against the site's configured address rather than a request's host
+- [x] 5.4 The shipped booker templates carry the link and say what it is for; verify the rendering suite asserts both the link and the sentence
+- [x] 5.5 A later message about the same booking does **not** restate the link; verify with a test that places, then confirms, and asserts only one message carries a secret
+
+**§5 notes.** Issuance happens in `BookingEmailHandler`, where a booker message is due, under three
+conditions — feature on, **placement only**, and the booking not already begun. All three
+mutation-tested and killed. The third exists because an operator can take a booking at the desk
+minutes before it starts, and a link whose expiry is that start would be **dead before it arrived**.
+
+`SelfServiceCancellationSettings` is bound from configuration **only** (§7.1), as a singleton, and
+deliberately not through the settings store: it is an exposure switch, so reading it from the store
+would make it writable by anyone who can reach the settings endpoint.
+
+**Three existing guards fired, and each was right to.** The durable-storage-surface guard demanded
+the new table be recorded with a decision; the send-path DI container needed the new services; and
+**my own boundary guard caught my own over-claim** — it asserted the persistence *assembly* could
+not see `CancellationSecret`, which stopped being true the moment minting was wired into the
+handler. The claim was wrong, not the code: what the package guarantees is that the plaintext never
+reaches **storage**. Narrowed to the stores, with a counterpart assertion that exactly one place
+still mints, so the narrowing cannot be read as "nobody may see it".
+
+**A tooling note, the second today.** A `` in a regex written through a heredoc arrived in the
+source as a literal **backspace character (0x08)**, so the guard searched for
+`<BS>CancellationSecret<BS>` and failed for a reason with nothing to do with the code. Repaired by
+building the backslash with `chr(92)`, and a repo-wide sweep for control characters in `.cs`/`.ts`
+came back **0**. Heredocs have now corrupted source three times on this project (NUL bytes once
+before); prefer the Write tool for anything containing escapes.
+
+Unit **1755** (baseline 1718; +37).
 
 ## 6. The landing page
 
@@ -150,7 +176,7 @@ Integration **167** (baseline 158; +9).
 
 ## 7. The flag
 
-- [ ] 7.1 `UBookIt:SelfServiceCancellation:Enabled`, bound at startup, default off; verify an unconfigured site issues nothing and serves no route
+- [x] 7.1 `UBookIt:SelfServiceCancellation:Enabled`, bound at startup, default off; verify an unconfigured site issues nothing and serves no route
 - [ ] 7.2 Declare it in the read-only tier and as restart-bound; verify a write through the settings endpoint is refused **by the server**, not merely hidden by the client
 - [ ] 7.3 State the `SendBookerEmails` dependency on the settings screen when it is unmet; verify the screen says the feature cannot run and why, rather than showing it as on
 - [ ] 7.4 A test that the feature does nothing at all where booker emails are off — no row, no link, and the route still absent

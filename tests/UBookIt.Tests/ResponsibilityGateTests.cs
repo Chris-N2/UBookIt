@@ -170,6 +170,9 @@ public class ResponsibilityGateTests
                 new AbsentResourceStore(), NullLogger<BookingMessageComposer>.Instance),
             resolver,
             new StubHostingEnvironment(),
+            new SelfServiceCancellationSettings(),
+            new NoCancellationSecrets(),
+            TimeProvider.System,
             NullLogger<BookingEmailHandler>.Instance);
 
         booking ??= Booking();
