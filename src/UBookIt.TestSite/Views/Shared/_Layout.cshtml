@@ -1,0 +1,77 @@
+@*
+    The consuming site's layout — deliberately somebody else's, because that is what uBookIt
+    always sits inside. It carries its own font, colours and chrome, and uBookIt inherits all
+    of them: the package sets no text colour of its own, so every colour here resolves through
+    `currentColor` or `inherit`.
+
+    The one uBookIt-specific line is the _Styles partial, exactly as docs/booking-page.md tells
+    a site author to add it. Use the partial rather than a hand-written <link>: a theme turns
+    the partial off and would not turn a hand-written link off.
+*@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>@(ViewData["Title"] ?? "Fairfield Studios")</title>
+    <style>
+        :root { color-scheme: light dark; }
+
+        body {
+            margin: 0;
+            font-family: ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+            line-height: 1.5;
+            color: #1c2024;
+            background: #fff;
+        }
+
+        header {
+            border-bottom: 1px solid #e3e5e8;
+            padding: 1rem 1.5rem;
+            display: flex;
+            align-items: baseline;
+            gap: 1.5rem;
+        }
+
+        header strong { font-size: 1.05rem; letter-spacing: -0.01em; }
+        header nav { display: flex; gap: 1.25rem; font-size: 0.9rem; }
+        header nav a { color: inherit; text-decoration: none; }
+        header nav a[aria-current="page"] { text-decoration: underline; text-underline-offset: 4px; }
+
+        main { max-width: 46rem; margin: 0 auto; padding: 2rem 1.5rem 4rem; }
+
+        footer {
+            border-top: 1px solid #e3e5e8;
+            padding: 1.25rem 1.5rem;
+            font-size: 0.85rem;
+            color: #5b6169;
+        }
+
+        @@media (prefers-color-scheme: dark) {
+            body { color: #e7e9ea; background: #16181a; }
+            header, footer { border-color: #2b2f33; }
+            footer { color: #9ba1a8; }
+        }
+    </style>
+
+    @* uBookIt's stylesheet. One line, and it is the line the docs ask for. *@
+    @await Html.PartialAsync("~/Views/Shared/UBookIt/_Styles.cshtml")
+</head>
+<body>
+    <header>
+        <strong>Fairfield Studios</strong>
+        <nav>
+            <a href="/">Home</a>
+            <a href="/book/" aria-current="page">Book</a>
+        </nav>
+    </header>
+
+    <main>
+        @RenderBody()
+    </main>
+
+    <footer>
+        A development harness for uBookIt. Not a real business.
+    </footer>
+</body>
+</html>

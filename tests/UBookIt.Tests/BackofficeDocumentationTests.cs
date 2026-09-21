@@ -141,15 +141,22 @@ public class BackofficeDocumentationTests
         DocumentationAssert.Says(docs, "Ticking statuses shows only those");
 
         // And the verbs the section genuinely lacks are named, because "management
-        // section" invites the assumption that it manages everything. Approve/decline left
-        // this list with the approval-decline change, and amend left it with move-booking —
-        // the section does both now — and the falsified-claims sweep in
-        // NotificationDocumentationTests holds the retired sentences out. What a MOVE does
-        // not do is what the list now names in their place, because "you can move a booking"
-        // invites exactly the assumptions those two sentences refuse.
-        DocumentationAssert.Says(docs, "It does not place bookings");
+        // section" invites the assumption that it manages everything. The list is maintained
+        // as the section grows: approve/decline left it with approval-decline, amend with
+        // move-booking, and PLACEMENT and FINDING-A-PERSON left it with booking-on-behalf and
+        // find-booking — the section does all four now. The falsified-claims sweep in
+        // NotificationDocumentationTests holds each retired sentence out of every document.
+        //
+        // Placement's entry did NOT leave when the feature shipped, and the pin below is why
+        // this is worth a comment rather than a deletion. `Says(docs, "It does not place
+        // bookings")` stood here for two releases after an operator could place one, so the
+        // suite REQUIRED a false sentence: correcting the document turned the suite red and
+        // told the person doing the right thing they had broken something. A positive pin on
+        // an absence has to be re-read whenever the absence might have ended — growing the
+        // list is the safe direction, and shrinking it is the one nothing prompts you to do.
         DocumentationAssert.Says(docs, "It does not change which resources a booking claims");
         DocumentationAssert.Says(docs, "It does not keep a history of where a booking has been");
+        DocumentationAssert.Says(docs, "It does not search by the booker's name");
         DocumentationAssert.DoesNotSay(docs, "It does not amend a booking's time");
     }
 

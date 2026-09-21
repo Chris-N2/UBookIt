@@ -90,11 +90,15 @@ somebody discovers.
   *(That changed in 17.1.0: an operator can move a booking from the bookings screen, keeping
   its reference, status, resources and booker. Changing which resources it claims is still
   not built.)*
-- **Taking a booking on someone's behalf** — a phone booking. Bookings arrive through the
-  front-end flow.
-- **Finding a booking without knowing its date.** The management read port is windowed by
-  design; searching by booker name, email or reference is a different query with different
-  indexing.
+- **Taking a booking on someone's behalf** — a phone booking. In v1 the only way a booking
+  could arrive was the front-end flow. *(That changed in 17.1.0: an operator holding both
+  "Act on bookings" and Umbraco's Sensitive data membership can record one from the bookings
+  screen.)*
+- **Finding a booking without knowing its date.** In v1 the management read port was windowed
+  by design, and searching by booker name, email or reference was a different query with
+  different indexing. *(That changed in stages: 0.3.0 added the search by email address, and
+  17.1.0 added lookup by reference and put both on the bookings screen. Searching by **name**
+  is still deliberately not offered.)*
 - **Filtering the backoffice list by resource or service.** Both are supported by the
   endpoint and neither has a control; they belong with a screen that has somewhere to put
   them.

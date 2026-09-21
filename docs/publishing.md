@@ -90,7 +90,48 @@ expire at the events it describes.**
 2. **The git remote must already be the public one.** This is not cosmetic: see the ordering
    section below.
 3. **The version must be the one you mean.** `<Version>` in `Directory.Build.props` is the only
-   place; every package and the backoffice manifest derive from it.
+   place it is **declared**; every package and the backoffice manifest derive from it.
+   **Prose is a different matter, and a bump has to move it by hand.** Three documents state a
+   version in words, in a URL or in a command — `README.md` in two places and this runbook in
+   two — and none of them derives anything:
+
+   | Where | What moves |
+   |---|---|
+   | `README.md`, near the top | the sentence naming the version uBookIt is currently at |
+   | `README.md`, *What it looks like* | **every** screenshot URL, each pinned to the release tag |
+   | `docs/publishing.md` | the *"uBookIt is at"* sentence under **What nuget.org will not let you undo** |
+   | `CHANGELOG.md` | a new entry for the version, its heading left undated until it is live |
+   | `docs/publishing.md`, *Tag the release* | **every** version literal in that section below — the example URL, and the `git tag`, `git push` and `curl` commands |
+
+   (The rows are described rather than quoted on purpose, and the reason is narrower than it
+   looks: **quoting a pinned sentence here reproduces it**, and a pinned sentence that appears
+   twice stops pinning the original. It is not that a version number is unsafe anywhere in this
+   file — the tag section below carries several, and `<version>` appears in a URL further down,
+   all green. `Every_documented_version_is_the_declared_version` matches one phrasing, not every
+   number it can find.)
+
+   > **The `## Status` line is NOT on that list, and must not be edited at a release.** The
+   > sentence opening that section names the date of the first publish and the version it was —
+   > an **anchor**, a statement about history, pinned by `The_documented_anchors_do_not_move`
+   > against the archived release change. Moving it forward makes it false and turns the suite
+   > red. An earlier draft of this very table told you to edit it, three lines above the
+   > paragraph saying never to: exactly the self-contradiction this checklist exists to prevent.
+   >
+   > (Described, not quoted — for the reason the *Status* section itself gives: a pinned
+   > sentence reproduced a second time stops pinning anything, and the draft that quoted it
+   > here also added a feed mention the accounting guard had not been told about.)
+
+   The suite fails when any of the first four disagree with `<Version>` — `VersionTruthTests`
+   for the README and runbook sentences and the screenshot URLs, `ChangelogTests` for the
+   changelog entry — so those four are a checklist to work through in one go rather than a risk
+   of shipping half done. **The last row is different: nothing checks it.** The worked commands
+   in *Tag the release* are illustrative text, invisible to every guard, so that row is the one
+   to re-read by eye.
+
+   **Statements about history do not move**: the sentence naming the first release, and the one
+   naming the version the public API was declared stable from. Both are pinned against the
+   archived release change, and editing them forward turns them into falsehoods and turns the
+   suite red. Never find-and-replace the version across the repository.
 4. **The suite must be green from a clean build.** Never accept a `--no-build` run as evidence —
    it can execute stale assemblies and report green.
 
@@ -181,6 +222,50 @@ git rev-parse HEAD                       # the SHA the pack will embed
 git branch -r --contains HEAD            # must list origin/main
 ```
 
+## Tag the release before you push the package
+
+**The packed readme's screenshots are addressed to a git tag named after the version**, like
+this:
+
+```
+https://raw.githubusercontent.com/Chris-N2/UBookIt/17.1.1/docs/images/booking-flow.png
+```
+
+That is deliberate. A readme is frozen at push and can never be corrected, but the images in it
+are fetched live every time somebody opens the package page. Addressed to a branch, this
+release's page would show whatever the repository holds years from now — a screenshot of a
+screen that has since changed, or a gap where a renamed file used to be. Addressed to a tag, it
+shows what this release shipped, permanently.
+
+**So the tag has to exist, and has to be pushed, before the package goes.** Until it does, every
+image on the package page is a broken image.
+
+**And the screenshot URLs move with the version.** They are written out in `README.md`, not derived
+from anything — the guard checks that they agree with `<Version>`, it does not update them. A
+bump therefore edits the readme's image refs in the same commit as `Directory.Build.props`; see
+*Before any push*, step 3, for the full list of what a bump touches.
+
+```bash
+git tag 17.1.1                  # on the commit you are packing from
+git push origin 17.1.1
+curl -sI https://raw.githubusercontent.com/Chris-N2/UBookIt/17.1.1/docs/images/booking-flow.png
+```
+
+The `curl` is the point of the step: a `200` means the address the readme carries resolves. Do it
+before the package push, because afterwards it is too late to matter.
+
+> **Nothing automated can catch a missing tag.** `VersionTruthTests` proves each image names an
+> allow-listed host, resolves to a file in this working tree, and is pinned to the declared
+> version. It cannot see whether the tag exists, because the tag lives on a remote — and it
+> cannot see whether nuget.org rendered anything, because that happens on nuget.org. Both are
+> human checks, and this is the only place they are written down.
+
+nuget.org renders readme images only from [an allow-list of
+hosts](https://learn.microsoft.com/nuget/nuget-org/package-readme-on-nuget-org#allowed-domains-for-images-and-badges);
+`raw.githubusercontent.com` is on it and plain `github.com` is not. **A rejected image is
+reported in a warning visible only to the package owner** — so nobody outside the project will
+ever tell you the page is broken.
+
 ## Pushing
 
 You need an API key from nuget.org. The route there is not obvious any more: **Account → API Keys
@@ -240,6 +325,13 @@ curl https://api.nuget.org/v3-flatcontainer/ubookit/index.json
 
 Search on the website lags further behind still. If an hour passes with no progress, check the
 package page and your email — nuget.org reports a validation failure by mail.
+
+**Open the package page and look at the screenshots.** Every image must render. This is the only
+check that ever sees what a consumer sees: no test can reach nuget.org, and a rejected or missing
+image is reported in a warning shown only to you as the owner, so a broken page is silent to
+everybody else. If one is missing, the usual cause is the tag — confirm
+`https://raw.githubusercontent.com/Chris-N2/UBookIt/<version>/docs/images/<file>` answers, and
+push the tag if it does not. The readme itself cannot be corrected for this version.
 
 The wildcard resolves alphabetically, so it pushes the `UBookIt` meta-package FIRST, before the
 libraries it depends on. That is harmless — nuget.org validates each package independently and
