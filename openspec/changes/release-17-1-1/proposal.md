@@ -1,25 +1,40 @@
 ## Why
 
 `docs-truth-and-screenshots` is merged and archived, and **none of it has reached a consumer.**
-The readme packed into all five published packages still tells a prospective user that uBookIt
-cannot take a booking on someone's behalf, cannot look one up by reference, and cannot find a
-person across bookings. All three have shipped since `17.1.0`. A packed readme is frozen per
-version, so the correction cannot be made in place — it costs a version number to deliver, and
-that is the entire reason this change exists.
+The readme packed into all five published packages still lists **two** features under *What it
+does not do yet* that `17.1.0` shipped: taking a booking on somebody's behalf, and looking one up
+by reference. A packed readme is frozen per version, so the correction cannot be made in place —
+it costs a version number to deliver, and that is the entire reason this change exists.
+
+**Two, not three, and the distinction is the kind this project keeps getting wrong.** The
+archived change counted three denials *across two documents*; the third — *"It does not find a
+person across bookings"* — was in `docs/backoffice.md`, which **is not packed**, and it had been
+false since `0.3.0` added the email-address search rather than since `17.1.0`. The packed readme
+did not deny that search at all; it **affirmed** it, in the same bullet that denied reference
+search. An earlier draft of this proposal and of the changelog entry collapsed the archived
+change's headline into a precise-sounding claim that all three were denied by the packed readme,
+and QA caught it before publication — which is the only reason it is not now frozen into five
+packages.
 
 It is a **patch**: no behavioural change, no API change, no schema change. `17.1.1` carries
 documentation, screenshots and test-suite guards, which is exactly what the README's own
 versioning table promises a patch contains.
 
 **There is also a live cost to waiting.** The repository README on `github.com/Chris-N2/UBookIt`
-points its four screenshots at a `17.1.1` tag that does not exist yet, so the project's landing
-page currently shows four broken images. That was accepted as a time-bounded cost on the
-condition that this release closes it.
+shows four broken images, and the reason is worth stating exactly, because it decides when the
+window closes: `main`'s readme points its screenshots at **`17.1.0`**, and no `17.1.0` tag
+exists — none can be created, since the images landed after that release. The bump to `17.1.1`
+lives on this branch, so **the window closes when this change is MERGED and the tag pushed**, not
+when the tag alone is pushed. An earlier draft of this proposal said the refs already pointed at
+`17.1.1`; they do not until the merge.
 
 ## What Changes
 
-**The version, in five places across four files** — the list `docs/publishing.md` step 3 now
-carries, which is the authority rather than this proposal:
+**The version, in six places across four files** — the list `docs/publishing.md` step 3 now
+carries, which is the authority rather than this proposal. (Five of the six are enumerated below;
+the sixth is the `CHANGELOG.md` entry, which the table also counts and which is described in its
+own paragraph. The count is spelled out because this project has now miscounted this exact list
+four times.)
 
 - `Directory.Build.props` — `<Version>`, the only place it is *declared*.
 - `README.md` — the sentence naming the version uBookIt is at.
@@ -79,6 +94,6 @@ order to have a delta would be writing a spec to satisfy a validator.
 | `CHANGELOG.md` | New `17.1.1` entry, undated until the feed confirms |
 | Code, schema, API surface | **Untouched.** |
 | nuget.org | Five packages at `17.1.1`. **A pushed version cannot be reused or edited.** |
-| `github.com/Chris-N2/UBookIt` | The `17.1.1` tag closes the broken-image window on the landing page |
+| `github.com/Chris-N2/UBookIt` | The **merge plus** the `17.1.1` tag closes the broken-image window on the landing page — the merge moves the refs, the tag makes them resolve |
 
 No breaking change. No new configuration. No migration.

@@ -26,22 +26,27 @@ install-compatible with `17.1.0` in both directions.
 
 ### What changed
 
-**The package page was describing features this package already has.** `17.1.0` added booking on
-somebody's behalf, lookup by reference, and finding every booking held against an email address —
-and the readme packed into all five packages went on saying none of them existed. It said bookings
-could only arrive through the front-end flow, and that there was no search by reference. Both were
-false the day `17.1.0` shipped, and a packed readme is frozen per version, so correcting it is
-what this release is for. `docs/backoffice.md` carried the same denials and has been corrected
-with it.
+**The package page was denying two features this package already has.** `17.1.0` added booking on
+somebody's behalf and lookup by a booking's reference — and the readme packed into all five
+packages went on listing both under *What it does not do yet*. It said bookings could only arrive
+through the front-end flow, and that there was no search by reference. Both were false the day
+`17.1.0` shipped. A packed readme is frozen per version, so correcting it is what this release is
+for.
 
-**The readme now shows you what you are installing** — the booking flow on a page, the same flow's
-time and details step, the Bookings screen, and a resource's opening hours.
+**`docs/backoffice.md` was worse, and is corrected with it.** It denied those same two, and also
+claimed the section could not find a person across bookings — false since `0.3.0` added the
+search by email address. All three denials sat within 200 lines of the sections describing the
+features in detail.
+
+**The readme now shows you what you are installing** — the booking flow on a page, the same
+flow's time and details step, the Bookings screen, and a resource's opening hours.
 
 **Smaller corrections in the same pass:** the documentation of how to move a booking had been
 filed under the section about recording a telephone booking, and now sits under its own heading;
 the version note no longer claims the public API is settled without saying what the promise
-actually is; and `docs/publishing.md` records what a release must do for the readme's screenshots
-to resolve.
+actually is; `docs/mvp.md`'s v1-era list gained the notes saying which of its entries have since
+shipped; and `docs/publishing.md` records what a release must do for the readme's screenshots to
+resolve.
 
 Nothing here reaches your site. If you are on `17.1.0` and not reading the documentation, this
 release changes nothing for you at all.

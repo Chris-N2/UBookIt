@@ -7,10 +7,19 @@ or `17.1.0`, and it is a step no test can verify.
 
 Two rules from previous releases are load-bearing here and are not re-derived:
 
-- **The ordering.** Publish → confirm on the flat-container endpoint → stamp the changelog date →
-  commit → *then* sync and archive. `ChangelogTests.Every_released_version_is_dated` reads the
-  **archive**, so archiving before the date is stamped turns the suite red. Verified twice, in
-  both directions, during `17.1.0`.
+- **The ordering, in full.** **Merge to `main` and push** → tag → pack → publish → confirm on the
+  flat-container endpoint → stamp the changelog date → commit → *then* sync and archive.
+  `ChangelogTests.Every_released_version_is_dated` reads the **archive**, so archiving before the
+  date is stamped turns the suite red — verified twice, in both directions, during `17.1.0`.
+
+  **The merge belongs at the FRONT, and an earlier draft of this design left it out entirely.**
+  `docs/publishing.md` says *"Pack from the merge commit on main, after it is pushed"*, and
+  `17.1.0` did exactly that. Omitting it produced a self-contradictory procedure: §3.4 gated the
+  tag and the pack on `origin/main` containing HEAD, while the merge was scheduled as the last
+  step of the release. Executed literally the releaser either blocks, or skips the one check that
+  prevents a permanent SourceLink 404. QA rated it CRITICAL, correctly — a one-way-door procedure
+  with a gate that cannot be satisfied is worse than no gate, because the natural response is to
+  step around it.
 - **The pack traps.** `dotnet pack` is incremental and `--no-incremental` does not govern it, so
   stale artifacts survive the procedure and get pushed by the wildcard; and SourceLink embeds the
   commit SHA, so packing from a commit that is not on the public repository produces source links
@@ -39,9 +48,10 @@ The runbook says so, but this is the first release where it matters, and the fai
 a missing tag makes every screenshot on the package page a broken image, and nuget.org reports
 that **only to the package owner**. Nobody outside the project would ever tell us.
 
-**The tag is pushed and then verified by fetching one image URL over the network** before the
-package goes. A `200` is the proof; the suite cannot provide one, because a tag lives on a remote
-and rendering happens on nuget.org.
+**The tag is pushed and then verified by fetching all four image URLs over the network** before
+the package goes — four, not one, because a per-file mistake in a single ref is exactly the kind
+one sample misses. A `200` each is the proof; the suite cannot provide one, because a tag lives
+on a remote and rendering happens on nuget.org.
 
 **Alternative rejected:** tag afterwards, since the readme is frozen either way. It leaves a
 window in which the package page is live and broken, and the whole argument for pinning to a tag
@@ -49,10 +59,12 @@ was to avoid exactly that kind of uncorrectable state.
 
 ### D2 — The bump is made by reading the runbook's table, not from memory
 
-Five literals across four files, one of which — the *Tag the release* worked examples — **is
-checked by nothing**. The guarded four fail the suite if they lag, so they cannot be forgotten;
-the fifth can. This project has now recorded three wrong counts about this very list, which is
-why the table in `docs/publishing.md` is the authority and this document does not restate it.
+Six places across four files, one of which — the *Tag the release* worked examples — **is
+checked by nothing**. The guarded ones fail the suite if they lag, so they cannot be forgotten;
+that one can. **This project has now miscounted this exact list four times, most recently in the
+first draft of this very decision, which said "five literals across four files".** That is why
+the table in `docs/publishing.md` is the authority, why this document points at it rather than
+restating it, and why the counting error keeps proving the point rather than undermining it.
 
 ### D3 — The changelog entry ships undated
 
@@ -61,18 +73,30 @@ a claim about an event that has not happened, and the release could still fail v
 `ChangelogTests` enforces the dating only against the archive, which is what makes the ordering in
 D4 work.
 
-### D4 — Archive last, after the date is stamped
+### D4 — Merge first, archive last
 
-Publish, confirm, stamp, commit, sync, archive. Not because it is tidy, but because
-`Every_released_version_is_dated` reads the archive: archiving an undated entry turns the suite
-red, and stamping a date before the feed confirms would be a false claim.
+**Merge and push, tag, pack, publish, confirm, stamp, commit, sync, archive.**
+
+The two ends are fixed for different reasons and neither is tidiness. The **merge leads** because
+SourceLink embeds the packed commit's SHA, so packing from anything not on the public repository
+produces source links that 404 for every consumer, permanently and uncorrectably. The **archive
+trails** because `Every_released_version_is_dated` reads the archive: archiving an undated entry
+turns the suite red, and stamping a date before the feed confirms would be a claim about an event
+that has not happened.
 
 ### D5 — Verify the pack rather than trust it
 
 Five `.nupkg` and four `.snupkg`, all `17.1.1`; repository commit equal to HEAD; icon and readme
 declared **and present**; SourceLink SHA equal to HEAD; **zero relative links in the packed
-readme**; and — new this release — **the four image URLs present and pinned to `17.1.1`**. The
-last is the only item on that list that did not exist before.
+readme**; and — new this release — **the four image URLs present and pinned to `17.1.1`**, in
+**every** packed readme rather than one, since each package carries its own copy.
+
+**Plus one check the first draft of this list missed: the tag must point at the packed commit.**
+`git rev-parse 17.1.1^{}` must equal `git rev-parse HEAD`. Checking the repository commit and the
+SourceLink SHA against HEAD does not establish it — the tag is created in the step before the
+pack, and any commit in between silently decouples them. The frozen readme's images would then
+address a tag that is not the source they were taken from, and neither a test nor the
+post-publish human check could see it.
 
 ## Risks / Trade-offs
 
@@ -98,4 +122,5 @@ There is nothing here that would warrant it.
 
 ## Open Questions
 
-None. The procedure is settled; what this release adds to it is one step, and D1 states it.
+None. The procedure is settled; what this release adds to it is the tag step (D1) and the
+tag-equals-packed-commit check (D5), both stated.
