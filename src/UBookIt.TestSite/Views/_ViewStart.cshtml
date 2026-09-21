@@ -1,0 +1,10 @@
+@{
+    // A real site sets its layout here; uBookIt deliberately sets none of its own.
+    //
+    // Added by `docs-truth-and-screenshots`. Until then this harness had NO layout at all, so
+    // every page — the installed Booking Page included — rendered with no <html>, <head> or
+    // <body>. That is a documented condition (docs/booking-page.md, "You need a layout for
+    // this"), and it meant the shipped stylesheet had nowhere to be linked from: nobody had
+    // ever seen the flow rendered as a consumer with an ordinary site would see it.
+    Layout = "_Layout";
+}

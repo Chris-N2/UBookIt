@@ -66,10 +66,20 @@ public static class DocumentationAssert
     /// the half of the inheritance that does not protect you.
     /// </para>
     /// </remarks>
-    public static void DoesNotSay(string document, string sentence)
+    /// <param name="document">The text to search.</param>
+    /// <param name="sentence">The sentence that must not appear.</param>
+    /// <param name="source">
+    /// Optional name of where <paramref name="document"/> came from, included in the failure.
+    /// <b>Supply it whenever the same needle is checked against more than one document</b> — the
+    /// sweep over every shipped markdown file reports a sentence that must not be there, and
+    /// without this the reader is told what is wrong but not which of twenty files to open.
+    /// </param>
+    public static void DoesNotSay(string document, string sentence, string? source = null)
         => Assert.False(
             Regex.IsMatch(Normalise(document), PatternFor(sentence)),
-            $"The documentation still says, or says again: \"{sentence}\"");
+            source is null
+                ? $"The documentation still says, or says again: \"{sentence}\""
+                : $"{source} still says, or says again: \"{sentence}\"");
 
     /// <summary>
     /// Asserts <paramref name="document"/> contains <paramref name="sentence"/> <b>exactly

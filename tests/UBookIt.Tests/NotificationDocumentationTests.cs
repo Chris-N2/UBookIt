@@ -449,17 +449,32 @@ public class NotificationDocumentationTests
     }
 
     /// <summary>
-    /// The claims this change falsified must not survive as claims. An over-claim survives by
-    /// ADDITION — only deleting the correction fails a positive assertion — so each needle
-    /// here is the false sentence itself, matched wrap-safely.
+    /// A claim a shipped capability falsified must not survive as a claim, in any document a
+    /// consumer can read. An over-claim survives by ADDITION — only deleting the correction fails
+    /// a positive assertion — so each needle is the false sentence itself, matched wrap-safely.
     /// </summary>
     /// <remarks>
+    /// <para>
     /// The needles are chosen to miss the corrections: "tells nobody unless you have
     /// configured it to" is the truthful conditional and must stay, so the needle for the
     /// false form is the unconditional phrasing that nothing correct contains.
-    /// <c>docs/mvp.md</c> is swept too — its historical account was deliberately worded to
-    /// paraphrase rather than quote the retired sentence, precisely so this guard could
-    /// cover it without an exemption.
+    /// <c>docs/mvp.md</c> is swept too — its historical account is deliberately worded to
+    /// paraphrase rather than quote a retired sentence, precisely so this guard can cover it
+    /// without an exemption.
+    /// </para>
+    /// <para>
+    /// <b>The needles live in <see cref="RetiredClaims"/> rather than inline, and each carries the
+    /// document text it was written against.</b> Inline, they were unfalsifiable: one of them had
+    /// never matched anything in its life and nothing could say so.
+    /// <see cref="Every_needle_matches_the_text_it_was_written_against"/> is the control, and it is
+    /// the reason this list can be trusted rather than merely read.
+    /// </para>
+    /// <para>
+    /// <b>Adding to this list is part of landing a capability, not a tidy-up afterwards.</b>
+    /// <c>booking-on-behalf</c>, <c>find-booking</c> and <c>self-service-cancellation</c> each
+    /// shipped without feeding it, and five false sentences reached a published package page as a
+    /// result — including in the readme packed into all five packages.
+    /// </para>
     /// </remarks>
     [Fact]
     public void The_claims_this_change_falsified_are_not_made_anywhere_in_the_docs()
@@ -468,30 +483,78 @@ public class NotificationDocumentationTests
         {
             var text = RepoFiles.Read(doc);
 
-            DocumentationAssert.DoesNotSay(text, "No v1 pathway produces those statuses");
-            DocumentationAssert.DoesNotSay(text, "no pathway produces them");
-            DocumentationAssert.DoesNotSay(text, "notifies nobody by itself");
-            DocumentationAssert.DoesNotSay(text, "does not tell the person who booked");
-            DocumentationAssert.DoesNotSay(text, "It does not approve or decline");
+            foreach (var claim in RetiredClaims.All)
+            {
+                // The document's own name, because this sweep runs over every shipped markdown
+                // file: without it the failure names a sentence and leaves the reader to find
+                // which of twenty files carries it.
+                DocumentationAssert.DoesNotSay(text, claim.Needle, doc);
+            }
+        }
+    }
 
-            // Falsified by 0.5.0, not by this change — found by QA in README, which no guard
-            // read. Swept here rather than left for the next change to trip over: the class is
-            // "an unconditional claim that the package sends nothing", and 0.5.0's own sweep
-            // demonstrably could not enumerate it.
-            DocumentationAssert.DoesNotSay(text, "Nothing is sent by the package");
-            DocumentationAssert.DoesNotSay(text, "placement auto-confirms");
+    /// <summary>
+    /// Every needle the sweep holds out matches the text it was written against.
+    /// </summary>
+    /// <remarks>
+    /// <para>
+    /// <b>This is the control the sweep above cannot be without.</b> A <c>DoesNotSay</c> assertion
+    /// is unfalsifiable in isolation: it claims absence, so a needle that could never match
+    /// anything passes exactly as a needle doing its job does, indefinitely.
+    /// </para>
+    /// <para>
+    /// <b>That is not hypothetical here.</b> The needle
+    /// <c>"there is no search by name, email or reference"</c> was written against a README
+    /// sentence that had already been narrowed — the wording it quotes was gone before the needle
+    /// existed. It matched nothing from birth, and the sentence it was supposed to cover went on
+    /// to be falsified by <c>find-booking</c> with the suite green. See
+    /// <see cref="RetiredClaims"/> for the commits.
+    /// </para>
+    /// <para>
+    /// The fixture is evidence recovered from git; the needle is the instrument; this test is the
+    /// crossing. It fails in the run that introduces a needle written from memory rather than in
+    /// the release that discovers one.
+    /// </para>
+    /// </remarks>
+    [Fact]
+    public void Every_needle_matches_the_text_it_was_written_against()
+    {
+        Assert.NotEmpty(RetiredClaims.All);
 
-            // Falsified by 0.3.0's find-by-booker, same class, same reason it survived: README
-            // was in no guard.
-            DocumentationAssert.DoesNotSay(text, "there is no search by name, email or reference");
+        foreach (var claim in RetiredClaims.All)
+        {
+            Assert.False(
+                string.IsNullOrWhiteSpace(claim.AsWritten),
+                $"The needle \"{claim.Needle}\" carries no evidence text, so nothing proves it "
+                + "could ever match. Recover the sentence from git rather than leaving this "
+                + "empty.");
 
-            // Falsified by move-booking. This sentence stood in EIGHT places, on the record as
-            // a decision; the decision was reversed, and a sentence that survives in one of
-            // them tells an operator the screen cannot do what it can. docs/mvp.md's
-            // historical account paraphrases rather than quotes it, so this can cover it.
-            DocumentationAssert.DoesNotSay(text, "the shape of that operation is a cancellation and a new booking");
-            DocumentationAssert.DoesNotSay(text, "There is no reschedule");
-            DocumentationAssert.DoesNotSay(text, "Amending a booking's time. There is no such operation");
+            DocumentationAssert.Says(claim.AsWritten, claim.Needle);
+        }
+    }
+
+    /// <summary>
+    /// The evidence for each needle names where it was recovered from.
+    /// </summary>
+    /// <remarks>
+    /// Anti-vacuity for the control above: a fixture whose <c>AsWritten</c> was retyped from the
+    /// needle would satisfy it trivially and prove nothing. Naming the commit is what makes the
+    /// recovery repeatable by somebody who does not trust this file — which is the only kind of
+    /// evidence worth having.
+    /// </remarks>
+    [Fact]
+    public void Every_needle_says_where_its_evidence_came_from()
+    {
+        foreach (var claim in RetiredClaims.All)
+        {
+            Assert.True(
+                claim.Evidence.Contains('@'),
+                $"The needle \"{claim.Needle}\" does not name the commit its evidence came from, "
+                + "so the recovery cannot be repeated.");
+
+            Assert.False(
+                string.IsNullOrWhiteSpace(claim.RetiredBy),
+                $"The needle \"{claim.Needle}\" does not name the capability that falsified it.");
         }
     }
 

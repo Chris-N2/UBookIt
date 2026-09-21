@@ -628,14 +628,24 @@ public class VersionTruthTests
             + "unchanged. The count is exact so a later requirement cannot smuggle a publication "
             + "claim into this file behind an allowance granted for behavioural facts."),
 
-        ("docs/publishing.md", "nuget.org", 17,
+        ("docs/publishing.md", "nuget.org", 22,
             "The publishing runbook names the feed as a DESTINATION — what nuget.org will "
             + "not let you undo, where the API key lives, which source to push to, how to "
             + "tell when indexing has finished — and, since publication, as a RECORD: its "
             + "Status section states that 17.0.0 shipped on 2026-09-15. Both are legitimate "
             + "here, and this is the one document where they should be. The count is "
             + "deliberately exact, so editing the runbook forces a fresh look at whether "
-            + "each new mention is an instruction, a true record, or a claim nobody checked."),
+            + "each new mention is an instruction, a true record, or a claim nobody checked. "
+            + "17 -> 22 at `docs-truth-and-screenshots`, and the fresh look this forced is "
+            + "recorded rather than skipped. Four are BEHAVIOURAL facts about the host — "
+            + "that nuget.org renders readme images only from an allow-list, that it "
+            + "renders them on its own servers where no test reaches, and that it reports "
+            + "a rejected image to the package owner alone. The fifth is the release "
+            + "checklist naming the section heading `What nuget.org will not let you "
+            + "undo`, so a releaser knows which sentence to move. None asserts anything "
+            + "about what has been published. A sixth was written and then removed: a "
+            + "parenthetical about the accounting guard itself, which would have spent an "
+            + "allowance on prose about the allowance."),
     ];
 
     /// <summary>
@@ -894,6 +904,22 @@ public class VersionTruthTests
         DocumentationAssert.SaysOnce(
             runbook,
             "a package built before the remote moved carries the old SourceLink URLs");
+
+        // The release TAG, which the packed readme's screenshots are addressed to. Pinned for
+        // the same reason as the manual URL check above: no automated check can see it. The
+        // image guard proves the ref matches the declared version and that the file is in this
+        // working tree — it cannot prove the tag was pushed, because the tag lives on a remote,
+        // and it cannot prove nuget.org rendered anything. Both are human steps, and a runbook
+        // is only where a human step can live.
+        DocumentationAssert.SaysOnce(
+            runbook, "the tag has to exist, and has to be pushed, before the package goes");
+        DocumentationAssert.SaysOnce(runbook, "Nothing automated can catch a missing tag");
+
+        // And the check that is the only thing in this project which ever sees what a consumer
+        // sees. A rejected readme image is reported ONLY to the package owner, so a broken page
+        // is silent to everybody else — which makes "somebody would have told us" false here.
+        DocumentationAssert.SaysOnce(
+            runbook, "Open the package page and look at the screenshots");
 
         // The commit SHA. Found by VERIFYING the SourceLink flip rather than reasoning about
         // it: a pack from an unpushed commit yields source links that 404 for every consumer,
@@ -1215,6 +1241,210 @@ public class VersionTruthTests
             $"No link in {readmeFile} resolved to a file in this repository, so the half of this "
             + "guard that checks link TARGETS proved nothing. Either the documentation links "
             + $"stopped pointing at '{blobPrefix}...', or the derivation of that prefix is wrong.");
+    }
+
+    /// <summary>
+    /// Hosts nuget.org will render a readme image from.
+    /// </summary>
+    /// <remarks>
+    /// <b>Read from NuGet's own documentation, not inferred</b> —
+    /// <c>learn.microsoft.com/nuget/nuget-org/package-readme-on-nuget-org#allowed-domains-for-images-and-badges</c>,
+    /// consulted 2026-09-21. Only the entries this repository could plausibly use are listed;
+    /// the published list is longer and consists of badge services. Note what is NOT here:
+    /// plain <c>github.com</c>, which is where the link guard's <c>blob/</c> prefix points. An
+    /// image addressed that way renders nowhere and serves an HTML page rather than image bytes.
+    /// </remarks>
+    private static readonly string[] HostsTheFeedRenders =
+    [
+        "raw.githubusercontent.com",
+        "raw.github.com",
+        "media.githubusercontent.com",
+        "user-images.githubusercontent.com",
+        "camo.githubusercontent.com",
+        "avatars.githubusercontent.com",
+        "img.shields.io",
+        "dev.azure.com",
+    ];
+
+    /// <summary>
+    /// Every image in the packed readme is one the feed will render, and shows what its release
+    /// shipped (packaging spec, "An image in the packed readme is rendered, and shows what its
+    /// release shipped").
+    /// </summary>
+    /// <remarks>
+    /// <para>
+    /// <b>An image fails differently from a link, and worse.</b> nuget.org renders no image from
+    /// a relative path and none from a host outside its allow-list — and it reports that in a
+    /// warning <i>visible only to the package owner</i>. A reader is shown a gap, nobody outside
+    /// the project is told, and the readme is frozen, so the repair costs a version number.
+    /// </para>
+    /// <para>
+    /// <b>This does not duplicate <see cref="The_readme_links_resolve_from_anywhere"/>.</b> That
+    /// guard resolves a target into the repository only when it begins with the declared
+    /// repository's <c>blob/</c> prefix, and an image cannot use that prefix — it is not an
+    /// allow-listed host and it serves a web page rather than image bytes. So every image
+    /// necessarily takes the form that guard accepts <b>unchecked</b>. Two things are added here:
+    /// the host, and the ref.
+    /// </para>
+    /// <para>
+    /// <b>The ref is why this guard exists at all.</b> The readme is frozen per published
+    /// version; the image it names is fetched live, every time somebody opens the package page.
+    /// An address on a moving branch means the <c>17.1.1</c> page shows whatever the repository
+    /// holds years later — a screenshot of a screen that has since changed, or a gap where a
+    /// renamed file used to be, on a page nobody can correct. So the ref is a release TAG, and it
+    /// is derived from the declared version rather than written out a second time: a bump that
+    /// forgets the images fails here instead of shipping a page pointing at the previous release.
+    /// </para>
+    /// <para>
+    /// <b>What it does not prove.</b> That the tag exists, or that the published page rendered
+    /// anything. No test can see either — a tag lives on a remote and rendering happens on
+    /// nuget.org. <c>docs/publishing.md</c> carries both as steps a person performs, and says
+    /// plainly that nothing automated can catch a missing tag.
+    /// </para>
+    /// </remarks>
+    [Fact]
+    public void The_readme_images_render_and_show_what_their_release_shipped()
+    {
+        var props = RepoFiles.Read("Directory.Build.props");
+
+        var readmeFile = Regex
+            .Match(props, @"<PackageReadmeFile>(?<file>[^<]+)</PackageReadmeFile>")
+            .Groups["file"].Value.Trim();
+
+        var declaredVersion = Regex
+            .Match(props, @"<Version>(?<version>[^<]+)</Version>")
+            .Groups["version"].Value.Trim();
+
+        var repositoryUrl = Regex
+            .Match(props, @"<RepositoryUrl>(?<url>[^<]+)</RepositoryUrl>")
+            .Groups["url"].Value.Trim();
+
+        Assert.True(
+            readmeFile.Length > 0 && declaredVersion.Length > 0 && repositoryUrl.Length > 0,
+            "Directory.Build.props must declare <PackageReadmeFile>, <Version> and "
+            + "<RepositoryUrl> for this guard to derive anything. One of them is missing.");
+
+        // github.com/<owner>/<repo>.git -> raw.githubusercontent.com/<owner>/<repo>/
+        // Derived, never restated: a repository move must not leave the images pointing at the
+        // old account with this test green. Same reasoning as the blob prefix above.
+        var ownerAndRepo = Regex.Replace(repositoryUrl, @"^https://github\.com/", string.Empty);
+        ownerAndRepo = Regex.Replace(ownerAndRepo, @"\.git$", string.Empty);
+
+        var ownRawPrefix = $"https://raw.githubusercontent.com/{ownerAndRepo}/";
+
+        var readme = RepoFiles.Read(readmeFile);
+
+        var images = Regex.Matches(readme, @"!\[(?<text>[^\]]*)\]\((?<target>[^)\s]+)\)");
+
+        Assert.True(
+            images.Count > 0,
+            $"{readmeFile} carries no images. Screenshots were added deliberately in 17.1.1 "
+            + "because a package page of unbroken prose tells a reader nothing about what they "
+            + "are installing. If dropping them is a decision rather than an accident, remove "
+            + "this guard in the same change — do not leave it passing over nothing.");
+
+        var offenders = new List<string>();
+        var pinnedToThisRelease = 0;
+
+        foreach (Match image in images)
+        {
+            var target = image.Groups["target"].Value;
+            var text = image.Groups["text"].Value;
+
+            if (text.Trim().Length == 0)
+            {
+                offenders.Add(
+                    $"image '{target}' has no alt text. This package's headline claim is "
+                    + "accessibility; a readme that ships an undescribed image contradicts it "
+                    + "on the first screen a reader sees.");
+            }
+
+            var host = Regex.Match(target, @"^https://(?<host>[^/]+)/").Groups["host"].Value;
+
+            if (host.Length == 0)
+            {
+                offenders.Add(
+                    $"image '{text}' targets '{target}', which is not an absolute https URL. "
+                    + "nuget.org renders NO image from a relative path, and warns only the "
+                    + "package owner.");
+
+                continue;
+            }
+
+            if (!HostsTheFeedRenders.Contains(host))
+            {
+                offenders.Add(
+                    $"image '{text}' is served from '{host}', which is not a host nuget.org "
+                    + "renders images from. The page will show a gap and tell nobody but the "
+                    + "package owner. Allowed here: "
+                    + $"{string.Join(", ", HostsTheFeedRenders)}.");
+
+                continue;
+            }
+
+            if (!target.StartsWith(ownRawPrefix, StringComparison.Ordinal))
+            {
+                // An allow-listed host that is not this repository — a badge, say. Accepted
+                // unchecked, for the same reason the link guard accepts an outside URL: proving
+                // it would mean failing when somebody else's service is down.
+                continue;
+            }
+
+            // raw.githubusercontent.com/<owner>/<repo>/<ref>/<path in the repository>
+            var afterPrefix = target[ownRawPrefix.Length..];
+            var firstSlash = afterPrefix.IndexOf('/');
+
+            if (firstSlash < 0)
+            {
+                offenders.Add(
+                    $"image '{text}' targets '{target}', which names a ref but no file beneath "
+                    + "it.");
+
+                continue;
+            }
+
+            var reference = afterPrefix[..firstSlash];
+            var relativePath = afterPrefix[(firstSlash + 1)..];
+
+            if (reference != declaredVersion)
+            {
+                offenders.Add(
+                    $"image '{text}' is pinned to '{reference}' but the declared version is "
+                    + $"'{declaredVersion}'. The readme is frozen per release and the image is "
+                    + "not: a ref that lags leaves this version's package page showing the "
+                    + "previous release's screenshots, and a ref that moves leaves every past "
+                    + "page showing today's.");
+            }
+
+            var full = Path.Combine(
+                RepoFiles.Root, relativePath.Replace('/', Path.DirectorySeparatorChar));
+
+            if (File.Exists(full))
+            {
+                pinnedToThisRelease++;
+            }
+            else
+            {
+                offenders.Add(
+                    $"image '{text}' targets '{target}', but this repository has no file at "
+                    + $"'{relativePath}'. A renamed or missing screenshot is caught here rather "
+                    + "than as a gap on a package page that can never be corrected.");
+            }
+        }
+
+        Assert.True(
+            offenders.Count == 0,
+            $"{readmeFile} carries {offenders.Count} image(s) a package page will not show "
+            + $"correctly:{Environment.NewLine}  "
+            + string.Join(Environment.NewLine + "  ", offenders));
+
+        // Anti-vacuity: every image could be an outside badge, in which case the ref and
+        // existence halves above ran over nothing while reporting success.
+        Assert.True(
+            pinnedToThisRelease > 0,
+            $"No image in {readmeFile} resolved to a file in this repository, so the halves of "
+            + "this guard that check the REF and the FILE proved nothing. Either the screenshots "
+            + $"stopped being served from '{ownRawPrefix}...', or that prefix is derived wrongly.");
     }
 
     /// <summary>
