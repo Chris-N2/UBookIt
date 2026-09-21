@@ -17,6 +17,41 @@ a patch. See [the versioning note](README.md#what-the-version-number-means).
 
 ---
 
+## 17.1.1
+
+### What you have to do
+
+**Nothing.** No API change, no schema change, no behavioural change; `17.1.1` is
+install-compatible with `17.1.0` in both directions.
+
+### What changed
+
+**The package page was denying two features this package already has.** `17.1.0` added booking on
+somebody's behalf and lookup by a booking's reference — and the readme packed into all five
+packages went on listing both under *What it does not do yet*. It said bookings could only arrive
+through the front-end flow, and that there was no search by reference. Both were false the day
+`17.1.0` shipped. A packed readme is frozen per version, so correcting it is what this release is
+for.
+
+**`docs/backoffice.md` carried three false sentences of its own, and is corrected with it.** It
+said twice over that the section could not take a booking on somebody's behalf, and it claimed
+the section could not find a person across bookings — false since `0.3.0` added the search by
+email address. It did not deny reference lookup; it documented it. Each of those three sentences
+sat within 200 lines of a section describing the very feature it denied.
+
+**The readme now shows you what you are installing** — the booking flow on a page, the same
+flow's time and details step, the Bookings screen, and a resource's opening hours.
+
+**Smaller corrections in the same pass:** the documentation of how to move a booking had been
+filed under the section about recording a telephone booking, and now sits under its own heading;
+the version note no longer claims the public API is settled without saying what the promise
+actually is; `docs/mvp.md`'s v1-era list gained the notes saying which of its entries have since
+shipped; and `docs/publishing.md` records what a release must do for the readme's screenshots to
+resolve.
+
+Nothing here reaches your site. If you are on `17.1.0` and not reading the documentation, this
+release changes nothing for you at all.
+
 ## 17.1.0 — 2026-09-18
 
 ### What you have to do
