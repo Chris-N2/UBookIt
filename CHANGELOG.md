@@ -33,10 +33,11 @@ through the front-end flow, and that there was no search by reference. Both were
 `17.1.0` shipped. A packed readme is frozen per version, so correcting it is what this release is
 for.
 
-**`docs/backoffice.md` was worse, and is corrected with it.** It denied those same two, and also
-claimed the section could not find a person across bookings — false since `0.3.0` added the
-search by email address. All three denials sat within 200 lines of the sections describing the
-features in detail.
+**`docs/backoffice.md` carried three false sentences of its own, and is corrected with it.** It
+said twice over that the section could not take a booking on somebody's behalf, and it claimed
+the section could not find a person across bookings — false since `0.3.0` added the search by
+email address. It did not deny reference lookup; it documented it. Each of those three sentences
+sat within 200 lines of a section describing the very feature it denied.
 
 **The readme now shows you what you are installing** — the booking flow on a page, the same
 flow's time and details step, the Bookings screen, and a resource's opening hours.

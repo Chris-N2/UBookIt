@@ -6,15 +6,21 @@ does not do yet* that `17.1.0` shipped: taking a booking on somebody's behalf, a
 by reference. A packed readme is frozen per version, so the correction cannot be made in place —
 it costs a version number to deliver, and that is the entire reason this change exists.
 
-**Two, not three, and the distinction is the kind this project keeps getting wrong.** The
-archived change counted three denials *across two documents*; the third — *"It does not find a
-person across bookings"* — was in `docs/backoffice.md`, which **is not packed**, and it had been
-false since `0.3.0` added the email-address search rather than since `17.1.0`. The packed readme
-did not deny that search at all; it **affirmed** it, in the same bullet that denied reference
-search. An earlier draft of this proposal and of the changelog entry collapsed the archived
-change's headline into a precise-sounding claim that all three were denied by the packed readme,
-and QA caught it before publication — which is the only reason it is not now frozen into five
-packages.
+**Two, and only in the packed readme — the distinction is the kind this project keeps getting
+wrong.** The archived change's *measurement* (`archive/2026-09-21-docs-truth-and-screenshots/tasks.md`
+§1.1) records **seven** false sentences across **three** documents: two in `README.md`, three in
+`docs/backoffice.md`, two in `docs/mvp.md`. Only `README.md` is packed. Of its two, one denied
+on-behalf placement and one denied reference search — and that same bullet **affirmed** the
+email-address search, which had shipped in `0.3.0`.
+
+**Two drafts of this proposal and of the changelog entry got this wrong, in opposite directions,
+and both times by reading a summary instead of the evidence.** The first took the archived
+change's opening line — "cannot do three things" — and re-expanded it into a precise claim that
+the packed readme denied all three. The second took its `Why` — "`docs/backoffice.md` says both
+of those" — and repeated it, when that file never denied reference lookup at all; it documents
+it. QA caught both before publication, which is the only reason neither is frozen into five
+packages. The rule that would have caught each: **for every sentence naming a document, open
+that document at `a875088` and find the line.**
 
 It is a **patch**: no behavioural change, no API change, no schema change. `17.1.1` carries
 documentation, screenshots and test-suite guards, which is exactly what the README's own

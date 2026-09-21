@@ -1,7 +1,8 @@
 ## 1. Bump the version
 
 Work from the table in `docs/publishing.md` step 3, not from this list — that table is the
-authority, and this project has recorded three wrong counts about it already.
+authority, and this project has now recorded **four** wrong counts about it, the most recent
+inside the decision that says to read the table rather than count from memory.
 
 - [x] 1.1 `Directory.Build.props` — `<Version>` 17.1.0 → 17.1.1. Verify by running
       `VersionTruthTests` and reading which documents it names: the failure message is the rest
@@ -24,9 +25,15 @@ authority, and this project has recorded three wrong counts about it already.
 - [x] 2.1 Add a `17.1.1` entry to `CHANGELOG.md`, **heading undated**, leading with what a site
       must do — nothing — before what changed. Verify `ChangelogTests` passes with the entry
       undated, which is the state it must be in at publication.
-- [x] 2.2 State the consumer-visible content plainly: the package page no longer denies three
-      shipped features, and the readme now carries screenshots. No API, schema or behavioural
-      change. Verify each sentence against the archived change rather than from memory.
+- [x] 2.2 State the consumer-visible content plainly: the packed readme no longer denies the
+      **two** `17.1.0` features it listed under *What it does not do yet*, and now carries
+      screenshots. No API, schema or behavioural change.
+      **Verify every sentence naming a document by opening that document at `a875088` and
+      finding the line** — not against the archived change's prose, and not against this task.
+      Both changelog defects in this release came from reading a *summary of* the evidence: the
+      archived `Why` says the readme "cannot do three things" and that `docs/backoffice.md`
+      "says both of those", and neither is what the measurement at
+      `archive/2026-09-21-docs-truth-and-screenshots/tasks.md:9` records.
 
 ## 3. Verify, then merge and push
 
@@ -181,3 +188,43 @@ on. Both CRITICALs were in artifacts, not in the bump.
 - **[NIT-2]** Left. `CHANGELOG.md` is outside the retired-claim sweep's file set and the new entry
       paraphrases retired claims in the past tense. Green today, and widening the sweep to cover a
       file whose entries must never be edited needs its own thought.
+
+## 10. QA round 2 — REJECT (1 CRITICAL, 2 MINOR)
+
+Round 1's fixes closed every finding except that **the fix for CRITICAL-2 put a new false
+sentence into the same frozen document** — the pattern CLAUDE.md names, on the artifact where it
+costs most.
+
+- [x] 10.1 **[CRITICAL-3] The corrected entry was false about `docs/backoffice.md`.** It said
+      that file "denied those same two". Verified against `git show a875088:docs/backoffice.md`:
+      it denied on-behalf placement **twice** (`:327`, `:519-520`) and claimed the section could
+      not find a person across bookings (`:524`). **It never denied reference lookup — `:372`
+      documents it working, in detail.** Rewritten to say exactly that, and each clause
+      re-verified against the file rather than against the finding.
+      (`:465`, "Swapping a resource … is not built", matched a loose grep on the way and is
+      **not** one of the three: it is still true.)
+- [x] 10.2 **[MINOR-4] Task 2.2, ticked, still specified the corrected error** — "no longer
+      denies three shipped features". The worst-placed stale seam of the three, because a later
+      reader takes a ticked task as the specification the artifact was built to. It now states
+      two, and carries the verification rule below.
+- [x] 10.3 **[MINOR-5] Two more stale "three"s.** §1's preamble said three wrong counts of the
+      bump list (it is four, per D2 and §9.5); and `proposal.md` repeated the "three denials
+      across two documents" compression **inside the paragraph diagnosing that compression**.
+      The measurement is seven false sentences across three documents.
+
+### The pattern, now with three data points
+
+Both changelog defects, and the proposal's, came from **reading a summary of the evidence rather
+than the evidence**:
+
+| Draft | Source read | What it said | What the evidence says |
+|---|---|---|---|
+| 1 | the archived `Why`'s opening — "cannot do three things" | the packed readme denied three | it denied two, and affirmed the third |
+| 2 | the archived `Why` — "`docs/backoffice.md` says both of those" | that file denied both | it denied one of them, twice, plus a different third |
+
+The archived change's own §1.1 measurement — seven sentences with file and line — settles both,
+and was consulted neither time. **The rule, now written into task 2.2: for every sentence naming
+a document, open that document at `a875088` and find the line.** A summary is not evidence, and
+a summary written by the same author is not a second source.
+
+**Suite after round 2: 1809 unit, 0 warnings in Release, `--strict` valid.**
