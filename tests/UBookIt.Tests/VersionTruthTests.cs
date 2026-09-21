@@ -618,15 +618,19 @@ public class VersionTruthTests
             + "So a mutation result is evidence only when BOTH hold: the file demonstrably "
             + "changed, and the assembly was built from the source under test."),
 
-        ("openspec/specs/packaging/spec.md", "nuget.org", 4,
+        ("openspec/specs/packaging/spec.md", "nuget.org", 5,
             "Arrived at SYNC, not written by hand — `release-17-0-1`'s requirements moved into "
-            + "the main spec and brought the feed's name with them. All four describe what "
+            + "the main spec and brought the feed's name with them. All five describe what "
             + "nuget.org DOES as a host: it resolves a relative link against the package page, "
-            + "renders no image from a relative path, scopes an API key to an owner, and shows a "
-            + "placeholder where a package has no icon. None asserts uBookIt has been published — "
+            + "renders no image from a relative path, scopes an API key to an owner, shows a "
+            + "placeholder where a package has no icon, and reports a rejected readme image to "
+            + "the package's own owner alone. None asserts uBookIt has been published — "
             + "that distinction is the one this guard exists to draw, and it survives a sync "
             + "unchanged. The count is exact so a later requirement cannot smuggle a publication "
-            + "claim into this file behind an allowance granted for behavioural facts."),
+            + "claim into this file behind an allowance granted for behavioural facts. "
+            + "4 -> 5 when `docs-truth-and-screenshots` synced: the guard fired ON THE ARCHIVE, "
+            + "which is the moment it is designed for — a sync carries sentences into a spec "
+            + "nobody re-read, and the failure is the handover of what to judge."),
 
         ("docs/publishing.md", "nuget.org", 22,
             "The publishing runbook names the feed as a DESTINATION — what nuget.org will "
