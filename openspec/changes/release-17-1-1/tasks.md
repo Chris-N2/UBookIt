@@ -41,7 +41,7 @@ inside the decision that says to read the table rather than count from memory.
       TestSite stopped. Record the counts.
 - [x] 3.2 Clean Release build, **0 warnings**. Never accept a `--no-build` run as evidence.
 - [x] 3.3 `openspec validate --all --strict`.
-- [ ] 3.4 **Merge this change to `main` and push it**, then confirm
+- [x] 3.4 **Merge this change to `main` and push it**, then confirm
       `git branch -r --contains HEAD` lists `origin/main`. SourceLink embeds the packed commit,
       so packing from anything not on the public repository produces source links that 404 for
       every consumer, permanently — and `docs/publishing.md` says to pack from the merge commit
@@ -77,11 +77,11 @@ declared-stable-from sentence is unmoved. Nothing was dragged along by the edits
 
 ## 4. Tag before packing (design D1 — the step that is new this release)
 
-- [ ] 4.1 `git tag 17.1.1` on the commit being packed, and `git push origin 17.1.1`.
-- [ ] 4.2 **Verify over the network**, because nothing else can:
+- [x] 4.1 `git tag 17.1.1` on the commit being packed, and `git push origin 17.1.1`.
+- [x] 4.2 **Verify over the network**, because nothing else can:
       `curl -sI https://raw.githubusercontent.com/Chris-N2/UBookIt/17.1.1/docs/images/booking-flow.png`
       must answer `200`. Check all four images, not one.
-- [ ] 4.3 Confirm the repository README's images now render on `github.com/Chris-N2/UBookIt`.
+- [x] 4.3 Confirm the repository README's images now render on `github.com/Chris-N2/UBookIt`.
       **This works only because §3.4 merged first**: before the merge, `main`'s readme still
       points at `17.1.0`, a tag that does not exist and cannot be created, so the `17.1.1` tag
       alone would change nothing on the landing page. The window closes at merge **plus** tag,
@@ -89,36 +89,36 @@ declared-stable-from sentence is unmoved. Nothing was dragged along by the edits
 
 ## 5. Pack and verify what was produced
 
-- [ ] 5.1 `dotnet clean UBookIt.slnx -c Release`, then a clean rebuild, then pack. The clean is
+- [x] 5.1 `dotnet clean UBookIt.slnx -c Release`, then a clean rebuild, then pack. The clean is
       not housekeeping: `dotnet pack` is incremental and `--no-incremental` does not govern it,
       so a stale `.nupkg` survives and the wildcard pushes it.
-- [ ] 5.2 Verify the artifacts: **5 `.nupkg` + 4 `.snupkg`, all `17.1.1`**; repository commit
+- [x] 5.2 Verify the artifacts: **5 `.nupkg` + 4 `.snupkg`, all `17.1.1`**; repository commit
       equals HEAD; icon and readme **declared and present**; SourceLink SHA equals HEAD.
-- [ ] 5.2a **`git rev-parse 17.1.1^{}` equals `git rev-parse HEAD`** — the tag points at the
+- [x] 5.2a **`git rev-parse 17.1.1^{}` equals `git rev-parse HEAD`** — the tag points at the
       commit actually being packed. Checking the repository commit and the SourceLink SHA
       against HEAD does **not** establish this: the tag is created a step earlier, and any
       commit in between decouples them silently. The frozen readme's images would then address
       a tag that is not the source they came from, and nothing — no test, not even the
       post-publish page check — could detect it.
-- [ ] 5.3 Verify the **packed** readme in **all five packages**, not one: zero relative links,
+- [x] 5.3 Verify the **packed** readme in **all five packages**, not one: zero relative links,
       and four image URLs pinned to `17.1.1`. Each package carries its own copy, which is why
       `docs/publishing.md` says to check all five. Inspect the packed file, not the source —
       that distinction is why `17.0.1` exists.
 
 ## 6. Publish
 
-- [ ] 6.1 Push all five packages. Read the key-ownership note first if the key is new: a `403`
+- [x] 6.1 Push all five packages. Read the key-ownership note first if the key is new: a `403`
       names the key but usually means its **owner** cannot publish.
-- [ ] 6.2 Confirm indexing on the flat-container endpoint per package —
+- [x] 6.2 Confirm indexing on the flat-container endpoint per package —
       `api.nuget.org/v3-flatcontainer/<id>/index.json`. The website lags and *unlisted during
       validation is a state, not a flag*.
-- [ ] 6.3 **Open the package page and look at the screenshots.** Every image must render. This is
+- [x] 6.3 **Open the package page and look at the screenshots.** Every image must render. This is
       the only check that sees what a consumer sees: no test reaches nuget.org, and a rejected
       image is reported to the owner alone.
 
 ## 7. Only after the feed confirms
 
-- [ ] 7.1 Stamp the release date on the `CHANGELOG.md` heading, and commit.
+- [x] 7.1 Stamp the release date on the `CHANGELOG.md` heading, and commit.
 - [ ] 7.2 Sync specs — expect **none**, since this change sets `skip_specs: true`. Verify that
       `openspec/specs/` is untouched rather than assuming it.
 - [ ] 7.3 Archive the change. **In this order**: `ChangelogTests` reads the archive, so archiving
@@ -228,3 +228,36 @@ a document, open that document at `a875088` and find the line.** A summary is no
 a summary written by the same author is not a second source.
 
 **Suite after round 2: 1809 unit, 0 warnings in Release, `--strict` valid.**
+
+## 11. Execution record (2026-09-21)
+
+**Published. All five packages indexed at `17.1.1`**, confirmed against
+`api.nuget.org/v3-flatcontainer/<id>/index.json` per package — and for the meta-package, by
+fetching the `.nupkg` itself (`200`), which is the actual restore path rather than a listing.
+
+**Two instrument faults of my own, both caught by the checks rather than by luck:**
+
+1. **A push that reported success and had not pushed.** `git push … | tail -4; echo $?` reads
+   `tail`'s exit code, not git's. §3.4's `git branch -r --contains HEAD` came back empty and
+   exposed it; a second attempt returned 124, a timeout on the credential prompt. **The gate
+   caught a false green** — which is the entire reason it is written as "verify against the
+   remote" rather than "push".
+2. **A verification script whose tag check silently failed.** `17.1.1^{}` lost its braces to the
+   shell inside `os.popen`, so the comparison read `False` while the summary line still printed
+   *ALL CHECKS PASS* — the `ok` flag did not include it. Re-run standalone: tag = HEAD =
+   `1d1830e`. [[verify-the-instrument-mutated-the-file]] again, in a new disguise.
+
+**§4.2 — all four image URLs returned `200`** before the pack, so the tag side was proven ahead
+of the one-way door. **§6.3 — Chris confirmed the screenshots render on the package page**, which
+is the only check in this release that sees what a consumer sees.
+
+**The website/feed distinction earned its place again.** With four of five indexed, the package
+page already showed `17.1.1` for the meta-package while the flat-container still listed `17.1.0`
+— the documented accepted → validating → indexed sequence. The date was held until the feed
+agreed, because `dotnet add package UBookIt` is the install the README prescribes and it resolved
+`17.1.0` until the last package landed.
+
+**Pack verification, run over all five rather than one:** 5 `.nupkg` + 4 `.snupkg`, all `17.1.1`;
+SourceLink commit = HEAD in every one; icon and readme declared **and present**; **four image
+URLs pinned to `17.1.1` and zero relative links in every packed readme**; and §5.2a, the tag
+pointing at the packed commit.
