@@ -110,9 +110,9 @@ a release is the one moment their absence cannot be corrected afterwards.
 
 ## 6. Publish — the order is load-bearing (design D5)
 
-- [ ] 6.1 **Chris pushes `dev/v18`.** Nothing is packed from an unpushed commit: SourceLink embeds
+- [x] 6.1 **Chris pushes `dev/v18`.** Nothing is packed from an unpushed commit: SourceLink embeds
       the SHA and a missing commit 404s permanently.
-- [ ] 6.2 Verify the push with `git branch -r --contains HEAD` rather than trusting it — a push
+- [x] 6.2 Verify the push with `git branch -r --contains HEAD` rather than trusting it — a push
       has reported success here having pushed nothing.
 - [ ] 6.3 **Tag `18.0.0` and push the tag**, before packing. The readme's image and documentation
       pins both resolve through it.
@@ -260,3 +260,21 @@ and not a regression test.
 **No global NuGet state was changed** — the feed and the source mapping live in a
 `nuget.config` inside the throwaway site, and `dotnet nuget list source` shows no registered
 sources.
+
+**§6 progress — pushed, verified, tagged locally, packed. Publishing waits on Chris.**
+
+- **6.1/6.2 done.** `dev/v18` pushed; verified with `git branch -r --contains HEAD` showing
+  `origin/dev/v18` and 0 commits ahead, rather than trusting the push — the gate that caught a
+  silent no-op push during `17.1.1`.
+- **6.3 half done: the annotated tag `18.0.0` exists locally on `7d63283` and is NOT yet on
+  origin.** Its message records why it is load-bearing: the packed readme's four images *and*
+  twelve documentation links both resolve through it, so a package published before the tag
+  lands shows a reader broken images and dead links on a page frozen for that version.
+- **6.4 half done: packed and verified, not published.** Cleaned and rebuilt per the runbook's
+  step 3 — the artifact deletion that stops `GenerateNuspec` skipping and surviving a repack —
+  producing **5 `.nupkg` + 4 `.snupkg`, every one `18.0.0`, every `repository commit` equal to
+  the tagged commit**. The earlier verification pack was from `e9c632a` and is discarded.
+
+**Publishing is Chris's**, and not by convention: `dotnet nuget push` takes the API key on the
+command line (there is no `dotnet nuget setapikey` in the .NET SDK), and the runbook's own advice
+is to read it in with `Read-Host` so it stays out of shell history. Credentials are his.
