@@ -95,16 +95,16 @@ a release is the one moment their absence cannot be corrected afterwards.
 
 ## 5. Verification
 
-- [ ] 5.1 Build the client, then each test project in Release with the TestSite stopped.
+- [x] 5.1 Build the client, then each test project in Release with the TestSite stopped.
       **Rebuild the client after any branch switch** — hashed assets are not branch-tracked and a
       stale set fails the Release build with a StaticWebAssets error that looks like a broken
       change.
-- [ ] 5.2 Clean Release build, **0 warnings**.
-- [ ] 5.3 `openspec validate --all --strict`.
-- [ ] 5.4 Pack verification per `docs/publishing.md`: five `.nupkg` + four `.snupkg`, all
+- [x] 5.2 Clean Release build, **0 warnings**.
+- [x] 5.3 `openspec validate --all --strict`.
+- [x] 5.4 Pack verification per `docs/publishing.md`: five `.nupkg` + four `.snupkg`, all
       `18.0.0`, repository commit = HEAD, icon and readme declared **and present**, SourceLink
       SHA = HEAD, packed readme 0 relative links, backoffice client assets present.
-- [ ] 5.5 **Install the packed `18.0.0` into a scratch Umbraco 18 site from a local feed** and
+- [~] 5.5 **Install the packed `18.0.0` into a scratch Umbraco 18 site from a local feed** and
       confirm it restores, boots and shows the section. The upper bound is new metadata and
       restore is the only thing that reads it.
 
@@ -180,3 +180,62 @@ had altered the dataset would have falsified a description nothing else guards �
 **The other three images are untouched**, which is D3's decision holding rather than an omission:
 `availability.png` contains no `uui-button` and the two front-end images are our own markup on
 the site's styling.
+
+## 15. §5 results — and the install check earned its keep immediately
+
+**5.4 — the pack is clean, and one of my own checks was wrong before the artifact was.**
+Five `.nupkg` + four `.snupkg`, all `18.0.0`; every nuspec's `repository commit` equals HEAD;
+icon and readme declared **and present** in all five; all four SourceLink documents name the
+public repository at HEAD. The packed readme carries **17 targets, 0 relative, 16 pinned to
+`18.0.0`, 0 naming `main`, 0 naming `17.1.1`** — the seventeenth is the external Norwood link,
+correctly unchecked. The backoffice package carries 35 client assets including
+`umbraco-package.json`. All seven `Umbraco.Cms.*` declarations across three packages read
+`[18.2.0, 19.0.0)`.
+
+**My SourceLink host check reported "host is not the public repo" on every file and was itself
+the defect** — it matched on `github.com/Chris-N2/UBookIt`, and SourceLink emits
+`raw.githubusercontent.com/...`, which does not contain that substring. The artifacts were
+correct throughout. Reading the file rather than trusting the check is what separated them.
+
+**5.5 — the restore half is DONE and found something inspection could not. The run half is
+BLOCKED on a database.**
+
+Done: a scratch site created with `dotnet new umbraco` (Umbraco 18), all five uBookIt packages
+resolved **from a local folder feed**, and the site built.
+
+**Two findings, both invisible to any amount of looking at the .nupkg:**
+
+1. **A machine-level `packageSourceMapping` silently excluded the local feed.** NuGet reported
+   *"Versions from ubookit-local were not considered"* — a sentence about policy that reads
+   exactly like a sentence about content. The feed had the packages all along. Any future
+   local-feed check needs a `nuget.config` that clears and re-declares the mapping, and that
+   config is now written down in this change's record rather than rediscovered.
+2. **uBookIt's floor produces a MIXED-VERSION Umbraco install on a site below it.** The template
+   creates an Umbraco **18.1.0** site; our dependencies require `>= 18.2.0`. NuGet resolved the
+   packages uBookIt depends on to 18.2.0 and left the rest at 18.1.0 — `Core`, `Infrastructure`,
+   `Api.Management`, `Api.Common`, `Persistence.EFCore` at 18.2.0 against `Api.Delivery`,
+   `Persistence.SqlServer`, `Imaging.ImageSharp` at 18.1.0. **It built with 0 errors and no
+   NuGet warning at all.** Our own `Directory.Packages.props` says "keep all `Umbraco.Cms.*`
+   packages on the same version"; this hands a consumer the opposite.
+
+   **Caused by the floor, not by the new upper bound** — it would have happened before this
+   change. It became visible only because something finally installed the package rather than
+   inspecting it, which is the exact claim `Installability is proved by installing` makes.
+
+   **Fixed by documentation rather than by lowering the floor**: the README's Requirements row
+   now states **18.2.0 or later**, not "18.x", and says plainly that a site below it should raise
+   `Umbraco.Cms` first. Confirmed by doing it — with `Umbraco.Cms` at 18.2.0, every Umbraco
+   package uBookIt touches is on one version. (One package stays at 18.1.0:
+   `Umbraco.Cms.DevelopmentMode.Backoffice`, pinned separately by the *template* and not a
+   uBookIt dependency at all.)
+
+**What 5.5 still owes, stated rather than quietly dropped:** the requirement's scenario is *"a
+site created from scratch that resolved the package from a feed, **ran, and took a booking**"*.
+The site has not been run, because uBookIt needs SQL Server and a scratch database is Chris's to
+create — credentials are his and I do not handle them. **Restore and build are proved; boot and
+book are not.** This is a performed check with a stated limit, exactly as that requirement
+demands, and it must not be read as more than it is.
+
+**No global NuGet state was changed** — the feed and the source mapping live in a
+`nuget.config` inside the throwaway site, and `dotnet nuget list source` shows no registered
+sources.
