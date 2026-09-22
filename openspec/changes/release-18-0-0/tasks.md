@@ -82,16 +82,16 @@ a release is the one moment their absence cannot be corrected afterwards.
 
 ## 4. The screenshot (design D3)
 
-- [ ] 4.1 Curate a plausible, non-personal booking set on the v18 dev site. The live-check
+- [x] 4.1 Curate a plausible, non-personal booking set on the v18 dev site. The live-check
       residue (`K3RT-FR4D`, and `8WZR-Q9P8` cancelled) is not a shipping dataset.
-- [ ] 4.2 Retake `bookings-screen.png` on Umbraco 18, matching the existing image's framing so
+- [x] 4.2 Retake `bookings-screen.png` on Umbraco 18, matching the existing image's framing so
       the four read as one set.
-- [ ] 4.3 Update its alt text if the data changed — the alt text describes the *contents*, and
+- [x] 4.3 Update its alt text if the data changed — the alt text describes the *contents*, and
       `docs-truth-and-screenshots` established that a description which stops matching its image
       is a defect of the same family as a false sentence.
-- [ ] 4.4 Confirm the other three are unchanged and that this is still a deliberate decision
+- [x] 4.4 Confirm the other three are unchanged and that this is still a deliberate decision
       rather than an omission (D3).
-- [ ] 4.5 **Before the tag**, because the pinned URLs resolve through it.
+- [x] 4.5 **Before the tag**, because the pinned URLs resolve through it.
 
 ## 5. Verification
 
@@ -145,3 +145,38 @@ that actually came out — which is also why §3.2's "all five, not one" needs n
 nuspec**, because only the TestSite references it. Bounding it changes nothing a consumer sees
 and keeps the file internally consistent; the guard correctly says nothing about it, because it
 asserts over what shipped.
+
+**§4 result — the curation task dissolved, and the alt text needed nothing.**
+
+**4.1 required no curation at all.** Chris restored the v18 database as a bacpac copy of the v17
+one, so the four bookings the shipped image shows were already present, unchanged:
+`FQ7R-M7X3` Priya Raman, `CGRR-QP4J` Tom Okafor, `CKBF-XTVP` Lena Fischer and `ZZHD-MDZM`
+Marcus Bell, same times, same resources, same services. **And the live-check residue is invisible
+rather than excluded**: the shipped framing sets From and To to 5 October 2026, while
+`K3RT-FR4D` and `8WZR-Q9P8` sit on 28 September. The date filter that makes the screenshot
+readable is the same thing that keeps the test data out of it.
+
+So the retake is a **true like-for-like**: identical data, identical window, identical framing,
+one difference — which is exactly what makes it evidence for D3 rather than a refresh.
+
+**4.3 needed no edit, and that was checked rather than assumed.** The alt text names the From/To
+window, the four status checkboxes, the New booking button, the table's columns and the per-row
+Move and Cancel actions. Every one still holds, because the data did not change. A retake that
+had altered the dataset would have falsified a description nothing else guards — the trap
+`docs-truth-and-screenshots` established.
+
+**Two mechanical notes worth keeping for the next retake:**
+
+- **Match the viewport before capturing, not after.** The first capture came out at roughly
+  double scale with the action buttons cut off the right edge, because the browser window had
+  been resized since the earlier session. `resize_window` to 1600×900 restored a viewport that
+  frames the table the way the shipped image does.
+- **The capture arrives as JPEG and is converted to PNG**, so it carries one lossy generation.
+  Compared against the shipped image at 3× magnification on the same text, the two are
+  equivalent — the existing image came through a comparable pipeline. Recorded because the
+  packed image is frozen per version, so "good enough" is a decision rather than an accident;
+  a native PNG capture is the alternative if a future retake needs it.
+
+**The other three images are untouched**, which is D3's decision holding rather than an omission:
+`availability.png` contains no `uui-button` and the two front-end images are our own markup on
+the site's styling.
