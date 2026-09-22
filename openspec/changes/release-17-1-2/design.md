@@ -235,7 +235,7 @@ QA's first finding was about. Recorded here rather than left to be rediscovered:
    version of this item named `run-on-umbraco-18`, and the correction of that then misattributed
    the miscount story to it as well.** Both stories are `release-18-0-0`'s: the `EndsWith` claim
    in task 1.4, the miscount in **task 3.1** (*"Seven, not the eight stated everywhere in this
-   change … Third miscount here"*). `run-on-umbraco-18` has neither — greppped, zero hits for
+   change … Third miscount here"*). `run-on-umbraco-18` has neither — grepped, zero hits for
    both. An obligation pointing at the wrong document is one nobody can act on, which is why
    this was a finding; getting the correction wrong in the other direction is the same defect
    twice. Both are archived, so the correction belongs wherever that line's next

@@ -190,10 +190,27 @@ and HTTP 200** — and what is **not** proved is that a migration ran or a booki
 is the very thing that requirement's first scenario asks for.
 
 **Acceptable here, and for a reason rather than by omission:** this release changes no code, so
-the migration and the booking flow are `17.1.1`'s, and `17.1.1`'s were proved on a real install
-during `release-18-0-0` §5.5. What `17.1.2` changes is package metadata, and metadata is read at
-restore — which is exactly the part that was measured. **Performed once, by hand, on 2026-09-22;
-not automated, and not a standing guarantee.**
+the migration and the booking flow are **byte-for-byte `17.1.1`'s** and this release cannot have
+altered them. What `17.1.2` changes is package metadata; metadata is read at **restore**, which
+is exactly the part that was measured — in both directions, on real scratch sites.
+**Performed once, by hand, on 2026-09-22; not automated, and not a standing guarantee.**
+
+**An earlier version of this paragraph cited `release-18-0-0` §5.5 as having proved `17.1.1`'s
+migration and booking flow. It did not, and nothing else has.** That check installed **`18.0.0`
+into an Umbraco 18 site** — the other line, the other CMS, a different package. Checked across
+the archive rather than assumed: `release-17-0-0`, `17-0-1`, `17-1-0` and `17-1-1` record
+**zero** real installs between them; the only one in this line's lineage is
+`2026-09-01-packaging-release` §5.x, at **`0.1.0`**.
+
+**So `Installability is proved by installing` is a live requirement on `main` that no 17-line
+release has ever exercised.** That is a standing gap in the line's evidence — not one this
+release creates, and not one it discharges. Recorded in `[[ubookit-deferred-obligations]]` rather
+than left inside an archived change, because an obligation nobody can find is not recorded.
+
+**Writing a false citation into the paragraph whose stated purpose is "what is proved and what is
+not" is the worst version of this change's recurring fault**, and the reason it matters more than
+a wrong reference: an archive that says a verification happened is how a future change skips a
+check on the grounds that somebody already did it.
 
 **Counts after the fixes: 1811 / 167 / 1168 / 290**, two above `main`'s 1809 baseline: the
 cherry-picked guard and D6's new one. **0 warnings**, `--strict` 23/23.
