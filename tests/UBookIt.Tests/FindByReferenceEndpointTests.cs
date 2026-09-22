@@ -236,6 +236,7 @@ public class FindByReferenceEndpointTests
     private static IBackOfficeSecurityAccessor Security(bool sensitiveData)
     {
         var user = new User(new GlobalSettings());
+#pragma warning disable CS0618 // Umbraco 18 obsoleted this ctor; see the note in UBookItSectionAccessTests.
         user.AddGroup(new ReadOnlyUserGroup(
             id: 1,
             key: sensitiveData ? Constants.Security.SensitiveDataGroupKey : Guid.NewGuid(),
@@ -250,6 +251,7 @@ public class FindByReferenceEndpointTests
             permissions: new HashSet<string>(),
             granularPermissions: new HashSet<IGranularPermission>(),
             hasAccessToAllLanguages: true));
+#pragma warning restore CS0618
 
         return new StubAccessor(new StubSecurity(user));
     }

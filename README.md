@@ -37,9 +37,9 @@ from Semantic Versioning.** The major is spent on the CMS version, so:
 
 | | |
 |---|---|
-| **`17.x.y` → `17.x.z`** (patch) | Never breaks. Fixes and internal changes only. |
-| **`17.x.0` → `17.y.0`** (minor) | New features — and the only place a breaking change may appear. |
-| **`17` → a later major** | A different Umbraco — and the API may change with it, since the CMS it targets did. |
+| **patch** (`x.y.1` → `x.y.2`) | Never breaks. Fixes and internal changes only. |
+| **minor** (`x.1.0` → `x.2.0`) | New features — and the only place a breaking change may appear. |
+| **major** (`17.x` → `18.x`) | A different Umbraco — and the API may change with it, since the CMS it targets did. |
 
 Breaking changes are avoided: the public interface is kept as consistent as possible, and
 additions are preferred to changes. Where one is genuinely unavoidable it lands in a **minor**

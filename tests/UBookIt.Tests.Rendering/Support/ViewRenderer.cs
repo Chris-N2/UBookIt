@@ -299,6 +299,12 @@ public sealed class ViewRenderer
 
         public IPublishedMediaCache Media => throw Unread();
 
+        // Umbraco 18 added the element cache to IUmbracoContext. Unread like the other caches:
+        // the booking flow's views render from view models, not from published content, and a
+        // view that started reaching for the content cache should fail loudly here rather than
+        // be handed an empty one that quietly renders nothing.
+        public IPublishedElementCache Elements => throw Unread();
+
         public IDomainCache Domains => throw Unread();
 
         public IPublishedRequest? PublishedRequest

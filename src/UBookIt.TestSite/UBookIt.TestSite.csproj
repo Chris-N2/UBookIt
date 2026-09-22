@@ -58,7 +58,11 @@
     <!-- Remove RazorCompileOnBuild and RazorCompileOnPublish when not using ModelsMode InMemoryAuto -->
     <RazorCompileOnBuild>false</RazorCompileOnBuild>
     <RazorCompileOnPublish>false</RazorCompileOnPublish>
-    <UserSecretsId>db95506d-3d16-4216-8e05-f216295500df</UserSecretsId>
+    <!-- Deliberately DIFFERENT from main's id on this branch. User secrets are keyed by
+         UserSecretsId, not by branch, so sharing one would mean sharing one connection string —
+         and pointing the v18 TestSite at main's database would let Umbraco 18 migrate it, after
+         which the v17 TestSite can no longer boot against it. Separate id, separate database. -->
+    <UserSecretsId>a220bfe8-cd6c-45e8-bd3f-e94f3a2dbd45</UserSecretsId>
   </PropertyGroup>
 
 </Project>

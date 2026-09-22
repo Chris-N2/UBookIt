@@ -5,9 +5,20 @@ booking system for Umbraco; this aims to be it.
 
 ## Invariants — these survive every context and every spec
 
-1. **Umbraco 17+ (LTS) only.** Single .NET target matching Umbraco 17's
-   supported runtime. No multi-targeting for earlier Umbraco majors. v13 and
-   the v14–16 STS line are explicitly out of scope.
+1. **Umbraco LTS is what `main` targets.** `main` tracks the current LTS —
+   Umbraco 17 now, Umbraco 21 from December 2027 — on the single .NET target
+   that LTS supports. **An STS line may be supported on a `dev/vXX` branch and
+   published as its own major** (`18.x` for Umbraco 18), but it is secondary:
+   features land on `main` first, and an STS line is dropped when its Umbraco
+   version reaches EOL rather than carried. Earlier majors stay out of scope:
+   v13 and the v14–16 STS line will not be supported, and there is no
+   multi-targeting for them.
+
+   *The previous wording — "Umbraco 17+ (LTS) only" — was ambiguous about
+   whether STS majors were excluded. They are not, and never were: supporting
+   STS was always intended. What this settles is which line `main` follows, and
+   the answer is the LTS, because 18 is STS and reaches EOL in June 2027,
+   seventeen months before 17 does.*
 
 2. **Zero DevExpress in this repository.** No `PackageReference`, no npm
    dependency, no CDN script tag, no copied source. The DevExpress EULA

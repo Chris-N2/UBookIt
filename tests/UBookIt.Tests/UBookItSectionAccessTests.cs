@@ -44,6 +44,20 @@ public class UBookItSectionAccessTests
     {
         var user = new User(new GlobalSettings());
 
+        // Umbraco 18 marked this ReadOnlyUserGroup constructor obsolete — "please use the
+        // constructor that includes all parameters. Scheduled for removal in Umbraco 19."
+        //
+        // NOT PORTED, deliberately, and this is the one place the reason is written down; the
+        // other three call sites point here. The replacement takes one extra nullable int,
+        // sitting among the start-node ids — and **Umbraco's shipped XML documentation names
+        // only thirteen of its fourteen parameters**, so the new one's name is not published.
+        // Passing `null` positionally across fourteen arguments to a parameter nobody can name
+        // is how a fixture comes to assert something nobody understands.
+        //
+        // The value is not in doubt (these fixtures want no start node at all); the name is.
+        // OWED BEFORE UMBRACO 19, when the obsolete constructor is removed and this becomes a
+        // build error rather than a suppression.
+#pragma warning disable CS0618
         user.AddGroup(new ReadOnlyUserGroup(
             id: 1,
             key: Guid.NewGuid(),
@@ -58,6 +72,7 @@ public class UBookItSectionAccessTests
             permissions: new HashSet<string>(),
             granularPermissions: new HashSet<IGranularPermission>(),
             hasAccessToAllLanguages: true));
+#pragma warning restore CS0618
 
         return user;
     }

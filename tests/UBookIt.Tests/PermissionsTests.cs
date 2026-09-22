@@ -426,6 +426,7 @@ public class PermissionsTests
         return user;
     }
 
+#pragma warning disable CS0618 // Umbraco 18 obsoleted this ctor; see the note in UBookItSectionAccessTests.
     private static ReadOnlyUserGroup Group(
         int id, string[] sections, string[] verbs, string? alias = null)
         => new(
@@ -442,6 +443,7 @@ public class PermissionsTests
             permissions: new HashSet<string>(verbs),
             granularPermissions: new HashSet<Umbraco.Cms.Core.Models.Membership.Permissions.IGranularPermission>(),
             hasAccessToAllLanguages: true);
+#pragma warning restore CS0618
 
     /// <summary>
     /// The whole pipeline: the REAL composer composed, the REAL policies and handlers,

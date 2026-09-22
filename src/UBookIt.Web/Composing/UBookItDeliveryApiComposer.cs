@@ -2,11 +2,11 @@ using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.Mvc.Controllers;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
-using Microsoft.OpenApi;
-using Swashbuckle.AspNetCore.SwaggerGen;
 using UBookIt.Core;
 using UBookIt.Web.Controllers;
 using UBookIt.Web.Mapping;
+using Umbraco.Cms.Api.Common.Attributes;
+using Umbraco.Cms.Api.Common.DependencyInjection;
 using Umbraco.Cms.Core.Composing;
 using Umbraco.Cms.Core.DependencyInjection;
 
@@ -53,19 +53,47 @@ public sealed class UBookItDeliveryApiComposer : IComposer
         builder.Services.Configure<MvcOptions>(options =>
             options.Conventions.Add(new CancellationExposureConvention(cancellation)));
 
-        builder.Services.Configure<SwaggerGenOptions>(options =>
+        // Deliberately NOT AddBackOfficeOpenApiDocument, and deliberately no authentication:
+        // the delivery API is anonymous by design, so its operations carry no auth requirement
+        // and its document must not advertise one. That absence is a guarantee about a public
+        // API rather than a line nobody typed — see the delivery-api capability. Do not add
+        // authentication here "for consistency" with the backoffice document; the two differ
+        // on purpose.
+        //
+        // Umbraco 18 generates OpenAPI through Microsoft.AspNetCore.OpenApi rather than
+        // Swashbuckle, so this is the framework's own AddOpenApi rather than a Umbraco
+        // backoffice helper — which is the right shape anyway, because this document describes
+        // a public API that has nothing to do with the backoffice.
+        builder.Services.AddOpenApi(Constants.DeliveryApiName, options =>
         {
-            options.SwaggerDoc(Constants.DeliveryApiName, new OpenApiInfo
+            options.AddDocumentTransformer((document, _, _) =>
             {
-                Title = "uBookIt Delivery API",
-                Version = "1.0",
-                Description = "Public, anonymous booking delivery API: resource discovery, "
-                    + "availability and slot queries, and booking placement.",
+                document.Info.Title = "uBookIt Delivery API";
+                document.Info.Version = "1.0";
+                document.Info.Description =
+                    "Public, anonymous booking delivery API: resource discovery, "
+                    + "availability and slot queries, and booking placement.";
+
+                return Task.CompletedTask;
             });
 
-            // Deliberately no security operation filter — the delivery API is
-            // anonymous, so its operations carry no auth requirement.
+            // Membership is decided by the SAME [MapToApi] attribute the controllers already
+            // carry, rather than by a namespace check duplicated here. One source of truth:
+            // move a controller out of the delivery API and this follows automatically.
+            //
+            // Endpoints hidden by DeliveryApiExposureConvention never reach this predicate —
+            // it clears ApiExplorer.IsVisible, so no ApiDescription is produced at all. That
+            // is why "a disabled endpoint does not appear in the OpenAPI document" survives
+            // the move off Swashbuckle: the mechanism was never Swashbuckle's.
+            options.ShouldInclude = api =>
+                api.ActionDescriptor is ControllerActionDescriptor controller
+                && controller.ControllerTypeInfo
+                    .GetCustomAttributes(typeof(MapToApiAttribute), inherit: true)
+                    .OfType<MapToApiAttribute>()
+                    .Any(attribute => attribute.ApiName == Constants.DeliveryApiName);
         });
+
+        builder.Services.AddOpenApiDocumentToUi(Constants.DeliveryApiName, "uBookIt Delivery API");
 
         // Transport/model-binding failures (malformed body, unparseable or
         // missing parameter) must use the same errors[] envelope as domain

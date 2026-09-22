@@ -41,6 +41,7 @@ public class UBookItSensitiveDataAccessTests
     {
         var user = new User(new GlobalSettings());
 
+#pragma warning disable CS0618 // Umbraco 18 obsoleted this ctor; see the note in UBookItSectionAccessTests.
         user.AddGroup(new ReadOnlyUserGroup(
             id: 1,
             key: groupKey,
@@ -55,6 +56,7 @@ public class UBookItSensitiveDataAccessTests
             permissions: new HashSet<string>(),
             granularPermissions: new HashSet<IGranularPermission>(),
             hasAccessToAllLanguages: true));
+#pragma warning restore CS0618
 
         return user;
     }

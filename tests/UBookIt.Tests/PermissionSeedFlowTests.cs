@@ -296,6 +296,13 @@ public class PermissionSeedFlowTests
         public Task<Attempt<UserGroupOperationStatus>> UpdateUserGroupsOnUsersAsync(
             ISet<Guid> userGroupKeys, ISet<Guid> userKeys) => throw new NotSupportedException(Explanation);
 
+        // Umbraco 18 added a performing-user overload. It throws like every other member the
+        // seed does not call — that is this stub's whole design: a seed that started doing
+        // more would say so here rather than be handed an invented answer.
+        public Task<Attempt<UserGroupOperationStatus>> UpdateUserGroupsOnUsersAsync(
+            ISet<Guid> userGroupKeys, ISet<Guid> userKeys, Guid performingUserKey)
+            => throw new NotSupportedException(Explanation);
+
         public Task<Attempt<UserGroupOperationStatus>> AddUsersToUserGroupAsync(
             UsersToUserGroupManipulationModel addUsersModel, Guid performingUserKey)
             => throw new NotSupportedException(Explanation);

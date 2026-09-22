@@ -222,6 +222,16 @@ public class BookingNotificationSettingsTests
 
         public Task SendAsync(EmailMessage message, string emailType, bool enableNotification)
             => Task.CompletedTask;
+
+        // Umbraco 18 added the scheduling overload to IEmailSender. The stub records nothing
+        // and sends nothing, exactly as the others do — this test is about whether the check
+        // reports the sender as usable, not about what reaches a mail server.
+        public Task SendAsync(
+            EmailMessage message,
+            string emailType,
+            bool enableNotification,
+            TimeSpan? delay)
+            => Task.CompletedTask;
     }
 
     private sealed class CapturingLogger : ILogger<UBookItNotificationBootCheck>
