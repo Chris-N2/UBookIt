@@ -31,7 +31,7 @@
 - [x] 3.2 **Carry the anonymity comment across.** The absence of `.WithBackOfficeAuthentication()`
       is a deliberate guarantee about a public API, not a line nobody typed — verify the comment
       survives the port and says so.
-- [ ] 3.3 Verify the delivery document still carries **no security requirement** on its
+- [x] 3.3 Verify the delivery document still carries **no security requirement** on its
       operations, by inspecting the generated document rather than the source.
 
 **§1–3, §5 results — and the spike's measurement was an undercount, necessarily.**
@@ -46,8 +46,12 @@ compiler got far enough to find.**
 **The backoffice composer went from ~40 lines to 5.** The delivery one uses the framework's own
 `AddOpenApi` with a `ShouldInclude` keyed on the `[MapToApi]` attribute the controllers already
 carried — one source of truth rather than a namespace check duplicated in the composer.
-`AddUmbracoOpenApiDocument` exists in the assembly but was not reachable as `IUmbracoBuilder` or
-`IServiceCollection`; after four attempts I stopped guessing and used the documented route.
+`AddUmbracoOpenApiDocument` exists in the assembly but is **not usable by a package, and now the
+reason is known rather than guessed at**: it is generic — `AddUmbracoOpenApiDocument<TConfigure>`
+— which is why four non-generic call attempts failed to resolve, and its type argument must derive
+from `ConfigureUmbracoOpenApiOptionsBase`, which is **internal to Umbraco**. Four guesses found
+nothing; reading the shipped XML documentation and then the assembly metadata found both facts in
+two calls. **Read the metadata on the first failure, not the fifth.**
 
 **2.3 — `CustomOperationHandler` is PORTED, not deleted — and the first version of this very
 paragraph claimed the opposite, on no evidence.** It recorded "deleted, on evidence: the 30
@@ -98,15 +102,76 @@ weakened.**
 
 ## 4. The guarantees the port must not break
 
-- [ ] 4.1 Run the `delivery-api` guards. Specifically the OpenAPI scenarios: a disabled endpoint
+- [x] 4.1 Run the `delivery-api` guards. Specifically the OpenAPI scenarios: a disabled endpoint
       does not appear in the document, and the delivery document is separate from the backoffice
       one. These are the acceptance criteria for the whole change.
-- [ ] 4.2 Verify the disabled-endpoint behaviour **against a generated document on a site with
+- [x] 4.2 Verify the disabled-endpoint behaviour **against a generated document on a site with
       the delivery API off**, not only against the unit guard — the mechanism may have been
       coupled to Swashbuckle's pipeline, and that coupling would not show in a test that never
       generates a document.
-- [ ] 4.3 Re-generate the TypeScript client and run the client suite. Verify the generation
+- [x] 4.3 Re-generate the TypeScript client and run the client suite. Verify the generation
       itself succeeded rather than reusing a stale `client.gen.ts`.
+
+**§4, §6 results — verified on a running Umbraco 18 site, not inferred.**
+
+**4.1 / 4.2 — `delivery-api`'s OpenAPI guarantees hold, and the second one was checked the way
+the task demanded rather than the cheap way.** With both delivery directions switched off by
+environment override (so the dev config is not left mutated), the generated delivery document
+carries **0 paths** and `GET /umbraco/ubookit/api/v1/resources` returns **404** — absent, not
+refused. This is the evidence the design asked for: the mechanism is
+`DeliveryApiExposureConvention` clearing `ApiExplorer.IsVisible`, so no `ApiDescription` is ever
+produced, and it was never Swashbuckle's to lose. With the API on, the delivery document is
+separate from the backoffice one (11 paths vs 30 operations) and **carries no `security` on any
+operation and none at the document root** (3.3).
+
+**An integer was not being described as one — found by the TypeScript compiler, not by reading
+the document.** With the client regenerated, `npm run build` failed with fourteen errors all of
+one shape: `Type 'string | number' is not assignable to type 'number'`. The cause is upstream of
+us. `Microsoft.AspNetCore.OpenApi` generates schemas from the **global HTTP `JsonOptions`** —
+Microsoft documents these as the only JSON options that influence OpenAPI, MVC's having *none* —
+and Umbraco configures those globally with `JsonNumberHandling.AllowReadingFromString`. So every
+`int` was emitted as `{"type": ["integer", "string"]}` with a numeric-string pattern: a true
+statement about a minimal API reading those options, and a **false** one about our controllers,
+which are MVC and do not.
+
+Umbraco's own documents do not have this, which is what proved it was ours. The two documents are
+fixed differently because only one of them has a supported seam:
+
+- **Backoffice** — `WithJsonOptions(Constants.JsonOptionsNames.BackOffice)` on the document
+  builder. This is precisely what the parameter is for: *"match the serialization conventions of
+  the API endpoints the document describes."*
+- **Delivery** — that seam is Umbraco-internal for a non-backoffice document and `OpenApiOptions`
+  exposes no serializer of its own, so a **schema transformer** narrows the union the serializer
+  settings widened: the `String` member is removed, `null` is preserved, and a schema that was
+  never widened is untouched.
+
+Confirmed on the live documents afterwards: backoffice **0 unions / 21 plain integers**, delivery
+**0 unions / 16 plain integers** with nullable ints still `["null", "integer"]`.
+
+**One guard adjusted, and the distinction matters: adjusted, not weakened.** `GeneratedClientTests`
+asserted `service?: BookedServiceModel | null`. Umbraco 18 emits OpenAPI 3.1, whose nullable shape
+is `{"type": ["null", "object"]}`, so the generator writes `null | BookedServiceModel` — the same
+type, the other order. The assertion now accepts either order and still requires all three things
+it always required: optional, nullable, and **one object**. Union order is the generator's
+business; the contract is ours.
+
+**6.1–6.3 — 1809 / 167 / 1168 / 290, every suite at the `main` baseline, nothing deleted or
+weakened. 0 warnings in a clean Release build. `openspec validate --all --strict` 23/23.**
+
+**6.4 — the port did NOT stay inside the five files the task predicted, and the task was wrong
+rather than the port.** The prediction was written from the spike, and §3's note already records
+why the spike undercounted: test projects never compiled while `src` was broken. The actual
+divergence from `main`, excluding this change's own OpenSpec artifacts, is 21 files — the five
+predicted, plus the nine test files whose doubles or fixtures Umbraco 18 touched
+(`ReadOnlyUserGroup` suppressions, `IUmbracoContext.Elements`, the `IEmailSender` and
+`IUserGroupService` overloads), `UBookIt.Web.csproj`'s `InterceptorsNamespaces`, the TestSite's
+own `UserSecretsId`, and `CLAUDE.md`.
+
+**`CLAUDE.md` is drift and is a SECOND cherry-pick obligation, alongside the README table.** The
+invariant-1 amendment describing the LTS/STS branching policy is a statement about the project,
+true of both lines, and it currently exists only on `dev/v18`. Left there it does what D6 warns
+about for the README: the two branches disagree about the project's own policy, in the file that
+tells every future context what the rules are.
 
 ## 5. The versioning table (design D6)
 
@@ -115,15 +180,18 @@ weakened.**
 - [x] 5.2 **Record the cherry-pick obligation prominently**: this edit is true of `main` too, and
       left here alone it makes two published READMEs disagree about the package's own policy.
       Branch flow is `main` → `dev/v18`, so it will also conflict at the next merge forward.
+- [ ] 5.3 **`CLAUDE.md`'s invariant 1 is the same obligation and was not noticed until §6.4's
+      confinement check.** The LTS/STS amendment is a statement about the project, not about the
+      v18 line, and it lives only on `dev/v18`. Cherry-pick it to `main` with the README table.
 
 ## 6. Verification
 
-- [ ] 6.1 Build the client first, then each test project sequentially in Release with the
+- [x] 6.1 Build the client first, then each test project sequentially in Release with the
       TestSite stopped. Record counts against the `main` baseline of 1809 / 167 / 1168 / 290 —
       **any drop is a guarantee that stopped being checked**, not a test that became irrelevant.
-- [ ] 6.2 Clean Release build, **0 warnings**.
-- [ ] 6.3 `openspec validate --all --strict`.
-- [ ] 6.4 Confirm the port stayed inside the coupled surface: `git diff main...dev/v18 --stat`
+- [x] 6.2 Clean Release build, **0 warnings**.
+- [x] 6.3 `openspec validate --all --strict`.
+- [x] 6.4 Confirm the port stayed inside the coupled surface: `git diff main...dev/v18 --stat`
       should touch the two composers, `Directory.Packages.props`, the README table and the
       generated client — and nothing else. Anything further is drift between the lines.
 
