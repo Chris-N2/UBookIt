@@ -114,13 +114,13 @@ a release is the one moment their absence cannot be corrected afterwards.
       the SHA and a missing commit 404s permanently.
 - [x] 6.2 Verify the push with `git branch -r --contains HEAD` rather than trusting it — a push
       has reported success here having pushed nothing.
-- [ ] 6.3 **Tag `18.0.0` and push the tag**, before packing. The readme's image and documentation
+- [x] 6.3 **Tag `18.0.0` and push the tag**, before packing. The readme's image and documentation
       pins both resolve through it.
-- [ ] 6.4 Pack, then publish all five packages.
-- [ ] 6.5 Confirm **per package** on `api.nuget.org/v3-flatcontainer/<id>/index.json`. The website
+- [x] 6.4 Pack, then publish all five packages.
+- [x] 6.5 Confirm **per package** on `api.nuget.org/v3-flatcontainer/<id>/index.json`. The website
       shows versions the feed cannot yet serve; the flat-container index is what restore reads.
-- [ ] 6.6 **Then** stamp the changelog date, and commit.
-- [ ] 6.7 Fetch the published readme's image and documentation URLs and confirm they render —
+- [x] 6.6 **Then** stamp the changelog date, and commit.
+- [x] 6.7 Fetch the published readme's image and documentation URLs and confirm they render —
       the human check both new requirements say a guard cannot make.
 
 ## 7. Record
@@ -278,3 +278,34 @@ sources.
 **Publishing is Chris's**, and not by convention: `dotnet nuget push` takes the API key on the
 command line (there is no `dotnet nuget setapikey` in the .NET SDK), and the runbook's own advice
 is to read it in with `Read-Host` so it stays out of shell history. Credentials are his.
+
+**§6 complete — `18.0.0` IS PUBLISHED.**
+
+**The tag went first, and its URLs were proved before anything was pushed to nuget.org**, because
+that is the one ordering this release could not undo. With `18.0.0` on origin at `7d63283`, all
+four packed images and every sampled documentation link answered **200** — checked *before*
+publishing rather than discovered after.
+
+**6.5 — confirmed on the flat-container, per package, not on the website.** All five list
+`17.0.0, 17.0.1, 17.1.0, 17.1.1, 18.0.0`. The website is not the authority: during `17.1.1` it
+showed a version the feed could not yet serve, which is why `dotnet add package UBookIt` is
+checked against `api.nuget.org/v3-flatcontainer/<id>/index.json`.
+
+**6.7 — verified against the PUBLISHED artifact, downloaded back off the feed**, rather than
+against the local one that was pushed. `UBookIt 18.0.0` reports `repository commit`
+`7d63283…` — the tagged commit — and its packed readme carries **17 targets, 0 relative, 16
+pinned to `18.0.0`, 0 naming `main`, 0 naming `17.1.1`**.
+
+**And the new guarantee is live in the published packages**, which is the only place it counts:
+
+| package | dependency | version |
+|---|---|---|
+| `UBookIt.Web` | `Umbraco.Cms.Api.Common`, `Umbraco.Cms.Web.Website` | `[18.2.0, 19.0.0)` |
+| `UBookIt.Backoffice` | `Api.Common`, `Api.Management`, `Web.Common`, `Web.Website` | `[18.2.0, 19.0.0)` |
+| `UBookIt.Persistence` | `Umbraco.Cms.Persistence.EFCore` | `[18.2.0, 19.0.0)` |
+
+Seven declarations, every one bounded. **This is the first uBookIt release where "which Umbraco"
+is something a resolver can read** rather than a sentence in a readme.
+
+**The date was stamped only after the feed agreed**, per design D5 — 1823 / 167 / 1168 green
+afterwards, so `ChangelogTests` is satisfied going into the archive rather than after it.
