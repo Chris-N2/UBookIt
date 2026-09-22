@@ -125,11 +125,11 @@ a release is the one moment their absence cannot be corrected afterwards.
 
 ## 7. Record
 
-- [ ] 7.1 Sync `packaging` with the two ADDED requirements, then archive.
-- [ ] 7.2 Record the 17-line obligations this change deliberately did not take: the `17.x` upper
+- [x] 7.1 Sync `packaging` with the two ADDED requirements, then archive.
+- [x] 7.2 Record the 17-line obligations this change deliberately did not take: the `17.x` upper
       bound, and that `17.0.0`–`17.1.1`'s readmes are frozen with `main` links and cannot be
       corrected.
-- [ ] 7.3 Note what the two-line release cost against the one-line one — the next major's release
+- [x] 7.3 Note what the two-line release cost against the one-line one — the next major's release
       is cheaper for knowing it, and this is the first release where "which line" was a question
       at every step.
 
@@ -309,3 +309,54 @@ is something a resolver can read** rather than a sentence in a readme.
 
 **The date was stamped only after the feed agreed**, per design D5 — 1823 / 167 / 1168 green
 afterwards, so `ChangelogTests` is satisfied going into the archive rather than after it.
+
+## 16. §7 — what this release leaves behind
+
+**7.1** — `packaging` synced with both ADDED requirements (22 requirements, up from 20),
+`--strict` 23/23. The sibling sweep found nothing falsified: the only hit for "no upper bound"
+is this release's own new scenario.
+
+**7.2 — the 17-line obligations this release deliberately did not take, and one of them got
+MORE urgent the moment `18.0.0` went live.**
+
+1. **`17.x` needs its own upper bound, and publishing `18.0.0` sharpened the risk rather than
+   relieving it.** `17.0.0`–`17.1.1` declare `Umbraco.Cms.Web.Website 17.6.2` with no ceiling, so
+   a site on Umbraco 18 that pins `UBookIt 17.1.1` **restores cleanly and then fails at
+   runtime** — a `17.x` assembly references Swashbuckle types Umbraco 18 does not ship. Before
+   today that was a latent inconsistency; now there is a correct package sitting next to the
+   wrong one and nothing in the metadata steers anyone to it. **Own change, on `main`, next.**
+
+   **Its version number rests on a premise nobody has tested.** A bound on `17.x` is a *patch*
+   only if nothing that worked stops working — and a site on Umbraco 18 with `17.1.1` restores
+   today and will not afterwards. That is defensible **if** such a site is already broken at
+   runtime, which is believed and **not measured**. That change should open by installing
+   `17.1.1` into a scratch Umbraco 18 site and recording what actually happens: if it boots, the
+   bound is a real break and belongs in `17.2.0`, not `17.1.2`.
+
+2. **`17.0.0`–`17.1.1`'s packed readmes are frozen with `blob/main` links and cannot be
+   corrected.** Everything this change added protects releases from here on. Those four versions
+   will always point a reader at whatever `main` holds, and from the moment `17.2` ships features
+   the `18.x` line does not, `17.1.1`'s readme will describe a different product than the one
+   whose page it sits on. Nothing can be done about it; it is recorded so nobody rediscovers it
+   as a bug.
+
+**7.3 — what a two-line release cost, against a one-line one.**
+
+The release itself was not much harder. **What changed is that "which line?" became a question at
+every step**, and the steps where nobody asked it are where the defects were:
+
+- The readme's documentation links had been correct for four releases *by coincidence*, because
+  `main` was the only line. A second line made a branch ref wrong without changing a character
+  of it — and the guard that could not see it had **already written its own blind spot down**
+  and named this work as the owner.
+- Dependency bounds had been imprecise for four releases and became actively misleading, for the
+  same reason: nothing distinguishes "needs Umbraco 17" from "needs 17 or later" until two
+  answers exist.
+- The install check found a **mixed-version Umbraco resolution** that predates this change
+  entirely and was invisible while nobody installed the package from a feed.
+
+**The reusable shape: publishing a second line does not create new defects so much as reveal the
+ones that a single line made unfalsifiable.** Every problem above was already true on `17.1.1`;
+none could be stated as wrong until there was something to be wrong *relative to*. The next line
+— `21.x` for the next LTS, on current policy — should expect the same and start by asking which
+of today's true sentences are true only because there are two lines rather than three.
