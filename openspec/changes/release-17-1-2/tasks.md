@@ -10,7 +10,8 @@
 
 - [x] 2.1 `[17.6.2,18.0.0)` on the `Umbraco.Cms.*` entries in `Directory.Packages.props`.
       **Count them rather than trusting the 18-line figure** — `grep -c "Umbraco.Cms"` counts the
-      comment line above them, which produced a wrong number three times in `run-on-umbraco-18`.
+      comment line above them, which produced a wrong number three times in `release-18-0-0`
+      (its task 3.1).
 - [x] 2.2 Confirm restore still succeeds against Umbraco 17.6.2 — a malformed range fails at
       restore, and pack succeeding is not evidence the range is right.
 - [x] 2.3 Run the guard again and watch it pass.
@@ -98,7 +99,8 @@ it is worth more than the three mutations that proved it on `dev/v18`.
 
 **2.1 — seven entries, counted rather than carried over.** The same number as the 18 line, and
 checked independently, because `grep -c "Umbraco.Cms"` counts the comment line above them and
-produced a wrong figure three times in `run-on-umbraco-18`.
+produced a wrong figure three times in `release-18-0-0` (its task 3.1 — **not**
+`run-on-umbraco-18`, which an earlier version of this line and of design §9 both named).
 
 **3.2 — the bump turned five guards red, all of them correctly.** Three `ChangelogTests` (no
 `17.1.2` entry yet), the image-pin guard and `Every_documented_version_is_the_declared_version`.
@@ -179,6 +181,20 @@ or anything after it".
 the local feed: restore exit 0, build 0/0, **site boots and serves HTTP 200**. The bound has not
 narrowed what the 17 line supports — which was the one thing D2 asserted without evidence.
 
+**Its limits, which `Installability is proved by installing` requires be recorded and which the
+first version of this paragraph omitted.** That requirement says *"What was verified SHALL be
+recorded, and its limits with it … the record SHALL say so plainly rather than allowing a
+performed check to be read as a standing one."* The task's own text asks for a scratch v17 site
+**and a database**; QA's harness had **no database**. So what is proved is **restore, build, boot
+and HTTP 200** — and what is **not** proved is that a migration ran or a booking was taken, which
+is the very thing that requirement's first scenario asks for.
+
+**Acceptable here, and for a reason rather than by omission:** this release changes no code, so
+the migration and the booking flow are `17.1.1`'s, and `17.1.1`'s were proved on a real install
+during `release-18-0-0` §5.5. What `17.1.2` changes is package metadata, and metadata is read at
+restore — which is exactly the part that was measured. **Performed once, by hand, on 2026-09-22;
+not automated, and not a standing guarantee.**
+
 **Counts after the fixes: 1811 / 167 / 1168 / 290**, two above `main`'s 1809 baseline: the
 cherry-picked guard and D6's new one. **0 warnings**, `--strict` 23/23.
 
@@ -197,9 +213,22 @@ succeed, by design.
 **Decision: scoped, not falsified, and the scenario is left exactly as it is.**
 `openspec/specs/` on `main` is the **17 line's** spec. "A newly created Umbraco project" means
 one this line supports, which after this change is stated precisely rather than left open —
-`[17.6.2,18.0.0)`. The same two requirements coexist on `dev/v18` against Umbraco 18 without
-contradiction, which is the test: if the sentence were genuinely falsified it could not be true
-on both lines simultaneously.
+`[17.6.2,18.0.0)`.
+
+**And the cross-line test was CHECKED, not argued** — which matters, because a decision resting
+on a reading of a document is the class this change has been wrong about twice. The scenario is
+**byte-identical on `dev/v18`**, where the bound has been in force since `18.0.0` shipped and
+where that line's own QA passed over it:
+
+```
+dev/v18:openspec/specs/packaging/spec.md  #### Scenario: One install is enough
+main   :openspec/specs/packaging/spec.md  #### Scenario: One install is enough
+→ identical, WHEN and THEN both
+```
+
+So the sentence is either true on both lines or false on both, and **it cannot be one this change
+falsifies, because this change did not touch the line on which it already coexists with the
+bound.** That is a measurement.
 
 **Recorded rather than assumed, because that is the sweep's entire purpose.** A scenario that is
 true only under a scope the spec does not state is exactly the kind of thing that reads fine for

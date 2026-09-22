@@ -232,9 +232,13 @@ QA's first finding was about. Recorded here rather than left to be rediscovered:
    `openspec/changes/archive/2026-09-22-release-18-0-0/tasks.md`, task 1.4's mutation table:
    *"one range left open at the top (`[18.2.0, )`) — fails, and a naive `EndsWith(')')` would
    have passed it"*. NuGet normalises that string away before the guard sees it. **An earlier
-   version of this item named `run-on-umbraco-18`**, which is where the *miscount* story lives
-   (task 2.1) — the two were conflated, and an obligation pointing at the wrong document is one
-   nobody can act on. Both are archived, so the correction belongs wherever that line's next
+   version of this item named `run-on-umbraco-18`, and the correction of that then misattributed
+   the miscount story to it as well.** Both stories are `release-18-0-0`'s: the `EndsWith` claim
+   in task 1.4, the miscount in **task 3.1** (*"Seven, not the eight stated everywhere in this
+   change … Third miscount here"*). `run-on-umbraco-18` has neither — greppped, zero hits for
+   both. An obligation pointing at the wrong document is one nobody can act on, which is why
+   this was a finding; getting the correction wrong in the other direction is the same defect
+   twice. Both are archived, so the correction belongs wherever that line's next
    release records its inherited claims.
 
 **Neither blocks this release.** Both are the same species as the README/`CLAUDE.md` cherry-picks
