@@ -24,11 +24,23 @@ a release is the one moment their absence cannot be corrected afterwards.
       The second row is the one that is usually skipped and the one that proves the guard is a
       guard rather than a wall. The fourth was checked for its *reason*, not just its failure —
       a guard failing for the wrong reason is indistinguishable from one working.
-- [ ] 1.3 Guard the upper bound **against the packed nuspec, not `Directory.Packages.props`**.
+- [x] 1.3 Guard the upper bound **against the packed nuspec, not `Directory.Packages.props`**.
       The requirement says the nuspec is the only copy a resolver sees and that the two can
       disagree; a guard reading the props file would assert the intention rather than the
       artifact.
-- [ ] 1.4 Verify that guard fires too: remove one bound and watch it fail, naming the dependency.
+- [x] 1.4 Verify that guard fires too: remove one bound and watch it fail, naming the dependency.
+
+      **Three directions, and the middle one is why the check is not `EndsWith(')')`:**
+
+      | mutation | result |
+      |---|---|
+      | one bound removed (`18.2.0`) | **fails**, naming `package -> dependency 'version'` |
+      | one range left **open at the top** (`[18.2.0, )`) | **fails** — and a naive `EndsWith(')')` would have passed it, because that string does end in a bracket |
+      | the id prefix changed to match nothing | **fails on anti-vacuity**, by its own message |
+
+      §3.2 is covered by this guard rather than by a separate manual pack: it reads the produced
+      `.nupkg`s through the existing `PackedSolution` fixture, so "all five packages" is the
+      population it iterates rather than a list somebody kept.
 
 ## 2. The version
 
@@ -57,12 +69,15 @@ a release is the one moment their absence cannot be corrected afterwards.
 
 ## 3. The upper bound
 
-- [ ] 3.1 Apply `[18.2.0,19.0.0)` to the eight `Umbraco.Cms.*` entries in
-      `Directory.Packages.props`.
-- [ ] 3.2 **Pack and read the nuspec** for all five packages, not one. The spike that established
+- [x] 3.1 Apply `[18.2.0,19.0.0)` to the **seven** `Umbraco.Cms.*` entries in
+      `Directory.Packages.props`. **Seven, not the eight stated everywhere in this change** —
+      the figure came from `grep -c "Umbraco.Cms"`, which counted the comment line above them.
+      Third miscount here, and all three share a cause: a number produced by a command nobody
+      read the output of.
+- [x] 3.2 **Pack and read the nuspec** for all five packages, not one. The spike that established
       this was a single-project pack; five packages have five nuspecs and only an inspection of
       each proves the bound reached them.
-- [ ] 3.3 Confirm restore still succeeds against Umbraco 18.2.0 — a malformed range fails at
+- [x] 3.3 Confirm restore still succeeds against Umbraco 18.2.0 — a malformed range fails at
       restore rather than at pack, and the pack succeeding is not evidence the range is right.
 
 ## 4. The screenshot (design D3)
@@ -117,3 +132,16 @@ a release is the one moment their absence cannot be corrected afterwards.
 - [ ] 7.3 Note what the two-line release cost against the one-line one — the next major's release
       is cheaper for knowing it, and this is the first release where "which line" was a question
       at every step.
+
+**§1 and §3 result — the bound is real, and one thing about the guard is worth keeping.**
+
+It reads the **packed nuspec**, not `Directory.Packages.props`, and the difference is not
+pedantry: the props file is what we intended and the nuspec is what a resolver gets. A guard
+derived from the file that produced a defect agrees with the defect. The existing
+`PackedSolution` fixture already runs a real `dotnet pack`, so the guard iterates the packages
+that actually came out — which is also why §3.2's "all five, not one" needs no separate step.
+
+**`Umbraco.Cms.DevelopmentMode.Backoffice` is bounded in the props file and appears in no
+nuspec**, because only the TestSite references it. Bounding it changes nothing a consumer sees
+and keeps the file internally consistent; the guard correctly says nothing about it, because it
+asserts over what shipped.

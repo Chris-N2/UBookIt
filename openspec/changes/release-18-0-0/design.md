@@ -13,7 +13,8 @@ recollection:
 - **A version range works under Central Package Management.** Packed `UBookIt.Web` with
   `Version="[18.2.0,19.0.0)"` on one dependency and read the nuspec out of the `.nupkg`:
   `<dependency id="Umbraco.Cms.Web.Website" version="[18.2.0, 19.0.0)" />`, with the untouched
-  sibling still `18.2.0`. Eight `Umbraco.Cms.*` entries exist.
+  sibling still `18.2.0`. **Seven** `Umbraco.Cms.*` entries exist — this design first said eight,
+  from a `grep -c` that counted the comment line above them.
 - **`ChangelogTests` derives released versions from the branch's own archive** via
   `release-(\d+)-(\d+)-(\d+)$`, so the two lines' changelogs stay self-consistent independently.
 

@@ -7,18 +7,18 @@
 
   <ItemGroup>
     <!-- Umbraco 18 (STS) — keep all Umbraco.Cms.* packages on the same version -->
-    <PackageVersion Include="Umbraco.Cms" Version="18.2.0" />
-    <PackageVersion Include="Umbraco.Cms.Api.Common" Version="18.2.0" />
-    <PackageVersion Include="Umbraco.Cms.Api.Management" Version="18.2.0" />
-    <PackageVersion Include="Umbraco.Cms.Web.Common" Version="18.2.0" />
-    <PackageVersion Include="Umbraco.Cms.Web.Website" Version="18.2.0" />
-    <PackageVersion Include="Umbraco.Cms.DevelopmentMode.Backoffice" Version="18.2.0" />
+    <PackageVersion Include="Umbraco.Cms" Version="[18.2.0,19.0.0)" />
+    <PackageVersion Include="Umbraco.Cms.Api.Common" Version="[18.2.0,19.0.0)" />
+    <PackageVersion Include="Umbraco.Cms.Api.Management" Version="[18.2.0,19.0.0)" />
+    <PackageVersion Include="Umbraco.Cms.Web.Common" Version="[18.2.0,19.0.0)" />
+    <PackageVersion Include="Umbraco.Cms.Web.Website" Version="[18.2.0,19.0.0)" />
+    <PackageVersion Include="Umbraco.Cms.DevelopmentMode.Backoffice" Version="[18.2.0,19.0.0)" />
     <PackageVersion Include="Microsoft.ICU.ICU4C.Runtime" Version="72.1.0.3" />
   </ItemGroup>
 
   <ItemGroup>
     <!-- Persistence (EF Core major aligned with Umbraco 18.2.x / .NET 10) -->
-    <PackageVersion Include="Umbraco.Cms.Persistence.EFCore" Version="18.2.0" />
+    <PackageVersion Include="Umbraco.Cms.Persistence.EFCore" Version="[18.2.0,19.0.0)" />
     <!-- Used directly: UBookIt.Web calls AddOpenApi/AddSchemaTransformer and
          UBookIt.Backoffice implements IOpenApiOperationTransformer. It arrives
          transitively through Umbraco 18 too, but a package we compile against is a

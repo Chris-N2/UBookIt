@@ -39,7 +39,7 @@ image pin already carries and the same mechanism: a readme frozen per version sh
 documentation *that version shipped*, and the ref should be derived from the declared version
 rather than written out a second time.
 
-**An upper bound on the host**, `[18.2.0,19.0.0)`, across the eight `Umbraco.Cms.*` dependencies.
+**An upper bound on the host**, `[18.2.0,19.0.0)`, across the seven `Umbraco.Cms.*` dependencies.
 Verified expressible rather than assumed: a range set on a `PackageVersion` under Central Package
 Management flows verbatim into the packed nuspec as `<dependency version="[18.2.0, 19.0.0)" />`,
 while an untouched sibling stays an open `18.2.0`.
@@ -96,7 +96,7 @@ with nothing in the diff resembling a deletion. There is no reason to take that 
 | | |
 |---|---|
 | `Directory.Build.props` | `17.1.1` → `18.0.0` |
-| `Directory.Packages.props` | Upper bound on eight `Umbraco.Cms.*` dependencies |
+| `Directory.Packages.props` | Upper bound on seven `Umbraco.Cms.*` dependencies |
 | `README.md` | Version sentence, four image pins, twelve documentation links |
 | `CHANGELOG.md` | A new `18.0.0` entry — **undated until the feed confirms**, per the release order |
 | `docs/images/bookings-screen.png` | Retaken on Umbraco 18 |

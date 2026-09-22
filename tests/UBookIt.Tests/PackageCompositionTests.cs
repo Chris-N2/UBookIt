@@ -348,4 +348,76 @@ public class PackageCompositionTests(PackedSolutionFixture fixture)
             Assert.True(offending.Count == 0, $"{package.Id} ships {string.Join(", ", offending)}.");
         }
     }
+
+    /// <summary>
+    /// Every Umbraco dependency a published package declares names an upper bound.
+    /// </summary>
+    /// <remarks>
+    /// <para>
+    /// A NuGet dependency version is a <b>minimum</b>, so <c>Umbraco.Cms.Web.Website 18.2.0</c>
+    /// says "18.2.0 or higher" and nothing else. For as long as uBookIt published one line that
+    /// was merely imprecise — it is why the Umbraco Marketplace lists uBookIt as running on v17
+    /// <i>and</i> v18, which is false, and why nothing a resolver reads has ever contradicted
+    /// that. With two lines published against two Umbraco majors it stops being imprecise: the
+    /// constraint exists only in prose, and no package manager reads prose.
+    /// </para>
+    /// <para>
+    /// <b>Read from the packed nuspec, not from <c>Directory.Packages.props</c>, and that is the
+    /// whole point.</b> The props file is what we intended; the nuspec is what a consumer's
+    /// resolver actually gets, and the two can disagree — a range that a project overrides, or a
+    /// dependency that reaches the package through a path central management does not govern,
+    /// would leave the props file looking correct and the package unbounded. A guard derived
+    /// from the same file that produced the defect would agree with it.
+    /// </para>
+    /// <para>
+    /// uBookIt's own packages are deliberately out of scope: they are versioned in lockstep by
+    /// this repository and already covered by
+    /// <see cref="Every_ubookit_dependency_names_a_package_this_repository_produces"/>.
+    /// </para>
+    /// </remarks>
+    [Fact]
+    public void Every_umbraco_dependency_names_an_upper_bound()
+    {
+        var unbounded = new List<string>();
+        var checkedDependencies = 0;
+
+        foreach (var package in Packed.Packages)
+        {
+            foreach (var (id, version) in package.Dependencies)
+            {
+                if (!id.StartsWith("Umbraco.Cms", StringComparison.OrdinalIgnoreCase))
+                {
+                    continue;
+                }
+
+                checkedDependencies++;
+
+                // A NuGet range with an upper bound ends in ')' or ']'. A bare version, or a
+                // range open at the top like "[18.2.0, )", does not bound anything above.
+                var bounded =
+                    (version.EndsWith(')') || version.EndsWith(']'))
+                    && !version.TrimEnd().EndsWith(", )", StringComparison.Ordinal)
+                    && !version.TrimEnd().EndsWith(",)", StringComparison.Ordinal);
+
+                if (!bounded)
+                {
+                    unbounded.Add($"{package.Id} -> {id} '{version}'");
+                }
+            }
+        }
+
+        // ANTI-VACUITY FIRST. A package set with no Umbraco dependency in it satisfies "none is
+        // unbounded" perfectly, and would do so if the id prefix were ever wrong.
+        Assert.True(
+            checkedDependencies > 0,
+            "No packed package declares an Umbraco.Cms* dependency, so this guard ran over "
+            + "nothing. Either the packages stopped depending on Umbraco or the id prefix this "
+            + "guard matches on is wrong.");
+
+        Assert.True(
+            unbounded.Count == 0,
+            $"{unbounded.Count} Umbraco dependency declaration(s) carry no upper bound, so the "
+            + "published package claims to support every future Umbraco major:"
+            + $"{Environment.NewLine}  " + string.Join(Environment.NewLine + "  ", unbounded));
+    }
 }
