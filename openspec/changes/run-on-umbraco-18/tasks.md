@@ -201,21 +201,49 @@ The compiler cannot see any of this, and it is the whole point of the branch.
 
 - [ ] 7.1 Run the TestSite against Umbraco 18. Verify the backoffice section loads, the Bookings
       screen lists, and a booking can be placed, moved and cancelled.
-- [ ] 7.2 Open both Swagger/OpenAPI documents in the browser and confirm they render, are
+- [x] 7.2 Open both Swagger/OpenAPI documents in the browser and confirm they render, are
       separate, and that the backoffice one requires authentication while the delivery one does
       not.
-- [ ] 7.3 Complete a booking through the **front-end flow with JavaScript disabled** — the
+- [x] 7.3 Complete a booking through the **front-end flow with JavaScript disabled** — the
       package's headline guarantee, and nothing about the OpenAPI port should touch it, which is
       exactly why it is worth confirming rather than assuming.
 - [ ] 7.4 **Look at the backoffice and compare it to the shipped screenshots** (design D5).
       Record whether Chris's assessment held. If it did not, the release change retakes them.
 
+**§7 results so far — and two of the four are BLOCKED ON CHROME, not done.**
+
+**7.2 — verified, and more strongly than "they render".** The two documents are separate and
+say opposite things about authentication, which is the guarantee rather than the rendering:
+
+| | backoffice | delivery |
+|---|---|---|
+| security scheme | `Backoffice-User` | **none declared** |
+| document-root `security` | `[{Backoffice-User: []}]` | **absent** |
+| operations carrying `security` | 30 of 30 | **0** |
+| unauthenticated request to an endpoint | **401** | **200** |
+
+The last row is the one worth having: the document's claim and the server's behaviour were
+checked against each other rather than either being taken on its own.
+
+**7.3 — a booking was placed with no JavaScript, and curl is the strictest possible client
+for that claim** — it cannot run a script even by accident. Walked the real flow: GET the page,
+choose a date and duration, read the rendered start times, POST the details form with its
+antiforgery token and `ufprt`. Response: **"Booking confirmed", reference `8WZR-Q9P8`** (dev-site
+residue, 09:15 on 28 September 2026). The OpenAPI port touches nothing here, which is exactly
+why confirming it beats assuming it.
+
+**7.1 and 7.4 are NOT done.** Both need the backoffice UI in a browser, and the Chrome extension
+is not connected in this session. They are the two checks the compiler and curl cannot stand in
+for — 7.1 because the backoffice is the client of every operation ID this change nearly broke,
+and 7.4 because it is design D5's whole basis. **Do not archive this change on the strength of
+the other checks passing.**
+
 ## 8. Record
 
-- [ ] 8.1 Note what the port cost against what the spike predicted — the value of the spike is
+- [x] 8.1 Note what the port cost against what the spike predicted — the value of the spike is
       only established by comparing it to the outcome.
-- [ ] 8.2 Record whether `OperationIdHandler` survived, and the evidence either way.
-- [ ] 8.3 Note anything Umbraco 18 made *easier*, not only what it broke. The registration is
+- [x] 8.2 Record whether `OperationIdHandler` survived, and the evidence either way.
+- [x] 8.3 Note anything Umbraco 18 made *easier*, not only what it broke. The registration is
       already shorter than what it replaces; if the port finds more of that, the next major's
       port is cheaper for knowing it.
 
@@ -238,3 +266,41 @@ dev environment for the LTS line is gone without a restore.
       needing them rebuilt.
 - [ ] 9.3 Once set, confirm `main` still boots against its own database. The whole point of the
       split is that it does, and that is worth proving rather than assuming.
+
+**§8 — what the spike predicted against what the port cost.**
+
+The spike predicted **four errors in two files** and that is what it could see. The port touched
+**21 files** and cost three defects the spike could not have found, each invisible to the thing
+that found the previous one:
+
+| found by | defect |
+|---|---|
+| the compiler | four composer errors — the spike's whole prediction |
+| the compiler, *after* `src` built | three more in test doubles; a build-error count is a count of the errors the compiler reached |
+| **regenerating the client** | operation IDs regressed to route-derived names. No compiler sees this; the docs said it would not happen |
+| **the TypeScript compiler** | every `int` described as `integer|string`. No C# compiler sees this either |
+
+**The reusable shape: a port's remaining risk lives in generated artifacts, and each generator
+must be run to find it.** Three of the four were found by running something and looking at what
+came out — never by reading source. The one thing the spike measured directly is the one thing
+it got right.
+
+**8.2 — `OperationIdHandler` SURVIVED, ported to `ActionNameOperationIdTransformer`.** Evidence
+in §2.3, including the fact that this change first recorded the opposite on no evidence at all.
+
+**8.3 — what Umbraco 18 made easier, which is most of it.**
+
+- **The backoffice composer went from ~40 lines to 8.** Four separate Swashbuckle concerns —
+  document registration, a security operation filter, schema conventions, an operation-ID
+  handler — collapse into one chained call plus the one transformer the host does not do for us.
+- **`WithJsonOptions` exists at all**, and its documentation states the exact rule the delivery
+  document had to work around by hand: a document should be generated with the serialization
+  conventions of the endpoints it describes. Umbraco saw this problem and gave the backoffice a
+  seam for it.
+- **`[MapToApi]` became the single source of document membership.** On 17 the delivery composer
+  could have used a namespace check; on 18 `ShouldInclude` reads the attribute the controllers
+  already carry.
+- **And the thing to fix before the next port:** the non-backoffice equivalent,
+  `AddUmbracoOpenApiDocument<T>`, is unusable by packages because its options base class is
+  internal. That is worth raising upstream — it is the difference between a delivery-style
+  document being three lines and being a hand-written schema transformer.
