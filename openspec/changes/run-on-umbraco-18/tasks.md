@@ -257,7 +257,16 @@ tells every future context what the rules are.
 - [x] 5.2 **Record the cherry-pick obligation prominently**: this edit is true of `main` too, and
       left here alone it makes two published READMEs disagree about the package's own policy.
       Branch flow is `main` → `dev/v18`, so it will also conflict at the next merge forward.
-- [!] 5.3 **`CLAUDE.md`'s invariant 1 is the same obligation, and it cannot be closed from this
+- [x] 5.3 **DONE on `main` at `aa23a22`, after QA round 4 and before archive.** Both shared
+      edits — `README.md`'s versioning table (5.1) and `CLAUDE.md`'s invariant 1 — were applied
+      to `main` in one commit and verified there: 1809 unit tests pass, `VersionTruthTests`
+      included, which is the guard over the packed README. **`main` is one commit ahead of
+      origin; Chris pushes.** The original wording is kept below because the reasoning is what
+      made the obligation visible in the first place.
+
+      ---
+
+      **`CLAUDE.md`'s invariant 1 is the same obligation, and it cannot be closed from this
       branch.** The LTS/STS amendment is a statement about the project, not about the v18 line,
       and it currently lives only on `dev/v18`. So does the README versioning table (5.1).
 
@@ -704,3 +713,32 @@ without that qualifier.
    all mine, not re-measured.
 2. **The two cherry-picks to `main` are still owed** — see §5.3 and
    [[ubookit-deferred-obligations]].
+
+## 14. The sibling sweep at archive time — "swagger group" is dated, not falsified
+
+The sweep for sentences this change falsifies in specs it did not touch found **eleven** across
+`booking-management` and `resource-management`, all of one shape: *"in the same swagger group as
+its other management endpoints"*, and in one case naming the group as `ubookitbackoffice`
+outright.
+
+**Checked rather than waved through, because a port is exactly where a term goes stale
+silently.** Two things are true on Umbraco 18:
+
+1. **The grouping is unchanged.** `[MapToApi(Constants.ApiName)]` still puts every management
+   endpoint in the `ubookitbackoffice` document; §1.2 measured the same 20 paths and 30
+   operations on both versions, with an identical operation-id set. The guarantee those SHALLs
+   make — *these endpoints belong to the same named API surface as the rest of uBookIt's* — holds
+   exactly.
+2. **"Swagger" is still literally what renders it.** Umbraco 18 dropped `Swashbuckle.AspNetCore`
+   (the **generator**) and **kept `Swashbuckle.AspNetCore.SwaggerUI`** (the **viewer**) — verified
+   in `umbraco.cms.api.management` 18.2.0's own nuspec, whose OpenAPI-related dependencies are
+   exactly `Microsoft.AspNetCore.OpenApi`, `Microsoft.OpenApi` and
+   `Swashbuckle.AspNetCore.SwaggerUI`. `AddOpenApiDocumentToUi` puts our documents in it.
+
+So **no requirement is falsified and none is edited.** What changed is the generator behind the
+document, which no spec names — the same reason `skip_specs: true` held under attack in QA round
+1: the requirements were written against behaviour, not against a host's implementation.
+
+**Recorded rather than left implicit**, because a future reader on the v18 line meeting the word
+"swagger" in a spec will reasonably wonder whether it went stale in this port. It did not, and
+the answer is one nuspec away.
