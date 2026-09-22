@@ -3,9 +3,15 @@
 - [x] 1.1 Capture the **current** generated TypeScript client's exported method names from
       `main` (or from `dev/v18` before the port), so D3's question has something to compare
       against. Verify the list is non-empty — a comparison against nothing proves nothing.
-- [ ] 1.2 Record the **current** delivery and backoffice OpenAPI documents from a running v17
-      TestSite: path count, the operation IDs, and which paths appear when the delivery API is
-      off. The last is `delivery-api`'s guarantee and the thing most likely to break silently.
+- [~] 1.2 **NOT DONE as written, and the substitute is weaker in one specific way — recorded
+      rather than quietly ticked.** Capturing the v17 documents needed a running v17 TestSite,
+      which by the time the port was under way meant switching branch, rebuilding the v17 client
+      and booting against `main`'s database. What stood in for it: §1.1's **method-name**
+      baseline from the v17-generated client (which is downstream of the v17 operation IDs, so it
+      pins them transitively), and the v18 measurements taken directly — 30 operations, 11
+      delivery paths, 0 paths with the API off. **What is genuinely unverified is the v17
+      *path count*,** so "11 delivery paths" is an absolute reading rather than a comparison.
+      The disabled-endpoint guarantee does not depend on it: 0 is 0 on either version.
 - [x] 1.3 Confirm the spike's measurement still holds at HEAD of `dev/v18`: restore succeeds,
       and `dotnet build` produces exactly the four errors in the two named files. If the number
       has changed, the design is built on a stale measurement and stops here.
@@ -199,7 +205,7 @@ tells every future context what the rules are.
 
 The compiler cannot see any of this, and it is the whole point of the branch.
 
-- [ ] 7.1 Run the TestSite against Umbraco 18. Verify the backoffice section loads, the Bookings
+- [x] 7.1 Run the TestSite against Umbraco 18. Verify the backoffice section loads, the Bookings
       screen lists, and a booking can be placed, moved and cancelled.
 - [x] 7.2 Open both Swagger/OpenAPI documents in the browser and confirm they render, are
       separate, and that the backoffice one requires authentication while the delivery one does
@@ -207,7 +213,7 @@ The compiler cannot see any of this, and it is the whole point of the branch.
 - [x] 7.3 Complete a booking through the **front-end flow with JavaScript disabled** — the
       package's headline guarantee, and nothing about the OpenAPI port should touch it, which is
       exactly why it is worth confirming rather than assuming.
-- [ ] 7.4 **Look at the backoffice and compare it to the shipped screenshots** (design D5).
+- [x] 7.4 **Look at the backoffice and compare it to the shipped screenshots** (design D5).
       Record whether Chris's assessment held. If it did not, the release change retakes them.
 
 **§7 results so far — and two of the four are BLOCKED ON CHROME, not done.**
@@ -247,11 +253,48 @@ visible mismatch in two of four images. That is a decision for the release chang
 this one — **retake the two backoffice shots for the `18.x` line, leaving `17.x`'s own alone** is
 the obvious answer, but it is Chris's call and it costs a v18 backoffice session to do.
 
-**7.1 and 7.4 are NOT done.** Both need the backoffice UI in a browser, and the Chrome extension
-is not connected in this session. They are the two checks the compiler and curl cannot stand in
-for — 7.1 because the backoffice is the client of every operation ID this change nearly broke,
-and 7.4 because it is design D5's whole basis. **Do not archive this change on the strength of
-the other checks passing.**
+**7.1 — done in a v18 backoffice, and it is the check that matters most**, because the
+backoffice is the client of every operation ID this change nearly broke. All four workspace views
+render and all four call the regenerated client successfully:
+
+| view | what it proves |
+|---|---|
+| Resources | `listResources`, and the resource editor's opening-hours panel |
+| Services | loads |
+| Bookings | `listBookings`, `findBookingByReference`, `listBookableSubjects` |
+| Settings | `getSettings`, including the read-only configuration-sourced rows |
+
+The full booking lifecycle was driven through the UI on booking `8WZR-Q9P8` — the one placed by
+§7.3's no-JavaScript walk-through, so the two halves of the system were exercised against the
+same record:
+
+1. **Found** by reference from the Bookings screen.
+2. **Moved** to 14:00. The first attempt, to 11:15, was *refused* — "Something else is booked at
+   that time. Choose another." — which is worth as much as the success: a domain failure
+   travelled the `errors[]` envelope through the new OpenAPI stack and rendered in the dialog.
+3. **Cancelled**, status going to Cancelled and its actions disappearing.
+4. **Placed on behalf** through *New booking* → reference `K3RT-FR4D`, 28 Sep 2026 14:00. This is
+   `placeBookingOnBehalf`, one of the three methods the missing transformer had renamed.
+
+**7.4 — Chris's assessment held for three of the four shipped screenshots, and the fourth needs
+retaking for the `18.x` line only.** Compared against the images in `docs/images/`:
+
+| screenshot | on Umbraco 18 |
+|---|---|
+| `booking-flow.png` | **unaffected** — front end, our markup on the site's styling |
+| `booking-form.png` | **unaffected**, same reason |
+| `availability.png` | **indistinguishable.** The panel is fieldsets, time inputs and *links* — it contains no `uui-button`, so the change does not reach it |
+| `bookings-screen.png` | **visibly different.** *New booking* and every *Move*/*Cancel* render fully pill-shaped on 18 against v17's small corner radius |
+
+So the difference is real, cosmetic, and confined to **one image** rather than the four a blanket
+retake would have cost. Layout, columns, typography, colour and the section chrome are otherwise
+identical. **Recommendation for the release change: retake `bookings-screen.png` on an 18 site
+for the `18.x` packed README, and leave `17.x`'s own image alone** — a packed README is frozen
+per version, so the two lines can hold different images without either becoming wrong. Chris's
+call.
+
+**This vindicates D5's shape rather than its content.** The decision was to look before
+publishing instead of re-capturing on spec; looking found one image to retake instead of four.
 
 ## 8. Record
 
@@ -262,7 +305,7 @@ the other checks passing.**
       already shorter than what it replaces; if the port finds more of that, the next major's
       port is cheaper for knowing it.
 
-## 9. The v18 TestSite needs its own database — BLOCKED ON CHRIS
+## 9. The v18 TestSite needs its own database — UNBLOCKED
 
 `§4` and `§7` both need a running v18 TestSite, and running one is not free.
 
@@ -274,13 +317,22 @@ dev environment for the LTS line is gone without a restore.
 - [x] 9.1 Give `dev/v18` its own `UserSecretsId` so the two branches can hold different
       connection strings. New id: `a220bfe8-cd6c-45e8-bd3f-e94f3a2dbd45`, with the reason in the
       csproj so nobody "tidies" it back.
-- [ ] 9.2 **Chris:** create the v18 database and set the secret. Credentials are his; I do not
+- [x] 9.2 **Chris:** create the v18 database and set the secret. Credentials are his; I do not
       handle them. **Restoring a copy of the v17 database under a new name is better than an
       empty one** — Umbraco 18 will migrate the copy, `main`'s database is untouched, and the
       live check keeps the resources, services and bookings the dev site already has rather than
       needing them rebuilt.
 - [ ] 9.3 Once set, confirm `main` still boots against its own database. The whole point of the
       split is that it does, and that is worth proving rather than assuming.
+
+      **Partially evidenced, and the gap is named.** The two `UserSecretsId`s are confirmed
+      different (`db95506d-…` on `main`, `a220bfe8-…` on `dev/v18`) and **both stores exist and
+      are populated**, so the configuration isolation the split was built for is real and
+      `main`'s connection string was not overwritten. Umbraco 18 then migrated only the database
+      the v18 store points at. **What is still unproven is the thing the task actually asks:
+      that `main` BOOTS.** That needs a v17 client build and a v17 TestSite run, and "the
+      configuration looks right" is not the same claim — which is exactly the substitution this
+      change has already been caught making once. Owed before the branch is trusted.
 
 **§8 — what the spike predicted against what the port cost.**
 
