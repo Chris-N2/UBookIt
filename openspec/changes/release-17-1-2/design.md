@@ -76,11 +76,23 @@ configurations and found:
 
 **So the universal is false, and the case it is false for is dismissed deliberately rather than
 by silence.** `UBookIt.Persistence` alone ships entities, migrations and repositories: no
-endpoint, no UI, no booking flow, nothing a site or a visitor can reach. A site in that
-configuration has installed a schema and nothing that uses it, and the readme says plainly that
-installing the sub-packages without `UBookIt.Web` **fails silently**. It loses no working
-*behaviour*, because it had none to lose — and QA's test had no database, so it is not even
-established the migration would apply on 18.
+endpoint, no UI, no booking flow, nothing a site or a visitor can reach — verified by QA against
+the source, not inferred: one composer, no controller, no `ViewComponent`, no `.cshtml`, no
+static asset. A site in that configuration has installed a schema and nothing that uses it. It
+loses no working *behaviour*, because it had none to lose — and QA's test had no database, so it
+is not even established the migration would apply on 18.
+
+**The readme is NOT evidence for this, and an earlier version of this paragraph said it was.** It
+claimed "the readme says plainly that installing the sub-packages without `UBookIt.Web` fails
+silently". The readme says that of **`UBookIt.Backoffice`**, with a consequence specific to it —
+*"the backoffice works and the booking page renders nothing"* — and says nothing whatever about
+`UBookIt.Persistence` alone. The citation was generalised into covering precisely the case it
+does not cover, and then leaned on, in the paragraph dismissing a QA finding.
+
+**The honest reading is stronger than the false one.** The readme documents the
+`UBookIt.Backoffice`-without-`UBookIt.Web` trap and does not mention Persistence-alone at all —
+which is itself evidence that nobody, including this project's own documentation, treats it as a
+configuration a site would be in.
 
 That is a judgement, not a measurement, and it is written down as one. **If it is wrong, the
 consequence is that a site running Persistence-alone on Umbraco 18 loses the ability to upgrade
@@ -133,13 +145,33 @@ mechanism the readme's image pin uses.
 whole point is that the cherry-picked method stays byte-identical across the two lines, and
 widening it here would break that on the first edit.
 
-**It is proved in one direction and unreachable in the other, which is worth stating rather than
-implying two.** A ceiling inside the major (`[17.6.2,17.7.0)`) fails it, naming the dependency
-and the expected ceiling. A *floor* in the wrong major (`[16.0.0,18.0.0)`) never reaches the
-test at all — NuGet rejects it at restore with `NU1107`, because Umbraco 16's own transitive
-constraints conflict with 17.6.2. The floor check is therefore defensive rather than
-demonstrated, which is the same shape as the `[17.6.2, )` finding in D3: **a clause can be
-correct and still have no reachable path through the layer the guard reads.**
+**Both halves are proved, and the first attempt at this paragraph got the second one wrong in a
+way worth keeping.** The ceiling is easy: `[17.6.2,17.7.0)` fails, naming the dependency and the
+expected ceiling. For the floor I tried `[16.0.0,18.0.0)`, watched NuGet reject it at restore
+with `NU1107` before the test ran, and concluded the clause was "defensive rather than
+demonstrated" — equating it with D3's `[17.6.2, )` case.
+
+**That was an argument from ignorance and QA broke it in one move.** The guard compares a range
+against a major *derived from the declared version*, so the other side of the comparison can be
+moved instead: declare `18.0.0` and set the ranges to `[17.6.2,19.0.0)` — which restores and
+packs perfectly, because the Umbraco packages resolved do not change — and the floor clause fires
+alone, all seven declarations, ceiling silent:
+
+```
+7 Umbraco dependency range(s) do not admit Umbraco 18 and exclude 19:
+  UBookIt.Backoffice -> Umbraco.Cms.Api.Common '[17.6.2, 19.0.0)'
+    starts at '17.6.2', which is not an Umbraco 18 version.
+```
+
+**And the scenario it catches is one this project has already been one edit away from**: a line
+moving to the next Umbraco major with a dependency's floor left behind at the old one — which is
+`release-18-0-0`'s own shape exactly.
+
+**So the equation with D3's finding was false, and the two are opposites.** The `EndsWith(", )")`
+clause is unreachable *at the layer the guard reads*, because NuGet normalises the string out of
+existence before the guard sees it. The floor clause is reachable and has been reached. The
+lesson is one already in this project's memory: **"the mutation I tried does not reach it" is not
+"no mutation reaches it"** — a finding enumerates a sample, not the population.
 
 ### D4 — The changelog entry leads with the restore failure
 
@@ -195,10 +227,15 @@ QA's first finding was about. Recorded here rather than left to be rediscovered:
 1. **`The_bound_admits_this_major_and_excludes_the_next`** (D6). `dev/v18` holds the same
    requirement with the same uncovered scenario, and its bound could drift to `[18.2.0,18.3.0)`
    with every guard green.
-2. **D3's mutation claim is wrong on `dev/v18` too.** Its `run-on-umbraco-18` record says the
-   `[18.2.0, )` mutation proves the `EndsWith(", )")` clause; NuGet normalises that away before
-   the guard sees it. The clause is fine, the sentence about it is not, and it is archived — so
-   the correction belongs wherever that line's next release records its inherited claims.
+2. **D3's mutation claim is wrong on `dev/v18` too — in `release-18-0-0`, not
+   `run-on-umbraco-18`.** The sentence lives in
+   `openspec/changes/archive/2026-09-22-release-18-0-0/tasks.md`, task 1.4's mutation table:
+   *"one range left open at the top (`[18.2.0, )`) — fails, and a naive `EndsWith(')')` would
+   have passed it"*. NuGet normalises that string away before the guard sees it. **An earlier
+   version of this item named `run-on-umbraco-18`**, which is where the *miscount* story lives
+   (task 2.1) — the two were conflated, and an obligation pointing at the wrong document is one
+   nobody can act on. Both are archived, so the correction belongs wherever that line's next
+   release records its inherited claims.
 
 **Neither blocks this release.** Both are the same species as the README/`CLAUDE.md` cherry-picks
 that `release-18-0-0` carried: a statement or a guard true of both lines, living on one.

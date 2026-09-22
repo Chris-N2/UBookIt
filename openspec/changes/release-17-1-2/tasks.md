@@ -71,6 +71,11 @@ trusting that a range does what ranges do.
 
 - [ ] 7.1 **Sync `packaging` with the ADDED requirement, then archive.** (`skip_specs` was
       removed — QA finding 1.)
+- [x] 7.1a **Run the sync-time sibling sweep, which removing `skip_specs` made owed.** CLAUDE.md
+      requires it at sync and records that it has found something on four consecutive changes.
+      Under `skip_specs` it was arguably not owed; the round-1 fix made it owed, and the round-2
+      task list did not pick it up — an obligation created by a change and not carried, which is
+      the same species as the defect it was fixing. Result recorded in §11.
 - [ ] 7.2 Record that `17.0.0`–`17.1.1` remain installable into Umbraco 18 permanently, and that
       the bound protects only releases from here.
 - [ ] 7.3 Record the readme-ref obligation this change deliberately did not take (design's open
@@ -153,7 +158,9 @@ labelled as one, rather than leaving a universal that is false.
 **MINOR — the cherry-pick corrupted two em dashes into mojibake**, falsifying D3's byte-identity
 claim on its first outing. Cause found: `subprocess.run(text=True)` decodes git's output with the
 console code page, mangling UTF-8. Refetched with `git show` redirected to the file and verified
-**byte-identical to `dev/v18`**. Same family as `verify-the-instrument-mutated-the-file` — and the
+**byte-identical to `dev/v18`**. (The count reported at the time — "15 em dashes" — was of the
+cherry-picked method; the file now carries 17, the extra two being D6's. The byte-identity check
+is the one that matters and it is right.) Same family as `verify-the-instrument-mutated-the-file` — and the
 reason it matters is not the comment: whatever did that to two em dashes would do it to a string
 literal.
 
@@ -174,3 +181,29 @@ narrowed what the 17 line supports — which was the one thing D2 asserted witho
 
 **Counts after the fixes: 1811 / 167 / 1168 / 290**, two above `main`'s 1809 baseline: the
 cherry-picked guard and D6's new one. **0 warnings**, `--strict` 23/23.
+
+## 11. The sibling sweep — one sentence, scoped rather than falsified
+
+Swept `openspec/specs/` for claims a host-version bound could falsify. **One hit worth a
+decision**, `packaging`'s *The package can be installed*:
+
+> **Scenario: One install is enough**
+> - **WHEN** a site adds the single uBookIt package to a newly created Umbraco project
+> - **THEN** restore succeeds, and the site has the backoffice section, …
+
+After this change that is **false for a newly created Umbraco 18 project** — restore does not
+succeed, by design.
+
+**Decision: scoped, not falsified, and the scenario is left exactly as it is.**
+`openspec/specs/` on `main` is the **17 line's** spec. "A newly created Umbraco project" means
+one this line supports, which after this change is stated precisely rather than left open —
+`[17.6.2,18.0.0)`. The same two requirements coexist on `dev/v18` against Umbraco 18 without
+contradiction, which is the test: if the sentence were genuinely falsified it could not be true
+on both lines simultaneously.
+
+**Recorded rather than assumed, because that is the sweep's entire purpose.** A scenario that is
+true only under a scope the spec does not state is exactly the kind of thing that reads fine for
+years and then misleads whoever meets it after the next major. The alternative — editing it to
+say "an Umbraco project this line supports" — was rejected as churn on a requirement this change
+does not otherwise touch, and because a `## MODIFIED` entry replaces a requirement wholesale and
+would put four unrelated scenarios at risk to reword one.
