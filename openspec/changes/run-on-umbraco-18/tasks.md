@@ -586,3 +586,68 @@ pass vacuously forever, so the instrument asserts itself before it asserts anyth
 
 **Counts after round 2: 1818 / 167 / 1168 / 290** - one more than round 1, the registration
 guard - **0 warnings in a clean Release build, `openspec validate --all --strict` 23/23.**
+
+## 12. QA round 3 — the guard was right and its paragraph argued the sibling away
+
+**REJECT, one MAJOR, and it is the same shape a third time.** Round 2 closed the schema
+transformer's registration gap. The doc block written to explain that fix then reasoned that the
+*other* transformer was already covered: *"asking the committed client covers the operation-ID
+transformer, because that one's effect is baked into a committed artifact."* True of the effect.
+**False of the registration**, which is the thing that disappears.
+
+The reviewer deleted `.ConfigureOpenApiOptions(... AddOperationTransformer<...>())` from the
+backoffice composer, rebuilt in Release and ran everything: **0 warnings, 1818 and 167 green.**
+The committed client catches that regression only after somebody regenerates, and a person
+deleting a registration has no reason to. **That is exactly how this change shipped its original
+defect** — and it was still possible after two rounds of fixing it.
+
+**The pattern across three rounds, stated once because it is the actual finding:** each round
+fixed the case it was given and wrote a paragraph explaining the fix, and each paragraph made a
+confident claim about a case nobody had checked. Round 1: "the two lines describe the same API".
+Round 2: "a unit test cannot see a transformer that was never registered; the artifact guard
+can". Round 3: the same sentence, applied to the sibling. **The code was never the recurring
+defect. The prose about the code was** — and prose is not checked by anything, which is why the
+fix each time has been to turn the claim into a guard.
+
+**Closed rather than documented as a limitation.** The reviewer flagged an honest caveat: it had
+not established that `AddBackOfficeOpenApiDocument` can be composed under
+`ServicesOnlyUmbracoBuilder` the way `AddOpenApi` can, and said that if it could not, the right
+outcome was to *state* the gap rather than weaken the guard. **It can** — probed directly, the
+backoffice document composes in isolation and registers five operation transformers, ours among
+them. So there is no caveat to write.
+
+Both registrations are now asserted through one helper, `RegisteredTransformers`, and the
+instrument is asserted before either of them by a `[Theory]` over both internal field names —
+because a renamed field makes each list come back empty, and an empty list reads as "no
+unexpected transformer" rather than as a broken test.
+
+**Mutation evidence:**
+
+| mutation | result |
+|---|---|
+| delete the **operation-ID** registration — round 3's mutation | **1 failed** |
+| delete the **schema** registration — round 2's mutation | **1 failed** |
+| rename the internal field the helper reads | **2 failed** (the guard *and* its instrument theory) |
+
+The reviewer also ran a vacuity attack worth recording: it swapped type registration for the
+**lambda overload**, leaving the list non-empty with our type absent. The guard fails — it
+distinguishes "some transformer" from "our transformer".
+
+**Also taken:**
+
+- **`proposal.md:83` still said "~40 lines become ~5".** Round 2 claimed the line count was
+  "reconciled in all three places". There were **four**, and the one missed is in the artifact
+  that survives archive and that a future reader meets first. Fourth instance of
+  [[a-finding-enumerates-a-sample]] in this change; all four occurrences now agree on 8.
+- **The reflection paragraph overstated its own case** — "the alternative is no guard at all"
+  when a source scan was offered and exists. Rewritten as the real trade: a scan asserts the
+  call is *written*, this asserts it *took effect*, and a scan would pass happily if the call
+  moved into a branch that never runs. The reviewer's verdict on the trade was to keep the
+  reflection, for that reason and because the blast radius is a test rather than a package.
+- **The `body` guard's `\S+` could let `body?: X | undefined;` escape both patterns** — matching
+  neither the required floor nor the loosened check. `[^;]+` closes it. hey-api does not emit
+  that shape today.
+
+**Counts after round 3: 1821 / 167 / 1168 / 290** — three more than round 2 (the second
+registration guard and the two instrument theory cases) — **0 warnings in a clean Release build,
+`openspec validate --all --strict` 23/23.**

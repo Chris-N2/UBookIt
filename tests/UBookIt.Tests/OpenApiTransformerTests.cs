@@ -7,6 +7,7 @@ using Microsoft.AspNetCore.OpenApi;
 using Microsoft.OpenApi;
 using UBookIt.Web;
 using UBookIt.Tests.Support;
+using UBookIt.Backoffice.Composers;
 using UBookIt.Web.Composing;
 
 namespace UBookIt.Tests;
@@ -172,8 +173,8 @@ public class OpenApiTransformerTests
         // taking no body at all, so the absence of any OTHER optional body is the real claim.
         var types = RepoFiles.Read("src/UBookIt.Backoffice/Client/src/api/types.gen.ts");
 
-        var required = Regex.Matches(types, @"^\s*body:\s*(?<model>\S+);\s*$", RegexOptions.Multiline);
-        var optional = Regex.Matches(types, @"^\s*body\?:\s*(?<model>\S+);\s*$", RegexOptions.Multiline);
+        var required = Regex.Matches(types, @"^\s*body:\s*(?<model>[^;]+);\s*$", RegexOptions.Multiline);
+        var optional = Regex.Matches(types, @"^\s*body\?:\s*(?<model>[^;]+);\s*$", RegexOptions.Multiline);
 
         // NON-EMPTY FIRST, for the same reason as the method-name guard: an extraction that
         // matches nothing satisfies the "no optional bodies" claim perfectly.
@@ -192,27 +193,39 @@ public class OpenApiTransformerTests
     }
 
     /// <summary>
-    /// That the schema transformer is actually REGISTERED on the delivery document.
+    /// That each transformer is actually REGISTERED on the document it belongs to.
     /// </summary>
     /// <remarks>
-    /// QA round 2 deleted <c>options.AddSchemaTransformer&lt;…&gt;()</c> from the composer,
-    /// rebuilt in Release and ran everything: <b>0 warnings, every test green.</b> Six unit
-    /// tests asked the transformer what it does to a schema and not one asked whether it runs.
     /// <para>
-    /// The operation-ID transformer is covered by the committed client, which is downstream of
-    /// it. <b>Nothing is generated from the delivery document</b>, so there is no artifact to
-    /// read this one out of — which also means the "it would break the TypeScript build"
-    /// failure direction claimed for it does not exist. Registration has to be asserted
-    /// directly, through the real composer, the way <c>DeliveryApiExposureTests</c> asserts the
-    /// exposure convention.
+    /// QA round 2 deleted the schema transformer's registration, rebuilt in Release and ran
+    /// everything: <b>0 warnings, every test green.</b> Round 3 did the same to the
+    /// operation-ID transformer's registration, with the same result — because the
+    /// committed-client guard covers that transformer's <i>effect</i> and only once somebody
+    /// regenerates, which a person deleting a registration has no reason to do. **That is
+    /// exactly how this change shipped its original defect.** So both registrations are
+    /// asserted, not one.
     /// </para>
     /// <para>
-    /// Reaches an internal field by reflection, deliberately: <c>OpenApiOptions</c> exposes no
-    /// public transformer collection, and the alternative is no guard at all over a line whose
-    /// removal is otherwise silent. If a future ASP.NET renames the field this test fails
-    /// loudly rather than passing vacuously — which is what the non-null assertion below is for.
+    /// Reaches an internal field by reflection. The trade is a real one rather than the
+    /// absence of an alternative: a source scan could assert that the call is <i>written</i>,
+    /// while this asserts that it <i>took effect</i> on the options object the framework will
+    /// consume — a scan would pass happily if the call moved into a branch that never runs.
+    /// The cost is a dependency on an ASP.NET internal, in a test that ships in the repository
+    /// and in no package. If the field is ever renamed these fail by name, which the
+    /// instrument assertion below exists to guarantee.
     /// </para>
     /// </remarks>
+    [Theory]
+    [InlineData("SchemaTransformers")]
+    [InlineData("OperationTransformers")]
+    public void The_transformer_lists_are_reachable(string field)
+    {
+        // THE INSTRUMENT, ASSERTED BEFORE ANYTHING IS ASSERTED WITH IT. Both guards below read
+        // these internal fields; a rename would make each return nothing, and "nothing" reads
+        // as "no unexpected transformer" rather than as a broken test.
+        Assert.NotNull(typeof(OpenApiOptions).GetField(field, BindingFlags.Instance | BindingFlags.NonPublic));
+    }
+
     [Fact]
     public void The_schema_transformer_is_registered_on_the_delivery_document()
     {
@@ -221,38 +234,56 @@ public class OpenApiTransformerTests
 
         new UBookItDeliveryApiComposer().Compose(new ServicesOnlyUmbracoBuilder(services, config));
 
+        Assert.Contains(
+            typeof(SerializerWidenedNumberSchemaTransformer),
+            RegisteredTransformers(services, UBookIt.Web.Constants.DeliveryApiName, "SchemaTransformers"));
+    }
+
+    [Fact]
+    public void The_operation_id_transformer_is_registered_on_the_backoffice_document()
+    {
+        // Deleting this registration is the defect this change shipped in its first pass: the
+        // thirty client method names turned route-derived and nothing failed. The committed
+        // client catches it only after a regeneration; this catches it at the source.
+        var services = new ServiceCollection();
+        var config = new ConfigurationBuilder().AddInMemoryCollection([]).Build();
+
+        new UBookItBackofficeApiComposer().Compose(new ServicesOnlyUmbracoBuilder(services, config));
+
+        Assert.Contains(
+            typeof(UBookItBackofficeApiComposer.ActionNameOperationIdTransformer),
+            RegisteredTransformers(services, UBookIt.Backoffice.Constants.ApiName, "OperationTransformers"));
+    }
+
+    /// <summary>
+    /// The transformer types registered on one document, read off the options object the
+    /// framework will actually consume.
+    /// </summary>
+    /// <remarks>
+    /// Registration by type stores the framework's own <c>TypeBased…Transformer</c> wrapper,
+    /// which names neither itself nor the wrapped type in its rendering — a first version of
+    /// this guard asserted on <c>ToString()</c> and failed for that reason. The wrapped type is
+    /// a <see cref="Type"/>-valued field on the wrapper, so that is what is read. The wrapper's
+    /// own type is included too, so a transformer registered as an instance is still seen.
+    /// </remarks>
+    private static Type[] RegisteredTransformers(IServiceCollection services, string documentName, string fieldName)
+    {
         using var provider = services.BuildServiceProvider();
-        var options = provider.GetRequiredService<IOptionsMonitor<OpenApiOptions>>()
-            .Get(Constants.DeliveryApiName);
+        var options = provider.GetRequiredService<IOptionsMonitor<OpenApiOptions>>().Get(documentName);
 
-        var field = typeof(OpenApiOptions)
-            .GetField("SchemaTransformers", BindingFlags.Instance | BindingFlags.NonPublic);
+        var field = typeof(OpenApiOptions).GetField(fieldName, BindingFlags.Instance | BindingFlags.NonPublic);
+        Assert.True(field is not null, $"OpenApiOptions.{fieldName} no longer exists; this guard cannot see anything.");
 
-        // THE INSTRUMENT FIRST. A renamed field would make `registered` empty, and an empty
-        // list would fail the assertion below for entirely the wrong reason.
-        Assert.True(field is not null, "OpenApiOptions.SchemaTransformers no longer exists; this guard cannot see anything.");
+        var registered = ((System.Collections.IEnumerable)field!.GetValue(options)!).Cast<object>().ToArray();
 
-        var registered = ((System.Collections.IEnumerable)field!.GetValue(options)!)
-            .Cast<object>()
-            .ToArray();
+        Assert.True(registered.Length > 0, $"No transformer is registered in {fieldName} for '{documentName}' at all.");
 
-        Assert.True(
-            registered.Length > 0,
-            "No schema transformer is registered on the delivery document at all.");
-
-        // Registered by TYPE, so the entry in the list is the framework's own
-        // TypeBasedOpenApiSchemaTransformer wrapper and our type is a Type-valued field on it.
-        // Read the field rather than the wrapper's ToString(), which names neither.
-        static IEnumerable<Type> WrappedTypes(object transformer) =>
-            transformer.GetType()
+        return registered
+            .SelectMany(transformer => transformer.GetType()
                 .GetFields(BindingFlags.Instance | BindingFlags.Public | BindingFlags.NonPublic)
-                .Select(field => field.GetValue(transformer))
-                .OfType<Type>();
-
-        var registeredTypes = registered
-            .SelectMany(transformer => WrappedTypes(transformer).Append(transformer.GetType()))
+                .Select(f => f.GetValue(transformer))
+                .OfType<Type>()
+                .Append(transformer.GetType()))
             .ToArray();
-
-        Assert.Contains(typeof(SerializerWidenedNumberSchemaTransformer), registeredTypes);
     }
 }

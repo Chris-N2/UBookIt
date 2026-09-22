@@ -80,7 +80,7 @@ and the change is not done until the guards over them pass unchanged.
 |---|---|
 | `Directory.Packages.props` | Umbraco 18.2.0, EF Core 10.0.11 *(already in the spike)* |
 | `Microsoft.AspNetCore.OpenApi` | **A new declared dependency of two packed packages.** `UBookIt.Web` calls `AddOpenApi`/`AddSchemaTransformer` and `UBookIt.Backoffice` implements `IOpenApiOperationTransformer`; it arrives transitively through Umbraco 18 either way, but a package we compile against belongs in the nuspec rather than resting on someone else's graph. Pinned `10.0.11`, which publishes as `>= 10.0.11` like every other NuGet dependency |
-| `UBookIt.Backoffice/Composers/UBookItBackofficeApiComposer.cs` | Ported; ~40 lines become ~5 |
+| `UBookIt.Backoffice/Composers/UBookItBackofficeApiComposer.cs` | Ported; ~40 lines become 8, plus the operation-ID transformer the host does **not** replace |
 | `UBookIt.Web/Composing/UBookItDeliveryApiComposer.cs` | Ported, anonymous — no auth requirement |
 | `README.md` | Versioning table generalised. **Must be cherry-picked to `main`** — it is true of both lines, and leaving it here alone makes two published READMEs disagree |
 | Generated TS client | Re-generated; method names verified, not assumed |
