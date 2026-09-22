@@ -232,6 +232,21 @@ antiforgery token and `ufprt`. Response: **"Booking confirmed", reference `8WZR-
 residue, 09:15 on 28 September 2026). The OpenAPI port touches nothing here, which is exactly
 why confirming it beats assuming it.
 
+**Chris has already reported a difference that bears on 7.4, and it narrows D5 rather than
+overturning it.** His note: the v18 backoffice has *"a border radius set on the buttons, so
+they're quite rounded at the edges rather than the square edges of v17"*. That splits the four
+packed screenshots in two:
+
+- `booking-flow.png` and `booking-form.png` show the **front end**, which is our own markup on
+  the site's own styling. Unaffected by anything in the backoffice chrome.
+- `bookings-screen.png` and `availability.png` show the **backoffice**, and both are full of
+  `uui-button`s. On an 18 site those render rounded while the shipped images show them square.
+
+So D5's "near-identical" holds, and a reader of the `18.x` README would still meet a small
+visible mismatch in two of four images. That is a decision for the release change rather than
+this one — **retake the two backoffice shots for the `18.x` line, leaving `17.x`'s own alone** is
+the obvious answer, but it is Chris's call and it costs a v18 backoffice session to do.
+
 **7.1 and 7.4 are NOT done.** Both need the backoffice UI in a browser, and the Chrome extension
 is not connected in this session. They are the two checks the compiler and curl cannot stand in
 for — 7.1 because the backoffice is the client of every operation ID this change nearly broke,
