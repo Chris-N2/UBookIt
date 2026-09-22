@@ -1,4 +1,4 @@
-using System.Security.Claims;
+﻿using System.Security.Claims;
 using System.Security.Principal;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.Extensions.Configuration;
@@ -44,20 +44,24 @@ public class UBookItSectionAccessTests
     {
         var user = new User(new GlobalSettings());
 
-        // Umbraco 18 marked this ReadOnlyUserGroup constructor obsolete — "please use the
-        // constructor that includes all parameters. Scheduled for removal in Umbraco 19."
+        // Umbraco 18 obsoleted the thirteen-parameter ReadOnlyUserGroup constructor in favour
+        // of this one, which adds `startElementId`. These fixtures want no start node of any
+        // kind, so it is null like its two siblings.
         //
-        // NOT PORTED, deliberately, and this is the one place the reason is written down; the
-        // other three call sites point here. The replacement takes one extra nullable int,
-        // sitting among the start-node ids — and **Umbraco's shipped XML documentation names
-        // only thirteen of its fourteen parameters**, so the new one's name is not published.
-        // Passing `null` positionally across fourteen arguments to a parameter nobody can name
-        // is how a fixture comes to assert something nobody understands.
+        // WORTH KNOWING WHY THIS IS A NAMED ARGUMENT AND NOT A SUPPRESSION. The first attempt
+        // kept the obsolete constructor behind `#pragma warning disable CS0618` in six
+        // fixtures, justified by the claim that Umbraco's shipped XML documents only thirteen
+        // of the fourteen parameters, so the new one "cannot be named". The XML half was true
+        // and the conclusion was false: XML documentation is not where parameter names live.
+        // They live in the assembly's parameter metadata — which is what lets every argument
+        // here be named — and, in this repository, in `ref/Umbraco-CMS-main/src/Umbraco.Core/
+        // Models/Membership/ReadOnlyUserGroup.cs`, where the parameter is visibly
+        // `startElementId`.
         //
-        // The value is not in doubt (these fixtures want no start node at all); the name is.
-        // OWED BEFORE UMBRACO 19, when the obsolete constructor is removed and this becomes a
-        // build error rather than a suppression.
-#pragma warning disable CS0618
+        // The lesson is worth more than the line: **a suppression justified by "the
+        // information is not available" has to name where it looked.** This one had looked in
+        // one place, found nothing, and reported that nowhere had it — inventing a debt
+        // ("OWED BEFORE UMBRACO 19") to be paid by whoever hit the build error in a year.
         user.AddGroup(new ReadOnlyUserGroup(
             id: 1,
             key: Guid.NewGuid(),
@@ -66,13 +70,13 @@ public class UBookItSectionAccessTests
             icon: null,
             startContentId: null,
             startMediaId: null,
+            startElementId: null,
             alias: "testGroup",
             allowedLanguages: [],
             allowedSections: sections,
             permissions: new HashSet<string>(),
             granularPermissions: new HashSet<IGranularPermission>(),
             hasAccessToAllLanguages: true));
-#pragma warning restore CS0618
 
         return user;
     }

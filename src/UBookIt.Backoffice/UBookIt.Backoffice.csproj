@@ -1,4 +1,4 @@
-<Project Sdk="Microsoft.NET.Sdk.Razor">
+﻿<Project Sdk="Microsoft.NET.Sdk.Razor">
   <PropertyGroup>
     <TargetFramework>net10.0</TargetFramework>
     <Nullable>enable</Nullable>
@@ -19,6 +19,7 @@
 
   <!-- Central package management - no versions -->
   <ItemGroup>
+    <PackageReference Include="Microsoft.AspNetCore.OpenApi" />
     <PackageReference Include="Umbraco.Cms.Api.Common" />
     <PackageReference Include="Umbraco.Cms.Api.Management" />
     <PackageReference Include="Umbraco.Cms.Web.Common" />

@@ -1,4 +1,4 @@
-using System.Security.Claims;
+﻿using System.Security.Claims;
 using System.Security.Principal;
 using Microsoft.AspNetCore.Authorization;
 using UBookIt.Backoffice.Security;
@@ -41,7 +41,6 @@ public class UBookItSensitiveDataAccessTests
     {
         var user = new User(new GlobalSettings());
 
-#pragma warning disable CS0618 // Umbraco 18 obsoleted this ctor; see the note in UBookItSectionAccessTests.
         user.AddGroup(new ReadOnlyUserGroup(
             id: 1,
             key: groupKey,
@@ -50,13 +49,13 @@ public class UBookItSensitiveDataAccessTests
             icon: null,
             startContentId: null,
             startMediaId: null,
+            startElementId: null,
             alias: "testGroup",
             allowedLanguages: [],
             allowedSections: [UBookIt.Backoffice.Constants.SectionAlias],
             permissions: new HashSet<string>(),
             granularPermissions: new HashSet<IGranularPermission>(),
             hasAccessToAllLanguages: true));
-#pragma warning restore CS0618
 
         return user;
     }

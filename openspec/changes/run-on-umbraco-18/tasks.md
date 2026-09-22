@@ -29,6 +29,27 @@ documents captured in §4. **The two lines describe the same API:**
 | `integer`/`string` unions | **0** | 0 *(after the fix)* | **0** | 0 *(after the fix)* |
 | delivery paths with the API **off** | — | — | **0**, endpoint 404 | **0**, endpoint 404 |
 
+**CORRECTED AFTER QA ROUND 1: "the two lines describe the same API" was FALSE, and it is the
+THIRD claim in this change to fail the same way.** The table above is built entirely from
+*name-and-count* instruments — path counts, operation counts, the operation-id set, exported
+method names. Every one of them is structurally blind to a change in schema **shape**, so the
+generated TypeScript could differ materially while all four agreed. It does, in three ways:
+
+| change | what it is |
+|---|---|
+| eleven request bodies `body?:` → `body:` | **a correction.** A `[FromBody]` parameter *is* required; Swashbuckle described it as optional and .NET's generator does not. Callers already pass one, which is why the TypeScript still compiles |
+| `SettingResponseModel.effectiveValue` / `.configuredValue` optional → required-and-nullable | **more precise.** "always present, may be null" rather than "may be absent, may be null" |
+| `ProblemDetails` lost its additional-properties index signature | **inert, checked rather than assumed.** Every error reader casts through `unknown` with its own local shape — `api-errors.ts` deliberately so, because it normalises three different failure shapes — so nothing read extension members through this type |
+
+**None of these is a regression and all three needed deciding rather than discovering.** The
+first two are now pinned by `OpenApiTransformerTests.The_generated_client_requires_a_body_on_every_write`,
+so a future regeneration that loosens them fails instead of passing quietly.
+
+**The lesson is [[a-guard-scoped-wrongly-reports-green]] for the third time in one change**, and
+it is sharper here than the memory states it: *counting things and comparing names is not
+comparing contracts.* Two documents can have identical paths, identical operations, identical
+operation ids and identical method names, and still promise different things.
+
 **The row that matters most is the unions one, and it is the row nobody asked for.** v17 emitted
 **zero** — so `{"type": ["integer","string"]}` was a v18 regression introduced by the generator
 swap, and the JSON-options fix and schema transformer **restore v17's behaviour** rather than
@@ -56,9 +77,13 @@ discharged: it is 11 on both.
       and the `IOperationIdHandler` registration with `builder.AddBackOfficeOpenApiDocument(...)`
       per design D1. Verify by building `UBookIt.Backoffice` alone — its two of the four errors
       should be gone.
-- [x] 2.2 Keep `Constants.ApiName` as the document name. Verify the document is served at the
-      same route a v17 site serves it from — a renamed document silently breaks the client
-      generation config and anything a site has bookmarked.
+- [x] 2.2 Keep `Constants.ApiName` as the document name. **Restated, because the task as
+      written asked for something that is false and it was ticked anyway.** The *document name*
+      is unchanged (`ubookitbackoffice`), which is the part this change controls and the part a
+      rename would break. **The route moved and could not be kept**: Umbraco 17 served
+      `/umbraco/swagger/{name}/swagger.json`, Umbraco 18 serves `/umbraco/openapi/{name}.json`.
+      That is the host's, not ours; `Client/package.json`'s `generate-client` URL follows it.
+      Anything a site had bookmarked does break, and saying so is the point of the task.
 - [x] 2.3 **Decide `CustomOperationHandler`'s fate by evidence** (D3): regenerate the client and
       diff the exported method names against §1.1. Keep the handler only if the names got worse,
       and record which happened either way — "the docs said it was unnecessary" is not a finding.
@@ -83,7 +108,7 @@ overload and an `IEmailSender` scheduling overload, all implemented by our test 
 errors in five files, not four in two. **A build-error count is only a count of the errors the
 compiler got far enough to find.**
 
-**The backoffice composer went from ~40 lines to 5.** The delivery one uses the framework's own
+**The backoffice composer's `Compose` went from ~40 lines to 8.** The delivery one uses the framework's own
 `AddOpenApi` with a `ShouldInclude` keyed on the `[MapToApi]` attribute the controllers already
 carried — one source of truth rather than a namespace check duplicated in the composer.
 `AddUmbracoOpenApiDocument` exists in the assembly but is **not usable by a package, and now the
@@ -220,9 +245,19 @@ tells every future context what the rules are.
 - [x] 5.2 **Record the cherry-pick obligation prominently**: this edit is true of `main` too, and
       left here alone it makes two published READMEs disagree about the package's own policy.
       Branch flow is `main` → `dev/v18`, so it will also conflict at the next merge forward.
-- [ ] 5.3 **`CLAUDE.md`'s invariant 1 is the same obligation and was not noticed until §6.4's
-      confinement check.** The LTS/STS amendment is a statement about the project, not about the
-      v18 line, and it lives only on `dev/v18`. Cherry-pick it to `main` with the README table.
+- [!] 5.3 **`CLAUDE.md`'s invariant 1 is the same obligation, and it cannot be closed from this
+      branch.** The LTS/STS amendment is a statement about the project, not about the v18 line,
+      and it currently lives only on `dev/v18`. So does the README versioning table (5.1).
+
+      **Both are cherry-picks onto `main`, which is a commit on another branch that Chris
+      pushes** — so this change can record the obligation and cannot discharge it. Marked `[!]`
+      rather than left as an unticked `[ ]`, because an open checkbox reads as work forgotten
+      and this is work *located*: two files, both already written, waiting on a branch this
+      change does not own. QA round 1 was right to object to the bare box.
+
+      Until they land, the two branches disagree about the package's own versioning policy in a
+      file packed into every NuGet package, and about the project's governing invariant in the
+      file that tells every future context what the rules are.
 
 ## 6. Verification
 
@@ -403,3 +438,69 @@ in §2.3, including the fact that this change first recorded the opposite on no 
   `AddUmbracoOpenApiDocument<T>`, is unusable by packages because its options base class is
   internal. That is worth raising upstream — it is the difference between a delivery-style
   document being three lines and being a hand-written schema transformer.
+
+## 10. QA round 1 — findings and what they cost
+
+**REJECT, five MAJOR, no CRITICAL.** The reviewer re-ran the build, all four suite counts,
+`--strict`, the DevExpress hard-fail gate and the branch-containment check, and proved the
+adjusted `GeneratedClientTests` guard still fires by mutating `types.gen.ts` two ways. It also
+hit §2.3's empty-extraction trap independently, on its first attempt, which is the strongest
+evidence yet that the trap is real rather than a one-off slip.
+
+**What was wrong, and the shape it shared.** Three of the five MAJORs were *claims*, not code —
+and all three failed the same way, which is why the count matters more than any one of them:
+
+1. **"The two lines describe the same API"** — asserted from instruments that count names and
+   cannot see schema shape. Corrected in §1.2 above; eleven request bodies and two settings
+   fields had changed optionality and `ProblemDetails` had lost an index signature.
+2. **"Umbraco's XML documents only 13 of 14 parameters, so the new one cannot be named"** — the
+   XML half was true and the conclusion false. The parameter is `startElementId`; it is in the
+   assembly metadata that makes every *other* argument nameable, and its source is checked into
+   this repository at `ref/Umbraco-CMS-main/…/ReadOnlyUserGroup.cs:114`. **All six `CS0618`
+   suppressions are gone and the self-invented "OWED BEFORE UMBRACO 19" debt with them** — 0
+   warnings is now achieved by fixing rather than hiding.
+3. **"The other three call sites point here"** — there were five. Moot now the suppressions are
+   deleted, but it is the same fault in miniature: a population described without being counted.
+
+**The other two were missing guards over exactly the behaviour this change had already broken
+once**, which is the more serious category:
+
+4. **The schema transformer had no test**, and its comment claimed a property — "only ever
+   narrows a union the serializer widened" — that the code could not implement, because
+   "has String and has Integer" equally describes an authored union, whose `Pattern` it would
+   also have discarded. **Fixed by making the code true rather than the comment weaker:** the
+   serializer's widening always carries the pattern `^-?(?:0|[1-9]\d*)$` (measured: 60
+   occurrences across both documents, one distinct pattern), so that pattern is now the
+   signature it matches on. Extracted to `SerializerWidenedNumberSchemaTransformer` so it can
+   be tested without generating a document.
+5. **Nothing failed if `ActionNameOperationIdTransformer` were deleted** — the defect this
+   change shipped, corrected, and left undetectable. Now guarded against the committed
+   `sdk.gen.ts`.
+
+**Eight tests added in `OpenApiTransformerTests`, and every one demonstrated by mutation rather
+than by passing** — because a guard that has only ever been seen green is a guard nobody has
+tested:
+
+| mutation | result |
+|---|---|
+| drop the pattern check (over-narrow an authored union) | **1 failed** |
+| assign `Integer` instead of clearing the `String` flag (loses `null`) | **2 failed** |
+| leave the pattern behind on a narrowed integer | **1 failed** |
+| `listBookings` → `getBookings` in `sdk.gen.ts` (*the real regression*) | **1 failed** |
+| a request body back to `body?:` | **1 failed** |
+| **break the extraction itself** so the name list comes back empty | **1 failed** |
+
+The last row is the one worth keeping. An empty extraction satisfies every "is absent" assertion
+and reads as a healthy client — the precise failure that made this change report "names
+unchanged" from a list of nothing, twice. **§2.3 wrote that lesson down and did not bank it; the
+non-empty assertion is now the guard rather than the paragraph.**
+
+**Also fixed:** an unclosed `</remarks>` that would become CS1570 the moment any project sets
+`GenerateDocumentationFile`; §2.2 restated, because it asked for a route that *could not* be kept
+and was ticked anyway (the document *name* is unchanged, the host's route moved); the line-count
+claim reconciled to 8 in all three places it appeared; and `Microsoft.AspNetCore.OpenApi` given
+explicit `PackageReference`s in both projects that compile against it, rather than relying on it
+arriving transitively through Umbraco.
+
+**Counts after the fixes: 1817 / 167 / 1168 / 290** — up eight, all new, none altered — **0
+warnings in a clean Release build, `openspec validate --all --strict` 23/23.**

@@ -1,4 +1,4 @@
-using UBookIt.Tests.Support;
+﻿using UBookIt.Tests.Support;
 using System.Runtime.CompilerServices;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
@@ -143,7 +143,6 @@ public class BookingsEndpointTests
     {
         var user = new User(new GlobalSettings());
 
-#pragma warning disable CS0618 // Umbraco 18 obsoleted this ctor; see the note in UBookItSectionAccessTests.
         user.AddGroup(new ReadOnlyUserGroup(
             id: 1,
             // The real built-in key when the user is meant to have access, and a group that is
@@ -156,13 +155,13 @@ public class BookingsEndpointTests
             icon: null,
             startContentId: null,
             startMediaId: null,
+            startElementId: null,
             alias: "testGroup",
             allowedLanguages: [],
             allowedSections: [UBookIt.Backoffice.Constants.SectionAlias],
             permissions: new HashSet<string>(),
             granularPermissions: new HashSet<IGranularPermission>(),
             hasAccessToAllLanguages: true));
-#pragma warning restore CS0618
 
         return new StubBackOfficeSecurityAccessor(new StubBackOfficeSecurity(user));
     }

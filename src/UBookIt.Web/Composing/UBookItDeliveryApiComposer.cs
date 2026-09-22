@@ -79,34 +79,12 @@ public sealed class UBookItDeliveryApiComposer : IComposer
             });
 
             // AN INTEGER IS AN INTEGER, and without this it is not described as one.
-            //
-            // Microsoft.AspNetCore.OpenApi generates schemas from the GLOBAL HTTP JsonOptions —
-            // documented as the only JSON options that influence OpenAPI, MVC's having none —
-            // and Umbraco configures those globally with JsonNumberHandling.AllowReadingFromString.
-            // So every `int` came out as {"type": ["integer", "string"]} with a numeric-string
-            // pattern, which is a true statement about a minimal API reading those options and a
-            // FALSE one about these controllers, which are MVC and do not.
-            //
-            // The backoffice document fixes this by naming its JSON options
-            // (BackOfficeOpenApiDocumentBuilder.WithJsonOptions). That seam is Umbraco-internal
-            // for a non-backoffice document — AddUmbracoOpenApiDocument's options base class is
-            // not public — and OpenApiOptions exposes no serializer of its own, so the correction
-            // is made here instead, on the generated schema.
-            options.AddSchemaTransformer((schema, _, _) =>
-            {
-                // Only ever NARROWS a union the serializer settings widened: the string member
-                // is removed and null is preserved, so a nullable int stays nullable. A schema
-                // that was never widened has no String flag and is left exactly as it is.
-                if (schema.Type is { } type
-                    && type.HasFlag(JsonSchemaType.String)
-                    && (type.HasFlag(JsonSchemaType.Integer) || type.HasFlag(JsonSchemaType.Number)))
-                {
-                    schema.Type = type & ~JsonSchemaType.String;
-                    schema.Pattern = null;
-                }
-
-                return Task.CompletedTask;
-            });
+            // Umbraco 18's generator widens every numeric property to ["integer", "string"];
+            // the v17 document emitted none of those. The whole reasoning, and why this
+            // narrows only the serializer's unions and not an authored one, lives on
+            // SerializerWidenedNumberSchemaTransformer — which is a named type rather than a
+            // lambda precisely so it can be tested without generating a document.
+            options.AddSchemaTransformer<SerializerWidenedNumberSchemaTransformer>();
 
             // Membership is decided by the SAME [MapToApi] attribute the controllers already
             // carry, rather than by a namespace check duplicated here. One source of truth:

@@ -1,4 +1,4 @@
-using System.Reflection;
+﻿using System.Reflection;
 using UBookIt.Backoffice.Mapping;
 using Microsoft.AspNetCore.Http;
 using System.Text.RegularExpressions;
@@ -236,7 +236,6 @@ public class FindByReferenceEndpointTests
     private static IBackOfficeSecurityAccessor Security(bool sensitiveData)
     {
         var user = new User(new GlobalSettings());
-#pragma warning disable CS0618 // Umbraco 18 obsoleted this ctor; see the note in UBookItSectionAccessTests.
         user.AddGroup(new ReadOnlyUserGroup(
             id: 1,
             key: sensitiveData ? Constants.Security.SensitiveDataGroupKey : Guid.NewGuid(),
@@ -245,13 +244,13 @@ public class FindByReferenceEndpointTests
             icon: null,
             startContentId: null,
             startMediaId: null,
+            startElementId: null,
             alias: "testGroup",
             allowedLanguages: [],
             allowedSections: [UBookIt.Backoffice.Constants.SectionAlias],
             permissions: new HashSet<string>(),
             granularPermissions: new HashSet<IGranularPermission>(),
             hasAccessToAllLanguages: true));
-#pragma warning restore CS0618
 
         return new StubAccessor(new StubSecurity(user));
     }

@@ -1,4 +1,4 @@
-using Microsoft.AspNetCore.OpenApi;
+﻿using Microsoft.AspNetCore.OpenApi;
 using Microsoft.OpenApi;
 using Umbraco.Cms.Api.Common.OpenApi;
 using Umbraco.Cms.Api.Management.OpenApi;
@@ -18,7 +18,7 @@ namespace UBookIt.Backoffice.Composers
     /// https://docs.umbraco.com/umbraco-cms/extend-your-project/tutorials/creating-a-backoffice-api/adding-a-custom-openapi-document
     /// </para>
     /// <para>
-    /// <b>This was forty lines against Umbraco 17 and is five against 18, because the host now
+    /// <b>This was forty lines against Umbraco 17 and is eight against 18, because the host now
     /// does the work itself.</b> Umbraco 17 exposed OpenAPI through Swashbuckle, so a package had
     /// to configure <c>SwaggerGenOptions</c>, register its own document, add an operation filter
     /// to attach backoffice authentication, and supply an <c>IOperationIdHandler</c> to stop the
@@ -39,6 +39,7 @@ namespace UBookIt.Backoffice.Composers
     /// The lesson is the one the task had already written down and the implementation then
     /// ignored: <b>decide by regenerating and comparing, never by what the docs imply.</b>
     /// </para>
+    /// </remarks>
     public class UBookItBackofficeApiComposer : IComposer
     {
         public void Compose(IUmbracoBuilder builder)

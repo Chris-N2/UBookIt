@@ -1,15 +1,15 @@
-<Project Sdk="Microsoft.NET.Sdk.Razor">
+﻿<Project Sdk="Microsoft.NET.Sdk.Razor">
 
   <PropertyGroup>
     <TargetFramework>net10.0</TargetFramework>
     <AddRazorSupportForMvc>true</AddRazorSupportForMvc>
-  
+
     <!-- Microsoft.AspNetCore.OpenApi's XML-comment source generator emits interceptors, which
          are opt-in per namespace. Required from Umbraco 18, which generates OpenAPI through
          Microsoft.AspNetCore.OpenApi instead of Swashbuckle; without it the generated
          OpenApiXmlCommentSupport file fails to compile with CS9137. -->
     <InterceptorsNamespaces>$(InterceptorsNamespaces);Microsoft.AspNetCore.OpenApi.Generated</InterceptorsNamespaces>
-</PropertyGroup>
+  </PropertyGroup>
 
   <PropertyGroup>
     <Title>uBookIt — front end</Title>
@@ -29,6 +29,7 @@
   </ItemGroup>
 
   <ItemGroup>
+    <PackageReference Include="Microsoft.AspNetCore.OpenApi" />
     <PackageReference Include="Umbraco.Cms.Api.Common" />
     <PackageReference Include="Umbraco.Cms.Web.Website" />
   </ItemGroup>
