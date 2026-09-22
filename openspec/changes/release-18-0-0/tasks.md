@@ -104,7 +104,7 @@ a release is the one moment their absence cannot be corrected afterwards.
 - [x] 5.4 Pack verification per `docs/publishing.md`: five `.nupkg` + four `.snupkg`, all
       `18.0.0`, repository commit = HEAD, icon and readme declared **and present**, SourceLink
       SHA = HEAD, packed readme 0 relative links, backoffice client assets present.
-- [~] 5.5 **Install the packed `18.0.0` into a scratch Umbraco 18 site from a local feed** and
+- [x] 5.5 **Install the packed `18.0.0` into a scratch Umbraco 18 site from a local feed** and
       confirm it restores, boots and shows the section. The upper bound is new metadata and
       restore is the only thing that reads it.
 
@@ -229,12 +229,33 @@ resolved **from a local folder feed**, and the site built.
    `Umbraco.Cms.DevelopmentMode.Backoffice`, pinned separately by the *template* and not a
    uBookIt dependency at all.)
 
-**What 5.5 still owes, stated rather than quietly dropped:** the requirement's scenario is *"a
-site created from scratch that resolved the package from a feed, **ran, and took a booking**"*.
-The site has not been run, because uBookIt needs SQL Server and a scratch database is Chris's to
-create — credentials are his and I do not handle them. **Restore and build are proved; boot and
-book are not.** This is a performed check with a stated limit, exactly as that requirement
-demands, and it must not be read as more than it is.
+**5.5 IS NOW COMPLETE — the site ran and took a booking.** Chris created
+`UBookit_V18_ScratchSite` on `localhost` (Windows auth, so the connection string carries no
+secret and I wrote it myself) and completed the installer's admin-user step, which is the one
+part of this I will not do.
+
+**The whole loop, on a site that had never seen uBookIt:**
+
+| step | evidence |
+|---|---|
+| migration ran from the **packaged** assembly | **0 tables before boot → 94 after**, including `__uBookItEFMigrationsHistory` and 13 `uBookIt*` tables |
+| the section is grantable, not automatic | invisible until granted — the README's first callout confirming itself on a real install |
+| backoffice **read** path | all four workspace views render from the packaged client |
+| backoffice **write** path | created `Consulting Room`, 5 weekday windows, bookable on its own |
+| the package's **document type and template** | *Booking Page* was the only creatable type, and carried its own template |
+| front end, **no JavaScript** | walked with curl: catalogue → resource → 22 dates (weekends correctly absent) → times → details POST |
+| the booking **persisted** | reference `53F77C23`, 22 Sep 14:30–15:00 UTC, one row in `uBookItResourceClaim` |
+| it reads back through the **packaged API** | `53F7-7C23` on the Bookings screen: Consulting Room, Booked directly, **Confirmed** |
+
+**Two things worth keeping.** The POST returned the catalogue rather than a confirmation, because
+`curl -L` followed the redirect without the query string — **the page looked like a failure and
+the database said otherwise.** Checking the row is what separated "the flow failed" from "my
+client dropped a parameter". And the reference is stored as `53F77C23` and displayed as
+`53F7-7C23`; the hyphen is presentation.
+
+**Still not automated**, exactly as `Installability is proved by installing` requires it be said:
+this was performed once, by hand, on 2026-09-22 against `18.0.0`. It is evidence about a moment
+and not a regression test.
 
 **No global NuGet state was changed** — the feed and the source mapping live in a
 `nuget.config` inside the throwaway site, and `dotnet nuget list source` shows no registered
