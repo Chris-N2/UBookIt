@@ -77,9 +77,9 @@ trusting that a range does what ranges do.
       Under `skip_specs` it was arguably not owed; the round-1 fix made it owed, and the round-2
       task list did not pick it up — an obligation created by a change and not carried, which is
       the same species as the defect it was fixing. Result recorded in §11.
-- [ ] 7.2 Record that `17.0.0`–`17.1.1` remain installable into Umbraco 18 permanently, and that
+- [x] 7.2 Record that `17.0.0`–`17.1.1` remain installable into Umbraco 18 permanently, and that
       the bound protects only releases from here.
-- [ ] 7.3 Record the readme-ref obligation this change deliberately did not take (design's open
+- [x] 7.3 Record the readme-ref obligation this change deliberately did not take (design's open
       question): the 17 readme still names `blob/main`, which is true today and becomes false when
       the lines' documentation diverges.
 
@@ -253,3 +253,49 @@ years and then misleads whoever meets it after the next major. The alternative �
 say "an Umbraco project this line supports" — was rejected as churn on a requirement this change
 does not otherwise touch, and because a `## MODIFIED` entry replaces a requirement wholesale and
 would put four unrelated scenarios at risk to reword one.
+
+## 12. §7.2 and §7.3 — what this release leaves behind
+
+**7.2 — `17.0.0`–`17.1.1` remain installable into an Umbraco 18 site, permanently.** A published
+package keeps the metadata it was published with; those four have no ceiling and never will. The
+bound protects releases **from `17.1.2` onward and nothing earlier**, and the changelog entry says
+so to the reader's face rather than implying the problem is solved. Anyone pinning one of those
+four on Umbraco 18 will still install it, build it, and get a site that does not start.
+
+**7.3 — the readme-ref obligation this change deliberately did not take.** `release-18-0-0` added
+*A documentation link in the packed readme names the release it shipped with*, and satisfied it on
+the 18 line. **The 17 readme still names `blob/main`** — twelve links, correct today because
+`main` *is* this line, and false the moment the two lines' documentation diverges, which `17.2`'s
+features will do. That requirement is not on `main`'s baseline either, so it is the same shape as
+QA's first finding here: enforcement and guarantee on one line only.
+
+Not taken because this change exists to stop sites bricking and stayed small on purpose. **Owed at
+the next 17-line release**, alongside the standing gap 7.2's sibling note records:
+`Installability is proved by installing` has never been exercised by a 17-line release.
+
+## 13. QA — APPROVED after five rounds, and the tally is the finding
+
+| round | shipped-artefact findings | self-record findings |
+|---|---|---|
+| 1 | 1 (readme wording) | 6 |
+| 2 | 0 | 2 |
+| 3 | 0 | 2 |
+| 4 | 0 | 2 |
+| 5 | 0 | 0 |
+
+**The code was essentially right from the first commit. What took five rounds was this change's
+description of what it had done** — and in rounds 2, 3 and 4 the defect was specifically in the
+paragraph announcing the previous round's fix.
+
+**Twice it was a citation**: a document quoted for something it does not say (the readme, on
+`UBookIt.Persistence`), and a verification claimed on another line's evidence (`release-18-0-0`
+§5.5, for `17.1.1`). That is a sharper form of the rule this project already holds — *treat each
+round's fixes as new code*:
+
+> **The sentence announcing the fix is new code too, and it is the one nothing compiles, no test
+> reads, and no guard can see. The only instrument that catches it is opening the document it
+> cites.** "Check the claim's source" is a different habit from "re-test the fix".
+
+**And one structural lesson that generalises beyond this change:** `skip_specs` on a change that
+cherry-picks *enforcement* from an unmerged branch leaves `main` holding a guard whose requirement
+`main` does not state. Any future cross-line pick has to carry both halves.
