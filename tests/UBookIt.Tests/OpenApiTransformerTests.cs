@@ -193,6 +193,29 @@ public class OpenApiTransformerTests
     }
 
     /// <summary>
+    /// That the two internal fields the registration guards reflect on still exist.
+    /// </summary>
+    /// <remarks>
+    /// <b>Not because the guards would otherwise pass vacuously — they would not.</b> An
+    /// earlier version of this comment said a rename "would make each return nothing, and
+    /// nothing reads as no unexpected transformer". Both halves are false:
+    /// <see cref="RegisteredTransformers"/> asserts the field by name before reading it, and
+    /// the guards are <i>presence</i> assertions, so an empty list fails them anyway. QA proved
+    /// it by renaming the field while leaving this theory reading the real names — both guards
+    /// failed, by name.
+    /// <para>
+    /// It earns its place for a smaller reason: it states the coupling to an ASP.NET internal
+    /// as its own named test, so a framework rename is diagnosed in one line rather than
+    /// inferred from two failure messages about missing transformers.
+    /// </para>
+    /// </remarks>
+    [Theory]
+    [InlineData("SchemaTransformers")]
+    [InlineData("OperationTransformers")]
+    public void The_transformer_lists_are_reachable(string field)
+        => Assert.NotNull(typeof(OpenApiOptions).GetField(field, BindingFlags.Instance | BindingFlags.NonPublic));
+
+    /// <summary>
     /// That each transformer is actually REGISTERED on the document it belongs to.
     /// </summary>
     /// <remarks>
@@ -201,8 +224,8 @@ public class OpenApiTransformerTests
     /// everything: <b>0 warnings, every test green.</b> Round 3 did the same to the
     /// operation-ID transformer's registration, with the same result — because the
     /// committed-client guard covers that transformer's <i>effect</i> and only once somebody
-    /// regenerates, which a person deleting a registration has no reason to do. **That is
-    /// exactly how this change shipped its original defect.** So both registrations are
+    /// regenerates, which a person deleting a registration has no reason to do. <b>That is
+    /// exactly how this change shipped its original defect.</b> So both registrations are
     /// asserted, not one.
     /// </para>
     /// <para>
@@ -211,21 +234,10 @@ public class OpenApiTransformerTests
     /// while this asserts that it <i>took effect</i> on the options object the framework will
     /// consume — a scan would pass happily if the call moved into a branch that never runs.
     /// The cost is a dependency on an ASP.NET internal, in a test that ships in the repository
-    /// and in no package. If the field is ever renamed these fail by name, which the
-    /// instrument assertion below exists to guarantee.
+    /// and in no package. If the field is ever renamed, <see cref="RegisteredTransformers"/>
+    /// fails by name rather than quietly finding nothing.
     /// </para>
     /// </remarks>
-    [Theory]
-    [InlineData("SchemaTransformers")]
-    [InlineData("OperationTransformers")]
-    public void The_transformer_lists_are_reachable(string field)
-    {
-        // THE INSTRUMENT, ASSERTED BEFORE ANYTHING IS ASSERTED WITH IT. Both guards below read
-        // these internal fields; a rename would make each return nothing, and "nothing" reads
-        // as "no unexpected transformer" rather than as a broken test.
-        Assert.NotNull(typeof(OpenApiOptions).GetField(field, BindingFlags.Instance | BindingFlags.NonPublic));
-    }
-
     [Fact]
     public void The_schema_transformer_is_registered_on_the_delivery_document()
     {

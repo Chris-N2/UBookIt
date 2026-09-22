@@ -573,9 +573,11 @@ pass vacuously forever, so the instrument asserts itself before it asserts anyth
   written one round earlier to fix a different instance of the same thing.
 - **Thirteen files had gained a UTF-8 BOM** across rounds 1 and 2 - including
   `Directory.Packages.props` and both csprojs, all shared with `main`, none Umbraco-18-forced.
-  That was my tooling, not a decision. The repo's convention is no BOM (333 `.cs` files without,
-  35 with), so all thirteen are stripped and the shared files are byte-identical to `main` again
-  apart from their real edits.
+  That was my tooling, not a decision. The repo's convention is no BOM — measured over tracked
+  `.cs` files: **370 tracked, 35 with a BOM, 335 without** — so all thirteen are stripped and the
+  shared files are byte-identical to `main` again apart from their real edits. (An earlier
+  version of this line said "333 without". That was a count of `main`'s tree stated without the
+  qualifier, and QA re-measured it rather than reading past it.)
 - **`Microsoft.AspNetCore.OpenApi` added to the proposal's Impact table.** It is now a declared
   dependency of two packed packages and changes both nuspecs.
 - **The two cherry-picks are recorded in [[ubookit-deferred-obligations]]**, not only in §5. The
@@ -616,10 +618,8 @@ outcome was to *state* the gap rather than weaken the guard. **It can** — prob
 backoffice document composes in isolation and registers five operation transformers, ours among
 them. So there is no caveat to write.
 
-Both registrations are now asserted through one helper, `RegisteredTransformers`, and the
-instrument is asserted before either of them by a `[Theory]` over both internal field names —
-because a renamed field makes each list come back empty, and an empty list reads as "no
-unexpected transformer" rather than as a broken test.
+Both registrations are now asserted through one helper, `RegisteredTransformers`, with a
+`[Theory]` naming both internal field names as its own test.
 
 **Mutation evidence:**
 
@@ -651,3 +651,56 @@ distinguishes "some transformer" from "our transformer".
 **Counts after round 3: 1821 / 167 / 1168 / 290** — three more than round 2 (the second
 registration guard and the two instrument theory cases) — **0 warnings in a clean Release build,
 `openspec validate --all --strict` 23/23.**
+
+## 13. QA round 4 — APPROVED, and it found the fourth instance where I asked it to look
+
+**APPROVE WITH NITS.** The reviewer re-ran every claim, re-deleted the operation-ID registration
+itself and confirmed the guard now fails, and closed the MAJOR.
+
+**Then it found the fourth instance of the pattern — inside §12's own paragraph declaring the
+pattern closed.** I had asked it to look there, which is the only reason this reads as a process
+working rather than as luck.
+
+The claim was that the instrument `[Theory]` exists *"because a renamed field makes each list
+come back empty, and an empty list reads as 'no unexpected transformer' rather than as a broken
+test."* **False on both halves:**
+
+1. A renamed field never produces an empty list. `RegisteredTransformers` asserts the field by
+   name *before* reading it, so the guards were never vacuous.
+2. Even if it did, an empty list would not pass — these are **presence** assertions
+   (`Length > 0`, then `Assert.Contains`). "No unexpected transformer" is the semantics of the
+   method-name and body guards, not of these.
+
+**My own mutation table was the evidence against my rationale and I did not read it that way:**
+"rename the field → **2 failed** (the guard *and* its instrument theory)". The guard failed. If
+the rationale had been true, only the theory would have. QA proved it directly by renaming the
+field while leaving the theory reading the real names — both guards failed, by name.
+
+The theory is kept, because it costs nothing and states the coupling to an ASP.NET internal as
+its own named test, so a framework rename is diagnosed in one line rather than inferred from two
+failure messages. But it is kept for that reason and not the invented one.
+
+**So the honest version of §12's conclusion, which is the correction:** this is not a pattern you
+finish. Four rounds produced four instances, each inside the fix for the last, and the fourth was
+in the sentence asserting there would not be a fourth. **The claim "the pattern is closed" is the
+same species as every claim that preceded it.** What is actually true is narrower and more
+useful: *every confident sentence about code is unchecked until something executes it*, which is
+why each round's fix has been to convert a claim into a guard — and why the guards, not the
+prose, are what this change leaves behind.
+
+**Also corrected:** the registration doc block had become mis-attached — the `[Theory]` was
+inserted between it and the two `[Fact]`s it was written for, and its closing sentence referred
+to an assertion "below" that was by then above. And §11's BOM measurement did not reproduce:
+370 tracked `.cs`, 35 with, **335** without, not 333. The 333 was a count of `main`'s tree stated
+without that qualifier.
+
+**Verdict: no MAJOR stands. Counts 1821 / 167 / 1168 / 290, 0 warnings, `--strict` 23/23.**
+
+**Two things the approval explicitly does not cover, carried forward:**
+
+1. **Every live-site measurement remains accepted-on-report.** No v18 site ran during any QA
+   round: the 401/200 split, the document-root `security`, 0-paths-plus-404 with the API off, the
+   union readings, the no-JS booking, the backoffice lifecycle and the screenshot comparison are
+   all mine, not re-measured.
+2. **The two cherry-picks to `main` are still owed** — see §5.3 and
+   [[ubookit-deferred-obligations]].
