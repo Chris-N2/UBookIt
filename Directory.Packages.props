@@ -7,18 +7,18 @@
 
   <ItemGroup>
     <!-- Umbraco 17 (LTS) — keep all Umbraco.Cms.* packages on the same version -->
-    <PackageVersion Include="Umbraco.Cms" Version="17.6.2" />
-    <PackageVersion Include="Umbraco.Cms.Api.Common" Version="17.6.2" />
-    <PackageVersion Include="Umbraco.Cms.Api.Management" Version="17.6.2" />
-    <PackageVersion Include="Umbraco.Cms.Web.Common" Version="17.6.2" />
-    <PackageVersion Include="Umbraco.Cms.Web.Website" Version="17.6.2" />
-    <PackageVersion Include="Umbraco.Cms.DevelopmentMode.Backoffice" Version="17.6.2" />
+    <PackageVersion Include="Umbraco.Cms" Version="[17.6.2,18.0.0)" />
+    <PackageVersion Include="Umbraco.Cms.Api.Common" Version="[17.6.2,18.0.0)" />
+    <PackageVersion Include="Umbraco.Cms.Api.Management" Version="[17.6.2,18.0.0)" />
+    <PackageVersion Include="Umbraco.Cms.Web.Common" Version="[17.6.2,18.0.0)" />
+    <PackageVersion Include="Umbraco.Cms.Web.Website" Version="[17.6.2,18.0.0)" />
+    <PackageVersion Include="Umbraco.Cms.DevelopmentMode.Backoffice" Version="[17.6.2,18.0.0)" />
     <PackageVersion Include="Microsoft.ICU.ICU4C.Runtime" Version="72.1.0.3" />
   </ItemGroup>
 
   <ItemGroup>
     <!-- Persistence (EF Core major aligned with Umbraco 17.6.x / .NET 10) -->
-    <PackageVersion Include="Umbraco.Cms.Persistence.EFCore" Version="17.6.2" />
+    <PackageVersion Include="Umbraco.Cms.Persistence.EFCore" Version="[17.6.2,18.0.0)" />
     <PackageVersion Include="Microsoft.EntityFrameworkCore.SqlServer" Version="10.0.10" />
     <PackageVersion Include="Microsoft.EntityFrameworkCore.Design" Version="10.0.10" />
   </ItemGroup>

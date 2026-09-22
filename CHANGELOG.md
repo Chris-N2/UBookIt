@@ -17,6 +17,34 @@ a patch. See [the versioning note](README.md#what-the-version-number-means).
 
 ---
 
+## 17.1.2
+
+### What you have to do
+
+**On Umbraco 17: nothing.** No code change, no schema change, no behavioural change. `17.1.2` is
+install-compatible with `17.1.1` in both directions.
+
+**On Umbraco 18: your restore will now fail, and that is this release doing its job.** Until now
+nothing in uBookIt's package metadata said which Umbraco it was for — a NuGet dependency version
+is a *minimum*, so `17.x` asking for `Umbraco.Cms.Web.Website 17.6.2` read as "17.6.2 or
+anything later", and Umbraco 18 satisfied it. So `17.x` installed into an Umbraco 18 site
+cleanly, built with no errors, **and then the site would not start at all** — an unhandled
+`TypeLoadException` during Umbraco's startup, naming Umbraco's own internals rather than
+anything of ours.
+
+From `17.1.2` your package manager refuses that combination and tells you why, instead of letting
+you discover it on first run. **Install `UBookIt 18.x` on Umbraco 18** — it is the same product
+for the newer CMS, with the same features.
+
+### What changed
+
+**Every `Umbraco.Cms.*` dependency now carries an upper bound**, `[17.6.2,18.0.0)`. Umbraco 17.6.2
+and every later Umbraco 17 release resolve exactly as before; Umbraco 18 and later do not.
+
+**This does not repair `17.0.0`–`17.1.1`.** A published package keeps the metadata it was
+published with, so those four versions remain installable into an Umbraco 18 site forever. If you
+are pinning one of them on Umbraco 18, nothing will stop you — but the site will not run.
+
 ## 17.1.1 — 2026-09-21
 
 ### What you have to do
