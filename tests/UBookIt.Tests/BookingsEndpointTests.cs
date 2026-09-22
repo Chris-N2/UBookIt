@@ -1,4 +1,4 @@
-﻿using UBookIt.Tests.Support;
+using UBookIt.Tests.Support;
 using System.Runtime.CompilerServices;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;

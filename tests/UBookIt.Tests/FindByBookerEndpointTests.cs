@@ -1,4 +1,4 @@
-﻿using UBookIt.Core.Bookings;
+using UBookIt.Core.Bookings;
 using UBookIt.Core.Common;
 using UBookIt.Tests.Support;
 using System.Reflection;

@@ -77,6 +77,13 @@ discharged: it is 11 on both.
       and the `IOperationIdHandler` registration with `builder.AddBackOfficeOpenApiDocument(...)`
       per design D1. Verify by building `UBookIt.Backoffice` alone — its two of the four errors
       should be gone.
+- [x] 2.1a **A user-visible string changed, and a change declaring "no behaviour change" has to
+      say so.** The backoffice document's title was `"UBook It Backoffice Backoffice API"` — a
+      typo carried since the composer was first written — and the port set it to
+      `"uBookIt Backoffice API"`. It is a fix and it is visible in the Swagger UI, so it is
+      recorded rather than left to be noticed. **Silence is not a decision**, and this was the
+      second unrecorded user-visible difference this change produced.
+
 - [x] 2.2 Keep `Constants.ApiName` as the document name. **Restated, because the task as
       written asked for something that is false and it was ticked anyway.** The *document name*
       is unchanged (`ubookitbackoffice`), which is the part this change controls and the part a
@@ -136,6 +143,11 @@ were read out of the shipped XML documentation rather than guessed at a fifth ti
 `/umbraco/openapi/ubookitbackoffice.json` carries 30 operations with action-shaped ids
 (`CancelBooking`, `ListBookings`, `PlaceBookingOnBehalf`, …), and the regenerated client's 30
 exported method names are byte-identical to the v17 baseline captured in §1.1.
+
+**One more difference, checked and inert:** `client.gen.ts`'s `baseUrl` gained a trailing
+slash on regeneration. `hey-api.ts` spreads `umbHttpClient.getConfig()` *after* `...config`, so
+the generated value is overwritten before any request is made. Noted here so the next reader
+does not re-investigate it.
 
 **Two instruments failed silently while checking this**, which is the reusable part: `grep -oP`
 is unavailable in this locale and printed a warning to stderr while returning **zero names**, and
@@ -504,3 +516,73 @@ arriving transitively through Umbraco.
 
 **Counts after the fixes: 1817 / 167 / 1168 / 290** — up eight, all new, none altered — **0
 warnings in a clean Release build, `openspec validate --all --strict` 23/23.**
+
+## 11. QA round 2 — the fix relocated the gap, twice
+
+**REJECT again, two MAJORs, and both were doc blocks.** Worth stating plainly: round 1's central
+finding was three false claims, round 1's fixes were written up in two new paragraphs, and
+**both paragraphs were false.** The fault did not recur despite the fix; it recurred *in* the
+fix, which is what CLAUDE.md means by treating each round's fixes as new code.
+
+**1. The schema transformer was still unguarded at the seam.** The reviewer deleted
+`options.AddSchemaTransformer<...>()` from the composer, rebuilt in Release and ran everything:
+**0 warnings, every test green.** Six unit tests asked the transformer what it does to a schema
+and not one asked whether it runs. MAJOR 4 was not closed; it was **relocated** - from "no test"
+to "no test of the only thing that can silently disappear".
+
+Worse, `OpenApiTransformerTests`' own remarks asserted a deliberate two-kinds design - *"a unit
+test cannot see a transformer that was never registered; the artifact guard can"* - which is
+true of the operation-ID transformer and **false of this one**, because nothing is generated
+from the delivery document. A comment asserting a property the code does not have, inside the
+doc block written to announce the fix for a comment asserting a property the code did not have.
+
+Fixed with `The_schema_transformer_is_registered_on_the_delivery_document`: it composes the real
+composer, resolves `IOptionsMonitor<OpenApiOptions>.Get("ubookitdelivery")` and reads the
+internal `SchemaTransformers` list - the shape `DeliveryApiExposureTests` already uses for the
+exposure convention. Reflection into an internal field is deliberate; the alternative is no
+guard at all over a line whose removal is otherwise undetectable.
+
+**2. The transformer's stated failure direction named a detector that does not exist.** It said
+a changed host pattern would "break the TypeScript build loudly". **Nothing generates TypeScript
+from the delivery document** - the only `generate-client` target is the backoffice document, and
+that one is fixed by `WithJsonOptions` rather than by this transformer. The fourteen TypeScript
+errors that started the whole investigation came from the backoffice client. So the failure it
+called loud is silent.
+
+That paragraph now also states what it does **not** cover: the pattern is `System.Text.Json`'s
+*integral* one, so a `decimal`, `double` or `float` on a delivery model would be widened with a
+different pattern and published as a string/number union unnoticed. Verified latent rather than
+live - no delivery model carries a non-integral number today.
+
+**Mutation evidence for both fixes**, because a guard seen only green is a guard nobody tested:
+
+| mutation | result |
+|---|---|
+| **delete the registration line** - the reviewer's own mutation | **1 failed** |
+| rename the internal `SchemaTransformers` field the guard reflects on | **1 failed** |
+
+The second matters as much as the first: a reflection guard that silently found nothing would
+pass vacuously forever, so the instrument asserts itself before it asserts anything else.
+
+**Minors, all taken:**
+
+- **The `body` guard enumerated a sample, not the population** - seven of eleven, and blind to a
+  twelfth write endpoint nobody has added yet. Replaced with the class assertion: every `body`
+  member in `types.gen.ts` is required except the generated `body?: never`, so **no other
+  optional body may exist**. That is [[a-finding-enumerates-a-sample]], caught inside a guard
+  written one round earlier to fix a different instance of the same thing.
+- **Thirteen files had gained a UTF-8 BOM** across rounds 1 and 2 - including
+  `Directory.Packages.props` and both csprojs, all shared with `main`, none Umbraco-18-forced.
+  That was my tooling, not a decision. The repo's convention is no BOM (333 `.cs` files without,
+  35 with), so all thirteen are stripped and the shared files are byte-identical to `main` again
+  apart from their real edits.
+- **`Microsoft.AspNetCore.OpenApi` added to the proposal's Impact table.** It is now a declared
+  dependency of two packed packages and changes both nuspecs.
+- **The two cherry-picks are recorded in [[ubookit-deferred-obligations]]**, not only in §5. The
+  reviewer accepted `[!]` as accurate marking and then named the real risk underneath it: a task
+  box inside an archived change is read by nothing.
+- **The backoffice document's title change recorded** (2.1a) and **the `client.gen.ts` trailing
+  slash** noted as checked-and-inert, so neither is rediscovered.
+
+**Counts after round 2: 1818 / 167 / 1168 / 290** - one more than round 1, the registration
+guard - **0 warnings in a clean Release build, `openspec validate --all --strict` 23/23.**

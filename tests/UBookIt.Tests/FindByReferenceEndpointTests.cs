@@ -1,4 +1,4 @@
-﻿using System.Reflection;
+using System.Reflection;
 using UBookIt.Backoffice.Mapping;
 using Microsoft.AspNetCore.Http;
 using System.Text.RegularExpressions;

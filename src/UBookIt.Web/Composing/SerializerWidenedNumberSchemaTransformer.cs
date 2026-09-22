@@ -35,9 +35,21 @@ namespace UBookIt.Web.Composing;
 /// none, is somebody's intent and is left exactly as it is.
 /// </para>
 /// <para>
-/// If a future host changes that pattern, this stops matching and the widened union reappears —
-/// which breaks the TypeScript build loudly rather than silently over-narrowing a contract.
-/// That is the intended failure direction.
+/// <b>Two things this does NOT cover, stated because the paragraph they replace claimed the
+/// opposite.</b> That paragraph said a changed host pattern would "break the TypeScript build
+/// loudly". It would not: <b>nothing generates TypeScript from the delivery document.</b> The
+/// only <c>generate-client</c> target is the backoffice document, and that one is fixed by
+/// <c>WithJsonOptions</c> rather than by this. The fourteen TypeScript errors that started this
+/// investigation came from the backoffice client. So the failure here is silent, and the guard
+/// is <c>OpenApiTransformerTests</c> rather than a build.
+/// </para>
+/// <para>
+/// And <see cref="NumericStringPattern"/> is <c>System.Text.Json</c>'s <b>integral</b> pattern.
+/// A <c>decimal</c>, <c>double</c> or <c>float</c> on a delivery model would be widened with a
+/// different one, would not match here, and would publish as <c>["number", "string"]</c> with
+/// nothing to notice. <b>No delivery model carries a non-integral number today</b>, so this is
+/// latent rather than live — but the first one that does needs its pattern added here, and
+/// knowing that is cheaper than rediscovering it.
 /// </para>
 /// </remarks>
 internal sealed class SerializerWidenedNumberSchemaTransformer : IOpenApiSchemaTransformer

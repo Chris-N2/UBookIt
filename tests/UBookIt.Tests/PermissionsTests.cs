@@ -1,4 +1,4 @@
-﻿using System.Text.RegularExpressions;
+using System.Text.RegularExpressions;
 using System.Reflection;
 using System.Security.Claims;
 using System.Security.Principal;

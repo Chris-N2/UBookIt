@@ -1,4 +1,4 @@
-﻿using Microsoft.AspNetCore.OpenApi;
+using Microsoft.AspNetCore.OpenApi;
 using Microsoft.OpenApi;
 using Umbraco.Cms.Api.Common.OpenApi;
 using Umbraco.Cms.Api.Management.OpenApi;
