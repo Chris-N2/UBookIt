@@ -58,15 +58,15 @@ trusting that a range does what ranges do.
 
 ## 6. Publish — the order is load-bearing
 
-- [ ] 6.1 **Chris pushes `main`**, and verify with `git branch -r --contains HEAD` rather than
+- [x] 6.1 **Chris pushes `main`**, and verify with `git branch -r --contains HEAD` rather than
       trusting it.
-- [ ] 6.2 **Tag `17.1.2` and push the tag before packing** — the readme's four images resolve
+- [x] 6.2 **Tag `17.1.2` and push the tag before packing** — the readme's four images resolve
       through it.
-- [ ] 6.3 Pack, then Chris publishes; the API key is his.
-- [ ] 6.4 Confirm **per package** on `api.nuget.org/v3-flatcontainer/<id>/index.json`, not the
+- [x] 6.3 Pack, then Chris publishes; the API key is his.
+- [x] 6.4 Confirm **per package** on `api.nuget.org/v3-flatcontainer/<id>/index.json`, not the
       website.
-- [ ] 6.5 **Then** stamp the changelog date, and commit.
-- [ ] 6.6 Fetch the published readme's image URLs and confirm they render.
+- [x] 6.5 **Then** stamp the changelog date, and commit.
+- [x] 6.6 Fetch the published readme's image URLs and confirm they render.
 
 ## 7. Record
 
@@ -299,3 +299,32 @@ round's fixes as new code*:
 **And one structural lesson that generalises beyond this change:** `skip_specs` on a change that
 cherry-picks *enforcement* from an unmerged branch leaves `main` holding a guard whose requirement
 `main` does not state. Any future cross-line pick has to carry both halves.
+
+## 14. §6 — `17.1.2` IS PUBLISHED
+
+**The tag went first and its images were proved before anything reached nuget.org**, which is the
+ordering this release could not undo: all four packed images returned **200** at the `17.1.2` tag
+before the push.
+
+**6.4 — confirmed per package on the flat-container, not the website.** All five now list
+`17.0.0, 17.0.1, 17.1.0, 17.1.1, 17.1.2, 18.0.0`. They did **not** arrive together: `UBookIt.Core`
+was indexed while the other four were not, and all five were present ~80 seconds later. **The date
+stamp was held until every one agreed**, exactly as `17.1.0` taught — `dotnet add package UBookIt`
+is the documented install and it resolves through the meta-package, which was among the four
+lagging.
+
+**6.6 — verified against the PUBLISHED artifacts, downloaded back off the feed**, not against the
+local ones that were pushed. The bound is live where it counts:
+
+| package | dependencies | version |
+|---|---|---|
+| `UBookIt.Web` | `Api.Common`, `Web.Website` | `[17.6.2, 18.0.0)` |
+| `UBookIt.Backoffice` | `Api.Common`, `Api.Management`, `Web.Common`, `Web.Website` | `[17.6.2, 18.0.0)` |
+| `UBookIt.Persistence` | `Persistence.EFCore` | `[17.6.2, 18.0.0)` |
+
+**Seven declarations, every one bounded — the loophole is closed on the feed.** A site on Umbraco
+18 can no longer take a `17.x` release that would refuse to start, from `17.1.2` onward.
+
+**The two lines now sit side by side on nuget.org**, each declaring the Umbraco it is for: `17.1.2`
+as `[17.6.2,18.0.0)` and `18.0.0` as `[18.2.0,19.0.0)`. That is the first moment in this project's
+history when a resolver could tell them apart.
