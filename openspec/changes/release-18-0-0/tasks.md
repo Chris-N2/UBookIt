@@ -3,14 +3,27 @@
 Guards first, deliberately. Both requirements are about what a **frozen** artifact promises, and
 a release is the one moment their absence cannot be corrected afterwards.
 
-- [ ] 1.1 Guard the readme's documentation refs: every link addressing a document in this
+- [x] 1.1 Guard the readme's documentation refs: every link addressing a document in this
       repository names a ref **derived from the declared version**, and a branch ref fails.
       Extend `VersionTruthTests` alongside `The_readme_links_resolve_from_anywhere` rather than
       inside it — that guard's remarks name this blind spot and say it does not claim to cover
       it, so replacing it would delete a stated limitation instead of closing it.
-- [ ] 1.2 Verify the guard **fires** before trusting it: point one link at a branch and watch it
+- [x] 1.2 Verify the guard **fires** before trusting it: point one link at a branch and watch it
       fail, point one at the previous version and watch it fail, and assert the extraction is
       non-empty first — a link scan that matches nothing satisfies "no branch refs" perfectly.
+
+      **Done, four directions, and the one that matters least is the one usually skipped:**
+
+      | state of `README.md` | result |
+      |---|---|
+      | as it stands, `blob/main`, version `17.1.1` | **fails**, naming all 12 |
+      | every link repinned to `17.1.1` | **passes** — so the guard is satisfiable, not permanently red |
+      | one link left at `17.1.0` | **fails** |
+      | no link pointing into the repository at all | **fails on the anti-vacuity assertion**, by its own message |
+
+      The second row is the one that is usually skipped and the one that proves the guard is a
+      guard rather than a wall. The fourth was checked for its *reason*, not just its failure —
+      a guard failing for the wrong reason is indistinguishable from one working.
 - [ ] 1.3 Guard the upper bound **against the packed nuspec, not `Directory.Packages.props`**.
       The requirement says the nuspec is the only copy a resolver sees and that the two can
       disagree; a guard reading the props file would assert the intention rather than the
@@ -19,17 +32,28 @@ a release is the one moment their absence cannot be corrected afterwards.
 
 ## 2. The version
 
-- [ ] 2.1 `Directory.Build.props` `17.1.1` → `18.0.0`.
-- [ ] 2.2 `README.md`'s version sentence. **Expect the image-pin guard to fail here** — it derives
+- [x] 2.1 `Directory.Build.props` `17.1.1` → `18.0.0`.
+- [x] 2.2 `README.md`'s version sentence. **Expect the image-pin guard to fail here** — it derives
       the pin from the declared version, so bumping the version is what surfaces the four stale
       `17.1.1` image URLs. That failure is the guard working; repin them.
-- [ ] 2.3 The readme's eleven documentation links, per design D1.
-- [ ] 2.4 `CHANGELOG.md` — an `18.0.0` entry, **undated** (D5). It leads with what upgrading asks
+
+      Two more sentences went with it, neither in the task list and both false the moment the
+      version moved: the readme opened *"A booking system for Umbraco 17"*, and its Requirements
+      table said **Umbraco 17.x (LTS)**. Found by reading the file rather than by a guard —
+      nothing checks prose against the host major, which is worth knowing but not worth a guard
+      in a release change.
+- [x] 2.3 The readme's **twelve** documentation links, per design D1. **Twelve, not the
+      eleven this change's own proposal first said** — a hand-count missed `LICENSE`, and the
+      guard from §1.1 is what produced the right number. Pin it with the rest: the licence a
+      version shipped under belongs to that version.
+- [x] 2.4 `CHANGELOG.md` — an `18.0.0` entry, **undated** (D5). It leads with what upgrading asks
       of a reader: for a site already on uBookIt `17.x` that is *moving to Umbraco 18*, and the
       entry says so plainly rather than describing it as an upgrade of uBookIt alone.
-- [ ] 2.5 `docs/publishing.md`'s four `17.1.1` literals (lines 14, 231, 249–251). **Stale at two
-      consecutive releases now.** Decide per design's open question: guard them or record the
-      obligation — silence is the one option already proven not to work.
+- [x] 2.5 `docs/publishing.md`'s **five** `17.1.1` literals. **The task as written rested on a
+      false premise and the suite said so within a minute.** It offered a choice — guard them or
+      record the obligation — on the belief that no guard read them. One does:
+      `Every_documented_version_is_the_declared_version` failed on the bump, naming the file. No
+      choice to make, no obligation to record, and five literals rather than four. See design D7.
 
 ## 3. The upper bound
 

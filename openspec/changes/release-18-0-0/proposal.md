@@ -7,7 +7,7 @@ the `18.x` line.
 **It is also the change that makes the two-line world real**, and two things that were fine while
 one line existed stop being fine the moment a second one publishes:
 
-1. **The packed readme's documentation links name a branch.** Eleven of them read
+1. **The packed readme's documentation links name a branch.** Twelve of them read
    `/blob/main/docs/…`, which on an `18.x` package sends a v18 reader to the v17 line's
    documentation. `docs/` is byte-identical between the branches **today**, which is exactly what
    makes this a trap rather than a visible bug: it is correct now and becomes wrong the moment
@@ -28,10 +28,11 @@ one line existed stop being fine the moment a second one publishes:
 
 ## What Changes
 
-**The version, across the five places that carry it** — `Directory.Build.props`, the readme's
-own version sentence, the readme's four image pins, `docs/publishing.md`'s four literals, and a
-new `CHANGELOG.md` entry. The image pins are **already guarded to follow the declared version**,
-so bumping the version will fail the suite until they are repinned; that is the guard working.
+**The version, across the places that carry it** — `Directory.Build.props`, the readme's own
+version sentence, the readme's four image pins, `docs/publishing.md`'s five literals, and a new
+`CHANGELOG.md` entry. **Every one of those is already guarded to follow the declared version**,
+so bumping it is what surfaces them; the suite going red on the bump is the guards working, not
+a list somebody has to remember.
 
 **The readme's documentation links pin to the release, not to a branch.** Same reasoning the
 image pin already carries and the same mechanism: a readme frozen per version should show the
@@ -96,10 +97,10 @@ with nothing in the diff resembling a deletion. There is no reason to take that 
 |---|---|
 | `Directory.Build.props` | `17.1.1` → `18.0.0` |
 | `Directory.Packages.props` | Upper bound on eight `Umbraco.Cms.*` dependencies |
-| `README.md` | Version sentence, four image pins, eleven documentation links |
+| `README.md` | Version sentence, four image pins, twelve documentation links |
 | `CHANGELOG.md` | A new `18.0.0` entry — **undated until the feed confirms**, per the release order |
 | `docs/images/bookings-screen.png` | Retaken on Umbraco 18 |
-| `docs/publishing.md` | Four stale `17.1.1` literals, and what the two new guarantees ask of a publish |
+| `docs/publishing.md` | Five stale `17.1.1` literals, and what the two new guarantees ask of a publish |
 | `openspec/specs/packaging` | Two ADDED requirements |
 | Tests | Guards for both new requirements |
 

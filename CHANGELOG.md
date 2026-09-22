@@ -17,6 +17,38 @@ a patch. See [the versioning note](README.md#what-the-version-number-means).
 
 ---
 
+## 18.0.0
+
+### What you have to do
+
+**Move your site to Umbraco 18 first, and install this instead of — not alongside — `17.x`.**
+uBookIt's major tracks the Umbraco major, so `18.0.0` is not an upgrade of `17.1.1`; it is the
+same product built for a different CMS. A site staying on Umbraco 17 stays on `17.x` and is not
+missing anything: the two lines ship the same features.
+
+**Nothing else.** No schema change, no API change, no behavioural change. Your bookings,
+resources, services and settings are untouched, and the database migrates on Umbraco 18's own
+terms rather than uBookIt's.
+
+### What changed
+
+**uBookIt runs on Umbraco 18.** Umbraco 18 generates its OpenAPI documents through
+`Microsoft.AspNetCore.OpenApi` rather than Swashbuckle, which is the entire reason `17.x` cannot
+run there — a `17.x` package on an Umbraco 18 site references types the host no longer ships.
+
+**Every package now says which Umbraco it is for.** A NuGet dependency version is a *minimum*, so
+until now nothing in the package metadata distinguished "needs Umbraco 17" from "needs Umbraco 17
+or anything later" — which is why uBookIt has been listed as running on versions it does not run
+on. Every `Umbraco.Cms.*` dependency now carries an upper bound excluding the next major, so your
+package manager refuses a mismatch instead of installing one.
+
+**The package page's links point at this release.** They named a branch before, which on a
+project with two published lines meant a reader could be sent to the other line's documentation.
+They now name `18.0.0`, so what you read is what this version shipped.
+
+**The Bookings screenshot was retaken on Umbraco 18**, because 18 rounds the backoffice's buttons
+and the shipped image still showed 17's square ones.
+
 ## 17.1.1 — 2026-09-21
 
 ### What you have to do

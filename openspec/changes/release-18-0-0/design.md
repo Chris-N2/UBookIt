@@ -5,8 +5,10 @@ recollection:
 
 - **The version surface is five files**, found by grepping for the literal rather than by reading
   the runbook's table: `Directory.Build.props:41`, `README.md:23`, the readme's four image URLs,
-  `docs/publishing.md` (lines 14, 231, 249–251) and a `CHANGELOG.md` entry that does not exist yet.
-- **The readme's eleven documentation links read `/blob/main/…`**, and `docs/` plus `CHANGELOG.md`
+  `docs/publishing.md` (five literals, not the four first counted) and a `CHANGELOG.md` entry that
+  does not exist yet. **All of it is already guarded** — see D7.
+- **The readme's twelve documentation links read `/blob/main/…`** — eleven documents plus
+  `LICENSE`, which a hand-count missed and the guard did not — and `docs/` plus `CHANGELOG.md`
   are byte-identical between `main` and `dev/v18` today.
 - **A version range works under Central Package Management.** Packed `UBookIt.Web` with
   `Version="[18.2.0,19.0.0)"` on one dependency and read the nuspec out of the `.nupkg`:
@@ -108,9 +110,8 @@ lines' histories stop being separable. It is recorded as an obligation instead.
 - **Two published lines, one repository, and a reader who lands on the wrong one** → partly
   what this change fixes, and partly permanent. `17.0.0`–`17.1.1`'s readmes are frozen with
   `main` links and cannot be corrected.
-- **A version literal nothing guards** → `docs/publishing.md`'s four are the known instance, and
-  they went stale exactly as predicted. Either guard them or stop pretending the runbook's table
-  is authoritative.
+- ~~**A version literal nothing guards**~~ → **retracted at apply time; the premise was false.**
+  See D7.
 
 ## Migration Plan
 
@@ -122,11 +123,29 @@ it.
 Rollback is the usual NuGet one: a published version cannot be withdrawn, only unlisted, and
 `18.0.0` is spent whatever happens. That is why the readme pins are guarded rather than reviewed.
 
+### D7 — `docs/publishing.md`'s literals are already guarded, and this change's own proposal said otherwise
+
+**Written after apply began, because the claim was falsified by running the suite.** The proposal
+and this design both stated that `docs/publishing.md`'s version literals are read by no guard —
+inherited from a memory note saying the same thing — and framed the choice as "guard them or
+record an obligation".
+
+**Both were wrong.** `VersionTruthTests.Every_documented_version_is_the_declared_version` reads
+every shipped document and fails when one states a version other than the declared one. Bumping
+to `18.0.0` failed it immediately, naming `docs/publishing.md`. There is no dichotomy and no
+obligation: the guard already exists, it fired at exactly the right moment, and the work was to
+update five literals rather than four.
+
+**Why it read as unguarded is the reusable part.** The literals went stale *at the previous
+release* and were noticed only afterwards — which looks exactly like an absent guard and is
+instead a guard that fires on the version bump, in a release where the bump and the noticing
+happened in the wrong order. **"Nobody caught it last time" is evidence about the process, not
+about the instrument.**
+
 ## Open Questions
 
 - **The dataset for the retaken screenshot.** Whether the v18 dev database can be curated into the
   same shape the `17.1.1` image shows, or whether it needs setting up deliberately. Answerable at
   apply time, with the site running.
-- **Whether `docs/publishing.md`'s version literals get a guard in this change or an obligation.**
-  They are documentation rather than packed content, so the cost of being wrong is lower — but
-  they have now been stale at two consecutive releases.
+- ~~**Whether `docs/publishing.md`'s version literals get a guard or an obligation.**~~ Closed by
+  D7: they already had one.

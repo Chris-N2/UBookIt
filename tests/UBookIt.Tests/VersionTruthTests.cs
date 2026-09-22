@@ -1248,6 +1248,127 @@ public class VersionTruthTests
     }
 
     /// <summary>
+    /// Every documentation link in the packed readme names the release it shipped with.
+    /// </summary>
+    /// <remarks>
+    /// <para>
+    /// <b>The blind spot <see cref="The_readme_links_resolve_from_anywhere"/> names and does not
+    /// claim to cover.</b> That guard resolves the PATH and ignores the git ref, so
+    /// <c>blob/main/docs/theming.md</c> passes forever because <c>docs/theming.md</c> exists in
+    /// this working tree — on either branch. Its remarks say so and hand the problem to "the
+    /// Umbraco 18 work". This is that.
+    /// </para>
+    /// <para>
+    /// <b>Why a branch ref is a defect rather than a style.</b> The readme is frozen per
+    /// published version; the document it links to is fetched live. A ref that moves leaves a
+    /// published package page describing whatever the branch holds today, and a ref naming the
+    /// OTHER line's branch sends a reader to a different product's documentation. With one
+    /// published line the second failure was invisible, because <c>main</c> was the only
+    /// documentation there was.
+    /// </para>
+    /// <para>
+    /// Deliberately a separate test rather than an extra clause inside the other one: that
+    /// guard's remarks state a limitation, and editing it to cover the ref would delete a stated
+    /// limitation instead of closing it. This is the same relationship the packed-image
+    /// requirement has to the link requirement — added alongside, overlap accepted, neither
+    /// depending on the other's implementation.
+    /// </para>
+    /// </remarks>
+    [Fact]
+    public void The_readme_documentation_links_name_the_release_they_shipped_with()
+    {
+        var props = RepoFiles.Read("Directory.Build.props");
+
+        var readmeFile = Regex
+            .Match(props, @"<PackageReadmeFile>(?<file>[^<]+)</PackageReadmeFile>")
+            .Groups["file"].Value.Trim();
+
+        var repositoryUrl = Regex
+            .Match(props, @"<RepositoryUrl>(?<url>[^<]+)</RepositoryUrl>")
+            .Groups["url"].Value.Trim();
+
+        var declaredVersion = DeclaredVersion();
+
+        Assert.True(
+            readmeFile.Length > 0 && repositoryUrl.Length > 0,
+            "Directory.Build.props must declare <PackageReadmeFile> and <RepositoryUrl> for the "
+            + "readme's documentation refs to be derived and checked.");
+
+        var blobPrefix = Regex.Replace(repositoryUrl, @"\.git$", string.Empty) + "/blob/";
+
+        var readme = RepoFiles.Read(readmeFile);
+
+        // Links only. An image cannot use the blob prefix — it serves a web page rather than
+        // image bytes, and that host is not on the feed's allow-list — so images are pinned by
+        // The_readme_images_render_and_show_what_their_release_shipped instead.
+        var links = Regex.Matches(readme, @"(?<image>!)?\[(?<text>[^\]]*)\]\((?<target>[^)\s]+)\)");
+
+        var offenders = new List<string>();
+        var pinnedToThisRelease = 0;
+
+        foreach (Match link in links)
+        {
+            if (link.Groups["image"].Success)
+            {
+                continue;
+            }
+
+            var target = link.Groups["target"].Value;
+
+            if (!target.StartsWith(blobPrefix, StringComparison.Ordinal))
+            {
+                // Somebody else's site. It names no release of ours to pin to.
+                continue;
+            }
+
+            var text = link.Groups["text"].Value;
+            var afterPrefix = target[blobPrefix.Length..];
+            var firstSlash = afterPrefix.IndexOf('/');
+
+            if (firstSlash < 0)
+            {
+                offenders.Add(
+                    $"link '{text}' targets '{target}', which names a git ref but no file "
+                    + "beneath it.");
+
+                continue;
+            }
+
+            var reference = afterPrefix[..firstSlash];
+
+            if (reference == declaredVersion)
+            {
+                pinnedToThisRelease++;
+            }
+            else
+            {
+                offenders.Add(
+                    $"link '{text}' is pinned to '{reference}' but the declared version is "
+                    + $"'{declaredVersion}'. A branch ref describes whatever that branch holds "
+                    + "today — and, with two published lines, possibly the other line's "
+                    + "documentation; a ref that lags sends this version's readers to the "
+                    + "previous release's documents. Neither is correctable once published.");
+            }
+        }
+
+        Assert.True(
+            offenders.Count == 0,
+            $"{readmeFile} carries {offenders.Count} documentation link(s) not pinned to this "
+            + $"release. A pushed readme cannot be edited, so each costs a version "
+            + $"number:{Environment.NewLine}  "
+            + string.Join(Environment.NewLine + "  ", offenders));
+
+        // Anti-vacuity. Every link could point outside this repository, in which case the loop
+        // above ran over nothing and reported success — the same absence the sibling guard
+        // checks for, and for the same reason.
+        Assert.True(
+            pinnedToThisRelease > 0,
+            $"No documentation link in {readmeFile} is pinned to '{declaredVersion}', so this "
+            + "guard proved nothing. Either the links stopped pointing at "
+            + $"'{blobPrefix}...', or the derivation of that prefix is wrong.");
+    }
+
+    /// <summary>
     /// Hosts nuget.org will render a readme image from.
     /// </summary>
     /// <remarks>
