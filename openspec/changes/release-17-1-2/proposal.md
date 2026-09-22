@@ -67,20 +67,24 @@ None.
 
 ### Modified Capabilities
 
-**None — and `skip_specs: true`, which needs arguing rather than asserting.**
+**`packaging` — one ADDED requirement, and `skip_specs` was WRONG.**
 
-`release-18-0-0` added the requirement *The package declares which Umbraco majors it accepts*,
-and that requirement already governs this. It says every `Umbraco.Cms.*` dependency a published
-package declares SHALL carry an upper bound excluding the next Umbraco major, and it explicitly
-records that the bound **cannot be retrofitted** to versions already on nuget.org.
+The first version of this proposal argued `skip_specs: true` on the grounds that
+*The package declares which Umbraco majors it accepts* already governs the 17 line, so this
+change adds no guarantee. **QA checked, and the requirement is not on `main` at all** — it exists
+only in `dev/v18`'s copy of `openspec/specs/packaging/spec.md`. `main`'s baseline has 20
+requirements and none of them is this one.
 
-So this change adds no guarantee. It brings the 17 line into compliance with one that already
-exists, on a branch that had not yet been brought into it — which is the definition of a release
-that adds nothing and ships something.
+The hedge in that argument — "on a branch that had not yet been brought into it" — *was* the
+defect, and CLAUDE.md names it: *"`openspec/specs/` on `main` is the baseline every later change
+diffs against, so unmerged specs make the sibling-sweep and wholesale-replacement disciplines
+read a false baseline."* Archiving with `skip_specs` would have left `main` enforcing a guard
+whose requirement `main` does not state — behaviour present in the code and absent from the
+spec, which is precisely the inverse of the risk this proposal raised about the guard.
 
-**The guard comes with it.** `Every_umbraco_dependency_names_an_upper_bound` was written on
-`dev/v18` and reads the packed nuspec; it must be cherry-picked here, or the 17 line would hold
-the requirement with nothing enforcing it.
+So the requirement is carried across as an `## ADDED` delta, exactly as the guard was, and for
+the same reason: **one requirement, one implementation, on both lines.** Cherry-picking the
+enforcement and leaving the guarantee behind was half a job.
 
 ## Impact
 

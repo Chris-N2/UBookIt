@@ -37,7 +37,7 @@ trusting that a range does what ranges do.
       `dotnet add package UBookIt --version 17.1.2` from a local feed, and confirm NuGet
       **refuses it and names the constraint**. This is the same harness that produced the
       original measurement, pointed at the fix.
-- [ ] 4.3 Confirm an Umbraco **17** site still installs `17.1.2` and boots — the bound must not
+- [x] 4.3 Confirm an Umbraco **17** site still installs `17.1.2` and boots — the bound must not
       have narrowed what the line supports. Needs a scratch v17 site and a database: **Chris's,
       and only if he wants the belt-and-braces**; the guard plus 4.1 already prove the range's
       shape.
@@ -69,7 +69,8 @@ trusting that a range does what ranges do.
 
 ## 7. Record
 
-- [ ] 7.1 `skip_specs: true` — nothing to sync. Archive.
+- [ ] 7.1 **Sync `packaging` with the ADDED requirement, then archive.** (`skip_specs` was
+      removed — QA finding 1.)
 - [ ] 7.2 Record that `17.0.0`–`17.1.1` remain installable into Umbraco 18 permanently, and that
       the bound protects only releases from here.
 - [ ] 7.3 Record the readme-ref obligation this change deliberately did not take (design's open
@@ -123,3 +124,53 @@ an oversight.
 **5.x — 1810 / 167 / 1168 / 290**, one above `main`'s baseline of 1809, which is the
 cherry-picked guard. **0 warnings** in a clean Release build, `--strict` 23/23, and the pack
 gives 5 `.nupkg` + 4 `.snupkg` at `17.1.2` with icon and readme present in every one.
+
+## 10. QA round 1 — REJECT, and the measurement survived
+
+**The load-bearing claim held under independent attack.** QA reproduced the failure itself and
+read the stack more carefully than I had, which closed both questions I had flagged as open:
+it dies at `Program.cs` line 4 inside `CreateUmbracoBuilder()` → `UmbracoBuilder`'s constructor →
+`AddAllCoreCollectionBuilders`, so **no database is involved** and **suppressing composers cannot
+avoid it**. My own framing — "composer discovery" — was wrong; it is *core collection-builder*
+discovery, earlier still.
+
+**MAJOR 1 — `skip_specs: true` was wrong, and the argument for it contained its own refutation.**
+I wrote that *The package declares which Umbraco majors it accepts* "already governs this … on a
+branch that had not yet been brought into it". That hedge **was** the defect: the requirement is
+not on `main` at all. Archiving would have left `main` enforcing a guard whose guarantee `main`'s
+spec does not state — behaviour in code, absent from spec, and the exact inverse of the risk the
+proposal itself raised about cherry-picking the guard. The requirement is now carried across as
+an `## ADDED` delta and `skip_specs` is gone. **Cherry-picking the enforcement and leaving the
+guarantee behind was half a job.**
+
+**MAJOR 2 — the claim was broader than the measurement.** "The site cannot start" was asserted of
+the package and measured only of the meta-package. QA measured the narrower installs:
+`UBookIt.Web` + `Persistence` also dies (on Swashbuckle, in the delivery composer — a *second*
+independent failure this change had not recorded), but **`UBookIt.Persistence` alone boots and
+serves HTTP 200**. D1 now states the exception and dismisses it explicitly, as a judgement
+labelled as one, rather than leaving a universal that is false.
+
+**MINOR — the cherry-pick corrupted two em dashes into mojibake**, falsifying D3's byte-identity
+claim on its first outing. Cause found: `subprocess.run(text=True)` decodes git's output with the
+console code page, mangling UTF-8. Refetched with `git show` redirected to the file and verified
+**byte-identical to `dev/v18`**. Same family as `verify-the-instrument-mutated-the-file` — and the
+reason it matters is not the comment: whatever did that to two em dashes would do it to a string
+literal.
+
+**MINOR — D3's "three mutations" overstated one.** `[17.6.2, )` is normalised by NuGet to the bare
+string `17.6.2` before the guard ever sees it, so the `EndsWith(", )")` clause is unreachable
+through a props-file mutation. Corrected here and recorded in §9 as wrong on `dev/v18` too.
+
+**MINOR — the requirement's third scenario had no guard**, so `[17.6.2,17.7.0)` would have passed:
+a ceiling that is present, wrong, and refuses every Umbraco 17 minor. Now covered by
+`The_bound_admits_this_major_and_excludes_the_next` (D6), demonstrated by that exact mutation.
+
+**MINOR — the readme said "and not 18"**, which reads as though 19 would be admitted. Now "not 18
+or anything after it".
+
+**4.3 closed by QA rather than skipped.** It built an Umbraco 17.6.2 site, installed `17.1.2` from
+the local feed: restore exit 0, build 0/0, **site boots and serves HTTP 200**. The bound has not
+narrowed what the 17 line supports — which was the one thing D2 asserted without evidence.
+
+**Counts after the fixes: 1811 / 167 / 1168 / 290**, two above `main`'s 1809 baseline: the
+cherry-picked guard and D6's new one. **0 warnings**, `--strict` 23/23.

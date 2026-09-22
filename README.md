@@ -55,7 +55,7 @@ opens with what upgrading asks of you before it says what you gain.
 
 | | |
 |---|---|
-| **Umbraco** | **17.6.2 or later, and not 18** — from `17.1.2` the packages say so, so your package manager refuses a mismatch instead of installing one. Not 13, and not the 14–16 STS line. For Umbraco 18, install uBookIt `18.x`. |
+| **Umbraco** | **17.6.2 or later, and not 18 or anything after it** — from `17.1.2` the packages say so, so your package manager refuses a mismatch instead of installing one. Not 13, and not the 14–16 STS line. For Umbraco 18, install uBookIt `18.x`. |
 | **.NET** | 10.0 |
 | **Database** | **SQL Server.** SQLite is not supported — including the SQLite database a `dotnet new umbraco` site gives you by default. |
 
