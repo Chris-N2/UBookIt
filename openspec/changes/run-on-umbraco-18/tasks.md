@@ -3,18 +3,52 @@
 - [x] 1.1 Capture the **current** generated TypeScript client's exported method names from
       `main` (or from `dev/v18` before the port), so D3's question has something to compare
       against. Verify the list is non-empty — a comparison against nothing proves nothing.
-- [~] 1.2 **NOT DONE as written, and the substitute is weaker in one specific way — recorded
-      rather than quietly ticked.** Capturing the v17 documents needed a running v17 TestSite,
-      which by the time the port was under way meant switching branch, rebuilding the v17 client
-      and booting against `main`'s database. What stood in for it: §1.1's **method-name**
-      baseline from the v17-generated client (which is downstream of the v17 operation IDs, so it
-      pins them transitively), and the v18 measurements taken directly — 30 operations, 11
-      delivery paths, 0 paths with the API off. **What is genuinely unverified is the v17
-      *path count*,** so "11 delivery paths" is an absolute reading rather than a comparison.
-      The disabled-endpoint guarantee does not depend on it: 0 is 0 on either version.
+- [x] 1.2 Record the **current** delivery and backoffice OpenAPI documents from a running v17
+      TestSite: path count, the operation IDs, and which paths appear when the delivery API is
+      off. **Done late — after the port, on `main` at `eced809`, once Chris offered the v17 site
+      — and doing it late is why it could be a comparison instead of a baseline.**
+
 - [x] 1.3 Confirm the spike's measurement still holds at HEAD of `dev/v18`: restore succeeds,
       and `dotnet build` produces exactly the four errors in the two named files. If the number
       has changed, the design is built on a stale measurement and stops here.
+
+**§1.2 results — the v17 baseline, captured on `main` after the port, and it settles more than
+it was asked to.**
+
+Both documents read off a running v17 TestSite at `eced809`, then diffed against the v18
+documents captured in §4. **The two lines describe the same API:**
+
+| | v17 backoffice | v18 backoffice | v17 delivery | v18 delivery |
+|---|---|---|---|---|
+| paths | 20 | **20** | 11 | **11** |
+| operations | 30 | **30** | 11 | **11** |
+| operations with an `operationId` | 30 | **30** | 0 | **0** |
+| operation-id set | — | **identical** | — | — |
+| security scheme | `Backoffice-User` | `Backoffice-User` | `Backoffice-User` | **none** |
+| operations carrying `security` | 30 | 30 | 0 | 0 |
+| `integer`/`string` unions | **0** | 0 *(after the fix)* | **0** | 0 *(after the fix)* |
+| delivery paths with the API **off** | — | — | **0**, endpoint 404 | **0**, endpoint 404 |
+
+**The row that matters most is the unions one, and it is the row nobody asked for.** v17 emitted
+**zero** — so `{"type": ["integer","string"]}` was a v18 regression introduced by the generator
+swap, and the JSON-options fix and schema transformer **restore v17's behaviour** rather than
+imposing a new opinion. Before this capture that was a well-reasoned inference from Umbraco's own
+documents; now it is measured against the thing the port is supposed to preserve. §6.4's earlier
+caveat — that "11 delivery paths" was an absolute reading rather than a comparison — is
+discharged: it is 11 on both.
+
+**Three differences, and all three are the host or an improvement:**
+
+1. **OpenAPI 3.0.4 → 3.1.1.** The host's choice. Its visible consequence is the nullable union
+   order that §4 adjusted a guard for.
+2. **The v18 backoffice document adds document-root `security`** on top of the per-operation
+   requirements v17 already had. Belt and braces — a stronger statement, not a weaker one.
+3. **The v17 delivery document declared a `Backoffice-User` security scheme in `components` that
+   no operation ever referenced. The v18 one declares no scheme at all.** This is a genuine
+   improvement to the `delivery-api` guarantee: the anonymous document no longer carries a
+   backoffice scheme as vestigial furniture. Worth noticing that nobody would have found this by
+   reading source — it only exists in the generated artifact.
+
 
 ## 2. Port the backoffice composer
 
@@ -322,17 +356,15 @@ dev environment for the LTS line is gone without a restore.
       empty one** — Umbraco 18 will migrate the copy, `main`'s database is untouched, and the
       live check keeps the resources, services and bookings the dev site already has rather than
       needing them rebuilt.
-- [ ] 9.3 Once set, confirm `main` still boots against its own database. The whole point of the
+- [x] 9.3 Once set, confirm `main` still boots against its own database. The whole point of the
       split is that it does, and that is worth proving rather than assuming.
 
-      **Partially evidenced, and the gap is named.** The two `UserSecretsId`s are confirmed
-      different (`db95506d-…` on `main`, `a220bfe8-…` on `dev/v18`) and **both stores exist and
-      are populated**, so the configuration isolation the split was built for is real and
-      `main`'s connection string was not overwritten. Umbraco 18 then migrated only the database
-      the v18 store points at. **What is still unproven is the thing the task actually asks:
-      that `main` BOOTS.** That needs a v17 client build and a v17 TestSite run, and "the
-      configuration looks right" is not the same claim — which is exactly the substitution this
-      change has already been caught making once. Owed before the branch is trusted.
+      **Proved, not inferred.** `main` at `eced809` was checked out, its v17 client rebuilt, and
+      the TestSite started: `/umbraco` **200**, site root **200**, no `SqlException` in the log.
+      Umbraco 18 migrated only the database the `dev/v18` secret store points at, and the LTS
+      line's dev environment is intact. The earlier "both secret stores exist and are populated"
+      evidence was the right *shape* of argument and still not this claim — which is the whole
+      reason it was not allowed to stand in.
 
 **§8 — what the spike predicted against what the port cost.**
 
