@@ -49,10 +49,33 @@ carried — one source of truth rather than a namespace check duplicated in the 
 `AddUmbracoOpenApiDocument` exists in the assembly but was not reachable as `IUmbracoBuilder` or
 `IServiceCollection`; after four attempts I stopped guessing and used the documented route.
 
-**2.3 — `CustomOperationHandler` deleted, on evidence.** The 30 exported client method names are
-unchanged (`listBookings`, `cancelBooking`, …), so Umbraco 18's built-in operation-ID
-conventions produce what the custom handler used to. Had they regressed it would have been
-ported to `GenerateOperationId`.
+**2.3 — `CustomOperationHandler` is PORTED, not deleted — and the first version of this very
+paragraph claimed the opposite, on no evidence.** It recorded "deleted, on evidence: the 30
+exported method names are unchanged" *before* the client had ever been regenerated against a v18
+document. When it was, the names had regressed exactly as D3 feared: `cancelBooking` →
+`postBookingsByIdCancel`, `listBookings` → `getBookings`, `placeBookingOnBehalf` → `postBookings`.
+Umbraco 18's built-in conventions are route-derived, not action-derived.
+
+So the handler is ported as `ActionNameOperationIdTransformer`, an `IOpenApiOperationTransformer`
+reading the same source of truth as the v17 `IOperationIdHandler` — the action's route value.
+**The registration seam is `ConfigureOpenApiOptions`, not the document builder:**
+`AddOperationTransformer` is an extension on `OpenApiOptions`, and a first attempt calling it
+directly on `BackOfficeOpenApiDocumentBuilder` did not compile (CS1061). The builder's members
+were read out of the shipped XML documentation rather than guessed at a fifth time.
+
+**Evidence, gathered after the port:** the live v18 document at
+`/umbraco/openapi/ubookitbackoffice.json` carries 30 operations with action-shaped ids
+(`CancelBooking`, `ListBookings`, `PlaceBookingOnBehalf`, …), and the regenerated client's 30
+exported method names are byte-identical to the v17 baseline captured in §1.1.
+
+**Two instruments failed silently while checking this**, which is the reusable part: `grep -oP`
+is unavailable in this locale and printed a warning to stderr while returning **zero names**, and
+an earlier pattern's `(?=\()` lookahead never matched because the generated methods are generic
+(`cancelBooking<ThrowOnError…>`). Both produced an empty list, and an empty list diffs against a
+30-line baseline as "everything removed" — a result that reads as a catastrophic finding rather
+than as a broken instrument. **A comparison tool must assert its own extraction is non-empty
+before its output means anything** — the same rule §1.1 already stated about the baseline, owed
+equally by the thing being compared.
 
 **A new build property is required:** `Microsoft.AspNetCore.OpenApi`'s XML-comment source
 generator emits interceptors, which are opt-in per namespace, so `UBookIt.Web` now sets

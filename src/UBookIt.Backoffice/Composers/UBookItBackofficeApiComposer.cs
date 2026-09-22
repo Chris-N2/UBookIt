@@ -1,3 +1,5 @@
+using Microsoft.AspNetCore.OpenApi;
+using Microsoft.OpenApi;
 using Umbraco.Cms.Api.Common.OpenApi;
 using Umbraco.Cms.Api.Management.OpenApi;
 using Umbraco.Cms.Core.Composing;
@@ -25,13 +27,18 @@ namespace UBookIt.Backoffice.Composers
     /// authentication, the schema conventions and the operation-ID conventions itself.
     /// </para>
     /// <para>
-    /// <b>The custom operation-ID handler was deleted on evidence, not on the documentation's
-    /// word.</b> Its only job was short method names — <c>listBookings</c> rather than a route-
-    /// derived mouthful — so the check was to regenerate the client and compare the exported
-    /// names against the thirty the v17 client had. They are unchanged. Had they regressed, the
-    /// handler would have been ported to v18's <c>GenerateOperationId</c> instead.
+    /// <b>The custom operation-ID handler is PORTED, not deleted — and the first attempt at this
+    /// change deleted it on the strength of the documentation saying the new registration
+    /// "applies the schema and operation ID conventions".</b> It does, but not the same ones.
+    /// Regenerating the client proved it: the thirty exported method names went from
+    /// <c>cancelBooking</c>, <c>listBookings</c> and <c>placeBookingOnBehalf</c> to
+    /// <c>postBookingsByIdCancel</c>, <c>getBookings</c> and <c>postBookings</c> — the verbose,
+    /// route-derived naming this handler has always existed to prevent.
     /// </para>
-    /// </remarks>
+    /// <para>
+    /// The lesson is the one the task had already written down and the implementation then
+    /// ignored: <b>decide by regenerating and comparing, never by what the docs imply.</b>
+    /// </para>
     public class UBookItBackofficeApiComposer : IComposer
     {
         public void Compose(IUmbracoBuilder builder)
@@ -39,6 +46,36 @@ namespace UBookIt.Backoffice.Composers
                 Constants.ApiName,
                 document => document
                     .WithTitle("uBookIt Backoffice API")
-                    .WithBackOfficeAuthentication());
+                    .WithBackOfficeAuthentication()
+                    .WithJsonOptions(Umbraco.Cms.Core.Constants.JsonOptionsNames.BackOffice)
+                    .ConfigureOpenApiOptions(options =>
+                        options.AddOperationTransformer<ActionNameOperationIdTransformer>()));
+
+        /// <summary>
+        /// Names each operation after its action method, so the generated TypeScript client reads
+        /// <c>listBookings()</c> rather than <c>getBookings()</c> or worse.
+        /// </summary>
+        /// <remarks>
+        /// The Umbraco 18 replacement for the <c>IOperationIdHandler</c> this package used on
+        /// Umbraco 17. Same rule, same source of truth — the action's route value — expressed
+        /// through the transformer pipeline that <c>Microsoft.AspNetCore.OpenApi</c> uses instead
+        /// of Swashbuckle's operation filters.
+        /// </remarks>
+        internal sealed class ActionNameOperationIdTransformer : IOpenApiOperationTransformer
+        {
+            public Task TransformAsync(
+                OpenApiOperation operation,
+                OpenApiOperationTransformerContext context,
+                CancellationToken cancellationToken)
+            {
+                if (context.Description.ActionDescriptor.RouteValues.TryGetValue("action", out var action)
+                    && string.IsNullOrWhiteSpace(action) is false)
+                {
+                    operation.OperationId = action;
+                }
+
+                return Task.CompletedTask;
+            }
+        }
     }
 }

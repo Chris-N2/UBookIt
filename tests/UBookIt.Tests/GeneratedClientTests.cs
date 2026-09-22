@@ -67,7 +67,14 @@ public class GeneratedClientTests
         // meeting that state has no correct way to read it.
         var types = RepoFiles.Read("src/UBookIt.Backoffice/Client/src/api/types.gen.ts");
 
-        Assert.Matches(@"\bservice\?:\s*BookedServiceModel\s*\|\s*null", types);
+        // Either order of the union, because the order is the generator's and not a
+        // guarantee. Umbraco 18 emits OpenAPI 3.1, whose nullable shape is
+        // {"type": ["null", "object"]} — so the same type that read
+        // `BookedServiceModel | null` on Umbraco 17 reads `null | BookedServiceModel` here.
+        // What is asserted is unchanged: optional, nullable, and ONE object.
+        Assert.Matches(
+            @"\bservice\?:\s*(BookedServiceModel\s*\|\s*null|null\s*\|\s*BookedServiceModel)\s*;",
+            types);
 
         // And the object itself carries both halves, so a null-vs-populated check on the
         // client is enough to know whether there is a name to show.

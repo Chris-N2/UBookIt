@@ -32,8 +32,8 @@ export class UBookItBackofficeService {
         });
     }
     
-    public static placeBookingOnBehalf<ThrowOnError extends boolean = false>(options?: Options<PlaceBookingOnBehalfData, ThrowOnError>) {
-        return (options?.client ?? client).post<PlaceBookingOnBehalfResponses, PlaceBookingOnBehalfErrors, ThrowOnError>({
+    public static placeBookingOnBehalf<ThrowOnError extends boolean = false>(options: Options<PlaceBookingOnBehalfData, ThrowOnError>) {
+        return (options.client ?? client).post<PlaceBookingOnBehalfResponses, PlaceBookingOnBehalfErrors, ThrowOnError>({
             security: [
                 {
                     scheme: 'bearer',
@@ -44,7 +44,7 @@ export class UBookItBackofficeService {
             ...options,
             headers: {
                 'Content-Type': 'application/json',
-                ...options?.headers
+                ...options.headers
             }
         });
     }
@@ -144,8 +144,8 @@ export class UBookItBackofficeService {
         });
     }
     
-    public static findBookingsByBooker<ThrowOnError extends boolean = false>(options?: Options<FindBookingsByBookerData, ThrowOnError>) {
-        return (options?.client ?? client).post<FindBookingsByBookerResponses, FindBookingsByBookerErrors, ThrowOnError>({
+    public static findBookingsByBooker<ThrowOnError extends boolean = false>(options: Options<FindBookingsByBookerData, ThrowOnError>) {
+        return (options.client ?? client).post<FindBookingsByBookerResponses, FindBookingsByBookerErrors, ThrowOnError>({
             security: [
                 {
                     scheme: 'bearer',
@@ -156,7 +156,7 @@ export class UBookItBackofficeService {
             ...options,
             headers: {
                 'Content-Type': 'application/json',
-                ...options?.headers
+                ...options.headers
             }
         });
     }
@@ -174,8 +174,8 @@ export class UBookItBackofficeService {
         });
     }
     
-    public static createResource<ThrowOnError extends boolean = false>(options?: Options<CreateResourceData, ThrowOnError>) {
-        return (options?.client ?? client).post<CreateResourceResponses, CreateResourceErrors, ThrowOnError>({
+    public static createResource<ThrowOnError extends boolean = false>(options: Options<CreateResourceData, ThrowOnError>) {
+        return (options.client ?? client).post<CreateResourceResponses, CreateResourceErrors, ThrowOnError>({
             security: [
                 {
                     scheme: 'bearer',
@@ -186,7 +186,7 @@ export class UBookItBackofficeService {
             ...options,
             headers: {
                 'Content-Type': 'application/json',
-                ...options?.headers
+                ...options.headers
             }
         });
     }
@@ -303,8 +303,8 @@ export class UBookItBackofficeService {
         });
     }
     
-    public static createService<ThrowOnError extends boolean = false>(options?: Options<CreateServiceData, ThrowOnError>) {
-        return (options?.client ?? client).post<CreateServiceResponses, CreateServiceErrors, ThrowOnError>({
+    public static createService<ThrowOnError extends boolean = false>(options: Options<CreateServiceData, ThrowOnError>) {
+        return (options.client ?? client).post<CreateServiceResponses, CreateServiceErrors, ThrowOnError>({
             security: [
                 {
                     scheme: 'bearer',
@@ -315,7 +315,7 @@ export class UBookItBackofficeService {
             ...options,
             headers: {
                 'Content-Type': 'application/json',
-                ...options?.headers
+                ...options.headers
             }
         });
     }
@@ -393,8 +393,8 @@ export class UBookItBackofficeService {
         });
     }
     
-    public static previewServiceConfiguration<ThrowOnError extends boolean = false>(options?: Options<PreviewServiceConfigurationData, ThrowOnError>) {
-        return (options?.client ?? client).post<PreviewServiceConfigurationResponses, PreviewServiceConfigurationErrors, ThrowOnError>({
+    public static previewServiceConfiguration<ThrowOnError extends boolean = false>(options: Options<PreviewServiceConfigurationData, ThrowOnError>) {
+        return (options.client ?? client).post<PreviewServiceConfigurationResponses, PreviewServiceConfigurationErrors, ThrowOnError>({
             security: [
                 {
                     scheme: 'bearer',
@@ -405,7 +405,7 @@ export class UBookItBackofficeService {
             ...options,
             headers: {
                 'Content-Type': 'application/json',
-                ...options?.headers
+                ...options.headers
             }
         });
     }
