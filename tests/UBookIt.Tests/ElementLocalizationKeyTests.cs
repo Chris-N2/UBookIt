@@ -67,6 +67,26 @@ public class ElementLocalizationKeyTests
                     offenders.Add($"{Path.GetFileName(file)}: {section}_{key}");
                 }
             }
+
+            // A term taking PARAMETERS cannot go through the `#term` helper, so it is written
+            // as a direct `localize.term("section_key", …)` call — which the pattern above
+            // cannot see. Found while adding the first such term to this package: the guard
+            // reported green over a key it had never looked at. Both shapes render a raw key
+            // when the entry is missing, so both are scanned.
+            //
+            // `\s*` after the paren is load-bearing: a parameterised call is long enough to wrap,
+            // and the first version of this pattern required the quote immediately after the
+            // bracket. It matched nothing, reported green, and was caught only by deleting the
+            // term it was written for and watching the guard stay silent.
+            foreach (Match call in Regex.Matches(source, @"localize\.term\(\s*""([A-Za-z0-9]+)_([A-Za-z0-9]+)"""))
+            {
+                checkedKeys++;
+
+                if (!Resolves(localization, call.Groups[1].Value, call.Groups[2].Value))
+                {
+                    offenders.Add($"{Path.GetFileName(file)}: {call.Groups[1].Value}_{call.Groups[2].Value}");
+                }
+            }
         }
 
         // The guard's own precondition. A refactor that renamed the helper, or moved the

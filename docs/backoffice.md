@@ -548,16 +548,70 @@ report a difference that is not there.
 | **See the closure list** | *Configure resources and services* **or** *Change site settings* |
 | **Open one resource anyway** | *Configure resources and services* |
 | **Add, edit or delete a closure** | *Change site settings* |
+| **Fetch and import public holidays** | *Change site settings* |
 
 Seeing the list sits with both grants because each needs it on its own account: you cannot exempt
 a resource from a closure you cannot see, and you cannot sensibly decide the site's closures
 without reading them.
+
+Fetching holidays sits with *Change site settings* although it creates nothing on its own. It makes
+your site's own code reach out on your behalf, and it is the first half of an act whose second half
+closes every resource you have; granting the fetch separately would hand somebody the outbound call
+without the decision it exists to serve.
 
 The split is deliberate. Exempting one resource is a resource decision; one closure entry shuts
 every resource the site has, so it sits with the same grant as the site's other settings — and
 that grant is **never given automatically**, including on upgrade. Until an administrator ticks
 it, the Closures view is visible to anyone who configures resources and says so, rather than
 appearing to work and refusing the save.
+
+### Bringing in public holidays
+
+If whoever built your site has supplied uBookIt with a source of public holidays, the Closures
+view carries a **Public holidays** panel. If it does not, the panel is not there — the feature is
+absent on such a site rather than present and refusing, so there is nothing to switch on and
+nothing has gone wrong.
+
+**Nothing is ever imported on its own.** There is no schedule and no startup job: holidays arrive
+only when somebody asks for them, and only the dates they tick are created.
+
+Choose a window — it opens on today through the end of next year — and **Fetch holidays**. Every
+holiday the source returns for that window is listed, each in one of three states:
+
+| | |
+|---|---|
+| **New** | No closure exists for the date. Ticked for you, and yours to untick. |
+| **Already closed** | A closure already exists for that date. Not offered: only one closure may exist per date, and the one already there — which may carry a name somebody chose — is not the import's to overwrite. |
+| **Cannot import** | The holiday cannot become a closure, most often because its name is longer than a closure name may be. Not offered, and shown with the reason rather than quietly dropped. |
+
+The list is a **selection, not a confirmation**. Every new date starts ticked because most
+organisations are closed on most public holidays; your work is unticking the ones yours is open
+on. **Create the ticked closures** creates exactly what is ticked and nothing else, and tells you
+how many it made and how many rows it had to skip.
+
+**Unticking is not remembered.** Fetch a window containing that date again — next month, next year
+— and it is offered again, ticked. Nothing records that you said no, because a remembered refusal
+would be invisible state you could neither see nor change, and it would quietly drift away from
+what the source says. If your organisation is genuinely open on a date every year, simply leave it
+unticked each time; if you want it never to appear, that is a question for your source, not for
+uBookIt.
+
+The same follows for deletion: a closure you delete stays deleted until somebody imports that
+window again and ticks it.
+
+**What you get is an ordinary closure.** Nothing records that a closure came from an import, and
+nothing anywhere treats one differently. Rename it, move it to another date, let a resource open
+anyway on it, delete it — all exactly as for a closure typed by hand. This matters more than it
+sounds: a source may call a date something your organisation would not, and renaming it is simply
+editing a closure.
+
+> In the UK, for instance, the government feed calls the days observed when Christmas falls at a
+> weekend "Christmas Day (substitute day)" and "Boxing Day (substitute day)". If your staff would
+> not recognise that, rename it.
+
+If the source cannot be reached, the panel says the source failed. That is deliberately different
+from a window with no holidays in it: an empty window is an answer, and a broken source is not, so
+they never read the same.
 
 ### What a closure does not do
 

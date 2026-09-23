@@ -99,6 +99,15 @@ public class PermissionsTests
         ["ClosuresController.CreateClosure"] = Constants.VerbPolicies.Settings,
         ["ClosuresController.UpdateClosure"] = Constants.VerbPolicies.Settings,
         ["ClosuresController.DeleteClosure"] = Constants.VerbPolicies.Settings,
+
+        // The holiday import (public-holiday-import). BOTH halves on the settings verb, including
+        // the preview, which writes nothing: it makes the site's own code reach out on an
+        // operator's behalf, and it is the first half of an act whose second half creates
+        // closures. Granting the read separately would hand somebody the outbound call without
+        // the decision it exists to serve.
+        ["ClosuresController.GetHolidaySource"] = Constants.VerbPolicies.Settings,
+        ["ClosuresController.PreviewHolidays"] = Constants.VerbPolicies.Settings,
+        ["ClosuresController.ImportHolidays"] = Constants.VerbPolicies.Settings,
     };
 
     /// <summary>
@@ -300,6 +309,23 @@ public class PermissionsTests
         // `Configure_does_not_reach_the_settings` and `Settings_reaches_neither_resources_nor_bookings`
         // — a test here repeating them would describe the claim rather than add to it, which is
         // what the one this replaced did.
+    }
+
+    [Fact]
+    public async Task Only_the_settings_verb_reaches_the_holiday_import()
+    {
+        // THROUGH THE REAL POLICY. Both halves sit on the settings verb, and Configure — which
+        // reads the closure list on its own account — reaches neither: deciding which of a
+        // source's dates the site closes on is the site's policy, not a resource-level act.
+        var settingsOnly = UserWith(section: true, Constants.Verbs.Settings);
+        var configureOnly = UserWith(section: true, Constants.Verbs.Configure);
+
+        Assert.True(await AuthorizeAsync(settingsOnly, Constants.VerbPolicies.Settings));
+
+        Assert.False(await AuthorizeAsync(configureOnly, Constants.VerbPolicies.Settings));
+
+        // And Configure keeps what it does have, so this is a boundary rather than a demotion.
+        Assert.True(await AuthorizeAsync(configureOnly, Constants.VerbPolicies.ClosuresRead));
     }
 
     [Fact]

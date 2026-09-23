@@ -76,6 +76,11 @@ migration time rather than quietly misbehave.
   except the gym" needs one tick rather than a rethink. Changing the list needs the *Change
   site settings* grant — one entry shuts everything — while opting one resource out comes with
   *Configure resources and services*. Seeing the list comes with either.
+- **Public holidays, if your site supplies them** — uBookIt publishes a port your own code
+  implements and ships **no holiday data for any country**. Where a site has registered a
+  source, an operator can fetch a window of holidays and tick which of them the organisation is
+  actually closed on; what that creates is an ordinary closure. Nothing imports on a schedule,
+  and a site that registers no source sees no import control at all.
 - **A booking page** you create like any other page. Point it at the whole catalogue, or at
   one service or resource. It uses your site's layout.
 - **A booking flow** that works without JavaScript, and a JSON delivery API if you would

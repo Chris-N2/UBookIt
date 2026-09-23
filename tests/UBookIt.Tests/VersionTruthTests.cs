@@ -618,7 +618,7 @@ public class VersionTruthTests
             + "So a mutation result is evidence only when BOTH hold: the file demonstrably "
             + "changed, and the assembly was built from the source under test."),
 
-        ("openspec/specs/packaging/spec.md", "nuget.org", 5,
+        ("openspec/specs/packaging/spec.md", "nuget.org", 6,
             "Arrived at SYNC, not written by hand — `release-17-0-1`'s requirements moved into "
             + "the main spec and brought the feed's name with them. All five describe what "
             + "nuget.org DOES as a host: it resolves a relative link against the package page, "
@@ -630,7 +630,21 @@ public class VersionTruthTests
             + "claim into this file behind an allowance granted for behavioural facts. "
             + "4 -> 5 when `docs-truth-and-screenshots` synced: the guard fired ON THE ARCHIVE, "
             + "which is the moment it is designed for — a sync carries sentences into a spec "
-            + "nobody re-read, and the failure is the handover of what to judge."),
+            + "nobody re-read, and the failure is the handover of what to judge.\n"
+            + "5 -> 6 when `release-18-0-0` synced, and the guard fired on THIS line for "
+            + "exactly the reason above — the sentence lived in the change's delta where "
+            + "nothing scanned it and became a spec sentence at sync. It went unnoticed "
+            + "because the suite was not re-run after that sync: `dev/v18` has been red at "
+            + "`7ef9a1b` since, which is a published line's branch failing its own guard. "
+            + "The 17 line hit the identical sentence by the identical route one release "
+            + "earlier (`39164cf`), so this is one defect found twice rather than two. "
+            + "The sixth is `The package declares which Umbraco majors it accepts` saying "
+            + "\"Versions already on nuget.org keep the metadata they were published with\" "
+            + "— and unlike the other five this one IS a publication claim, so it is allowed "
+            + "on evidence rather than on the behavioural-fact rationale. VERIFIED against "
+            + "the feed, not reasoned about: GET .../ubookit/index.json returns 17.0.0, "
+            + "17.0.1, 17.1.0, 17.1.1, 17.1.2 and 18.0.0, and those versions do keep the "
+            + "metadata they shipped with — which is the whole reason `17.1.2` exists."),
 
         ("docs/publishing.md", "nuget.org", 22,
             "The publishing runbook names the feed as a DESTINATION — what nuget.org will "

@@ -3,9 +3,20 @@ import { UmbLitElement } from "@umbraco-cms/backoffice/lit-element";
 import { UMB_CURRENT_USER_CONTEXT } from "@umbraco-cms/backoffice/current-user";
 import { canManageClosures, canReadClosures } from "./permission-verbs.js";
 import { UBookItBackofficeService } from "../api/index.js";
-import type { SiteClosureModel } from "../api/index.js";
+import type { HolidayRowModel, SiteClosureModel } from "../api/index.js";
 import { toApiErrors } from "./api-errors.js";
 import { listQuery, showsEditingControls } from "./closure-fields.js";
+import {
+  chosenRows,
+  defaultWindow,
+  initialSelection,
+  isSelectable,
+  previewFailure,
+  previewOutcome,
+  shouldAskForSource,
+  showsImport,
+  toggleDate,
+} from "./holiday-fields.js";
 
 /** A closure being added or edited, before it is sent. */
 interface ClosureDraft {
@@ -57,6 +68,31 @@ export class UBookItClosuresViewElement extends UmbLitElement {
   @state()
   private _busy = false;
 
+  // ---------------------------------------------------------------- holiday import
+
+  /** Undefined until asked; false on a site whose developer registered no source. */
+  @state()
+  private _hasHolidaySource?: boolean;
+
+  @state()
+  private _importOpen = false;
+
+  @state()
+  private _window = defaultWindow(new Date());
+
+  @state()
+  private _holidayRows?: HolidayRowModel[];
+
+  @state()
+  private _selectedDates: string[] = [];
+
+  /** A source that threw — kept apart from "no rows", which is a real answer. */
+  @state()
+  private _holidaySourceFailed = false;
+
+  @state()
+  private _importSummary?: string;
+
   #term(key: string) {
     return this.localize.term(`ubookitClosures_${key}`);
   }
@@ -76,6 +112,12 @@ export class UBookItClosuresViewElement extends UmbLitElement {
           void this.#load();
         } else if (!canRead) {
           this._loading = false;
+        }
+
+        // Asked once, and only of somebody who could use the feature. A site with no source
+        // renders no import control at all rather than one that fails when pressed.
+        if (shouldAskForSource(this._canWrite, this._hasHolidaySource)) {
+          void this.#loadHolidaySource();
         }
       });
     });
@@ -184,6 +226,117 @@ export class UBookItClosuresViewElement extends UmbLitElement {
     }
   }
 
+  async #loadHolidaySource() {
+    try {
+      const { data, error } = await UBookItBackofficeService.getHolidaySource();
+      this._hasHolidaySource = !error && data ? data.registered : false;
+    } catch {
+      // Treated as absent: a probe that cannot be answered is not grounds for offering a
+      // control whose first action would fail.
+      this._hasHolidaySource = false;
+    }
+  }
+
+  async #preview() {
+    this._busy = true;
+    this._error = undefined;
+    this._importSummary = undefined;
+    this._holidaySourceFailed = false;
+    this._holidayRows = undefined;
+
+    try {
+      const { data, error, response } = await UBookItBackofficeService.previewHolidays({
+        query: { from: this._window.from, to: this._window.to },
+      });
+
+      if (error || !data) {
+        // NOT an empty list. A broken source and a window with no holidays are different
+        // facts, and this is the branch that keeps them apart.
+        //
+        // A 404 is a third fact again: the site has no source, which can become true while this
+        // screen is open. That withdraws the panel rather than blaming a feed.
+        if (previewFailure(response?.status) === "absent") {
+          this.#withdrawImport();
+          return;
+        }
+
+        this._holidaySourceFailed = true;
+        return;
+      }
+
+      this._holidayRows = data.rows;
+      this._selectedDates = initialSelection(data.rows);
+    } catch {
+      this._holidaySourceFailed = true;
+    } finally {
+      this._busy = false;
+    }
+  }
+
+  /**
+   * Withdraws the import entirely, as though the source had never been registered.
+   *
+   * **One method because both holiday endpoints answer 404 for one reason** — the site has no
+   * source — and a rule applied to whichever of them was noticed first is the shape of defect
+   * this project keeps finding: the class is "any holiday endpoint reporting absence", not
+   * "the preview".
+   */
+  #withdrawImport() {
+    this._hasHolidaySource = false;
+    this._importOpen = false;
+    this._holidayRows = undefined;
+    this._selectedDates = [];
+    this._holidaySourceFailed = false;
+  }
+
+  async #import() {
+    const rows = this._holidayRows;
+    if (!rows) {
+      return;
+    }
+
+    this._busy = true;
+    this._error = undefined;
+
+    try {
+      const { data, error, response } = await UBookItBackofficeService.importHolidays({
+        body: { holidays: chosenRows(rows, this._selectedDates) },
+      });
+
+      if (error || !data) {
+        // The SAME rule the preview applies, because the server answers 404 from BOTH
+        // endpoints for the same reason: the site has no source. A source deregistered between
+        // fetching and confirming must withdraw the feature rather than report that closures
+        // "could not be created" for a feature this site no longer has.
+        if (previewFailure(response?.status) === "absent") {
+          this.#withdrawImport();
+          return;
+        }
+
+        this._error = this.#term("importFailed");
+        await this.#focusError();
+        return;
+      }
+
+      this._importSummary = this.localize.term(
+        "ubookitClosures_importSummary",
+        data.created,
+        data.skipped.length,
+      );
+
+      // The preview is stale the moment anything is created, and the list behind it has
+      // changed too.
+      this._holidayRows = undefined;
+      this._selectedDates = [];
+      await this.#load();
+    } catch {
+      this._error = this.#term("importFailed");
+      await this.#focusError();
+    } finally {
+      this._busy = false;
+    }
+  }
+
   async #focusError() {
     await this.updateComplete;
     this.shadowRoot?.querySelector<HTMLElement>("#closure-error")?.focus();
@@ -217,6 +370,7 @@ export class UBookItClosuresViewElement extends UmbLitElement {
           ? nothing
           : html`<p class="read-only">${this.#term("notPermittedWrite")}</p>`}
         ${this.#renderError()} ${this.#renderList()} ${this.#renderDraft()}
+        ${this.#renderHolidayImport()}
 
         <div class="actions">
           ${showsEditingControls(this._canWrite) && !this._draft
@@ -287,6 +441,138 @@ export class UBookItClosuresViewElement extends UmbLitElement {
           )}
         </tbody>
       </table>
+    `;
+  }
+
+  /**
+   * The holiday import.
+   *
+   * Absent entirely — not disabled, not explained — where no source is registered. A site whose
+   * developer has not registered one does not have this feature, and a control that appears and
+   * then apologises is the thing this package spends its guards avoiding.
+   */
+  #renderHolidayImport() {
+    if (!showsImport(showsEditingControls(this._canWrite), this._hasHolidaySource)) {
+      return nothing;
+    }
+
+    return html`
+      <uui-box headline=${this.#term("importHeadline")}>
+        <p>${this.#term("importIntro")}</p>
+
+        ${this._importOpen
+          ? html`
+              <div class="field">
+                <label for="holiday-from">${this.#term("importFrom")}</label>
+                <input
+                  id="holiday-from"
+                  type="date"
+                  .value=${this._window.from}
+                  @input=${(e: InputEvent) =>
+                    (this._window = { ...this._window, from: (e.target as HTMLInputElement).value })}
+                />
+              </div>
+              <div class="field">
+                <label for="holiday-to">${this.#term("importTo")}</label>
+                <input
+                  id="holiday-to"
+                  type="date"
+                  .value=${this._window.to}
+                  @input=${(e: InputEvent) =>
+                    (this._window = { ...this._window, to: (e.target as HTMLInputElement).value })}
+                />
+              </div>
+              <div class="actions">
+                <uui-button
+                  look="secondary"
+                  ?disabled=${this._busy}
+                  label=${this.#term("importFetch")}
+                  @click=${() => void this.#preview()}
+                ></uui-button>
+              </div>
+              ${this.#renderHolidayRows()}
+            `
+          : html`<div class="actions">
+              <uui-button
+                look="primary"
+                label=${this.#term("importOpen")}
+                @click=${() => (this._importOpen = true)}
+              ></uui-button>
+            </div>`}
+        ${this._importSummary
+          ? html`<p id="holiday-summary" role="status">${this._importSummary}</p>`
+          : nothing}
+      </uui-box>
+    `;
+  }
+
+  #renderHolidayRows() {
+    const outcome = previewOutcome(this._holidayRows, this._holidaySourceFailed);
+
+    // THREE outcomes, three messages. "Failed" must never read as "empty": a window with no
+    // holidays is a correct answer, and a source that threw is not an answer at all.
+    if (outcome === "failed") {
+      return html`<p id="holiday-error" class="error" role="alert" tabindex="-1">
+        ${this.#term("importSourceFailed")}
+      </p>`;
+    }
+
+    if (this._holidayRows === undefined) {
+      return nothing;
+    }
+
+    if (outcome === "empty") {
+      return html`<p>${this.#term("importNone")}</p>`;
+    }
+
+    return html`
+      <table>
+        <thead>
+          <tr>
+            <th scope="col">${this.#term("importColumnChoose")}</th>
+            <th scope="col">${this.#term("columnDate")}</th>
+            <th scope="col">${this.#term("columnLabel")}</th>
+            <th scope="col">${this.#term("importColumnState")}</th>
+          </tr>
+        </thead>
+        <tbody>
+          ${this._holidayRows.map(
+            (row) => html`
+              <tr>
+                <td>
+                  ${isSelectable(row)
+                    ? html`<uui-checkbox
+                        label="${this.#term("importChoose")}: ${row.date} ${row.name}"
+                        ?checked=${this._selectedDates.includes(row.date)}
+                        @change=${(e: Event) =>
+                          (this._selectedDates = toggleDate(
+                            this._selectedDates,
+                            row.date,
+                            (e.target as HTMLInputElement).checked,
+                          ))}
+                      ></uui-checkbox>`
+                    : nothing}
+                </td>
+                <td>${row.date}</td>
+                <td>${row.name}</td>
+                <td>
+                  ${row.state === "alreadyClosed" ? this.#term("importAlreadyClosed") : nothing}
+                  ${row.state === "cannotImport" ? this.#term("importCannot") : nothing}
+                  ${row.collapsedDuplicate ? html`<span>${this.#term("importCollapsed")}</span>` : nothing}
+                </td>
+              </tr>
+            `,
+          )}
+        </tbody>
+      </table>
+      <div class="actions">
+        <uui-button
+          look="primary"
+          ?disabled=${this._busy || chosenRows(this._holidayRows, this._selectedDates).length === 0}
+          label=${this.#term("importConfirm")}
+          @click=${() => void this.#import()}
+        ></uui-button>
+      </div>
     `;
   }
 

@@ -43,7 +43,8 @@ namespace UBookIt.Backoffice.Controllers;
 public class ClosuresController(
     ISiteClosureManagementStore store,
     TimeProvider timeProvider,
-    SiteBookingSettings settings) : UBookItBackofficeApiControllerBase
+    SiteBookingSettings settings,
+    IHolidayPreviewService holidays) : UBookItBackofficeApiControllerBase
 {
     /// <summary>
     /// The site's closures, newest-relevant first by date. <paramref name="includePast"/>
@@ -141,6 +142,147 @@ public class ClosuresController(
     /// setting has its own validation and its own failure code, and refusing to show a closure
     /// list is a worse answer to a bad setting than showing it a day early.
     /// </remarks>
+    // ---------------------------------------------------------------- public holidays
+
+    /// <summary>
+    /// Whether this site has a holiday source registered.
+    /// </summary>
+    /// <remarks>
+    /// The client asks once and renders no import control at all when the answer is no — the
+    /// feature is absent rather than disabled. Answering this reaches no source: it reports
+    /// whether one was registered, never whether one works.
+    /// </remarks>
+    [Authorize(Policy = Constants.VerbPolicies.Settings)]
+    [HttpGet("closures/holidays/source")]
+    [ProducesResponseType<HolidaySourceModel>(StatusCodes.Status200OK)]
+    public IActionResult GetHolidaySource()
+        => Ok(new HolidaySourceModel { Registered = holidays.SourceRegistered });
+
+    /// <summary>
+    /// What a site's own holiday source offers for a window, classified against the closures the
+    /// site already has. <b>Creates nothing, and is safe to repeat.</b>
+    /// </summary>
+    /// <remarks>
+    /// <para>
+    /// <b>Gated on the settings verb although it writes nothing.</b> It makes the site's own code
+    /// reach out on an operator's behalf, and it is the first half of an act whose second half
+    /// creates closures — granting the read separately would hand somebody the outbound call
+    /// without the decision it exists to serve.
+    /// </para>
+    /// <para>
+    /// <b>404 when no source is registered</b>, so the feature's absence is not something only a
+    /// client observes. A site without one has no import, rather than an import that explains
+    /// itself.
+    /// </para>
+    /// </remarks>
+    [Authorize(Policy = Constants.VerbPolicies.Settings)]
+    [HttpGet("closures/holidays")]
+    [ProducesResponseType<HolidayPreviewModel>(StatusCodes.Status200OK)]
+    [ProducesResponseType<ProblemDetails>(StatusCodes.Status400BadRequest)]
+    [ProducesResponseType<ProblemDetails>(StatusCodes.Status404NotFound)]
+    public async Task<IActionResult> PreviewHolidays(
+        DateOnly from, DateOnly to, CancellationToken cancellationToken = default)
+    {
+        if (!holidays.SourceRegistered)
+        {
+            return NoSourceProblem();
+        }
+
+        var preview = await holidays.PreviewAsync(from, to, cancellationToken);
+
+        return preview.Succeeded
+            ? Ok(new HolidayPreviewModel { Rows = preview.Value.Select(ToModel).ToList() })
+            : preview.Failures.ToProblemResult();
+    }
+
+    /// <summary>
+    /// Creates closures for the holidays an operator chose.
+    /// </summary>
+    /// <remarks>
+    /// <b>Every row is validated again here rather than trusted from the preview.</b> The
+    /// preview's answer can be stale — somebody else can close a date in between, and the screen
+    /// can sit open — so a date that was offered may now be taken. That row is reported and the
+    /// rest still create: a batch failing wholesale because one date was taken is a worse answer
+    /// than a report.
+    /// </remarks>
+    [Authorize(Policy = Constants.VerbPolicies.Settings)]
+    [HttpPost("closures/holidays")]
+    [ProducesResponseType<HolidayImportResultModel>(StatusCodes.Status200OK)]
+    [ProducesResponseType<ProblemDetails>(StatusCodes.Status400BadRequest)]
+    [ProducesResponseType<ProblemDetails>(StatusCodes.Status404NotFound)]
+    public async Task<IActionResult> ImportHolidays(
+        HolidayImportRequestModel model, CancellationToken cancellationToken = default)
+    {
+        if (!holidays.SourceRegistered)
+        {
+            return NoSourceProblem();
+        }
+
+        var result = new HolidayImportResultModel();
+
+        foreach (var row in model.Holidays)
+        {
+            var closure = SiteClosure.Create(row.Date, row.Name);
+
+            if (!closure.Succeeded)
+            {
+                result.Skipped.Add(new HolidayImportSkippedModel
+                {
+                    Date = row.Date,
+                    Code = FailureCodes.HolidayNotImportable,
+                });
+                continue;
+            }
+
+            var created = await store.CreateAsync(closure.Value, cancellationToken);
+
+            if (created.Succeeded)
+            {
+                result.Created++;
+                continue;
+            }
+
+            // Overwhelmingly `duplicate-closure-date`: the date was taken between the preview
+            // and now. Reported with the store's own code rather than translated, so a client
+            // can tell "somebody beat you to it" from "that name will not fit".
+            //
+            // Indexed defensively rather than at [0]: a failed result is contractually required
+            // to carry a reason, but this row is inside a loop that must finish — a batch that
+            // threw here would abandon the rows after it, having already created the rows before
+            // it, which is the one outcome worse than an unhelpful code.
+            result.Skipped.Add(new HolidayImportSkippedModel
+            {
+                Date = row.Date,
+                Code = created.Failures.FirstOrDefault()?.Code ?? FailureCodes.HolidayNotImportable,
+            });
+        }
+
+        return Ok(result);
+    }
+
+    private static HolidayRowModel ToModel(HolidayRow row)
+        => new()
+        {
+            Date = row.Date,
+            Name = row.Name,
+            State = row.State switch
+            {
+                HolidayRowState.New => "new",
+                HolidayRowState.AlreadyClosed => "alreadyClosed",
+                _ => "cannotImport",
+            },
+            Reason = row.Reason,
+            CollapsedDuplicate = row.CollapsedDuplicate,
+        };
+
+    private IActionResult NoSourceProblem()
+        => NotFound(new ProblemDetails
+        {
+            Type = "NotFound",
+            Title = "This site has no public holiday source.",
+            Status = StatusCodes.Status404NotFound,
+        });
+
     private DateOnly Today()
     {
         var now = timeProvider.GetUtcNow();

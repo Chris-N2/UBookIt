@@ -261,6 +261,36 @@ public static class FailureCodes
     /// date its editor believed they had exempted it from.
     /// </summary>
     public const string ClosureNotFound = "closure-not-found";
+
+    // Public holidays
+
+    /// <summary>
+    /// The site's registered holiday source failed — it threw, timed out, or was
+    /// cancelled.
+    /// </summary>
+    /// <remarks>
+    /// <b>Distinct from a source that returned nothing, and that distinction is the
+    /// point.</b> A window containing no holidays is a real and correct answer; a
+    /// broken source is not an answer at all. Reporting the second as the first would
+    /// invite an operator to conclude their calendar is clear when it is unknown.
+    /// </remarks>
+    public const string HolidaySourceFailed = "holiday-source-failed";
+
+    /// <summary>
+    /// A holiday a source returned cannot become a closure — its name is longer than a
+    /// label may be, or is blank.
+    /// </summary>
+    /// <remarks>
+    /// Reported against the row rather than failing the whole import: one unusable
+    /// entry in somebody else's feed should not cost an operator the other eleven.
+    /// </remarks>
+    public const string HolidayNotImportable = "holiday-not-importable";
+
+    /// <summary>
+    /// The import was asked for, but the site has registered no source. Distinct from
+    /// a source that failed: there is nothing to fail.
+    /// </summary>
+    public const string HolidaySourceAbsent = "holiday-source-absent";
 }
 
 /// <summary>
