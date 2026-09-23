@@ -136,7 +136,9 @@ reading a name or an email SHALL require having established that details are pre
 - **THEN** no such value can be produced
 
 ### Requirement: Placement validation pipeline
-Booking placement SHALL validate a request against an ordered rule pipeline, producing a structured result: success, or failure carrying one stable machine-readable code per failed rule. The rules and codes SHALL be, in order: `interval-invalid` (end not after start, malformed, or not representable), `granularity` (start or duration not aligned), `duration-too-short`, `duration-too-long`, `lead-time` (starts sooner than minimum lead), `horizon` (starts beyond booking horizon), `outside-open-hours` (interval not fully inside open hours with exceptions applied), `conflict` (overlaps a blocking claim). Start alignment is defined relative to the start of the coalesced open window containing the interval; when the interval lies outside open hours, start alignment cannot be evaluated and only `outside-open-hours` is reported. Failures SHALL NOT be signalled by exceptions.
+Booking placement SHALL validate a request against an ordered rule pipeline, producing a structured result: success, or failure carrying one stable machine-readable code per failed rule. The rules and codes SHALL be, in order: `interval-invalid` (end not after start, malformed, or not representable), `granularity` (start or duration not aligned), `duration-too-short`, `duration-too-long`, `lead-time` (starts sooner than minimum lead), `horizon` (starts beyond booking horizon), `outside-open-hours` (interval not fully inside open hours with the resource's own exceptions and any applicable site closures applied), `conflict` (overlaps a blocking claim). Start alignment is defined relative to the start of the coalesced open window containing the interval; when the interval lies outside open hours, start alignment cannot be evaluated and only `outside-open-hours` is reported. Failures SHALL NOT be signalled by exceptions.
+
+A site closure the resource has not opted out of SHALL close its date for placement on the same terms as for availability, and SHALL be reported as `outside-open-hours` rather than as a code of its own. **The refusal SHALL NOT name the closure or its label**: placement is reachable anonymously, and the reason a date is shut is not a disclosure the booking path makes.
 
 A request SHALL fail with `interval-invalid`, ahead of every other rule, when the requested interval cannot be represented: when the start added to the duration would exceed the last representable instant, or fall before the first. Both directions SHALL be covered — a far-future start overflows, and a large negative duration underflows.
 
@@ -155,6 +157,14 @@ When placement runs over a service's candidate pool, an `interval-invalid` failu
 #### Scenario: Request outside open hours
 - **WHEN** placement is requested for 07:00–08:00 on a resource open from 08:00
 - **THEN** the result is failure with code `outside-open-hours`
+
+#### Scenario: Request on a site closure date
+- **WHEN** placement is requested for an otherwise-valid interval on a date carrying a site closure the resource has not opted out of
+- **THEN** the result is failure with code `outside-open-hours`, and the failure names neither the closure nor its label
+
+#### Scenario: Request on a closure date the resource has opted out of
+- **WHEN** placement is requested for an aligned, correctly sized interval inside open hours on a closure date the resource has opted out of
+- **THEN** the result is success
 
 #### Scenario: Valid request succeeds with structured result
 - **WHEN** placement is requested for an aligned, correctly sized interval in free open time
