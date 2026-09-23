@@ -512,7 +512,13 @@ public class SiteClosureStoreTests(SqlServerFixture fixture) : IAsyncLifetime
         var interceptor = new CommandRecordingInterceptor();
         await using var context = fixture.CreateContext(interceptor);
 
-        await new SqlResourceStore(context, new SqlSiteClosureStore(context)).GetAsync(resourceId, Ct);
+        var resource = await new SqlResourceStore(context, new SqlSiteClosureStore(context))
+            .GetAsync(resourceId, Ct);
+
+        // The read HYDRATED from those commands. `NotEmpty` below proves a closure query was
+        // sent; this proves the resource was built from it, so the shape being inspected is the
+        // shape of a query that actually did the work.
+        Assert.Single(resource!.Availability.Closures);
 
         // The closure read stands alone: it never joins the exception or open-hours tables, which
         // is what a storage-layer precedence rule would have to do.

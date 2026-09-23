@@ -638,6 +638,22 @@ public class DeliveryApiTests
         var resources = new InMemoryResourceStore().Add(room);
         var controller = new ResourcesController(resources, TestData.Settings);
 
+        // THE GUARD'S OWN PRECONDITION, and its absence is what QA proved twice over: a
+        // `DoesNotContain` over a subject that never carried the label is the string-matching
+        // twin of an `Assert.All` over an empty sequence. Dropping the `closures:` argument in a
+        // refactor would retire this guard silently.
+        Assert.Single(room.Availability.Closures);
+
+        // And the closure is IN FORCE on the very read path this guard inspects, not merely
+        // attached to the fixture: the date it covers offers nothing.
+        var availability = new AvailabilityController(
+            new AvailabilityService(
+                resources, new InMemoryBookingStore(), new FixedTimeProvider(TestData.Now), TestData.Settings),
+            TestData.Settings);
+
+        var slots = Ok<SlotsResponseModel>(await availability.GetSlots(room.Id, BaseDate, BaseDate, 60));
+        Assert.Empty(slots.Slots);
+
         var single = Ok<ResourceReadModel>(await controller.GetResource(room.Id));
         var page = Ok<PagedResourcesModel>(await controller.ListResources());
 

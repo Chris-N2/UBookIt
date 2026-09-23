@@ -62,6 +62,12 @@ describe("whether an exception is stated as superseded", () => {
     // a resource would then be told its exception is inert when it is in force.
     expect(isSuperseded({})).toBe(false);
     expect(isSuperseded({ superseded: undefined })).toBe(false);
+
+    // `null` joined the contract when the C# member became nullable and the client was
+    // regenerated (`superseded?: boolean | null`). Pinned because the obvious "simplification"
+    // — `superseded !== false` — passes every other assertion here while telling an operator
+    // that an exception in force has no effect.
+    expect(isSuperseded({ superseded: null })).toBe(false);
   });
 
   it("never derives the answer from a closure list", () => {

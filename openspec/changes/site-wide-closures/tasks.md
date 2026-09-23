@@ -318,3 +318,45 @@ throwing, and the element defines — which is the technique this project alread
 telling that flake from a module-evaluation break. Both strings are covered by
 `ElementLocalizationKeyTests`, which is mutation-proved to fail on a missing term, so a raw key
 cannot render; what is unverified is only how they look on screen.
+
+## QA round 3 — REJECT, one MAJOR, and it was the same fault twice
+
+**The serialization guard had no precondition that its subject carried a closure.** QA left a
+label leaking through a member called `Note` *and* dropped the `closures:` argument from the
+fixture: the test passed while the anonymous delivery API handed every caller the label, because
+`Zzyzx` was never in the body to be found. `Assert.DoesNotContain` over an absent subject is the
+string-matching twin of `Assert.All` over an empty sequence — **the exact fault round 2 found in
+the SQL guard, whose fix I applied twelve lines away in the same commit and did not carry across.**
+The class, not the instance: this repository's own recorded lesson, and I had it in front of me.
+
+Fixed with the precondition **and** the stronger check QA suggested: the guard now asserts the
+resource carries exactly one closure, and that the closure is **in force on the read path it
+inspects** — the delivery availability for that date is empty through the real
+`AvailabilityController`. **Verified by reproducing QA's mutation**: dropping `closures:` now fails
+on the precondition rather than passing vacuously.
+
+Two MINORs, both one-liners in tests: `isSuperseded` now pins `null`, which joined the contract in
+round 2 when the member became nullable and nothing followed it (a later "simplification" to
+`superseded !== false` would have passed everything while telling an operator that an exception in
+force has no effect); and the SQL-shape guard now asserts the read it inspects actually hydrated,
+rather than only that a closure query was sent.
+
+QA answered the three questions I put to it, by mutation rather than by reading:
+
+- The rationale and the bullet list now agree, clause by clause — **finding 1 closed**.
+- `NotEmpty` is the right precondition for the shape guard; a count would over-specify, because
+  the number of closure reads is its sibling's subject, not this one's.
+- The distinctive label is load-bearing: leaking **only** the label through a member named `Note`,
+  with no forbidden substring in the value, is caught by `Zzyzx`/`stocktake` and by nothing else in
+  the list.
+
+**Spec criteria verified: 51 of 51**, with the live gap below standing.
+
+### The live gap, as QA framed it
+
+QA advised **against** restarting the TestSite for a further round: `notPermittedRead` is
+unreachable behind the manifest's `oneOf` gate, `notPermittedWrite` is a plain paragraph of a term
+whose resolution is mutation-proved, and nothing since has touched rendered markup structure. The
+two refusal messages are folded into the existing 5.8 live-verification gap, to be discharged with
+it before archive. The extension-registration flake is a known caching shape — stable entry
+filename, per-build chunk hashes — and is not evidence about this change.
