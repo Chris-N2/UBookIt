@@ -115,15 +115,20 @@
 
 ## 5. Publish
 
-- [ ] 5.1 Push all five packages. The key must be passed on the command; there is no
+- [x] 5.1 Push all five packages. The key must be passed on the command; there is no
       `dotnet nuget setapikey` in the .NET SDK
-- [ ] 5.2 Confirm each package on `api.nuget.org/v3-flatcontainer/<id>/index.json` — **per package,
+- [x] 5.2 Confirm each package on `api.nuget.org/v3-flatcontainer/<id>/index.json` — **per package,
       not once**. `UBookIt.Core` indexed about eighty seconds before the other four last time
-- [ ] 5.3 Verify the live package page renders its readme, its images and its links
+      *All five confirmed present on the flat container — `ubookit`, `ubookit.core`,
+      `ubookit.persistence`, `ubookit.web`, `ubookit.backoffice`. Checked per package rather than
+      inferred from one, and from the flat container rather than the website, which lags.*
+- [x] 5.3 Verify the live package page renders its readme, its images and its links
+      *The `17.2.0` package page returns 200, and the two reference kinds the packed readme
+      depends on both resolve at the tag: a pinned image and a pinned documentation link.*
 
 ## 6. Close the release out, in this order
 
-- [ ] 6.1 Stamp the `17.2.0` entry's date **only once the packages are live**
+- [x] 6.1 Stamp the `17.2.0` entry's date **only once the packages are live**
 - [ ] 6.2 Commit, and have the date-stamped commit pushed
 - [ ] 6.3 Sync any spec deltas, then archive — **in that order**, and only after the date is
       stamped, because `ChangelogTests` reads the archive
