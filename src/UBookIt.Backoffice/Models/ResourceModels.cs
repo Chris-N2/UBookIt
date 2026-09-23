@@ -236,3 +236,76 @@ public class SiteClosureRequestModel
     /// </summary>
     public string Label { get; set; } = string.Empty;
 }
+
+/// <summary>One holiday a site's source returned, classified against the closures it already has.</summary>
+public class HolidayRowModel
+{
+    public DateOnly Date { get; set; }
+
+    /// <summary>The name the source gave it, which becomes the closure's label if imported.</summary>
+    public string Name { get; set; } = string.Empty;
+
+    /// <summary>
+    /// <c>new</c>, <c>alreadyClosed</c> or <c>cannotImport</c>. Only <c>new</c> may be selected.
+    /// </summary>
+    public string State { get; set; } = string.Empty;
+
+    /// <summary>
+    /// Why it cannot be imported, for <c>cannotImport</c>; null otherwise. A stable failure code,
+    /// so a client renders its own words.
+    /// </summary>
+    public string? Reason { get; set; }
+
+    /// <summary>
+    /// Whether the source returned more than one holiday for this date and the others were
+    /// dropped. Reported rather than silent: a name an operator expected and cannot see was
+    /// collapsed, not lost.
+    /// </summary>
+    public bool CollapsedDuplicate { get; set; }
+}
+
+/// <summary>What a preview offers an operator to choose from.</summary>
+public class HolidayPreviewModel
+{
+    public List<HolidayRowModel> Rows { get; set; } = [];
+}
+
+/// <summary>The rows an operator chose to import.</summary>
+public class HolidayImportRequestModel
+{
+    /// <summary>
+    /// The chosen holidays, carrying the date and name to create. Sent rather than referring to
+    /// the earlier preview by a token: the preview's answer can be stale, so the server validates
+    /// each again and reports per row.
+    /// </summary>
+    public List<HolidayImportRowModel> Holidays { get; set; } = [];
+}
+
+/// <summary>One holiday an operator chose to import.</summary>
+public class HolidayImportRowModel
+{
+    public DateOnly Date { get; set; }
+
+    public string Name { get; set; } = string.Empty;
+}
+
+/// <summary>What an import did, row by row.</summary>
+public class HolidayImportResultModel
+{
+    public int Created { get; set; }
+
+    /// <summary>
+    /// Rows that were not created and why — a date taken between the preview and the import, or a
+    /// name the domain refused. Reported rather than failing the batch: one unusable row should
+    /// not cost an operator the others.
+    /// </summary>
+    public List<HolidayImportSkippedModel> Skipped { get; set; } = [];
+}
+
+/// <summary>One row an import did not create, with the code saying why.</summary>
+public class HolidayImportSkippedModel
+{
+    public DateOnly Date { get; set; }
+
+    public string Code { get; set; } = string.Empty;
+}

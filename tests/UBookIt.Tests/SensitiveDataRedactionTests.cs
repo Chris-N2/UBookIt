@@ -782,6 +782,11 @@ public class SensitiveDataRedactionTests
             "ClosuresController.CreateClosure",
             "ClosuresController.UpdateClosure",
             "ClosuresController.DeleteClosure",
+            // A genuine write: creates closures from the holidays an operator chose
+            // (public-holiday-import). Recorded deliberately rather than left to default to
+            // "read". It carries dates and the SITE's own source's names for them — never a
+            // booker's detail, and never free text matched against anything a booker supplied.
+            "ClosuresController.ImportHolidays",
         ];
 
         var classifiedActions = new List<string>();
@@ -1007,6 +1012,11 @@ public class SensitiveDataRedactionTests
             "ClosuresController.UpdateClosure = write",
             "ClosuresController.DeleteClosure = write",
             "ClosuresController.ListClosures = read",
+            // The preview is a READ — it creates nothing — so the free-text rule below applies to
+            // it, correctly. It takes two dates and returns dates with the site's own source's
+            // names; it touches no booking and accepts nothing a booker supplied.
+            "ClosuresController.PreviewHolidays = read",
+            "ClosuresController.ImportHolidays = write",
             "ResourcesController.CreateResource = write",
             "ResourcesController.DeleteResource = write",
             "ResourcesController.GetResource = read",

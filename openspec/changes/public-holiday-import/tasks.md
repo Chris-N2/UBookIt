@@ -15,13 +15,13 @@
 
 ## 3. Management API
 
-- [ ] 3.1 Add the preview endpoint in the `ubookitbackoffice` swagger group, taking the window and returning the classified rows plus any collapse or source-failure report; verify with endpoint tests over a fake source covering all three row states
-- [ ] 3.2 Add the import endpoint taking the chosen dates and names, creating each through the existing closure management store; verify only the chosen rows are created
-- [ ] 3.3 Re-validate at import rather than trusting the preview, reporting per row where a date has since been taken while still creating the rest; verify by creating a closure between a preview and an import and asserting the rest still land
-- [ ] 3.4 Gate both endpoints on `UBookIt.Settings`; verify through the **real policy engine** (the `PermissionsTests` harness), not by reading `[Authorize]` attributes — an attribute test would pass with the policy registered against the wrong verbs
-- [ ] 3.5 Refuse both endpoints when no source is registered, so absence is not merely a client-side hide; verify with a controller built without a source
-- [ ] 3.6 Verify the preview creates nothing: call it twice and assert the closure list is unchanged after both
-- [ ] 3.7 Regenerate the OpenAPI client and verify the generated TypeScript compiles and carries the new endpoints
+- [x] 3.1 Add the preview endpoint in the `ubookitbackoffice` swagger group, taking the window and returning the classified rows plus any collapse or source-failure report; verify with endpoint tests over a fake source covering all three row states
+- [x] 3.2 Add the import endpoint taking the chosen dates and names, creating each through the existing closure management store; verify only the chosen rows are created
+- [x] 3.3 Re-validate at import rather than trusting the preview, reporting per row where a date has since been taken while still creating the rest; verify by creating a closure between a preview and an import and asserting the rest still land
+- [x] 3.4 Gate both endpoints on `UBookIt.Settings`; verify through the **real policy engine** (the `PermissionsTests` harness), not by reading `[Authorize]` attributes — an attribute test would pass with the policy registered against the wrong verbs
+- [x] 3.5 Refuse both endpoints when no source is registered, so absence is not merely a client-side hide; verify with a controller built without a source
+- [x] 3.6 Verify the preview creates nothing: call it twice and assert the closure list is unchanged after both
+- [x] 3.7 Regenerate the OpenAPI client and verify the generated TypeScript compiles and carries the new endpoints
 
 ## 4. Backoffice client
 
