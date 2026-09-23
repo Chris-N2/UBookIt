@@ -1,17 +1,17 @@
 ## 1. The port and the classification rule
 
-- [ ] 1.1 Add `IPublicHolidaySource` and the `PublicHoliday` record to `UBookIt.Core`, taking an inclusive window and a cancellation token; verify by a test asserting the port carries no region, country or locale parameter, since that absence is the design decision rather than an omission
-- [ ] 1.2 Add the failure codes this change owns (a source that failed, a holiday that cannot be imported) to `FailureCodes`; verify with a test asserting each literal value, as the codes are a published contract
-- [ ] 1.3 Implement the classification rule as a pure function over the source's holidays and the existing closure dates, producing rows of new / already closed / cannot import with a reason; verify with unit tests for each state, needing no database, network or HTTP
-- [ ] 1.4 Collapse same-date duplicates in that rule, first name winning, reporting the collapse; verify with a test that two holidays on one date yield one row carrying the first name **and** a reported collapse — a test that only counts rows would pass while the operator learns nothing
-- [ ] 1.5 Drop holidays dated outside the requested window; verify with a test over a source that returns one either side
-- [ ] 1.6 Verify the rule treats an over-long name as unimportable with its reason rather than truncating it, and that the reason names the label length rather than a generic failure
+- [x] 1.1 Add `IPublicHolidaySource` and the `PublicHoliday` record to `UBookIt.Core`, taking an inclusive window and a cancellation token; verify by a test asserting the port carries no region, country or locale parameter, since that absence is the design decision rather than an omission
+- [x] 1.2 Add the failure codes this change owns (a source that failed, a holiday that cannot be imported) to `FailureCodes`; verify with a test asserting each literal value, as the codes are a published contract
+- [x] 1.3 Implement the classification rule as a pure function over the source's holidays and the existing closure dates, producing rows of new / already closed / cannot import with a reason; verify with unit tests for each state, needing no database, network or HTTP
+- [x] 1.4 Collapse same-date duplicates in that rule, first name winning, reporting the collapse; verify with a test that two holidays on one date yield one row carrying the first name **and** a reported collapse — a test that only counts rows would pass while the operator learns nothing
+- [x] 1.5 Drop holidays dated outside the requested window; verify with a test over a source that returns one either side
+- [x] 1.6 Verify the rule treats an over-long name as unimportable with its reason rather than truncating it, and that the reason names the label length rather than a generic failure
 
 ## 2. Reading a source
 
-- [ ] 2.1 Add the read that calls a registered source over a window and returns its holidays, passing cancellation through; verify with a fake source that records the token it was given
-- [ ] 2.2 Report a source that throws as a **source failure**, distinct from an empty result; verify with two tests — a throwing source and a source returning none — asserting the two produce different, distinguishable answers
-- [ ] 2.3 Verify no code path in the package calls a source except in response to an operator request: no job, no startup hook, no composer call. Assert it by scanning for callers rather than by reading, since "nothing schedules it" is the change's central claim
+- [x] 2.1 Add the read that calls a registered source over a window and returns its holidays, passing cancellation through; verify with a fake source that records the token it was given
+- [x] 2.2 Report a source that throws as a **source failure**, distinct from an empty result; verify with two tests — a throwing source and a source returning none — asserting the two produce different, distinguishable answers
+- [x] 2.3 Verify no code path in the package calls a source except in response to an operator request: no job, no startup hook, no composer call. Assert it by scanning for callers rather than by reading, since "nothing schedules it" is the change's central claim
 
 ## 3. Management API
 

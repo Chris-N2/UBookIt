@@ -78,6 +78,13 @@ public sealed class UBookItPersistenceComposer : IComposer
         // already carries them.
         builder.Services.AddScoped<ISiteClosureStore, SqlSiteClosureStore>();
         builder.Services.AddScoped<ISiteClosureManagementStore, SqlSiteClosureManagementStore>();
+        // The holiday preview, with its source resolved OPTIONALLY. `GetService` rather than
+        // `GetRequiredService` is the whole mechanism: a site that registered no
+        // `IPublicHolidaySource` gets null, the feature reports itself absent, and nothing is
+        // configured, warned or logged. Registering one is how a site turns it on.
+        builder.Services.AddScoped<IHolidayPreviewService>(serviceProvider => new HolidayPreviewService(
+            serviceProvider.GetRequiredService<ISiteClosureStore>(),
+            serviceProvider.GetService<IPublicHolidaySource>()));
         builder.Services.AddScoped<IResourceStore, SqlResourceStore>();
         builder.Services.AddScoped<IResourceManagementStore, SqlResourceManagementStore>();
         builder.Services.AddScoped<IServiceStore, SqlServiceStore>();
