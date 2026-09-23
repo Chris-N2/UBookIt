@@ -41,7 +41,8 @@ through the backoffice group editor's default-permissions surface:
   implies the other: a receptionist who may take a telephone booking must be able to see what
   there is to book, and must not thereby acquire the privilege to reconfigure it.*
 - **`UBookIt.Settings`** — reading and changing the site's own settings, **reading the site
-  closure list, and changing it**.
+  closure list, changing it, and both halves of a public holiday import** — asking a registered
+  source what it offers for a window, and creating closures from the rows an operator chose.
 
 *Moving joined Manage rather than becoming a fifth verb because the verb already means "may act
 on a booking", and moving a booking is a smaller act than cancelling one: it keeps the booking,
@@ -67,6 +68,17 @@ the list they are deciding. The line is between deciding the site's policy and a
 exemption to one thing under it; the read is on both sides of that line, which is why it is the
 one act neither verb owns exclusively.*
 
+*Importing public holidays added a fourth act to that split rather than a fifth verb, and it sits
+with `Settings` in both halves. **Creating the closures is plainly a site-level act** — it is the
+same act as typing them, and produces closures indistinguishable from typed ones. **Previewing is
+gated identically although it creates nothing**, which the three-act reasoning above does not by
+itself decide: a preview neither decides the site's policy nor applies an exemption, so the
+"deciding versus exempting" line does not place it. What places it is that previewing makes the
+site's own code reach outward on an operator's behalf, and that it is the first half of an act
+whose second half closes every resource the site has. Granting the preview separately would hand
+somebody the outbound call without the decision it exists to serve, and would make `Configure` —
+a grant meaning "may add a meeting room" — a grant that can make the site call out.*
+
 **Manage SHALL imply Read**, in the authorization rule and not by copying verbs onto
 groups: a group holding only Manage reads bookings, because managing what cannot be seen
 is incoherent, and the implication living in one rule means no group's stored verbs need
@@ -75,7 +87,8 @@ restating when it changes.
 **`UBookIt.Settings` SHALL imply nothing and SHALL be implied by nothing.** It is not a
 senior form of `UBookIt.Configure`: configuring a bookable resource and configuring the
 site are different privileges, and the settings reach the site's retention posture, its
-anonymous exposure and the addresses bookers' details are sent to. A grant meaning "may
+anonymous exposure, the addresses bookers' details are sent to, and — where a site registered a
+holiday source — the invocation of that site's own code on an operator's behalf. A grant meaning "may
 add a meeting room" does not carry them, in either direction. **That closures are readable
 under either verb is not an implication between them**: each verb reaches that read on its own
 account, and neither acquires anything else the other holds.
@@ -169,7 +182,19 @@ own.
 
 #### Scenario: The verb count is unchanged
 - **WHEN** the package's permission verbs are enumerated
-- **THEN** there are exactly four, and neither placing a booking on a booker's behalf nor site closures introduced any
+- **THEN** there are exactly four, and none of placing a booking on a booker's behalf, site closures or the public holiday import introduced any
+
+#### Scenario: Settings reaches both halves of an import
+- **WHEN** a user whose groups hold only `UBookIt.Settings` previews public holidays and then imports the rows they chose
+- **THEN** both are served
+
+#### Scenario: Configure alone reaches neither half, and still reads the list
+- **WHEN** a user whose groups hold only `UBookIt.Configure` requests a holiday preview and an import
+- **THEN** both are refused, and reading the closure list remains available to them
+
+#### Scenario: The source probe is gated too
+- **WHEN** a user holding the section but not `UBookIt.Settings` asks whether a holiday source is registered
+- **THEN** the request is refused, so the question is not answerable below the verb that acts on the answer
 
 ### Requirement: The section grant remains the outer gate
 
