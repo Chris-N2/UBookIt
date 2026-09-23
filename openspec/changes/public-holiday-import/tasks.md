@@ -5,7 +5,8 @@
 - [x] 1.3 Implement the classification rule as a pure function over the source's holidays and the existing closure dates, producing rows of new / already closed / cannot import with a reason; verify with unit tests for each state, needing no database, network or HTTP
 - [x] 1.4 Collapse same-date duplicates in that rule, first name winning, reporting the collapse; verify with a test that two holidays on one date yield one row carrying the first name **and** a reported collapse — a test that only counts rows would pass while the operator learns nothing
 - [x] 1.5 Drop holidays dated outside the requested window; verify with a test over a source that returns one either side
-- [x] 1.6 Verify the rule treats an over-long name as unimportable with its reason rather than truncating it, and that the reason names the label length rather than a generic failure
+- [x] 1.6 Verify the rule treats an over-long name as unimportable **with a reason** rather than truncating it
+      *Corrected in QA: this originally claimed "the reason names the label length rather than a generic failure". It does not. Both an over-long name and a blank one report the single code `holiday-not-importable`, and `HolidayImportTests` asserts that same code for each. The behaviour is deliberate — the code is stable and the client renders its own words, which is how every other failure on this surface works — but the task described a distinction the code does not draw, and a task that misdescribes what it verified is a false record whether or not the behaviour is right.*
 
 ## 2. Reading a source
 
@@ -70,3 +71,59 @@
 - [x] 8.6 **MODIFIED** `site-closures` / *The closures view* — the action enumeration becomes conditional on the site and the user's verb, and the keyboard scenario covers the import. Guarantees diffed: 4 scenarios in, 5 out, none dropped; the upcoming-by-default rule, the no-automatic-deletion rule and the accessibility bar all carried forward verbatim
 - [x] 8.7 **MODIFIED** `site-closures` / *Closures are read and written by different verbs* — "Both" becomes "Each of these" over four acts; the read-but-not-write explanation rule is distinguished from this change's absent-capability rule. Guarantees diffed: 7 scenarios in, 10 out, none dropped; all three verb rules and the server-enforcement rule carried forward verbatim
 - [x] 8.8 **MODIFIED** `site-closures` / *Closures are managed through versioned management endpoints* — the endpoint enumeration gains preview, import and probe, and the 404 rule covers the absent-source case. Guarantees diffed: 4 scenarios in, 6 out, none dropped; the purpose-built-DTO rule, the no-domain-types rule, the server-side upcoming filter and the stable-code rule carried forward verbatim
+
+## 9. QA round 1 — REJECT, and what it cost
+
+Three MAJORs, all upheld on independent re-verification rather than taken on trust.
+
+- [x] 9.1 **MAJOR — the retraction did not reach the docs.** The delta was narrowed in this same
+      session to say the delivery API's rule does NOT carry over, and `sweep.md` recorded that as
+      done — while `docs/configuration.md`, written an hour earlier, still asserted "the same
+      decision the delivery API makes about disabled directions". The narrowing was applied to the
+      spec and not to the shipped sentence that made the claim. *Fixed: the doc now states the
+      weaker claim and why the audience makes it sufficient.* **The lesson is the recorded one —
+      the sentence announcing the fix is new code — arriving as a claim in `sweep.md` that its own
+      remedy was complete.**
+- [x] 9.2 **MAJOR — the leak guard's control did not test the instrument.** After the third
+      narrowing the regex matched nothing in the repository at all, including the TestSite file
+      whose purpose is to carry the vocabulary; the "control" asserted only that `substitut`
+      appeared in that file's raw text, which it does — in a doc comment the guard strips before
+      matching. So the control passed on evidence the instrument never sees. *Fixed: the regex is
+      a named field with a `[Theory]` of samples it must match and samples it must spare,
+      including the real sentence that forced the second narrowing; the sweep now reads `.ts` as
+      well as `.cs`, because a term dictionary is where a country's word would reach a screen; and
+      a file-set control names the three files it must be reading.* Verified by blinding the
+      regex: three theory cases fail by name, where the old control stayed green.
+- [x] 9.3 **MAJOR — the change's central client guarantee had no guard.** "No source, no control"
+      is the scenario the whole absence design rests on, and nothing tested either branch: the
+      decision sat inline in the element while every other decision in this change lives in
+      `holiday-fields.ts` with tests. *Fixed: `showsImport` and `shouldAskForSource` extracted,
+      eight cases added, and the element routed through them so the tests guard the code that
+      runs.* Verified by mutation — making `showsImport` ignore the source fails two named tests.
+- [x] 9.4 **MINOR — a host's exception text travelled into an HTTP response body.** Arbitrary site
+      code's message, which routinely carries the URI it called and can carry a credential, was
+      interpolated into the failure and served to the client, which never displays it. *Fixed: the
+      exception type name is reported, the message is not, and a test asserts a planted fake
+      secret does not survive.*
+- [x] 9.5 **MINOR — a test that compared a value with itself.** `Already_closed_does_not_depend_on_who_closed_it`
+      built "typed" and "imported" from character-for-character identical expressions, because
+      there is no way to build a closure that remembers its origin — which is the property being
+      claimed. *Rewritten structurally as `Nothing_records_where_a_closure_came_from`: the domain
+      type has exactly id, date and label, and the rule takes dates.*
+- [x] 9.6 **MINOR — task 1.6 described a distinction the code does not draw.** Corrected in place.
+- [x] 9.7 **MINOR — `Failures[0]` indexed unguarded** inside a loop that must finish. Guarded.
+- [x] 9.8 **NIT — an inverted window read back as "no holidays for those dates".** Refused instead,
+      with the code the availability surface already uses. **Absence is checked first**, so a
+      sourceless site answers "no such feature" even to a malformed request rather than validating
+      it and thereby confirming the endpoint exists.
+- [x] 9.9 **NIT — every preview error read as "the source could not be reached".** A 404 means the
+      site has no source, which can become true while the screen is open. `previewFailure`
+      separates the two: absent withdraws the panel, anything else reports a failure — and a 401
+      or 403 is deliberately NOT treated as absence, so a refusal never silently removes a feature
+      the site has.
+- [x] 9.10 **NIT — `IsPackable`** now asserts the positive fact as well as the negative.
+- [ ] 9.11 **NIT NOT FIXED, deliberately: the import summary always states a skipped count,
+      including zero, and does not pluralise.** Splitting it needs a second localization term and
+      would not solve "1 rows" without plural handling this client does not have anywhere else.
+      Recorded as a deferred obligation rather than half-fixed late in a change; it is cosmetic and
+      affects one sentence on one screen.

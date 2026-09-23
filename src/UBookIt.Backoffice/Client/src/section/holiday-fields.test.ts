@@ -4,7 +4,10 @@ import {
   defaultWindow,
   initialSelection,
   isSelectable,
+  previewFailure,
   previewOutcome,
+  shouldAskForSource,
+  showsImport,
   toggleDate,
 } from "./holiday-fields.js";
 
@@ -154,5 +157,71 @@ describe("what the screen says about a preview", () => {
     // The other direction: a site with no holidays in the window is a correct answer, and
     // reporting it as a broken source would send somebody to debug a feed that is fine.
     expect(previewOutcome([], false)).toBe("empty");
+  });
+});
+
+describe("whether the import belongs on the screen", () => {
+  it("shows it to a writer on a site with a source", () => {
+    expect(showsImport(true, true)).toBe(true);
+  });
+
+  it("hides it where no source is registered", () => {
+    // THE guarantee the whole 'absence is total' design rests on. A site whose developer
+    // registered no source does not have this feature, and must see no trace of it.
+    expect(showsImport(true, false)).toBe(false);
+  });
+
+  it("hides it before the question has been answered", () => {
+    // Fails closed: an unanswered probe renders nothing rather than flashing a panel that may
+    // not belong on this site at all.
+    expect(showsImport(true, undefined)).toBe(false);
+  });
+
+  it("hides it from a user who may not change closures", () => {
+    // Importing is a way of changing closures, so the verb that gates changing them gates this.
+    expect(showsImport(false, true)).toBe(false);
+  });
+
+  it("hides it when neither holds", () => {
+    expect(showsImport(false, false)).toBe(false);
+    expect(showsImport(false, undefined)).toBe(false);
+  });
+});
+
+describe("whether to ask the server if a source is registered", () => {
+  it("asks once, for somebody who could act on the answer", () => {
+    expect(shouldAskForSource(true, undefined)).toBe(true);
+  });
+
+  it("does not ask again once answered, either way", () => {
+    expect(shouldAskForSource(true, true)).toBe(false);
+    expect(shouldAskForSource(true, false)).toBe(false);
+  });
+
+  it("never asks on behalf of a user who could not act on it", () => {
+    // Not merely tidiness: the probe requires the settings verb, so asking would be refused.
+    // A Configure-only session must never call it.
+    expect(shouldAskForSource(false, undefined)).toBe(false);
+  });
+});
+
+describe("what a failed preview means", () => {
+  it("treats a 404 as the source being gone, not broken", () => {
+    // The server answers 404 when no source is registered. A screen opened while one still was
+    // must withdraw the panel, not report a feed that failed.
+    expect(previewFailure(404)).toBe("absent");
+  });
+
+  it("treats anything else as the source having failed", () => {
+    expect(previewFailure(500)).toBe("failed");
+    expect(previewFailure(502)).toBe("failed");
+    expect(previewFailure(undefined)).toBe("failed");
+  });
+
+  it("does not call a refusal an absence", () => {
+    // 401/403 mean this user may not, which is neither "no source" nor "source broken" — it
+    // must not silently withdraw the feature from a site that has it.
+    expect(previewFailure(401)).toBe("failed");
+    expect(previewFailure(403)).toBe("failed");
   });
 });

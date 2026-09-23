@@ -263,9 +263,17 @@ every row, which is exactly the bare-date problem the label exists to prevent.
 
 `IPublicHolidaySource` is resolved optionally. Register one and the Closures view grows a
 **Public holidays** panel; register none and there is **no control, no explanation of one, and the
-two import endpoints refuse** — the same decision the delivery API makes about disabled
-directions, because a control that appears and then explains it cannot work is a control that
-looks live and is not.
+two import endpoints refuse**, because a control that appears and then explains it cannot work is a
+control that looks live and is not.
+
+That is the same *reasoning* the delivery API applies to a disabled direction, but **not the same
+rule, and this is deliberately a weaker claim**. The delivery API guarantees an anonymous caller no
+status, header, body member or timing signal separating "disabled" from "never existed". uBookIt
+does not claim that here: a third endpoint exists precisely to tell the backoffice client which
+case it is in, so that it can render nothing, and it answers in a body member. What makes the
+weaker rule sufficient is who may ask — that endpoint sits behind backoffice authentication and the
+same `UBookIt.Settings` verb as the import, so the only people who can tell the two apart are the
+people who could register a source themselves. Nothing anonymous learns anything either way.
 
 A site without a source starts normally. Nothing is logged, warned about, or reported: the absence
 is a configuration, not a fault.

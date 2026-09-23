@@ -73,6 +73,14 @@ without one, and SHALL NOT fail to start, warn, or log about its absence.
 - **WHEN** an import endpoint is called directly on a site with no registered source
 - **THEN** the request is refused, so the absence is not something only the client observes
 
+#### Scenario: Absence outranks every other answer
+- **WHEN** a malformed request — an inverted window — is made on a site with no registered source
+- **THEN** it is answered as an absent feature rather than as a validation failure, so a refusal never confirms the endpoint is there
+
+#### Scenario: A source that goes away while the screen is open
+- **WHEN** a source is deregistered after a client has been told one exists, and that client then requests a preview
+- **THEN** the client withdraws the import rather than reporting that the source could not be reached, because the site no longer has the feature at all
+
 ### Requirement: Import is operator-triggered and never automatic
 
 The package SHALL import holidays **only** in response to an operator's action. It SHALL NOT
@@ -181,6 +189,14 @@ returns without failing in a way the operator cannot act on.
 #### Scenario: Cancellation reaches the source
 - **WHEN** a preview request is cancelled
 - **THEN** the cancellation is passed to the source
+
+#### Scenario: An inverted window is refused, not answered emptily
+- **WHEN** a preview is requested with a start date after its end date
+- **THEN** the request is refused as an invalid range, the source is not called, and the answer is not an empty holiday list
+
+#### Scenario: A host's exception text does not travel into the response
+- **WHEN** a registered source throws with a message carrying a URI, a credential or any other detail the host composed
+- **THEN** the reported failure names the kind of failure without quoting that message
 
 ### Requirement: Importing is reached by the verb that changes closures
 

@@ -94,3 +94,51 @@ export function previewOutcome(
 
   return rows && rows.length > 0 ? "rows" : "empty";
 }
+
+/**
+ * Whether the import belongs on the screen at all.
+ *
+ * **Two independent conditions, and the absence they produce is indistinguishable.** A user who
+ * may not change closures does not get it because importing is changing them; a site whose
+ * developer registered no source does not get it because the site does not have the feature. In
+ * neither case is anything rendered — no control, and no explanation of one — so an operator is
+ * never shown a thing that would fail when pressed.
+ *
+ * `hasSource` is deliberately `boolean | undefined`: undefined means the question has not been
+ * answered yet, and an unanswered question renders nothing rather than briefly flashing a panel
+ * that may not belong. **It fails closed**, which is the same choice {@link isSelectable} makes
+ * about a state it has never heard of.
+ */
+export function showsImport(canWrite: boolean, hasSource: boolean | undefined): boolean {
+  return canWrite && hasSource === true;
+}
+
+/**
+ * Whether to ask the server if a source is registered.
+ *
+ * Asked once, and only of somebody who could act on the answer — which is also what keeps a
+ * Configure-only session from calling an endpoint it would be refused. `undefined` is the
+ * unanswered state; once answered either way, it is not asked again.
+ */
+export function shouldAskForSource(canWrite: boolean, hasSource: boolean | undefined): boolean {
+  return canWrite && hasSource === undefined;
+}
+
+/**
+ * What a failed preview means, from the status the server answered with.
+ *
+ * **A 404 is not a failure of the source — it is the absence of one.** The server answers 404
+ * when no source is registered, which can happen to a screen that was opened while one still
+ * was: a developer deregistered it, or the site restarted with the composer removed. Reporting
+ * that as "the source could not be reached" would send somebody to debug a feed that is not
+ * there, and would leave a panel on screen for a feature the site no longer has.
+ *
+ * So the two are kept apart at exactly the point the rest of this capability keeps them apart.
+ * `absent` withdraws the panel, as though the probe had said no in the first place; `failed`
+ * says the source was asked and did not answer.
+ */
+export type PreviewFailure = "absent" | "failed";
+
+export function previewFailure(status: number | undefined): PreviewFailure {
+  return status === 404 ? "absent" : "failed";
+}

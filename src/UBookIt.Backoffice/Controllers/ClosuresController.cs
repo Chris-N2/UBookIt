@@ -245,10 +245,15 @@ public class ClosuresController(
             // Overwhelmingly `duplicate-closure-date`: the date was taken between the preview
             // and now. Reported with the store's own code rather than translated, so a client
             // can tell "somebody beat you to it" from "that name will not fit".
+            //
+            // Indexed defensively rather than at [0]: a failed result is contractually required
+            // to carry a reason, but this row is inside a loop that must finish — a batch that
+            // threw here would abandon the rows after it, having already created the rows before
+            // it, which is the one outcome worse than an unhelpful code.
             result.Skipped.Add(new HolidayImportSkippedModel
             {
                 Date = row.Date,
-                Code = created.Failures[0].Code,
+                Code = created.Failures.FirstOrDefault()?.Code ?? FailureCodes.HolidayNotImportable,
             });
         }
 

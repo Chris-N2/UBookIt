@@ -92,16 +92,45 @@ public class HolidayImportTests
         Assert.Equal(HolidayRowState.AlreadyClosed, row.State);
     }
 
+    /// <summary>
+    /// <b>Already closed cannot depend on who closed it, because nothing records who did.</b>
+    /// </summary>
+    /// <remarks>
+    /// <para>
+    /// This was originally written as a comparison — classify a "typed" closure, classify an
+    /// "imported" one, assert the same answer. The two expressions were character-for-character
+    /// identical, because there is no way to build a closure that remembers where it came from,
+    /// which is precisely the property being claimed. A test that stages a comparison between a
+    /// value and itself passes whatever the rule does.
+    /// </para>
+    /// <para>
+    /// So it is asserted STRUCTURALLY instead. The guarantee — "the package SHALL NOT record that
+    /// a closure came from an import" — is a fact about the types, and the reason no behavioural
+    /// test can express it is the same reason it holds: the domain has nowhere to put an origin,
+    /// and the rule is handed dates alone. This fails the day somebody adds the field.
+    /// </para>
+    /// </remarks>
     [Fact]
-    public void Already_closed_does_not_depend_on_who_closed_it()
+    public void Nothing_records_where_a_closure_came_from()
     {
-        // The rule takes DATES, not origins — it cannot tell an imported closure from a typed
-        // one, and nothing about the answer should depend on that.
-        var typed = Classify([Holiday("2027-05-03", "Early May bank holiday")], "2027-05-03");
-        var imported = Classify([Holiday("2027-05-03", "Early May bank holiday")], "2027-05-03");
+        var closureMembers = typeof(SiteClosure)
+            .GetProperties(BindingFlags.Public | BindingFlags.Instance)
+            .Select(property => property.Name)
+            .ToList();
 
-        Assert.Equal(HolidayRowState.AlreadyClosed, Assert.Single(typed).State);
-        Assert.Equal(HolidayRowState.AlreadyClosed, Assert.Single(imported).State);
+        // The whole of it: an id, a date, a label. No origin, no source, no "imported" flag.
+        Assert.Equal(
+            new[] { nameof(SiteClosure.Date), nameof(SiteClosure.Id), nameof(SiteClosure.Label) },
+            closureMembers.OrderBy(name => name, StringComparer.Ordinal));
+
+        // And the classification is handed dates, not closures, so it could not read an origin
+        // even if one existed.
+        var closedDates = typeof(HolidayImport)
+            .GetMethod(nameof(HolidayImport.Classify))!
+            .GetParameters()
+            .Single(parameter => parameter.Name == "closedDates");
+
+        Assert.Equal(typeof(IEnumerable<DateOnly>), closedDates.ParameterType);
     }
 
     [Fact]
@@ -342,6 +371,74 @@ public class HolidayPreviewServiceTests
 
         Assert.False(broken.Succeeded);
         Assert.Equal(FailureCodes.HolidaySourceFailed, Assert.Single(broken.Failures).Code);
+    }
+
+    /// <summary>
+    /// <b>A host's exception text never reaches the reported failure.</b>
+    /// </summary>
+    /// <remarks>
+    /// The source is arbitrary site code reaching an arbitrary place, and the message it throws
+    /// with is the host's, not ours. Such a message routinely carries the URI it was calling —
+    /// query string and all — and can carry a connection string or a credential. The failure
+    /// travels into an HTTP response body, so quoting the message would publish whatever the host
+    /// happened to put in it, to nobody's benefit: the client renders a fixed sentence from the
+    /// stable code and never displays the detail.
+    /// <para>
+    /// The secret here is a fake, and the assertion is that it does not appear. The type name is
+    /// asserted present so this is not satisfied by reporting nothing at all.
+    /// </para>
+    /// </remarks>
+    [Fact]
+    public async Task A_sources_own_exception_text_is_not_carried_into_the_failure()
+    {
+        var leaky = new ThrowingSource(new HttpRequestException(
+            "GET https://holidays.example/api?apiKey=not-a-real-secret-8sf7 failed"));
+
+        var result = await Service(leaky).PreviewAsync(From, To, Ct);
+
+        var message = Assert.Single(result.Failures).Message;
+
+        Assert.DoesNotContain("apiKey", message, StringComparison.OrdinalIgnoreCase);
+        Assert.DoesNotContain("not-a-real-secret-8sf7", message, StringComparison.Ordinal);
+        Assert.DoesNotContain("holidays.example", message, StringComparison.OrdinalIgnoreCase);
+
+        // Not vacuous: something IS reported, and it names the shape of the failure.
+        Assert.Contains(nameof(HttpRequestException), message, StringComparison.Ordinal);
+    }
+
+    /// <summary>
+    /// An inverted window is a malformed request, not an empty answer.
+    /// </summary>
+    /// <remarks>
+    /// Without this it read back as "the source returned no holidays for those dates" — the same
+    /// conflation of "no answer" with "an empty answer" that the empty/failed distinction exists
+    /// to prevent, arriving by a different door.
+    /// </remarks>
+    [Fact]
+    public async Task An_inverted_window_is_refused_rather_than_answered_emptily()
+    {
+        var source = new FakeSource(new PublicHoliday(new DateOnly(2027, 1, 1), "New Year's Day"));
+
+        var result = await Service(source).PreviewAsync(To, From, Ct);
+
+        Assert.False(result.Succeeded);
+        Assert.Equal(FailureCodes.DateRangeInvalid, Assert.Single(result.Failures).Code);
+
+        // And the source was never troubled with a window that could not be answered.
+        Assert.Null(source.WindowReceived);
+    }
+
+    /// <summary>
+    /// <b>Absence outranks validation.</b> A site with no source answers "no such feature" to a
+    /// malformed request too, rather than validating it and thereby confirming the endpoint is
+    /// there. Absence is total, including in what it declines to tell anyone.
+    /// </summary>
+    [Fact]
+    public async Task With_no_source_even_a_malformed_window_reports_absence()
+    {
+        var result = await Service(source: null).PreviewAsync(To, From, Ct);
+
+        Assert.Equal(FailureCodes.HolidaySourceAbsent, Assert.Single(result.Failures).Code);
     }
 
     [Fact]

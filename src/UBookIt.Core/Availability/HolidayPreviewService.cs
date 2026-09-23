@@ -56,6 +56,17 @@ public sealed class HolidayPreviewService(
                 FailureCodes.HolidaySourceAbsent, "This site has no public holiday source.");
         }
 
+        if (to < from)
+        {
+            // An inverted window is a malformed request, not a window with nothing in it. Left
+            // unchecked it reads back as "the source returned no holidays for those dates",
+            // which is the same conflation of "no answer" with "an empty answer" that this
+            // service exists to prevent one layer up. Reported with the code the availability
+            // surface already uses for the same mistake, rather than a new one.
+            return DomainResult<IReadOnlyList<HolidayRow>>.Failure(
+                FailureCodes.DateRangeInvalid, "The from date must not be after the to date.");
+        }
+
         IReadOnlyList<PublicHoliday> holidays;
 
         try
@@ -78,9 +89,18 @@ public sealed class HolidayPreviewService(
             // site code reaching an arbitrary place, and the failure modes are not ours to
             // enumerate. What matters is that it is reported AS a failure rather than as an
             // empty holiday list.
+            //
+            // **The exception's own message is deliberately NOT carried into the result.** It is
+            // arbitrary text from arbitrary site code reaching an arbitrary place, and the things
+            // that end up in such a message — a URI with its query string, a connection string, a
+            // token in a header dump — would then travel into an HTTP response body. The
+            // operator's client renders a fixed sentence from this code and never shows the
+            // detail, so carrying it would expose it to nobody's benefit. The type name is kept
+            // because it names the shape of the failure without quoting anything the host
+            // composed; whoever registered the source has their own logs for the rest.
             return DomainResult<IReadOnlyList<HolidayRow>>.Failure(
                 FailureCodes.HolidaySourceFailed,
-                $"The site's public holiday source failed: {exception.Message}");
+                $"The site's public holiday source failed ({exception.GetType().Name}).");
         }
 
         var closedDates = (await closures.ListAsync(cancellationToken).ConfigureAwait(false))

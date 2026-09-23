@@ -11,7 +11,10 @@ import {
   defaultWindow,
   initialSelection,
   isSelectable,
+  previewFailure,
   previewOutcome,
+  shouldAskForSource,
+  showsImport,
   toggleDate,
 } from "./holiday-fields.js";
 
@@ -113,7 +116,7 @@ export class UBookItClosuresViewElement extends UmbLitElement {
 
         // Asked once, and only of somebody who could use the feature. A site with no source
         // renders no import control at all rather than one that fails when pressed.
-        if (this._canWrite && this._hasHolidaySource === undefined) {
+        if (shouldAskForSource(this._canWrite, this._hasHolidaySource)) {
           void this.#loadHolidaySource();
         }
       });
@@ -242,13 +245,22 @@ export class UBookItClosuresViewElement extends UmbLitElement {
     this._holidayRows = undefined;
 
     try {
-      const { data, error } = await UBookItBackofficeService.previewHolidays({
+      const { data, error, response } = await UBookItBackofficeService.previewHolidays({
         query: { from: this._window.from, to: this._window.to },
       });
 
       if (error || !data) {
         // NOT an empty list. A broken source and a window with no holidays are different
         // facts, and this is the branch that keeps them apart.
+        //
+        // A 404 is a third fact again: the site has no source, which can become true while this
+        // screen is open. That withdraws the panel rather than blaming a feed.
+        if (previewFailure(response?.status) === "absent") {
+          this._hasHolidaySource = false;
+          this._importOpen = false;
+          return;
+        }
+
         this._holidaySourceFailed = true;
         return;
       }
@@ -416,7 +428,7 @@ export class UBookItClosuresViewElement extends UmbLitElement {
    * then apologises is the thing this package spends its guards avoiding.
    */
   #renderHolidayImport() {
-    if (!showsEditingControls(this._canWrite) || this._hasHolidaySource !== true) {
+    if (!showsImport(showsEditingControls(this._canWrite), this._hasHolidaySource)) {
       return nothing;
     }
 
