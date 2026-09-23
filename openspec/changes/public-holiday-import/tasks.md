@@ -46,7 +46,13 @@
 - [x] 6.3 Untick one row, confirm, and verify exactly the ticked closures were created — then verify the unticked date is offered again by a second preview
 - [x] 6.4 Verify an imported closure behaves as any other: rename it, opt a resource out of it, and confirm availability for that date disappears and returns exactly as it does for a hand-typed closure
 - [x] 6.5 Verify the import is absent on a site with no source — by unregistering it in the TestSite composer, restarting, and confirming both the control and the endpoints are gone
-- [ ] 6.6 Verify the verb split live against a Configure-only user: the closure list is readable, the preview and import are refused
+- [x] 6.6 Verify the verb split live against a Configure-only user: the closure list is readable, the preview and import are refused
+      *Observed by the site owner, signed in as a user whose only uBookIt grant is `UBookIt.Configure` (the `Perm Test` group, set to Configure alone with `See bookings` off), and evidenced by screenshot:*
+      - *All ten closures render with their dates and names — `Configure` reads the list.*
+      - *The Actions column is absent entirely and `Show past closures` is the only control: no add, no edit, no delete.*
+      - *The read-only state is explained, naming the grant and where to give it: "You do not have permission to change closures. An administrator can grant it in Users → User Groups → Default permissions, by ticking 'Change site settings'. It is not granted automatically, including on upgrade."*
+      - ***No import control and no second explanation** — that one sentence covers importing too, because importing is a way of changing closures. This is the scenario "The verb explanation covers the import without naming the source", observed rather than inferred.*
+      - *Gated twice in the client: the source probe is only requested when the user may write (`closures-view.element.ts:116`), so a Configure-only session never asks whether a source exists at all, and the panel separately requires the probe to have answered true (`:419`).*
 
 ## 7. Documentation
 
