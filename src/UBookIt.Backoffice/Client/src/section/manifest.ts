@@ -122,6 +122,37 @@ export const manifests: Array<UmbExtensionManifest> = [
   },
   {
     type: "sectionView",
+    alias: "UBookIt.SectionView.Closures",
+    name: "uBookIt Closures Section View",
+    js: () => import("./closures-view.element.js"),
+    // Below the two configuration views and the bookings list: closures are edited rarely,
+    // and by fewer people than any of those.
+    weight: 70,
+    meta: {
+      label: "#ubookitClosures_label",
+      pathname: "closures",
+      icon: "icon-calendar",
+    },
+    conditions: [
+      {
+        alias: "Umb.Condition.SectionAlias",
+        match: "UBookIt.Section",
+      },
+      {
+        // Configure OR Settings — the same any-of the server's ClosuresRead policy takes.
+        // NOT an implication between the two: each reaches this read on its own account.
+        //
+        // Gated, unlike the settings view, and for the reason that view is not: Configure IS
+        // seeded, so this tab appears on an upgraded site for the people who edit resources,
+        // rather than vanishing until somebody grants a verb nobody has yet. A user who can
+        // see it but not write is told so by the view itself.
+        alias: UBOOKIT_VERB_CONDITION_ALIAS,
+        oneOf: [CONFIGURE_VERB, SETTINGS_VERB],
+      },
+    ],
+  },
+  {
+    type: "sectionView",
     alias: "UBookIt.SectionView.Bookings",
     name: "uBookIt Bookings Section View",
     js: () => import("./bookings-view.element.js"),

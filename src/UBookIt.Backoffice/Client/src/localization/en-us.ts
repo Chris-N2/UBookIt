@@ -25,6 +25,22 @@ export default {
     capabilityNone: "This resource has no capabilities.",
     capabilityHint: "Lower-case, hyphenated, e.g. cert-x. Choose one already in use, or enter a new one.",
 
+    // ---------------------------------------------------------- site closures
+    //
+    // What the editor of ONE resource sees of a SITE-WIDE decision. The wording says
+    // where the dates come from, because an editor who cannot reach the Closures view
+    // would otherwise meet dates they did not enter with no way to tell why.
+    globalClosures: "Global closures",
+    globalClosuresIntro:
+      "Dates the whole organisation is closed, set in the Closures view. They close this resource too, on top of its own opening hours and exceptions. Override one below to stay open on that date.",
+    closureOpenAnyway: "Open anyway",
+
+    // Stated only where the outcome actually differs — on an exception that would
+    // otherwise change the day. An exception that is itself a closure closes the date
+    // either way, and calling that superseded would report a difference that is not there.
+    exceptionSuperseded:
+      "A global closure covers this date, so this exception has no effect at the moment. Tick “Open anyway” for that date in Global closures to use it.",
+
     // ---------------------------------------------------------- direct booking
     //
     // The control must not read as "can this be booked at all". A resource that
@@ -613,6 +629,44 @@ export default {
     selfServiceCancellationEnabledLabel: "Let bookers cancel their own bookings",
     selfServiceCancellationEnabledDescription:
       "Whether the message sent to a booker carries a link that cancels their booking. Changed in configuration only — like the delivery API, it opens a public route, so it is decided as the application starts. The link is single use and stops working when the booking starts.",
+  },
+  ubookitClosures: {
+    label: "Closures",
+    intro:
+      "Dates the whole organisation is closed. Every resource is closed on these dates. A resource can override a closure in its own editor and stay open.",
+
+    // Unconditional, and it reads nothing. True of every site whatever its data, which is
+    // what lets it be stated beside the action rather than computed — a count rendered
+    // here would be stale by the time somebody read it.
+    bookingsUnaffected:
+      "Closures change what can be booked from now on. Bookings already placed on a date you close keep their times and are not cancelled.",
+
+    // TWO conditions, two messages. One term served both, so a reader who could not see the
+    // list at all was told they could not CHANGE it — an answer to a question they had not
+    // asked, on a branch that is unreachable anyway because the section view is gated.
+    notPermittedWrite:
+      "You do not have permission to change closures. An administrator can grant it in Users → User Groups → Default permissions, by ticking “Change site settings”. It is not granted automatically, including on upgrade.",
+    notPermittedRead:
+      "You do not have permission to see the site's closures. An administrator can grant it in Users → User Groups → Default permissions, by ticking “Configure resources and services” or “Change site settings”.",
+    loadFailed: "The closures could not be loaded.",
+    saveFailed: "That closure could not be saved.",
+    deleteFailed: "That closure could not be deleted.",
+    empty: "No closures yet.",
+    emptyPast: "No past closures.",
+    add: "Add closure",
+    edit: "Edit",
+    delete: "Delete",
+    save: "Save",
+    cancel: "Cancel",
+    date: "Date",
+    labelField: "Name",
+    labelHint: "What this date is — for example Christmas Day, or Stocktake.",
+    showPast: "Show past closures",
+    hidePast: "Hide past closures",
+    dateRequired: "Each closure needs a date before saving.",
+    columnDate: "Date",
+    columnLabel: "Name",
+    columnActions: "Actions",
   },
   ubookitResponsibility: {
     headline: "Responsibility",

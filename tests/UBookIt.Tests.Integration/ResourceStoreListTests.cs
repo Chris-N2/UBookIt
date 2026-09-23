@@ -28,7 +28,7 @@ public class ResourceStoreListTests(SqlServerFixture fixture)
         };
 
         await using var context = fixture.CreateContext();
-        var store = new SqlResourceStore(context);
+        var store = new SqlResourceStore(context, new SqlSiteClosureStore(context));
 
         var all = await store.ListAsync(skip: 0, take: 500, Ct);
         Assert.True(all.Total >= seeded.Length);

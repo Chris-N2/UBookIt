@@ -241,7 +241,7 @@ public class ResponsibilityStoreTests(SqlServerFixture fixture)
 
         await using (var context = fixture.CreateContext())
         {
-            Assert.True((await new SqlResourceManagementStore(context).DeleteAsync(resourceId, Ct)).Succeeded);
+            Assert.True((await new SqlResourceManagementStore(context, new SqlSiteClosureStore(context)).DeleteAsync(resourceId, Ct)).Succeeded);
         }
 
         await using var read = fixture.CreateContext();

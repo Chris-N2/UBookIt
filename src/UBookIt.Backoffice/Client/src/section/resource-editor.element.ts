@@ -1,8 +1,19 @@
 import { css, html, customElement, property, state, nothing } from "@umbraco-cms/backoffice/external/lit";
 import { UmbLitElement } from "@umbraco-cms/backoffice/lit-element";
 import { UBookItBackofficeService } from "../api/index.js";
-import type { CapabilityUsageModel, DayOfWeek, ResourceRequestModel } from "../api/index.js";
+import type {
+  CapabilityUsageModel,
+  DayOfWeek,
+  ResourceClosureModel,
+  ResourceRequestModel,
+} from "../api/index.js";
 import { toApiErrors, type ApiError } from "./api-errors.js";
+import {
+  exceptionDescribedByIds,
+  isSuperseded,
+  optOutIds,
+  supersededId,
+} from "./closure-fields.js";
 import "./capability-input.element.js";
 import "./responsibility-editor.element.js";
 import type { UBookItResponsibilityEditorElement } from "./responsibility-editor.element.js";
@@ -16,6 +27,14 @@ interface ExceptionForm {
   date: string;
   closed: boolean;
   windows: WindowForm[];
+
+  /**
+   * Whether a site closure currently overrides this exception, as reported by the
+   * SERVER. Never derived here: precedence has one implementation, in the domain, and a
+   * second one in the client would be free to disagree with the availability a visitor
+   * is actually offered.
+   */
+  superseded: boolean;
 }
 
 const DAY_ORDER: DayOfWeek[] = [
@@ -98,6 +117,14 @@ export class UBookItResourceEditorElement extends UmbLitElement {
   @state()
   private _exceptions: ExceptionForm[] = [];
 
+  /**
+   * Every site closure, with whether this resource is exempt from it. Read-only apart
+   * from the exemption: the dates and labels belong to the site and are edited in the
+   * Closures view, behind a different grant.
+   */
+  @state()
+  private _closures: ResourceClosureModel[] = [];
+
   @state()
   private _constraints = {
     granularityMinutes: 15,
@@ -159,7 +186,9 @@ export class UBookItResourceEditorElement extends UmbLitElement {
       date: exception.date,
       closed: exception.windows.length === 0,
       windows: exception.windows.map((w) => ({ start: toInputTime(w.start), end: toInputTime(w.end) })),
+      superseded: isSuperseded(exception),
     }));
+    this._closures = [...data.closures];
     this._constraints = { ...data.constraints };
     this._capabilities = [...data.capabilities];
     this._directlyBookable = data.directlyBookable;
@@ -195,6 +224,9 @@ export class UBookItResourceEditorElement extends UmbLitElement {
         date: exception.date,
         windows: exception.closed ? [] : exception.windows.map((w) => ({ start: w.start, end: w.end })),
       })),
+      // Full replacement, like the capabilities above: an exemption left out is an
+      // exemption withdrawn.
+      closureOptOuts: optOutIds(this._closures),
       constraints: { ...this._constraints },
     };
   }
@@ -283,7 +315,8 @@ export class UBookItResourceEditorElement extends UmbLitElement {
 
       <form @submit=${this.#save} novalidate>
         ${this.#renderDetails()} ${this.#renderCapabilities()} ${this.#renderResponsibility()}
-        ${this.#renderOpeningHours()} ${this.#renderExceptions()} ${this.#renderConstraints()}
+        ${this.#renderOpeningHours()} ${this.#renderExceptions()} ${this.#renderGlobalClosures()}
+        ${this.#renderConstraints()}
 
         <div class="actions">
           <uui-button
@@ -496,6 +529,54 @@ export class UBookItResourceEditorElement extends UmbLitElement {
     this._exceptions = exceptions;
   }
 
+  #mutateClosures(mutate: (closures: ResourceClosureModel[]) => void) {
+    const closures = this._closures.map((closure) => ({ ...closure }));
+    mutate(closures);
+    this._closures = closures;
+  }
+
+  /**
+   * Site closures this resource inherits, each with a control exempting it.
+   *
+   * Read-only except for the exemption: the dates and labels are the site's, edited in
+   * the Closures view behind the settings grant, and shown here so that somebody who
+   * cannot reach that view can still see what is closing their resource — and say that
+   * this one is open anyway.
+   *
+   * Absent entirely when the site has no closures, rather than rendered empty: a group
+   * whose only content is "none" is noise in an editor that already has five.
+   */
+  #renderGlobalClosures() {
+    if (this._closures.length === 0) {
+      return nothing;
+    }
+
+    return html`
+      <uui-box headline=${this.#term("globalClosures")}>
+        <p class="group-intro">${this.#term("globalClosuresIntro")}</p>
+        <ul class="closures">
+          ${this._closures.map(
+            // The toggle's `label` is BOTH its accessible name and its visible text — measured
+            // in the running backoffice, where rendering the date and label beside it as well
+            // showed each closure three times on one row.
+            (closure, index) => html`
+              <li>
+                <uui-toggle
+                  label="${this.#term("closureOpenAnyway")}: ${closure.date} ${closure.label}"
+                  ?checked=${closure.excluded}
+                  @change=${(e: Event) =>
+                    this.#mutateClosures(
+                      (list) => (list[index].excluded = (e.target as HTMLInputElement).checked),
+                    )}
+                ></uui-toggle>
+              </li>
+            `,
+          )}
+        </ul>
+      </uui-box>
+    `;
+  }
+
   #renderExceptions() {
     // Window-shape failures can originate from exception overrides as well as
     // weekly hours, so both groups claim the window codes.
@@ -512,8 +593,19 @@ export class UBookItResourceEditorElement extends UmbLitElement {
         ${this.#renderGroupErrors("err-exceptions", ...exceptionCodes)}
         ${this._exceptions.map(
           (exception, index) => html`
-            <fieldset class="exception" aria-describedby=${hasErrors ? "err-exceptions" : nothing}>
+            <fieldset
+              class="exception"
+              aria-describedby=${exceptionDescribedByIds(index, {
+                hasGroupErrors: hasErrors,
+                superseded: exception.superseded,
+              }).join(" ") || nothing}
+            >
               <legend>${this.#term("exception")} ${index + 1}</legend>
+              ${exception.superseded
+                ? html`<p id=${supersededId(index)} class="superseded">
+                    ${this.#term("exceptionSuperseded")}
+                  </p>`
+                : nothing}
               <div class="window-row">
                 <label for="ex-${index}-date">${this.#term("date")}</label>
                 <input
@@ -565,7 +657,11 @@ export class UBookItResourceEditorElement extends UmbLitElement {
           look="secondary"
           label=${this.#term("addException")}
           @click=${() =>
-            this.#mutateExceptions((list) => list.push({ date: "", closed: true, windows: [] }))}
+            this.#mutateExceptions((list) =>
+              // A new exception is never superseded: the flag is the SERVER's answer about a
+              // stored date, and this one has not been saved, or even given a date yet.
+              list.push({ date: "", closed: true, windows: [], superseded: false }),
+            )}
         ></uui-button>
       </uui-box>
     `;
@@ -643,6 +739,31 @@ export class UBookItResourceEditorElement extends UmbLitElement {
       display: flex;
       gap: var(--uui-size-space-3);
       margin-top: var(--uui-size-space-5);
+    }
+    .group-intro {
+      margin: 0 0 var(--uui-size-space-3);
+    }
+    .closures {
+      list-style: none;
+      margin: 0;
+      padding: 0;
+    }
+    .closures li {
+      align-items: center;
+      display: flex;
+      gap: var(--uui-size-space-3);
+      margin-bottom: var(--uui-size-space-2);
+    }
+    /*
+     * The statement that an exception is superseded. Deliberately NOT coloured as an
+     * error: nothing is wrong, and the exception becomes live again the moment the
+     * closure above it is opted out of. It carries no colour of its own at all, so it
+     * inherits whatever the backoffice sets and cannot fail contrast on a theme this
+     * package has never seen.
+     */
+    .superseded {
+      font-style: italic;
+      margin: var(--uui-size-space-2) var(--uui-size-space-3);
     }
   `;
 }

@@ -114,7 +114,7 @@ public class ServiceBookingStoreTests(SqlServerFixture fixture)
         var other = await Seed.EveryDayRoomAsync(fixture, Ct);
 
         await using var context = fixture.CreateContext();
-        var store = new SqlResourceStore(context);
+        var store = new SqlResourceStore(context, new SqlSiteClosureStore(context));
 
         var listed = await store.ListByTypeAsync(type, Ct);
 
@@ -144,7 +144,7 @@ public class ServiceBookingStoreTests(SqlServerFixture fixture)
         }
 
         await using var context = fixture.CreateContext();
-        var listed = await new SqlResourceStore(context).ListByTypeAsync(type, Ct);
+        var listed = await new SqlResourceStore(context, new SqlSiteClosureStore(context)).ListByTypeAsync(type, Ct);
 
         Assert.Equal(seeded.Count, listed.Count);
     }
@@ -211,7 +211,7 @@ public class ServiceBookingStoreTests(SqlServerFixture fixture)
     {
         var settings = new SiteBookingSettings { TimeZoneId = "UTC" };
         var time = new FixedTimeProvider(nowUtc.AddDays(-1));
-        var resources = new SqlResourceStore(context);
+        var resources = new SqlResourceStore(context, new SqlSiteClosureStore(context));
         var bookings = new SqlBookingStore(context);
 
         return new ServiceBookingService(

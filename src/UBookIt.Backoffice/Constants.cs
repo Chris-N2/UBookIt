@@ -81,6 +81,20 @@ namespace UBookIt.Backoffice
             public const string Configure = "UBookItConfigure";
 
             public const string Settings = "UBookItSettings";
+
+            /// <summary>
+            /// Reading the site closure list, satisfied by <see cref="Verbs.Configure"/> OR
+            /// <see cref="Verbs.Settings"/>.
+            /// </summary>
+            /// <remarks>
+            /// <b>Not an implication between the two verbs.</b> Each reaches this read on its own
+            /// account and acquires nothing else the other holds: an operator editing a resource
+            /// must see what it is inheriting in order to exempt it, and whoever decides the
+            /// site's closures must be able to see them. <b>Changing</b> the list stays on
+            /// <see cref="Settings"/> alone — one entry shuts every resource the site has,
+            /// including those created after it.
+            /// </remarks>
+            public const string ClosuresRead = "UBookItClosuresRead";
         }
     }
 }

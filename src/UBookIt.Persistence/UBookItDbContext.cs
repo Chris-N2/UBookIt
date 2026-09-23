@@ -1,4 +1,5 @@
 using Microsoft.EntityFrameworkCore;
+using UBookIt.Core.Availability;
 using UBookIt.Core.Bookings;
 using UBookIt.Persistence.Entities;
 
@@ -39,6 +40,10 @@ public sealed class UBookItDbContext(DbContextOptions<UBookItDbContext> options)
 
     internal DbSet<CancellationSecretRow> CancellationSecrets => Set<CancellationSecretRow>();
 
+    internal DbSet<SiteClosureRow> SiteClosures => Set<SiteClosureRow>();
+
+    internal DbSet<ResourceClosureOptOutRow> ResourceClosureOptOuts => Set<ResourceClosureOptOutRow>();
+
     /// <summary>
     /// Single place that configures the SQL Server provider (uBookIt requires
     /// SQL Server 2019+) with the package-private migrations history table.
@@ -58,6 +63,8 @@ public sealed class UBookItDbContext(DbContextOptions<UBookItDbContext> options)
             resource.Property(r => r.DisplayName).HasMaxLength(512);
             resource.HasMany(r => r.OpenHours).WithOne().HasForeignKey(w => w.ResourceId).OnDelete(DeleteBehavior.Cascade);
             resource.HasMany(r => r.Exceptions).WithOne().HasForeignKey(e => e.ResourceId).OnDelete(DeleteBehavior.Cascade);
+            resource.HasMany(r => r.ClosureOptOuts).WithOne()
+                .HasForeignKey(o => o.ResourceId).OnDelete(DeleteBehavior.Cascade);
             resource.HasMany(r => r.Capabilities).WithOne().HasForeignKey(c => c.ResourceId).OnDelete(DeleteBehavior.Cascade);
         });
 
@@ -253,6 +260,40 @@ public sealed class UBookItDbContext(DbContextOptions<UBookItDbContext> options)
             // Finding the outstanding secrets for a booking, which is what issuing a replacement
             // and tidying after a cancellation both need.
             secret.HasIndex(s => s.BookingId);
+        });
+
+        modelBuilder.Entity<SiteClosureRow>(closure =>
+        {
+            closure.ToTable("uBookItSiteClosure");
+            closure.HasKey(c => c.Id);
+            closure.Property(c => c.Id).ValueGeneratedNever();
+
+            // Held on the domain type so the column and the validation cannot drift apart —
+            // the arrangement BookingReference.Length already has with the reference column.
+            closure.Property(c => c.Label).HasMaxLength(SiteClosure.MaxLabelLength);
+
+            // UNIQUE, so "at most one closure per date" is enforced by the schema. A check
+            // before writing is a race, and two closures on one date can only repeat or
+            // contradict each other.
+            closure.HasIndex(c => c.Date).IsUnique();
+
+            // Deleting a closure takes its exemptions with it: an exemption cannot outlive the
+            // thing it exempts from.
+            closure.HasMany(c => c.OptOuts).WithOne()
+                .HasForeignKey(o => o.ClosureId).OnDelete(DeleteBehavior.Cascade);
+        });
+
+        modelBuilder.Entity<ResourceClosureOptOutRow>(optOut =>
+        {
+            optOut.ToTable("uBookItResourceClosureOptOut");
+
+            // The pair IS the primary key, so a duplicate exemption is impossible in storage
+            // and not only in the domain — the same shape the capability tables use.
+            optOut.HasKey(o => new { o.ResourceId, o.ClosureId });
+
+            // Hydration reads every opt-out for a batch of resources in one query; this is the
+            // index that read seeks on.
+            optOut.HasIndex(o => o.ResourceId);
         });
     }
 }

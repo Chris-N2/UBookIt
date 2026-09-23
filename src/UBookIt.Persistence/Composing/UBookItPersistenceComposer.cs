@@ -73,6 +73,11 @@ public sealed class UBookItPersistenceComposer : IComposer
                 serviceProvider.GetRequiredService<IConfiguration>(),
                 serviceProvider.GetRequiredService<ISettingsStore>())));
 
+        // Registered before the resource stores read it: both hydrate the closures that
+        // apply to a resource, so a resource handed to any availability computation
+        // already carries them.
+        builder.Services.AddScoped<ISiteClosureStore, SqlSiteClosureStore>();
+        builder.Services.AddScoped<ISiteClosureManagementStore, SqlSiteClosureManagementStore>();
         builder.Services.AddScoped<IResourceStore, SqlResourceStore>();
         builder.Services.AddScoped<IResourceManagementStore, SqlResourceManagementStore>();
         builder.Services.AddScoped<IServiceStore, SqlServiceStore>();

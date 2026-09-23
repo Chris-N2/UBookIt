@@ -67,6 +67,13 @@ public sealed class UBookItAuthorizationComposer : IComposer
             // services or bookings. See Constants.Verbs.Settings for why.
             AddVerbPolicy(options, Constants.VerbPolicies.Settings,
                 Constants.Verbs.Settings);
+
+            // Reading the closure list, satisfied by EITHER verb — and, like the bookings
+            // pair, that any-of lives here rather than as verbs copied onto groups. It is
+            // not an implication: neither verb acquires anything else the other holds, and
+            // WRITING closures names the settings policy above, not this one.
+            AddVerbPolicy(options, Constants.VerbPolicies.ClosuresRead,
+                Constants.Verbs.Configure, Constants.Verbs.Settings);
         });
     }
 

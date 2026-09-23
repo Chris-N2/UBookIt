@@ -3,6 +3,7 @@ using UBookIt.Core;
 using UBookIt.Core.Bookings;
 using UBookIt.Core.Common;
 using UBookIt.Core.Stores;
+using UBookIt.Persistence;
 using UBookIt.Persistence.Entities;
 using UBookIt.Persistence.Stores;
 using UBookIt.Tests.Integration.Support;
@@ -284,12 +285,19 @@ public class MoveStorageTests(SqlServerFixture fixture)
             => inner.GetBookingIdsDueForErasureAsync(cutoffUtc, take, cancellationToken);
     }
 
+    /// <summary>
+    /// The real resource store with its real closure store, over one context — so this
+    /// test exercises the same hydration production does, closures included.
+    /// </summary>
+    private static SqlResourceStore ResourceStoreOver(UBookItDbContext context)
+        => new(context, new SqlSiteClosureStore(context));
+
     /// <summary>The real service over the real SQL stores, with the hook installed on the booking store.</summary>
     private BookingService ServiceWith(Func<Task> beforeMove)
     {
         var settings = new SiteBookingSettings { TimeZoneId = "UTC" };
         return new BookingService(
-            new SqlResourceStore(fixture.CreateContext()),
+            ResourceStoreOver(fixture.CreateContext()),
             new Interposing(new SqlBookingStore(fixture.CreateContext()), beforeMove),
             new FixedTimeProvider(Now),
             settings);

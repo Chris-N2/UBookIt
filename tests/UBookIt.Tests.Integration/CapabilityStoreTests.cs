@@ -41,12 +41,12 @@ public class CapabilityStoreTests(SqlServerFixture fixture)
 
         await using (var context = fixture.CreateContext())
         {
-            Assert.True((await new SqlResourceManagementStore(context).CreateAsync(resource, Ct)).Succeeded);
+            Assert.True((await new SqlResourceManagementStore(context, new SqlSiteClosureStore(context)).CreateAsync(resource, Ct)).Succeeded);
         }
 
         await using (var context = fixture.CreateContext())
         {
-            var reloaded = await new SqlResourceStore(context).GetAsync(resource.Id, Ct);
+            var reloaded = await new SqlResourceStore(context, new SqlSiteClosureStore(context)).GetAsync(resource.Id, Ct);
 
             Assert.NotNull(reloaded);
             Assert.Equal(resource.Capabilities, reloaded.Capabilities);
@@ -62,12 +62,12 @@ public class CapabilityStoreTests(SqlServerFixture fixture)
 
         await using (var context = fixture.CreateContext())
         {
-            Assert.True((await new SqlResourceManagementStore(context).CreateAsync(resource, Ct)).Succeeded);
+            Assert.True((await new SqlResourceManagementStore(context, new SqlSiteClosureStore(context)).CreateAsync(resource, Ct)).Succeeded);
         }
 
         await using (var context = fixture.CreateContext())
         {
-            var reloaded = await new SqlResourceStore(context).GetAsync(resource.Id, Ct);
+            var reloaded = await new SqlResourceStore(context, new SqlSiteClosureStore(context)).GetAsync(resource.Id, Ct);
 
             Assert.NotNull(reloaded);
             Assert.True(reloaded.Capabilities.IsEmpty);
@@ -87,12 +87,12 @@ public class CapabilityStoreTests(SqlServerFixture fixture)
 
         await using (var context = fixture.CreateContext())
         {
-            Assert.True((await new SqlResourceManagementStore(context).CreateAsync(resource, Ct)).Succeeded);
+            Assert.True((await new SqlResourceManagementStore(context, new SqlSiteClosureStore(context)).CreateAsync(resource, Ct)).Succeeded);
         }
 
         await using (var context = fixture.CreateContext())
         {
-            var listed = await new SqlResourceStore(context).ListByTypeAsync(type, Ct);
+            var listed = await new SqlResourceStore(context, new SqlSiteClosureStore(context)).ListByTypeAsync(type, Ct);
 
             Assert.Equal(["cert-x"], Assert.Single(listed).Capabilities.Keys);
         }
@@ -121,18 +121,18 @@ public class CapabilityStoreTests(SqlServerFixture fixture)
 
         await using (var context = fixture.CreateContext())
         {
-            Assert.True((await new SqlResourceManagementStore(context).CreateAsync(resource, Ct)).Succeeded);
+            Assert.True((await new SqlResourceManagementStore(context, new SqlSiteClosureStore(context)).CreateAsync(resource, Ct)).Succeeded);
         }
 
         await using (var context = fixture.CreateContext())
         {
             // The read port's paged list — behind the anonymous GET /resources.
-            var readPage = await new SqlResourceStore(context).ListAsync(0, 500, Ct);
+            var readPage = await new SqlResourceStore(context, new SqlSiteClosureStore(context)).ListAsync(0, 500, Ct);
             var fromRead = readPage.Items.Single(r => r.Id == resource.Id);
             Assert.Equal(resource.Capabilities, fromRead.Capabilities);
 
             // The management port's paged list — behind the backoffice grid.
-            var managementPage = await new SqlResourceManagementStore(context).ListAsync(0, 500, Ct);
+            var managementPage = await new SqlResourceManagementStore(context, new SqlSiteClosureStore(context)).ListAsync(0, 500, Ct);
             var fromManagement = managementPage.Items.Single(r => r.Id == resource.Id);
             Assert.Equal(resource.Capabilities, fromManagement.Capabilities);
         }
@@ -176,7 +176,7 @@ public class CapabilityStoreTests(SqlServerFixture fixture)
 
         await using (var context = fixture.CreateContext())
         {
-            Assert.True((await new SqlResourceManagementStore(context).CreateAsync(original, Ct)).Succeeded);
+            Assert.True((await new SqlResourceManagementStore(context, new SqlSiteClosureStore(context)).CreateAsync(original, Ct)).Succeeded);
         }
 
         var replacement = Resource.Create(
@@ -184,12 +184,12 @@ public class CapabilityStoreTests(SqlServerFixture fixture)
 
         await using (var context = fixture.CreateContext())
         {
-            Assert.True((await new SqlResourceManagementStore(context).UpdateAsync(replacement, Ct)).Succeeded);
+            Assert.True((await new SqlResourceManagementStore(context, new SqlSiteClosureStore(context)).UpdateAsync(replacement, Ct)).Succeeded);
         }
 
         await using (var context = fixture.CreateContext())
         {
-            var reloaded = await new SqlResourceStore(context).GetAsync(original.Id, Ct);
+            var reloaded = await new SqlResourceStore(context, new SqlSiteClosureStore(context)).GetAsync(original.Id, Ct);
 
             Assert.NotNull(reloaded);
             Assert.Equal(["massage"], reloaded.Capabilities.Keys);
@@ -205,12 +205,12 @@ public class CapabilityStoreTests(SqlServerFixture fixture)
 
         await using (var context = fixture.CreateContext())
         {
-            Assert.True((await new SqlResourceManagementStore(context).CreateAsync(resource, Ct)).Succeeded);
+            Assert.True((await new SqlResourceManagementStore(context, new SqlSiteClosureStore(context)).CreateAsync(resource, Ct)).Succeeded);
         }
 
         await using (var context = fixture.CreateContext())
         {
-            Assert.True((await new SqlResourceManagementStore(context).DeleteAsync(resource.Id, Ct)).Succeeded);
+            Assert.True((await new SqlResourceManagementStore(context, new SqlSiteClosureStore(context)).DeleteAsync(resource.Id, Ct)).Succeeded);
         }
 
         await using (var context = fixture.CreateContext())
@@ -235,7 +235,7 @@ public class CapabilityStoreTests(SqlServerFixture fixture)
 
         await using (var context = fixture.CreateContext())
         {
-            Assert.True((await new SqlResourceManagementStore(context).CreateAsync(resource, Ct)).Succeeded);
+            Assert.True((await new SqlResourceManagementStore(context, new SqlSiteClosureStore(context)).CreateAsync(resource, Ct)).Succeeded);
         }
 
         await using (var context = fixture.CreateContext())
@@ -316,14 +316,14 @@ public class CapabilityStoreTests(SqlServerFixture fixture)
 
         await using (var context = fixture.CreateContext())
         {
-            var store = new SqlResourceManagementStore(context);
+            var store = new SqlResourceManagementStore(context, new SqlSiteClosureStore(context));
             Assert.True((await store.CreateAsync(Person($"One {suffix}", alpha, beta), Ct)).Succeeded);
             Assert.True((await store.CreateAsync(Person($"Two {suffix}", alpha), Ct)).Succeeded);
         }
 
         await using (var context = fixture.CreateContext())
         {
-            var usage = await new SqlResourceManagementStore(context).ListCapabilitiesAsync(Ct);
+            var usage = await new SqlResourceManagementStore(context, new SqlSiteClosureStore(context)).ListCapabilitiesAsync(Ct);
             var mine = usage.Where(u => u.Key.EndsWith(suffix, StringComparison.Ordinal)).ToList();
 
             Assert.Collection(

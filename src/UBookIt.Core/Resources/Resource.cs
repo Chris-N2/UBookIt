@@ -17,6 +17,8 @@ public static class ResourceTypes
 /// </summary>
 public sealed class Resource
 {
+    private static readonly IReadOnlySet<Guid> EmptyOptOuts = new HashSet<Guid>();
+
     private Resource(
         Guid id,
         string type,
@@ -24,7 +26,8 @@ public sealed class Resource
         string? description,
         CapabilitySet capabilities,
         AvailabilityConfiguration availability,
-        bool directlyBookable)
+        bool directlyBookable,
+        IReadOnlySet<Guid> closureOptOuts)
     {
         Id = id;
         Type = type;
@@ -33,6 +36,7 @@ public sealed class Resource
         Capabilities = capabilities;
         Availability = availability;
         DirectlyBookable = directlyBookable;
+        ClosureOptOuts = closureOptOuts;
     }
 
     public Guid Id { get; }
@@ -51,6 +55,24 @@ public sealed class Resource
     public CapabilitySet Capabilities { get; }
 
     public AvailabilityConfiguration Availability { get; }
+
+    /// <summary>
+    /// The site closures this resource is exempt from, by closure id. Empty means
+    /// it inherits every closure the site has.
+    /// </summary>
+    /// <remarks>
+    /// <b>Resource-owned state, unlike <see cref="AvailabilityConfiguration.Closures"/>.</b>
+    /// This is written by the resource's own save, exactly as its capabilities are;
+    /// the closures on <see cref="Availability"/> are the site's, resolved against
+    /// this set when the resource is read and never written back. The two have
+    /// different lifetimes, which is why they are held in different places.
+    /// <para>
+    /// Keyed by closure id rather than by date so that editing a closure's date
+    /// carries the exemption with it, and so that a date deleted and later
+    /// recreated does not silently reinstate an exemption nobody re-considered.
+    /// </para>
+    /// </remarks>
+    public IReadOnlySet<Guid> ClosureOptOuts { get; }
 
     /// <summary>
     /// Whether this resource may be booked <em>on its own</em>. False by default:
@@ -91,7 +113,8 @@ public sealed class Resource
         IEnumerable<string?>? capabilities = null,
         AvailabilityConfiguration? availability = null,
         bool directlyBookable = false,
-        Guid? id = null)
+        Guid? id = null,
+        IEnumerable<Guid>? closureOptOuts = null)
     {
         var failures = new List<DomainFailure>();
 
@@ -138,6 +161,13 @@ public sealed class Resource
                 // Defaulted to withheld, and never validated: neither answer makes
                 // a resource invalid, so there is no branch above that can reject
                 // one. A caller that says nothing is saying no.
-                directlyBookable));
+                directlyBookable,
+                // Not validated against the closures that exist, deliberately: this
+                // type has no way to read them, and an opt-out naming no closure is
+                // rejected where the closures ARE readable — at the management
+                // surface, with the `closure-not-found` code. Validating here would
+                // mean either a store dependency in the domain or a rule that only
+                // appears to be enforced.
+                closureOptOuts is null ? EmptyOptOuts : closureOptOuts.ToHashSet()));
     }
 }

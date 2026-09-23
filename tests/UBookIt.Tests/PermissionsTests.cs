@@ -87,6 +87,18 @@ public class PermissionsTests
         ["ResponsibilityController.GetServiceResponsibility"] = Constants.VerbPolicies.Configure,
         ["ResponsibilityController.PutResourceResponsibility"] = Constants.VerbPolicies.Configure,
         ["ResponsibilityController.PutServiceResponsibility"] = Constants.VerbPolicies.Configure,
+
+        // Site closures split across two verbs, and the split is the decision (site-wide-closures
+        // change). READING names a policy satisfied by Configure OR Settings: an operator editing
+        // a resource must see what it is inheriting in order to exempt it, and cannot do either
+        // without reading the list. WRITING names the settings verb alone — one entry shuts every
+        // resource the site has, including those created after it, and a grant meaning "may add a
+        // meeting room" does not carry that. Exempting one resource is a resource write and sits
+        // on ResourcesController.UpdateResource above, under Configure, where it belongs.
+        ["ClosuresController.ListClosures"] = Constants.VerbPolicies.ClosuresRead,
+        ["ClosuresController.CreateClosure"] = Constants.VerbPolicies.Settings,
+        ["ClosuresController.UpdateClosure"] = Constants.VerbPolicies.Settings,
+        ["ClosuresController.DeleteClosure"] = Constants.VerbPolicies.Settings,
     };
 
     /// <summary>
@@ -268,6 +280,34 @@ public class PermissionsTests
         Assert.False(await AuthorizeAsync(user, Constants.VerbPolicies.Configure));
         Assert.False(await AuthorizeAsync(user, Constants.VerbPolicies.BookingsRead));
         Assert.False(await AuthorizeAsync(user, Constants.VerbPolicies.BookingsManage));
+    }
+
+    [Fact]
+    public async Task Either_configuring_verb_reaches_the_closure_list()
+    {
+        // THROUGH THE REAL POLICY, not by reading an [Authorize] attribute. Registering
+        // ClosuresRead with Settings alone would leave every attribute assertion green while a
+        // Configure-only operator lost the list their own resource editor depends on — which is
+        // what the attribute-shaped test this replaces could not have caught.
+        var configureOnly = UserWith(section: true, Constants.Verbs.Configure);
+        var settingsOnly = UserWith(section: true, Constants.Verbs.Settings);
+
+        Assert.True(await AuthorizeAsync(configureOnly, Constants.VerbPolicies.ClosuresRead));
+        Assert.True(await AuthorizeAsync(settingsOnly, Constants.VerbPolicies.ClosuresRead));
+
+        // AND IT IS NOT AN IMPLICATION: each verb reaches this read on its own account and gains
+        // nothing else the other holds. That half is asserted by
+        // `Configure_does_not_reach_the_settings` and `Settings_reaches_neither_resources_nor_bookings`
+        // — a test here repeating them would describe the claim rather than add to it, which is
+        // what the one this replaced did.
+    }
+
+    [Fact]
+    public async Task Neither_verb_means_no_closure_list()
+    {
+        var bookingsOnly = UserWith(section: true, Constants.Verbs.BookingsManage);
+
+        Assert.False(await AuthorizeAsync(bookingsOnly, Constants.VerbPolicies.ClosuresRead));
     }
 
     [Fact]

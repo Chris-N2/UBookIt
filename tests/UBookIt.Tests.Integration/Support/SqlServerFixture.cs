@@ -128,7 +128,8 @@ public sealed class SqlServerFixture : IAsyncLifetime
     {
         var settings = new SiteBookingSettings { TimeZoneId = "UTC" };
         var time = new FixedTimeProvider(nowUtc);
-        var resourceStore = new SqlResourceStore(TrackContext());
+        var closureContext = TrackContext();
+        var resourceStore = new SqlResourceStore(closureContext, new SqlSiteClosureStore(closureContext));
         var bookingStore = new SqlBookingStore(TrackContext());
 
         return (

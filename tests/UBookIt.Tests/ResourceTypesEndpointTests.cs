@@ -45,7 +45,7 @@ public class ResourceTypesEndpointTests
     }
 
     private static ResourcesController Wire(params ResourceTypeUsage[] types)
-        => new(new InMemoryResourceStore(), new TypesOnlyManagementStore(types));
+        => new(new InMemoryResourceStore(), new TypesOnlyManagementStore(types), new InMemorySiteClosureStore());
 
     private static List<ResourceTypeUsageModel> Ok(IActionResult result)
         => Assert.IsType<List<ResourceTypeUsageModel>>(Assert.IsType<OkObjectResult>(result).Value);

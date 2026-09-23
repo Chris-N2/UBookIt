@@ -461,7 +461,13 @@ public class SensitiveDataRedactionTests
 
             "OpenHoursRow: DayOfWeek,EndTime,Id,ResourceId,StartTime",
             "ResourceCapabilityRow: Key,ResourceId",
-            "ResourceRow: Capabilities,Description,DirectlyBookable,DisplayName,Exceptions,GranularityMinutes,HorizonDays,Id,LeadTimeMinutes,MaxDurationMinutes,MinDurationMinutes,OpenHours,Type",
+
+            // Decision, site-wide-closures (roadmap 17.2.0): one row per resource exempted
+            // from one closure — two identifiers and nothing else. It names no person and
+            // carries no text at all, so erasure has no business with it, and deleting either
+            // parent removes it by cascade.
+            "ResourceClosureOptOutRow: ClosureId,ResourceId",
+            "ResourceRow: Capabilities,ClosureOptOuts,Description,DirectlyBookable,DisplayName,Exceptions,GranularityMinutes,HorizonDays,Id,LeadTimeMinutes,MaxDurationMinutes,MinDurationMinutes,OpenHours,Type",
 
             // Decision, resource-responsibility (roadmap 0.8.0): four keys and nothing
             // else. The party columns reference an Umbraco user or group BY KEY — no
@@ -484,6 +490,15 @@ public class SensitiveDataRedactionTests
             // is the site's own staff distribution list, already in appsettings today, and
             // deliberately not a booker's.
             "SettingRow: Key,UpdatedUtc,Value",
+
+            // Decision, site-wide-closures (roadmap 17.2.0): one row per date the organisation
+            // is closed — a date, the SITE's own label for it, and its id. The label is free
+            // text, and it is the site's own words about its own calendar ("Christmas Day",
+            // "Stocktake"): it is written only by a holder of the settings verb, it is never
+            // matched against anything a booker supplied, and it is never disclosed through the
+            // delivery API or the front end, where a closed date is indistinguishable from any
+            // other unavailable one. No booker detail can reach this table by any route.
+            "SiteClosureRow: Date,Id,Label,OptOuts",
         ];
 
         Assert.True(
@@ -757,6 +772,16 @@ public class SensitiveDataRedactionTests
             "SettingsController.PutSetting",
             "SettingsController.ResetSetting",
             "ServicesController.DeleteService",
+            // Genuine writes: each changes the site's closure list (site-wide-closures change).
+            // Recorded deliberately rather than left to default to "read", for the reason the
+            // settings entries above record. None takes a booker's detail or any free text that
+            // is searched: a closure carries a date and the SITE's own label for it, stored and
+            // echoed back but never matched against anything a booker supplied. Nothing here
+            // reads, writes or reports a booking — a closure changes what is OFFERED, and a
+            // booking already placed keeps its interval, status and reference.
+            "ClosuresController.CreateClosure",
+            "ClosuresController.UpdateClosure",
+            "ClosuresController.DeleteClosure",
         ];
 
         var classifiedActions = new List<string>();
@@ -972,6 +997,16 @@ public class SensitiveDataRedactionTests
             // filter, no search term, no contact detail — and returns names of rooms and
             // services, never a booker or a booking.
             "BookingsController.ListBookableSubjects = read",
+            // Site closures (site-wide-closures change). The three writes change the site's
+            // closure list; the list read is a READ and the free-text rule below therefore
+            // applies to it, correctly — it takes one boolean (whether to include past dates)
+            // and returns dates and the site's own labels. None of the four touches a booking
+            // or accepts anything a booker supplied, so no question about a booker can be
+            // asked of any of them.
+            "ClosuresController.CreateClosure = write",
+            "ClosuresController.UpdateClosure = write",
+            "ClosuresController.DeleteClosure = write",
+            "ClosuresController.ListClosures = read",
             "ResourcesController.CreateResource = write",
             "ResourcesController.DeleteResource = write",
             "ResourcesController.GetResource = read",

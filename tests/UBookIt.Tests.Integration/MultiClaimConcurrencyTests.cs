@@ -302,6 +302,17 @@ public class MultiClaimConcurrencyTests(SqlServerFixture fixture)
                 // uBookItResourceClaim or uBookItBooking, so the concurrency guarantee this test
                 // exists for is untouched.
                 "20260918132340_AddCancellationSecrets",
+
+                // site-wide-closures: creates uBookItSiteClosure (id, date uniquely indexed,
+                // label) and uBookItResourceClosureOptOut (resource id + closure id compound PK,
+                // cascading from both parents). Confirmed against the rule above — two
+                // CreateTable statements and three indexes, altering and dropping nothing.
+                // The opt-out table takes a foreign key to uBookItResource, which is NOT one of
+                // the two tables this guarantee is about: neither uBookItResourceClaim nor
+                // uBookItBooking is referenced or altered, so placement's locking and conflict
+                // re-check are untouched. Closures change which times are OFFERED, never how a
+                // claim on an offered time is written.
+                "20260923094150_AddSiteClosures",
             ],
             applied.OrderBy(name => name, StringComparer.Ordinal));
 

@@ -593,11 +593,83 @@ public class DeliveryApiTests
             .Select(p => p.Name)
             .ToArray();
 
+        // `closure` and `optout` joined this list when site closures arrived. The forbidden
+        // set is the POPULATION of internal availability configuration, not the sample that
+        // existed when the guard was written — a new kind of configuration added to the read
+        // model would otherwise pass a guard whose whole purpose is to refuse it.
         Assert.DoesNotContain(names, n =>
             n.Contains("open", StringComparison.OrdinalIgnoreCase)
             || n.Contains("hour", StringComparison.OrdinalIgnoreCase)
             || n.Contains("exception", StringComparison.OrdinalIgnoreCase)
-            || n.Contains("window", StringComparison.OrdinalIgnoreCase));
+            || n.Contains("window", StringComparison.OrdinalIgnoreCase)
+            || n.Contains("closure", StringComparison.OrdinalIgnoreCase)
+            || n.Contains("closed", StringComparison.OrdinalIgnoreCase)
+            || n.Contains("optout", StringComparison.OrdinalIgnoreCase)
+            || n.Contains("opt_out", StringComparison.OrdinalIgnoreCase));
+    }
+
+    /// <summary>
+    /// The same rule over the SERIALIZED body of a REAL response, because a label can reach a
+    /// caller through a member whose name says nothing — an "unavailableReason", a note, a
+    /// description carried through from configuration.
+    /// </summary>
+    /// <remarks>
+    /// <b>It must go through the controller.</b> The first version of this built a
+    /// <c>ResourceReadModel</c> by hand and serialized that, so it inspected the type's defaults
+    /// rather than the endpoint's output — QA proved it vacuous by adding an
+    /// <c>UnavailableReason</c> member, having the mapper set it to "Site closure: Christmas
+    /// Day", and watching all 38 delivery tests stay green while the public API handed anonymous
+    /// callers the closure label. A guard over a hand-built instance can only ever see the
+    /// members the test itself remembered to set.
+    /// </remarks>
+    [Fact]
+    public async Task A_real_resource_response_carries_no_trace_of_the_closure_it_is_subject_to()
+    {
+        // A resource genuinely subject to a closure with a distinctive label: if any part of the
+        // read path carries it outward, the label is in the body.
+        var closure = TestData.Closure(BaseDate, "Zzyzx Stocktake Day");
+        var room = Resource.Create(
+            ResourceTypes.Room,
+            "Consulting Room",
+            directlyBookable: true,
+            availability: TestData.Config(
+                TestData.Weekly("09:00", "17:00", BaseDate.DayOfWeek), closures: [closure])).Value;
+
+        var resources = new InMemoryResourceStore().Add(room);
+        var controller = new ResourcesController(resources, TestData.Settings);
+
+        // THE GUARD'S OWN PRECONDITION, and its absence is what QA proved twice over: a
+        // `DoesNotContain` over a subject that never carried the label is the string-matching
+        // twin of an `Assert.All` over an empty sequence. Dropping the `closures:` argument in a
+        // refactor would retire this guard silently.
+        Assert.Single(room.Availability.Closures);
+
+        // And the closure is IN FORCE on the very read path this guard inspects, not merely
+        // attached to the fixture: the date it covers offers nothing.
+        var availability = new AvailabilityController(
+            new AvailabilityService(
+                resources, new InMemoryBookingStore(), new FixedTimeProvider(TestData.Now), TestData.Settings),
+            TestData.Settings);
+
+        var slots = Ok<SlotsResponseModel>(await availability.GetSlots(room.Id, BaseDate, BaseDate, 60));
+        Assert.Empty(slots.Slots);
+
+        var single = Ok<ResourceReadModel>(await controller.GetResource(room.Id));
+        var page = Ok<PagedResourcesModel>(await controller.ListResources());
+
+        foreach (var body in new[]
+        {
+            System.Text.Json.JsonSerializer.Serialize(single),
+            System.Text.Json.JsonSerializer.Serialize(page),
+        })
+        {
+            Assert.DoesNotContain("Zzyzx", body, StringComparison.OrdinalIgnoreCase);
+
+            foreach (var forbidden in new[] { "closure", "closed", "stocktake", "optOut", "opt_out" })
+            {
+                Assert.DoesNotContain(forbidden, body, StringComparison.OrdinalIgnoreCase);
+            }
+        }
     }
 
     // Transport/model-binding failures share the domain envelope (design D7).
