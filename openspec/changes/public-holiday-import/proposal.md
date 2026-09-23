@@ -71,17 +71,43 @@ migration in this change.
 
 ### Modified Capabilities
 
-None — and that is a claim worth stating rather than an omission:
+**This section originally claimed "None", for both `site-closures` and `permissions`. That claim
+was wrong, and the sweep at the end of the change found it.** It is corrected here rather than
+quietly replaced, because the reasoning that produced it is the interesting part: both arguments
+were about *behaviour* — an imported closure is an ordinary closure, and importing is already
+"changing the list" — and both remain true. What they missed is that a spec does not only state
+behaviour; it **enumerates**. Two of the enumerations were exhaustive and are now incomplete, and
+an enumeration that silently stops being exhaustive is exactly the failure the sweep exists to
+catch.
 
-- **`site-closures` is untouched.** An imported closure is created through the same store and
-  validation as any other, so no requirement about closures changes. If this change needed to
-  modify that spec, the import would have grown a second kind of closure, which is the thing it is
-  shaped to avoid.
-- **`permissions` is untouched.** The `UBookIt.Settings` bullet already reads "reading the site
-  closure list, and changing it"; importing changes it. The preview is a read in service of that
-  change and is gated identically. No new power is conferred: the source is code a developer
-  registered, not a URL an operator supplies, so there is no outbound target anyone can choose.
-  Recorded as considered rather than left silent.
+- **`site-closures` is modified in three requirements.** *The closures view* listed the view's
+  actions as "create, edit and delete" and its keyboard scenario named those three plus revealing
+  past closures; the view now conditionally carries an import control with a selectable row per
+  holiday, which is the most complex control on the screen and was covered by no accessibility
+  scenario. *Closures are managed through versioned management endpoints* enumerated them as
+  "list, create, update and delete"; there are now three more. *Closures are read and written by
+  different verbs* said "Both SHALL be enforced by the server" of two acts where there are now
+  four, and its rule that a read-only user is **told** why they cannot write sat one paragraph away
+  from this change's rule that a missing source is **not explained at all** — two opposite-looking
+  policies about one screen, which the spec now distinguishes explicitly (one is about the verb,
+  the other about a capability the site does not have).
+
+  The original claim's own test still holds: no requirement changed because an imported closure
+  behaves differently, and the change did not grow a second kind of closure.
+
+- **`permissions` is modified in one requirement.** The `UBookIt.Settings` bullet does read
+  "reading the site closure list, and changing it", and importing is changing it — but the verb now
+  also reaches **previewing**, which changes nothing, and the spec's own rationale for how closures
+  split across the verbs is written as a line between "deciding the site's policy" and "applying an
+  exemption". Previewing is on neither side of that line: it decides nothing and exempts nothing.
+  It is gated with the writes for a different reason — it makes the site's own code reach outward on
+  an operator's behalf — and a rationale that does not say so leaves the next reader to re-derive
+  it, or to conclude the gate is arbitrary. The verb count is unchanged, and no new power is
+  conferred: the source is code a developer registered, not a URL an operator supplies, so there is
+  no outbound target anyone can choose.
+
+**No other spec is modified.** The sweep's full record — every spec checked, every candidate
+sentence, and the ones judged not falsified with the evidence for each — is in `sweep.md`.
 
 ## Impact
 

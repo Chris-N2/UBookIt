@@ -43,10 +43,20 @@ Where a site has registered no source, the package SHALL present **no import con
 explanation of one**. The capability SHALL be absent rather than disabled, refused, or rendered
 with a message.
 
-**This is the same decision the delivery API makes**: a control that appears and then explains it
-cannot work is a control that looks live and is not. A developer learns from the documentation that
-a source must be registered; an operator on a site without one is not shown a feature their site
-does not have.
+**This follows the delivery API's reasoning about a disabled direction**: a control that appears and
+then explains it cannot work is a control that looks live and is not. A developer learns from the
+documentation that a source must be registered; an operator on a site without one is not shown a
+feature their site does not have.
+
+**It is the reasoning that carries over, not the rule.** The delivery API's rule is stronger: an
+anonymous caller receives no status, header, body member or timing signal separating "disabled"
+from "never existed". This capability does not meet that bar and SHALL NOT be read as claiming it,
+because the client must be told which case it is in so it can render nothing — the probe answers
+exactly that, in a body member. What makes the weaker rule sufficient here is the audience: the
+probe sits behind backoffice authentication and the same verb as the import, so what it
+distinguishes is distinguished only for operators who could register a source themselves. An
+anonymous caller learns nothing either way, which is the guarantee the delivery API's rule exists
+to give.
 
 Registration SHALL be optional in the ordinary sense — the package SHALL function completely
 without one, and SHALL NOT fail to start, warn, or log about its absence.
@@ -184,6 +194,13 @@ exists to serve.
 
 `UBookIt.Configure` SHALL NOT reach either. Reading the closure list is a resource-level act that
 verb holds; deciding the site's closures is not.
+
+**The probe reporting whether a source is registered SHALL require the same verb**, so that all
+three of this capability's endpoints classify under `UBookIt.Settings` and none is left
+unclassified. It is gated not because the answer is sensitive but because it is of no use below the
+verb that acts on it: a client that may not import has nothing to do with knowing a source exists,
+and an endpoint answering a question its caller cannot act on is a gap in the classification rather
+than a convenience.
 
 #### Scenario: The settings verb reaches both halves
 - **WHEN** a user whose groups hold `UBookIt.Settings` previews and then imports

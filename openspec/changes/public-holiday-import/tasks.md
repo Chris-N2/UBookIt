@@ -35,27 +35,32 @@
 
 ## 5. The TestSite implementation — the seam's proof
 
-- [ ] 5.1 Implement `IPublicHolidaySource` in `UBookIt.TestSite` against the `gov.uk` bank-holiday feed, mapping `title` to the name and handling the `notes` field that marks a substitute day; verify it is registered in the TestSite's own composer and **not** packed
-- [ ] 5.2 Verify the package's own test suites never call the live feed — the fake source is what tests use; assert no test project references the gov.uk host
-- [ ] 5.3 Verify the port expressed the real feed without the package learning what a substitution is: the substitute-day handling lives entirely in the TestSite implementation
+- [x] 5.1 Implement `IPublicHolidaySource` in `UBookIt.TestSite` against the `gov.uk` bank-holiday feed, mapping `title` to the name and handling the `notes` field that marks a substitute day; verify it is registered in the TestSite's own composer and **not** packed
+- [x] 5.2 Verify the package's own test suites never call the live feed — the fake source is what tests use; assert no test project references the gov.uk host
+- [x] 5.3 Verify the port expressed the real feed without the package learning what a substitution is: the substitute-day handling lives entirely in the TestSite implementation
 
 ## 6. Live verification
 
-- [ ] 6.1 Build the client, then the solution, and verify zero warnings in Release
-- [ ] 6.2 On the running TestSite, preview a window against the live `gov.uk` feed and verify the rows classify correctly against the closures already present (one of which should be a date the feed also returns, to exercise *already closed*)
-- [ ] 6.3 Untick one row, confirm, and verify exactly the ticked closures were created — then verify the unticked date is offered again by a second preview
-- [ ] 6.4 Verify an imported closure behaves as any other: rename it, opt a resource out of it, and confirm availability for that date disappears and returns exactly as it does for a hand-typed closure
-- [ ] 6.5 Verify the import is absent on a site with no source — by unregistering it in the TestSite composer, restarting, and confirming both the control and the endpoints are gone
+- [x] 6.1 Build the client, then the solution, and verify zero warnings in Release
+- [x] 6.2 On the running TestSite, preview a window against the live `gov.uk` feed and verify the rows classify correctly against the closures already present (one of which should be a date the feed also returns, to exercise *already closed*)
+- [x] 6.3 Untick one row, confirm, and verify exactly the ticked closures were created — then verify the unticked date is offered again by a second preview
+- [x] 6.4 Verify an imported closure behaves as any other: rename it, opt a resource out of it, and confirm availability for that date disappears and returns exactly as it does for a hand-typed closure
+- [x] 6.5 Verify the import is absent on a site with no source — by unregistering it in the TestSite composer, restarting, and confirming both the control and the endpoints are gone
 - [ ] 6.6 Verify the verb split live against a Configure-only user: the closure list is readable, the preview and import are refused
 
 ## 7. Documentation
 
-- [ ] 7.1 Document the operator's side in `docs/backoffice.md` — what the preview offers, that unticking is not remembered, and that an imported closure is an ordinary one
-- [ ] 7.2 Document the developer's side: the port, that registration is optional and absence is total, that a source must respect cancellation, and that regions are the source's business — with the TestSite implementation as the worked example
-- [ ] 7.3 Verify the docs state that the package ships no holiday data for any country and will not be adding any
+- [x] 7.1 Document the operator's side in `docs/backoffice.md` — what the preview offers, that unticking is not remembered, and that an imported closure is an ordinary one
+- [x] 7.2 Document the developer's side: the port, that registration is optional and absence is total, that a source must respect cancellation, and that regions are the source's business — with the TestSite implementation as the worked example
+- [x] 7.3 Verify the docs state that the package ships no holiday data for any country and will not be adding any
 
 ## 8. Spec sync
 
-- [ ] 8.1 Re-run the sibling-falsification sweep over every spec, looking for sentences about closures, verbs or scheduled work that this change makes untrue; verify by listing what was checked and what was found
-- [ ] 8.2 Re-check the two "modifies nothing" claims in the proposal — `site-closures` and `permissions` — against the specs as they now stand, and record the result either way
-- [ ] 8.3 Run `openspec validate --strict` and the full suites, and verify `ChangeDeltaIntegrityTests` passes
+- [x] 8.1 Re-run the sibling-falsification sweep over every spec, looking for sentences about closures, verbs or scheduled work that this change makes untrue; verify by listing what was checked and what was found
+- [x] 8.2 Re-check the two "modifies nothing" claims in the proposal — `site-closures` and `permissions` — against the specs as they now stand, and record the result either way
+- [x] 8.3 Run `openspec validate --strict` and the full suites, and verify `ChangeDeltaIntegrityTests` passes
+- [ ] 8.4 At sync, correct `site-closures`' Purpose sentence "so that a later public-holiday feed has somewhere to write" — this is a host-implemented port read on an operator's action, not a feed that writes; recorded in `sweep.md`
+- [x] 8.5 **MODIFIED** `permissions` / *Access within the section is decided by four verbs* — the `UBookIt.Settings` bullet gains both halves of an import; the closure-split rationale gains a fourth act and the reason previewing sits with the writes; the verb's reach gains invoking the site's own code. Guarantees diffed: 18 scenarios in, 21 out, none dropped; every SHALL carried forward verbatim; the verb count stays four
+- [x] 8.6 **MODIFIED** `site-closures` / *The closures view* — the action enumeration becomes conditional on the site and the user's verb, and the keyboard scenario covers the import. Guarantees diffed: 4 scenarios in, 5 out, none dropped; the upcoming-by-default rule, the no-automatic-deletion rule and the accessibility bar all carried forward verbatim
+- [x] 8.7 **MODIFIED** `site-closures` / *Closures are read and written by different verbs* — "Both" becomes "Each of these" over four acts; the read-but-not-write explanation rule is distinguished from this change's absent-capability rule. Guarantees diffed: 7 scenarios in, 10 out, none dropped; all three verb rules and the server-enforcement rule carried forward verbatim
+- [x] 8.8 **MODIFIED** `site-closures` / *Closures are managed through versioned management endpoints* — the endpoint enumeration gains preview, import and probe, and the 404 rule covers the absent-source case. Guarantees diffed: 4 scenarios in, 6 out, none dropped; the purpose-built-DTO rule, the no-domain-types rule, the server-side upcoming filter and the stable-code rule carried forward verbatim
