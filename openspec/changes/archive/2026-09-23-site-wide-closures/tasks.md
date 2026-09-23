@@ -96,7 +96,7 @@ more scenarios than the version it replaces:
 | availability / Date exceptions | 2 → 5 | 3 |
 | availability / Free-time computation | 3 → 5 | 4 |
 | bookings / Placement validation pipeline | 8 → 10 | 10 |
-| permissions / Access within the section is decided by four verbs | 12 → 17 | 4 |
+| permissions / Access within the section is decided by four verbs | 12 → 18 | 4 |
 | resource-management / Resource CRUD endpoints | 5 → 11 | 4 |
 | resource-management / Workspace editor for a resource | 5 → 9 | 3 |
 
