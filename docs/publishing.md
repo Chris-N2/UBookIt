@@ -11,7 +11,7 @@ only the first: `17.0.0` is already out, and all of it applies unchanged to the 
   copyright are named explicitly because they have been wrong in this repository before, and
   a list that omits them is how that goes unnoticed. A wrong URL is fixed by publishing a *new
   version*, and the wrong one stays visible on the version history forever.
-- **A version number cannot be reused**, even after unlisting. uBookIt is at `18.0.0`, and
+- **A version number cannot be reused**, even after unlisting. uBookIt is at `18.1.0`, and
   that number is spent the moment it is pushed, successfully or not. This is no longer
   hypothetical: `17.0.0` was published on 2026-09-15 carrying a readme whose documentation links
   were relative, every one of them resolved against nuget.org rather than the repository, and
@@ -92,13 +92,14 @@ expire at the events it describes.**
 3. **The version must be the one you mean.** `<Version>` in `Directory.Build.props` is the only
    place it is **declared**; every package and the backoffice manifest derive from it.
    **Prose is a different matter, and a bump has to move it by hand.** Three documents state a
-   version in words, in a URL or in a command — `README.md` in two places and this runbook in
-   two — and none of them derives anything:
+   version in words, in a URL or in a command — `README.md` in **three** places and this runbook
+   in two — and none of them derives anything:
 
    | Where | What moves |
    |---|---|
    | `README.md`, near the top | the sentence naming the version uBookIt is currently at |
    | `README.md`, *What it looks like* | **every** screenshot URL, each pinned to the release tag |
+   | `README.md`, throughout | **every** documentation link — pinned to the release tag too, not to a branch, for the reason the screenshots are |
    | `docs/publishing.md` | the *"uBookIt is at"* sentence under **What nuget.org will not let you undo** |
    | `CHANGELOG.md` | a new entry for the version, its heading left undated until it is live |
    | `docs/publishing.md`, *Tag the release* | **every** version literal in that section below — the example URL, and the `git tag`, `git push` and `curl` commands |
@@ -121,10 +122,10 @@ expire at the events it describes.**
    > sentence reproduced a second time stops pinning anything, and the draft that quoted it
    > here also added a feed mention the accounting guard had not been told about.)
 
-   The suite fails when any of the first four disagree with `<Version>` — `VersionTruthTests`
-   for the README and runbook sentences and the screenshot URLs, `ChangelogTests` for the
-   changelog entry — so those four are a checklist to work through in one go rather than a risk
-   of shipping half done. **The last row is different: nothing checks it.** The worked commands
+   The suite fails when any of the first five disagree with `<Version>` — `VersionTruthTests`
+   for the README and runbook sentences, the screenshot URLs and the documentation links,
+   `ChangelogTests` for the changelog entry — so those five are a checklist to work through in one
+   go rather than a risk of shipping half done. **The last row is different: nothing checks it.** The worked commands
    in *Tag the release* are illustrative text, invisible to every guard, so that row is the one
    to re-read by eye.
 
@@ -224,11 +225,11 @@ git branch -r --contains HEAD            # must list origin/main
 
 ## Tag the release before you push the package
 
-**The packed readme's screenshots are addressed to a git tag named after the version**, like
-this:
+**The packed readme's screenshots AND its documentation links are addressed to a git tag named
+after the version**, like this:
 
 ```
-https://raw.githubusercontent.com/Chris-N2/UBookIt/18.0.0/docs/images/booking-flow.png
+https://raw.githubusercontent.com/Chris-N2/UBookIt/18.1.0/docs/images/booking-flow.png
 ```
 
 That is deliberate. A readme is frozen at push and can never be corrected, but the images in it
@@ -238,17 +239,25 @@ screen that has since changed, or a gap where a renamed file used to be. Address
 shows what this release shipped, permanently.
 
 **So the tag has to exist, and has to be pushed, before the package goes.** Until it does, every
-image on the package page is a broken image.
+image on the package page is a broken image **and every documentation link on it is dead** — and
+after the push neither can be corrected, because the readme carrying those addresses is frozen.
 
-**And the screenshot URLs move with the version.** They are written out in `README.md`, not derived
-from anything — the guard checks that they agree with `<Version>`, it does not update them. A
+**Both kinds are pinned, and for the same reason with different consequences.** An unpinned image
+would show a screenshot of a screen that has since changed; an unpinned *link* sends the reader to
+documentation for a version they are not running — and with two published lines, potentially to
+the other line's documentation entirely, silently, because the file exists on both branches.
+
+**And these addresses move with the version.** They are written out in `README.md`, not derived
+from anything — the guards check that they agree with `<Version>`, they do not update them. That
+is true of the screenshot URLs and of every documentation link alike; bumping one set and not the
+other is the half-done state the checklist above exists to prevent. A
 bump therefore edits the readme's image refs in the same commit as `Directory.Build.props`; see
 *Before any push*, step 3, for the full list of what a bump touches.
 
 ```bash
-git tag 18.0.0                  # on the commit you are packing from
-git push origin 18.0.0
-curl -sI https://raw.githubusercontent.com/Chris-N2/UBookIt/18.0.0/docs/images/booking-flow.png
+git tag 18.1.0                  # on the commit you are packing from
+git push origin 18.1.0
+curl -sI https://raw.githubusercontent.com/Chris-N2/UBookIt/18.1.0/docs/images/booking-flow.png
 ```
 
 The `curl` is the point of the step: a `200` means the address the readme carries resolves. Do it
@@ -326,7 +335,8 @@ curl https://api.nuget.org/v3-flatcontainer/ubookit/index.json
 Search on the website lags further behind still. If an hour passes with no progress, check the
 package page and your email — nuget.org reports a validation failure by mail.
 
-**Open the package page and look at the screenshots.** Every image must render. This is the only
+**Open the package page, look at the screenshots, and follow a documentation link.** Every image
+must render and every link must land. This is the only
 check that ever sees what a consumer sees: no test can reach nuget.org, and a rejected or missing
 image is reported in a warning shown only to you as the owner, so a broken page is silent to
 everybody else. If one is missing, the usual cause is the tag — confirm

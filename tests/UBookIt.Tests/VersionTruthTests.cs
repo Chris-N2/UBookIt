@@ -936,8 +936,13 @@ public class VersionTruthTests
         // And the check that is the only thing in this project which ever sees what a consumer
         // sees. A rejected readme image is reported ONLY to the package owner, so a broken page
         // is silent to everybody else — which makes "somebody would have told us" false here.
+        //
+        // The pinned sentence covers LINKS as well as images from `18.1.0`. This line pinned its
+        // documentation links at `18.0.0` and the runbook was never updated to say so, so the
+        // human check had been images-only here for a release longer than on the 17 line — which
+        // found it first only because its own pinning was fresh.
         DocumentationAssert.SaysOnce(
-            runbook, "Open the package page and look at the screenshots");
+            runbook, "Open the package page, look at the screenshots, and follow a documentation link");
 
         // The commit SHA. Found by VERIFYING the SourceLink flip rather than reasoning about
         // it: a pack from an unpushed commit yields source links that 404 for every consumer,

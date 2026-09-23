@@ -17,6 +17,84 @@ a patch. See [the versioning note](README.md#what-the-version-number-means).
 
 ---
 
+## 18.1.0
+
+### What you have to do
+
+**Nothing.** No configuration change and no API change. A site that upgrades and changes no
+settings gets the product it had, plus a closures screen it can ignore.
+
+There is a database migration, and it runs on start-up as every uBookIt migration does. It only
+adds — a table for the closure list and one for per-resource exemptions — so nothing you have
+stored changes shape or goes away.
+
+**If you read about these features and installed `18.0.0` expecting them, this is the release you
+wanted.** `17.2.0` shipped them on the Umbraco 17 line first, and its package page describes them
+while pointing Umbraco 18 readers at `18.x` — which until now meant `18.0.0`, without them. The
+two lines ship the same features again from here.
+
+### What changed
+
+**The same two capabilities `17.2.0` added, on the same terms.** The lines are not diverging: what
+follows is the Umbraco 18 build of exactly what the 17 line already has.
+
+**Site-wide closures.** The dates your whole organisation is shut — a bank holiday, a stocktake,
+the week between Christmas and New Year — are now one list in the uBookIt section instead of the
+same date typed into every resource's exceptions.
+
+A closure closes **every** resource for that date, including resources you add afterwards, and it
+takes precedence over a resource's own weekly hours and its own date exceptions. Bookers simply
+find the date unavailable: nothing on the booking page or in the delivery API says a closure
+exists or what it is called.
+
+Any single resource can be **opened anyway** on a given closure, from a tick in its own editor —
+so "we are closed on Boxing Day except the gym" is one tick rather than a rethink.
+
+**It does not cancel bookings already placed.** A booking on a date you then close keeps its time,
+its status and its reference, and goes on holding that slot. Closing a date changes what can be
+booked from that moment; it never reaches backwards.
+
+Who can do what: **seeing** the list comes with either *Configure resources and services* or
+*Change site settings*; **opening one resource anyway** comes with *Configure*; **adding, editing
+or deleting** a closure needs *Change site settings*, because one entry shuts everything you have.
+As with every uBookIt verb, that grant is **never given automatically, including on upgrade** —
+an administrator ticks it for the people who should have it.
+
+**Public holidays, if your site supplies them.** uBookIt can turn public holidays into closures,
+and **ships no holiday data for any country**. Holiday dates come from your own code.
+
+For developers, this release publishes a new interface on the 18 line:
+
+> **`IPublicHolidaySource`** (in `UBookIt.Core.Availability`) — implement it and register it, and
+> uBookIt will ask it for the holidays in a date window. It returns a date and a name for each;
+> it takes no country or region, because which jurisdiction a site wants is a property of the
+> implementation you registered rather than something uBookIt could validate. A worked example
+> against the UK government's bank-holiday feed is in `docs/configuration.md`.
+>
+> **Nothing is required of you.** This is a new interface, not a change to an existing one:
+> nothing you have written stops compiling, and a site that implements nothing sees no difference
+> at all — where no source is registered the import is absent rather than disabled, with no
+> control and no explanation of one.
+
+Where a site *does* register one, an operator on the Closures screen can fetch a window of
+holidays and **tick which of them the organisation is actually closed on**. Every new date arrives
+ticked, because most organisations are closed on most public holidays, and the work is unticking
+the ones yours is open on. Confirming creates exactly the ticked dates, as ordinary closures you
+can rename, move, opt a resource out of, or delete.
+
+Nothing is ever imported on a schedule or at start-up — only when somebody asks — and unticking is
+not remembered, so a date you decline today is offered again the next time that window is fetched.
+Fetching and importing both need *Change site settings*.
+
+### Also in this release
+
+- The backoffice Closures screen states, for a user who may read but not change closures, which
+  grant is missing and where an administrator gives it.
+- `docs/backoffice.md` gains the operator's side of both features, and `docs/configuration.md` the
+  developer's side of the holiday port.
+
+---
+
 ## 18.0.0 — 2026-09-22
 
 ### What you have to do

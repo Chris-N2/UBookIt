@@ -4,50 +4,70 @@
 
 Done first, because a guard added after the entry is written cannot tell you the entry was wrong.
 
-- [ ] 1.1 Carry `A_release_that_published_a_new_extension_point_names_it` into `ChangelogTests`,
+- [x] 1.1 Carry `A_release_that_published_a_new_extension_point_names_it` into `ChangelogTests`,
       with an `[InlineData("18.1.0", "IPublicHolidaySource")]` row. **Verify by mutation** that
       both halves fire: removing the interface name from the entry, and removing the sentence
       saying a site implementing nothing is unaffected
-- [ ] 1.2 Carry `packaging`'s sixth scenario — *A release that publishes a new extension point
+      *Carried and pinned to `18.1.0`. Added BEFORE the entry existed, deliberately: it failed
+      with "CHANGELOG.md has no entry for 18.1.0", which proves it fires rather than assuming the
+      guard travelled intact. Both halves then mutation-tested on THIS line — renaming the
+      interface in the entry fails the first, removing the reassurance fails the second.*
+- [x] 1.2 Carry `packaging`'s sixth scenario — *A release that publishes a new extension point
       names it* — as a `MODIFIED` delta on *A release names the contract changes a consumer must
       act on*. Diff the guarantees: this line has 5 scenarios, `main` has 6, and none of the 5 may
       be lost
-- [ ] 1.3 Fix the stale bump checklist in `docs/publishing.md`, measured on THIS branch rather
+      *Diffed: 5 in, 6 out, none dropped, every SHALL carried. The added scenario is "A release
+      that publishes a new extension point names it".*
+- [x] 1.3 Fix the stale bump checklist in `docs/publishing.md`, measured on THIS branch rather
       than assumed from the 17 line's diff: the "in two places" count, the table's missing row for
       documentation links, "the first four" guarded things, and the *Tag the release* sentences
       that justify the tag on image grounds alone
-- [ ] 1.4 Verify nothing was carried that this line already has — it originated *A documentation
+      *Seven sentences, the same set as the 17 line but measured here first: the "in two places"
+      count, the table's missing row, "the first four" guarded things, and four in *Tag the
+      release*. One is PINNED — the guard failed on the edit and the pin was moved with the reason
+      recorded, which is that this line had been images-only for a release LONGER than the 17
+      line, having pinned its links at `18.0.0`.*
+- [x] 1.4 Verify nothing was carried that this line already has — it originated *A documentation
       link in the packed readme names the release it shipped with*, and fixing that twice would
       be its own defect
+      *Confirmed: `dev/v18` already carries *A documentation link in the packed readme names the
+      release it shipped with* — it originated here. Not carried again.*
 
 ## 2. The version, and the documents that state it
 
-- [ ] 2.1 Bump `<Version>` to `18.1.0`; verify it is the only `<Version>` element
-- [ ] 2.2 Update the *uBookIt is at* sentence in `README.md` and `docs/publishing.md`
-- [ ] 2.3 Re-pin every screenshot URL **and every documentation link** in `README.md` to the
+- [x] 2.1 Bump `<Version>` to `18.1.0`; verify it is the only `<Version>` element
+- [x] 2.2 Update the *uBookIt is at* sentence in `README.md` and `docs/publishing.md`
+- [x] 2.3 Re-pin every screenshot URL **and every documentation link** in `README.md` to the
       `18.1.0` tag
-- [ ] 2.4 Update the four unguarded *Tag the release* literals, and record which four
-- [ ] 2.5 **Verify the two anchors did NOT move** — the first-publish sentence and the API
+- [x] 2.4 Update the four unguarded *Tag the release* literals, and record which four
+- [x] 2.5 **Verify the two anchors did NOT move** — the first-publish sentence and the API
       stability sentence
-- [ ] 2.6 Audit the whole diff: account for every changed line naming a version, and name any
+- [x] 2.6 Audit the whole diff: account for every changed line naming a version, and name any
       version literal deliberately left alone
+      *Version literals moved: `<Version>`, both "uBookIt is at" sentences, 4 screenshot URLs, 12
+      documentation links, 4 unguarded *Tag the release* literals. **Deliberately left**:
+      `README.md`'s "`17.1.0` itself added members to five published interfaces" — history. This
+      line has no `18.0.0` prose mention to protect, unlike the 17 line's "from `17.1.2` the
+      packages say so", so the audit found nothing that needed holding back.*
 
 ## 3. The changelog entry
 
-- [ ] 3.1 Write the `18.1.0` entry, heading **undated**
-- [ ] 3.2 Lead with what upgrading asks of the reader
-- [ ] 3.3 Describe both capabilities as a consumer meets them
-- [ ] 3.4 Name `IPublicHolidaySource`, what implementing it enables, and that a site implementing
+- [x] 3.1 Write the `18.1.0` entry, heading **undated**
+- [x] 3.2 Lead with what upgrading asks of the reader
+- [x] 3.3 Describe both capabilities as a consumer meets them
+- [x] 3.4 Name `IPublicHolidaySource`, what implementing it enables, and that a site implementing
       nothing is unaffected — satisfying the scenario carried in 1.2, verified by the guard
       carried in 1.1 rather than by reading it over
-- [ ] 3.5 State that the package ships no holiday data for any country
-- [ ] 3.6 Verify every `ChangelogTests` guard passes, including the newly carried one
+- [x] 3.5 State that the package ships no holiday data for any country
+- [x] 3.6 Verify every `ChangelogTests` guard passes, including the newly carried one
 
 ## 4. Build, and prove the suite is green from a clean one
 
-- [ ] 4.1 Build the client, then the solution in Release with the TestSite stopped: zero warnings
-- [ ] 4.2 Run every suite from a clean build — never accept `--no-build` as evidence
-- [ ] 4.3 Run `openspec validate --all --strict`
+- [x] 4.1 Build the client, then the solution in Release with the TestSite stopped: zero warnings
+- [x] 4.2 Run every suite from a clean build — never accept `--no-build` as evidence
+- [x] 4.3 Run `openspec validate --all --strict`
+      *Release from a cleared client output with `--no-incremental`: 0 warnings, 0 errors. Unit
+      1962, integration 183, rendering 1168, client 335. Validate 25/25.*
 
 ## 5. Verify the readme BEFORE tagging
 
@@ -55,9 +75,13 @@ Done first, because a guard added after the entry is written cannot tell you the
 a defect, and had to delete and re-push a tag.
 
 - [ ] 5.1 Confirm the working tree is clean and `dev/v18` is pushed
-- [ ] 5.2 Confirm **no** readme link or image names a branch rather than the release — the check
+- [x] 5.2 Confirm **no** readme link or image names a branch rather than the release — the check
       whose absence cost `17.2.0` a tag
-- [ ] 5.3 Confirm every readme address is absolute; a relative one is the `17.0.0` defect
+      *Every reference resolves to `18.1.0` — `UBookIt/18.1.0/` for images, `blob/18.1.0/` for
+      documentation. No branch ref survives. **This is the check being run before the tag exists,
+      which is the whole point of the reordering.***
+- [x] 5.3 Confirm every readme address is absolute; a relative one is the `17.0.0` defect
+      *No relative link or image in the readme.*
 - [ ] 5.4 Only then tag `18.1.0` and have the tag pushed
 - [ ] 5.5 Fetch every readme address against the pushed tag and require 200 — **retry a failure
       before believing it**, because a 503 is not a 404
