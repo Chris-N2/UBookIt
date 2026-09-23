@@ -5,6 +5,7 @@ using Microsoft.AspNetCore.Mvc;
 using UBookIt.Backoffice.Mapping;
 using UBookIt.Backoffice.Models;
 using UBookIt.Core.Availability;
+using UBookIt.Core.Resources;
 using UBookIt.Core.Common;
 using UBookIt.Core.Stores;
 
@@ -46,6 +47,31 @@ public class ResourcesController(
                 $"No closure exists with id {id}.",
                 nameof(ResourceRequestModel.ClosureOptOuts)))
             .ToArray();
+
+    /// <summary>
+    /// The saved resource as a subsequent read would report it.
+    /// </summary>
+    /// <remarks>
+    /// <b>Re-read rather than mapped from what was written.</b> The aggregate a write produces
+    /// was built from the REQUEST, and a request carries opt-outs but never closures — so the
+    /// closure layer that decides whether an exception is superseded is absent from it, and a
+    /// response mapped from it reported `superseded: false` on every save whatever the site had
+    /// configured. The editor lost the statement the moment somebody saved and got it back on
+    /// reload. Found in the running backoffice; no test here could see it, because each one
+    /// handed the mapper a resource it had built WITH its closures.
+    /// <para>
+    /// Composing the closure layer here instead would mean a second implementation of "which
+    /// closures apply to this resource", which is the thing the hydration seam exists to keep
+    /// singular. One extra read is the cheaper mistake.
+    /// </para>
+    /// </remarks>
+    private async Task<IActionResult> SavedResourceAsync(
+        Guid id, Resource fallback, IReadOnlyList<SiteClosure> closures, CancellationToken cancellationToken)
+    {
+        var stored = await resourceStore.GetAsync(id, cancellationToken);
+
+        return Ok(ResourceModelMapper.ToModel(stored ?? fallback, closures));
+    }
 
     [Authorize(Policy = Constants.VerbPolicies.Configure)]
     [HttpGet("resources")]
@@ -129,7 +155,7 @@ public class ResourcesController(
         var created = await managementStore.CreateAsync(resource.Value, cancellationToken);
 
         return created.Succeeded
-            ? Ok(ResourceModelMapper.ToModel(created.Value, closures))
+            ? await SavedResourceAsync(created.Value.Id, created.Value, closures, cancellationToken)
             : created.Failures.ToProblemResult();
     }
 
@@ -154,7 +180,7 @@ public class ResourcesController(
         var updated = await managementStore.UpdateAsync(resource.Value, cancellationToken);
 
         return updated.Succeeded
-            ? Ok(ResourceModelMapper.ToModel(updated.Value, closures))
+            ? await SavedResourceAsync(updated.Value.Id, updated.Value, closures, cancellationToken)
             : updated.Failures.ToProblemResult();
     }
 

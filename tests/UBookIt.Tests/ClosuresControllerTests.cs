@@ -277,7 +277,10 @@ public class ClosuresControllerTests
     private static (ResourcesController Controller, InMemorySiteClosureStore Closures) WireResources()
     {
         var closures = new InMemorySiteClosureStore();
-        var resources = new InMemoryResourceStore();
+
+        // Hydrating, like the shipped store: a double that returns exactly what was written
+        // cannot see a response computed from an un-hydrated aggregate.
+        var resources = new InMemoryResourceStore().Hydrating(closures);
         return (new ResourcesController(resources, resources, closures), closures);
     }
 
@@ -347,5 +350,75 @@ public class ClosuresControllerTests
         var created = Ok<ResourceResponseModel>(await controller.CreateResource(RequestWith(), Ct));
 
         Assert.False(Assert.Single(created.Closures).Excluded);
+    }
+
+    /// <summary>
+    /// <b>FOUND IN THE RUNNING BACKOFFICE, not by any test here.</b> The save response was built
+    /// from the aggregate the REQUEST mapped to — and a request carries no closures, only
+    /// opt-outs — so <c>superseded</c> came back false however the site was configured, while the
+    /// GET of the same resource said true. The editor therefore lost the statement the moment
+    /// somebody saved, and got it back on reload.
+    /// <para>
+    /// The fix re-reads the resource through the read port after the write, so the save response
+    /// is the same projection a subsequent GET produces. Asserted here as "the two agree", rather
+    /// than as "the flag is true", because the defect was the two DISAGREEING.
+    /// </para>
+    /// </summary>
+    [Fact]
+    public async Task A_save_response_reports_the_superseded_state_the_next_read_would()
+    {
+        var (controller, closures) = WireResources();
+        var closure = TestData.Closure(Date, "Christmas Day");
+        closures.Add(closure);
+
+        var request = RequestWith();
+        request.OpeningHours = [new OpeningHoursModel { Day = Date.DayOfWeek, Start = new TimeOnly(9, 0), End = new TimeOnly(17, 0) }];
+        request.Exceptions =
+        [
+            new AvailabilityExceptionModel
+            {
+                Date = Date,
+                Windows = [new TimeWindowModel { Start = new TimeOnly(10, 0), End = new TimeOnly(14, 0) }],
+            },
+        ];
+
+        var created = Ok<ResourceResponseModel>(await controller.CreateResource(request, Ct));
+        var fetched = Ok<ResourceResponseModel>(await controller.GetResource(created.Id, Ct));
+
+        Assert.Equal(
+            Assert.Single(fetched.Exceptions).Superseded,
+            Assert.Single(created.Exceptions).Superseded);
+
+        // And it is the TRUE answer, not merely a consistent one: the closure applies.
+        Assert.True(Assert.Single(created.Exceptions).Superseded);
+    }
+
+    [Fact]
+    public async Task An_update_response_reports_the_superseded_state_the_next_read_would()
+    {
+        var (controller, closures) = WireResources();
+        var closure = TestData.Closure(Date, "Christmas Day");
+        closures.Add(closure);
+
+        var request = RequestWith();
+        var created = Ok<ResourceResponseModel>(await controller.CreateResource(request, Ct));
+
+        request.OpeningHours = [new OpeningHoursModel { Day = Date.DayOfWeek, Start = new TimeOnly(9, 0), End = new TimeOnly(17, 0) }];
+        request.Exceptions =
+        [
+            new AvailabilityExceptionModel
+            {
+                Date = Date,
+                Windows = [new TimeWindowModel { Start = new TimeOnly(10, 0), End = new TimeOnly(14, 0) }],
+            },
+        ];
+
+        var updated = Ok<ResourceResponseModel>(await controller.UpdateResource(created.Id, request, Ct));
+        var fetched = Ok<ResourceResponseModel>(await controller.GetResource(created.Id, Ct));
+
+        Assert.Equal(
+            Assert.Single(fetched.Exceptions).Superseded,
+            Assert.Single(updated.Exceptions).Superseded);
+        Assert.True(Assert.Single(updated.Exceptions).Superseded);
     }
 }

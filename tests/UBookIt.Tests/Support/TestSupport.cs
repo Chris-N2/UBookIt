@@ -27,14 +27,65 @@ public sealed class InMemoryResourceStore : IResourceStore, IResourceManagementS
 {
     private readonly Dictionary<Guid, Resource> _resources = [];
 
+    private InMemorySiteClosureStore? _closures;
+
     public InMemoryResourceStore Add(Resource resource)
     {
         _resources[resource.Id] = resource;
         return this;
     }
 
+    /// <summary>
+    /// Makes this double hydrate closures on every read, as the shipped store does.
+    /// </summary>
+    /// <remarks>
+    /// <b>Not decoration: a double that skipped this hid a real defect.</b> The save response
+    /// was mapped from the aggregate the request produced — which carries opt-outs but no
+    /// closures — so `superseded` came back false on every save while a read of the same
+    /// resource said true. Every test passed, because the double returned exactly what had been
+    /// written and the controller looked consistent with it. The defect surfaced in the running
+    /// backoffice. A double that does not hydrate is a double that cannot see this class of
+    /// fault at all.
+    /// </remarks>
+    public InMemoryResourceStore Hydrating(InMemorySiteClosureStore closures)
+    {
+        _closures = closures;
+        return this;
+    }
+
+    /// <summary>Applies the closures this resource has not opted out of, as the SQL store does.</summary>
+    private Resource Hydrate(Resource resource)
+    {
+        if (_closures is null)
+        {
+            return resource;
+        }
+
+        var applicable = ((ISiteClosureStore)_closures).ListAsync().GetAwaiter().GetResult()
+            .Where(closure => !resource.ClosureOptOuts.Contains(closure.Id));
+
+        var availability = AvailabilityConfiguration.Create(
+            resource.Availability.OpenHours,
+            resource.Availability.Exceptions,
+            resource.Availability.Constraints,
+            applicable).Value;
+
+        return Resource.Create(
+            type: resource.Type,
+            displayName: resource.DisplayName,
+            description: resource.Description,
+            capabilities: resource.Capabilities.Keys,
+            availability: availability,
+            directlyBookable: resource.DirectlyBookable,
+            id: resource.Id,
+            closureOptOuts: resource.ClosureOptOuts).Value;
+    }
+
     public Task<Resource?> GetAsync(Guid resourceId, CancellationToken cancellationToken = default)
-        => Task.FromResult(_resources.GetValueOrDefault(resourceId));
+    {
+        var resource = _resources.GetValueOrDefault(resourceId);
+        return Task.FromResult(resource is null ? null : Hydrate(resource));
+    }
 
     public Task<ResourcePage> ListAsync(int skip, int take, CancellationToken cancellationToken = default)
     {

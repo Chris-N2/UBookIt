@@ -29,13 +29,14 @@ public class ClosureAccessibilityTests
         // row: the accessible name has to carry the date and the label, not just the verb.
         var source = RepoFiles.Read(ClosuresView);
 
+        // No colon: the house form is "Edit <thing>", as the Resources list already does.
         Assert.Contains(
-            "label=\"${this.#term(\"edit\")}: ${closure.date} ${closure.label}\"",
+            "label=\"${this.#term(\"edit\")} ${closure.date} ${closure.label}\"",
             source,
             StringComparison.Ordinal);
 
         Assert.Contains(
-            "label=\"${this.#term(\"delete\")}: ${closure.date} ${closure.label}\"",
+            "label=\"${this.#term(\"delete\")} ${closure.date} ${closure.label}\"",
             source,
             StringComparison.Ordinal);
     }

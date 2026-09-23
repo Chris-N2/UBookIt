@@ -556,6 +556,9 @@ export class UBookItResourceEditorElement extends UmbLitElement {
         <p class="group-intro">${this.#term("globalClosuresIntro")}</p>
         <ul class="closures">
           ${this._closures.map(
+            // The toggle's `label` is BOTH its accessible name and its visible text — measured
+            // in the running backoffice, where rendering the date and label beside it as well
+            // showed each closure three times on one row.
             (closure, index) => html`
               <li>
                 <uui-toggle
@@ -566,8 +569,6 @@ export class UBookItResourceEditorElement extends UmbLitElement {
                       (list) => (list[index].excluded = (e.target as HTMLInputElement).checked),
                     )}
                 ></uui-toggle>
-                <span class="closure-date">${closure.date}</span>
-                <span class="closure-label">${closure.label}</span>
               </li>
             `,
           )}
@@ -752,9 +753,6 @@ export class UBookItResourceEditorElement extends UmbLitElement {
       display: flex;
       gap: var(--uui-size-space-3);
       margin-bottom: var(--uui-size-space-2);
-    }
-    .closure-date {
-      font-weight: bold;
     }
     /*
      * The statement that an exception is superseded. Deliberately NOT coloured as an

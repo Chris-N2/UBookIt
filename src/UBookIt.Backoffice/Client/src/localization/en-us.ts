@@ -32,7 +32,7 @@ export default {
     // would otherwise meet dates they did not enter with no way to tell why.
     globalClosures: "Global closures",
     globalClosuresIntro:
-      "Dates the whole organisation is closed, set in the Closures view. They close this resource too, on top of its own opening hours and exceptions — unless you open it anyway below.",
+      "Dates the whole organisation is closed, set in the Closures view. They close this resource too, on top of its own opening hours and exceptions. Override one below to stay open on that date.",
     closureOpenAnyway: "Open anyway",
 
     // Stated only where the outcome actually differs — on an exception that would
@@ -633,7 +633,7 @@ export default {
   ubookitClosures: {
     label: "Closures",
     intro:
-      "Dates the whole organisation is closed. Every resource is closed on these dates unless it is opened anyway in its own editor.",
+      "Dates the whole organisation is closed. Every resource is closed on these dates. A resource can override a closure in its own editor and stay open.",
 
     // Unconditional, and it reads nothing. True of every site whatever its data, which is
     // what lets it be stated beside the action rather than computed — a count rendered

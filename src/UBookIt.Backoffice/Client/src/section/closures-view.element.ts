@@ -264,14 +264,14 @@ export class UBookItClosuresViewElement extends UmbLitElement {
                         look="secondary"
                         compact
                         ?disabled=${this._busy}
-                        label="${this.#term("edit")}: ${closure.date} ${closure.label}"
+                        label="${this.#term("edit")} ${closure.date} ${closure.label}"
                         @click=${() => this.#startEdit(closure)}
                       ></uui-button>
                       <uui-button
                         look="secondary"
                         compact
                         ?disabled=${this._busy}
-                        label="${this.#term("delete")}: ${closure.date} ${closure.label}"
+                        label="${this.#term("delete")} ${closure.date} ${closure.label}"
                         @click=${() => void this.#delete(closure)}
                       ></uui-button>
                     </td>`

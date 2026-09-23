@@ -155,7 +155,52 @@ Against the running TestSite, over the real HTTP surfaces:
   afterwards; every closure created by the checks was deleted, so the TestSite is back to
   baseline.
 
-### Still outstanding — the backoffice UI, live
+### The backoffice UI, live — DONE, and it found three things
+
+Driven in the real backoffice once the browser was connected. The Closures tab appears between
+Bookings and Settings; a closure was created **entirely by keyboard** (Tab through date and name,
+Enter on Save) with visible focus throughout, and the table, the Global closures group and the
+superseded statement all render.
+
+**Three defects that no source-level test could see:**
+
+1. **The date and label were stated three times on each opt-out row.** `uui-toggle` renders its
+   `label` as visible text *as well as* using it for the accessible name — measured in the running
+   backoffice — so the two spans beside it repeated what the control already said. The spans are
+   gone; the toggle's own label carries it once.
+2. **The row buttons used a colon** (`Edit: 2026-12-25 Christmas Day`) where the rest of the
+   backoffice writes `Edit Closure Live Room`. Now consistent. (The visible-name style itself is
+   the house pattern — the Resources list does the same — so it was left alone.)
+3. **A save reported `superseded: false` however the site was configured.** The create and update
+   responses were mapped from the aggregate the REQUEST produced, and a request carries opt-outs
+   but never closures — so the layer that decides the marker was absent from it, while a GET of
+   the same resource said `true`. The editor lost the statement the moment somebody saved it and
+   got it back on reload.
+
+   Fixed by re-reading through the read port after a write, so a save answers exactly what the
+   next read would. **Composing the closure layer in the controller instead was rejected**: it
+   would be a second implementation of "which closures apply", which the hydration seam exists to
+   keep singular.
+
+   **The test double hid this.** `InMemoryResourceStore` returned exactly what had been written,
+   so the controller looked consistent with it and every test passed. The double now hydrates
+   closures as the shipped store does, and two tests assert the save response and the next read
+   agree — both failed before the fix.
+
+One result worth recording because it looks like a defect and is not: after opting out through the
+UI, the delivery API offered **no slots on 25 December**. That is the 90-day booking horizon, which
+ends 2026-12-22 — confirmed by walking the boundary on the same resource (20th, 21st, 22nd → 8
+slots each; 23rd, 25th → none).
+
+### Superseded — the live statement
+
+> *A global closure covers this date, so this exception has no effect at the moment. Tick "Open
+> anyway" for that date in Global closures to use it.*
+
+Rendered italic, inside the exception's own fieldset and referenced from it, and it disappears once
+the closure is overridden.
+
+### Superseded (historic note)
 
 **5.8's live half is NOT done.** The source-level half is (`ClosureAccessibilityTests`: every
 control names the closure it acts on, native inputs are labelled, the failed save is announced
