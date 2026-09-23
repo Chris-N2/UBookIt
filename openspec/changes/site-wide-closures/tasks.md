@@ -403,3 +403,27 @@ QA's disposition, which stands: it would not spend a round on this. `notPermitte
 unreachable behind the manifest's `oneOf` gate, `notPermittedWrite` is a plain paragraph of a term
 whose resolution `ElementLocalizationKeyTests` mutation-proves, and nothing since `119c3e3` has
 touched rendered markup structure. **It is a look-at-it task, not a re-review.**
+
+## 5.8 live half — DISCHARGED
+
+The backoffice session recovered (Chris refreshed another tab, which renewed the token for the
+origin), so the last gap is closed. Both refusal messages observed **rendered in the real shadow
+DOM**, with the three permission states driven on the live element:
+
+| State | Banner | Controls actually present |
+|---|---|---|
+| May read and write | none | Edit, Delete, Add closure, Show past closures |
+| May read, not write | "You do not have permission to change closures." | **Show past closures only** — the list still visible |
+| May not read | "You do not have permission to see the site's closures." | **none**, and no list |
+
+No raw localisation key appears in any of the three states, and restoring the state returns the
+control set exactly.
+
+**The first version of this check was vacuous, and it is worth recording why.** It asked whether
+the rendered text contained "Add closure" — but `uui-button` renders its label inside its OWN
+shadow root, so `shadowRoot.textContent` cannot see it. The check reported "writer sees no Add
+button" while the button was plainly on screen, which means its companions — "reader has no Add
+button", "reader has no row actions" — would have read TRUE with the buttons present. **A
+`DoesNotContain` over a subject the instrument cannot observe**: the same class QA found twice in
+this change, in an instrument built to verify the fix for it. Redone by enumerating the `uui-button`
+elements and reading their labels, which is what produced the table above.
