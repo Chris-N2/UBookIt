@@ -86,18 +86,32 @@
 
 ## 4. Pack, and verify the packed metadata rather than assuming it
 
-- [ ] 4.1 Confirm the working tree is clean and `main` is pushed — publishing from a commit that is
+- [x] 4.1 Confirm the working tree is clean and `main` is pushed — publishing from a commit that is
       not on the public repository is what makes SourceLink point nowhere
-- [ ] 4.2 **Tag `17.2.0` and push the tag BEFORE packing.** Both readmes' images resolve through
+- [x] 4.2 **Tag `17.2.0` and push the tag BEFORE packing.** Both readmes' images resolve through
       the tag; packing first produces a readme whose images 404 forever
-- [ ] 4.3 Delete prior `.nupkg` output before packing. More than one match for a package id is the
+- [x] 4.3 Delete prior `.nupkg` output before packing. More than one match for a package id is the
       stale-artifact defect, not a null reference to work around
-- [ ] 4.4 Read the packed metadata out of a `.nupkg` (it is a zip) and verify the version, the
+      *Four stale `17.1.2` artifacts were present and were deleted. This is not hypothetical
+      housekeeping: `GenerateNuspec` skips when its outputs look up to date, so they would have
+      survived the rebuild and been matched by the push wildcard.*
+- [x] 4.4 Read the packed metadata out of a `.nupkg` (it is a zip) and verify the version, the
       publisher, the icon and the Umbraco dependency bounds
-- [ ] 4.5 Verify SourceLink points at the tagged commit on the public repository
-- [ ] 4.6 **Fetch every link and image in the packed readme and verify each returns 200**, resolved
+      *Five packages, exactly one `.nupkg` each: all `17.2.0`, publisher `Norwood Design &
+      Development Ltd.`, `icon.png` present, and every `Umbraco.Cms.*` dependency bounded
+      `[17.6.2, 18.0.0)` — the bound `17.1.2` exists to carry.*
+- [x] 4.5 Verify SourceLink points at the tagged commit on the public repository
+      *All four `.snupkg` resolve to `db1ed39`, which is the tagged commit and is on origin.
+      Four rather than five is expected — the `UBookIt` metapackage carries no assembly.*
+- [x] 4.6 **Fetch every link and image in the packed readme and verify each returns 200**, resolved
       as nuget.org will resolve it — from the package page, not from the repository. This is the
       check `17.0.0` did not have and `17.0.1` paid for
+      *Sixteen addresses verified against the pushed tag: four images and twelve documentation
+      links, all 200. One returned 503 on the first attempt; retried rather than assumed either
+      way, and it is 200 — the file is present at the tag and its raw form resolves too.*
+      *The readme INSIDE the package was then read out of the `.nupkg` rather than inferred from
+      the working tree: zero relative links, every doc link and image pinned to `17.2.0`, and its
+      "uBookIt is at" sentence says `17.2.0`.*
 
 ## 5. Publish
 
