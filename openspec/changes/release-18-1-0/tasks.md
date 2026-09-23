@@ -74,7 +74,7 @@ Done first, because a guard added after the entry is written cannot tell you the
 **This ordering is the correction `17.2.0` paid for.** It tagged first, then verified, then found
 a defect, and had to delete and re-push a tag.
 
-- [ ] 5.1 Confirm the working tree is clean and `dev/v18` is pushed
+- [x] 5.1 Confirm the working tree is clean and `dev/v18` is pushed
 - [x] 5.2 Confirm **no** readme link or image names a branch rather than the release — the check
       whose absence cost `17.2.0` a tag
       *Every reference resolves to `18.1.0` — `UBookIt/18.1.0/` for images, `blob/18.1.0/` for
@@ -82,21 +82,36 @@ a defect, and had to delete and re-push a tag.
       which is the whole point of the reordering.***
 - [x] 5.3 Confirm every readme address is absolute; a relative one is the `17.0.0` defect
       *No relative link or image in the readme.*
-- [ ] 5.4 Only then tag `18.1.0` and have the tag pushed
-- [ ] 5.5 Fetch every readme address against the pushed tag and require 200 — **retry a failure
+- [x] 5.4 Only then tag `18.1.0` and have the tag pushed
+- [x] 5.5 Fetch every readme address against the pushed tag and require 200 — **retry a failure
       before believing it**, because a 503 is not a 404
+      *All sixteen resolved on first attempt — four images and twelve documentation links. No
+      retry needed this time, and no tag had to be moved, which is the reordering working.*
 
 ## 6. Pack, and verify the packed metadata rather than assuming it
 
-- [ ] 6.1 Delete `src/*/bin/Release` before packing. `GenerateNuspec` skips when its outputs look
+- [x] 6.1 Delete `src/*/bin/Release` before packing. `GenerateNuspec` skips when its outputs look
       current, so a stale `18.0.0` `.nupkg` would survive the rebuild and be matched by the push
       wildcard
-- [ ] 6.2 Clean rebuild, then pack; verify exactly one `.nupkg` per package
-- [ ] 6.3 Read the packed metadata out of the `.nupkg` and verify version, publisher, icon, and
+      *Four stale `18.0.0` artifacts were present and deleted. Present again, on the other line,
+      one release later — this is a standing condition of the repository rather than a one-off.*
+- [x] 6.2 Clean rebuild, then pack; verify exactly one `.nupkg` per package
+- [x] 6.3 Read the packed metadata out of the `.nupkg` and verify version, publisher, icon, and
       that every `Umbraco.Cms.*` dependency is bounded to the **18** range, not the 17 one
-- [ ] 6.4 Verify SourceLink resolves to the tagged commit, and that the commit is on origin
-- [ ] 6.5 Read the readme **out of the package** and confirm it is the pinned one — not the
+      *Five packages, one `.nupkg` each, all `18.1.0`, publisher and icon correct, and every
+      `Umbraco.Cms.*` bounded `[18.2.0, 19.0.0)` — asserted against the 18 range explicitly, since
+      inheriting the 17 line's bound is exactly the mistake a cherry-picked release could make.*
+- [x] 6.4 Verify SourceLink resolves to the tagged commit, and that the commit is on origin
+- [x] 6.5 Read the readme **out of the package** and confirm it is the pinned one — not the
       working tree's copy, which is not what ships
+      *Packed readme: zero relative refs, every doc link and image on `18.1.0`, "uBookIt is at
+      `18.1.0`".*
+      *Also read the packed BACKOFFICE CLIENT, to answer whether the cherry-picked client shipped:
+      `closures/holidays`, `importHeadline`, `importSummary`, `alreadyClosed` and `cannotImport`
+      are all present in the packed JS. `showsImport` is NOT — and that is the instrument, not a
+      defect: Vite mangles internal function names while keeping string literals. Confirmed by
+      checking names that certainly exist (`toggleDate`, `isSelectable`) and finding them equally
+      absent, rather than reasoning about it.*
 
 ## 7. Publish
 
