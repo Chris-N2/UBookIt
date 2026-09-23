@@ -127,3 +127,37 @@ Three MAJORs, all upheld on independent re-verification rather than taken on tru
       would not solve "1 rows" without plural handling this client does not have anywhere else.
       Recorded as a deferred obligation rather than half-fixed late in a change; it is cosmetic and
       affects one sentence on one screen.
+
+## 10. QA round 2 — APPROVED, and the nits spent rather than carried
+
+Round 2 approved with nits and judged further rounds unwarranted. Three of its MINORs were
+cheap and one was a class/instance gap, so they are spent here rather than deferred.
+
+- [x] 10.1 **The 404-means-absence rule reached one of the two endpoints that return it.** The
+      server answers 404 from the preview AND the import for one reason — the site has no source —
+      and only the preview consulted `previewFailure`. A source deregistered between fetching and
+      confirming reported "those closures could not be created" for a feature the site no longer
+      had: exactly the conflation that function exists to end. *Fixed: both calls share
+      `#withdrawImport()`, and `Both_holiday_calls_treat_a_404_as_an_absent_source` asserts the
+      call appears twice, so the class is guarded rather than the instance.* The spec scenario was
+      written to match the half that was implemented, and is now written about both.
+- [x] 10.2 **The leak instrument's comment samples did not exercise comment-stripping.** Neither
+      contained a double quote, so the regex could not match them stripped or not — they were
+      spared for a different reason than the docblock claimed. *Fixed: two samples added carrying
+      the phrase inside a QUOTED string within a comment, which the stripping and nothing else
+      spares; the unquoted pair is kept and its weaker role stated.*
+- [x] 10.3 **The `showsImport` seam was pinned on one side only.** Every client test stays green if
+      the condition is inlined again, which is how the guarantee reached QA untested in the first
+      place. *Fixed following the precedent three assertions away in the same file: the call
+      asserted present and both hand-written forms asserted absent.* Verified by mutation —
+      inlining the condition and dropping the now-unused import fails the guard by name. (Inlining
+      alone is caught earlier by `tsc`, which is a stronger guard but only while the import
+      survives.)
+- [ ] 10.4 **NIT NOT FIXED: `previewFailure` maps 401/403 to "failed",** so an expired session can
+      read as "the source could not be reached". Not treating them as absence is right; calling
+      them a source failure is the wrong other half. A third outcome needs a third message and a
+      term, and the auth layer usually intercepts first. Recorded rather than half-fixed.
+- [ ] 10.5 **NIT NOT FIXED: the leak sweep reads `.cs` and `.ts`, not `.cshtml`.** No holiday text
+      can reach a Razor view — closures are never disclosed publicly — so there is nothing to catch
+      today. Recorded because that reasoning is what makes the narrower scope safe, and it would
+      stop being true if closures ever gained a public surface.

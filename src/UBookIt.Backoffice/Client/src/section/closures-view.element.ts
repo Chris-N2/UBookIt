@@ -256,8 +256,7 @@ export class UBookItClosuresViewElement extends UmbLitElement {
         // A 404 is a third fact again: the site has no source, which can become true while this
         // screen is open. That withdraws the panel rather than blaming a feed.
         if (previewFailure(response?.status) === "absent") {
-          this._hasHolidaySource = false;
-          this._importOpen = false;
+          this.#withdrawImport();
           return;
         }
 
@@ -274,6 +273,22 @@ export class UBookItClosuresViewElement extends UmbLitElement {
     }
   }
 
+  /**
+   * Withdraws the import entirely, as though the source had never been registered.
+   *
+   * **One method because both holiday endpoints answer 404 for one reason** — the site has no
+   * source — and a rule applied to whichever of them was noticed first is the shape of defect
+   * this project keeps finding: the class is "any holiday endpoint reporting absence", not
+   * "the preview".
+   */
+  #withdrawImport() {
+    this._hasHolidaySource = false;
+    this._importOpen = false;
+    this._holidayRows = undefined;
+    this._selectedDates = [];
+    this._holidaySourceFailed = false;
+  }
+
   async #import() {
     const rows = this._holidayRows;
     if (!rows) {
@@ -284,11 +299,20 @@ export class UBookItClosuresViewElement extends UmbLitElement {
     this._error = undefined;
 
     try {
-      const { data, error } = await UBookItBackofficeService.importHolidays({
+      const { data, error, response } = await UBookItBackofficeService.importHolidays({
         body: { holidays: chosenRows(rows, this._selectedDates) },
       });
 
       if (error || !data) {
+        // The SAME rule the preview applies, because the server answers 404 from BOTH
+        // endpoints for the same reason: the site has no source. A source deregistered between
+        // fetching and confirming must withdraw the feature rather than report that closures
+        // "could not be created" for a feature this site no longer has.
+        if (previewFailure(response?.status) === "absent") {
+          this.#withdrawImport();
+          return;
+        }
+
         this._error = this.#term("importFailed");
         await this.#focusError();
         return;

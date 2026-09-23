@@ -148,4 +148,70 @@ public class ClosureAccessibilityTests
         Assert.Contains("${isSelectable(row)", source, StringComparison.Ordinal);
         Assert.DoesNotContain("row.state === \"new\"", source, StringComparison.Ordinal);
     }
+
+    /// <summary>
+    /// The view asks the shared decisions whether the import belongs on screen, rather than
+    /// re-deciding inline.
+    /// </summary>
+    /// <remarks>
+    /// <para>
+    /// <b>This pins the seam, which testing both sides of it does not.</b> `showsImport` and
+    /// `shouldAskForSource` are covered by eight cases in `holiday-fields.test.ts`, and the view
+    /// is what must keep calling them — inline the condition again and every client test stays
+    /// green while "no source, no control" quietly stops being guarded. That guarantee is the one
+    /// the whole absence design rests on, and it reached QA with no test at all.
+    /// </para>
+    /// <para>
+    /// Asserted in both directions, as the selectable-row guard above is: the call present, and
+    /// the hand-written form absent. A positive assertion alone survives a second, inline copy
+    /// sitting beside the call and disagreeing with it.
+    /// </para>
+    /// </remarks>
+    [Fact]
+    public void The_import_asks_the_shared_decisions_rather_than_re_deciding_inline()
+    {
+        var source = RepoFiles.Read(ClosuresView);
+
+        Assert.Contains("showsImport(", source, StringComparison.Ordinal);
+        Assert.Contains("shouldAskForSource(", source, StringComparison.Ordinal);
+
+        // The two conditions these replaced. Either one reappearing means the seam has been
+        // bypassed, whether or not the shared function is still called somewhere.
+        Assert.DoesNotContain("_hasHolidaySource !== true", source, StringComparison.Ordinal);
+        Assert.DoesNotContain("_hasHolidaySource === undefined", source, StringComparison.Ordinal);
+    }
+
+    /// <summary>
+    /// Both holiday endpoints report an absent source the same way.
+    /// </summary>
+    /// <remarks>
+    /// The server answers 404 from the preview AND the import for one reason — the site has no
+    /// source — so a client that applies the rule to one of them conflates "this feature is gone"
+    /// with "your closures could not be created" on the other. The rule was applied to the
+    /// preview first and the import was found by QA; this asserts the class rather than the
+    /// instance.
+    /// </remarks>
+    [Fact]
+    public void Both_holiday_calls_treat_a_404_as_an_absent_source()
+    {
+        var source = RepoFiles.Read(ClosuresView);
+
+        Assert.Equal(2, Occurrences(source, "previewFailure(response?.status)"));
+        // `this.` prefixed, so the method's own declaration is not counted as a third call.
+        Assert.Equal(2, Occurrences(source, "this.#withdrawImport()"));
+    }
+
+    private static int Occurrences(string haystack, string needle)
+    {
+        var count = 0;
+        var at = haystack.IndexOf(needle, StringComparison.Ordinal);
+
+        while (at >= 0)
+        {
+            count++;
+            at = haystack.IndexOf(needle, at + needle.Length, StringComparison.Ordinal);
+        }
+
+        return count;
+    }
 }

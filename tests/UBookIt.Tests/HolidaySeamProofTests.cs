@@ -99,6 +99,13 @@ public class HolidaySeamProofTests
     [InlineData("\"No default period has been substituted\"", false)]
     [InlineData("\"a substitute for the missing window\"", false)]
     // Must not match: prose about a jurisdiction is documentation, not behaviour.
+    //
+    // The first two carry the phrase inside a QUOTED string within the comment, so they are
+    // spared by the stripping and by nothing else — delete StripComments and they match. The
+    // unquoted pair below would be spared either way; they are here for the shape of the comment,
+    // not as evidence that stripping works.
+    [InlineData("// a term like \"Boxing Day (substitute day)\" is the feed's word, not ours", false)]
+    [InlineData("/// <remarks>Rendered as \"Spring bank holiday\" by the UK feed.</remarks>", false)]
     [InlineData("// the UK calls this a substitute day", false)]
     [InlineData("/// <remarks>A bank holiday, for example.</remarks>", false)]
     public void The_leak_instrument_matches_a_leak_and_spares_ordinary_prose(string line, bool isLeak)
