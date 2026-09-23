@@ -12,7 +12,23 @@ namespace UBookIt.Persistence.Stores;
 /// </summary>
 internal static class ResourceRowMapper
 {
-    internal static Resource ToDomain(ResourceRow row)
+    /// <summary>
+    /// Builds the domain aggregate, applying the site closures this resource has not
+    /// opted out of.
+    /// </summary>
+    /// <param name="row">The resource row, with its child collections loaded.</param>
+    /// <param name="siteClosures">
+    /// Every closure the site has. Passed in rather than read here so that a listing
+    /// costs one closure query for the whole batch instead of one per resource — the
+    /// N+1 a candidate pool would otherwise make of a single availability question.
+    /// </param>
+    /// <remarks>
+    /// <b>Closures are applied to the availability configuration, never to the
+    /// exception rows.</b> <see cref="ToExceptionRows"/> is what the write path
+    /// persists; a closure that arrived in that collection would be written back as an
+    /// exception this resource owns, outliving the closure itself.
+    /// </remarks>
+    internal static Resource ToDomain(ResourceRow row, IReadOnlyList<SiteClosure> siteClosures)
     {
         var openHours = WeeklyOpenHours.Create(
             row.OpenHours.Select(w =>
@@ -33,7 +49,15 @@ internal static class ResourceRowMapper
             leadTime: TimeSpan.FromMinutes(row.LeadTimeMinutes),
             horizonDays: row.HorizonDays).Value;
 
-        var availability = AvailabilityConfiguration.Create(openHours, exceptions, constraints).Value;
+        var optOuts = row.ClosureOptOuts.Select(o => o.ClosureId).ToHashSet();
+
+        // Filtered here, so the configuration carries only closures that actually close
+        // this resource's dates. An opted-out resource is then indistinguishable from one
+        // on a site that never had the closure — which is exactly what opting out means.
+        var applicableClosures = siteClosures.Where(c => !optOuts.Contains(c.Id));
+
+        var availability = AvailabilityConfiguration
+            .Create(openHours, exceptions, constraints, applicableClosures).Value;
 
         // Named rather than positional, deliberately. This call passed `row.Id`
         // as the sixth argument; adding one before it shifted the meaning of
@@ -47,7 +71,8 @@ internal static class ResourceRowMapper
             capabilities: row.Capabilities.Select(c => (string?)c.Key),
             availability: availability,
             directlyBookable: row.DirectlyBookable,
-            id: row.Id).Value;
+            id: row.Id,
+            closureOptOuts: optOuts).Value;
     }
 
     internal static ResourceRow ToRow(Resource resource)
@@ -61,6 +86,7 @@ internal static class ResourceRowMapper
             OpenHours = ToOpenHoursRows(resource),
             Exceptions = ToExceptionRows(resource),
             Capabilities = ToCapabilityRows(resource),
+            ClosureOptOuts = ToClosureOptOutRows(resource),
         };
         ApplyScalars(resource, row);
         return row;
@@ -101,6 +127,19 @@ internal static class ResourceRowMapper
     internal static List<ResourceCapabilityRow> ToCapabilityRows(Resource resource)
         => resource.Capabilities.Keys
             .Select(key => new ResourceCapabilityRow { ResourceId = resource.Id, Key = key })
+            .ToList();
+
+    /// <summary>
+    /// The resource's closure exemptions. Written with its other availability rows; the
+    /// closures themselves are the site's and are never written from here.
+    /// </summary>
+    internal static List<ResourceClosureOptOutRow> ToClosureOptOutRows(Resource resource)
+        => resource.ClosureOptOuts
+            .Select(closureId => new ResourceClosureOptOutRow
+            {
+                ResourceId = resource.Id,
+                ClosureId = closureId,
+            })
             .ToList();
 
     internal static List<ExceptionRow> ToExceptionRows(Resource resource)

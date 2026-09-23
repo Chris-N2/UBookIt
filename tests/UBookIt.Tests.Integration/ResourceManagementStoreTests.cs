@@ -35,12 +35,12 @@ public class ResourceManagementStoreTests(SqlServerFixture fixture)
 
         await using (var context = fixture.CreateContext())
         {
-            var created = await new SqlResourceManagementStore(context).CreateAsync(resource, Ct);
+            var created = await new SqlResourceManagementStore(context, new SqlSiteClosureStore(context)).CreateAsync(resource, Ct);
             Assert.True(created.Succeeded);
         }
 
         await using var readContext = fixture.CreateContext();
-        var reloaded = await new SqlResourceStore(readContext).GetAsync(resource.Id, Ct);
+        var reloaded = await new SqlResourceStore(readContext, new SqlSiteClosureStore(readContext)).GetAsync(resource.Id, Ct);
 
         Assert.NotNull(reloaded);
         Assert.Equal(resource.DisplayName, reloaded.DisplayName);
@@ -60,7 +60,7 @@ public class ResourceManagementStoreTests(SqlServerFixture fixture)
         var prefix = $"Page {Guid.NewGuid():N} ";
         await using (var context = fixture.CreateContext())
         {
-            var store = new SqlResourceManagementStore(context);
+            var store = new SqlResourceManagementStore(context, new SqlSiteClosureStore(context));
             for (var i = 0; i < 25; i++)
             {
                 var created = await store.CreateAsync(
@@ -70,7 +70,7 @@ public class ResourceManagementStoreTests(SqlServerFixture fixture)
         }
 
         await using var listContext = fixture.CreateContext();
-        var all = await new SqlResourceManagementStore(listContext).ListAsync(0, 500, Ct);
+        var all = await new SqlResourceManagementStore(listContext, new SqlSiteClosureStore(listContext)).ListAsync(0, 500, Ct);
         var mine = all.Items.Where(r => r.DisplayName.StartsWith(prefix)).ToList();
 
         Assert.Equal(25, mine.Count);
@@ -101,12 +101,12 @@ public class ResourceManagementStoreTests(SqlServerFixture fixture)
 
         await using (var context = fixture.CreateContext())
         {
-            Assert.True((await new SqlResourceManagementStore(context).CreateAsync(granting, Ct)).Succeeded);
+            Assert.True((await new SqlResourceManagementStore(context, new SqlSiteClosureStore(context)).CreateAsync(granting, Ct)).Succeeded);
         }
 
         await using (var context = fixture.CreateContext())
         {
-            var reloaded = await new SqlResourceStore(context).GetAsync(granting.Id, Ct);
+            var reloaded = await new SqlResourceStore(context, new SqlSiteClosureStore(context)).GetAsync(granting.Id, Ct);
             Assert.NotNull(reloaded);
             Assert.True(reloaded.DirectlyBookable);
         }
@@ -120,11 +120,11 @@ public class ResourceManagementStoreTests(SqlServerFixture fixture)
 
         await using (var context = fixture.CreateContext())
         {
-            Assert.True((await new SqlResourceManagementStore(context).UpdateAsync(withdrawn, Ct)).Succeeded);
+            Assert.True((await new SqlResourceManagementStore(context, new SqlSiteClosureStore(context)).UpdateAsync(withdrawn, Ct)).Succeeded);
         }
 
         await using var readContext = fixture.CreateContext();
-        var afterUpdate = await new SqlResourceStore(readContext).GetAsync(granting.Id, Ct);
+        var afterUpdate = await new SqlResourceStore(readContext, new SqlSiteClosureStore(readContext)).GetAsync(granting.Id, Ct);
 
         Assert.NotNull(afterUpdate);
         Assert.False(afterUpdate.DirectlyBookable);
@@ -142,11 +142,11 @@ public class ResourceManagementStoreTests(SqlServerFixture fixture)
 
         await using (var context = fixture.CreateContext())
         {
-            Assert.True((await new SqlResourceManagementStore(context).CreateAsync(silent, Ct)).Succeeded);
+            Assert.True((await new SqlResourceManagementStore(context, new SqlSiteClosureStore(context)).CreateAsync(silent, Ct)).Succeeded);
         }
 
         await using var readContext = fixture.CreateContext();
-        var reloaded = await new SqlResourceStore(readContext).GetAsync(silent.Id, Ct);
+        var reloaded = await new SqlResourceStore(readContext, new SqlSiteClosureStore(readContext)).GetAsync(silent.Id, Ct);
 
         Assert.NotNull(reloaded);
         Assert.False(reloaded.DirectlyBookable);
@@ -164,7 +164,7 @@ public class ResourceManagementStoreTests(SqlServerFixture fixture)
 
         await using (var context = fixture.CreateContext())
         {
-            Assert.True((await new SqlResourceManagementStore(context).CreateAsync(original, Ct)).Succeeded);
+            Assert.True((await new SqlResourceManagementStore(context, new SqlSiteClosureStore(context)).CreateAsync(original, Ct)).Succeeded);
         }
 
         var replacement = Resource.Create(
@@ -175,11 +175,11 @@ public class ResourceManagementStoreTests(SqlServerFixture fixture)
 
         await using (var context = fixture.CreateContext())
         {
-            Assert.True((await new SqlResourceManagementStore(context).UpdateAsync(replacement, Ct)).Succeeded);
+            Assert.True((await new SqlResourceManagementStore(context, new SqlSiteClosureStore(context)).UpdateAsync(replacement, Ct)).Succeeded);
         }
 
         await using var readContext = fixture.CreateContext();
-        var reloaded = await new SqlResourceStore(readContext).GetAsync(original.Id, Ct);
+        var reloaded = await new SqlResourceStore(readContext, new SqlSiteClosureStore(readContext)).GetAsync(original.Id, Ct);
 
         Assert.NotNull(reloaded);
         Assert.Equal("Replace Room v2", reloaded.DisplayName);
@@ -208,7 +208,7 @@ public class ResourceManagementStoreTests(SqlServerFixture fixture)
                 availability: AvailabilityConfiguration.Create(WeeklyOpenHours.Empty).Value).Value;
             await using (var context = fixture.CreateContext())
             {
-                Assert.True((await new SqlResourceManagementStore(context).CreateAsync(original, Ct)).Succeeded);
+                Assert.True((await new SqlResourceManagementStore(context, new SqlSiteClosureStore(context)).CreateAsync(original, Ct)).Succeeded);
             }
 
             Resource Variant(string time, DateOnly exceptionDate) => Resource.Create(
@@ -225,18 +225,18 @@ public class ResourceManagementStoreTests(SqlServerFixture fixture)
                 Task.Run(async () =>
                 {
                     await using var context = fixture.CreateContext();
-                    return await new SqlResourceManagementStore(context).UpdateAsync(variantA, Ct);
+                    return await new SqlResourceManagementStore(context, new SqlSiteClosureStore(context)).UpdateAsync(variantA, Ct);
                 }, Ct),
                 Task.Run(async () =>
                 {
                     await using var context = fixture.CreateContext();
-                    return await new SqlResourceManagementStore(context).UpdateAsync(variantB, Ct);
+                    return await new SqlResourceManagementStore(context, new SqlSiteClosureStore(context)).UpdateAsync(variantB, Ct);
                 }, Ct));
 
             Assert.All(results, r => Assert.True(r.Succeeded));
 
             await using var readContext = fixture.CreateContext();
-            var reloaded = await new SqlResourceStore(readContext).GetAsync(original.Id, Ct);
+            var reloaded = await new SqlResourceStore(readContext, new SqlSiteClosureStore(readContext)).GetAsync(original.Id, Ct);
             Assert.NotNull(reloaded);
 
             // Exactly one writer's complete set — a union would produce two
@@ -270,7 +270,7 @@ public class ResourceManagementStoreTests(SqlServerFixture fixture)
         var resourceId = await Seed.EveryDayRoomAsync(fixture, Ct);
 
         await using var deleteContext = fixture.CreateContext();
-        var store = new SqlResourceManagementStore(deleteContext)
+        var store = new SqlResourceManagementStore(deleteContext, new SqlSiteClosureStore(deleteContext))
         {
             TestHookAfterDeletePreCheck = async hookCancellation =>
             {
@@ -308,7 +308,7 @@ public class ResourceManagementStoreTests(SqlServerFixture fixture)
 
         await using (var context = fixture.CreateContext())
         {
-            var store = new SqlResourceManagementStore(context);
+            var store = new SqlResourceManagementStore(context, new SqlSiteClosureStore(context));
             Assert.True((await store.CreateAsync(resource, Ct)).Succeeded);
             Assert.True((await store.DeleteAsync(resource.Id, Ct)).Succeeded);
         }
@@ -333,7 +333,7 @@ public class ResourceManagementStoreTests(SqlServerFixture fixture)
         }
 
         await using var context = fixture.CreateContext();
-        var result = await new SqlResourceManagementStore(context).DeleteAsync(resourceId, Ct);
+        var result = await new SqlResourceManagementStore(context, new SqlSiteClosureStore(context)).DeleteAsync(resourceId, Ct);
 
         Assert.False(result.Succeeded);
         Assert.Equal(FailureCodes.ResourceInUse, Assert.Single(result.Failures).Code);
@@ -360,7 +360,7 @@ public class ResourceManagementStoreTests(SqlServerFixture fixture)
 
         await using (var context = fixture.CreateContext())
         {
-            var store = new SqlResourceManagementStore(context);
+            var store = new SqlResourceManagementStore(context, new SqlSiteClosureStore(context));
             foreach (var (type, name) in new[]
                      {
                          (roomType, "Room A"), (roomType, "Room B"), (roomType, "Room C"),
@@ -373,7 +373,7 @@ public class ResourceManagementStoreTests(SqlServerFixture fixture)
         }
 
         await using var verifyContext = fixture.CreateContext();
-        var types = await new SqlResourceManagementStore(verifyContext).ListTypesAsync(Ct);
+        var types = await new SqlResourceManagementStore(verifyContext, new SqlSiteClosureStore(verifyContext)).ListTypesAsync(Ct);
 
         Assert.Equal(3, types.Single(t => t.Type == roomType).Count);
         Assert.Equal(1, types.Single(t => t.Type == masseurType).Count);
@@ -389,7 +389,7 @@ public class ResourceManagementStoreTests(SqlServerFixture fixture)
 
         await using (var context = fixture.CreateContext())
         {
-            var store = new SqlResourceManagementStore(context);
+            var store = new SqlResourceManagementStore(context, new SqlSiteClosureStore(context));
 
             // Inserted in reverse key order: an unordered projection would
             // surface them insertion-first and fail the assertion below.
@@ -402,7 +402,7 @@ public class ResourceManagementStoreTests(SqlServerFixture fixture)
         }
 
         await using var verifyContext = fixture.CreateContext();
-        var store2 = new SqlResourceManagementStore(verifyContext);
+        var store2 = new SqlResourceManagementStore(verifyContext, new SqlSiteClosureStore(verifyContext));
 
         var first = await store2.ListTypesAsync(Ct);
         var second = await store2.ListTypesAsync(Ct);
@@ -419,7 +419,7 @@ public class ResourceManagementStoreTests(SqlServerFixture fixture)
         fixture.EnsureAvailable();
 
         await using var context = fixture.CreateContext();
-        var store = new SqlResourceManagementStore(context);
+        var store = new SqlResourceManagementStore(context, new SqlSiteClosureStore(context));
 
         var update = await store.UpdateAsync(
             BuildResource("Ghost", [(DayOfWeek.Monday, "08:00", "12:00")]), Ct);

@@ -111,3 +111,24 @@ the rest of your site:
 Nothing. The Razor booking flow renders on the server from the package's own services —
 that is a stated guarantee, not an implementation detail — so leaving both settings off
 costs it nothing, and turning them on changes nothing about it.
+
+## Closed dates look like any other unavailable date
+
+A site can mark dates on which the whole organisation is shut. This API says nothing about
+them: a closed date carries no availability, and there is no closure, label, or reason
+anywhere in the resource read model or in a refusal. A placement on such a date is refused
+with `outside-open-hours`, exactly as a request at three in the morning would be.
+
+That is deliberate. A closure's name is the site's own operational note — "Stocktake",
+"Directors' away day" — and this API is anonymous, so anything it returns is public. A
+consumer that wants to explain why a date is unavailable has to get that from the site, not
+from here.
+
+## Supplying your own resource store
+
+`IResourceStore` is a published port, so a host may implement its own. If you do, **applying
+the site's closures to the resources you hydrate is yours to do**, exactly as their opening
+hours and exceptions already are: availability is computed from the resource you return, and
+a resource returned without its closures is one the package will happily offer on a date the
+site has closed. The shipped SQL Server store does this; nothing in the domain can do it on
+your behalf, because the domain never loads a resource.

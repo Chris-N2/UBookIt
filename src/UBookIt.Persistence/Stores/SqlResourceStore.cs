@@ -9,7 +9,18 @@ namespace UBookIt.Persistence.Stores;
 /// (resource loads and public paged discovery). Resource writes live on the
 /// separate management store.
 /// </summary>
-internal sealed class SqlResourceStore(UBookItDbContext db) : IResourceStore
+/// <remarks>
+/// <b>Every read here hydrates the site closures that apply to the resource</b>, so a
+/// resource handed to any availability computation already carries them — including the
+/// pure projection, which takes no closure argument and could not be given one without
+/// widening a signature frozen at 17.0.0.
+/// <para>
+/// The closure set is read <b>once per call</b>, never once per resource: the consumer of
+/// <see cref="ListByTypeAsync"/> is a service's candidate pool, and a per-resource read
+/// there turns one availability question into an N+1.
+/// </para>
+/// </remarks>
+internal sealed class SqlResourceStore(UBookItDbContext db, ISiteClosureStore closures) : IResourceStore
 {
     public async Task<Resource?> GetAsync(Guid resourceId, CancellationToken cancellationToken = default)
     {
@@ -18,11 +29,19 @@ internal sealed class SqlResourceStore(UBookItDbContext db) : IResourceStore
             .Include(r => r.OpenHours)
             .Include(r => r.Exceptions)
             .Include(r => r.Capabilities)
+            .Include(r => r.ClosureOptOuts)
             .AsSplitQuery()
             .FirstOrDefaultAsync(r => r.Id == resourceId, cancellationToken)
             .ConfigureAwait(false);
 
-        return row is null ? null : ResourceRowMapper.ToDomain(row);
+        if (row is null)
+        {
+            return null;
+        }
+
+        var siteClosures = await closures.ListAsync(cancellationToken).ConfigureAwait(false);
+
+        return ResourceRowMapper.ToDomain(row, siteClosures);
     }
 
     public async Task<ResourcePage> ListAsync(int skip, int take, CancellationToken cancellationToken = default)
@@ -37,6 +56,7 @@ internal sealed class SqlResourceStore(UBookItDbContext db) : IResourceStore
             .Include(r => r.OpenHours)
             .Include(r => r.Exceptions)
             .Include(r => r.Capabilities)
+            .Include(r => r.ClosureOptOuts)
             .AsSplitQuery()
             .OrderBy(r => r.DisplayName).ThenBy(r => r.Id)
             .Skip(skip)
@@ -44,7 +64,9 @@ internal sealed class SqlResourceStore(UBookItDbContext db) : IResourceStore
             .ToListAsync(cancellationToken)
             .ConfigureAwait(false);
 
-        return new ResourcePage(rows.Select(ResourceRowMapper.ToDomain).ToList(), total);
+        var siteClosures = await closures.ListAsync(cancellationToken).ConfigureAwait(false);
+
+        return new ResourcePage(rows.Select(r => ResourceRowMapper.ToDomain(r, siteClosures)).ToList(), total);
     }
 
     public async Task<IReadOnlyList<Resource>> ListByTypeAsync(
@@ -60,12 +82,17 @@ internal sealed class SqlResourceStore(UBookItDbContext db) : IResourceStore
             .Include(r => r.OpenHours)
             .Include(r => r.Exceptions)
             .Include(r => r.Capabilities)
+            .Include(r => r.ClosureOptOuts)
             .AsSplitQuery()
             .Where(r => r.Type == type)
             .OrderBy(r => r.Id)
             .ToListAsync(cancellationToken)
             .ConfigureAwait(false);
 
-        return rows.Select(ResourceRowMapper.ToDomain).ToList();
+        // One closure read for the whole pool, outside the projection below, so that the
+        // cost of this query does not scale with the number of candidates.
+        var siteClosures = await closures.ListAsync(cancellationToken).ConfigureAwait(false);
+
+        return rows.Select(r => ResourceRowMapper.ToDomain(r, siteClosures)).ToList();
     }
 }

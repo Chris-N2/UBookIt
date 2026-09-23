@@ -20,7 +20,7 @@ public class ResourceCapabilityApiTests
     private static (ResourcesController Controller, InMemoryResourceStore Store) Wire()
     {
         var store = new InMemoryResourceStore();
-        return (new ResourcesController(store, store), store);
+        return (new ResourcesController(store, store, new InMemorySiteClosureStore()), store);
     }
 
     private static ResourceRequestModel Request(params string[] capabilities) => new()

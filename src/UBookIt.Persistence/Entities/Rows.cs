@@ -36,6 +36,13 @@ internal sealed class ResourceRow
     public List<ExceptionRow> Exceptions { get; set; } = [];
 
     public List<ResourceCapabilityRow> Capabilities { get; set; } = [];
+
+    /// <summary>
+    /// The site closures this resource is exempt from. Resource-owned, written with
+    /// the resource's other availability rows; the closures themselves belong to the
+    /// site and are never written from here.
+    /// </summary>
+    public List<ResourceClosureOptOutRow> ClosureOptOuts { get; set; } = [];
 }
 
 /// <summary>
@@ -333,4 +340,47 @@ internal sealed class CancellationSecretRow
     public DateTimeOffset IssuedUtc { get; set; }
 
     public DateTimeOffset? RedeemedUtc { get; set; }
+}
+
+/// <summary>
+/// Table: uBookItSiteClosure. One row per date the organisation is closed.
+/// </summary>
+/// <remarks>
+/// <b>Site-owned, and never a resource's exception.</b> A closure is inherited by every
+/// resource, so it lives in a table of its own rather than being copied onto each — which
+/// is also what lets one edit reach every resource, and what stops a resource's own save
+/// writing an inherited date back as an exception it owns.
+/// <para>
+/// <b>No personal data, ever.</b> A date and the site's own name for it. Erasure has no
+/// business with this table.
+/// </para>
+/// </remarks>
+internal sealed class SiteClosureRow
+{
+    public Guid Id { get; set; }
+
+    /// <summary>
+    /// Uniquely indexed: at most one closure per date is a property of the schema rather
+    /// than of the store's code, because a check performed before writing is a race.
+    /// </summary>
+    public DateOnly Date { get; set; }
+
+    public required string Label { get; set; }
+
+    public List<ResourceClosureOptOutRow> OptOuts { get; set; } = [];
+}
+
+/// <summary>
+/// Table: uBookItResourceClosureOptOut. One row per resource exempted from one closure.
+/// </summary>
+/// <remarks>
+/// Keyed by (resource, closure) so a duplicate exemption is impossible in storage and not
+/// only in the domain. Cascades from both parents: an exemption cannot outlive the closure
+/// it exempts from, nor the resource it exempts.
+/// </remarks>
+internal sealed class ResourceClosureOptOutRow
+{
+    public Guid ResourceId { get; set; }
+
+    public Guid ClosureId { get; set; }
 }

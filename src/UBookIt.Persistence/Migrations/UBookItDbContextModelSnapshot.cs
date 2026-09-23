@@ -229,6 +229,23 @@ namespace UBookIt.Persistence.Migrations
                     b.ToTable("uBookItResourceCapability", (string)null);
                 });
 
+            modelBuilder.Entity("UBookIt.Persistence.Entities.ResourceClosureOptOutRow", b =>
+                {
+                    b.Property<Guid>("ResourceId")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<Guid>("ClosureId")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.HasKey("ResourceId", "ClosureId");
+
+                    b.HasIndex("ClosureId");
+
+                    b.HasIndex("ResourceId");
+
+                    b.ToTable("uBookItResourceClosureOptOut", (string)null);
+                });
+
             modelBuilder.Entity("UBookIt.Persistence.Entities.ResourceRow", b =>
                 {
                     b.Property<Guid>("Id")
@@ -383,6 +400,27 @@ namespace UBookIt.Persistence.Migrations
                     b.ToTable("uBookItSetting", (string)null);
                 });
 
+            modelBuilder.Entity("UBookIt.Persistence.Entities.SiteClosureRow", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<DateOnly>("Date")
+                        .HasColumnType("date");
+
+                    b.Property<string>("Label")
+                        .IsRequired()
+                        .HasMaxLength(512)
+                        .HasColumnType("nvarchar(512)");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("Date")
+                        .IsUnique();
+
+                    b.ToTable("uBookItSiteClosure", (string)null);
+                });
+
             modelBuilder.Entity("UBookIt.Persistence.Entities.ClaimRow", b =>
                 {
                     b.HasOne("UBookIt.Persistence.Entities.BookingRow", null)
@@ -425,6 +463,21 @@ namespace UBookIt.Persistence.Migrations
                         .IsRequired();
                 });
 
+            modelBuilder.Entity("UBookIt.Persistence.Entities.ResourceClosureOptOutRow", b =>
+                {
+                    b.HasOne("UBookIt.Persistence.Entities.SiteClosureRow", null)
+                        .WithMany("OptOuts")
+                        .HasForeignKey("ClosureId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.HasOne("UBookIt.Persistence.Entities.ResourceRow", null)
+                        .WithMany("ClosureOptOuts")
+                        .HasForeignKey("ResourceId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+                });
+
             modelBuilder.Entity("UBookIt.Persistence.Entities.ServiceRoleCapabilityRow", b =>
                 {
                     b.HasOne("UBookIt.Persistence.Entities.ServiceRoleRow", null)
@@ -452,6 +505,8 @@ namespace UBookIt.Persistence.Migrations
                 {
                     b.Navigation("Capabilities");
 
+                    b.Navigation("ClosureOptOuts");
+
                     b.Navigation("Exceptions");
 
                     b.Navigation("OpenHours");
@@ -465,6 +520,11 @@ namespace UBookIt.Persistence.Migrations
             modelBuilder.Entity("UBookIt.Persistence.Entities.ServiceRow", b =>
                 {
                     b.Navigation("Roles");
+                });
+
+            modelBuilder.Entity("UBookIt.Persistence.Entities.SiteClosureRow", b =>
+                {
+                    b.Navigation("OptOuts");
                 });
 #pragma warning restore 612, 618
         }

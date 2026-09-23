@@ -316,6 +316,7 @@ theming guide. Nothing about it will look broken if a theme leaves it out.
 | **Resources** | The bookable things themselves: opening hours, exceptions, duration limits, capabilities, and whether each may be booked directly |
 | **Services** | What a visitor books by name, and the resource roles each service resolves to |
 | **Bookings** | What the site has taken: a window you choose, filtered by status, showing the reference, when, who booked *(if you may see it — below)*, which resources, which service, and status |
+| **Closures** | The dates the whole organisation is shut. Every resource inherits them; any resource can be opened anyway on a given date from its own editor |
 
 **The reference is the first column, because it is the one you scan.** Every booking carries a
 short reference — `7QX4-M2NP` — which the person who booked was shown on their confirmation.
@@ -516,6 +517,53 @@ somebody edits a service today.
 **A booking with no service was booked directly**, against a resource offered on its own.
 It is not a booking whose service failed to be recorded. Both kinds are normal, and which
 one a resource allows is the *booked directly* setting on the resource itself.
+
+## Closures
+
+A **closure** is a date the organisation itself is shut — a bank holiday, a stocktake, the
+week between Christmas and New Year. It is kept once, in the Closures view, instead of being
+typed into every resource's exception list.
+
+**A closure closes every resource for that date**, including resources created after it, and
+it wins over both a resource's weekly hours and its own date exceptions. Bookers see the date
+simply as unavailable: nothing on the booking page or the delivery API says a closure exists
+or what it is called.
+
+### Opening one resource anyway
+
+Every resource's editor carries a **Global closures** group listing the site's closures, each
+with an **Open anyway** tick. Ticking one exempts *that resource* from *that closure*, and the
+date then behaves exactly as if the closure had never existed — the resource's own exception
+for the day if it has one, otherwise its weekly hours.
+
+Where a resource has an exception that a closure is currently overriding, the editor says so
+against that exception. It says it only when the exception would otherwise change the day: an
+exception that closes the date is closed either way, and calling that "superseded" would
+report a difference that is not there.
+
+### Who can do what
+
+| | |
+|---|---|
+| **See the closure list, and open a resource anyway** | *Configure resources and services* |
+| **Add, edit or delete a closure** | *Change site settings* |
+
+The split is deliberate. Exempting one resource is a resource decision; one closure entry shuts
+every resource the site has, so it sits with the same grant as the site's other settings — and
+that grant is **never given automatically**, including on upgrade. Until an administrator ticks
+it, the Closures view is visible to anyone who configures resources and says so, rather than
+appearing to work and refusing the save.
+
+### What a closure does not do
+
+**It does not cancel bookings already placed.** A booking on a date you then close keeps its
+time, its status and its reference, and goes on holding that slot against anything else being
+booked over it. Closing a date changes what can be booked from that moment; it never reaches
+backwards into what has been.
+
+It also has no notion of a half day — closing at one o'clock on Christmas Eve is a resource's
+own exception, which can set any hours for a single date — and no notion of recurrence: each
+year's date is its own entry.
 
 ## What the section does not do
 

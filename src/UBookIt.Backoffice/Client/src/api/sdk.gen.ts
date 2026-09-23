@@ -2,7 +2,7 @@
 
 import type { Client, Options as Options2, TDataShape } from './client';
 import { client } from './client.gen';
-import type { CancelBookingData, CancelBookingErrors, CancelBookingResponses, ConfirmBookingData, ConfirmBookingErrors, ConfirmBookingResponses, CreateResourceData, CreateResourceErrors, CreateResourceResponses, CreateServiceData, CreateServiceErrors, CreateServiceResponses, DeclineBookingData, DeclineBookingErrors, DeclineBookingResponses, DeleteResourceData, DeleteResourceErrors, DeleteResourceResponses, DeleteServiceData, DeleteServiceErrors, DeleteServiceResponses, EraseBookerData, EraseBookerErrors, EraseBookerResponses, FindBookingByReferenceData, FindBookingByReferenceErrors, FindBookingByReferenceResponses, FindBookingsByBookerData, FindBookingsByBookerErrors, FindBookingsByBookerResponses, GetResourceData, GetResourceErrors, GetResourceResponses, GetResourceResponsibilityData, GetResourceResponsibilityErrors, GetResourceResponsibilityResponses, GetServiceData, GetServiceErrors, GetServiceResponses, GetServiceResponsibilityData, GetServiceResponsibilityErrors, GetServiceResponsibilityResponses, GetSettingsData, GetSettingsErrors, GetSettingsResponses, ListBookableSubjectsData, ListBookableSubjectsErrors, ListBookableSubjectsResponses, ListBookingsData, ListBookingsErrors, ListBookingsResponses, ListCapabilitiesData, ListCapabilitiesErrors, ListCapabilitiesResponses, ListResourcesData, ListResourcesErrors, ListResourcesResponses, ListResourceTypesData, ListResourceTypesErrors, ListResourceTypesResponses, ListServicesData, ListServicesErrors, ListServicesResponses, MoveBookingData, MoveBookingErrors, MoveBookingResponses, PlaceBookingOnBehalfData, PlaceBookingOnBehalfErrors, PlaceBookingOnBehalfResponses, PreviewServiceConfigurationData, PreviewServiceConfigurationErrors, PreviewServiceConfigurationResponses, PutResourceResponsibilityData, PutResourceResponsibilityErrors, PutResourceResponsibilityResponses, PutServiceResponsibilityData, PutServiceResponsibilityErrors, PutServiceResponsibilityResponses, PutSettingData, PutSettingErrors, PutSettingResponses, ResetSettingData, ResetSettingErrors, ResetSettingResponses, UpdateResourceData, UpdateResourceErrors, UpdateResourceResponses, UpdateServiceData, UpdateServiceErrors, UpdateServiceResponses } from './types.gen';
+import type { CancelBookingData, CancelBookingErrors, CancelBookingResponses, ConfirmBookingData, ConfirmBookingErrors, ConfirmBookingResponses, CreateClosureData, CreateClosureErrors, CreateClosureResponses, CreateResourceData, CreateResourceErrors, CreateResourceResponses, CreateServiceData, CreateServiceErrors, CreateServiceResponses, DeclineBookingData, DeclineBookingErrors, DeclineBookingResponses, DeleteClosureData, DeleteClosureErrors, DeleteClosureResponses, DeleteResourceData, DeleteResourceErrors, DeleteResourceResponses, DeleteServiceData, DeleteServiceErrors, DeleteServiceResponses, EraseBookerData, EraseBookerErrors, EraseBookerResponses, FindBookingByReferenceData, FindBookingByReferenceErrors, FindBookingByReferenceResponses, FindBookingsByBookerData, FindBookingsByBookerErrors, FindBookingsByBookerResponses, GetResourceData, GetResourceErrors, GetResourceResponses, GetResourceResponsibilityData, GetResourceResponsibilityErrors, GetResourceResponsibilityResponses, GetServiceData, GetServiceErrors, GetServiceResponses, GetServiceResponsibilityData, GetServiceResponsibilityErrors, GetServiceResponsibilityResponses, GetSettingsData, GetSettingsErrors, GetSettingsResponses, ListBookableSubjectsData, ListBookableSubjectsErrors, ListBookableSubjectsResponses, ListBookingsData, ListBookingsErrors, ListBookingsResponses, ListCapabilitiesData, ListCapabilitiesErrors, ListCapabilitiesResponses, ListClosuresData, ListClosuresErrors, ListClosuresResponses, ListResourcesData, ListResourcesErrors, ListResourcesResponses, ListResourceTypesData, ListResourceTypesErrors, ListResourceTypesResponses, ListServicesData, ListServicesErrors, ListServicesResponses, MoveBookingData, MoveBookingErrors, MoveBookingResponses, PlaceBookingOnBehalfData, PlaceBookingOnBehalfErrors, PlaceBookingOnBehalfResponses, PreviewServiceConfigurationData, PreviewServiceConfigurationErrors, PreviewServiceConfigurationResponses, PutResourceResponsibilityData, PutResourceResponsibilityErrors, PutResourceResponsibilityResponses, PutServiceResponsibilityData, PutServiceResponsibilityErrors, PutServiceResponsibilityResponses, PutSettingData, PutSettingErrors, PutSettingResponses, ResetSettingData, ResetSettingErrors, ResetSettingResponses, UpdateClosureData, UpdateClosureErrors, UpdateClosureResponses, UpdateResourceData, UpdateResourceErrors, UpdateResourceResponses, UpdateServiceData, UpdateServiceErrors, UpdateServiceResponses } from './types.gen';
 
 export type Options<TData extends TDataShape = TDataShape, ThrowOnError extends boolean = boolean> = Options2<TData, ThrowOnError> & {
     /**
@@ -157,6 +157,66 @@ export class UBookItBackofficeService {
             headers: {
                 'Content-Type': 'application/json',
                 ...options?.headers
+            }
+        });
+    }
+    
+    public static listClosures<ThrowOnError extends boolean = false>(options?: Options<ListClosuresData, ThrowOnError>) {
+        return (options?.client ?? client).get<ListClosuresResponses, ListClosuresErrors, ThrowOnError>({
+            security: [
+                {
+                    scheme: 'bearer',
+                    type: 'http'
+                }
+            ],
+            url: '/umbraco/ubookitbackoffice/api/v1/closures',
+            ...options
+        });
+    }
+    
+    public static createClosure<ThrowOnError extends boolean = false>(options?: Options<CreateClosureData, ThrowOnError>) {
+        return (options?.client ?? client).post<CreateClosureResponses, CreateClosureErrors, ThrowOnError>({
+            security: [
+                {
+                    scheme: 'bearer',
+                    type: 'http'
+                }
+            ],
+            url: '/umbraco/ubookitbackoffice/api/v1/closures',
+            ...options,
+            headers: {
+                'Content-Type': 'application/json',
+                ...options?.headers
+            }
+        });
+    }
+    
+    public static deleteClosure<ThrowOnError extends boolean = false>(options: Options<DeleteClosureData, ThrowOnError>) {
+        return (options.client ?? client).delete<DeleteClosureResponses, DeleteClosureErrors, ThrowOnError>({
+            security: [
+                {
+                    scheme: 'bearer',
+                    type: 'http'
+                }
+            ],
+            url: '/umbraco/ubookitbackoffice/api/v1/closures/{id}',
+            ...options
+        });
+    }
+    
+    public static updateClosure<ThrowOnError extends boolean = false>(options: Options<UpdateClosureData, ThrowOnError>) {
+        return (options.client ?? client).put<UpdateClosureResponses, UpdateClosureErrors, ThrowOnError>({
+            security: [
+                {
+                    scheme: 'bearer',
+                    type: 'http'
+                }
+            ],
+            url: '/umbraco/ubookitbackoffice/api/v1/closures/{id}',
+            ...options,
+            headers: {
+                'Content-Type': 'application/json',
+                ...options.headers
             }
         });
     }

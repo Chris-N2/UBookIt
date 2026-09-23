@@ -120,7 +120,12 @@ internal static class ResourceModelMapper
             capabilities: model.Capabilities,
             availability: availability ?? AvailabilityConfiguration.Closed,
             directlyBookable: model.DirectlyBookable,
-            id: id);
+            id: id,
+
+            // Full replacement, like the capability set: an update that omits an id
+            // withdraws that exemption. Whether each id names a closure that exists is
+            // checked by the controller, which can read the closures; the domain cannot.
+            closureOptOuts: model.ClosureOptOuts);
 
         if (!resource.Succeeded)
         {
@@ -132,7 +137,18 @@ internal static class ResourceModelMapper
             : DomainResult<Resource>.Success(resource.Value);
     }
 
-    internal static ResourceResponseModel ToModel(Resource resource)
+    /// <summary>
+    /// The resource as the management contract reports it, with every site closure projected
+    /// beside it.
+    /// </summary>
+    /// <param name="resource">The resource, hydrated with the closures that apply to it.</param>
+    /// <param name="siteClosures">
+    /// EVERY closure the site has — including the ones this resource is exempt from, which are
+    /// absent from its availability by construction and could not otherwise be offered for the
+    /// editor to un-exempt.
+    /// </param>
+    internal static ResourceResponseModel ToModel(
+        Resource resource, IReadOnlyList<SiteClosure>? siteClosures = null)
     {
         var constraints = resource.Availability.Constraints;
 
@@ -156,6 +172,21 @@ internal static class ResourceModelMapper
                     Windows = exception.Windows
                         .Select(window => new TimeWindowModel { Start = window.Start, End = window.End })
                         .ToList(),
+
+                    // Asked of the domain rather than derived here: precedence has one
+                    // implementation, and this readout must agree with the availability the
+                    // booking path computes from the same rule.
+                    Superseded = resource.Availability.IsExceptionSuperseded(exception.Date),
+                })
+                .ToList(),
+            Closures = (siteClosures ?? [])
+                .OrderBy(closure => closure.Date)
+                .Select(closure => new ResourceClosureModel
+                {
+                    Id = closure.Id,
+                    Date = closure.Date,
+                    Label = closure.Label,
+                    Excluded = resource.ClosureOptOuts.Contains(closure.Id),
                 })
                 .ToList(),
             Constraints = new ConstraintsModel

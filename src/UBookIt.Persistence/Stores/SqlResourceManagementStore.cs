@@ -13,7 +13,8 @@ namespace UBookIt.Persistence.Stores;
 /// single transaction — the write-path exception-date uniqueness enforcement
 /// (design D2): every committed write is one writer's complete validated set.
 /// </summary>
-internal sealed class SqlResourceManagementStore(UBookItDbContext db) : IResourceManagementStore
+internal sealed class SqlResourceManagementStore(UBookItDbContext db, ISiteClosureStore closures)
+    : IResourceManagementStore
 {
     private const int SqlForeignKeyViolation = 547;
 
@@ -64,9 +65,16 @@ internal sealed class SqlResourceManagementStore(UBookItDbContext db) : IResourc
             .ExecuteDeleteAsync(cancellationToken).ConfigureAwait(false);
         await db.ResourceCapabilities.Where(c => c.ResourceId == resource.Id)
             .ExecuteDeleteAsync(cancellationToken).ConfigureAwait(false);
+        await db.ResourceClosureOptOuts.Where(o => o.ResourceId == resource.Id)
+            .ExecuteDeleteAsync(cancellationToken).ConfigureAwait(false);
         db.OpenHours.AddRange(ResourceRowMapper.ToOpenHoursRows(resource));
         db.Exceptions.AddRange(ResourceRowMapper.ToExceptionRows(resource));
         db.ResourceCapabilities.AddRange(ResourceRowMapper.ToCapabilityRows(resource));
+
+        // Exemptions are replaced wholesale with the rest of the resource's availability,
+        // inside the same transaction and under the same per-resource lock, so a write can
+        // neither merge two writers' sets nor leave a resource half-exempted.
+        db.ResourceClosureOptOuts.AddRange(ResourceRowMapper.ToClosureOptOutRows(resource));
 
         await db.SaveChangesAsync(cancellationToken).ConfigureAwait(false);
         await transaction.CommitAsync(cancellationToken).ConfigureAwait(false);
@@ -168,6 +176,7 @@ internal sealed class SqlResourceManagementStore(UBookItDbContext db) : IResourc
             .Include(r => r.OpenHours)
             .Include(r => r.Exceptions)
             .Include(r => r.Capabilities)
+            .Include(r => r.ClosureOptOuts)
             .AsSplitQuery()
             .OrderBy(r => r.DisplayName).ThenBy(r => r.Id)
             .Skip(skip)
@@ -175,7 +184,12 @@ internal sealed class SqlResourceManagementStore(UBookItDbContext db) : IResourc
             .ToListAsync(cancellationToken)
             .ConfigureAwait(false);
 
-        return new ResourcePage(rows.Select(ResourceRowMapper.ToDomain).ToList(), total);
+        // One closure read for the page, so the backoffice list reports the same
+        // inheritance the booking path computes, at the same cost whatever its size.
+        var siteClosures = await closures.ListAsync(cancellationToken).ConfigureAwait(false);
+
+        return new ResourcePage(
+            rows.Select(r => ResourceRowMapper.ToDomain(r, siteClosures)).ToList(), total);
     }
 
     public async Task<IReadOnlyList<ResourceTypeUsage>> ListTypesAsync(CancellationToken cancellationToken = default)

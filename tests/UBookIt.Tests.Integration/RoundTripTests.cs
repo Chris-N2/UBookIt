@@ -50,7 +50,7 @@ public class RoundTripTests(SqlServerFixture fixture)
         }
 
         await using var readContext = fixture.CreateContext();
-        var resource = await new SqlResourceStore(readContext).GetAsync(id, Ct);
+        var resource = await new SqlResourceStore(readContext, new SqlSiteClosureStore(readContext)).GetAsync(id, Ct);
 
         Assert.NotNull(resource);
         Assert.Equal("room", resource.Type);
@@ -123,7 +123,7 @@ public class RoundTripTests(SqlServerFixture fixture)
         fixture.EnsureAvailable();
 
         await using var context = fixture.CreateContext();
-        Assert.Null(await new SqlResourceStore(context).GetAsync(Guid.NewGuid(), Ct));
+        Assert.Null(await new SqlResourceStore(context, new SqlSiteClosureStore(context)).GetAsync(Guid.NewGuid(), Ct));
         Assert.Null(await new SqlBookingStore(context).GetBookingAsync(Guid.NewGuid(), Ct));
     }
 }

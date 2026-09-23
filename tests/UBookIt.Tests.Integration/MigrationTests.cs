@@ -26,6 +26,8 @@ public class MigrationTests(SqlServerFixture fixture)
         Assert.Contains("uBookItResourceClaim", tables);
         Assert.Contains("uBookItResponsibility", tables);
         Assert.Contains("uBookItFlag", tables);
+        Assert.Contains("uBookItSiteClosure", tables);
+        Assert.Contains("uBookItResourceClosureOptOut", tables);
         Assert.Contains(UBookItDbContext.MigrationsHistoryTableName, tables);
         Assert.DoesNotContain("__EFMigrationsHistory", tables);
     }

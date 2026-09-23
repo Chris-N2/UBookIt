@@ -4,6 +4,8 @@ using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
 using UBookIt.Backoffice.Mapping;
 using UBookIt.Backoffice.Models;
+using UBookIt.Core.Availability;
+using UBookIt.Core.Common;
 using UBookIt.Core.Stores;
 
 namespace UBookIt.Backoffice.Controllers;
@@ -18,8 +20,33 @@ namespace UBookIt.Backoffice.Controllers;
 [ApiExplorerSettings(GroupName = "UBookIt.Backoffice")]
 public class ResourcesController(
     IResourceStore resourceStore,
-    IResourceManagementStore managementStore) : UBookItBackofficeApiControllerBase
+    IResourceManagementStore managementStore,
+    ISiteClosureStore closureStore) : UBookItBackofficeApiControllerBase
 {
+    /// <summary>
+    /// Every site closure, read once per request. The response projects the whole list —
+    /// including closures this resource is exempt from, which its availability does not
+    /// carry — so an editor can un-exempt as well as exempt.
+    /// </summary>
+    private Task<IReadOnlyList<SiteClosure>> ClosuresAsync(CancellationToken cancellationToken)
+        => closureStore.ListAsync(cancellationToken);
+
+    /// <summary>
+    /// Refuses an opt-out naming a closure that does not exist. Checked here because this is
+    /// where the closures are readable: the domain never loads them, so a rule stated there
+    /// would only appear to be enforced.
+    /// </summary>
+    private static DomainFailure[] UnknownClosures(
+        ResourceRequestModel model, IReadOnlyList<SiteClosure> closures)
+        => model.ClosureOptOuts
+            .Where(id => closures.All(closure => closure.Id != id))
+            .Distinct()
+            .Select(id => new DomainFailure(
+                FailureCodes.ClosureNotFound,
+                $"No closure exists with id {id}.",
+                nameof(ResourceRequestModel.ClosureOptOuts)))
+            .ToArray();
+
     [Authorize(Policy = Constants.VerbPolicies.Configure)]
     [HttpGet("resources")]
     [ProducesResponseType<PagedResourcesModel>(StatusCodes.Status200OK)]
@@ -27,11 +54,12 @@ public class ResourcesController(
         int skip = 0, int take = 50, CancellationToken cancellationToken = default)
     {
         var page = await managementStore.ListAsync(skip, take, cancellationToken);
+        var closures = await ClosuresAsync(cancellationToken);
 
         return Ok(new PagedResourcesModel
         {
             Total = page.Total,
-            Items = page.Items.Select(ResourceModelMapper.ToModel).ToList(),
+            Items = page.Items.Select(resource => ResourceModelMapper.ToModel(resource, closures)).ToList(),
         });
     }
 
@@ -76,7 +104,7 @@ public class ResourcesController(
 
         return resource is null
             ? NotFoundProblem(id)
-            : Ok(ResourceModelMapper.ToModel(resource));
+            : Ok(ResourceModelMapper.ToModel(resource, await ClosuresAsync(cancellationToken)));
     }
 
     [Authorize(Policy = Constants.VerbPolicies.Configure)]
@@ -86,16 +114,22 @@ public class ResourcesController(
     public async Task<IActionResult> CreateResource(
         ResourceRequestModel model, CancellationToken cancellationToken = default)
     {
+        var closures = await ClosuresAsync(cancellationToken);
+
         var resource = ResourceModelMapper.ToDomain(model);
-        if (!resource.Succeeded)
+        var unknown = UnknownClosures(model, closures);
+
+        if (!resource.Succeeded || unknown.Length > 0)
         {
-            return resource.Failures.ToProblemResult();
+            // Both sets in one response, so a save reports every failed rule rather than
+            // whichever check happened to run first.
+            return resource.Failures.Concat(unknown).ToList().ToProblemResult();
         }
 
         var created = await managementStore.CreateAsync(resource.Value, cancellationToken);
 
         return created.Succeeded
-            ? Ok(ResourceModelMapper.ToModel(created.Value))
+            ? Ok(ResourceModelMapper.ToModel(created.Value, closures))
             : created.Failures.ToProblemResult();
     }
 
@@ -107,16 +141,20 @@ public class ResourcesController(
     public async Task<IActionResult> UpdateResource(
         Guid id, ResourceRequestModel model, CancellationToken cancellationToken = default)
     {
+        var closures = await ClosuresAsync(cancellationToken);
+
         var resource = ResourceModelMapper.ToDomain(model, id);
-        if (!resource.Succeeded)
+        var unknown = UnknownClosures(model, closures);
+
+        if (!resource.Succeeded || unknown.Length > 0)
         {
-            return resource.Failures.ToProblemResult();
+            return resource.Failures.Concat(unknown).ToList().ToProblemResult();
         }
 
         var updated = await managementStore.UpdateAsync(resource.Value, cancellationToken);
 
         return updated.Succeeded
-            ? Ok(ResourceModelMapper.ToModel(updated.Value))
+            ? Ok(ResourceModelMapper.ToModel(updated.Value, closures))
             : updated.Failures.ToProblemResult();
     }
 

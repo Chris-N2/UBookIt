@@ -7,6 +7,7 @@ export type ClientOptions = {
 export type AvailabilityExceptionModel = {
     date: string;
     windows: Array<TimeWindowModel>;
+    superseded?: boolean;
 };
 
 export type BookableSubjectModel = {
@@ -182,6 +183,13 @@ export type ProblemDetails = {
     [key: string]: unknown | string | null | string | null | number | null | string | null | string | null | undefined;
 };
 
+export type ResourceClosureModel = {
+    id: string;
+    date: string;
+    label: string;
+    excluded: boolean;
+};
+
 export type ResourceRequestModel = {
     type: string;
     displayName: string;
@@ -190,6 +198,7 @@ export type ResourceRequestModel = {
     exceptions: Array<AvailabilityExceptionModel>;
     capabilities: Array<string>;
     directlyBookable: boolean;
+    closureOptOuts: Array<string>;
     constraints?: ConstraintsModel | null;
 };
 
@@ -202,6 +211,7 @@ export type ResourceResponseModel = {
     exceptions: Array<AvailabilityExceptionModel>;
     capabilities: Array<string>;
     directlyBookable: boolean;
+    closures: Array<ResourceClosureModel>;
     constraints: ConstraintsModel;
 };
 
@@ -314,6 +324,17 @@ export type ShortfallRoleModel = {
     resourceType: string;
     requiredCapabilities: Array<string>;
     count: number;
+};
+
+export type SiteClosureModel = {
+    id: string;
+    date: string;
+    label: string;
+};
+
+export type SiteClosureRequestModel = {
+    date: string;
+    label: string;
 };
 
 export type StartMisalignmentModel = {
@@ -642,6 +663,124 @@ export type FindBookingsByBookerResponses = {
 };
 
 export type FindBookingsByBookerResponse = FindBookingsByBookerResponses[keyof FindBookingsByBookerResponses];
+
+export type ListClosuresData = {
+    body?: never;
+    path?: never;
+    query?: {
+        includePast?: boolean;
+    };
+    url: '/umbraco/ubookitbackoffice/api/v1/closures';
+};
+
+export type ListClosuresErrors = {
+    /**
+     * The resource is protected and requires an authentication token
+     */
+    401: unknown;
+};
+
+export type ListClosuresResponses = {
+    /**
+     * OK
+     */
+    200: Array<SiteClosureModel>;
+};
+
+export type ListClosuresResponse = ListClosuresResponses[keyof ListClosuresResponses];
+
+export type CreateClosureData = {
+    body?: SiteClosureRequestModel;
+    path?: never;
+    query?: never;
+    url: '/umbraco/ubookitbackoffice/api/v1/closures';
+};
+
+export type CreateClosureErrors = {
+    /**
+     * Bad Request
+     */
+    400: ProblemDetails;
+    /**
+     * The resource is protected and requires an authentication token
+     */
+    401: unknown;
+};
+
+export type CreateClosureError = CreateClosureErrors[keyof CreateClosureErrors];
+
+export type CreateClosureResponses = {
+    /**
+     * OK
+     */
+    200: SiteClosureModel;
+};
+
+export type CreateClosureResponse = CreateClosureResponses[keyof CreateClosureResponses];
+
+export type DeleteClosureData = {
+    body?: never;
+    path: {
+        id: string;
+    };
+    query?: never;
+    url: '/umbraco/ubookitbackoffice/api/v1/closures/{id}';
+};
+
+export type DeleteClosureErrors = {
+    /**
+     * The resource is protected and requires an authentication token
+     */
+    401: unknown;
+    /**
+     * Not Found
+     */
+    404: ProblemDetails;
+};
+
+export type DeleteClosureError = DeleteClosureErrors[keyof DeleteClosureErrors];
+
+export type DeleteClosureResponses = {
+    /**
+     * OK
+     */
+    200: unknown;
+};
+
+export type UpdateClosureData = {
+    body?: SiteClosureRequestModel;
+    path: {
+        id: string;
+    };
+    query?: never;
+    url: '/umbraco/ubookitbackoffice/api/v1/closures/{id}';
+};
+
+export type UpdateClosureErrors = {
+    /**
+     * Bad Request
+     */
+    400: ProblemDetails;
+    /**
+     * The resource is protected and requires an authentication token
+     */
+    401: unknown;
+    /**
+     * Not Found
+     */
+    404: ProblemDetails;
+};
+
+export type UpdateClosureError = UpdateClosureErrors[keyof UpdateClosureErrors];
+
+export type UpdateClosureResponses = {
+    /**
+     * OK
+     */
+    200: SiteClosureModel;
+};
+
+export type UpdateClosureResponse = UpdateClosureResponses[keyof UpdateClosureResponses];
 
 export type ListResourcesData = {
     body?: never;

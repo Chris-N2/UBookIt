@@ -45,3 +45,27 @@ export function canConfigure(permissions: Array<string> | undefined): boolean {
 export function canManageSettings(permissions: Array<string> | undefined): boolean {
   return hasAnyVerb(permissions, SETTINGS_VERB);
 }
+
+/**
+ * Reading the site's closure list.
+ *
+ * Satisfied by EITHER verb, mirroring the server's `UBookItClosuresRead` policy — and, like
+ * it, this is not an implication between them: each reaches this read on its own account and
+ * gains nothing else the other holds. An operator editing a resource must see what it is
+ * inheriting in order to exempt it, and whoever decides the site's closures must be able to
+ * see them.
+ */
+export function canReadClosures(permissions: Array<string> | undefined): boolean {
+  return hasAnyVerb(permissions, CONFIGURE_VERB, SETTINGS_VERB);
+}
+
+/**
+ * Changing the closure list — the settings verb alone, exactly as writing a setting is.
+ *
+ * One entry shuts every resource the site has, including those created after it, so a grant
+ * meaning "may add a meeting room" does not carry it. Reading is deliberately wider: see
+ * `canReadClosures`.
+ */
+export function canManageClosures(permissions: Array<string> | undefined): boolean {
+  return canManageSettings(permissions);
+}

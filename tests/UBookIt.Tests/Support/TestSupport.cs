@@ -109,6 +109,79 @@ public sealed class InMemoryResourceStore : IResourceStore, IResourceManagementS
     }
 }
 
+/// <summary>
+/// Doubles for both closure ports.
+/// </summary>
+/// <remarks>
+/// <b>Hydration is the shipped store's job, not this one's.</b> A resource handed to a
+/// controller in these tests already carries whatever closures its configuration was built
+/// with; this double answers "what closures does the site have", which is what the
+/// management surface reads in order to project them and to reject an opt-out naming none.
+/// </remarks>
+public sealed class InMemorySiteClosureStore : ISiteClosureStore, ISiteClosureManagementStore
+{
+    private readonly Dictionary<Guid, SiteClosure> _closures = [];
+
+    public InMemorySiteClosureStore Add(SiteClosure closure)
+    {
+        _closures[closure.Id] = closure;
+        return this;
+    }
+
+    public Task<IReadOnlyList<SiteClosure>> ListAsync(CancellationToken cancellationToken = default)
+        => Task.FromResult(Ordered(null));
+
+    public Task<IReadOnlyList<SiteClosure>> ListAsync(
+        DateOnly? from = null, CancellationToken cancellationToken = default)
+        => Task.FromResult(Ordered(from));
+
+    public Task<SiteClosure?> GetAsync(Guid closureId, CancellationToken cancellationToken = default)
+        => Task.FromResult(_closures.GetValueOrDefault(closureId));
+
+    public Task<DomainResult<SiteClosure>> CreateAsync(
+        SiteClosure closure, CancellationToken cancellationToken = default)
+    {
+        if (_closures.Values.Any(c => c.Date == closure.Date))
+        {
+            return Task.FromResult(DomainResult<SiteClosure>.Failure(
+                FailureCodes.DuplicateClosureDate, $"A closure already exists for {closure.Date:yyyy-MM-dd}."));
+        }
+
+        _closures[closure.Id] = closure;
+        return Task.FromResult(DomainResult<SiteClosure>.Success(closure));
+    }
+
+    public Task<DomainResult<SiteClosure>> UpdateAsync(
+        SiteClosure closure, CancellationToken cancellationToken = default)
+    {
+        if (!_closures.ContainsKey(closure.Id))
+        {
+            return Task.FromResult(DomainResult<SiteClosure>.Failure(
+                FailureCodes.ClosureNotFound, $"No closure exists with id {closure.Id}."));
+        }
+
+        if (_closures.Values.Any(c => c.Date == closure.Date && c.Id != closure.Id))
+        {
+            return Task.FromResult(DomainResult<SiteClosure>.Failure(
+                FailureCodes.DuplicateClosureDate, $"A closure already exists for {closure.Date:yyyy-MM-dd}."));
+        }
+
+        _closures[closure.Id] = closure;
+        return Task.FromResult(DomainResult<SiteClosure>.Success(closure));
+    }
+
+    public Task<DomainResult> DeleteAsync(Guid closureId, CancellationToken cancellationToken = default)
+        => Task.FromResult(_closures.Remove(closureId)
+            ? DomainResult.Success()
+            : DomainResult.Failure(FailureCodes.ClosureNotFound, $"No closure exists with id {closureId}."));
+
+    private IReadOnlyList<SiteClosure> Ordered(DateOnly? from)
+        => _closures.Values
+            .Where(c => from is null || c.Date >= from)
+            .OrderBy(c => c.Date)
+            .ToList();
+}
+
 /// <summary>In-memory service store implementing both the read and management ports.</summary>
 public sealed class InMemoryServiceStore : IServiceStore, IServiceManagementStore
 {
@@ -547,8 +620,16 @@ public static class TestData
     public static AvailabilityConfiguration Config(
         WeeklyOpenHours openHours,
         IEnumerable<DateException>? exceptions = null,
-        BookingConstraints? constraints = null)
-        => AvailabilityConfiguration.Create(openHours, exceptions, constraints).Value;
+        BookingConstraints? constraints = null,
+        IEnumerable<SiteClosure>? closures = null)
+        => AvailabilityConfiguration.Create(openHours, exceptions, constraints, closures).Value;
+
+    /// <summary>
+    /// A site closure for a date. The label is required of every closure, so the
+    /// helper supplies one rather than letting a test's intent hinge on it.
+    /// </summary>
+    public static SiteClosure Closure(DateOnly date, string label = "Public holiday", Guid? id = null)
+        => SiteClosure.Create(date, label, id).Value;
 
     /// <summary>
     /// A room open 08:00–18:00 on <see cref="BaseDate"/>'s day of week (and only

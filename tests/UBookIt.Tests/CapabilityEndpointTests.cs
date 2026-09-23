@@ -42,7 +42,7 @@ public class CapabilityEndpointTests
     }
 
     private static ResourcesController Wire(CapabilityUsage[]? capabilities = null)
-        => new(new InMemoryResourceStore(), new ProjectionOnlyManagementStore(capabilities));
+        => new(new InMemoryResourceStore(), new ProjectionOnlyManagementStore(capabilities), new InMemorySiteClosureStore());
 
     private static List<CapabilityUsageModel> OkUsage(IActionResult result)
         => Assert.IsType<List<CapabilityUsageModel>>(Assert.IsType<OkObjectResult>(result).Value);

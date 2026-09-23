@@ -87,6 +87,18 @@ public class PermissionsTests
         ["ResponsibilityController.GetServiceResponsibility"] = Constants.VerbPolicies.Configure,
         ["ResponsibilityController.PutResourceResponsibility"] = Constants.VerbPolicies.Configure,
         ["ResponsibilityController.PutServiceResponsibility"] = Constants.VerbPolicies.Configure,
+
+        // Site closures split across two verbs, and the split is the decision (site-wide-closures
+        // change). READING names a policy satisfied by Configure OR Settings: an operator editing
+        // a resource must see what it is inheriting in order to exempt it, and cannot do either
+        // without reading the list. WRITING names the settings verb alone — one entry shuts every
+        // resource the site has, including those created after it, and a grant meaning "may add a
+        // meeting room" does not carry that. Exempting one resource is a resource write and sits
+        // on ResourcesController.UpdateResource above, under Configure, where it belongs.
+        ["ClosuresController.ListClosures"] = Constants.VerbPolicies.ClosuresRead,
+        ["ClosuresController.CreateClosure"] = Constants.VerbPolicies.Settings,
+        ["ClosuresController.UpdateClosure"] = Constants.VerbPolicies.Settings,
+        ["ClosuresController.DeleteClosure"] = Constants.VerbPolicies.Settings,
     };
 
     /// <summary>

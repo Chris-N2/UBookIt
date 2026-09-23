@@ -34,7 +34,7 @@ public class ServicePreviewTests(SqlServerFixture fixture)
     {
         var settings = new SiteBookingSettings { TimeZoneId = "UTC" };
         var time = new FixedIntegrationClock();
-        var resources = new SqlResourceStore(context);
+        var resources = new SqlResourceStore(context, new SqlSiteClosureStore(context));
         var bookings = new SqlBookingStore(context);
 
         return new ServiceBookingService(

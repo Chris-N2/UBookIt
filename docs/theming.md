@@ -200,6 +200,17 @@ tells its visitors nothing about their personal data — and nobody reports that
 If your theme replaces `_YourDetails`, either call `_PrivacyNotice` from it or render the
 same four facts yourself.
 
+## A closed date is just an unavailable date
+
+Your views never see why a date is unavailable. A date the whole organisation is closed on, a
+date the resource is simply not open on, and a date that is fully booked all reach a theme the
+same way: with nothing to render. There is no closure, label or reason in any view model, so a
+theme cannot say "closed for Christmas" — and one that hard-codes such a message will be wrong
+on every other unavailable date.
+
+This is the same decision the delivery API makes, for the same reason: a closure's name is the
+site's own operational note, and the booking flow is public.
+
 ## What has been measured
 
 A theme's views winning over uBookIt's own has been measured in two configurations:

@@ -227,6 +227,40 @@ public static class FailureCodes
     /// </para>
     /// </summary>
     public const string PinnedResourceUnavailable = "pinned-resource-unavailable";
+
+    // Site closures
+
+    /// <summary>
+    /// A site closure's label is absent, blank once trimmed, or longer than the
+    /// package's name-column length.
+    /// <para>
+    /// <b>One code for shape and length</b>, on the same grounds as
+    /// <see cref="TypeKeyInvalid"/>: the length is validated in the domain rather
+    /// than left to the column, so that an over-long label is a stable validation
+    /// failure instead of a 500 at INSERT.
+    /// </para>
+    /// <para>
+    /// The label is required rather than optional because an inherited closure is
+    /// offered for opt-out where a resource is edited, and a bare date asks an
+    /// operator to exempt something they cannot identify.
+    /// </para>
+    /// </summary>
+    public const string ClosureLabelInvalid = "closure-label-invalid";
+
+    /// <summary>
+    /// A second site closure was offered for a date that already carries one.
+    /// Distinct from <see cref="DuplicateExceptionDate"/>, which is about a single
+    /// resource's own exceptions: a date may legitimately carry both a closure and
+    /// a resource's exception, and only the closure layer is site-wide.
+    /// </summary>
+    public const string DuplicateClosureDate = "duplicate-closure-date";
+
+    /// <summary>
+    /// A resource's closure opt-out named an id no closure carries. Refused rather
+    /// than ignored: an opt-out silently dropped would leave a resource closed on a
+    /// date its editor believed they had exempted it from.
+    /// </summary>
+    public const string ClosureNotFound = "closure-not-found";
 }
 
 /// <summary>

@@ -1,0 +1,170 @@
+## 1. Domain: the closure layer and precedence
+
+- [x] 1.1 Add a `SiteClosure` value type (id, date, label) with `Create` validating a required, trimmed label against the name-column length and returning the stable code `closure-label-invalid`; verify with unit tests covering absent, blank, whitespace-only and over-long labels
+- [x] 1.2 Add the failure codes `closure-label-invalid`, `duplicate-closure-date` and `closure-not-found` to `FailureCodes`; verify by a test asserting each constant's literal value, since the codes are a published contract
+- [x] 1.3 Extend `AvailabilityConfiguration` with an applicable-closure layer via a new optional parameter on `Create` and a read-only member, leaving the existing signature and every existing caller untouched; verify the existing availability suite still passes unchanged
+- [x] 1.4 Make `EffectiveWindows` consult closures first — a closure yields no windows for its date, whatever the exception or weekly pattern says; verify with unit tests for closure-over-weekly, closure-over-override-exception, and closure-over-closure-exception
+- [x] 1.5 Add the resource's opt-out closure ids to `Resource` as a new optional parameter on `Create` (defaulting to none) and a read-only member; verify a resource created without them carries none and existing construction sites still compile
+- [x] 1.6 Verify the full precedence ladder end to end in `UBookIt.Core` — closure, then the resource's own exception, then the weekly pattern — including that an opted-out closure produces a result identical to a site holding no closure for that date
+- [x] 1.7 Define the closure read and management ports (`ISiteClosureStore` and its management counterpart) as **new** interfaces; verify by a test asserting no member was added to `IResourceStore`, `IBookingStore` or any other published port
+
+## 2. Persistence: tables, migration, hydration
+
+- [x] 2.1 Add `SiteClosureRow` and `ResourceClosureOptOutRow` entities with a unique index on the closure date, a unique (resource, closure) pair, and cascade delete from both parents; verify the model builds and the context snapshot reflects both tables
+- [x] 2.2 Generate one additive EF Core migration creating both tables; verify against a database from the previous version that both tables exist and no existing table, column or index was altered or dropped
+- [x] 2.3 Implement the closure stores (list with an upcoming/all filter, create, update, delete), with deterministic ordering; verify with integration tests on real SQL Server, including that a duplicate date is refused as `duplicate-closure-date` under concurrent writes rather than throwing
+- [x] 2.4 Hydrate applicable closures in `ResourceRowMapper.ToDomain` and the resource stores — the full closure list minus that resource's opt-outs — reading closures **once per store call**; verify a type-filtered listing issues one closure query for the whole batch, not one per resource
+- [x] 2.5 Persist opt-out rows through `ToRow`/`ApplyScalars` alongside open hours and exceptions, replaced wholesale in the same transaction; verify with integration tests that concurrent updates leave exactly one writer's complete set and that an update replaces rather than merges
+- [x] 2.6 Verify the write-back trap is shut: load a resource inheriting a closure, save it unchanged, delete the closure, and assert the resource has no exception for that date and the date resolves from its weekly pattern
+- [x] 2.7 Write the seam test through the production entry point — a real resource read followed by a real availability query on a closure date — rather than a test either side of the join; verify it fails if hydration is removed
+- [x] 2.8 Register the new stores in the persistence composer; verify by resolving them from the container in an integration test
+
+## 3. Availability and placement wiring
+
+- [x] 3.1 Verify slot projection, bookable-start projection and the pure `ProjectBookableStarts` overload all omit a closure date, with no change to their signatures; assert the public surface is unchanged by a test over the frozen API
+- [x] 3.2 Verify service availability over a candidate pool omits a closure date, and still offers it when a candidate that can fill every role has opted out
+- [x] 3.3 Verify placement on a closure date fails with `outside-open-hours`, that the failure names neither the closure nor its label, and that placement on an opted-out closure date succeeds
+
+## 4. Management API
+
+- [x] 4.1 Add closure DTO models and a closures controller in the `ubookitbackoffice` swagger group (list with upcoming/all filter, create, update, delete), with problem-details responses carrying a type member; verify with controller tests covering each verb and a 404 for an unknown id
+- [x] 4.2 Enforce the verb split in authorization policy — writes require `UBookIt.Settings`, reads require `UBookIt.Configure` or `UBookIt.Settings`; verify with tests for each verb combination, including that an Umbraco administrator without `UBookIt.Settings` is refused a write
+- [x] 4.3 Add opt-out closure ids to `ResourceRequestModel` with full-replacement semantics and `closure-not-found` validation; verify round-trip, replacement, omission-means-none, and the unknown-id rejection
+- [x] 4.4 Add the projected closure list (id, date, label, excluded) to `ResourceResponseModel`; verify a resource's response reports every closure with the correct excluded flag
+- [x] 4.5 Compute the superseded-exception marking server-side, firing only where the outcome differs; verify an override exception on a non-excluded closure date is marked, a closure exception on the same date is not, and opting out clears the marking
+- [x] 4.6 Regenerate the OpenAPI client and verify the generated TypeScript compiles and carries the new endpoints and members
+
+## 5. Backoffice client
+
+- [x] 5.1 Add the `Closures` section view and manifest entry gated `oneOf: [UBookIt.Configure, UBookIt.Settings]`; verify the view appears for a Configure-only user and is absent for a user holding neither
+- [x] 5.2 Implement the closures list with create, edit and delete, defaulting to upcoming with past available on request, served by the server-side filter; verify with client tests over the list's filter state
+- [x] 5.3 State the read-only condition for a user without `UBookIt.Settings` — what the grant is and where it is given — instead of rendering controls that would be refused; verify with a client test for the read-only rendering
+- [x] 5.4 State unconditionally that closures never cancel bookings already placed, computing nothing; verify by a test asserting the statement is produced without any booking request being made
+- [x] 5.5 Add the Global closures group to the resource editor — each closure's date and label with an opt-out control, identifiable as originating outside the resource; verify opting out round-trips through a save and reopen
+- [x] 5.6 Render the superseded-exception statement from the server's marking, programmatically associated with the exception it concerns; verify with a client test that the marking is read from the response and not derived from the closure list
+- [x] 5.7 Add the new localization terms to `en-us.ts`; verify with the cross-language guard that every term the C# side and the elements reference has an entry, so no raw key can render
+- [x] 5.8 Verify the accessibility baseline on both surfaces: every input labelled, failures announced and associated, full keyboard operability with visible focus on the closures view and the Global closures group
+
+## 6. Live verification
+
+- [x] 6.1 Build the client, then the solution, and verify zero warnings in Release
+- [x] 6.2 On the running TestSite, create a closure and verify a resource's availability loses that date in the front-end booking flow, with nothing naming the closure or its reason
+- [x] 6.3 On the running TestSite, opt one resource out and verify the date returns for that resource only, and that a resource whose own override exception was superseded now offers those windows
+- [x] 6.4 Verify the delivery API exposes no closure, label or opt-out on the public resource read model, and that a closed date is indistinguishable from any other unavailable date
+- [x] 6.5 Verify the verb split live: a Configure-only backoffice user sees the list and can opt a resource out but cannot create a closure
+
+## 7. Documentation
+
+- [x] 7.1 Document site closures in the README feature list and the setup guide, including the precedence ladder and the opt-out; verify the README's feature claims match what ships, since a denial pinned by a guard has shipped here before
+- [x] 7.2 Document that a host implementing its own `IResourceStore` owns applying closures, alongside the other published-port obligations; verify the statement names the interface and the consequence
+- [x] 7.3 Record in the front-end/theming docs that a closed date is indistinguishable from any other unavailable date, so a theme author does not expect a reason to render
+
+## 8. Wholesale replacements to re-diff
+
+Each of these requirements is replaced **in full** by this change's deltas, so anything the current
+version guarantees and the new one forgets to restate is deleted with nothing in the diff that looks
+like a deletion. `design.md` (D9) records the diff made at propose time; each task below is to check
+that record against `openspec/specs/` as it stands now, not to trust it.
+
+- [x] 8.1 Re-diff **Date exceptions** (availability): every SHALL and both original scenarios carried forward, closure precedence and retention added; verify by listing each original guarantee as carried, dropped or superseded
+- [x] 8.2 Re-diff **Free-time computation** (availability): subtraction of blocking claims, ordered disjoint output, non-blocking statuses, window coalescing, all three original scenarios; verify the same way
+- [x] 8.3 Re-diff **Placement validation pipeline** (bookings): the ordered code list, start-alignment rule, both representability paragraphs, the service-pool rule, all nine original scenarios; verify the same way
+- [x] 8.4 Re-diff **Access within the section is decided by four verbs** (permissions): four bullets, every italic rationale, Manage-implies-Read, Settings-implies-nothing, the union rule, the no-permission-store rule, all twelve original scenarios; verify the same way
+- [x] 8.5 Re-diff **Resource CRUD endpoints** (resource-management): every existing sentence and all five original scenarios; verify the same way
+- [x] 8.6 Re-diff **Workspace editor for a resource** (resource-management): every existing sentence and all five original scenarios; verify the same way
+
+## 9. Spec sync
+
+- [x] 9.1 Re-run the sibling-falsification sweep over every spec not in this change's deltas, looking for sentences about availability, exceptions or verbs that closures make untrue; verify by listing what was checked and what was found
+- [x] 9.2 Run `openspec validate --strict` and verify the change passes
+- [x] 9.3 Run the full unit suite and verify `ChangeDeltaIntegrityTests` passes, since it is the guard that refuses an unlisted wholesale replacement
+
+## Results
+
+### Guarantee diffs (group 8)
+
+Re-diffed mechanically against `openspec/specs/` as it stands, with a script that was first
+**proved able to find a deletion**: removing one scenario and one untouched SHALL from a copy
+of the availability delta made it report both. (A diff that reports nothing is as suspect as
+one that reports everything.)
+
+**No scenario was dropped from any of the six replaced requirements** — every one carries
+more scenarios than the version it replaces:
+
+| Requirement | Scenarios before → after | SHALLs checked |
+|---|---|---|
+| availability / Date exceptions | 2 → 5 | 3 |
+| availability / Free-time computation | 3 → 5 | 4 |
+| bookings / Placement validation pipeline | 8 → 10 | 10 |
+| permissions / Access within the section is decided by four verbs | 12 → 17 | 4 |
+| resource-management / Resource CRUD endpoints | 5 → 11 | 4 |
+| resource-management / Workspace editor for a resource | 5 → 9 | 3 |
+
+Five SHALL sentences were reported as "not found verbatim". Each was checked by hand and is a
+sentence this change **deliberately widened**, with the remainder intact:
+
+1. *Free-time computation* — "open hours (with exceptions applied)" → "(with the resource's own
+   exceptions and any applicable site closures applied)".
+2. *Placement validation pipeline* — the same widening inside the `outside-open-hours` gloss.
+3. *Four verbs* (twice) — the Configure and Settings bullets gained closures; the sentences
+   themselves (`define exactly four permission verbs…`, `Manage SHALL imply Read`,
+   `SHALL imply nothing and SHALL be implied by nothing`, the union rule, the no-permission-store
+   rule) are all present verbatim, confirmed by literal match.
+4. *Workspace editor* — the grouped-sections list gained **Global closures**.
+
+### Sibling-falsification sweep (9.1)
+
+Checked every spec **not** in this change's deltas for sentences about open hours, exceptions,
+availability or verbs. **Nothing was falsified**; the four worth recording as considered:
+
+- `delivery-api` "SHALL NOT expose management or internal configuration (raw weekly open-hours
+  pattern, date exceptions)" — **still true**, and closures are not exposed. The parenthetical is
+  an example list rather than an enumeration, and the positive guarantee for closures is stated
+  with its own scenarios in `site-closures` ("Closures are not disclosed publicly"), so the
+  requirement was left unmodified deliberately rather than by oversight.
+- `delivery-api` failure-code mapping — closures reuse `outside-open-hours` → 400, already listed.
+  Confirmed live.
+- `booking-management` move-refusal wording ("outside the resource's open hours") — true of a
+  closure date, which is outside the resource's effective open hours.
+- `site-settings` time-zone consequence ("open hours and exceptions are stored as day-and-time
+  without a zone") — a closure is a bare date, so it is reinterpreted on the same terms; the
+  statement remains true and complete about what it names.
+
+### Live verification (group 6)
+
+Against the running TestSite, over the real HTTP surfaces:
+
+- **6.1** Release build clean, **0 warnings**. (Trap worth knowing: the vite bundle's hashed
+  filenames change on every client build, so a stale `obj/<config>` static-web-asset manifest
+  fails the build with "No file exists for the asset". Deleting `wwwroot/App_Plugins/UBookItBackoffice`
+  and the config's `obj` folder clears it — hit in both Debug and Release.)
+- **6.2** On the **shipped Razor booking page**, not just the API: 29 dates offered; closing one
+  in the middle left 28, with the closed date gone, **every other date still offered**, and the
+  date restored when the closure was deleted. The rendered page names no closure, label or
+  reason. (The check first flagged the word "closure" on the page — it was the fixture resource's
+  own display name, "Closure Live Room", in the heading. Explained rather than waved away.)
+- **6.3** Opting one resource out returned 8 slots on the closed date while a second resource
+  **created after the closure** still had none. A resource whose own 10:00–14:00 override had been
+  superseded then offered exactly 10:00, 11:00, 12:00 and 13:00 — the ladder, end to end.
+- **6.4** The public resource read model carries no closure, label or opt-out. Placement on a
+  closed date was refused **400 `outside-open-hours`**, with nothing in the body naming the
+  closure or its label; a control placement on an open date succeeded.
+- **6.5** Proved against a **real user holding `UBookIt.Configure` and nothing else** (a user
+  group and API user created for the purpose): `GET closures` → 200, `POST closures` → **403**,
+  `GET resources` → 200, `GET settings` → 403. The credentials were revoked and the user disabled
+  afterwards; every closure created by the checks was deleted, so the TestSite is back to
+  baseline.
+
+### Still outstanding — the backoffice UI, live
+
+**5.8's live half is NOT done.** The source-level half is (`ClosureAccessibilityTests`: every
+control names the closure it acts on, native inputs are labelled, the failed save is announced
+and focused, the superseded statement is referenced from its exception). What has **not** been
+verified is the rendered backoffice: the Closures view and the Global closures group in a real
+browser, keyboard operability and focus visibility through `uui-*` shadow DOM, and that the
+section tab appears where expected.
+
+The Chrome extension is not connected in this session, so it could not be driven from here. This
+package's own history says backoffice editor faults show up only in the real shadow DOM, so this
+is a genuine gap rather than a formality — it needs doing before QA, by hand or with the
+extension connected.
