@@ -55,6 +55,24 @@
       previous version's assembly is not present to diff against, so "which interfaces are new"
       cannot be derived inside the suite.*
 
+## 2b. What the pre-publish verification found — and it was owed to this release
+
+- [x] 2b.1 **The packed readme's twelve documentation links named `blob/main`, not the release.**
+      The readme is frozen per published version while the documents it links to are fetched live,
+      so `17.2.0`'s page would have described whatever `main` holds years from now. This is not a
+      new discovery: `release-18-0-0` found it, fixed it **on the 18 line only**, and it was
+      recorded as owed at the next 17-line release. This is that release, and it is the last
+      moment it can be fixed for `17.2.0` — after the push the readme cannot be corrected
+- [x] 2b.2 Pin all twelve to the `17.2.0` tag. Verified none remain on a branch ref
+- [x] 2b.3 **Carry BOTH halves across from `dev/v18`, not one.** Moving a guard without its
+      requirement, or a requirement without its guard, is the recorded failure mode that left this
+      defect on one line in the first place:
+      - the guard `The_readme_documentation_links_name_the_release_they_shipped_with`, mutation-
+        tested here — reverting a single link to `blob/main` fails it by name
+      - the requirement *A documentation link in the packed readme names the release it shipped
+        with*, as an `ADDED` delta with all five of its scenarios
+- [x] 2b.4 Verify the link addresses resolve on the tag once it is moved to the final commit
+
 ## 3. Build, and prove the suite is green from a clean one
 
 - [x] 3.1 Build the client, then the solution in Release with the TestSite stopped: zero warnings

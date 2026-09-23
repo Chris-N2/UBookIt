@@ -111,6 +111,15 @@ something it does not fit.
 reaches every release rather than that change — and it is fixed here rather than deferred because
 this is the first release it actually binds.
 
+**`packaging` also gains one requirement**, and that one was owed rather than discovered: *A
+documentation link in the packed readme names the release it shipped with* was added by
+`release-18-0-0` and satisfied **on the 18 line only**, leaving `main`'s readme pointing its
+twelve documentation links at `blob/main`. The pre-publish verification found it, which is what
+that verification is for — and this release is the last moment it can be fixed for `17.2.0`,
+because a packed readme cannot be corrected after the push. Both halves are carried across, the
+requirement and its guard, because moving one without the other is what left the defect on a
+single line to begin with.
+
 **No other capability is modified.** Recorded as considered rather than left silent. If the
 pre-publish verification finds a documented claim this release falsifies, that becomes a further
 modification and is proposed here rather than fixed quietly.

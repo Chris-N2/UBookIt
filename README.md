@@ -18,13 +18,13 @@ Grant it deliberately rather than to everyone: it decides who can see the bookin
 taken. Who can see the **name and email address** of the person who booked is a second
 question, answered by Umbraco's built-in **Sensitive data** group — and note that only the
 site's original super user is in that group to begin with, so a newly created administrator
-sees those details hidden until you add them. See [the backoffice docs](https://github.com/Chris-N2/UBookIt/blob/main/docs/backoffice.md).
+sees those details hidden until you add them. See [the backoffice docs](https://github.com/Chris-N2/UBookIt/blob/17.2.0/docs/backoffice.md).
 
 > **uBookIt is at `17.2.0`, and the public API is a promise.** The promise is not that nothing
 > will ever change — `17.1.0` itself added members to five published interfaces, which is why it
 > is a minor. It is that a change to a published contract is deliberate, is named before you meet
 > it, and never arrives in a patch. What each release asks of a site that is upgrading is the
-> first thing in [the changelog](https://github.com/Chris-N2/UBookIt/blob/main/CHANGELOG.md).
+> first thing in [the changelog](https://github.com/Chris-N2/UBookIt/blob/17.2.0/CHANGELOG.md).
 
 ### What the version number means
 
@@ -48,7 +48,7 @@ defaults or a documented upgrade path so a site that already works keeps working
 release never carries a breaking change.
 
 **"Called out explicitly" means
-[the changelog](https://github.com/Chris-N2/UBookIt/blob/main/CHANGELOG.md)**, where each release
+[the changelog](https://github.com/Chris-N2/UBookIt/blob/17.2.0/CHANGELOG.md)**, where each release
 opens with what upgrading asks of you before it says what you gain.
 
 ## Requirements
@@ -90,7 +90,7 @@ migration time rather than quietly misbehave.
   calling (no header check or CORS policy can make an anonymous API know that), and volume
   protection belongs to your host's rate limiting or edge — uBookIt makes no
   DDoS-protection claim. The details, including the breaking change if you were already
-  using the API, are in [the delivery API](https://github.com/Chris-N2/UBookIt/blob/main/docs/delivery-api.md).
+  using the API, are in [the delivery API](https://github.com/Chris-N2/UBookIt/blob/17.2.0/docs/delivery-api.md).
 - **A Bookings section** in the backoffice for seeing bookings, cancelling them, moving them
   to a new time, and — where you have asked for bookings to be approved rather than confirmed
   on the spot — confirming or declining them. **With permissions per user group**: seeing bookings, acting on them,
@@ -107,7 +107,7 @@ migration time rather than quietly misbehave.
 - **Self-service cancellation**, so a booker can call a booking off from a link in their
   confirmation email instead of ringing you. **Off by default**, and it needs booker emails
   on — the link rides that message, so without it the feature stays absent rather than
-  half-working. Read [the configuration notes](https://github.com/Chris-N2/UBookIt/blob/main/docs/configuration.md) first: the link is the credential.
+  half-working. Read [the configuration notes](https://github.com/Chris-N2/UBookIt/blob/17.2.0/docs/configuration.md) first: the link is the credential.
 - **A settings screen**, so uBookIt's configuration is visible in one place rather than only
   in `appsettings.json`. Settings that can only come from configuration are shown read-only
   with where to set them. It needs the *Change site settings* permission, which is
@@ -159,7 +159,7 @@ conformance is a property of a page. Text contrast, focus appearance and target 
 decided by CSS, the shipped stylesheet sets no text colour of its own, and non-text contrast
 for decorative borders is explicitly **not** claimed. The full account, including what becomes
 yours the moment you override a token or supply a theme, is in
-[the booking page docs](https://github.com/Chris-N2/UBookIt/blob/main/docs/booking-page.md#accessibility-what-we-hold-and-what-becomes-yours).
+[the booking page docs](https://github.com/Chris-N2/UBookIt/blob/17.2.0/docs/booking-page.md#accessibility-what-we-hold-and-what-becomes-yours).
 
 ## What it does not do yet
 
@@ -177,13 +177,13 @@ On the record as decisions, not gaps somebody discovers:
 
 ## Documentation
 
-- [The booking page](https://github.com/Chris-N2/UBookIt/blob/main/docs/booking-page.md) — creating it, the URL parameters, styling, the
+- [The booking page](https://github.com/Chris-N2/UBookIt/blob/17.2.0/docs/booking-page.md) — creating it, the URL parameters, styling, the
   deployment note about committing the installed template, and the accessibility statement
-- [The backoffice](https://github.com/Chris-N2/UBookIt/blob/main/docs/backoffice.md) — resources, availability, services and bookings
-- [The delivery API](https://github.com/Chris-N2/UBookIt/blob/main/docs/delivery-api.md) — turning it on, what anonymous means, and
+- [The backoffice](https://github.com/Chris-N2/UBookIt/blob/17.2.0/docs/backoffice.md) — resources, availability, services and bookings
+- [The delivery API](https://github.com/Chris-N2/UBookIt/blob/17.2.0/docs/delivery-api.md) — turning it on, what anonymous means, and
   where volume protection belongs
-- [Reacting to bookings](https://github.com/Chris-N2/UBookIt/blob/main/docs/notifications.md) — the notifications and how to handle them
-- [Writing a theme](https://github.com/Chris-N2/UBookIt/blob/main/docs/theming.md) — replacing the rendering with your own views
+- [Reacting to bookings](https://github.com/Chris-N2/UBookIt/blob/17.2.0/docs/notifications.md) — the notifications and how to handle them
+- [Writing a theme](https://github.com/Chris-N2/UBookIt/blob/17.2.0/docs/theming.md) — replacing the rendering with your own views
 
 ## The packages
 
@@ -205,6 +205,6 @@ booking page renders nothing. Install `UBookIt`.
 
 ## Licence
 
-[MIT](https://github.com/Chris-N2/UBookIt/blob/main/LICENSE). Copyright © Norwood Design & Development Ltd.
+[MIT](https://github.com/Chris-N2/UBookIt/blob/17.2.0/LICENSE). Copyright © Norwood Design & Development Ltd.
 
 Built by [Norwood Design & Development Ltd.](https://www.norwood-development.co.uk).
