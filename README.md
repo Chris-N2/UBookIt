@@ -74,8 +74,8 @@ migration time rather than quietly misbehave.
   take precedence over a resource's own hours and exceptions. Any single resource can be
   **opened anyway** on a given closure, from its own editor, so "we are closed on Boxing Day
   except the gym" needs one tick rather than a rethink. Changing the list needs the *Change
-  site settings* grant — one entry shuts everything — while seeing it and opting a resource
-  out come with *Configure resources and services*.
+  site settings* grant — one entry shuts everything — while opting one resource out comes with
+  *Configure resources and services*. Seeing the list comes with either.
 - **A booking page** you create like any other page. Point it at the whole catalogue, or at
   one service or resource. It uses your site's layout.
 - **A booking flow** that works without JavaScript, and a JSON delivery API if you would

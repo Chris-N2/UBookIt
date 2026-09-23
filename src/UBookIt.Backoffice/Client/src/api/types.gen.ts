@@ -7,7 +7,7 @@ export type ClientOptions = {
 export type AvailabilityExceptionModel = {
     date: string;
     windows: Array<TimeWindowModel>;
-    superseded?: boolean;
+    superseded?: boolean | null;
 };
 
 export type BookableSubjectModel = {
@@ -824,6 +824,10 @@ export type CreateResourceErrors = {
      * The resource is protected and requires an authentication token
      */
     401: unknown;
+    /**
+     * Not Found
+     */
+    404: ProblemDetails;
 };
 
 export type CreateResourceError = CreateResourceErrors[keyof CreateResourceErrors];

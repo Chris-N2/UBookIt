@@ -132,6 +132,15 @@ public class ClosuresController(
         return deleted.Succeeded ? Ok() : NotFoundProblem(id);
     }
 
+    /// <summary>Today, in the site's time zone.</summary>
+    /// <remarks>
+    /// <b>A third copy of this try/catch, and knowingly so.</b> <c>BookingWindow</c> keeps its
+    /// own privately and <c>AvailabilityService.ResolveZone</c> is internal to Core, so the
+    /// backoffice cannot reach either; each copy also answers a different question when the zone
+    /// id will not resolve. Here a list falls back to UTC rather than failing, because the zone
+    /// setting has its own validation and its own failure code, and refusing to show a closure
+    /// list is a worse answer to a bad setting than showing it a day early.
+    /// </remarks>
     private DateOnly Today()
     {
         var now = timeProvider.GetUtcNow();

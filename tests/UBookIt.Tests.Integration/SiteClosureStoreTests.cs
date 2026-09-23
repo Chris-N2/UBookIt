@@ -517,7 +517,14 @@ public class SiteClosureStoreTests(SqlServerFixture fixture) : IAsyncLifetime
         // The closure read stands alone: it never joins the exception or open-hours tables, which
         // is what a storage-layer precedence rule would have to do.
         var closureCommands = interceptor.Commands
-            .Where(text => text.Contains("uBookItSiteClosure", StringComparison.OrdinalIgnoreCase));
+            .Where(text => text.Contains("uBookItSiteClosure", StringComparison.OrdinalIgnoreCase))
+            .ToList();
+
+        // THE GUARD'S OWN PRECONDITION, and it was missing: `Assert.All` over an empty sequence
+        // passes, so a closure read that stopped touching the table at all — renamed, raw SQL in
+        // different casing, a compiled query — would retire this guard silently while it went on
+        // reporting green. QA proved exactly that by replacing the store's body with `return []`.
+        Assert.NotEmpty(closureCommands);
 
         Assert.All(closureCommands, text =>
         {

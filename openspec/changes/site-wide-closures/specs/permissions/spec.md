@@ -18,8 +18,8 @@ through the backoffice group editor's default-permissions surface:
   is a **name and an identifier**, and nothing else. The two are not a hierarchy and neither
   implies the other: a receptionist who may take a telephone booking must be able to see what
   there is to book, and must not thereby acquire the privilege to reconfigure it.*
-- **`UBookIt.Settings`** — reading and changing the site's own settings, **and changing the site
-  closure list**.
+- **`UBookIt.Settings`** — reading and changing the site's own settings, **reading the site
+  closure list, and changing it**.
 
 *Moving joined Manage rather than becoming a fifth verb because the verb already means "may act
 on a booking", and moving a booking is a smaller act than cancelling one: it keeps the booking,
@@ -33,14 +33,17 @@ accepts a booker's contact details, and a group that may take a booking on the t
 therefore already a group the site has trusted with personal data. A fifth verb would divide
 the smaller privilege while leaving the larger one undivided.*
 
-*Site closures split across two existing verbs rather than introducing a fifth. **Changing the
-list is a site-level act** — one entry shuts every resource the site has, including those created
-after it — so it sits with `Settings`, alongside the other decisions a grant meaning "may add a
-meeting room" does not carry. **Reading the list and exempting one resource from a closure are
-resource-level acts**, and sit with `Configure`: an operator editing a resource must be able to
-see what it is inheriting and to opt it out, and can do neither without reading the list. The
-split is between deciding the site's policy and applying an exemption to one thing under it, which
-is the same line the two verbs already draw.*
+*Site closures split across the two existing verbs rather than introducing a fifth, and the split
+is between three acts rather than two. **Changing the list is a site-level act** — one entry shuts
+every resource the site has, including those created after it — so it sits with `Settings` alone,
+alongside the other decisions a grant meaning "may add a meeting room" does not carry.
+**Exempting one resource from a closure is a resource-level act**, and sits with `Configure`
+alone: it is a resource write, gated exactly as every other resource write is. **Reading the list
+sits with BOTH**, because each verb needs it on its own account — an operator editing a resource
+cannot exempt what they cannot see, and whoever decides the site's closures must be able to read
+the list they are deciding. The line is between deciding the site's policy and applying an
+exemption to one thing under it; the read is on both sides of that line, which is why it is the
+one act neither verb owns exclusively.*
 
 **Manage SHALL imply Read**, in the authorization rule and not by copying verbs onto
 groups: a group holding only Manage reads bookings, because managing what cannot be seen
@@ -125,6 +128,10 @@ own.
 #### Scenario: Configure opts a resource out of a closure
 - **WHEN** a user whose groups hold only `UBookIt.Configure` saves a resource with a closure opt-out
 - **THEN** the write is served
+
+#### Scenario: Settings alone reads the closure list
+- **WHEN** a user whose groups hold only `UBookIt.Settings` reads the closure list
+- **THEN** the list is served
 
 #### Scenario: Settings changes the closure list
 - **WHEN** a user whose groups hold only `UBookIt.Settings` creates, edits and deletes a closure

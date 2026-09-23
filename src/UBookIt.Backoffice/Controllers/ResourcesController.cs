@@ -66,7 +66,7 @@ public class ResourcesController(
     /// </para>
     /// </remarks>
     private async Task<IActionResult> SavedResourceAsync(
-        Guid id, CancellationToken cancellationToken)
+        Guid id, IReadOnlyList<SiteClosure> closures, CancellationToken cancellationToken)
     {
         var stored = await resourceStore.GetAsync(id, cancellationToken);
 
@@ -75,9 +75,11 @@ public class ResourcesController(
         // whatever the site had configured, and the one path that did so would be the one
         // nobody could reproduce. A resource that has vanished between a committed write and
         // the read after it is reported as missing, which is what has happened.
+        // The caller has already read the closures to validate the opt-outs; re-reading them
+        // here would be a second query per write for the same answer.
         return stored is null
             ? NotFoundProblem(id)
-            : Ok(ResourceModelMapper.ToModel(stored, await ClosuresAsync(cancellationToken)));
+            : Ok(ResourceModelMapper.ToModel(stored, closures));
     }
 
     [Authorize(Policy = Constants.VerbPolicies.Configure)]
@@ -144,6 +146,11 @@ public class ResourcesController(
     [HttpPost("resources")]
     [ProducesResponseType<ResourceResponseModel>(StatusCodes.Status200OK)]
     [ProducesResponseType<ProblemDetails>(StatusCodes.Status400BadRequest)]
+    // A create can answer 404: the response is re-read after the write, and a resource that has
+    // vanished in between is reported as missing rather than described from the write aggregate.
+    // Unreachable in practice, declared because an undeclared status is absent from the generated
+    // client and therefore unhandleable by any consumer that meets it.
+    [ProducesResponseType<ProblemDetails>(StatusCodes.Status404NotFound)]
     public async Task<IActionResult> CreateResource(
         ResourceRequestModel model, CancellationToken cancellationToken = default)
     {
@@ -162,7 +169,7 @@ public class ResourcesController(
         var created = await managementStore.CreateAsync(resource.Value, cancellationToken);
 
         return created.Succeeded
-            ? await SavedResourceAsync(created.Value.Id, cancellationToken)
+            ? await SavedResourceAsync(created.Value.Id, closures, cancellationToken)
             : created.Failures.ToProblemResult();
     }
 
@@ -187,7 +194,7 @@ public class ResourcesController(
         var updated = await managementStore.UpdateAsync(resource.Value, cancellationToken);
 
         return updated.Succeeded
-            ? await SavedResourceAsync(updated.Value.Id, cancellationToken)
+            ? await SavedResourceAsync(updated.Value.Id, closures, cancellationToken)
             : updated.Failures.ToProblemResult();
     }
 

@@ -483,7 +483,7 @@ public class ClosuresControllerTests
     [Fact]
     public async Task The_default_filter_uses_the_sites_date_not_the_servers()
     {
-        // 03:00 UTC on the 2nd is still 22:00 on the 1st in New York.
+        // 03:00 UTC on the 2nd is still 23:00 on the 1st in New York (EDT, UTC-4).
         var nowUtc = new DateTimeOffset(2026, 10, 2, 3, 0, 0, TimeSpan.Zero);
         var (controller, store) = Wire("America/New_York", nowUtc);
 

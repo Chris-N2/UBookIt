@@ -609,28 +609,50 @@ public class DeliveryApiTests
     }
 
     /// <summary>
-    /// The same rule over the SERIALIZED body rather than the property names, because a label
-    /// can reach a caller through a member whose name says nothing — an "unavailableReason", a
-    /// note, a description carried through from configuration.
+    /// The same rule over the SERIALIZED body of a REAL response, because a label can reach a
+    /// caller through a member whose name says nothing — an "unavailableReason", a note, a
+    /// description carried through from configuration.
     /// </summary>
+    /// <remarks>
+    /// <b>It must go through the controller.</b> The first version of this built a
+    /// <c>ResourceReadModel</c> by hand and serialized that, so it inspected the type's defaults
+    /// rather than the endpoint's output — QA proved it vacuous by adding an
+    /// <c>UnavailableReason</c> member, having the mapper set it to "Site closure: Christmas
+    /// Day", and watching all 38 delivery tests stay green while the public API handed anonymous
+    /// callers the closure label. A guard over a hand-built instance can only ever see the
+    /// members the test itself remembered to set.
+    /// </remarks>
     [Fact]
-    public void A_serialized_resource_read_model_carries_no_trace_of_a_closure()
+    public async Task A_real_resource_response_carries_no_trace_of_the_closure_it_is_subject_to()
     {
-        var model = new ResourceReadModel
-        {
-            Id = Guid.NewGuid(),
-            Type = "room",
-            DisplayName = "Consulting Room",
-            Description = "A room",
-            ZoneId = "Europe/London",
-            Constraints = new ConstraintsModel(),
-        };
+        // A resource genuinely subject to a closure with a distinctive label: if any part of the
+        // read path carries it outward, the label is in the body.
+        var closure = TestData.Closure(BaseDate, "Zzyzx Stocktake Day");
+        var room = Resource.Create(
+            ResourceTypes.Room,
+            "Consulting Room",
+            directlyBookable: true,
+            availability: TestData.Config(
+                TestData.Weekly("09:00", "17:00", BaseDate.DayOfWeek), closures: [closure])).Value;
 
-        var json = System.Text.Json.JsonSerializer.Serialize(model);
+        var resources = new InMemoryResourceStore().Add(room);
+        var controller = new ResourcesController(resources, TestData.Settings);
 
-        foreach (var forbidden in new[] { "closure", "closed", "optOut", "opt_out" })
+        var single = Ok<ResourceReadModel>(await controller.GetResource(room.Id));
+        var page = Ok<PagedResourcesModel>(await controller.ListResources());
+
+        foreach (var body in new[]
         {
-            Assert.DoesNotContain(forbidden, json, StringComparison.OrdinalIgnoreCase);
+            System.Text.Json.JsonSerializer.Serialize(single),
+            System.Text.Json.JsonSerializer.Serialize(page),
+        })
+        {
+            Assert.DoesNotContain("Zzyzx", body, StringComparison.OrdinalIgnoreCase);
+
+            foreach (var forbidden in new[] { "closure", "closed", "stocktake", "optOut", "opt_out" })
+            {
+                Assert.DoesNotContain(forbidden, body, StringComparison.OrdinalIgnoreCase);
+            }
         }
     }
 

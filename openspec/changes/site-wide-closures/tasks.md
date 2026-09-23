@@ -270,3 +270,51 @@ where the two dates genuinely differ, and a fallback test for an unreadable zone
   that omits seven tables. Pre-existing; D9 is about where new tables are declared, not about that
   word, and correcting it here would mean a wholesale replacement of an untouched requirement for
   a single misleading verb.
+
+## QA round 2 — REJECT, and two of the three were round 1's fixes
+
+The shape I was warned to expect. Both of the guards written in round 1 were **proved defective by
+mutation**, not merely doubted:
+
+1. **`specs/permissions/spec.md` contradicted itself inside one requirement.** Round 1 fixed who
+   may *set an opt-out*; it left the **read** wrong in the place that matters most — the bullet
+   list, which is the normative enumeration of what each verb governs. The `Settings` bullet did
+   not mention reading the closure list, and the rationale assigned reading to `Configure`, while
+   four paragraphs later the change's own added sentence said the read sits with either verb.
+   Now: the bullet carries the read, the rationale splits three acts instead of two (change =
+   Settings, exempt = Configure, **read = both**), a `Settings alone reads the closure list`
+   scenario exists, and the README and `docs/backoffice.md` rows carry the same correction.
+2. **`No_query_joins_closures_to_decide_precedence` was vacuous.** `Assert.All` over an empty
+   sequence passes; QA replaced the closure store's body with `return []` and the test stayed
+   green. `Assert.NotEmpty(closureCommands)` added — **verified by reproducing that exact
+   mutation**, which now fails.
+3. **`A_serialized_resource_read_model_carries_no_trace_of_a_closure` could not see what its own
+   comment named.** It hand-built the model, so it inspected the type's defaults rather than the
+   endpoint's output. QA added an `UnavailableReason` member, had the mapper fill it with "Site
+   closure: Christmas Day", and watched all 38 delivery tests pass while the public API leaked the
+   label. Rewritten to serialize a **real controller response** — both the single read and the
+   paged list — for a resource genuinely subject to a distinctively-labelled closure. **Verified
+   by reproducing QA's mutation**: the rewritten guard fails on it.
+
+MINORs: `CreateResource` now declares the 404 its re-read can produce (client regenerated, which
+also picked up `superseded?: boolean | null`); the closure list is read once per write rather than
+twice; the duplicated third assertion — identical to the first, under a remark about writing — is
+gone, with a note pointing at the two tests that actually carry the non-implication; the zone
+try/catch records why it is a third copy with a third fallback; and the comment arithmetic said
+22:00 where New York is 23:00 under EDT.
+
+QA withdrew both round-1 deferrals, accepting the reasons — and judged the Global closures one
+better than its own finding, because filtering would hide a past-dated exemption from the only
+screen that can remove it.
+
+### What was NOT seen rendered
+
+The two new refusal messages (`notPermittedRead` / `notPermittedWrite`) have **not** been observed
+in the real backoffice. After the rebuild, Umbraco stopped registering package extensions in this
+browser session across two tabs — the bundle's entry filename is stable while its content changes
+each build, so a cached entry points at chunk hashes that no longer exist. **The code is sound**:
+importing the bundle directly loads all 15 manifests, the Closures view module evaluates without
+throwing, and the element defines — which is the technique this project already records for
+telling that flake from a module-evaluation break. Both strings are covered by
+`ElementLocalizationKeyTests`, which is mutation-proved to fail on a missing term, so a raw key
+cannot render; what is unverified is only how they look on screen.

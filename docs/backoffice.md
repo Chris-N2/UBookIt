@@ -545,8 +545,13 @@ report a difference that is not there.
 
 | | |
 |---|---|
-| **See the closure list, and open a resource anyway** | *Configure resources and services* |
+| **See the closure list** | *Configure resources and services* **or** *Change site settings* |
+| **Open one resource anyway** | *Configure resources and services* |
 | **Add, edit or delete a closure** | *Change site settings* |
+
+Seeing the list sits with both grants because each needs it on its own account: you cannot exempt
+a resource from a closure you cannot see, and you cannot sensibly decide the site's closures
+without reading them.
 
 The split is deliberate. Exempting one resource is a resource decision; one closure entry shuts
 every resource the site has, so it sits with the same grant as the site's other settings — and

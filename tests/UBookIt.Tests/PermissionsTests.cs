@@ -294,22 +294,12 @@ public class PermissionsTests
 
         Assert.True(await AuthorizeAsync(configureOnly, Constants.VerbPolicies.ClosuresRead));
         Assert.True(await AuthorizeAsync(settingsOnly, Constants.VerbPolicies.ClosuresRead));
-    }
 
-    [Fact]
-    public async Task Reading_closures_under_either_verb_is_not_an_implication_between_them()
-    {
-        // The any-of grants each verb this READ and nothing else of the other's. Without this,
-        // "not an implication" is a sentence in a spec with no way to fail.
-        var configureOnly = UserWith(section: true, Constants.Verbs.Configure);
-        var settingsOnly = UserWith(section: true, Constants.Verbs.Settings);
-
-        Assert.False(await AuthorizeAsync(configureOnly, Constants.VerbPolicies.Settings));
-        Assert.False(await AuthorizeAsync(settingsOnly, Constants.VerbPolicies.Configure));
-
-        // And writing a closure stays on Settings alone: the closures controller names that
-        // policy, so a Configure-only user reaching it is refused by this same rule.
-        Assert.False(await AuthorizeAsync(configureOnly, Constants.VerbPolicies.Settings));
+        // AND IT IS NOT AN IMPLICATION: each verb reaches this read on its own account and gains
+        // nothing else the other holds. That half is asserted by
+        // `Configure_does_not_reach_the_settings` and `Settings_reaches_neither_resources_nor_bookings`
+        // — a test here repeating them would describe the claim rather than add to it, which is
+        // what the one this replaced did.
     }
 
     [Fact]
