@@ -127,6 +127,111 @@ They now name `18.0.0`, so what you read is what this version shipped.
 **The Bookings screenshot was retaken on Umbraco 18**, because 18 rounds the backoffice's buttons
 and the shipped image still showed 17's square ones.
 
+## 17.2.0 — 2026-09-23
+
+### What you have to do
+
+**Nothing.** No code change, no configuration change, no schema change you have to act on.
+`17.2.0` adds two capabilities and takes nothing away: a site that upgrades and changes no
+settings gets the product it had, plus a closures screen it can ignore.
+
+There is a database migration, and it runs on start-up as every uBookIt migration does. It only
+adds — a table for the closure list and one for per-resource exemptions — so nothing you have
+stored changes shape or goes away.
+
+**This is a minor rather than a patch because it adds capability, not because anything broke.**
+uBookIt's major number tracks the *Umbraco* major, so it can never signal a break of ours; a
+minor is where anything a site should read about lands.
+
+### What changed
+
+**Site-wide closures.** The dates your whole organisation is shut — a bank holiday, a stocktake,
+the week between Christmas and New Year — are now one list in the uBookIt section instead of the
+same date typed into every resource's exceptions.
+
+A closure closes **every** resource for that date, including resources you add afterwards, and it
+takes precedence over a resource's own weekly hours and its own date exceptions. Bookers simply
+find the date unavailable: nothing on the booking page or in the delivery API says a closure
+exists or what it is called.
+
+Any single resource can be **opened anyway** on a given closure, from a tick in its own editor —
+so "we are closed on Boxing Day except the gym" is one tick rather than a rethink.
+
+**It does not cancel bookings already placed.** A booking on a date you then close keeps its time,
+its status and its reference, and goes on holding that slot. Closing a date changes what can be
+booked from that moment; it never reaches backwards.
+
+Who can do what: **seeing** the list comes with either *Configure resources and services* or
+*Change site settings*; **opening one resource anyway** comes with *Configure*; **adding, editing
+or deleting** a closure needs *Change site settings*, because one entry shuts everything you have.
+As with every uBookIt verb, that grant is **never given automatically, including on upgrade** —
+an administrator ticks it for the people who should have it.
+
+**Public holidays, if your site supplies them.** uBookIt can turn public holidays into closures,
+and **ships no holiday data for any country**. Holiday dates come from your own code.
+
+For developers, this release publishes a new interface:
+
+> **`IPublicHolidaySource`** (in `UBookIt.Core.Availability`) — implement it and register it, and
+> uBookIt will ask it for the holidays in a date window. It returns a date and a name for each;
+> it takes no country or region, because which jurisdiction a site wants is a property of the
+> implementation you registered rather than something uBookIt could validate. A worked example
+> against the UK government's bank-holiday feed is in `docs/configuration.md`.
+>
+> **Nothing is required of you.** This is a new interface, not a change to an existing one:
+> nothing you have written stops compiling, and a site that implements nothing sees no difference
+> at all — where no source is registered the import is absent rather than disabled, with no
+> control and no explanation of one.
+
+Where a site *does* register one, an operator on the Closures screen can fetch a window of
+holidays and **tick which of them the organisation is actually closed on**. Every new date arrives
+ticked, because most organisations are closed on most public holidays, and the work is unticking
+the ones yours is open on. Confirming creates exactly the ticked dates, as ordinary closures you
+can rename, move, opt a resource out of, or delete.
+
+Nothing is ever imported on a schedule or at start-up — only when somebody asks — and unticking is
+not remembered, so a date you decline today is offered again the next time that window is fetched.
+Fetching and importing both need *Change site settings*.
+
+### Also in this release
+
+- The backoffice Closures screen states, for a user who may read but not change closures, which
+  grant is missing and where an administrator gives it.
+- `docs/backoffice.md` gains the operator's side of both features, and `docs/configuration.md` the
+  developer's side of the holiday port.
+
+---
+
+## 17.1.2 — 2026-09-22
+
+### What you have to do
+
+**On Umbraco 17: nothing.** No code change, no schema change, no behavioural change. `17.1.2` is
+install-compatible with `17.1.1` in both directions.
+
+**On Umbraco 18: your restore will now fail, and that is this release doing its job.** Until now
+nothing in uBookIt's package metadata said which Umbraco it was for — a NuGet dependency version
+is a *minimum*, so `17.x` asking for `Umbraco.Cms.Web.Website 17.6.2` read as "17.6.2 or
+anything later", and Umbraco 18 satisfied it. So `17.x` installed into an Umbraco 18 site
+cleanly, built with no errors, **and then the site would not start at all** — an unhandled
+`TypeLoadException` during Umbraco's startup, naming Umbraco's own internals rather than
+anything of ours.
+
+From `17.1.2` your package manager refuses that combination and tells you why, instead of letting
+you discover it on first run. **Install `UBookIt 18.x` on Umbraco 18** — it is the same product
+for the newer CMS, with the same features.
+
+### What changed
+
+**Every `Umbraco.Cms.*` dependency now carries an upper bound**, `[17.6.2,18.0.0)`. Umbraco 17.6.2
+and every later Umbraco 17 release resolve exactly as before; Umbraco 18 and later do not.
+
+**This does not repair `17.0.0`–`17.1.1`.** A published package keeps the metadata it was
+published with, so those four versions remain installable into an Umbraco 18 site forever. If you
+are pinning one of them on Umbraco 18, nothing will stop you — but the site will not run.
+
+---
+
 ## 17.1.1 — 2026-09-21
 
 ### What you have to do

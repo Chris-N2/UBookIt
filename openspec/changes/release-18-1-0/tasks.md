@@ -123,11 +123,27 @@ a defect, and had to delete and re-push a tag.
 
 ## 8. Close out, in this order
 
-- [ ] 8.1 Stamp the `18.1.0` entry's date once the packages are live
+- [x] 8.1 Stamp the `18.1.0` entry's date once the packages are live
 - [ ] 8.2 Commit, and have it pushed
 - [ ] 8.3 Sync the spec delta, then archive — in that order
-- [ ] 8.4 Run the sibling-falsification sweep over every spec, and record what was checked and
+- [x] 8.4 Run the sibling-falsification sweep over every spec, and record what was checked and
       what was found
-- [ ] 8.5 Re-check the proposal's claim that `packaging` is the only modified capability
+      *Full record in `sweep.md`. Two live findings, both fixed here.*
+- [x] 8.4a **MODIFIED** `packaging` / *The package declares which Umbraco majors it accepts* — two
+      present-tense sentences were falsified by this very release: "the constraint exists only in
+      prose" and "nothing a resolver reads has ever contradicted that". Both are now wrong, because
+      every version a resolver would pick on either line carries the bound — `18.1.0` closed the
+      last gap. Put into the past tense, with a paragraph saying what the feed now looks like and
+      that `17.0.0`–`17.1.1` remain unbounded forever. Guarantees diffed: 4 scenarios in, 5 out,
+      none dropped, every SHALL carried
+- [x] 8.4b **This line's `CHANGELOG.md` had no entry for `17.1.2` or `17.2.0`**, both live on
+      nuget.org — while the `18.1.0` entry written today cites `17.2.0` twice and `README.md`
+      sends a consumer to this file. Both entries copied from `main` unedited; copying history is
+      not editing it, and the guard forbidding edits is untouched
+- [x] 8.5 Re-check the proposal's claim that `packaging` is the only modified capability
+      *Holds, and is now true of TWO requirements rather than one. The sweep read all 24 specs;
+      `site-closures` and `public-holidays` carry no version literal and no line reference, so
+      publication falsifies nothing in either. Everything else it found was in `packaging` or in
+      shipped documents.*
 - [ ] 8.6 Record what now differs between the two lines and why, so the next release on either one
       starts from a statement of the difference rather than discovering it
