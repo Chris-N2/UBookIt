@@ -10,6 +10,7 @@ using UBookIt.Core;
 using UBookIt.Core.Availability;
 using UBookIt.Core.Common;
 using UBookIt.Core.Resources;
+using UBookIt.Core.Stores;
 using UBookIt.Tests.Support;
 using Constants = UBookIt.Backoffice.Constants;
 
@@ -26,13 +27,16 @@ public class ClosuresControllerTests
     private static CancellationToken Ct => CancellationToken.None;
 
     private static (ClosuresController Controller, InMemorySiteClosureStore Store) Wire(
-        string timeZoneId = "Europe/London", DateTimeOffset? nowUtc = null)
+        string timeZoneId = "Europe/London",
+        DateTimeOffset? nowUtc = null,
+        IPublicHolidaySource? source = null)
     {
         var store = new InMemorySiteClosureStore();
         var settings = new SiteBookingSettings { TimeZoneId = timeZoneId };
         var time = new FixedTimeProvider(nowUtc ?? TestData.Now);
+        var holidays = new HolidayPreviewService(store, source);
 
-        return (new ClosuresController(store, time, settings), store);
+        return (new ClosuresController(store, time, settings, holidays), store);
     }
 
     private static T Ok<T>(IActionResult result)
@@ -506,5 +510,178 @@ public class ClosuresControllerTests
         var listed = Ok<List<SiteClosureModel>>(await controller.ListClosures(cancellationToken: Ct));
 
         Assert.Single(listed);
+    }
+
+    // ---- public holidays ----
+
+    private sealed class StubSource(params PublicHoliday[] holidays) : IPublicHolidaySource
+    {
+        public Task<IReadOnlyList<PublicHoliday>> GetAsync(
+            DateOnly from, DateOnly to, CancellationToken cancellationToken = default)
+            => Task.FromResult<IReadOnlyList<PublicHoliday>>(holidays);
+    }
+
+    private static PublicHoliday Holiday(string date, string name) => new(DateOnly.Parse(date), name);
+
+    private static readonly DateOnly WindowFrom = new(2027, 1, 1);
+    private static readonly DateOnly WindowTo = new(2027, 12, 31);
+
+    [Fact]
+    public async Task The_preview_reports_all_three_row_states()
+    {
+        var source = new StubSource(
+            Holiday("2027-01-01", "New Year's Day"),
+            Holiday("2027-12-25", "Christmas Day"),
+            Holiday("2027-06-01", new string('x', SiteClosure.MaxLabelLength + 1)));
+
+        var (controller, store) = Wire(source: source);
+        store.Add(TestData.Closure(new DateOnly(2027, 12, 25), "Christmas Day"));
+
+        var preview = Ok<HolidayPreviewModel>(await controller.PreviewHolidays(WindowFrom, WindowTo, Ct));
+
+        Assert.Equal(
+            new[] { "new", "cannotImport", "alreadyClosed" },
+            preview.Rows.Select(r => r.State));
+
+        Assert.Equal(
+            FailureCodes.HolidayNotImportable,
+            Assert.Single(preview.Rows, r => r.State == "cannotImport").Reason);
+    }
+
+    [Fact]
+    public async Task The_preview_creates_nothing_however_often_it_is_asked()
+    {
+        var (controller, store) = Wire(source: new StubSource(Holiday("2027-01-01", "New Year's Day")));
+
+        await controller.PreviewHolidays(WindowFrom, WindowTo, Ct);
+        await controller.PreviewHolidays(WindowFrom, WindowTo, Ct);
+
+        Assert.Empty(await ((ISiteClosureStore)store).ListAsync(Ct));
+    }
+
+    [Fact]
+    public async Task Only_the_chosen_rows_are_created()
+    {
+        var (controller, store) = Wire(source: new StubSource());
+
+        var result = Ok<HolidayImportResultModel>(await controller.ImportHolidays(new HolidayImportRequestModel
+        {
+            Holidays =
+            [
+                new HolidayImportRowModel { Date = new DateOnly(2027, 1, 1), Name = "New Year's Day" },
+                new HolidayImportRowModel { Date = new DateOnly(2027, 4, 2), Name = "Good Friday" },
+            ],
+        }, Ct));
+
+        var stored = await ((ISiteClosureStore)store).ListAsync(Ct);
+
+        Assert.Equal(2, result.Created);
+        Assert.Empty(result.Skipped);
+        Assert.Equal(
+            new[] { "2027-01-01", "2027-04-02" },
+            stored.Select(c => c.Date.ToString("yyyy-MM-dd")));
+    }
+
+    /// <summary>
+    /// <b>The preview's answer can be stale, and this is that case.</b> A date offered as new is
+    /// taken before the operator confirms — by somebody else, or by the same person in another
+    /// tab. That row is reported and the others still create: failing the whole batch over one
+    /// taken date would be a worse answer than a report.
+    /// </summary>
+    [Fact]
+    public async Task A_date_taken_since_the_preview_is_reported_and_the_rest_still_create()
+    {
+        var (controller, store) = Wire(source: new StubSource());
+
+        // Between "preview" and "import": somebody closes one of the offered dates.
+        store.Add(TestData.Closure(new DateOnly(2027, 4, 2), "Someone else got there first"));
+
+        var result = Ok<HolidayImportResultModel>(await controller.ImportHolidays(new HolidayImportRequestModel
+        {
+            Holidays =
+            [
+                new HolidayImportRowModel { Date = new DateOnly(2027, 1, 1), Name = "New Year's Day" },
+                new HolidayImportRowModel { Date = new DateOnly(2027, 4, 2), Name = "Good Friday" },
+                new HolidayImportRowModel { Date = new DateOnly(2027, 12, 25), Name = "Christmas Day" },
+            ],
+        }, Ct));
+
+        Assert.Equal(2, result.Created);
+
+        var skipped = Assert.Single(result.Skipped);
+        Assert.Equal(new DateOnly(2027, 4, 2), skipped.Date);
+        Assert.Equal(FailureCodes.DuplicateClosureDate, skipped.Code);
+
+        // And the closure that was already there is untouched — not relabelled by the import.
+        var existing = Assert.Single(
+            await ((ISiteClosureStore)store).ListAsync(Ct),
+            c => c.Date == new DateOnly(2027, 4, 2));
+        Assert.Equal("Someone else got there first", existing.Label);
+    }
+
+    [Fact]
+    public async Task An_unimportable_row_sent_anyway_is_refused_per_row()
+    {
+        // The client should not offer it, but the endpoint is reachable directly.
+        var (controller, store) = Wire(source: new StubSource());
+
+        var result = Ok<HolidayImportResultModel>(await controller.ImportHolidays(new HolidayImportRequestModel
+        {
+            Holidays =
+            [
+                new HolidayImportRowModel { Date = new DateOnly(2027, 1, 1), Name = "New Year's Day" },
+                new HolidayImportRowModel
+                {
+                    Date = new DateOnly(2027, 6, 1),
+                    Name = new string('x', SiteClosure.MaxLabelLength + 1),
+                },
+            ],
+        }, Ct));
+
+        Assert.Equal(1, result.Created);
+        Assert.Equal(FailureCodes.HolidayNotImportable, Assert.Single(result.Skipped).Code);
+    }
+
+    /// <summary>
+    /// Absence is not something only the client observes: the endpoints themselves are gone.
+    /// </summary>
+    [Fact]
+    public async Task Both_endpoints_refuse_when_no_source_is_registered()
+    {
+        var (controller, _) = Wire(source: null);
+
+        var preview = await controller.PreviewHolidays(WindowFrom, WindowTo, Ct);
+        var import = await controller.ImportHolidays(new HolidayImportRequestModel
+        {
+            Holidays = [new HolidayImportRowModel { Date = new DateOnly(2027, 1, 1), Name = "New Year's Day" }],
+        }, Ct);
+
+        foreach (var result in new[] { preview, import })
+        {
+            var problem = Assert.IsType<ProblemDetails>(Assert.IsType<NotFoundObjectResult>(result).Value);
+            Assert.Equal(StatusCodes.Status404NotFound, problem.Status);
+        }
+    }
+
+    [Fact]
+    public async Task An_import_refused_for_want_of_a_source_creates_nothing()
+    {
+        var (controller, store) = Wire(source: null);
+
+        await controller.ImportHolidays(new HolidayImportRequestModel
+        {
+            Holidays = [new HolidayImportRowModel { Date = new DateOnly(2027, 1, 1), Name = "New Year's Day" }],
+        }, Ct);
+
+        Assert.Empty(await ((ISiteClosureStore)store).ListAsync(Ct));
+    }
+
+    [Fact]
+    public void Both_holiday_actions_name_the_settings_policy()
+    {
+        // The wiring; whether that policy admits the right verbs is evaluated through the real
+        // policy engine in PermissionsTests.
+        Assert.Equal(Constants.VerbPolicies.Settings, PolicyOf(nameof(ClosuresController.PreviewHolidays)));
+        Assert.Equal(Constants.VerbPolicies.Settings, PolicyOf(nameof(ClosuresController.ImportHolidays)));
     }
 }

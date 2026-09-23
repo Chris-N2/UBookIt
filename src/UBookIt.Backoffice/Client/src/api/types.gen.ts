@@ -102,6 +102,41 @@ export type FindBookingsByBookerModel = {
     take?: number | null;
 };
 
+export type HolidayImportRequestModel = {
+    holidays: Array<HolidayImportRowModel>;
+};
+
+export type HolidayImportResultModel = {
+    created: number;
+    skipped: Array<HolidayImportSkippedModel>;
+};
+
+export type HolidayImportRowModel = {
+    date: string;
+    name: string;
+};
+
+export type HolidayImportSkippedModel = {
+    date: string;
+    code: string;
+};
+
+export type HolidayPreviewModel = {
+    rows: Array<HolidayRowModel>;
+};
+
+export type HolidayRowModel = {
+    date: string;
+    name: string;
+    state: string;
+    reason?: string | null;
+    collapsedDuplicate: boolean;
+};
+
+export type HolidaySourceModel = {
+    registered: boolean;
+};
+
 export type MisalignedRoleModel = {
     resourceType: string;
     resourceId: string;
@@ -781,6 +816,98 @@ export type UpdateClosureResponses = {
 };
 
 export type UpdateClosureResponse = UpdateClosureResponses[keyof UpdateClosureResponses];
+
+export type PreviewHolidaysData = {
+    body?: never;
+    path?: never;
+    query?: {
+        from?: string;
+        to?: string;
+    };
+    url: '/umbraco/ubookitbackoffice/api/v1/closures/holidays';
+};
+
+export type PreviewHolidaysErrors = {
+    /**
+     * Bad Request
+     */
+    400: ProblemDetails;
+    /**
+     * The resource is protected and requires an authentication token
+     */
+    401: unknown;
+    /**
+     * Not Found
+     */
+    404: ProblemDetails;
+};
+
+export type PreviewHolidaysError = PreviewHolidaysErrors[keyof PreviewHolidaysErrors];
+
+export type PreviewHolidaysResponses = {
+    /**
+     * OK
+     */
+    200: HolidayPreviewModel;
+};
+
+export type PreviewHolidaysResponse = PreviewHolidaysResponses[keyof PreviewHolidaysResponses];
+
+export type ImportHolidaysData = {
+    body?: HolidayImportRequestModel;
+    path?: never;
+    query?: never;
+    url: '/umbraco/ubookitbackoffice/api/v1/closures/holidays';
+};
+
+export type ImportHolidaysErrors = {
+    /**
+     * Bad Request
+     */
+    400: ProblemDetails;
+    /**
+     * The resource is protected and requires an authentication token
+     */
+    401: unknown;
+    /**
+     * Not Found
+     */
+    404: ProblemDetails;
+};
+
+export type ImportHolidaysError = ImportHolidaysErrors[keyof ImportHolidaysErrors];
+
+export type ImportHolidaysResponses = {
+    /**
+     * OK
+     */
+    200: HolidayImportResultModel;
+};
+
+export type ImportHolidaysResponse = ImportHolidaysResponses[keyof ImportHolidaysResponses];
+
+export type GetHolidaySourceData = {
+    body?: never;
+    path?: never;
+    query?: never;
+    url: '/umbraco/ubookitbackoffice/api/v1/closures/holidays/source';
+};
+
+export type GetHolidaySourceErrors = {
+    /**
+     * The resource is protected and requires an authentication token
+     */
+    401: unknown;
+};
+
+export type GetHolidaySourceResponses = {
+    /**
+     * OK
+     */
+    200: HolidaySourceModel;
+};
+
+export type GetHolidaySourceResponse = GetHolidaySourceResponses[keyof GetHolidaySourceResponses];
 
 export type ListResourcesData = {
     body?: never;

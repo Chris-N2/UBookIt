@@ -231,6 +231,88 @@ The settings screen and its endpoints require the **`UBookIt.Settings`** verb, g
 
 See [Permissions in the backoffice](backoffice.md) for the other three verbs.
 
+## Supplying public holidays
+
+uBookIt can turn public holidays into site closures, but it **ships no holiday data for any
+country and will not be adding any**. Shipping dates would mean maintaining them for every
+jurisdiction and every substitution rule, forever, and being silently wrong in the year a
+government moves one. What the package publishes is the seam; the dates are your site's to supply.
+
+Implement `IPublicHolidaySource` and register it:
+
+```csharp
+public sealed class MyHolidaySource : IPublicHolidaySource
+{
+    public Task<IReadOnlyList<PublicHoliday>> GetAsync(
+        DateOnly from, DateOnly to, CancellationToken cancellationToken = default)
+        => // whatever your site knows: an HTTP feed, a file, a table, a hard-coded list
+}
+
+public sealed class MyHolidayComposer : IComposer
+{
+    public void Compose(IUmbracoBuilder builder)
+        => builder.Services.AddScoped<IPublicHolidaySource, MyHolidaySource>();
+}
+```
+
+A `PublicHoliday` is a `DateOnly` and a **name**. The name is required rather than optional
+because a closure's label is required: a date-only port would oblige uBookIt to invent a name for
+every row, which is exactly the bare-date problem the label exists to prevent.
+
+### Registration is optional, and absence is total
+
+`IPublicHolidaySource` is resolved optionally. Register one and the Closures view grows a
+**Public holidays** panel; register none and there is **no control, no explanation of one, and the
+two import endpoints refuse**, because a control that appears and then explains it cannot work is a
+control that looks live and is not.
+
+That is the same *reasoning* the delivery API applies to a disabled direction, but **not the same
+rule, and this is deliberately a weaker claim**. The delivery API guarantees an anonymous caller no
+status, header, body member or timing signal separating "disabled" from "never existed". uBookIt
+does not claim that here: a third endpoint exists precisely to tell the backoffice client which
+case it is in, so that it can render nothing, and it answers in a body member. What makes the
+weaker rule sufficient is who may ask — that endpoint sits behind backoffice authentication and the
+same `UBookIt.Settings` verb as the import, so the only people who can tell the two apart are the
+people who could register a source themselves. Nothing anonymous learns anything either way.
+
+A site without a source starts normally. Nothing is logged, warned about, or reported: the absence
+is a configuration, not a fault.
+
+### What a source owes, and what it does not
+
+- **Return what you can.** Fewer holidays than the window asked for — including none — is a valid
+  answer, not an error.
+- **Respect the cancellation token.** uBookIt passes one through so an operator waiting on a slow
+  feed can abandon it rather than have the screen held. Honouring it is your side of that
+  contract. uBookIt sets no timeout of its own, because a timeout is a policy and the policy
+  belongs to whoever owns the call — set one on your own `HttpClient`.
+- **Throw rather than return empty when you have failed.** uBookIt reports a source that *failed*
+  differently from a window with no holidays in it, and it can only tell the two apart if you do.
+  Returning an empty list from a broken feed tells an operator their calendar is clear when it is
+  actually unknown.
+- **You need not deduplicate or clip to the window.** Two holidays on one date collapse to one row
+  (first name wins) and the collapse is reported; a holiday outside the window is ignored.
+
+### The region is yours, not the package's
+
+**The port takes no region, country or locale.** Which jurisdiction's holidays a site wants is a
+property of the implementation you registered, not a parameter uBookIt could meaningfully validate
+or default — and every jurisdiction expresses its own oddities differently, so a shared parameter
+would mean the package learning one country's rules.
+
+A worked example ships in this repository's dev site, `UBookIt.TestSite/GovUkBankHolidaySource.cs`.
+It reads the UK government's published bank-holiday feed, picks the `england-and-wales` division in
+a single constant, and folds the feed's `notes` field into the name so a substituted day arrives as
+`"Boxing Day (substitute day)"`. All of that knowledge lives in that one class: uBookIt receives a
+date and a name and has no concept of a substitution. A Scottish site changes the constant; a site
+with offices in two divisions merges both there and lets the import collapse any date they share.
+
+### Who may use it
+
+Both previewing and importing require **`UBookIt.Settings`**, enforced by the server.
+`UBookIt.Configure` reaches neither, though it still reads the closure list. See
+[Permissions in the backoffice](backoffice.md#who-can-do-what).
+
 ## Example
 
 ```json
