@@ -360,3 +360,46 @@ whose resolution is mutation-proved, and nothing since has touched rendered mark
 two refusal messages are folded into the existing 5.8 live-verification gap, to be discharged with
 it before archive. The extension-registration flake is a known caching shape — stable entry
 filename, per-build chunk hashes — and is not evidence about this change.
+
+## QA round 4 — APPROVE WITH NITS, 51 of 51
+
+Nothing in round 3's commit was defective. All three of its changes were guard edits — the shape
+that failed in rounds 1, 2 and 3 — so the reviewer mutation-tested each rather than reading them,
+**including one I had not run**: it stopped `EffectiveWindows` consulting closures while still
+carrying them, which leaves the new precondition passing and fails the `Assert.Empty(slots.Slots)`
+line. That proves the in-force check is load-bearing and that `BaseDate` is inside lead time and
+horizon — "empty for the wrong reason" is how an in-force assertion turns decorative, and it does
+not here.
+
+It also confirmed the SQL guard's two preconditions now cover **different** failures (mutating
+`ToDomain` to build from an empty closure set leaves `NotEmpty` green and fails the hydration
+assertion), and noted honestly that the `null` case in `isSuperseded` is belt-and-braces rather
+than uniquely load-bearing, since the existing `{}` and `undefined` assertions catch the same
+mutation. Kept for the contract it pins, not counted as a guard that stands alone.
+
+Four nits, none blocking and none needing a round: the colon comment in `ClosureAccessibilityTests`
+reading as a rule the next test breaks; `IX_uBookItResourceClosureOptOut_ResourceId` duplicating
+the leading column of the composite PK; `notPermittedWrite` hard-coding "Change site settings"
+rather than referencing the term that renders it (the settings view already does the same); and a
+third private copy of `NotFoundProblem`.
+
+## The one item left before archive
+
+**5.8's live half is partly discharged and partly not**, and the split matters:
+
+- **Done, on 2026-09-23 in the real backoffice**: the Closures view rendering, a closure created
+  **entirely by keyboard** with visible focus throughout, the table, the Global closures group, and
+  the superseded statement — which is where the three live-only defects came from.
+- **Not done**: the two refusal messages added in round 2 (`notPermittedRead`,
+  `notPermittedWrite`) have never been seen rendered.
+
+The blocker is not the change. Across the rebuilds the backoffice session's token refresh failed
+(`[UmbAuthClient] Token request error: TypeError: Failed to fetch`, with the SignalR socket
+dropping each time the site restarted), so the shell and its tabs render while no authenticated
+view mounts — which is why the element never defines. It needs a fresh sign-in, which only Chris
+can perform.
+
+QA's disposition, which stands: it would not spend a round on this. `notPermittedRead` is
+unreachable behind the manifest's `oneOf` gate, `notPermittedWrite` is a plain paragraph of a term
+whose resolution `ElementLocalizationKeyTests` mutation-proves, and nothing since `119c3e3` has
+touched rendered markup structure. **It is a look-at-it task, not a re-review.**
