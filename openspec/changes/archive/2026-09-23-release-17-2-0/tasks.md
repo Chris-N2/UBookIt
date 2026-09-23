@@ -129,17 +129,80 @@
 ## 6. Close the release out, in this order
 
 - [x] 6.1 Stamp the `17.2.0` entry's date **only once the packages are live**
-- [ ] 6.2 Commit, and have the date-stamped commit pushed
-- [ ] 6.3 Sync any spec deltas, then archive — **in that order**, and only after the date is
+- [x] 6.2 Commit, and have the date-stamped commit pushed
+- [x] 6.3 Sync any spec deltas, then archive — **in that order**, and only after the date is
       stamped, because `ChangelogTests` reads the archive
-- [ ] 6.4 Run the sibling-falsification sweep over every spec for sentences this release makes
+      *`packaging` synced: 21 requirements to 22, 88 scenarios to 94, verified against a snapshot
+      taken BEFORE the sync rather than against a report of it. `git diff --numstat` shows 78
+      insertions and 0 deletions — a pure addition, so the wholesale replacement was byte-identical
+      apart from what it added and nothing could have been dropped unseen.*
+- [x] 6.4 Run the sibling-falsification sweep over every spec for sentences this release makes
       untrue, and record what was checked and what was found
-- [ ] 6.5 Re-check the proposal's claim that `packaging` is the ONLY capability modified, against
+      *Full record in `sweep.md`. Seven sentences in `docs/publishing.md` were falsified by this
+      release's own doc-link pinning — the bump checklist stopped enumerating everything that
+      moves, which is precisely the defect class this release exists to guard against. All seven
+      fixed. One of them is PINNED, so the guard failed on the edit and the pin was moved
+      deliberately rather than the sentence left alone.*
+- [x] 6.5 Re-check the proposal's claim that `packaging` is the ONLY capability modified, against
       the specs as they stand, and record the result either way
+      *Holds. The sweep read all 24 specs and found no other requirement this release falsifies or
+      leaves incomplete; `site-closures` and `public-holidays` are written in present-tense SHALL
+      form and so survive their own publication. Everything else the sweep found was in shipped
+      documents, not specs.*
+      *One finding has no edit as its remedy: `README.md` tells an Umbraco 18 reader to install
+      `18.x`, which today means `18.0.0` — a release carrying neither feature the page advertises.
+      `17.2.0`'s copy of that sentence is frozen in the package, so only shipping `18.1.0` ends
+      the mismatch. Carried into `release-18-1-0`.*
 
 ## 7. Hand over to `18.1.0`
 
-- [ ] 7.1 Record what this release learned that the 18 line's release must not rediscover —
+- [x] 7.1 Record what this release learned that the 18 line's release must not rediscover —
       especially anything found in the unguarded *Tag the release* literals
-- [ ] 7.2 Confirm `18.1.0` is proposed as its own change on `dev/v18`, and that nothing in this
+
+      **The four unguarded literals, now an inventory rather than a warning.** In
+      `docs/publishing.md`, between `## Tag the release before you push the package` and
+      `## Pushing`: the example `raw.githubusercontent.com` URL, `git tag <v>`,
+      `git push origin <v>`, and the `curl -sI` URL. Nothing reads them. On the 18 line they will
+      say `18.0.0`.
+
+      **The bump checklist is now correct on `main` and STALE ON `dev/v18`.** This release found
+      seven sentences in `docs/publishing.md` falsified by its own doc-link pinning — the "three
+      documents / two places" count, the bump table's missing row, "the first four" guarded
+      things, and four sentences in *Tag the release* that justify the tag on image grounds alone.
+      The 18 line pinned its links at `18.0.0` and so has carried the same stale prose for longer.
+      **Check whether `dev/v18`'s runbook has the same seven defects before bumping anything.**
+
+      **The stale-artifact deletion is load-bearing.** Four `17.1.2` `.nupkg` were present and
+      would have survived the rebuild — `GenerateNuspec` skips when its outputs look current — and
+      been matched by the push wildcard. Delete `src/*/bin/Release` before packing, every time.
+
+      **A 503 is not a 404.** One documentation link failed on first fetch and was 200 on retry.
+      Retry before recording an address as broken, and before recording it as fine.
+
+      **The tag had to be moved once.** A defect found by the pre-publish verification landed a
+      commit after the tag was already pushed, so the tag named a commit whose readme was wrong.
+      Deleting and re-pushing a tag is cheap while no package references it, and impossible after.
+      **Do the readme verification BEFORE tagging next time**, not between tagging and packing.
+
+- [x] 7.2 Confirm `18.1.0` is proposed as its own change on `dev/v18`, and that nothing in this
       change edited that line
+      *Nothing in this change touched `dev/v18`: every commit is on `main`, and the cherry-picks
+      that put the features on the 18 line were made before this change existed.*
+
+      **What `release-18-1-0` must carry that this release added, and would otherwise ship
+      without — each is a one-line-only mistake waiting to happen, which is the exact shape of the
+      defect this release found:**
+
+      1. **`A_release_that_published_a_new_extension_point_names_it`** — added to
+         `ChangelogTests` on `main` only. It is pinned PER RELEASE (`[InlineData("17.2.0",
+         "IPublicHolidaySource")]`), so the 18 line needs both the guard AND its own
+         `18.1.0` row, or it ships the same new interface unnamed with every test green.
+      2. **The `packaging` requirement *A release names the contract changes a consumer must act
+         on*** gained a sixth scenario about publishing a new interface. `dev/v18` has the
+         five-scenario version.
+      3. **The seven `docs/publishing.md` corrections** listed under 7.1.
+
+      **And the reason `18.1.0` is a correction rather than the next item:** `17.2.0`'s packed
+      readme — frozen, uncorrectable — tells an Umbraco 18 reader to install `18.x`, while
+      advertising two features no released `18.x` has. That misdirection is live on nuget.org from
+      now until `18.1.0` publishes. See `sweep.md`.

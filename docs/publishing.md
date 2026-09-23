@@ -92,13 +92,14 @@ expire at the events it describes.**
 3. **The version must be the one you mean.** `<Version>` in `Directory.Build.props` is the only
    place it is **declared**; every package and the backoffice manifest derive from it.
    **Prose is a different matter, and a bump has to move it by hand.** Three documents state a
-   version in words, in a URL or in a command — `README.md` in two places and this runbook in
-   two — and none of them derives anything:
+   version in words, in a URL or in a command — `README.md` in **three** places and this runbook
+   in two — and none of them derives anything:
 
    | Where | What moves |
    |---|---|
    | `README.md`, near the top | the sentence naming the version uBookIt is currently at |
    | `README.md`, *What it looks like* | **every** screenshot URL, each pinned to the release tag |
+   | `README.md`, throughout | **every** documentation link — pinned to the release tag too, not to a branch, for the reason the screenshots are |
    | `docs/publishing.md` | the *"uBookIt is at"* sentence under **What nuget.org will not let you undo** |
    | `CHANGELOG.md` | a new entry for the version, its heading left undated until it is live |
    | `docs/publishing.md`, *Tag the release* | **every** version literal in that section below — the example URL, and the `git tag`, `git push` and `curl` commands |
@@ -121,10 +122,10 @@ expire at the events it describes.**
    > sentence reproduced a second time stops pinning anything, and the draft that quoted it
    > here also added a feed mention the accounting guard had not been told about.)
 
-   The suite fails when any of the first four disagree with `<Version>` — `VersionTruthTests`
-   for the README and runbook sentences and the screenshot URLs, `ChangelogTests` for the
-   changelog entry — so those four are a checklist to work through in one go rather than a risk
-   of shipping half done. **The last row is different: nothing checks it.** The worked commands
+   The suite fails when any of the first five disagree with `<Version>` — `VersionTruthTests`
+   for the README and runbook sentences, the screenshot URLs and the documentation links,
+   `ChangelogTests` for the changelog entry — so those five are a checklist to work through in one
+   go rather than a risk of shipping half done. **The last row is different: nothing checks it.** The worked commands
    in *Tag the release* are illustrative text, invisible to every guard, so that row is the one
    to re-read by eye.
 
@@ -224,8 +225,8 @@ git branch -r --contains HEAD            # must list origin/main
 
 ## Tag the release before you push the package
 
-**The packed readme's screenshots are addressed to a git tag named after the version**, like
-this:
+**The packed readme's screenshots AND its documentation links are addressed to a git tag named
+after the version**, like this:
 
 ```
 https://raw.githubusercontent.com/Chris-N2/UBookIt/17.2.0/docs/images/booking-flow.png
@@ -238,10 +239,20 @@ screen that has since changed, or a gap where a renamed file used to be. Address
 shows what this release shipped, permanently.
 
 **So the tag has to exist, and has to be pushed, before the package goes.** Until it does, every
-image on the package page is a broken image.
+image on the package page is a broken image **and every documentation link on it is dead** — and
+after the push neither can be corrected, because the readme carrying those addresses is frozen.
 
-**And the screenshot URLs move with the version.** They are written out in `README.md`, not derived
-from anything — the guard checks that they agree with `<Version>`, it does not update them. A
+**Both kinds are pinned, and for the same reason with different consequences.** An unpinned image
+would show a screenshot of a screen that has since changed; an unpinned *link* sends the reader to
+documentation for a version they are not running — which, once a second line exists, can mean a
+different product's documentation entirely. `17.2.0` is the release that pinned the links; until
+then they named `blob/main`, correct only for as long as `main` happened to be the line the reader
+was on.
+
+**And these addresses move with the version.** They are written out in `README.md`, not derived
+from anything — the guards check that they agree with `<Version>`, they do not update them. That
+is true of the four screenshot URLs and of every documentation link alike; bumping one set and not
+the other is the half-done state the checklist above exists to prevent. A
 bump therefore edits the readme's image refs in the same commit as `Directory.Build.props`; see
 *Before any push*, step 3, for the full list of what a bump touches.
 
@@ -326,12 +337,15 @@ curl https://api.nuget.org/v3-flatcontainer/ubookit/index.json
 Search on the website lags further behind still. If an hour passes with no progress, check the
 package page and your email — nuget.org reports a validation failure by mail.
 
-**Open the package page and look at the screenshots.** Every image must render. This is the only
-check that ever sees what a consumer sees: no test can reach nuget.org, and a rejected or missing
-image is reported in a warning shown only to you as the owner, so a broken page is silent to
-everybody else. If one is missing, the usual cause is the tag — confirm
+**Open the package page, look at the screenshots, and follow a documentation link.** Every image
+must render and every link must land. This is the only check that ever sees what a consumer sees:
+no test can reach nuget.org, and a rejected or missing image is reported in a warning shown only
+to you as the owner, so a broken page is silent to everybody else. If an image is missing, the
+usual cause is the tag — confirm
 `https://raw.githubusercontent.com/Chris-N2/UBookIt/<version>/docs/images/<file>` answers, and
-push the tag if it does not. The readme itself cannot be corrected for this version.
+push the tag if it does not. **A dead documentation link has the same cause and the same cure**,
+at `https://github.com/Chris-N2/UBookIt/blob/<version>/docs/<file>`. The readme itself cannot be
+corrected for this version, which is why both are worth the minute.
 
 The wildcard resolves alphabetically, so it pushes the `UBookIt` meta-package FIRST, before the
 libraries it depends on. That is harmless — nuget.org validates each package independently and
