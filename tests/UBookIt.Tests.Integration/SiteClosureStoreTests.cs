@@ -452,4 +452,77 @@ public class SiteClosureStoreTests(SqlServerFixture fixture) : IAsyncLifetime
 
         Assert.True(saved.Succeeded, string.Join(", ", saved.Failures.Select(f => f.Code)));
     }
+
+    /// <summary>
+    /// <b>The N+1 the design promised not to have, counted rather than asserted.</b> A candidate
+    /// pool is what <c>ListByTypeAsync</c> serves, so a closure read per resource would turn one
+    /// availability question into one query per candidate. Moving the closure read inside the
+    /// projection would pass every other test in this repository; it fails here.
+    /// </summary>
+    [Fact]
+    public async Task Listing_by_type_reads_closures_once_for_the_whole_batch()
+    {
+        fixture.EnsureAvailable();
+
+        var type = $"closure-n1-{Guid.NewGuid():N}"[..20];
+        for (var i = 0; i < 5; i++)
+        {
+            await Seed.EveryDayRoomAsync(fixture, Ct, type: type);
+        }
+
+        await using (var setup = fixture.CreateContext())
+        {
+            await new SqlSiteClosureManagementStore(setup)
+                .CreateAsync(SiteClosure.Create(ClosureDate, "Bank holiday").Value, Ct);
+        }
+
+        var interceptor = new CommandRecordingInterceptor();
+        await using var context = fixture.CreateContext(interceptor);
+
+        var resources = await new SqlResourceStore(context, new SqlSiteClosureStore(context))
+            .ListByTypeAsync(type, Ct);
+
+        Assert.Equal(5, resources.Count);
+        Assert.All(resources, resource => Assert.Single(resource.Availability.Closures));
+
+        // ONE closure query, whatever the pool size.
+        var closureReads = interceptor.Commands
+            .Count(text => text.Contains("uBookItSiteClosure", StringComparison.OrdinalIgnoreCase));
+
+        Assert.Equal(1, closureReads);
+    }
+
+    /// <summary>
+    /// Precedence is decided in the domain, so no query may filter by it. Asserted over what was
+    /// actually SENT, because the rule is about the SQL rather than about the code that wrote it.
+    /// </summary>
+    [Fact]
+    public async Task No_query_joins_closures_to_decide_precedence()
+    {
+        fixture.EnsureAvailable();
+
+        var resourceId = await Seed.EveryDayRoomAsync(fixture, Ct);
+
+        await using (var setup = fixture.CreateContext())
+        {
+            await new SqlSiteClosureManagementStore(setup)
+                .CreateAsync(SiteClosure.Create(ClosureDate, "Bank holiday").Value, Ct);
+        }
+
+        var interceptor = new CommandRecordingInterceptor();
+        await using var context = fixture.CreateContext(interceptor);
+
+        await new SqlResourceStore(context, new SqlSiteClosureStore(context)).GetAsync(resourceId, Ct);
+
+        // The closure read stands alone: it never joins the exception or open-hours tables, which
+        // is what a storage-layer precedence rule would have to do.
+        var closureCommands = interceptor.Commands
+            .Where(text => text.Contains("uBookItSiteClosure", StringComparison.OrdinalIgnoreCase));
+
+        Assert.All(closureCommands, text =>
+        {
+            Assert.DoesNotContain("uBookItResourceException", text, StringComparison.OrdinalIgnoreCase);
+            Assert.DoesNotContain("uBookItResourceOpenHours", text, StringComparison.OrdinalIgnoreCase);
+        });
+    }
 }

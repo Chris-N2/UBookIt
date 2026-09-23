@@ -174,18 +174,28 @@ superseded statement all render.
 3. **A save reported `superseded: false` however the site was configured.** The create and update
    responses were mapped from the aggregate the REQUEST produced, and a request carries opt-outs
    but never closures — so the layer that decides the marker was absent from it, while a GET of
-   the same resource said `true`. The editor lost the statement the moment somebody saved it and
-   got it back on reload.
+   the same resource said `true`.
+
+   **What this did NOT do — corrected after QA round 1.** The first version of this note said
+   "the editor lost the statement the moment somebody saved it and got it back on reload".
+   **That cannot happen**: `resources-view.element.ts:33` binds `@ubookit-saved` to the handler
+   that clears `_editing`, so the editor unmounts on save and the shipped backoffice never
+   renders a save response at all. The defect was real, but it was a **contract** defect — the
+   management API is a published surface and its save response disagreed with its own next read
+   — not a user-visible one. The record justified an extra database read with a symptom that does
+   not exist, which is the third handover claim on this project a reviewer has found false.
 
    Fixed by re-reading through the read port after a write, so a save answers exactly what the
    next read would. **Composing the closure layer in the controller instead was rejected**: it
    would be a second implementation of "which closures apply", which the hydration seam exists to
-   keep singular.
+   keep singular. The null branch of that re-read returns not-found rather than falling back to
+   the write aggregate — the fallback quietly reinstated the very defect (QA proved the branch
+   wrong by mutation, not merely untested).
 
    **The test double hid this.** `InMemoryResourceStore` returned exactly what had been written,
    so the controller looked consistent with it and every test passed. The double now hydrates
-   closures as the shipped store does, and two tests assert the save response and the next read
-   agree — both failed before the fix.
+   closures on every read path, and three tests assert the save response, the paged list and the
+   next read all agree.
 
 One result worth recording because it looks like a defect and is not: after opting out through the
 UI, the delivery API offered **no slots on 25 December**. That is the 90-day booking horizon, which
@@ -213,3 +223,50 @@ The Chrome extension is not connected in this session, so it could not be driven
 package's own history says backoffice editor faults show up only in the real shadow DOM, so this
 is a genuine gap rather than a formality — it needs doing before QA, by hand or with the
 extension connected.
+
+## QA round 1 — REJECT, and what it found
+
+Six MAJOR findings, all upheld. Every claim I made was independently verified by the reviewer
+(suite counts, Release warnings, `--strict`, and the guarantee diff, which they re-derived with
+their own differ rather than re-running mine). What the review found was not wrong claims about
+the code, but **missing guards, and two documents disagreeing with it**:
+
+1. **`specs/site-closures/spec.md` contradicted the permissions delta** on who may set a
+   resource's opt-out — the security sentence said Configure OR Settings, while the code, the
+   permissions delta, the README and the backoffice doc all say Configure alone. The spec was
+   wrong; it now separates reading the list (either verb) from setting an opt-out (Configure,
+   because it is a resource write), with a scenario for the Settings-only refusal.
+2. **No test evaluated the `ClosuresRead` policy.** The one that claimed to compared `[Authorize]`
+   attribute *strings*. Three tests now run the real policy engine through the harness in
+   `PermissionsTests`; the misleading test is renamed to what it actually asserts.
+   **Mutation-checked**: registering `ClosuresRead` with `Settings` alone turns the new test red.
+3. **Task 2.4's N+1 verification did not exist.** Now counted rather than asserted:
+   `Listing_by_type_reads_closures_once_for_the_whole_batch` records every command a real context
+   sends and requires exactly one closure read for a five-resource pool. **Mutation-checked**:
+   moving the read inside the projection turns it red. A second test proves no closure query joins
+   the exception or open-hours tables, so precedence stays in the domain.
+4. **The delivery-API omission guard tested a sample the change had outgrown** — it matched
+   `open|hour|exception|window` and never `closure`. Extended, plus a second guard over the
+   serialized body, because a label can escape through a member whose name says nothing.
+5. **The double's comment said "every read" and hydrated one.** `ListAsync` and `ListByTypeAsync`
+   now hydrate too, and a new test covers the paged list, which was the uncovered surface.
+6. **The item-3 narrative above was false** — corrected in place, above, rather than quietly
+   edited away.
+
+Also fixed from the MINORs: the null fallback that reinstated the defect; `showsEditingControls`
+exported, tested and called by nothing (now the decision every write branch routes through); the
+default filter using UTC rather than the site's time zone (with a fixed-clock test at an instant
+where the two dates genuinely differ, and a fallback test for an unreadable zone id); and
+`notPermitted` serving two different conditions with one message.
+
+**Deliberately not changed**, recorded rather than left silent:
+
+- **The resource editor's Global closures group is unfiltered.** The reviewer is right that it
+  grows without bound. Filtering it to upcoming would change what the `resource-management` delta
+  promises ("the site closures that apply to the resource") and would hide an exemption on a past
+  date from the only screen that can remove it. It belongs with pruning, which this change
+  deliberately does not do.
+- **`persistence`'s *Schema shape and naming* still says "SHALL comprise"** over an enumeration
+  that omits seven tables. Pre-existing; D9 is about where new tables are declared, not about that
+  word, and correcting it here would mean a wholesale replacement of an untouched requirement for
+  a single misleading verb.

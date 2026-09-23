@@ -5,7 +5,7 @@ import { canManageClosures, canReadClosures } from "./permission-verbs.js";
 import { UBookItBackofficeService } from "../api/index.js";
 import type { SiteClosureModel } from "../api/index.js";
 import { toApiErrors } from "./api-errors.js";
-import { listQuery } from "./closure-fields.js";
+import { listQuery, showsEditingControls } from "./closure-fields.js";
 
 /** A closure being added or edited, before it is sent. */
 interface ClosureDraft {
@@ -195,8 +195,10 @@ export class UBookItClosuresViewElement extends UmbLitElement {
     }
 
     if (!this._canRead) {
+      // A DIFFERENT message from the read-only banner: this reader cannot see the list at all,
+      // and telling them they cannot CHANGE it would answer a question they did not ask.
       return html`<uui-box headline=${this.#term("label")}>
-        <p>${this.#term("notPermitted")}</p>
+        <p>${this.#term("notPermittedRead")}</p>
       </uui-box>`;
     }
 
@@ -211,11 +213,13 @@ export class UBookItClosuresViewElement extends UmbLitElement {
         -->
         <p class="unaffected">${this.#term("bookingsUnaffected")}</p>
 
-        ${this._canWrite ? nothing : html`<p class="read-only">${this.#term("notPermitted")}</p>`}
+        ${showsEditingControls(this._canWrite)
+          ? nothing
+          : html`<p class="read-only">${this.#term("notPermittedWrite")}</p>`}
         ${this.#renderError()} ${this.#renderList()} ${this.#renderDraft()}
 
         <div class="actions">
-          ${this._canWrite && !this._draft
+          ${showsEditingControls(this._canWrite) && !this._draft
             ? html`<uui-button
                 look="primary"
                 label=${this.#term("add")}
@@ -249,7 +253,9 @@ export class UBookItClosuresViewElement extends UmbLitElement {
           <tr>
             <th scope="col">${this.#term("columnDate")}</th>
             <th scope="col">${this.#term("columnLabel")}</th>
-            ${this._canWrite ? html`<th scope="col">${this.#term("columnActions")}</th>` : nothing}
+            ${showsEditingControls(this._canWrite)
+              ? html`<th scope="col">${this.#term("columnActions")}</th>`
+              : nothing}
           </tr>
         </thead>
         <tbody>
@@ -258,7 +264,7 @@ export class UBookItClosuresViewElement extends UmbLitElement {
               <tr>
                 <td>${closure.date}</td>
                 <td>${closure.label}</td>
-                ${this._canWrite
+                ${showsEditingControls(this._canWrite)
                   ? html`<td class="row-actions">
                       <uui-button
                         look="secondary"
@@ -286,7 +292,7 @@ export class UBookItClosuresViewElement extends UmbLitElement {
 
   #renderDraft() {
     const draft = this._draft;
-    if (!draft || !this._canWrite) {
+    if (!draft || !showsEditingControls(this._canWrite)) {
       return nothing;
     }
 

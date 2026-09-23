@@ -36,7 +36,8 @@ public sealed class InMemoryResourceStore : IResourceStore, IResourceManagementS
     }
 
     /// <summary>
-    /// Makes this double hydrate closures on every read, as the shipped store does.
+    /// Makes this double hydrate closures on every read path — <see cref="GetAsync"/>,
+    /// <see cref="ListAsync"/> and <see cref="ListByTypeAsync"/> — as the shipped stores do.
     /// </summary>
     /// <remarks>
     /// <b>Not decoration: a double that skipped this hid a real defect.</b> The save response
@@ -46,6 +47,12 @@ public sealed class InMemoryResourceStore : IResourceStore, IResourceManagementS
     /// written and the controller looked consistent with it. The defect surfaced in the running
     /// backoffice. A double that does not hydrate is a double that cannot see this class of
     /// fault at all.
+    /// <para>
+    /// <b>And it must cover every read, not the one the first test happened to use.</b> QA found
+    /// this hydrating <see cref="GetAsync"/> alone while the comment said "every read" — leaving
+    /// the paged list, which the resources screen maps from, on exactly the unhydrated path the
+    /// fix had just closed elsewhere.
+    /// </para>
     /// </remarks>
     public InMemoryResourceStore Hydrating(InMemorySiteClosureStore closures)
     {
@@ -97,6 +104,7 @@ public sealed class InMemoryResourceStore : IResourceStore, IResourceManagementS
             .OrderBy(r => r.DisplayName).ThenBy(r => r.Id)
             .Skip(skip)
             .Take(take)
+            .Select(Hydrate)
             .ToList();
 
         return Task.FromResult(new ResourcePage(items, total));
@@ -109,6 +117,7 @@ public sealed class InMemoryResourceStore : IResourceStore, IResourceManagementS
         IReadOnlyList<Resource> items = _resources.Values
             .Where(r => string.Equals(r.Type, type, StringComparison.Ordinal))
             .OrderBy(r => r.Id)
+            .Select(Hydrate)
             .ToList();
 
         return Task.FromResult(items);

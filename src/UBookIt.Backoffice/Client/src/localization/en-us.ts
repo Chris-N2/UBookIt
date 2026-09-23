@@ -641,8 +641,13 @@ export default {
     bookingsUnaffected:
       "Closures change what can be booked from now on. Bookings already placed on a date you close keep their times and are not cancelled.",
 
-    notPermitted:
+    // TWO conditions, two messages. One term served both, so a reader who could not see the
+    // list at all was told they could not CHANGE it — an answer to a question they had not
+    // asked, on a branch that is unreachable anyway because the section view is gated.
+    notPermittedWrite:
       "You do not have permission to change closures. An administrator can grant it in Users → User Groups → Default permissions, by ticking “Change site settings”. It is not granted automatically, including on upgrade.",
+    notPermittedRead:
+      "You do not have permission to see the site's closures. An administrator can grant it in Users → User Groups → Default permissions, by ticking “Configure resources and services” or “Change site settings”.",
     loadFailed: "The closures could not be loaded.",
     saveFailed: "That closure could not be saved.",
     deleteFailed: "That closure could not be deleted.",

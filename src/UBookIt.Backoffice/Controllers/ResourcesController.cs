@@ -66,11 +66,18 @@ public class ResourcesController(
     /// </para>
     /// </remarks>
     private async Task<IActionResult> SavedResourceAsync(
-        Guid id, Resource fallback, IReadOnlyList<SiteClosure> closures, CancellationToken cancellationToken)
+        Guid id, CancellationToken cancellationToken)
     {
         var stored = await resourceStore.GetAsync(id, cancellationToken);
 
-        return Ok(ResourceModelMapper.ToModel(stored ?? fallback, closures));
+        // NO FALLBACK TO THE WRITE AGGREGATE. Mapping that one is exactly the defect this
+        // method exists to close — it carries no closures, so `superseded` would report false
+        // whatever the site had configured, and the one path that did so would be the one
+        // nobody could reproduce. A resource that has vanished between a committed write and
+        // the read after it is reported as missing, which is what has happened.
+        return stored is null
+            ? NotFoundProblem(id)
+            : Ok(ResourceModelMapper.ToModel(stored, await ClosuresAsync(cancellationToken)));
     }
 
     [Authorize(Policy = Constants.VerbPolicies.Configure)]
@@ -155,7 +162,7 @@ public class ResourcesController(
         var created = await managementStore.CreateAsync(resource.Value, cancellationToken);
 
         return created.Succeeded
-            ? await SavedResourceAsync(created.Value.Id, created.Value, closures, cancellationToken)
+            ? await SavedResourceAsync(created.Value.Id, cancellationToken)
             : created.Failures.ToProblemResult();
     }
 
@@ -180,7 +187,7 @@ public class ResourcesController(
         var updated = await managementStore.UpdateAsync(resource.Value, cancellationToken);
 
         return updated.Succeeded
-            ? await SavedResourceAsync(updated.Value.Id, updated.Value, closures, cancellationToken)
+            ? await SavedResourceAsync(updated.Value.Id, cancellationToken)
             : updated.Failures.ToProblemResult();
     }
 

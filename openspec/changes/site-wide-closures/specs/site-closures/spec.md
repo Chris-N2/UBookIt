@@ -159,9 +159,15 @@ number rendered beside an action can be stale between the render and the reading
 **Writing the closure list SHALL require `UBookIt.Settings`.** Closing the whole organisation is a
 site-level act, and the grant that means "may add a meeting room" SHALL NOT carry it.
 
-**Reading the closure list, and setting a resource's opt-outs, SHALL require `UBookIt.Configure` or
-`UBookIt.Settings`.** An operator editing a resource must be able to see what that resource is
-inheriting and exempt it, and cannot do either without reading the list.
+**Reading the closure list SHALL require `UBookIt.Configure` or `UBookIt.Settings`.** An operator
+editing a resource must be able to see what that resource is inheriting in order to exempt it, and
+cannot do so without reading the list.
+
+**Setting a resource's opt-outs SHALL require `UBookIt.Configure`** — the verb that governs every
+other resource write, which is what exempting one resource is. It is deliberately NOT reachable
+under `UBookIt.Settings`: that grant decides the site's policy, and applying an exemption to one
+resource is a resource decision. A holder of `UBookIt.Settings` alone is therefore refused a
+resource write, exactly as they are refused every other one.
 
 Both SHALL be enforced by the server, whatever the client rendered.
 
@@ -177,6 +183,10 @@ that failed to ship.
 #### Scenario: Configure alone may still opt a resource out
 - **WHEN** a user whose groups hold only `UBookIt.Configure` saves a resource with an opt-out
 - **THEN** the write is served
+
+#### Scenario: Settings alone cannot opt a resource out
+- **WHEN** a user whose groups hold only `UBookIt.Settings` saves a resource carrying an opt-out
+- **THEN** the write is refused, because saving a resource is a `Configure` act
 
 #### Scenario: Settings reaches the writes
 - **WHEN** a user whose groups hold `UBookIt.Settings` creates, edits and deletes a closure

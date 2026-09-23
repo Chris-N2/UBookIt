@@ -6,6 +6,7 @@ using Microsoft.AspNetCore.Mvc.Routing;
 using UBookIt.Backoffice.Controllers;
 using UBookIt.Backoffice.Mapping;
 using UBookIt.Backoffice.Models;
+using UBookIt.Core;
 using UBookIt.Core.Availability;
 using UBookIt.Core.Common;
 using UBookIt.Core.Resources;
@@ -24,10 +25,14 @@ public class ClosuresControllerTests
 
     private static CancellationToken Ct => CancellationToken.None;
 
-    private static (ClosuresController Controller, InMemorySiteClosureStore Store) Wire()
+    private static (ClosuresController Controller, InMemorySiteClosureStore Store) Wire(
+        string timeZoneId = "Europe/London", DateTimeOffset? nowUtc = null)
     {
         var store = new InMemorySiteClosureStore();
-        return (new ClosuresController(store), store);
+        var settings = new SiteBookingSettings { TimeZoneId = timeZoneId };
+        var time = new FixedTimeProvider(nowUtc ?? TestData.Now);
+
+        return (new ClosuresController(store, time, settings), store);
     }
 
     private static T Ok<T>(IActionResult result)
@@ -142,8 +147,14 @@ public class ClosuresControllerTests
             .Select(a => a.Policy)
             .Single()!;
 
+    /// <summary>
+    /// The attributes name the policies they should. <b>This asserts the wiring, not the
+    /// decision</b> — whether those policies then admit the right verbs is evaluated through the
+    /// real policy engine in <c>PermissionsTests</c>, because a test that compares attribute
+    /// strings would stay green if <c>ClosuresRead</c> were registered with the wrong verbs.
+    /// </summary>
     [Fact]
-    public void Reading_the_list_is_reachable_by_either_verb_and_writing_is_not()
+    public void Each_closure_action_names_the_policy_it_should()
     {
         Assert.Equal(Constants.VerbPolicies.ClosuresRead, PolicyOf(nameof(ClosuresController.ListClosures)));
 
@@ -420,5 +431,80 @@ public class ClosuresControllerTests
             Assert.Single(fetched.Exceptions).Superseded,
             Assert.Single(updated.Exceptions).Superseded);
         Assert.True(Assert.Single(updated.Exceptions).Superseded);
+    }
+
+    /// <summary>
+    /// The PAGED LIST reports the same superseded state a single read does.
+    /// </summary>
+    /// <remarks>
+    /// The list maps from the management store rather than the read port, so it is a second
+    /// route to the same statement — and it was the route no test covered while the double
+    /// hydrated only <c>GetAsync</c>. A readout that disagreed with itself between a list and a
+    /// detail view is the same defect the save response had, on a different surface.
+    /// </remarks>
+    [Fact]
+    public async Task The_paged_list_reports_the_superseded_state_a_single_read_does()
+    {
+        var (controller, closures) = WireResources();
+        closures.Add(TestData.Closure(Date, "Christmas Day"));
+
+        var request = RequestWith();
+        request.OpeningHours = [new OpeningHoursModel { Day = Date.DayOfWeek, Start = new TimeOnly(9, 0), End = new TimeOnly(17, 0) }];
+        request.Exceptions =
+        [
+            new AvailabilityExceptionModel
+            {
+                Date = Date,
+                Windows = [new TimeWindowModel { Start = new TimeOnly(10, 0), End = new TimeOnly(14, 0) }],
+            },
+        ];
+
+        var created = Ok<ResourceResponseModel>(await controller.CreateResource(request, Ct));
+        var listed = Ok<PagedResourcesModel>(await controller.ListResources(0, 50, Ct));
+        var fetched = Ok<ResourceResponseModel>(await controller.GetResource(created.Id, Ct));
+
+        var fromList = Assert.Single(listed.Items, r => r.Id == created.Id);
+
+        Assert.Equal(
+            Assert.Single(fetched.Exceptions).Superseded,
+            Assert.Single(fromList.Exceptions).Superseded);
+        Assert.True(Assert.Single(fromList.Exceptions).Superseded);
+    }
+
+    /// <summary>
+    /// "Today" for the default filter is today in the SITE's time zone.
+    /// </summary>
+    /// <remarks>
+    /// On a site west of UTC, a UTC "today" drops the current day's closure out of the default
+    /// list from the local afternoon — the operator loses the row for the day they are standing
+    /// in. Asserted with a fixed clock at an instant where the two dates genuinely differ, so
+    /// the test cannot pass by the zones happening to agree.
+    /// </remarks>
+    [Fact]
+    public async Task The_default_filter_uses_the_sites_date_not_the_servers()
+    {
+        // 03:00 UTC on the 2nd is still 22:00 on the 1st in New York.
+        var nowUtc = new DateTimeOffset(2026, 10, 2, 3, 0, 0, TimeSpan.Zero);
+        var (controller, store) = Wire("America/New_York", nowUtc);
+
+        var localToday = TestData.Closure(new DateOnly(2026, 10, 1), "Still today in New York");
+        store.Add(localToday);
+
+        var listed = Ok<List<SiteClosureModel>>(await controller.ListClosures(cancellationToken: Ct));
+
+        Assert.Equal(localToday.Id, Assert.Single(listed).Id);
+    }
+
+    [Fact]
+    public async Task An_unreadable_time_zone_still_serves_the_list()
+    {
+        // The setting has its own validation and its own code; a list is not where that is
+        // enforced, and failing here would show nothing at all.
+        var (controller, store) = Wire("Not/AZone", new DateTimeOffset(2026, 10, 2, 3, 0, 0, TimeSpan.Zero));
+        store.Add(TestData.Closure(new DateOnly(2026, 10, 5), "Later"));
+
+        var listed = Ok<List<SiteClosureModel>>(await controller.ListClosures(cancellationToken: Ct));
+
+        Assert.Single(listed);
     }
 }

@@ -593,11 +593,45 @@ public class DeliveryApiTests
             .Select(p => p.Name)
             .ToArray();
 
+        // `closure` and `optout` joined this list when site closures arrived. The forbidden
+        // set is the POPULATION of internal availability configuration, not the sample that
+        // existed when the guard was written — a new kind of configuration added to the read
+        // model would otherwise pass a guard whose whole purpose is to refuse it.
         Assert.DoesNotContain(names, n =>
             n.Contains("open", StringComparison.OrdinalIgnoreCase)
             || n.Contains("hour", StringComparison.OrdinalIgnoreCase)
             || n.Contains("exception", StringComparison.OrdinalIgnoreCase)
-            || n.Contains("window", StringComparison.OrdinalIgnoreCase));
+            || n.Contains("window", StringComparison.OrdinalIgnoreCase)
+            || n.Contains("closure", StringComparison.OrdinalIgnoreCase)
+            || n.Contains("closed", StringComparison.OrdinalIgnoreCase)
+            || n.Contains("optout", StringComparison.OrdinalIgnoreCase)
+            || n.Contains("opt_out", StringComparison.OrdinalIgnoreCase));
+    }
+
+    /// <summary>
+    /// The same rule over the SERIALIZED body rather than the property names, because a label
+    /// can reach a caller through a member whose name says nothing — an "unavailableReason", a
+    /// note, a description carried through from configuration.
+    /// </summary>
+    [Fact]
+    public void A_serialized_resource_read_model_carries_no_trace_of_a_closure()
+    {
+        var model = new ResourceReadModel
+        {
+            Id = Guid.NewGuid(),
+            Type = "room",
+            DisplayName = "Consulting Room",
+            Description = "A room",
+            ZoneId = "Europe/London",
+            Constraints = new ConstraintsModel(),
+        };
+
+        var json = System.Text.Json.JsonSerializer.Serialize(model);
+
+        foreach (var forbidden in new[] { "closure", "closed", "optOut", "opt_out" })
+        {
+            Assert.DoesNotContain(forbidden, json, StringComparison.OrdinalIgnoreCase);
+        }
     }
 
     // Transport/model-binding failures share the domain envelope (design D7).

@@ -4,6 +4,7 @@ using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
 using UBookIt.Backoffice.Mapping;
 using UBookIt.Backoffice.Models;
+using UBookIt.Core;
 using UBookIt.Core.Availability;
 using UBookIt.Core.Common;
 using UBookIt.Core.Stores;
@@ -39,7 +40,10 @@ namespace UBookIt.Backoffice.Controllers;
 /// </remarks>
 [ApiVersion("1.0")]
 [ApiExplorerSettings(GroupName = "UBookIt.Backoffice")]
-public class ClosuresController(ISiteClosureManagementStore store) : UBookItBackofficeApiControllerBase
+public class ClosuresController(
+    ISiteClosureManagementStore store,
+    TimeProvider timeProvider,
+    SiteBookingSettings settings) : UBookItBackofficeApiControllerBase
 {
     /// <summary>
     /// The site's closures, newest-relevant first by date. <paramref name="includePast"/>
@@ -48,8 +52,13 @@ public class ClosuresController(ISiteClosureManagementStore store) : UBookItBack
     /// <remarks>
     /// The filter is applied by the store rather than by the client hiding rows, so the
     /// view's default does not depend on fetching every closure a site has ever recorded.
-    /// "Today" is the server's date: a closure list is a site-wide statement, and the
-    /// viewer's own clock has no business deciding what it contains.
+    /// <para>
+    /// <b>"Today" is today in the SITE's time zone</b>, not the server's and not the viewer's.
+    /// A closure list is a site-wide statement about the site's own calendar, and UTC would
+    /// drop today's closure out of the default list from the local afternoon on any site west
+    /// of it. An unreadable zone id falls back to UTC rather than failing the read — the
+    /// setting has its own validation, and a list is not the place to enforce it.
+    /// </para>
     /// </remarks>
     [Authorize(Policy = Constants.VerbPolicies.ClosuresRead)]
     [HttpGet("closures")]
@@ -57,8 +66,7 @@ public class ClosuresController(ISiteClosureManagementStore store) : UBookItBack
     public async Task<IActionResult> ListClosures(
         bool includePast = false, CancellationToken cancellationToken = default)
     {
-        var closures = await store.ListAsync(
-            includePast ? null : DateOnly.FromDateTime(DateTime.UtcNow), cancellationToken);
+        var closures = await store.ListAsync(includePast ? null : Today(), cancellationToken);
 
         return Ok(closures.Select(ToModel).ToList());
     }
@@ -122,6 +130,25 @@ public class ClosuresController(ISiteClosureManagementStore store) : UBookItBack
         var deleted = await store.DeleteAsync(id, cancellationToken);
 
         return deleted.Succeeded ? Ok() : NotFoundProblem(id);
+    }
+
+    private DateOnly Today()
+    {
+        var now = timeProvider.GetUtcNow();
+
+        try
+        {
+            var zone = TimeZoneInfo.FindSystemTimeZoneById(settings.TimeZoneId);
+            return DateOnly.FromDateTime(TimeZoneInfo.ConvertTime(now, zone).DateTime);
+        }
+        catch (Exception exception) when (
+            exception is TimeZoneNotFoundException or InvalidTimeZoneException)
+        {
+            // The setting has its own validation and its own failure code; a LIST is not the
+            // place to enforce it. Falling back to UTC shows a closure a day early at worst,
+            // where failing would show nothing at all.
+            return DateOnly.FromDateTime(now.UtcDateTime);
+        }
     }
 
     private static SiteClosureModel ToModel(SiteClosure closure)

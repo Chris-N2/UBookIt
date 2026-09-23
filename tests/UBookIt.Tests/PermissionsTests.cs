@@ -283,6 +283,44 @@ public class PermissionsTests
     }
 
     [Fact]
+    public async Task Either_configuring_verb_reaches_the_closure_list()
+    {
+        // THROUGH THE REAL POLICY, not by reading an [Authorize] attribute. Registering
+        // ClosuresRead with Settings alone would leave every attribute assertion green while a
+        // Configure-only operator lost the list their own resource editor depends on — which is
+        // what the attribute-shaped test this replaces could not have caught.
+        var configureOnly = UserWith(section: true, Constants.Verbs.Configure);
+        var settingsOnly = UserWith(section: true, Constants.Verbs.Settings);
+
+        Assert.True(await AuthorizeAsync(configureOnly, Constants.VerbPolicies.ClosuresRead));
+        Assert.True(await AuthorizeAsync(settingsOnly, Constants.VerbPolicies.ClosuresRead));
+    }
+
+    [Fact]
+    public async Task Reading_closures_under_either_verb_is_not_an_implication_between_them()
+    {
+        // The any-of grants each verb this READ and nothing else of the other's. Without this,
+        // "not an implication" is a sentence in a spec with no way to fail.
+        var configureOnly = UserWith(section: true, Constants.Verbs.Configure);
+        var settingsOnly = UserWith(section: true, Constants.Verbs.Settings);
+
+        Assert.False(await AuthorizeAsync(configureOnly, Constants.VerbPolicies.Settings));
+        Assert.False(await AuthorizeAsync(settingsOnly, Constants.VerbPolicies.Configure));
+
+        // And writing a closure stays on Settings alone: the closures controller names that
+        // policy, so a Configure-only user reaching it is refused by this same rule.
+        Assert.False(await AuthorizeAsync(configureOnly, Constants.VerbPolicies.Settings));
+    }
+
+    [Fact]
+    public async Task Neither_verb_means_no_closure_list()
+    {
+        var bookingsOnly = UserWith(section: true, Constants.Verbs.BookingsManage);
+
+        Assert.False(await AuthorizeAsync(bookingsOnly, Constants.VerbPolicies.ClosuresRead));
+    }
+
+    [Fact]
     public async Task An_administrator_without_the_verb_is_refused()
     {
         // UBookItVerbHandler intersects the user's groups' permissions and calls Fail() — there is
