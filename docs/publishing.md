@@ -11,7 +11,7 @@ only the first: `17.0.0` is already out, and all of it applies unchanged to the 
   copyright are named explicitly because they have been wrong in this repository before, and
   a list that omits them is how that goes unnoticed. A wrong URL is fixed by publishing a *new
   version*, and the wrong one stays visible on the version history forever.
-- **A version number cannot be reused**, even after unlisting. uBookIt is at `17.1.2`, and
+- **A version number cannot be reused**, even after unlisting. uBookIt is at `17.2.0`, and
   that number is spent the moment it is pushed, successfully or not. This is no longer
   hypothetical: `17.0.0` was published on 2026-09-15 carrying a readme whose documentation links
   were relative, every one of them resolved against nuget.org rather than the repository, and
@@ -228,7 +228,7 @@ git branch -r --contains HEAD            # must list origin/main
 this:
 
 ```
-https://raw.githubusercontent.com/Chris-N2/UBookIt/17.1.2/docs/images/booking-flow.png
+https://raw.githubusercontent.com/Chris-N2/UBookIt/17.2.0/docs/images/booking-flow.png
 ```
 
 That is deliberate. A readme is frozen at push and can never be corrected, but the images in it
@@ -246,9 +246,9 @@ bump therefore edits the readme's image refs in the same commit as `Directory.Bu
 *Before any push*, step 3, for the full list of what a bump touches.
 
 ```bash
-git tag 17.1.2                  # on the commit you are packing from
-git push origin 17.1.2
-curl -sI https://raw.githubusercontent.com/Chris-N2/UBookIt/17.1.2/docs/images/booking-flow.png
+git tag 17.2.0                  # on the commit you are packing from
+git push origin 17.2.0
+curl -sI https://raw.githubusercontent.com/Chris-N2/UBookIt/17.2.0/docs/images/booking-flow.png
 ```
 
 The `curl` is the point of the step: a `200` means the address the readme carries resolves. Do it

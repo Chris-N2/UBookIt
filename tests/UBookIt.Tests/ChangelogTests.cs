@@ -238,4 +238,53 @@ public class ChangelogTests
             RepoFiles.Read(Changelog),
             "An entry for a release that has happened is never edited");
     }
+
+    /// <summary>
+    /// A published interface a host may implement is named in the entry of the release that
+    /// introduced it.
+    /// </summary>
+    /// <remarks>
+    /// <para>
+    /// <b>The obligation argument that carries every other contract callout does not reach this
+    /// case.</b> A member added to an existing interface stops an implementing site compiling, so
+    /// the entry must say so or the reader is ambushed. A whole new interface obliges a consumer
+    /// to nothing — nothing stops compiling, and a site that ignores it keeps the product it had
+    /// — so under the rule as it stood, naming it was optional.
+    /// </para>
+    /// <para>
+    /// It is required for the reason `packaging` already gives about notifications: <b>an
+    /// extension point nobody is told about is not one.</b> A site that does not know the seam
+    /// exists will either go without the capability or reach past the contracts into the
+    /// database, which is the outcome every port in this package exists to prevent.
+    /// </para>
+    /// <para>
+    /// Pinned per release rather than derived, because there is no honest way to ask the assembly
+    /// "which of your public interfaces are new since the last version" from inside the suite —
+    /// the previous version's assembly is not here to compare against. The list is the
+    /// declaration, and <see cref="Released_versions_keep_their_entries"/> then protects the
+    /// sentence the same way it protects the rest of the entry.
+    /// </para>
+    /// </remarks>
+    [Theory]
+    [InlineData("17.2.0", "IPublicHolidaySource")]
+    public void A_release_that_published_a_new_extension_point_names_it(string version, string type)
+    {
+        var entry = EntryFor(version);
+
+        Assert.True(entry is not null, $"{Changelog} has no entry for {version}.");
+
+        Assert.True(
+            entry!.Contains(type, StringComparison.Ordinal),
+            $"{Changelog}'s entry for {version} does not name {type}. That release published it as "
+            + "a new interface a host site may implement, and an extension point nobody is told "
+            + "about is not one.");
+
+        // Naming it is not enough: a reader has to learn that it asks nothing of them. Without
+        // this, "we added an interface" reads as work to do.
+        Assert.True(
+            entry.Contains("Nothing is required of you", StringComparison.OrdinalIgnoreCase)
+            || entry.Contains("implements nothing", StringComparison.OrdinalIgnoreCase),
+            $"{Changelog}'s entry for {version} names {type} without saying that a site which "
+            + "implements nothing is unaffected.");
+    }
 }

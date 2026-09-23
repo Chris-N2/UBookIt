@@ -20,7 +20,7 @@ question, answered by Umbraco's built-in **Sensitive data** group — and note t
 site's original super user is in that group to begin with, so a newly created administrator
 sees those details hidden until you add them. See [the backoffice docs](https://github.com/Chris-N2/UBookIt/blob/main/docs/backoffice.md).
 
-> **uBookIt is at `17.1.2`, and the public API is a promise.** The promise is not that nothing
+> **uBookIt is at `17.2.0`, and the public API is a promise.** The promise is not that nothing
 > will ever change — `17.1.0` itself added members to five published interfaces, which is why it
 > is a minor. It is that a change to a published contract is deliberate, is named before you meet
 > it, and never arrives in a patch. What each release asks of a site that is upgrading is the
@@ -129,23 +129,23 @@ migration time rather than quietly misbehave.
 to the site; uBookIt supplies the markup and one stylesheet, and sets no text colour of its own,
 so the flow takes the site's. It works with JavaScript turned off.
 
-![A booking page on a site called Fairfield Studios: the site's own header and navigation across the top, then a heading reading Book Studio session and a grouped list of radio buttons headed "Dates with availability for 30 minutes in the next 30 days", one per day from Monday 21 September 2026 onward, the first already selected. The list continues below the visible area.](https://raw.githubusercontent.com/Chris-N2/UBookIt/17.1.2/docs/images/booking-flow.png)
+![A booking page on a site called Fairfield Studios: the site's own header and navigation across the top, then a heading reading Book Studio session and a grouped list of radio buttons headed "Dates with availability for 30 minutes in the next 30 days", one per day from Monday 21 September 2026 onward, the first already selected. The list continues below the visible area.](https://raw.githubusercontent.com/Chris-N2/UBookIt/17.2.0/docs/images/booking-flow.png)
 
 **Choosing a time, and giving your details.** The start times for the chosen day render as a
 wrapping run rather than a long column, every field is labelled, and the notice explaining what
 the site does with the details sits where the details are asked for.
 
-![The lower half of the same booking page: a How long do you need? selector reading 30 minutes, a Show times button, and a fieldset headed "Available start times on Monday 21 September 2026 for 30 minutes" whose nine radio options from 12:30 to 16:30 wrap across two rows. Below it a Your details fieldset holds labelled Name, Email and optional Phone fields, a note saying the site will email you about your booking, two paragraphs explaining what the details are used for and how long they are kept, and a Book button.](https://raw.githubusercontent.com/Chris-N2/UBookIt/17.1.2/docs/images/booking-form.png)
+![The lower half of the same booking page: a How long do you need? selector reading 30 minutes, a Show times button, and a fieldset headed "Available start times on Monday 21 September 2026 for 30 minutes" whose nine radio options from 12:30 to 16:30 wrap across two rows. Below it a Your details fieldset holds labelled Name, Email and optional Phone fields, a note saying the site will email you about your booking, two paragraphs explaining what the details are used for and how long they are kept, and a Book button.](https://raw.githubusercontent.com/Chris-N2/UBookIt/17.2.0/docs/images/booking-form.png)
 
 **The Bookings screen in the backoffice.** Find a booking by reference or email address, choose a
 date window, filter by status, and act on a row.
 
-![The uBookIt Bookings screen inside the Umbraco backoffice: a Find box for a reference or email address, From and To date fields both set to 5 October 2026, status checkboxes for Requested, Confirmed, Cancelled and Declined, and a New booking button for recording one taken by telephone. Below them a table of four bookings shows reference, date and time, booker name and email, resources, service and status, each row offering Move and Cancel actions.](https://raw.githubusercontent.com/Chris-N2/UBookIt/17.1.2/docs/images/bookings-screen.png)
+![The uBookIt Bookings screen inside the Umbraco backoffice: a Find box for a reference or email address, From and To date fields both set to 5 October 2026, status checkboxes for Requested, Confirmed, Cancelled and Declined, and a New booking button for recording one taken by telephone. Below them a table of four bookings shows reference, date and time, booker name and email, resources, service and status, each row offering Move and Cancel actions.](https://raw.githubusercontent.com/Chris-N2/UBookIt/17.2.0/docs/images/bookings-screen.png)
 
 **Availability, per resource.** Opening hours are windows on each weekday — add as many as a day
 needs, for a lunch break or a split shift.
 
-![The Opening hours panel of a resource in the uBookIt backoffice, with one section per day of the week. Monday through Friday are shown and the remaining days continue below the picture; each day holds a From and a To time field reading 09:00 and 17:00, a Remove window link beside them, and an Add window link for that day underneath.](https://raw.githubusercontent.com/Chris-N2/UBookIt/17.1.2/docs/images/availability.png)
+![The Opening hours panel of a resource in the uBookIt backoffice, with one section per day of the week. Monday through Friday are shown and the remaining days continue below the picture; each day holds a From and a To time field reading 09:00 and 17:00, a Remove window link beside them, and an Add window link for that day underneath.](https://raw.githubusercontent.com/Chris-N2/UBookIt/17.2.0/docs/images/availability.png)
 
 ### Accessibility is a feature here, not a checkbox
 

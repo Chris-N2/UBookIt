@@ -2,48 +2,69 @@
 
 ## 1. The version, and the documents that state it
 
-- [ ] 1.1 Bump `<Version>` in `Directory.Build.props` to `17.2.0`, and verify it is the **only**
+- [x] 1.1 Bump `<Version>` in `Directory.Build.props` to `17.2.0`, and verify it is the **only**
       `<Version>` element — `DeclaredVersion()` asserts exactly one, because a second would
       silently become the number every document is checked against
-- [ ] 1.2 Update the *uBookIt is at* sentence in `README.md` and in `docs/publishing.md`
-- [ ] 1.3 Re-pin every screenshot URL in `README.md`'s *What it looks like* to the `17.2.0` tag
-- [ ] 1.4 **Verify the two anchors did NOT move** — the `## Status` sentence naming the first
+- [x] 1.2 Update the *uBookIt is at* sentence in `README.md` and in `docs/publishing.md`
+- [x] 1.3 Re-pin every screenshot URL in `README.md`'s *What it looks like* to the `17.2.0` tag
+- [x] 1.4 **Verify the two anchors did NOT move** — the `## Status` sentence naming the first
       publish, and the sentence naming the version the public API was declared stable from.
       Confirm by reading them, and by `The_documented_anchors_do_not_move` passing
-- [ ] 1.5 Update every version literal in `docs/publishing.md`'s *Tag the release* section — the
+- [x] 1.5 Update every version literal in `docs/publishing.md`'s *Tag the release* section — the
       example URL and the `git tag`, `git push` and `curl` commands. **Nothing guards these**;
       verify by eye and record what was changed, so the next release has a list rather than a
       warning
-- [ ] 1.6 Verify no version literal was changed anywhere else: diff the working tree and account
+      *Four, exactly as the standing note predicted: the example `raw.githubusercontent.com` URL,
+      `git tag <v>`, `git push origin <v>`, and the `curl -sI` URL. All four inside the section
+      between `## Tag the release before you push the package` and `## Pushing`. No other version
+      literal in that file needed to move.*
+- [x] 1.6 Verify no version literal was changed anywhere else: diff the working tree and account
       for every changed line naming a version
+      *Eleven changed lines across three files, every one accounted for: the `<Version>` element,
+      the two "uBookIt is at" sentences, four screenshot URLs and the four Tag-the-release
+      literals. **README.md line 58 was deliberately NOT changed** — "from `17.1.2` the packages
+      say so" is a statement about when the host bound was introduced, and moving it forward would
+      make it false.*
 
 ## 2. The changelog entry
 
-- [ ] 2.1 Write the `17.2.0` entry, heading left **undated**
-- [ ] 2.2 Lead with what upgrading asks of the reader, which for this release is nothing — state it
+- [x] 2.1 Write the `17.2.0` entry, heading left **undated**
+- [x] 2.2 Lead with what upgrading asks of the reader, which for this release is nothing — state it
       rather than omitting it
-- [ ] 2.3 Describe both capabilities as a consumer meets them, not as the changes were structured
-- [ ] 2.4 Name `IPublicHolidaySource` as a new published interface a host may implement, say what
+- [x] 2.3 Describe both capabilities as a consumer meets them, not as the changes were structured
+- [x] 2.4 Name `IPublicHolidaySource` as a new published interface a host may implement, say what
       implementing it enables, state that a site implementing nothing is unaffected, and state that
       the package ships no holiday data for any country — satisfying the scenario this change adds
       to `packaging` rather than only the prose of the proposal
-- [ ] 2.5 Verify `ChangelogTests` passes on all six of its guards
+- [x] 2.5 Verify `ChangelogTests` passes on all six of its guards
 
 ## 2a. The requirement this release binds first
 
-- [ ] 2a.1 **MODIFIED** `packaging` / *A release names the contract changes a consumer must act on*
+- [x] 2a.1 **MODIFIED** `packaging` / *A release names the contract changes a consumer must act on*
       — the requirement reasons from obligation and all its scenarios describe a member added to an
       existing interface; a whole new interface obliges a consumer to nothing, so it fell outside.
       Diff the guarantees scenario by scenario before and after, and record the counts
-- [ ] 2a.2 Verify the new scenario is satisfied by the entry actually written, not merely by the
+      *Diffed: 5 scenarios in, 6 out, none dropped; every SHALL carried forward verbatim. The
+      added scenario is "A release that publishes a new extension point names it".*
+- [x] 2a.2 Verify the new scenario is satisfied by the entry actually written, not merely by the
       entry's intent
+      *Made verifiable rather than asserted: `A_release_that_published_a_new_extension_point_names_it`
+      pins the `17.2.0` entry to naming `IPublicHolidaySource` AND to saying a site implementing
+      nothing is unaffected. Both halves mutation-tested — renaming the interface in the entry
+      fails the first, removing the reassurance fails the second. Pinned per release because the
+      previous version's assembly is not present to diff against, so "which interfaces are new"
+      cannot be derived inside the suite.*
 
 ## 3. Build, and prove the suite is green from a clean one
 
-- [ ] 3.1 Build the client, then the solution in Release with the TestSite stopped: zero warnings
-- [ ] 3.2 Run every suite from a **clean** build — never accept `--no-build` as evidence, which can
+- [x] 3.1 Build the client, then the solution in Release with the TestSite stopped: zero warnings
+- [x] 3.2 Run every suite from a **clean** build — never accept `--no-build` as evidence, which can
       execute stale assemblies and report green
-- [ ] 3.3 Run `openspec validate --all --strict`
+- [x] 3.3 Run `openspec validate --all --strict`
+      *Release build from a cleared client output and `--no-incremental`: 0 warnings, 0 errors.
+      Unit 1950, integration 183, rendering 1168, client 335. `validate --all --strict` 25/25.
+      The TestSite was stopped first — it holds the Release output and the build cannot be trusted
+      while it runs.*
 
 ## 4. Pack, and verify the packed metadata rather than assuming it
 
