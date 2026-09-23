@@ -105,6 +105,7 @@ public class PermissionsTests
         // operator's behalf, and it is the first half of an act whose second half creates
         // closures. Granting the read separately would hand somebody the outbound call without
         // the decision it exists to serve.
+        ["ClosuresController.GetHolidaySource"] = Constants.VerbPolicies.Settings,
         ["ClosuresController.PreviewHolidays"] = Constants.VerbPolicies.Settings,
         ["ClosuresController.ImportHolidays"] = Constants.VerbPolicies.Settings,
     };

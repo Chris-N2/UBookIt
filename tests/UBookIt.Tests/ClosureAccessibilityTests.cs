@@ -99,4 +99,53 @@ public class ClosureAccessibilityTests
         Assert.Contains("exceptionDescribedByIds(index, {", source, StringComparison.Ordinal);
         Assert.Contains("id=${supersededId(index)}", source, StringComparison.Ordinal);
     }
+
+    [Fact]
+    public void Each_holiday_checkbox_names_the_date_it_would_close()
+    {
+        // A column of identical "Close on" checkboxes is unusable without sight of the row. The
+        // accessible name has to carry the date and the holiday's name, exactly as the closure
+        // row controls do.
+        var source = RepoFiles.Read(ClosuresView);
+
+        Assert.Contains(
+            "label=\"${this.#term(\"importChoose\")}: ${row.date} ${row.name}\"",
+            source,
+            StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public void The_import_window_inputs_are_labelled()
+    {
+        var source = RepoFiles.Read(ClosuresView);
+
+        foreach (var id in new[] { "holiday-from", "holiday-to" })
+        {
+            Assert.Contains($"<label for=\"{id}\">", source, StringComparison.Ordinal);
+            Assert.Contains($"id=\"{id}\"", source, StringComparison.Ordinal);
+        }
+    }
+
+    [Fact]
+    public void A_failed_holiday_source_is_announced_and_an_import_result_is_not()
+    {
+        // TWO different live regions, deliberately. A source that failed is an ALERT — it
+        // interrupts, because the operator's next move depends on it. A summary of what was
+        // created is a STATUS: worth announcing, not worth interrupting for.
+        var source = RepoFiles.Read(ClosuresView);
+
+        Assert.Contains("id=\"holiday-error\" class=\"error\" role=\"alert\"", source, StringComparison.Ordinal);
+        Assert.Contains("id=\"holiday-summary\" role=\"status\"", source, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public void Only_a_selectable_holiday_row_renders_a_checkbox()
+    {
+        // The rendering asks the shared decision rather than testing the state inline, so the
+        // control offered and the row sent can never disagree about what is selectable.
+        var source = RepoFiles.Read(ClosuresView);
+
+        Assert.Contains("${isSelectable(row)", source, StringComparison.Ordinal);
+        Assert.DoesNotContain("row.state === \"new\"", source, StringComparison.Ordinal);
+    }
 }

@@ -667,6 +667,35 @@ export default {
     columnDate: "Date",
     columnLabel: "Name",
     columnActions: "Actions",
+
+    // ---------------------------------------------------------- holiday import
+    //
+    // The wording says what the screen does rather than what it could do: an operator UNTICKS
+    // the dates their organisation is open on, and only the ticked ones are created. Nothing
+    // here promises the list will be kept up to date, because nothing keeps it up to date —
+    // importing is something a person does.
+    importHeadline: "Public holidays",
+    importIntro:
+      "Bring in public holidays from the source this site uses, and choose which of them your organisation is actually closed on. Nothing is created until you confirm, and nothing is imported automatically.",
+    importOpen: "Import public holidays",
+    importFrom: "From",
+    importTo: "To",
+    importFetch: "Fetch holidays",
+    importConfirm: "Create the ticked closures",
+    importChoose: "Close on",
+    importColumnChoose: "Close on",
+    importColumnState: "Status",
+    importAlreadyClosed: "Already closed",
+    importCannot: "Cannot be imported — the name is too long or empty",
+    importCollapsed: "Another holiday on this date was collapsed into this one",
+
+    // A source that FAILED, kept apart from a window with no holidays in it. Telling an operator
+    // "no holidays" when the feed is down would have them conclude their calendar is clear.
+    importSourceFailed:
+      "The site's holiday source could not be reached, so there is nothing to show. This is not the same as there being no holidays — try again, or ask a developer to check the source.",
+    importNone: "The source returned no holidays for those dates.",
+    importFailed: "Those closures could not be created.",
+    importSummary: "Created %0% closures. %1% rows were skipped.",
   },
   ubookitResponsibility: {
     headline: "Responsibility",

@@ -25,13 +25,13 @@
 
 ## 4. Backoffice client
 
-- [ ] 4.1 Add the import panel to the Closures view with the window fields defaulting to today through the end of next year; verify the default window with a fixed clock, at an instant where "next year" is unambiguous
-- [ ] 4.2 Render the three row states, with only new rows selectable and selected by default, and both other states showing why they are not; verify with client tests over the pure selection state
-- [ ] 4.3 Send only the ticked rows on confirm, derived from the whole list each time; verify that unticking and re-ticking produces the same set as never having ticked — full replacement, like the opt-out set
-- [ ] 4.4 Show the import control only where a source is registered, and render nothing about importing otherwise; verify both branches
-- [ ] 4.5 Report a source failure distinctly from an empty result in the UI; verify the two render differently, since conflating them tells an operator their calendar is clear when it is unknown
-- [ ] 4.6 Add the localization terms; verify with the element-terms guard, which fails on a term an element asks for and `en-us.ts` lacks
-- [ ] 4.7 Accessibility: every checkbox individually labelled with its date and name, the window inputs labelled, failures announced and associated, full keyboard operability with visible focus; verify at source level and confirm live in task 6
+- [x] 4.1 Add the import panel to the Closures view with the window fields defaulting to today through the end of next year; verify the default window with a fixed clock, at an instant where "next year" is unambiguous
+- [x] 4.2 Render the three row states, with only new rows selectable and selected by default, and both other states showing why they are not; verify with client tests over the pure selection state
+- [x] 4.3 Send only the ticked rows on confirm, derived from the whole list each time; verify that unticking and re-ticking produces the same set as never having ticked — full replacement, like the opt-out set
+- [x] 4.4 Show the import control only where a source is registered, and render nothing about importing otherwise; verify both branches
+- [x] 4.5 Report a source failure distinctly from an empty result in the UI; verify the two render differently, since conflating them tells an operator their calendar is clear when it is unknown
+- [x] 4.6 Add the localization terms; verify with the element-terms guard, which fails on a term an element asks for and `en-us.ts` lacks
+- [x] 4.7 Accessibility: every checkbox individually labelled with its date and name, the window inputs labelled, failures announced and associated, full keyboard operability with visible focus; verify at source level and confirm live in task 6
 
 ## 5. The TestSite implementation — the seam's proof
 

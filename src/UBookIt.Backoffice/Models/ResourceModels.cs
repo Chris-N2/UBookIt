@@ -309,3 +309,14 @@ public class HolidayImportSkippedModel
 
     public string Code { get; set; } = string.Empty;
 }
+
+/// <summary>Whether this site has a public holiday source at all.</summary>
+/// <remarks>
+/// Asked so the client can render <b>nothing</b> rather than a control that fails when pressed.
+/// Behind the settings verb like the rest of the import: only somebody who could use the feature
+/// learns whether the site has it.
+/// </remarks>
+public class HolidaySourceModel
+{
+    public bool Registered { get; set; }
+}

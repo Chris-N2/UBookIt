@@ -1015,6 +1015,10 @@ public class SensitiveDataRedactionTests
             // The preview is a READ — it creates nothing — so the free-text rule below applies to
             // it, correctly. It takes two dates and returns dates with the site's own source's
             // names; it touches no booking and accepts nothing a booker supplied.
+            // Whether a source is REGISTERED — it reaches no source and reports nothing about
+            // whether one works. Behind the settings verb like the rest of the import, so only
+            // somebody who could use the feature learns whether the site has it.
+            "ClosuresController.GetHolidaySource = read",
             "ClosuresController.PreviewHolidays = read",
             "ClosuresController.ImportHolidays = write",
             "ResourcesController.CreateResource = write",

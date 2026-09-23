@@ -145,6 +145,20 @@ public class ClosuresController(
     // ---------------------------------------------------------------- public holidays
 
     /// <summary>
+    /// Whether this site has a holiday source registered.
+    /// </summary>
+    /// <remarks>
+    /// The client asks once and renders no import control at all when the answer is no — the
+    /// feature is absent rather than disabled. Answering this reaches no source: it reports
+    /// whether one was registered, never whether one works.
+    /// </remarks>
+    [Authorize(Policy = Constants.VerbPolicies.Settings)]
+    [HttpGet("closures/holidays/source")]
+    [ProducesResponseType<HolidaySourceModel>(StatusCodes.Status200OK)]
+    public IActionResult GetHolidaySource()
+        => Ok(new HolidaySourceModel { Registered = holidays.SourceRegistered });
+
+    /// <summary>
     /// What a site's own holiday source offers for a window, classified against the closures the
     /// site already has. <b>Creates nothing, and is safe to repeat.</b>
     /// </summary>

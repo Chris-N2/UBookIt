@@ -133,6 +133,10 @@ export type HolidayRowModel = {
     collapsedDuplicate: boolean;
 };
 
+export type HolidaySourceModel = {
+    registered: boolean;
+};
+
 export type MisalignedRoleModel = {
     resourceType: string;
     resourceId: string;
@@ -881,6 +885,29 @@ export type ImportHolidaysResponses = {
 };
 
 export type ImportHolidaysResponse = ImportHolidaysResponses[keyof ImportHolidaysResponses];
+
+export type GetHolidaySourceData = {
+    body?: never;
+    path?: never;
+    query?: never;
+    url: '/umbraco/ubookitbackoffice/api/v1/closures/holidays/source';
+};
+
+export type GetHolidaySourceErrors = {
+    /**
+     * The resource is protected and requires an authentication token
+     */
+    401: unknown;
+};
+
+export type GetHolidaySourceResponses = {
+    /**
+     * OK
+     */
+    200: HolidaySourceModel;
+};
+
+export type GetHolidaySourceResponse = GetHolidaySourceResponses[keyof GetHolidaySourceResponses];
 
 export type ListResourcesData = {
     body?: never;
