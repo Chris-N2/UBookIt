@@ -115,17 +115,30 @@ a defect, and had to delete and re-push a tag.
 
 ## 7. Publish
 
-- [ ] 7.1 Push all five packages
-- [ ] 7.2 Confirm each on `api.nuget.org/v3-flatcontainer/<id>/index.json` **per package**
-- [ ] 7.3 Open the package page: images render, and a documentation link lands
-- [ ] 7.4 **Confirm the correction actually happened** — `18.1.0` is installable and carries both
+- [x] 7.1 Push all five packages
+- [x] 7.2 Confirm each on `api.nuget.org/v3-flatcontainer/<id>/index.json` **per package**
+      *All five present. The account page already showed them, but the website lags the feed and
+      presents a package as unlisted while validating, so the feed is the answer that counts.*
+- [x] 7.3 Open the package page: images render, and a documentation link lands
+- [x] 7.4 **Confirm the correction actually happened** — `18.1.0` is installable and carries both
       features, so `17.2.0`'s frozen "install `18.x`" sentence is now true
+      *Verified against the artifacts rather than reasoned about: `17.2.0`'s tagged readme does
+      say "For Umbraco 18, install uBookIt `18.x`."; the newest `18.x` on the feed is `18.1.0`;
+      and the `18.1.0` tag contains `PublicHolidaySource.cs`. The sentence is true again.*
+      *The window was a few hours and the main package's download count did not move, so nobody
+      installed against it — though a download count does not measure page views, so "nobody read
+      it" is probable rather than certain.*
 
 ## 8. Close out, in this order
 
 - [x] 8.1 Stamp the `18.1.0` entry's date once the packages are live
-- [ ] 8.2 Commit, and have it pushed
-- [ ] 8.3 Sync the spec delta, then archive — in that order
+- [x] 8.2 Commit, and have it pushed
+- [x] 8.3 Sync the spec delta, then archive — in that order
+      *`packaging` synced: 22 requirements unchanged, 93 scenarios to 95, verified against a
+      snapshot taken BEFORE the sync. `git diff --numstat` shows 34 insertions and **7 deletions**
+      — and unlike the 17 line's pure-addition sync, those 7 were inspected individually: all
+      seven are the falsified prose being rewritten, with no SHALL, no scenario and no requirement
+      among them.*
 - [x] 8.4 Run the sibling-falsification sweep over every spec, and record what was checked and
       what was found
       *Full record in `sweep.md`. Two live findings, both fixed here.*
@@ -145,5 +158,29 @@ a defect, and had to delete and re-push a tag.
       `site-closures` and `public-holidays` carry no version literal and no line reference, so
       publication falsifies nothing in either. Everything else it found was in `packaging` or in
       shipped documents.*
-- [ ] 8.6 Record what now differs between the two lines and why, so the next release on either one
+- [x] 8.6 Record what now differs between the two lines and why, so the next release on either one
       starts from a statement of the difference rather than discovering it
+
+      **`packaging` now matches across both lines in every requirement** — 22 each, same names,
+      and every scenario on `main` is present here. The single difference is one scenario this
+      line has and `main` does not: *The newest version of each line tells a resolver which line it
+      is*.
+
+      **And that difference is a defect, not a design.** It exists because this line's sweep found
+      two sentences that `main`'s sweep missed — "the constraint exists only in prose" and
+      "nothing a resolver reads has ever contradicted that". **Both are still present on `main`,
+      verified by `git show main:openspec/specs/packaging/spec.md`.** They were already false when
+      `17.2.0` published, and arguably from `17.1.2`, so the miss is real rather than a matter of
+      timing.
+
+      **Leaving it here would be the exact failure this release was created to correct** — a fix
+      that reaches one line only, which is what cost the documentation-link pinning a whole
+      release. It is NOT fixed here, because editing `main`'s specs from a change archived on
+      `dev/v18` is how the two lines drift in the first place, and because that correction is its
+      own change on its own branch. **Raised with the owner and recorded in the deferred
+      obligations, owed on `main`, before the next release on either line.**
+
+      Other standing differences, all deliberate: the version (`18.1.0` vs `17.2.0`), the Umbraco
+      bound (`[18.2.0, 19.0.0)` vs `[17.6.2, 18.0.0)`), the generated client (this line's OpenAPI
+      document orders nullable unions `null | T` and marks request bodies required), the
+      `generate-client` URL, and the changelog's own release history.

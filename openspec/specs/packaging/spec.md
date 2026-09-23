@@ -727,6 +727,15 @@ added to a published interface without a default implementation stops an impleme
 compiling, and "gained a member" does not tell a reader that. The obligation is the fact the
 consumer needs; the enumeration of members is how they discharge it.
 
+**A published contract is also changed by a whole new type a host may implement, and such an
+addition SHALL be named on the same terms.** It obliges a consumer to nothing — nothing stops
+compiling, and a site that ignores it keeps the product it had — so the argument from obligation
+that carries the member case does not reach it. What carries it is that an extension point
+nobody is told about is not one: a site that does not know a seam exists will either go without
+the capability or reach past the contracts into the database, which is the outcome every port in
+this package exists to prevent. The entry SHALL therefore name the type, say what implementing it
+gives the site, and say that nothing is required of a site that does not.
+
 **The entry SHALL be required to exist for the declared version, and that requirement SHALL be
 verified rather than asserted.** A release note written by hand and checked by nobody is stale
 at the next release, which is the failure mode this package has already paid for with prose
@@ -769,6 +778,12 @@ a reference to the single copy is what the package page carries.
 - **WHEN** a new release is prepared
 - **THEN** the entries describing earlier releases are unchanged
 - **AND** a check that compares them to the declared version does not require them to equal it
+
+#### Scenario: A release that publishes a new extension point names it
+
+- **WHEN** a release adds a new published interface a host site may implement
+- **THEN** the release's entry names the interface, says what implementing it enables, and states that a site which implements nothing is unaffected
+- **AND** the entry does not describe it as a breaking change, because nothing a consumer already wrote stops working
 
 ### Requirement: The documentation a consumer reads does not deny what the package does
 
@@ -994,13 +1009,21 @@ pushed**, which the publishing runbook SHALL state.
 
 A NuGet dependency version is a **minimum**, so declaring `Umbraco.Cms.Web.Website 18.2.0` says
 "18.2.0 or higher" and nothing more. For as long as uBookIt published one line this was merely
-imprecise; it is why the Umbraco Marketplace lists uBookIt as running on **v17 and v18**, which is
-false, and why nothing a resolver reads has ever contradicted that.
+imprecise; it is why the Umbraco Marketplace was able to describe uBookIt as running on **v17 and
+v18**, with nothing a resolver reads to contradict it.
 
-With two lines published against two different Umbraco majors, an unbounded dependency is no
-longer imprecise but wrong: a resolver asked for uBookIt has no machine-readable way to tell which
-line a site's Umbraco can take, and the constraint exists only in prose — the readme, this spec
-and `CLAUDE.md`, none of which a package manager reads.
+With two lines published against two different Umbraco majors, an unbounded dependency is not
+imprecise but wrong: a resolver asked for uBookIt would have no machine-readable way to tell which
+line a site's Umbraco can take, and the constraint would live only in prose — the readme, this
+spec and `CLAUDE.md`, none of which a package manager reads.
+
+**That is no longer the state of the feed, and the sentences above are written in the past tense
+for that reason.** From `17.1.2` on the 17 line and `18.0.0` on the 18 line, every published
+version carries the bound in its packed nuspec, `18.1.0` included — so a resolver *can* now tell
+the lines apart, and the requirement below is satisfied rather than merely stated. **What remains
+unbounded is `17.0.0`–`17.1.1` and always will**, for the reason the retrofit paragraph gives: a
+published version keeps the metadata it shipped with. A claim that uBookIt runs on both majors is
+therefore still supportable from those four versions alone, and from nothing newer.
 
 So every `Umbraco.Cms.*` dependency a published uBookIt package declares SHALL carry an **upper
 bound excluding the next Umbraco major**, and that bound SHALL be present in the packed nuspec
@@ -1042,3 +1065,7 @@ published with, so this requirement binds releases from here on and says nothing
 - **WHEN** a packed uBookIt package declares a dependency on another uBookIt package
 - **THEN** this requirement does not apply to it, because those are versioned in lockstep by this
   repository and are already covered by `The package can be installed`
+
+#### Scenario: The newest version of each line tells a resolver which line it is
+- **WHEN** the most recently published version of either line is inspected by a package manager
+- **THEN** its `Umbraco.Cms.*` dependencies carry an upper bound, so the major it accepts is machine-readable rather than stated only in prose
