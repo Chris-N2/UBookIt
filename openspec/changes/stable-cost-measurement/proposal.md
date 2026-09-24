@@ -33,9 +33,11 @@ not running, and only CPU time leaves it out.
   `clock_gettime(CLOCK_THREAD_CPUTIME_ID)` on Linux and macOS. The native calls live in the test
   project only. Any other platform **fails with a message naming it**; it never passes without
   measuring.
-- A batch that **switches thread** is discarded, because CPU time across two threads means nothing.
-  If too few batches are valid, the test **fails with an explicit "could not measure" message**,
-  never a quiet pass.
+- A batch in which any call **did not complete synchronously** is discarded, because that call's
+  work finished on a thread whose CPU time this thread's clock cannot see. If too few batches are
+  valid, the test **fails with an explicit "could not measure" message**, never a quiet pass.
+  Work run on other threads *inside* a read that still completes synchronously is a stated,
+  measured limit (see the design), not a covered case.
 - **The guarantee is unchanged:** reading *n* days must cost less than `n × 4` times reading one
   day. The same shape and the same threshold. The number is **not** raised.
 - The recorded line (`[available-dates] …`) is kept, so the cost is still written where a person

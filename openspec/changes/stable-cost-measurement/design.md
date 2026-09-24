@@ -32,8 +32,10 @@ gaps between pauses still let the other width through. See proposal.md for why t
 - Pauses and preemption, however frequent, cannot fail the test. The one condition that still can
   (memory exhaustion) identifies itself in the failure message. See Risks.
 - The test still fails when the projection's cost is genuinely super-linear, at the same threshold.
-- The test can never pass without having measured anything. Every way the measurement can be
-  invalid ends in a failure that says so.
+- The test can never pass without having measured anything. A read that stops completing
+  synchronously, and a platform with no thread clock, each end in a failure that says so. The one
+  invalidity the test cannot detect (work genuinely run on other threads inside a synchronous
+  read) is stated as a limit with its measured effect, not claimed as covered. See D3 and Risks.
 - All of this is **demonstrated**, on Windows and on Linux, not argued.
 
 **Non-Goals:**
@@ -75,17 +77,29 @@ project uses xUnit 2, which has no runtime skip, and CI rejects skips anyway.
 The native calls stay in the test project, which ships nothing, so no production code or package
 gains them.
 
-### D3. A batch that switches thread is discarded, and too few valid batches fail
+### D3. A batch in which any call did not complete synchronously is discarded, and too few valid batches fail
 
-CPU time read on two different threads is meaningless, and the subtraction could underflow. Each
-batch records `Environment.CurrentManagedThreadId` before and after. If the thread changed, the
-batch is discarded. The harness saw **no** switches, but the xUnit 2 runner installs its own
-synchronization context, so the test cannot assume the harness's behaviour holds.
+The thread clock measures only work done on the calling thread. So the precondition is that
+**every call's work ran on this thread**, and it is checked directly: each call's returned task
+must already be complete (`IsCompleted`) before it is awaited. A task that is complete when
+returned did all its work here, and awaiting it never leaves the thread, so the two clock reads
+bracket exactly that work, and the subtraction cannot straddle two threads.
+
+*Rejected, and the reason this decision was revised (QA round 1):* comparing
+`Environment.CurrentManagedThreadId` at the start and end of a batch. It checks a symptom, not the
+precondition. When the read went genuinely async (`Task.Delay(...).ConfigureAwait(false)`), the
+projection ran in a pool-thread continuation, but the xUnit 2 synchronization context brought the
+batch back to its starting thread. The batches counted as valid, and a quadratic regression
+**passed at 34–58×**. The original guard proof only forced the message path and never made the
+read async, so it proved the mechanism and not the guarantee.
 
 If fewer than **10 of the 25** batches are valid for either width, the test **fails** with a
-message saying the measurement could not be taken. That is a real signal: something made the call
-asynchronous. The recorded line prints the valid batch count for each width, so a creeping
+message saying the measurement could not be taken because the read has started completing
+asynchronously. The recorded line prints the valid batch count for each width, so a creeping
 discard rate is visible before it becomes a failure.
+
+**What this does not detect:** work that runs on other threads *inside* a read that still
+completes synchronously. See the second risk.
 
 ### D4. Interleave, take the minimum, and make the two batches last about the same time
 
@@ -114,8 +128,10 @@ the final method side by side, 200 trials, under 8 allocation-churn load threads
   native signature or clock ID, which would produce plausible-looking numbers that mean nothing.
 - **Mutation:** temporarily make the projection quadratic inside `AvailabilityService`. The new test
   must fail. Then revert, and confirm `git diff -- src/` is empty.
-- **Guard proofs:** temporarily force every batch to count as a thread switch, and force the
-  unknown-platform branch. Each must fail with its message. Then revert both.
+- **Guard proofs, by making the condition real, not by forcing the message:** make the read
+  genuinely asynchronous inside `AvailabilityService` (`Task.Delay(...).ConfigureAwait(false)`,
+  always and occasionally, with and without the quadratic regression). Every variant must fail.
+  Force the unknown-platform branch as well. Revert all of them.
 
 *Alternative:* keep the harness in the suite. Rejected, because a permanent load-generating test
 would itself be the kind of noise this change removes.
@@ -135,10 +151,23 @@ would itself be the kind of noise this change removes.
   batches that saw a gen-1 or gen-2 collection only turns this failure into "could not measure",
   and GC counts are process-wide, so another thread's collection would discard a clean batch. A
   no-GC region per batch is ended by any other test's allocations and throws when it ends.
+- **[Known limit, measured: the clock sees only the calling thread.]** A read that completes
+  synchronously but runs part of its work on other threads is under-counted, not detected. A
+  quadratic regression spread with `Parallel.For` read **106–135×**, about a fifth of the ~530×
+  it reads when run on the calling thread, and **passed one run in three**. The same regression
+  behind a blocking `Task.Run(...).GetAwaiter().GetResult()` was caught (441×, 484×), but only
+  because the runtime ran the queued task inline on the waiting thread; that is the runtime's
+  choice, not a guarantee. The read does neither today. → **Stated in the class remarks as a
+  condition under which the test stops guarding the cost**, not engineered around. Comparing
+  thread CPU time against wall-clock time to spot missing work was considered and rejected: under
+  load, wall-clock time is exactly the noise this change removes, so the comparison would bring
+  the flake back.
 - [A wrong native signature or clock ID returns numbers that look plausible.] → The Linux no-load
   sanity check in D6 compares against the wall-clock ratio on an idle container.
-- [The xUnit 2 synchronization context moves a batch to another thread.] → D3 discards such
-  batches, fails the test if too few survive, and prints the counts.
+- [The read stops completing synchronously, and the xUnit 2 synchronization context hides it by
+  returning the batch to its starting thread.] → D3 checks each call's task, not the thread;
+  discards such batches; fails the test if too few survive; and prints the counts. This was the
+  QA round 1 CRITICAL, and it is proved by genuinely async mutations (tasks 2.7).
 - [The minimum under-reports cost that only shows up sometimes, such as a quadratic path that
   allocates enough to trigger GC in only some batches.] → The guard targets an order-of-magnitude
   algorithmic change, and that shows up in *every* window batch. The D6 mutation checks this
