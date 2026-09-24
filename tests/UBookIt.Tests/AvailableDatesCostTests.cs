@@ -44,6 +44,17 @@ namespace UBookIt.Tests;
 /// with a heap near the machine's memory is this, not the algorithm — check the box, then the
 /// code. (<c>stable-cost-measurement</c>, design, first risk.)
 /// </para>
+/// <para>
+/// <b>Known limit — the clock sees only this thread.</b> A read that stops completing
+/// synchronously is caught: every call's task is checked, and too few clean batches fail the
+/// test. Work that genuinely runs on OTHER threads inside a synchronous read is only partly
+/// seen. A quadratic regression spread with <c>Parallel.For</c> read 106–135× — about a fifth of
+/// the ~530× it reads run on this thread — and passed one run in three. (The same regression
+/// behind a blocking wait on <c>Task.Run</c> was caught, only because the runtime chose to run
+/// the task inline on the waiting thread; that is not a guarantee.) The read does neither today.
+/// If it ever spreads work across threads, this test stops guarding the cost and must be
+/// rethought, not trusted.
+/// </para>
 /// </remarks>
 public class AvailableDatesCostTests
 {
@@ -94,27 +105,36 @@ public class AvailableDatesCostTests
     }
 
     /// <summary>
-    /// CPU time per call for one batch, or <see langword="null"/> when the batch finished on a
-    /// different thread from the one it started on — a thread's CPU clock read on two threads
-    /// measures nothing.
+    /// CPU time per call for one batch, or <see langword="null"/> when any call in it did not
+    /// complete synchronously.
     /// </summary>
+    /// <remarks>
+    /// <b>The precondition is checked on each call, not inferred from the thread.</b> A read that
+    /// returns an unfinished task finishes its work in a continuation — on a pool thread whose
+    /// CPU time this thread's clock never sees — and the batch can still end on the thread it
+    /// started on. Checking only the thread let a quadratic regression pass at 34–58× once the
+    /// read went asynchronous (QA round 1). A task already complete when it is returned ran all
+    /// of its work here, and awaiting it never leaves this thread, so the two clock reads bracket
+    /// exactly that work.
+    /// </remarks>
     private static async Task<double?> BatchAsync(
         AvailabilityService availability, Guid resourceId, Width width)
     {
-        var thread = Environment.CurrentManagedThreadId;
+        var synchronous = true;
         var start = ThreadCpuTime.Now();
 
         for (var call = 0; call < width.CallsPerBatch; call++)
         {
-            var result = await availability.GetBookableStartsAsync(resourceId, width.From, width.To);
+            var read = availability.GetBookableStartsAsync(resourceId, width.From, width.To);
+            synchronous &= read.IsCompleted;
+
+            var result = await read;
             Assert.True(result.Succeeded);
         }
 
         var end = ThreadCpuTime.Now();
 
-        return Environment.CurrentManagedThreadId == thread
-            ? (double)(end - start) / width.CallsPerBatch
-            : null;
+        return synchronous ? (double)(end - start) / width.CallsPerBatch : null;
     }
 
     [Fact]
@@ -144,8 +164,9 @@ public class AvailableDatesCostTests
         Assert.True(
             oneDay.Valid >= MinimumValidBatches && window.Valid >= MinimumValidBatches,
             $"Could not measure: only {oneDay.Valid} one-day and {window.Valid} window batches of "
-            + $"{Rounds} stayed on one thread (need {MinimumValidBatches} each). The read has "
-            + "started completing asynchronously, so a per-thread CPU clock cannot time it.");
+            + $"{Rounds} completed synchronously (need {MinimumValidBatches} each). The read has "
+            + "started completing asynchronously, so part of its work runs on other threads, "
+            + "which the calling thread's CPU clock cannot see.");
 
         var days = to.DayNumber - from.DayNumber + 1;
         var ratio = oneDay.Cheapest > 0 ? window.Cheapest / oneDay.Cheapest : double.NaN;
