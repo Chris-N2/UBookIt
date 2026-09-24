@@ -121,6 +121,8 @@
     - design D6 describes the props comparison precisely;
     - the audit's exact-URL match was tested by QA and fails closed, so no change.
   - **Gate before merge (QA's words: "treat that run as the gate"):** no GitHub run exists for the rewritten commits. The force-push of this branch must produce a green `ci` run, and it will also be the first live pull of the digest-pinned SQL Server image.
+  - **Gate PASSED:** run **`36010870721`** on `3e218ca` (the rewritten head), SUCCESS. Every verification step green, including *Start SQL Server* (so the schema-2 digest pulls on Docker 28); parity skipped as designed on a feature branch; zero annotations (the raw API returns `[]`). The maintainer signed off the artifact amendments made during apply (spec narrowing and new scenarios, the parity set, the D4/D6/D7 amendments, 6.5 moved to 10.1) on 2026-09-24. **Spec sync** by a separate agent before archive: new `openspec/specs/continuous-integration/spec.md` (6 requirements, 21 scenarios, byte-identical to the delta below its header); `persistence/spec.md` +10 −2, all inside *Integration test coverage on real SQL Server*; the guarantee diff was re-checked against HEAD (nothing dropped; one scenario narrowed on purpose; two added); strict validation 26/26.
+  - **Unticked at archive, by design:** 6.5 (moved to 10.1) and 10.1–10.5 all happen after merge; the archive cannot be edited afterwards, so their results go in the session handover and the `dev/v18` commit.
 
 ## 10. After merge (unticked at archive by design — results go in the handover and the dev/v18 commit)
 
