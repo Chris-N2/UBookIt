@@ -31,8 +31,18 @@ namespace UBookIt.Tests;
 /// on the git object store and on history never being rewritten". That trade-off was argued
 /// before there was a counter-example; there is one now, and it was in the fixture the
 /// argument was written to justify. The dependency is real and accepted: this repository is
-/// always a git checkout, the commits named are old and on <c>main</c>, and a rewrite that
-/// orphaned them would be a far larger event than a red test.
+/// always a git checkout, and a rewrite that orphaned the named commits would be a far larger
+/// event than a red test.
+/// </para>
+/// <para>
+/// <b>A named commit must be reachable from a published branch, not merely present
+/// locally.</b> This paragraph used to say the commits named were "old and on <c>main</c>".
+/// Four of them never were: they were pre-rebase copies that survived only as unreachable
+/// objects on the machine that built the fixture, so this test passed there and failed on
+/// every fresh clone. Nothing noticed until the first CI run, on a clean Linux runner. Each was
+/// re-pointed to its rebased twin holding the <b>identical blob</b> for the cited path, so the
+/// text checked did not change. Before citing a commit, check it with
+/// <c>git branch -r --contains &lt;sha&gt;</c>.
 /// </para>
 /// <para>
 /// <b>It fails rather than skips when git cannot answer.</b> A provenance check that quietly

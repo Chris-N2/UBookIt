@@ -73,7 +73,7 @@ public static class RetiredClaims
             """
             - Approving or declining a booking. No v1 pathway produces those statuses.
             """,
-            "docs/notifications.md @ d5ee3c96",
+            "docs/notifications.md @ 22403023c6a7",
             "approval-decline"),
         new(
             "no pathway produces them",
@@ -82,7 +82,7 @@ public static class RetiredClaims
               approval workflow exist in the data model so it can be added without a breaking change,
               but no pathway produces them today.
             """,
-            "docs/backoffice.md @ 59eed26d",
+            "docs/backoffice.md @ 48cdbc57e04e",
             "approval-decline"),
         new(
             "notifies nobody by itself",
@@ -90,7 +90,7 @@ public static class RetiredClaims
             placement and cancellation carrying enough to act on; and the backoffice documentation says
             plainly that the package notifies nobody by itself.
             """,
-            "docs/mvp.md @ 59eed26d",
+            "docs/mvp.md @ 6b82fc7405ae",
             "booking-emails"),
         new(
             "does not tell the person who booked",
@@ -108,7 +108,7 @@ public static class RetiredClaims
               approval workflow exist in the data model so it can be added without a breaking change,
               but no pathway produces them today.
             """,
-            "docs/backoffice.md @ cd6c3fb9",
+            "docs/backoffice.md @ ffd2691dc5b9",
             "approval-decline"),
         new(
             "Nothing is sent by the package",
@@ -116,14 +116,14 @@ public static class RetiredClaims
             - **Emails.** uBookIt raises a notification; your site owns the channel and the wording.
               Nothing is sent by the package, including to somebody whose booking you cancel.
             """,
-            "README.md @ 567480aa",
+            "README.md @ ca18ccdfeaa0",
             "booking-emails"),
         new(
             "placement auto-confirms",
             """
             - **Approving or declining** a booking — placement auto-confirms.
             """,
-            "README.md @ 567480aa",
+            "README.md @ ca18ccdfeaa0",
             "approval-decline"),
         new(
             "there is no search by name, email or reference",
@@ -139,7 +139,7 @@ public static class RetiredClaims
             - **It does not amend a booking's time.** There is no reschedule; the shape of that
               operation is a cancellation and a new booking.
             """,
-            "docs/backoffice.md @ cd6c3fb9",
+            "docs/backoffice.md @ ffd2691dc5b9",
             "move-booking"),
         new(
             "There is no reschedule",
@@ -147,7 +147,7 @@ public static class RetiredClaims
             - **It does not amend a booking's time.** There is no reschedule; the shape of that
               operation is a cancellation and a new booking.
             """,
-            "docs/backoffice.md @ cd6c3fb9",
+            "docs/backoffice.md @ ffd2691dc5b9",
             "move-booking"),
         new(
             "Amending a booking's time. There is no such operation",
@@ -155,7 +155,7 @@ public static class RetiredClaims
             - Amending a booking's time. There is no such operation; the shape of it is a cancellation
               and a new booking.
             """,
-            "docs/notifications.md @ d5ee3c96",
+            "docs/notifications.md @ 22403023c6a7",
             "move-booking"),
     ];
 
