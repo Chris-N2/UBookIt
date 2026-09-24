@@ -1,0 +1,75 @@
+# NuGet vulnerability audit of BOTH published lines.
+#
+# The verification build keeps advisories (NU1901-NU1904) as warnings, because an advisory
+# is published against a package rather than introduced by a commit, and would otherwise
+# fail unrelated work. This workflow is where they fail instead.
+#
+# WHY THE MATRIX NAMES BOTH LINES EXPLICITLY - do not "simplify" it to the current ref:
+# GitHub runs scheduled workflows from the DEFAULT BRANCH ONLY. dev/v18 carries an identical
+# copy of this file (the CI definitions are held identical on both lines), but that copy's
+# schedule never fires. If this job audited only the ref it ran on, dev/v18 would never be
+# audited at all, and nothing would say so.
+#
+# The scripts run from THIS checkout (the default branch's), against the line checked out
+# beside it, so a line that has not yet received a script change is still audited.
+#
+# The same default-branch rule governs workflow_dispatch: the "Run workflow" button exists only
+# for a workflow whose file is on the default branch. A change to this file cannot be tried by
+# hand from a feature branch; it takes effect, and can be run, once it reaches main.
+#
+# Scheduled workflows in a public repository are disabled by GitHub after 60 days without
+# repository activity. Run it by hand (workflow_dispatch) to check it is still alive.
+
+name: audit
+
+on:
+  schedule:
+    - cron: '0 6 * * 1' # Mondays, 06:00 UTC
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  audit:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+
+    strategy:
+      fail-fast: false
+      matrix:
+        line: [main, dev/v18]
+
+    env:
+      DOTNET_NOLOGO: 'true'
+      DOTNET_CLI_TELEMETRY_OPTOUT: 'true'
+
+    steps:
+      - name: Check out the audit scripts
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - name: Check out ${{ matrix.line }}
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: ${{ matrix.line }}
+          path: line
+          persist-credentials: false
+
+      - name: Set up .NET (from this checkout's global.json)
+        # This checkout's copy, not the line's: a line that has not yet received a
+        # global.json must still be audited. The later dotnet commands run from this
+        # checkout's root and look global.json up from the working directory, so this pin
+        # governs them too; the parity check holds the lines' copies identical anyway.
+        uses: actions/setup-dotnet@a98b56852c35b8e3190ac28c8c2271da59106c68 # v6.0.0
+        with:
+          global-json-file: global.json
+
+      - name: Restore ${{ matrix.line }}
+        # Restore only: the audit reads the assets file, and nothing needs building.
+        run: dotnet restore line/UBookIt.slnx
+
+      - name: Audit ${{ matrix.line }}
+        shell: pwsh
+        run: ./scripts/ci/Assert-NoVulnerablePackages.ps1 -Target line/UBookIt.slnx

@@ -22,9 +22,12 @@ namespace UBookIt.Tests;
 /// a control.
 /// </para>
 /// <para>
-/// There is no CI on this repository (the project moves to GitHub later), so nothing
-/// runs unattended. Until then this test is the substitute for that pipeline rather
-/// than a supplement to it.
+/// CI now runs this on every push, and it still belongs here rather than in the
+/// pipeline: a solution-level <c>dotnet test</c> in CI is blind in exactly the same
+/// way a local one is, because an excluded project is never asked. CI's own results
+/// check (<c>scripts/ci/Assert-TestResults.ps1</c>) also catches a project that stops
+/// reporting; this catches the cause, in the one file that produces it, on a
+/// maintainer's machine before anything is pushed.
 /// </para>
 /// </summary>
 public class SolutionIntegrityTests

@@ -1,0 +1,163 @@
+# Unattended verification for both published lines.
+#
+# This file, global.json, scripts/ci/ and Directory.Build.props (apart from its <Version> line)
+# are held IDENTICAL on main and dev/v18 - the
+# parity step below fails when they are not. Change them on both lines in one sitting.
+#
+# A green run here means every suite demonstrably ran, not merely that nothing failed:
+#   - integration tests run against a real SQL Server started for the job, with
+#     UBOOKIT_TEST_DB_REQUIRED=true so an unreachable database FAILS instead of skipping
+#     (a skip does not fail a run, and this runner has no LocalDB);
+#   - scripts/ci/Assert-TestResults.ps1 fails the run if any test project on disk did not
+#     report, or if any test was skipped.
+#
+# Third-party actions are pinned to full commit SHAs; the tag in the trailing comment is
+# what the SHA was resolved from. Update both together.
+
+name: ci
+
+on:
+  push:
+    # Branches only: a release tag names a commit whose push has already been verified.
+    branches: ['**']
+  pull_request:
+    branches: [main, dev/v18]
+
+permissions:
+  contents: read
+
+concurrency:
+  # EVERY COMMIT ON A PUBLISHED LINE GETS ITS OWN GROUP (the ref plus the commit SHA), so no run
+  # there is ever queued behind another, and so none can be cancelled.
+  #
+  # This used to be one group per ref with cancel-in-progress false, and a comment claiming that
+  # made every commit complete. It did not: GitHub keeps at most ONE pending run per group by
+  # default, and a newer run CANCELS the pending one. So three pushes to main inside one run's
+  # duration (push, stamp, sync, during a release) would have left the middle commit never
+  # verified. Found in QA; measured against GitHub's concurrency docs.
+  #
+  # Feature branches and pull requests keep one group per ref, where replacing a superseded
+  # run is the intent: only the latest push to them is verified, and the spec says so.
+  group: >-
+    ${{ (github.ref == 'refs/heads/main' || github.ref == 'refs/heads/dev/v18')
+        && format('ci-{0}-{1}', github.ref, github.sha)
+        || format('ci-{0}', github.ref) }}
+  cancel-in-progress: ${{ github.ref != 'refs/heads/main' && github.ref != 'refs/heads/dev/v18' }}
+
+jobs:
+  verify:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 45
+
+    env:
+      DOTNET_NOLOGO: 'true'
+      DOTNET_CLI_TELEMETRY_OPTOUT: 'true'
+      UBOOKIT_TEST_DB_REQUIRED: 'true'
+      CLIENT_DIR: src/UBookIt.Backoffice/Client
+      RESULTS_DIR: ${{ github.workspace }}/../test-results
+
+    steps:
+      - name: Check out, with full history
+        # Full history: RetiredClaimEvidenceTests reads files as they stood at historical
+        # commits (`git show <sha>:<path>`), and the parity step compares against the other
+        # line's branch. A depth-1 clone has neither.
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+
+      - name: Set up .NET (from global.json)
+        uses: actions/setup-dotnet@a98b56852c35b8e3190ac28c8c2271da59106c68 # v6.0.0
+        with:
+          global-json-file: global.json
+
+      - name: Set up Node
+        uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: src/UBookIt.Backoffice/Client/package-lock.json
+
+      - name: Start SQL Server
+        # Started by a step rather than declared as a service container so that the SA
+        # password can be generated here, per run, instead of written into this file.
+        # Microsoft SQL Server 2022 Developer edition: licensed for development and test,
+        # never redistributed, a dependency of nothing that ships.
+        shell: bash
+        run: |
+          # Hex, then a fixed suffix for SQL Server's complexity rule (three of: upper, lower,
+          # digit, symbol). No pipeline, so no SIGPIPE under the runner's pipefail.
+          password="$(openssl rand -hex 16)Aa1!"
+          echo "::add-mask::$password"
+
+          # Pinned by digest, like the actions: a moved tag cannot change what runs. The tag stays
+          # for readability; Docker uses the digest. It is the schema-2 manifest's digest - the
+          # registry also answers with a schema-1 digest, which Docker 28 refuses to pull. The
+          # cost: SQL Server updates no longer arrive by themselves. To bump, re-resolve with
+          #   curl -sI -H "Accept: application/vnd.docker.distribution.manifest.v2+json" \
+          #     https://mcr.microsoft.com/v2/mssql/server/manifests/2022-latest
+          # and take Docker-Content-Digest. Resolved 2026-09-24.
+          docker run --detach --name mssql \
+            --env ACCEPT_EULA=Y \
+            --env MSSQL_PID=Developer \
+            --env "MSSQL_SA_PASSWORD=$password" \
+            --publish 1433:1433 \
+            mcr.microsoft.com/mssql/server:2022-latest@sha256:4402d880dd4c34bfa7d8705e56a86cd6c88da80a1f6bbbe741f999e76264a090
+
+          # Bounded wait: ~90s, then fail with the container's log rather than poll forever.
+          for attempt in $(seq 1 45); do
+            if docker exec --env "SQLCMDPASSWORD=$password" mssql \
+                 /opt/mssql-tools18/bin/sqlcmd -C -S localhost -U sa -Q "SELECT 1" > /dev/null 2>&1; then
+              echo "SQL Server accepted a connection after $attempt attempt(s)."
+              echo "UBOOKIT_TEST_DB=Server=localhost,1433;User ID=sa;Password=$password;TrustServerCertificate=true" >> "$GITHUB_ENV"
+              exit 0
+            fi
+            sleep 2
+          done
+
+          echo "::error title=SQL Server::SQL Server did not accept a connection within ~90s."
+          docker logs mssql
+          exit 1
+
+      - name: Client - install
+        working-directory: ${{ env.CLIENT_DIR }}
+        run: npm ci
+
+      - name: Client - tests
+        # vitest fails on zero test files by default (no --passWithNoTests), which is what
+        # makes this step's green mean the suite ran.
+        working-directory: ${{ env.CLIENT_DIR }}
+        run: npm test
+
+      - name: Build (Release; warnings are errors because CI=true)
+        # The Backoffice project builds the client itself (npm run build) and adds the
+        # output to static web assets before discovery - no separate client build step.
+        run: dotnet build UBookIt.slnx --configuration Release
+
+      - name: Test
+        run: >-
+          dotnet test UBookIt.slnx
+          --configuration Release
+          --no-build
+          --logger trx
+          --results-directory "${{ env.RESULTS_DIR }}"
+
+      - name: Every suite ran, nothing skipped
+        # Runs even when tests failed, so a run that failed AND lost a suite says both.
+        if: ${{ !cancelled() }}
+        shell: pwsh
+        run: ./scripts/ci/Assert-TestResults.ps1 -ResultsDirectory "${{ env.RESULTS_DIR }}"
+
+      - name: OpenSpec - strict validation
+        if: ${{ !cancelled() }}
+        run: npx --yes @fission-ai/openspec@1.13.0 validate --all --strict
+
+      - name: Parity with the other published line
+        # Only where a published line is involved: a push to one, or a pull request into
+        # one. A feature branch is expected to differ until it lands.
+        if: >-
+          ${{ !cancelled() && (
+            github.ref == 'refs/heads/main' || github.ref == 'refs/heads/dev/v18' ||
+            github.base_ref == 'main' || github.base_ref == 'dev/v18') }}
+        shell: pwsh
+        run: ./scripts/ci/Assert-LineParity.ps1 -Line "${{ github.base_ref || github.ref_name }}"

@@ -17,9 +17,26 @@ namespace UBookIt.Tests.Integration.Support;
 /// server is reachable, tests skip with an explicit diagnostic (never
 /// silently pass) — see <see cref="EnsureAvailable"/>.
 /// </summary>
+/// <remarks>
+/// <para>
+/// <b>Unless a database is required.</b> With <c>UBOOKIT_TEST_DB_REQUIRED</c> set to
+/// exactly <c>true</c> — lower case, compared ordinally, because it is set by a machine
+/// and a near-miss spelling should behave visibly like "not set" rather than be guessed
+/// at — an unreachable server fails every test in the fixture with the same diagnostic
+/// instead of skipping them.
+/// </para>
+/// <para>
+/// CI sets it. A skip does not fail a run, and the CI runner has no LocalDB, so without
+/// this every integration test would skip there and the run would report green having
+/// tested nothing against SQL Server. The CI results check also fails on any skip; this
+/// flag is what makes the failure name its cause. Locally, unset, the skip stays — a
+/// maintainer without SQL Server can still run the rest.
+/// </para>
+/// </remarks>
 public sealed class SqlServerFixture : IAsyncLifetime
 {
     public const string ConnectionEnvVar = "UBOOKIT_TEST_DB";
+    public const string RequiredEnvVar = "UBOOKIT_TEST_DB_REQUIRED";
     private const string DefaultServer = @"Server=(localdb)\MSSQLLocalDB;Integrated Security=true;TrustServerCertificate=true";
 
     private readonly string _databaseName = $"uBookItTest_{Guid.NewGuid():N}";
@@ -31,9 +48,27 @@ public sealed class SqlServerFixture : IAsyncLifetime
 
     public DbContextOptions<UBookItDbContext> Options { get; private set; } = null!;
 
-    public async ValueTask InitializeAsync()
+    public ValueTask InitializeAsync() =>
+        InitializeAsync(
+            Environment.GetEnvironmentVariable(ConnectionEnvVar),
+            Environment.GetEnvironmentVariable(RequiredEnvVar));
+
+    /// <summary>
+    /// Everything after the environment is read, with its two inputs made explicit, so the
+    /// required-mode cases can be tested without writing process-wide environment variables that
+    /// every other fixture initialising in parallel would also read.
+    /// </summary>
+    /// <remarks>
+    /// This is NOT the path xunit takes: xunit calls the public overload, which reads the
+    /// environment. An earlier version of this comment said it was, and QA showed the gap —
+    /// replacing the public overload's read of <see cref="RequiredEnvVar"/> with <c>null</c> left
+    /// every test here green. The public overload is covered separately, by
+    /// <c>RequiredDatabaseEnvironmentTests</c>, which writes the real variables in a collection that
+    /// runs alone.
+    /// </remarks>
+    internal async ValueTask InitializeAsync(string? configuredConnection, string? required)
     {
-        var configured = Environment.GetEnvironmentVariable(ConnectionEnvVar) ?? DefaultServer;
+        var configured = configuredConnection ?? DefaultServer;
         var builder = new SqlConnectionStringBuilder(configured)
         {
             InitialCatalog = "master",
@@ -56,6 +91,14 @@ public sealed class SqlServerFixture : IAsyncLifetime
                 $"No SQL Server reachable for integration tests ({ex.GetType().Name}: {ex.Message}). " +
                 $"Set the {ConnectionEnvVar} environment variable to a SQL Server connection string, " +
                 "or install LocalDB.";
+
+            if (string.Equals(required, "true", StringComparison.Ordinal))
+            {
+                throw new InvalidOperationException(
+                    $"{RequiredEnvVar} is 'true', so an unreachable database fails rather than skips. {SkipReason}",
+                    ex);
+            }
+
             return;
         }
 
