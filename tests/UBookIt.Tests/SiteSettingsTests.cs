@@ -236,45 +236,80 @@ public class SiteSettingsTests
     public void No_policy_link_is_configured_by_default()
         => Assert.Null(UBookItPersistenceComposer.ResolveSettings(PolicyUrlConfig(null)).PrivacyPolicyUrl);
 
+    /// <summary>
+    /// Policy links the site uses. Shared with <c>SettingsControllerTests</c>, which asserts the
+    /// settings screen accepts exactly these — so a case added here is tested at that seam too.
+    /// </summary>
+    /// <remarks>
+    /// The two site-relative rows are the ones a Linux host refused until the rule stopped
+    /// offering a value beginning with <c>/</c> to <c>Uri.TryCreate</c>: .NET on Linux reads it
+    /// as an absolute <c>file:</c> URI. They pass on Windows either way, so on the dev machine
+    /// this list cannot see that regression — CI's Linux run is what can.
+    /// </remarks>
+    public static TheoryData<string> UsablePolicyLinks => new()
+    {
+        "https://example.com/privacy",
+        "http://example.com/privacy",
+        "/privacy",
+        "/legal/privacy-policy",
+    };
+
+    /// <summary>
+    /// Policy links the site refuses. Shared with <c>SettingsControllerTests</c>, on the same
+    /// terms as <see cref="UsablePolicyLinks"/>.
+    /// </summary>
+    public static TheoryData<string> UnusablePolicyLinks => new()
+    {
+        "",                                     // blank
+        "   ",                                  // whitespace
+        "javascript:alert(1)",                  // executes on click, in an href
+        "JavaScript:alert(1)",                  // and the scheme is case-insensitive
+        "data:text/html,<script>1</script>",
+        "file:///etc/passwd",
+        "vbscript:msgbox(1)",
+        "//evil.example/privacy",               // protocol-relative: looks local, is not
+        "privacy",                              // no leading slash: resolves against the current path
+        "../privacy",
+        // FOUND BY QA, and each of these was ACCEPTED before the control-character rule.
+        //
+        // A browser removes every ASCII tab and newline from a URL BEFORE parsing it, so each of
+        // the first three resolves to the protocol-relative //evil.example that the rule below
+        // exists to refuse. The interior character survives Trim(), which only touches the ends —
+        // one character defeated the guarantee the comment on that rule states.
+        "/\t/evil.example",
+        "/\n/evil.example",
+        "/\r/evil.example",
+        "/pri\u0000vacy",
+        //
+        // Backslashes go with them. "/\\evil.example/x" was refused on Windows only by accident —
+        // .NET parses it as an implicit UNC `file:` URI, so the scheme allow-list caught it — and
+        // that parsing is platform-specific. Umbraco 17 on .NET 10 is routinely hosted on Linux,
+        // where it would have been accepted as site-relative, while a browser reads the
+        // backslash as a slash and navigates to https://evil.example/x.
+        "/\\evil.example/x",
+        "\\\\evil.example\\x",
+        //
+        // FOUND BY QA: ABSOLUTE http(s) values the site has always refused, which the settings
+        // screen used to ACCEPT and store. Its old check was "parses as absolute, scheme is
+        // http(s)" with no control-character or backslash rule, and .NET parses each of these
+        // happily — the backslash one as https://evil.example/x. So the screen stored values the
+        // site then silently ignored. Without rows like these the seam test could only see the
+        // two layers disagree in ONE direction: a validator that accepted everything the old
+        // check did passed it 120/120.
+        "https:\\\\evil.example/x",
+        "https://example.com/a\tb",
+        "https://example.com/p\u0000x",
+    };
+
     [Theory]
-    [InlineData("https://example.com/privacy")]
-    [InlineData("http://example.com/privacy")]
-    [InlineData("/privacy")]
-    [InlineData("/legal/privacy-policy")]
+    [MemberData(nameof(UsablePolicyLinks))]
     public void A_usable_policy_link_is_accepted(string configured)
         => Assert.Equal(
             configured,
             UBookItPersistenceComposer.ResolveSettings(PolicyUrlConfig(configured)).PrivacyPolicyUrl);
 
     [Theory]
-    [InlineData("")]                            // blank
-    [InlineData("   ")]                         // whitespace
-    [InlineData("javascript:alert(1)")]         // executes on click, in an href
-    [InlineData("JavaScript:alert(1)")]         // and the scheme is case-insensitive
-    [InlineData("data:text/html,<script>1</script>")]
-    [InlineData("file:///etc/passwd")]
-    [InlineData("vbscript:msgbox(1)")]
-    [InlineData("//evil.example/privacy")]      // protocol-relative: looks local, is not
-    [InlineData("privacy")]                     // no leading slash: resolves against the current path
-    [InlineData("../privacy")]
-    // FOUND BY QA, and each of these was ACCEPTED before the control-character rule.
-    //
-    // A browser removes every ASCII tab and newline from a URL BEFORE parsing it, so each of
-    // the first three resolves to the protocol-relative //evil.example that the rule below
-    // exists to refuse. The interior character survives Trim(), which only touches the ends —
-    // one character defeated the guarantee the comment on that rule states.
-    [InlineData("/\t/evil.example")]
-    [InlineData("/\n/evil.example")]
-    [InlineData("/\r/evil.example")]
-    [InlineData("/pri\u0000vacy")]
-    //
-    // Backslashes go with them. "/\\evil.example/x" is refused on Windows only by accident —
-    // .NET parses it as an implicit UNC `file:` URI, so the scheme allow-list catches it — and
-    // that parsing is platform-specific. Umbraco 17 on .NET 10 is routinely hosted on Linux,
-    // where it would fall into the relative branch and be accepted, while a browser reads the
-    // backslash as a slash and navigates to https://evil.example/x.
-    [InlineData("/\\evil.example/x")]
-    [InlineData("\\\\evil.example\\x")]
+    [MemberData(nameof(UnusablePolicyLinks))]
     public void An_unusable_policy_link_resolves_to_none(string configured)
     {
         // THE ONE SETTING WHOSE VALUE REACHES AN href ON A PUBLIC PAGE, so what it refuses

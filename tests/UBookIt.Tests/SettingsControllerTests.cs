@@ -164,6 +164,99 @@ public class SettingsControllerTests
         Assert.Equal((UBookItPersistenceComposer.AutoConfirmSettingKey, "false"), Assert.Single(store.Written));
     }
 
+    // ---- the policy link: the screen and the site answer "usable?" the same way --------------
+
+    /// <summary>
+    /// Usable links with surrounding whitespace: the site trims and uses them, so the screen must
+    /// accept them. Seam-only, because <c>SiteSettingsTests.UsablePolicyLinks</c> asserts the
+    /// resolved link is identical to what was configured, and here it is the trimmed value.
+    /// </summary>
+    /// <remarks>
+    /// FOUND BY QA (round 2): without these, a validator that refused any padded value passed every
+    /// case — the one direction of disagreement the shared lists could not express — while the
+    /// design claimed the seam test asserted it.
+    /// </remarks>
+    public static TheoryData<string> PaddedPolicyLinks => new()
+    {
+        " /privacy ",
+        " https://example.com/privacy ",
+    };
+
+    /// <summary>
+    /// The seam between the settings screen and the site: for every policy link either side has an
+    /// opinion about, the screen accepts it exactly when the site would use it.
+    /// </summary>
+    /// <remarks>
+    /// <para>
+    /// <b>This was false, on every platform, until the validator started calling the resolver's
+    /// rule.</b> The screen demanded an absolute http(s) address while the resolver and the
+    /// documentation accepted <c>/privacy</c>, so an editor could not store the documented form.
+    /// </para>
+    /// <para>
+    /// <b>"Would the site use it" is asked of CONFIGURATION, never of what the screen stored.</b>
+    /// A refused value is not stored, so resolving through the store would answer "no link" for
+    /// every refusal and the two sides would agree vacuously — the assertion would hold for a
+    /// screen that refused everything. The site's answer has to be independent of the screen's.
+    /// </para>
+    /// <para>
+    /// The values are <see cref="SiteSettingsTests"/>' own lists, not a copy, so a case added
+    /// there is tested at this seam without anyone remembering to — plus
+    /// <see cref="PaddedPolicyLinks"/>, which is local because the shared usable list cannot hold a
+    /// value whose resolved link differs from its configured text.
+    /// </para>
+    /// <para>
+    /// <b>What it cannot see:</b> the store. <c>FakeSettingsStore</c> holds any length, while the
+    /// real <c>uBookItSetting.Value</c> column holds 2048 characters and no layer checks length on
+    /// write — a pre-existing gap for every setting, recorded as a deferred obligation.
+    /// </para>
+    /// </remarks>
+    [Theory]
+    [MemberData(nameof(SiteSettingsTests.UsablePolicyLinks), MemberType = typeof(SiteSettingsTests))]
+    [MemberData(nameof(SiteSettingsTests.UnusablePolicyLinks), MemberType = typeof(SiteSettingsTests))]
+    [MemberData(nameof(PaddedPolicyLinks))]
+    public async Task The_screen_accepts_a_policy_link_exactly_when_the_site_would_use_it(string value)
+    {
+        var key = UBookItPersistenceComposer.PrivacyPolicyUrlSettingKey;
+
+        var siteWouldUse = UBookItPersistenceComposer.ResolveSettings(Config((key, value))).PrivacyPolicyUrl;
+
+        var store = new FakeSettingsStore();
+        var result = await Controller(store, Config()).PutSetting(key, new SettingWriteModel { Value = value });
+
+        if (siteWouldUse is null)
+        {
+            Assert.IsType<BadRequestObjectResult>(result);
+            Assert.Empty(store.Written);
+            return;
+        }
+
+        Assert.IsType<OkResult>(result);
+
+        // And what the screen stored is what the site then links to, through the real
+        // store-over-configuration path rather than the value the test happens to hold.
+        var resolvedFromStore = UBookItPersistenceComposer.ResolveSettings(
+            UBookItPersistenceComposer.EffectiveConfiguration(Config(), store)).PrivacyPolicyUrl;
+
+        Assert.Equal(siteWouldUse, resolvedFromStore);
+
+        // And the screen, reading back, reports as effective what the site links to.
+        Assert.Equal(siteWouldUse, Setting(Read(Controller(store, Config())), key).EffectiveValue);
+    }
+
+    [Fact]
+    public async Task The_policy_link_refusal_names_both_accepted_forms()
+    {
+        var result = await Controller(new FakeSettingsStore(), Config()).PutSetting(
+            UBookItPersistenceComposer.PrivacyPolicyUrlSettingKey,
+            new SettingWriteModel { Value = "privacy" });
+
+        var problem = Assert.IsAssignableFrom<Microsoft.AspNetCore.Mvc.ProblemDetails>(
+            Assert.IsType<BadRequestObjectResult>(result).Value);
+
+        Assert.Contains("http or https address", problem.Detail);
+        Assert.Contains("site-relative path beginning with a single '/'", problem.Detail);
+    }
+
     // ---- the read shows what is being overridden ----------------------------------------------
 
     [Fact]
