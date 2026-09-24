@@ -73,13 +73,45 @@ expire at the events it describes.**
 
 **What is still outstanding**, stated here so this section cannot be read as "everything is done":
 
-- **There is no CI, anywhere.** Nothing builds or tests this repository except a maintainer's
-  machine, and nothing prevents an untested push.
+- **CI verifies, but does not yet gate.** Every commit pushed to `main` or `dev/v18` is built and
+  tested unattended, as is the latest push to any other branch (see *Continuous integration*
+  below). No branch protection requires a green run, so an untested push is visible rather than
+  prevented.
 - **No Trusted Publishing.** Pushes use an API key, which nuget.org now caps at 30 days.
 - **Not submitted to the Umbraco Marketplace.** The package carries the `umbraco-marketplace` tag
   the listing is picked up from, but the submission has not been made.
 - **The packages are owned by a personal account**, not by the organisation — see the key
   ownership note under *Pushing*.
+
+## Continuous integration
+
+Two GitHub Actions workflows, held **identical on `main` and `dev/v18`** together with
+`global.json`, `scripts/ci/` and `Directory.Build.props` (all of it except the `<Version>` line,
+which is the one thing the lines legitimately disagree on). A push to either line fails its parity
+step while those files
+differ from the other line's tip — so after changing CI on one line, **expect that line's run to be
+red until the same change is pushed to the other**, then re-run it. The red is true: at that moment
+the lines do differ.
+
+- **`ci`** — every commit pushed to either line, each with its own run that nothing cancels; the
+  latest push to any other branch; and pull requests into either line. On Linux, from a clean
+  clone with full history: the client's tests, a Release build with warnings as errors, the three
+  .NET suites against a SQL Server started for the run, and `openspec validate --all --strict`.
+  **A green run means every suite demonstrably ran**: the integration fixture runs with
+  `UBOOKIT_TEST_DB_REQUIRED=true`, so an unreachable database fails instead of skipping, and
+  `scripts/ci/Assert-TestResults.ps1` fails the run if any test project on disk did not report or
+  any test was skipped. It publishes nothing and holds no secrets.
+- **`audit`** — Mondays 06:00 UTC, and on demand from the Actions tab. Audits the NuGet graph of
+  **both** lines for known vulnerabilities, direct and transitive, and fails on any. Advisories are
+  deliberately *not* errors in the `ci` build (see `Directory.Build.props`): an advisory is
+  published against a package, not introduced by a commit, and would otherwise fail unrelated
+  work. **GitHub disables scheduled workflows after 60 days without repository activity** — if the
+  project goes quiet, run it by hand.
+
+**To reproduce CI's build locally**, set `CI=true` for the build (`$env:CI='true'` in PowerShell):
+the warnings-as-errors rule and its advisory exception both live in `Directory.Build.props`, not in
+the workflow. `global.json` pins the SDK to the 10.0.3xx band for local builds as well as CI; a
+machine without one is told so rather than silently building with another band.
 
 ## Before any push
 

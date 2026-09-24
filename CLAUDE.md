@@ -119,7 +119,9 @@ flow against the delivery API without referencing `UBookIt.Web`.
 
 ## Conventions
 
-- Nullable reference types enabled everywhere; warnings are errors in CI.
+- Nullable reference types enabled everywhere; warnings are errors in CI, except NuGet
+  vulnerability advisories, which the scheduled `audit` workflow checks instead (see
+  `docs/publishing.md` — *Continuous integration*).
 - Public API surface is a compatibility promise once published, and the surface
   is declared stable from `17.0.0` — so treat it as frozen from that version
   whether or not a package has reached a feed yet. Additive changes preferred;
