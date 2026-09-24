@@ -52,8 +52,9 @@ namespace UBookIt.Tests;
 /// depending on its shape — a sixth to a fifth of what it reads run on this thread — and in one
 /// shape passed every run (QA round 2: 3 of 3, at 55–65×). (The same regression behind a
 /// blocking wait on <c>Task.Run</c> was caught, only because the runtime ran the task inline on
-/// the waiting thread — it does so when the caller is a pool thread, as under xUnit here, and not
-/// from a dedicated thread; that is not a guarantee.) The read does neither today.
+/// the waiting thread — it does so when the caller is a pool thread (inferred for xUnit here:
+/// case D was counted in full), and not from a dedicated thread; that is not a guarantee.) The
+/// read does neither today.
 /// If it ever spreads work across threads, this test stops guarding the cost and must be
 /// rethought, not trusted.
 /// </para>

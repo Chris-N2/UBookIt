@@ -160,9 +160,9 @@ would itself be the kind of noise this change removes.
   passed one run in three (106×). **`Parallel.For(0, days, …)` passed every run** (QA round 2:
   3 of 3, at 60.2×, 64.8× and 54.6×), nowhere near the limit. Treat this as a blind spot, not a
   near miss. The same regression behind a blocking `Task.Run(...).GetAwaiter().GetResult()` was
-  caught (441×, 484×; QA round 2: 290–326×), but only because the runtime ran the queued task
+  caught (441×, 484×; QA round 2: 289–326×), but only because the runtime ran the queued task
   inline on the waiting thread. QA measured that it does so when the caller is a thread-pool
-  thread (400 of 400, as under xUnit here) and never from a dedicated thread (0 of 400). That is
+  thread (400 of 400; inferred to be the case under xUnit here, since case D was counted in full) and never from a dedicated thread (0 of 400). That is
   the runtime's choice, not a guarantee. The read does neither today. → **Stated in the class remarks as a
   condition under which the test stops guarding the cost**, not engineered around. Comparing
   thread CPU time against wall-clock time to spot missing work was considered and rejected: under
