@@ -7,9 +7,12 @@ was built and tested rather than that a maintainer remembered to.
 ## ADDED Requirements
 
 ### Requirement: Verification runs unattended on both published lines
-Verification SHALL run without a maintainer's involvement on every push to any branch of the
-repository and on every pull request whose base is `main` or `dev/v18`. Each run SHALL start from a
-clean clone with full history and SHALL, in one job:
+Verification SHALL run without a maintainer's involvement on every push to `main` or `dev/v18`,
+and every such run SHALL complete: no run for a commit on a published line SHALL be cancelled or
+replaced by a run for a later commit. Verification SHALL also run on pushes to any other branch and
+on every pull request whose base is `main` or `dev/v18`. There, a run superseded by a newer push to
+the same branch or pull request MAY be cancelled, so that the latest push is the one verified.
+Each run SHALL start from a clean clone with full history and SHALL, in one job:
 
 - build the solution in Release configuration, with the repository's CI warnings-as-errors rule in
   force;
@@ -17,13 +20,25 @@ clean clone with full history and SHALL, in one job:
 - run the backoffice client's test suite;
 - validate every OpenSpec change and spec in strict mode.
 
-A failure of any of these SHALL fail the run. A run SHALL NOT be reported as passing when any step
-was skipped, cancelled or not reached.
+A failure of any of these SHALL fail the run. A run SHALL NOT be reported as passing when any of
+these four activities was skipped, cancelled or not reached. (Steps that exist only for particular
+events, such as the parity check under *Both published lines carry the same CI definitions*, are
+skipped where they do not apply, and that does not fail a run.)
 
 #### Scenario: A push to either line is verified
 - **WHEN** a commit is pushed to `main` or to `dev/v18`
 - **THEN** a verification run starts for that commit without anyone triggering it, and its result is
   shown against the commit
+
+#### Scenario: Quick successive pushes to a published line are each verified
+- **WHEN** three commits are pushed to `main` one after another, each before the previous
+  commit's run has finished
+- **THEN** all three runs complete and each commit shows its own result; none is cancelled or
+  replaced
+
+#### Scenario: A superseded feature-branch run may be cancelled
+- **WHEN** a feature branch receives a new push while its previous run is still in progress
+- **THEN** the previous run may be cancelled, and the newest push is verified
 
 #### Scenario: A pull request is verified before merge
 - **WHEN** a pull request is opened or updated with base `main` or `dev/v18`
@@ -123,8 +138,9 @@ copy of the schedule.
 - **THEN** it runs against both lines immediately, without waiting for the schedule
 
 ### Requirement: Both published lines carry the same CI definitions
-The CI definitions — the workflow files, the pinned SDK file, and the scripts the workflows run —
-SHALL be identical on `main` and `dev/v18`. A verification run for a push to either line SHALL fail
+The CI definitions — the workflow files, the pinned SDK file, the scripts the workflows run, and
+the shared build properties that carry the warnings rules (every part except the package version,
+which legitimately differs between the lines) — SHALL be identical on `main` and `dev/v18`. A verification run for a push to either line SHALL fail
 when those definitions differ from the other line's current tip, naming the differing files, so
 that a CI change landed on one line only cannot pass unnoticed.
 

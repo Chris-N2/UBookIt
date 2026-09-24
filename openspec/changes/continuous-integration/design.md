@@ -121,6 +121,12 @@ file's header so nobody "simplifies" the matrix to `${{ github.ref }}`.
 *Known limitation:* GitHub disables scheduled workflows in a public repository after 60 days without
 repository activity. Recorded in `docs/publishing.md`'s CI section; not engineered around.
 
+**Amended during apply: `workflow_dispatch` obeys the same default-branch rule, and this decision
+missed it.** "Run workflow" exists only for a workflow whose file is on the default branch, so the
+audit cannot be run by hand from this change's branch (the API returns 404 for the workflow) and
+task 6.5 could not be done as written. The audit's first real run is therefore a post-merge
+verification (tasks 10.1). The file's header now states the rule for both triggers.
+
 ### D5. Pinning
 
 - `global.json`: `{"sdk": {"version": "10.0.300", "rollForward": "latestPatch"}}` — any 10.0.3xx
@@ -137,9 +143,14 @@ repository activity. Recorded in `docs/publishing.md`'s CI section; not engineer
 
 ### D6. Parity: a step that diffs the CI definitions against the other line
 
-The CI definitions are `.github/workflows/**`, `global.json` and `scripts/ci/**`. On a push to
-`main` the parity step runs `git diff --exit-code origin/dev/v18 HEAD -- <those paths>`, and the
-mirror on `dev/v18`; it prints the differing files on failure. It runs only for pushes to the two
+The CI definitions are `.github/workflows/**`, `global.json`, `scripts/ci/**` and — **added in QA
+round 1** — `Directory.Build.props` compared with its `<Version>` line removed on both sides. (It
+was excluded at first, because the version differs; but it also carries the warnings-as-errors
+rule and its advisory exception, which could then drift between lines silently.) On a push to
+`main` the parity step (`scripts/ci/Assert-LineParity.ps1`) diffs the three whole-file paths
+against `origin/dev/v18` with `git diff --name-only`, and separately compares
+`Directory.Build.props` from both sides with its first `<Version>` line removed; the mirror runs on
+`dev/v18`. Each differing file is named in an annotation. It runs only for pushes to the two
 published lines and pull requests into them (for a PR, against the *other* line's tip), not for
 feature-branch pushes — a feature branch is expected to differ until it lands.
 
@@ -156,8 +167,17 @@ maintainer's last fetch rather than on the code.
 
 - `ci.yml` triggers: `push` (all branches) and `pull_request` with `branches: [main, dev/v18]`.
 - `permissions: contents: read` at workflow level; no `secrets.*` referenced anywhere.
-- `concurrency: ci-${{ github.ref }}`, `cancel-in-progress: true` except on the two published lines,
-  where every commit's run completes.
+- ~~`concurrency: ci-${{ github.ref }}`, `cancel-in-progress: true` except on the two published
+  lines, where every commit's run completes.~~ **Wrong, and amended in QA round 1 (MAJOR).**
+  `cancel-in-progress: false` does not make every run complete: GitHub keeps at most one *pending*
+  run per group (`queue: single`, the default), and a newer run **cancels** the pending one. Three
+  quick pushes to `main` would have left the middle commit unverified. **Now:** on the published
+  lines the group is `ci-<ref>-<sha>`, one group per commit, so nothing there is ever queued or
+  cancelled and runs proceed in parallel. On every other ref it stays `ci-<ref>` with
+  `cancel-in-progress: true`, and the spec says only the latest push there is verified.
+  *Alternative rejected:* `queue: max` (up to 100 pending) — it still queues, it depends on a
+  newer syntax, and it cannot be combined with `cancel-in-progress: true` in one expression. A
+  per-commit group removes the queue instead of lengthening it.
 - Checkout with `fetch-depth: 0`, which also fetches the other line's ref for D6.
 
 ### D8. The first Linux run is part of apply, and what it finds is triaged, not absorbed
