@@ -40,7 +40,16 @@ public enum SettingValueKind
     /// <summary>An IANA time zone id the host can resolve.</summary>
     TimeZoneId,
 
-    /// <summary>An absolute http or https URL.</summary>
+    /// <summary>
+    /// A link a public page may render: an absolute http or https URL, or a site-relative path
+    /// beginning with a single <c>/</c> — decided by the same rule the site resolves it with.
+    /// </summary>
+    /// <remarks>
+    /// That rule is the PRIVACY POLICY LINK's (<c>TryGetUsablePolicyLink</c>), which is correct
+    /// only because the policy link is the one setting of this kind. A second <c>Url</c> setting
+    /// would inherit a rule written for one specific href — decide deliberately whether it should,
+    /// rather than letting it arrive by the enum value.
+    /// </remarks>
     Url,
 
     /// <summary>A comma-separated list of email addresses.</summary>

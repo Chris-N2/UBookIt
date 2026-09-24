@@ -93,8 +93,9 @@ says it *calls* the resolver's rule, which is checkable.
    (Rebasing, not merging, keeps CI's branch a straight line on top of the fix it depends on.)
 3. QA on `usable-privacy-link`; archive; fast-forward `main`; cherry-pick to `dev/v18`.
 4. `continuous-integration` resumes on top of the new `main`.
-5. The patch releases follow **after** `continuous-integration` lands, so `17.2.1` and `18.1.1` are
-   the first releases whose commits were verified unattended on Linux. This is a recommendation;
+5. The releases (patch or minor on each line, per the maintainer's decision in tasks.md 6.3)
+   follow **after** `continuous-integration` lands, so they are the first releases whose commits
+   were verified unattended on Linux. This is a recommendation;
    the maintainer may release sooner — nothing in this change depends on the order.
 
 ## Risks / Trade-offs
@@ -104,12 +105,40 @@ says it *calls* the resolver's rule, which is checkable.
   dangerous forms (`//`, `\`, control characters, other schemes) are refused before the branch.
 - [The rule's trim now also applies at validation] → the validator stores the raw submitted text;
   resolution trims it. A value with surrounding spaces was already usable at resolution, so
-  accepting it at the screen is the agreement the seam test asserts. Stored bytes are unchanged.
-- [`SettingValidation` is a public class whose behaviour changes] → no signature changes; the
-  change is a widening; called out in the CHANGELOG entry of the release changes.
+  accepting it at the screen is the agreement the seam test asserts — **made true in QA round 2**:
+  this sentence claimed it before any padded value was in the data, and a validator refusing
+  every padded value passed. `SettingsControllerTests.PaddedPolicyLinks` (`" /privacy "`,
+  `" https://example.com/privacy "`) is seam-only, because the shared usable list asserts the
+  resolved link equals the configured text. Stored bytes are unchanged. **Why no further direction
+  can be missing from the VALIDATOR'S DECISION:** its only code outside the shared rule is its
+  blank pre-check (covered by `""` and `"   "`) and its handling of the untrimmed raw value
+  (covered by the padded rows); anything else is the one rule called twice. **That argument covers
+  the validator, not the whole screen** — narrowed in QA round 3, which pointed out the screen is
+  the endpoint *and the store*. The store's `Value` column is `nvarchar(2048)` and nothing checks
+  length on write, so an http(s) link longer than 2048 characters is used by the site from
+  configuration, accepted by the validator, and then fails at the database instead of being
+  refused with a 400. That gap predates this change and affects every setting; it is **not fixed
+  here**. The ADDED requirement is bounded to values "within the settings store's capacity"
+  (currently 2048 characters), and the gap is left as a known, unaddressed limit.
+- [`SettingValidation` is a public class whose behaviour changes — in BOTH directions] → no
+  signature changes. It widens (site-relative links) and, **as QA found and this document first
+  missed, it narrows**: absolute http(s) values containing a control character or a backslash were
+  accepted by the old check and are refused now. Each of them was already refused by the resolver,
+  so a site's rendered output cannot change; the narrowing only stops the screen storing a link
+  that would never render. Patch-eligibility decided by the maintainer on the record (tasks.md 6.3)
+  and stated in the release changes' CHANGELOG entries as a narrowing, not hidden in "widening".
+- [A value the old screen accepted is already stored on some site] → it stays stored and stays
+  absent, exactly as before; resolution treats it as unusable and reports it at startup, the
+  fallback `site-settings` keeps for "a value that stopped being valid after it was written". Only
+  a new write of such a value is refused.
+- [The seam test could see disagreement in one direction only] → found by QA: none of its rows
+  was an absolute http(s) value the old validator accepted and the site refuses, so a validator
+  "storing what the site ignores" passed 120/120. Three such rows added to the shared unusable
+  list (a backslash, an interior tab, an interior NUL); both of QA's mutants now go red on them.
 - [The Windows suite cannot see a regression of the Linux defect] → accepted, D3. CI on Linux is
   the guard, which is the argument for landing `continuous-integration` before the releases.
 
 ## Migration Plan
 
-None. A widening; no stored data changes. Rollback is reverting the commit.
+None. No stored data changes; a previously stored value the screen would now refuse stays stored
+and stays absent, as it always was (see Risks). Rollback is reverting the commit.

@@ -1,3 +1,5 @@
+using UBookIt.Persistence.Composing;
+
 namespace UBookIt.Backoffice.Settings;
 
 /// <summary>
@@ -78,13 +80,15 @@ public static class SettingValidation
                 break;
 
             case SettingValueKind.Url:
-                // Absolute, and http(s) only — this value reaches an href on a public page, so the
-                // scheme matters more here than for any other setting. Mirrors the resolver, which
-                // treats anything else as absent rather than rendering it.
-                if (!Uri.TryCreate(value, UriKind.Absolute, out var uri)
-                    || (uri.Scheme != Uri.UriSchemeHttp && uri.Scheme != Uri.UriSchemeHttps))
+                // The resolver's own rule, CALLED rather than restated: the screen must accept a
+                // value exactly when the site would use it. This case used to say it "mirrors the
+                // resolver" while applying a different rule — absolute http(s) only — and so
+                // refused every site-relative link the resolver and the documentation accept.
+                // A mirror is a second copy, and a second copy drifts; a call cannot.
+                if (!UBookItPersistenceComposer.TryGetUsablePolicyLink(value, out _))
                 {
-                    error = "Must be an absolute http or https address.";
+                    error = "Must be an http or https address, or a site-relative path beginning "
+                        + "with a single '/'.";
                 }
 
                 break;

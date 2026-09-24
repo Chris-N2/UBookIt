@@ -16,10 +16,17 @@ beginning with `/` SHALL be judged as a site-relative path and SHALL NOT be inte
 absolute URI of any scheme, so that a platform which reads such a value as a local file path
 cannot change the answer.
 
-**The settings screen SHALL accept a value for this setting exactly when the site would use it.**
-Validation on write and resolution remain separate checks, as `site-settings` requires; they SHALL
-apply the same definition of usable, so that the screen neither refuses a value the site would use
-nor stores one the site would treat as absent. The screen's refusal SHALL name both accepted forms.
+**The settings screen SHALL accept a value for this setting exactly when the site would use it**,
+for any value within the settings store's capacity. Validation on write and resolution remain
+separate checks, as `site-settings` requires; they SHALL apply the same definition of usable, so
+that the screen neither refuses a value the site would use nor stores one the site would treat as
+absent. The screen's refusal SHALL name both accepted forms.
+
+*A value longer than the settings store can hold — currently 2048 characters, the
+`uBookItSetting.Value` column — is outside this requirement: the site can use such a value from
+configuration, but the screen cannot store it, and today the write fails at the database rather
+than being refused. That limit applies to every setting and predates this requirement; it is a
+known gap, not yet addressed, rather than something settled here.*
 
 #### Scenario: A site-relative link is used on a Linux host
 - **WHEN** the site runs on Linux and the policy link is configured as `/privacy`
@@ -44,7 +51,8 @@ nor stores one the site would treat as absent. The screen's refusal SHALL name b
 - **THEN** the value is accepted and stored
 
 #### Scenario: The screen and the site agree on every value
-- **WHEN** any value is submitted to the settings screen for the policy link
+- **WHEN** any value within the settings store's capacity is submitted to the settings screen for
+  the policy link
 - **THEN** the screen accepts it if and only if the site, resolving the same value, would use it as
   the link
 

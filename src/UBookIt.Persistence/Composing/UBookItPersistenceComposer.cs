@@ -354,15 +354,47 @@ public sealed class UBookItPersistenceComposer : IComposer
     /// </para>
     /// </remarks>
     internal static string? ResolvePrivacyPolicyUrl(IConfiguration configuration)
-    {
-        var configured = configuration[PrivacyPolicyUrlSettingKey];
+        => TryGetUsablePolicyLink(configuration[PrivacyPolicyUrlSettingKey], out var link) ? link : null;
 
-        if (string.IsNullOrWhiteSpace(configured))
+    /// <summary>
+    /// Whether <paramref name="value"/> is usable as the privacy policy link, and if so the link
+    /// to render (the value, trimmed).
+    /// </summary>
+    /// <remarks>
+    /// <para>
+    /// <b>THE ONE DEFINITION of a usable policy link.</b> <see cref="ResolvePrivacyPolicyUrl"/>
+    /// calls it when the site reads the setting, and the backoffice settings screen's validator
+    /// calls it when an editor writes one. They stay two checks, at two moments, as the
+    /// site-settings spec requires; they must not be two rules. When they were, the screen refused
+    /// every site-relative link that the resolver, and the documentation, accepted.
+    /// </para>
+    /// <para>
+    /// The rule, in order — each step is explained where it happens, in the body:
+    /// </para>
+    /// <list type="number">
+    /// <item>blank → unusable;</item>
+    /// <item>any control character or backslash, anywhere → unusable (a measured bypass, and a
+    /// platform-dependent parse);</item>
+    /// <item>begins with <c>/</c> → usable unless it begins with <c>//</c>, <b>decided before any URI
+    /// parsing</b>, because Linux .NET reads a rooted path as an absolute <c>file:</c> URI;</item>
+    /// <item>otherwise → usable only as an absolute <c>http</c> or <c>https</c> URI.</item>
+    /// </list>
+    /// <para>
+    /// Why it is an allow-list rather than a block-list is on <see cref="ResolvePrivacyPolicyUrl"/>.
+    /// </para>
+    /// </remarks>
+    internal static bool TryGetUsablePolicyLink(
+        string? value,
+        [System.Diagnostics.CodeAnalysis.NotNullWhen(true)] out string? link)
+    {
+        link = null;
+
+        if (string.IsNullOrWhiteSpace(value))
         {
-            return null;
+            return false;
         }
 
-        var value = configured.Trim();
+        var candidate = value.Trim();
 
         // CONTROL CHARACTERS AND BACKSLASHES, REFUSED BEFORE ANYTHING ELSE — and this is not
         // belt-and-braces, it closes a measured bypass of the rule below.
@@ -375,31 +407,52 @@ public sealed class UBookItPersistenceComposer : IComposer
         // `//evil.example`, which is exactly the protocol-relative value the rule below exists to
         // refuse. One character defeated it.
         //
-        // The backslash goes with them for a related reason. `/\evil.example/x` is refused today
+        // The backslash goes with them for a related reason. `/\evil.example/x` was once refused
         // on Windows only by accident: .NET parses it as an implicit UNC `file:` URI, so the
-        // scheme allow-list catches it. That parsing is Windows-specific, and Umbraco 17 on
-        // .NET 10 is routinely hosted on Linux, where the value would fall into the relative
-        // branch and be accepted — while a browser resolves `\` as `/` for special schemes and
-        // navigates to https://evil.example/x. Refusing it outright removes the question rather
-        // than relying on a platform's parser to keep answering it the same way.
-        if (value.Any(char.IsControl) || value.Contains('\\', StringComparison.Ordinal))
+        // scheme allow-list caught it. That parsing is Windows-specific, and Umbraco 17 on
+        // .NET 10 is routinely hosted on Linux, where the value would have been accepted as
+        // site-relative — while a browser resolves `\` as `/` for special schemes and navigates
+        // to https://evil.example/x. Refusing it outright removes the question rather than
+        // relying on a platform's parser to keep answering it the same way.
+        if (candidate.Any(char.IsControl) || candidate.Contains('\\', StringComparison.Ordinal))
         {
-            return null;
+            return false;
         }
 
-        if (Uri.TryCreate(value, UriKind.Absolute, out var absolute))
+        // SITE-RELATIVE, DECIDED BEFORE ANY URI PARSING — and the order is the fix for a
+        // measured defect, not a style choice.
+        //
+        // This branch used to come AFTER `Uri.TryCreate(…, UriKind.Absolute, …)`. On Linux .NET
+        // reads a rooted path such as `/privacy` as an absolute `file:` URI, so the parse
+        // succeeded, the scheme allow-list refused it, and every site-relative link was treated
+        // as absent on a Linux host — the exact example the documentation gives. On Windows the
+        // same parse fails and the value fell through to here, which is why no test on the dev
+        // machine could see it. It was found by the first CI run on a Linux runner
+        // (github.com/Chris-N2/UBookIt/actions/runs/35977150698). A value beginning with `/` is
+        // now never offered to the parser, so no platform's opinion of it can change the answer.
+        //
+        // One leading slash and not two: a protocol-relative "//host/path" navigates off-site,
+        // which is exactly the value somebody would use to make an off-site link look like a
+        // local one.
+        if (candidate.StartsWith('/'))
         {
-            return absolute.Scheme == Uri.UriSchemeHttp || absolute.Scheme == Uri.UriSchemeHttps
-                ? value
-                : null;
+            if (candidate.StartsWith("//", StringComparison.Ordinal))
+            {
+                return false;
+            }
+
+            link = candidate;
+            return true;
         }
 
-        // Site-relative: one leading slash and not two. A protocol-relative "//host/path" is
-        // parsed as relative by Uri.TryCreate but navigates off-site, which is exactly the value
-        // somebody would use to make an off-site link look like a local one.
-        return value.StartsWith('/') && !value.StartsWith("//", StringComparison.Ordinal)
-            ? value
-            : null;
+        if (Uri.TryCreate(candidate, UriKind.Absolute, out var absolute)
+            && (absolute.Scheme == Uri.UriSchemeHttp || absolute.Scheme == Uri.UriSchemeHttps))
+        {
+            link = candidate;
+            return true;
+        }
+
+        return false;
     }
 
     /// <summary>
