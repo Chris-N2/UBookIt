@@ -47,11 +47,13 @@ namespace UBookIt.Tests;
 /// <para>
 /// <b>Known limit — the clock sees only this thread.</b> A read that stops completing
 /// synchronously is caught: every call's task is checked, and too few clean batches fail the
-/// test. Work that genuinely runs on OTHER threads inside a synchronous read is only partly
-/// seen. A quadratic regression spread with <c>Parallel.For</c> read 106–135× — about a fifth of
-/// the ~530× it reads run on this thread — and passed one run in three. (The same regression
-/// behind a blocking wait on <c>Task.Run</c> was caught, only because the runtime chose to run
-/// the task inline on the waiting thread; that is not a guarantee.) The read does neither today.
+/// test. Work that genuinely runs on OTHER threads inside a synchronous read is NOT detected and
+/// only partly seen. A quadratic regression spread with <c>Parallel.For</c> read 55–135×
+/// depending on its shape — a sixth to a fifth of what it reads run on this thread — and in one
+/// shape passed every run (QA round 2: 3 of 3, at 55–65×). (The same regression behind a
+/// blocking wait on <c>Task.Run</c> was caught, only because the runtime ran the task inline on
+/// the waiting thread — it does so when the caller is a pool thread, as under xUnit here, and not
+/// from a dedicated thread; that is not a guarantee.) The read does neither today.
 /// If it ever spreads work across threads, this test stops guarding the cost and must be
 /// rethought, not trusted.
 /// </para>
@@ -113,9 +115,10 @@ public class AvailableDatesCostTests
     /// returns an unfinished task finishes its work in a continuation — on a pool thread whose
     /// CPU time this thread's clock never sees — and the batch can still end on the thread it
     /// started on. Checking only the thread let a quadratic regression pass at 34–58× once the
-    /// read went asynchronous (QA round 1). A task already complete when it is returned ran all
-    /// of its work here, and awaiting it never leaves this thread, so the two clock reads bracket
-    /// exactly that work.
+    /// read went asynchronous (QA round 1). When every task is already complete on return,
+    /// awaiting them never leaves this thread, so the two clock reads bracket everything THIS
+    /// thread did and the subtraction never mixes two threads' clocks. That is all it proves: it
+    /// does not prove the work happened here — see the class remarks on work run on other threads.
     /// </remarks>
     private static async Task<double?> BatchAsync(
         AvailabilityService availability, Guid resourceId, Width width)

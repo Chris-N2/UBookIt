@@ -49,6 +49,10 @@
     - After all reverts: `git diff -- src/` = 0 lines; Release solution build 0 warnings; the test alone passes 23.6×, 25/25 both widths; unit **1980/0/0** (25 s).
     - Harness rerun with the new code (DLLs hash-checked): **Windows 0/100** (p50 25.5×, max 27.6×), **Linux 0/100** (p50 23.9×, max 28.1×), 0 discarded on either; OLD 40/100 and 45/100.
     - MINOR fixed: task 1.2 cited D5 for the harness (now D6). NIT (GC figures are process-wide and cumulative): accepted as is; the message labels them "Process GC at failure" and phrases them conditionally. MINOR (10.3 closed on two derived checks): **for the maintainer**.
+- [x] 2.8 **QA round 2 (APPROVE, conditional on two text fixes; the code was accepted).** The reviewer verified B (FAILED ×3, "could not measure"), D (FAILED ×3, 290–326×) and the synchronous quadratic (341–364×); `src/` clean; build 0 warnings; unit 1980.
+    - MINOR 1: the guard's justification ("a task already complete when returned ran all of its work here") was false, disproved by the change's own case E, and it contradicted the limit stated beside it. It is now narrowed in the `BatchAsync` remarks and design D3: completion on return means the clock reads bracket everything THIS thread did and never mix two threads' clocks; it does NOT prove the work happened here. D3's opening sentence, which called "every call's work ran on this thread" the checked precondition, is corrected too.
+    - MINOR 2: the blind spot was understated. The reviewer's shape `Parallel.For(0, days, …)` **PASSED 3/3 at 60.2×, 64.8×, 54.6×**, against 341–364× synchronous on that day. The class remarks and design Risk 2 now say "55–135× depending on its shape … in one shape passed every run", and describe it as a blind spot, not a near miss. **The `05ecdfb` commit message's "passed one run in three" is superseded by this record.**
+    - NIT: case D is inline only when the caller is a thread-pool thread (reviewer's scratch program: 400/400 inline from the pool, 0/400 from the main thread). Added to the remark and the Risk.
 
 ## 3. The guard can still fire
 

@@ -79,11 +79,13 @@ gains them.
 
 ### D3. A batch in which any call did not complete synchronously is discarded, and too few valid batches fail
 
-The thread clock measures only work done on the calling thread. So the precondition is that
-**every call's work ran on this thread**, and it is checked directly: each call's returned task
-must already be complete (`IsCompleted`) before it is awaited. A task that is complete when
-returned did all its work here, and awaiting it never leaves the thread, so the two clock reads
-bracket exactly that work, and the subtraction cannot straddle two threads.
+The thread clock measures only work done on the calling thread. What the test can check
+directly is that **no call finishes its work in a continuation**: each call's returned task must
+already be complete (`IsCompleted`) before it is awaited. When every task is complete on return,
+awaiting them never leaves the thread, so the two clock reads bracket everything *this thread*
+did, and the subtraction never mixes two threads' clocks. **That is all it proves.** It does not
+prove the read's work happened on this thread: a read can complete synchronously and still have
+run work elsewhere (see "What this does not detect" below, and the second Risk).
 
 *Rejected, and the reason this decision was revised (QA round 1):* comparing
 `Environment.CurrentManagedThreadId` at the start and end of a batch. It checks a symptom, not the
@@ -153,11 +155,15 @@ would itself be the kind of noise this change removes.
   no-GC region per batch is ended by any other test's allocations and throws when it ends.
 - **[Known limit, measured: the clock sees only the calling thread.]** A read that completes
   synchronously but runs part of its work on other threads is under-counted, not detected. A
-  quadratic regression spread with `Parallel.For` read **106–135×**, about a fifth of the ~530×
-  it reads when run on the calling thread, and **passed one run in three**. The same regression
-  behind a blocking `Task.Run(...).GetAwaiter().GetResult()` was caught (441×, 484×), but only
-  because the runtime ran the queued task inline on the waiting thread; that is the runtime's
-  choice, not a guarantee. The read does neither today. → **Stated in the class remarks as a
+  quadratic regression spread with `Parallel.For` read **55–135× depending on its shape**, a
+  sixth to a fifth of what it reads when run on the calling thread. `Parallel.For(1, days, …)`
+  passed one run in three (106×). **`Parallel.For(0, days, …)` passed every run** (QA round 2:
+  3 of 3, at 60.2×, 64.8× and 54.6×), nowhere near the limit. Treat this as a blind spot, not a
+  near miss. The same regression behind a blocking `Task.Run(...).GetAwaiter().GetResult()` was
+  caught (441×, 484×; QA round 2: 290–326×), but only because the runtime ran the queued task
+  inline on the waiting thread. QA measured that it does so when the caller is a thread-pool
+  thread (400 of 400, as under xUnit here) and never from a dedicated thread (0 of 400). That is
+  the runtime's choice, not a guarantee. The read does neither today. → **Stated in the class remarks as a
   condition under which the test stops guarding the cost**, not engineered around. Comparing
   thread CPU time against wall-clock time to spot missing work was considered and rejected: under
   load, wall-clock time is exactly the noise this change removes, so the comparison would bring
