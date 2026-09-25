@@ -1,3 +1,5 @@
+using System.Globalization;
+using System.Text.RegularExpressions;
 using System.Text.Json;
 using UBookIt.Tests.Support;
 
@@ -419,5 +421,78 @@ public class PackageCompositionTests(PackedSolutionFixture fixture)
             $"{unbounded.Count} Umbraco dependency declaration(s) carry no upper bound, so the "
             + "published package claims to support every future Umbraco major:"
             + $"{Environment.NewLine}  " + string.Join(Environment.NewLine + "  ", unbounded));
+    }
+
+    /// <summary>
+    /// The bound admits the Umbraco major this line targets, and excludes the next.
+    /// </summary>
+    /// <remarks>
+    /// <b>Covers the one scenario <see cref="Every_umbraco_dependency_names_an_upper_bound"/>
+    /// does not.</b> That guard asks only whether <i>a</i> ceiling exists, so
+    /// <c>[17.6.2,17.7.0)</c> satisfies it while refusing every Umbraco 17 minor this line claims
+    /// to support — a bound that is present, wrong, and invisible. QA found the gap when the
+    /// requirement moved onto this branch; the requirement states both halves, so both are
+    /// guarded.
+    /// <para>
+    /// The expected majors are derived from the declared version rather than written down, so
+    /// this cannot be left behind by a version bump — the same reasoning the readme's image pin
+    /// already uses. It is deliberately silent about the lower bound's minor and patch: which
+    /// Umbraco 17 the line needs is a separate decision, and pinning it here would make every
+    /// dependency bump a test edit.
+    /// </para>
+    /// </remarks>
+    [Fact]
+    public void The_bound_admits_this_major_and_excludes_the_next()
+    {
+        var declared = VersionTruthTests.DeclaredVersion();
+        var major = int.Parse(declared.Split('.')[0], CultureInfo.InvariantCulture);
+        var expectedCeiling = $"{major + 1}.0.0";
+
+        var wrong = new List<string>();
+        var checkedDependencies = 0;
+
+        foreach (var package in Packed.Packages)
+        {
+            foreach (var (id, version) in package.Dependencies)
+            {
+                if (!id.StartsWith("Umbraco.Cms", StringComparison.OrdinalIgnoreCase))
+                {
+                    continue;
+                }
+
+                checkedDependencies++;
+
+                var match = Regex.Match(version, @"^\[\s*(?<low>[^,\s]+)\s*,\s*(?<high>[^)\]\s]+)\s*\)$");
+
+                if (!match.Success)
+                {
+                    wrong.Add($"{package.Id} -> {id} '{version}' is not an interval with an exclusive upper bound.");
+                    continue;
+                }
+
+                var low = match.Groups["low"].Value;
+                var high = match.Groups["high"].Value;
+
+                if (!low.StartsWith($"{major}.", StringComparison.Ordinal))
+                {
+                    wrong.Add($"{package.Id} -> {id} '{version}' starts at '{low}', which is not an Umbraco {major} version.");
+                }
+
+                if (high != expectedCeiling)
+                {
+                    wrong.Add($"{package.Id} -> {id} '{version}' stops at '{high}', not '{expectedCeiling}'. "
+                        + $"A ceiling inside Umbraco {major} refuses releases this line supports.");
+                }
+            }
+        }
+
+        Assert.True(
+            checkedDependencies > 0,
+            "No packed package declares an Umbraco.Cms* dependency, so this guard ran over nothing.");
+
+        Assert.True(
+            wrong.Count == 0,
+            $"{wrong.Count} Umbraco dependency range(s) do not admit Umbraco {major} and exclude "
+            + $"{major + 1}:{Environment.NewLine}  " + string.Join(Environment.NewLine + "  ", wrong));
     }
 }
