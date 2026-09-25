@@ -95,3 +95,6 @@ use is the next tidy patch on each line.
   - `actions/download-artifact` (MIT; v8.0.1)
 
   All three are workflow-only. None of them ships in a package.
+- **New test-only dependency** *(added at QA round 5)*: `YamlDotNet` 18.1.0 (MIT), referenced by
+  `tests/UBookIt.Tests` only, so that the workflow guards read YAML as a parser does. Nothing
+  shipped references it, and it has no advisories at the time of adding.

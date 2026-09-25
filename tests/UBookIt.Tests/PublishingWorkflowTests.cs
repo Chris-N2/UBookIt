@@ -1,5 +1,6 @@
 using System.Text.RegularExpressions;
 using UBookIt.Tests.Support;
+using YamlDotNet.RepresentationModel;
 
 namespace UBookIt.Tests;
 
@@ -18,45 +19,38 @@ namespace UBookIt.Tests;
 /// nobody has written yet needs a guard that reads every file, every run.
 /// </para>
 /// <para>
-/// <b>They read every LINE, not the shape they expect.</b> The first version found grants by
-/// structure: job bodies, plus the lines before <c>jobs:</c>. QA round 2 put a workflow-level
-/// <c>permissions: id-token: write</c> AFTER <c>jobs:</c> (valid YAML), and a flow-style
-/// <c>- { uses: actions/checkout@v4 }</c>, into a new file, and all four tests passed. A guard that
-/// looks where grants usually are cannot see one placed elsewhere. So the rules are now stated
-/// over every non-comment line of every workflow, and structure is used for one thing only: to
-/// know which lines are the publish job's, where the single allowed grant lives.
+/// <b>They read the YAML, not its text.</b> The first four versions of these tests read the
+/// workflows line by line, and each QA round found a neighbouring YAML form the line scanner
+/// misread:
+/// <list type="bullet">
+/// <item><description>round 2: a workflow-level grant placed after <c>jobs:</c>, and flow-style
+/// <c>- { uses: … }</c>;</description></item>
+/// <item><description>round 3: a quoted job name, and <c>"id\x2Dtoken"</c>;</description></item>
+/// <item><description>round 4: a quoted key hidden inside what the scanner took for a block
+/// scalar;</description></item>
+/// <item><description>round 5: a <c>uses:</c> whose value sat on the next line, and the explicit-key
+/// <c>?</c> indicator.</description></item>
+/// </list>
+/// Each fix taught the scanner one more form. So the rules are now asserted over the tree a real
+/// YAML parser (YamlDotNet, test-only) builds. A quoted, escaped, tagged, flow-style, multi-line
+/// or explicit key is just a key there.
 /// </para>
 /// <para>
-/// <b>What a text guard cannot read, it refuses.</b> QA round 3 took the next step: a quoted job
-/// name (<c>"sneak":</c>), whose lines then fell inside the publish job's span, and a YAML escape
-/// in a double-quoted key (<c>"id\x2Dtoken": write</c>), which decodes to <c>id-token</c> and which
-/// no substring search sees. Both were confirmed with a real YAML parser, and both passed. A line
-/// scanner cannot follow everything YAML can say, so it does not pretend to.
-/// <see cref="Every_workflow_is_written_in_the_plain_YAML_these_guards_read"/> rejects every form
-/// the others cannot see through. Quoted keys, anchors, aliases and merge keys are refused on
-/// EVERY line, and backslash escapes on every line outside a block scalar. The other rules
-/// therefore hold over what is left, which is all that GitHub can be given.
+/// <b>What the parser does not settle, and how that is closed.</b> YamlDotNet's representation
+/// model shares an aliased node rather than copying it, and does not apply <c>&lt;&lt;</c> merge
+/// keys. Rather than reason about either,
+/// <see cref="Every_workflow_is_one_plain_YAML_document"/> refuses anchors (so there can be no
+/// aliases), merge keys and a second document. It also keeps the round-3/4 text rule as a
+/// BACKSTOP: no quoted keys, anchors, aliases or merge keys on any line, and no backslash outside a
+/// block scalar. That rule is not what the other tests rely on. It is there in case GitHub's
+/// parser and this one ever read a construct differently, which nothing here can observe.
 /// </para>
 /// <para>
-/// <b>Why "every line", and not "every YAML line".</b> QA round 4 wrote <c>- name: |</c> followed
-/// by <c>"uses": actions/checkout@v4</c> at the step's key column. The block-scalar model called
-/// that line shell; YAML calls it a sibling key. Three rounds running, each fix taught the guard
-/// one more YAML form and the next round found one it did not know. So the rules that decide
-/// what a workflow may say no longer consult that model. It survives only to exempt shell
-/// backslashes, where a misjudged line can at worst let through a backslash, and an escape
-/// cannot form a key without the quotes that are refused everywhere.
-/// </para>
-/// <para>
-/// <b>What these read, and what they cannot.</b> The workflow files, as text. There is no YAML
-/// library here, and none is added for this. Comments are stripped as a <c>#</c> at line start or
-/// after whitespace. Block scalars (<c>run: |</c> bodies) are shell, not YAML, and are exempt from
-/// the plain-YAML rule. Within the publish job they are still searched for <c>git</c>/<c>gh</c> and
-/// for this repository's own URLs. <b>Not guarded, and resting on review:</b> a publish-job step
-/// fetching code from any other host (<c>curl … | bash</c> from somewhere that is not GitHub) and
-/// running it. The tests also cannot see the repository's own settings (the <c>release</c>
-/// environment's reviewers and tag rule) or the nuget.org policy. Those live outside the
-/// repository, and <c>docs/publishing.md</c> records their values. The last test holds that record
-/// to the workflow, which is as close as a test can get.
+/// <b>What these cannot see.</b> A publish-job step fetching code from a host other than this
+/// repository's and running it; that rests on review, and the spec says so. The repository's own
+/// settings (the <c>release</c> environment's reviewers and tag rule) and the nuget.org policy
+/// live outside the repository. <c>docs/publishing.md</c> records their values, and the last test
+/// holds that record to the workflow, which is as close as a test can get.
 /// </para>
 /// </remarks>
 public class PublishingWorkflowTests
@@ -83,85 +77,88 @@ public class PublishingWorkflowTests
 
         foreach (var workflow in Workflows())
         {
-            var lines = Code(RepoFiles.Read(workflow));
+            var root = Root(workflow);
 
-            // A workflow-level permissions block in every workflow, WHEREVER it sits in the file.
-            // Without one, jobs get the repository's default token permissions.
             Assert.True(
-                lines.Any(line => Regex.IsMatch(line, @"^permissions:")),
+                Child(root, "permissions") is not null,
                 $"{workflow} declares no workflow-level `permissions:`. Every workflow here states "
                 + "its token's permissions, so that none inherits a repository default.");
 
-            var publishSpan = workflow == PublishWorkflow
-                ? Jobs(workflow, lines).Single(job => job.Name == PublishJob)
-                : null;
-
-            for (var index = 0; index < lines.Count; index++)
+            foreach (var (path, key, value) in Entries(root, workflow))
             {
-                var line = lines[index];
-
-                if (Regex.IsMatch(line, @"\bwrite-all\b"))
+                if (Is(key, "id-token"))
                 {
-                    offenders.Add($"{workflow}:{index + 1}: {line.Trim()}  (write-all includes id-token)");
+                    var grant = $"{path} = {Describe(value)}";
+                    if (workflow == PublishWorkflow && path == $"{PublishWorkflow}/jobs/{PublishJob}/permissions/id-token")
+                    {
+                        allowed.Add(grant);
+                    }
+                    else
+                    {
+                        offenders.Add(grant);
+                    }
                 }
 
-                if (!line.Contains("id-token", StringComparison.Ordinal))
+                if (value is YamlScalarNode scalar && Is(scalar, "write-all"))
                 {
-                    continue;
-                }
-
-                if (publishSpan is not null && index >= publishSpan.Start && index < publishSpan.End)
-                {
-                    allowed.Add($"{workflow}:{index + 1}: {line.Trim()}");
-                }
-                else
-                {
-                    offenders.Add($"{workflow}:{index + 1}: {line.Trim()}");
+                    offenders.Add($"{path} = write-all (which includes id-token)");
                 }
             }
         }
 
         Assert.True(
             offenders.Count == 0,
-            "Only the '" + PublishJob + "' job of " + PublishWorkflow + " may request an identity "
-            + "token. These lines grant one elsewhere, or grant everything:\n  "
-            + string.Join("\n  ", offenders));
+            $"Only the '{PublishJob}' job of {PublishWorkflow} may request an identity token. "
+            + "These grant one elsewhere, or grant everything:\n  " + string.Join("\n  ", offenders));
 
         Assert.True(
-            allowed.Count == 1 && Regex.IsMatch(allowed[0], @": id-token:\s*write\s*$"),
+            allowed.Count == 1 && allowed[0].EndsWith("= write", StringComparison.Ordinal),
             $"The '{PublishJob}' job must carry exactly one grant, `id-token: write`. Found:\n  "
             + (allowed.Count == 0 ? "(none)" : string.Join("\n  ", allowed)));
+
+        // And nothing else: the job's comment promises "the Trusted Publishing exchange, and
+        // nothing else", so a second permission beside it is a widening too.
+        var publishPermissions = Child(PublishJobNode(), "permissions") as YamlMappingNode;
+        Assert.True(
+            publishPermissions is not null && publishPermissions.Children.Count == 1,
+            $"The '{PublishJob}' job's permissions must be exactly `id-token: write`. Found: "
+            + Describe(Child(PublishJobNode(), "permissions")));
     }
 
     [Fact]
     public void The_publish_job_runs_no_repository_code_and_waits_for_approval()
     {
-        var lines = Code(RepoFiles.Read(PublishWorkflow));
-        var job = Jobs(PublishWorkflow, lines).Single(candidate => candidate.Name == PublishJob);
-        var body = lines.Skip(job.Start).Take(job.End - job.Start).ToList();
-
+        var job = PublishJobNode();
         var offenders = new List<string>();
 
-        foreach (var reference in body.SelectMany(Uses))
+        foreach (var (path, key, value) in Entries(job, $"{PublishWorkflow}/jobs/{PublishJob}"))
         {
-            var action = Regex.Replace(reference, "@.*$", string.Empty);
-            if (!PublishJobActions.Contains(action, StringComparer.Ordinal))
+            if (Is(key, "uses"))
             {
-                offenders.Add($"uses {reference}");
+                var reference = (value as YamlScalarNode)?.Value ?? Describe(value);
+                var action = Regex.Replace(reference, "@.*$", string.Empty);
+                if (!PublishJobActions.Contains(action, StringComparer.Ordinal))
+                {
+                    offenders.Add($"{path}: uses {reference}");
+                }
             }
         }
 
-        // A checkout need not be an action: git or gh on a run line fetches the repository just
-        // as well. Preceded by anything that can start a command word, including a quote (a
-        // quoted `run:` value is ordinary YAML) and a path separator (/usr/bin/git). QA round 3.
-        offenders.AddRange(body
-            .Where(line => Regex.IsMatch(line, @"(^|[\s;&|(`$""'/])(git|gh)\s"))
-            .Select(line => $"runs {line.Trim()}"));
+        foreach (var (path, text) in Scalars(job, $"{PublishWorkflow}/jobs/{PublishJob}"))
+        {
+            // A checkout need not be an action: git or gh fetches the repository just as well,
+            // after anything that can start a command word.
+            if (Regex.IsMatch(text, @"(^|[\s;&|(`$""'/])(git|gh)\s", RegexOptions.Multiline))
+            {
+                offenders.Add($"{path}: runs git or gh");
+            }
 
-        // Nor may it fetch this repository's content over HTTP.
-        offenders.AddRange(body
-            .Where(line => Regex.IsMatch(line, @"github\.com|githubusercontent\.com|codeload\.github|github\.repository\b|github\.server_url", RegexOptions.IgnoreCase))
-            .Select(line => $"references the repository {line.Trim()}"));
+            // Nor may it fetch this repository's content over HTTP.
+            if (Regex.IsMatch(text, @"github\.com|githubusercontent\.com|codeload\.github|github\.repository\b|github\.server_url", RegexOptions.IgnoreCase))
+            {
+                offenders.Add($"{path}: references the repository's own addresses");
+            }
+        }
 
         Assert.True(
             offenders.Count == 0,
@@ -170,64 +167,13 @@ public class PublishingWorkflowTests
             + "the repository runs while the one-hour key exists. Found:\n  "
             + string.Join("\n  ", offenders));
 
-        Assert.Contains(body, line => Regex.IsMatch(line, @"^\s+environment:\s*release\s*$"));
-        Assert.Contains(body, line => Regex.IsMatch(line, @"^\s+if:\s*\$\{\{\s*github\.event_name == 'push'\s*\}\}\s*$"));
-        Assert.Contains(body, line => Regex.IsMatch(line, @"^\s+needs:\s*\[\s*check\s*,\s*pack\s*\]\s*$"));
-    }
+        Assert.Equal("release", ScalarChild(job, "environment"));
+        Assert.Equal("${{ github.event_name == 'push' }}", ScalarChild(job, "if"));
 
-    [Fact]
-    public void Every_workflow_is_written_in_the_plain_YAML_these_guards_read()
-    {
-        var offenders = new List<string>();
-
-        foreach (var workflow in Workflows())
-        {
-            var lines = Code(RepoFiles.Read(workflow));
-            var yamlLines = OutsideBlockScalars(lines).ToHashSet();
-
-            // Quoted keys, anchors, aliases and merge keys are refused on EVERY line, block bodies
-            // included. QA round 4: with the block model deciding which lines were exempt, a
-            // `- name: |` followed by `"uses": actions/checkout@v4` at the step's key column was
-            // "block body" to the guard and a sibling key to YAML. Modelling YAML's block rules
-            // exactly is what three rounds of holes came from, so these rules no longer depend on
-            // the model at all. None of them occurs in a shell body here, and a probe of every line
-            // of every workflow found none before the rule went in. Only the backslash rule stays
-            // scoped to YAML lines, because shell scripts legitimately contain backslashes and a
-            // YAML escape can only spell a key inside quotes, which this rule refuses everywhere.
-            for (var index = 0; index < lines.Count; index++)
-            {
-                var line = lines[index];
-                var reasons = new List<string>();
-
-                if (Regex.IsMatch(line, @"^\s*(-\s*)?[""'][^""']*[""']\s*:") || Regex.IsMatch(line, @"[{,]\s*[""'][^""']*[""']\s*:"))
-                {
-                    reasons.Add("a quoted key");
-                }
-
-                if (yamlLines.Contains(index) && line.Contains('\\', StringComparison.Ordinal))
-                {
-                    reasons.Add("a backslash (a YAML escape can spell a key these guards search for)");
-                }
-
-                if (Regex.IsMatch(line, @"(^|[:\-\[,{]\s)\s*[&*][A-Za-z0-9_-]") || Regex.IsMatch(line, @"<<\s*:"))
-                {
-                    reasons.Add("an anchor, alias or merge key");
-                }
-
-                if (reasons.Count > 0)
-                {
-                    offenders.Add($"{workflow}:{index + 1}: {string.Join("; ", reasons)}: {line.Trim()}");
-                }
-            }
-        }
-
+        var needs = Child(job, "needs") as YamlSequenceNode;
         Assert.True(
-            offenders.Count == 0,
-            "The workflow guards read YAML as text. Keys must be plain and there may be no anchors, "
-            + "aliases or merge keys, anywhere in the file; outside `run: |` style block scalars "
-            + "there may be no backslashes either. Each of these can express a permission or an "
-            + "action these guards would not see. Write it plainly:\n  "
-            + string.Join("\n  ", offenders));
+            needs is not null && needs.Children.Select(Describe).SequenceEqual(["check", "pack"]),
+            $"The '{PublishJob}' job must need exactly [check, pack]. Found: {Describe(Child(job, "needs"))}");
     }
 
     [Fact]
@@ -238,15 +184,21 @@ public class PublishingWorkflowTests
 
         foreach (var workflow in Workflows())
         {
-            foreach (var reference in Code(RepoFiles.Read(workflow)).SelectMany(Uses))
+            foreach (var (path, key, value) in Entries(Root(workflow), workflow))
             {
-                if (Regex.IsMatch(reference, @"^[A-Za-z0-9_.-]+/[A-Za-z0-9_.-]+(/[^@\s]+)?@[0-9a-f]{40}$"))
+                if (!Is(key, "uses"))
+                {
+                    continue;
+                }
+
+                var reference = (value as YamlScalarNode)?.Value;
+                if (reference is not null && Regex.IsMatch(reference, @"^[A-Za-z0-9_.-]+/[A-Za-z0-9_.-]+(/[^@\s]+)?@[0-9a-f]{40}$"))
                 {
                     pinned++;
                 }
                 else
                 {
-                    offenders.Add($"{workflow}: {reference}");
+                    offenders.Add($"{path}: {Describe(value)}");
                 }
             }
         }
@@ -262,15 +214,79 @@ public class PublishingWorkflowTests
     }
 
     [Fact]
+    public void Every_workflow_is_one_plain_YAML_document()
+    {
+        var offenders = new List<string>();
+
+        foreach (var workflow in Workflows())
+        {
+            var stream = Parse(workflow);
+            if (stream.Documents.Count != 1)
+            {
+                offenders.Add($"{workflow}: {stream.Documents.Count} YAML documents; exactly one is allowed");
+                continue;
+            }
+
+            // In the tree: an anchor (so no alias can exist) or a merge key is refused, because
+            // the representation model shares aliased nodes and does not apply merges.
+            foreach (var (path, node) in Nodes(stream.Documents[0].RootNode, workflow))
+            {
+                if (!node.Anchor.IsEmpty)
+                {
+                    offenders.Add($"{path}: anchor &{node.Anchor}");
+                }
+            }
+
+            foreach (var (path, key, _) in Entries(stream.Documents[0].RootNode, workflow))
+            {
+                if (Is(key, "<<"))
+                {
+                    offenders.Add($"{path}: merge key");
+                }
+            }
+
+            // The text BACKSTOP (see the remarks): kept from rounds 3 and 4 in case GitHub's
+            // parser and YamlDotNet ever disagree about a construct.
+            var lines = Code(RepoFiles.Read(workflow));
+            var yamlLines = OutsideBlockScalars(lines).ToHashSet();
+            for (var index = 0; index < lines.Count; index++)
+            {
+                var line = lines[index];
+
+                if (Regex.IsMatch(line, @"^\s*(-\s*)?[""'][^""']*[""']\s*:") || Regex.IsMatch(line, @"[{,]\s*[""'][^""']*[""']\s*:"))
+                {
+                    offenders.Add($"{workflow}:{index + 1}: a quoted key: {line.Trim()}");
+                }
+
+                if (Regex.IsMatch(line, @"(^|[:\-\[,{]\s)\s*[&*][A-Za-z0-9_-]") || Regex.IsMatch(line, @"<<\s*:"))
+                {
+                    offenders.Add($"{workflow}:{index + 1}: an anchor, alias or merge key: {line.Trim()}");
+                }
+
+                if (yamlLines.Contains(index) && line.Contains('\\', StringComparison.Ordinal))
+                {
+                    offenders.Add($"{workflow}:{index + 1}: a backslash outside a block scalar: {line.Trim()}");
+                }
+            }
+        }
+
+        Assert.True(
+            offenders.Count == 0,
+            "Workflows here are one YAML document, with no anchors, aliases or merge keys, and with "
+            + "plain keys and no backslashes outside `run: |` style blocks, so that what these "
+            + "guards read is what GitHub runs. Write it plainly:\n  " + string.Join("\n  ", offenders));
+    }
+
+    [Fact]
     public void The_runbook_records_what_the_nuget_org_policy_must_match()
     {
-        var lines = Code(RepoFiles.Read(PublishWorkflow));
-        var job = Jobs(PublishWorkflow, lines).Single(candidate => candidate.Name == PublishJob);
-        var body = lines.Skip(job.Start).Take(job.End - job.Start).ToList();
-
-        var environment = Value(body, @"^\s+environment:\s*(?<value>\S+)\s*$", "environment");
-        var user = Value(body, @"^\s+NUGET_USER:\s*(?<value>\S+)\s*$", "NUGET_USER");
+        var job = PublishJobNode();
+        var environment = ScalarChild(job, "environment");
+        var user = ScalarChild(Child(job, "env"), "NUGET_USER");
         var fileName = Path.GetFileName(PublishWorkflow);
+
+        Assert.False(string.IsNullOrWhiteSpace(environment), $"The '{PublishJob}' job names no environment.");
+        Assert.False(string.IsNullOrWhiteSpace(user), $"The '{PublishJob}' job sets no NUGET_USER.");
 
         var runbook = RepoFiles.Read("docs/publishing.md");
 
@@ -282,6 +298,8 @@ public class PublishingWorkflowTests
         DocumentationAssert.SaysOnce(runbook, $"| Environment | `{environment}` |");
         DocumentationAssert.SaysOnce(runbook, $"**GitHub → Settings → Environments → `{environment}`:**");
     }
+
+    // --- Reading the workflows -------------------------------------------------------------
 
     private static IReadOnlyList<string> Workflows()
     {
@@ -295,6 +313,85 @@ public class PublishingWorkflowTests
         return workflows;
     }
 
+    private static YamlStream Parse(string workflow)
+    {
+        var stream = new YamlStream();
+        stream.Load(new StringReader(RepoFiles.Read(workflow)));
+        return stream;
+    }
+
+    private static YamlMappingNode Root(string workflow)
+    {
+        var stream = Parse(workflow);
+        Assert.True(stream.Documents.Count >= 1, $"{workflow} contains no YAML document.");
+        return Assert.IsType<YamlMappingNode>(stream.Documents[0].RootNode);
+    }
+
+    private static YamlMappingNode PublishJobNode()
+    {
+        var jobs = Assert.IsType<YamlMappingNode>(Child(Root(PublishWorkflow), "jobs"));
+        return Assert.IsType<YamlMappingNode>(Child(jobs, PublishJob));
+    }
+
+    private static bool Is(YamlNode node, string name) =>
+        node is YamlScalarNode scalar && string.Equals(scalar.Value, name, StringComparison.OrdinalIgnoreCase);
+
+    private static YamlNode? Child(YamlNode? node, string key) =>
+        node is YamlMappingNode mapping
+            ? mapping.Children.FirstOrDefault(pair => Is(pair.Key, key)).Value
+            : null;
+
+    private static string? ScalarChild(YamlNode? node, string key) => (Child(node, key) as YamlScalarNode)?.Value;
+
+    private static string Describe(YamlNode? node) => node switch
+    {
+        null => "(absent)",
+        YamlScalarNode scalar => scalar.Value ?? "(null)",
+        YamlSequenceNode sequence => "[" + string.Join(", ", sequence.Children.Select(Describe)) + "]",
+        YamlMappingNode mapping => "{" + string.Join(", ", mapping.Children.Select(pair => $"{Describe(pair.Key)}: {Describe(pair.Value)}")) + "}",
+        _ => node.ToString(),
+    };
+
+    /// <summary>Every node in the tree, keys included, with a readable path.</summary>
+    private static IEnumerable<(string Path, YamlNode Node)> Nodes(YamlNode node, string path)
+    {
+        yield return (path, node);
+
+        switch (node)
+        {
+            case YamlMappingNode mapping:
+                foreach (var (key, value) in mapping.Children)
+                {
+                    var childPath = $"{path}/{Describe(key)}";
+                    foreach (var inner in Nodes(key, childPath + "(key)")) yield return inner;
+                    foreach (var inner in Nodes(value, childPath)) yield return inner;
+                }
+                break;
+
+            case YamlSequenceNode sequence:
+                for (var index = 0; index < sequence.Children.Count; index++)
+                {
+                    foreach (var inner in Nodes(sequence.Children[index], $"{path}[{index}]")) yield return inner;
+                }
+                break;
+        }
+    }
+
+    /// <summary>Every mapping entry in the tree, at any depth, with the path to its value.</summary>
+    private static IEnumerable<(string Path, YamlNode Key, YamlNode Value)> Entries(YamlNode node, string path) =>
+        Nodes(node, path)
+            .Where(pair => pair.Node is YamlMappingNode)
+            .SelectMany(pair => ((YamlMappingNode)pair.Node).Children
+                .Select(child => ($"{pair.Path}/{Describe(child.Key)}", child.Key, child.Value)));
+
+    /// <summary>Every scalar value in the tree (not keys), with its path.</summary>
+    private static IEnumerable<(string Path, string Text)> Scalars(YamlNode node, string path) =>
+        Nodes(node, path)
+            .Where(pair => pair.Node is YamlScalarNode && !pair.Path.EndsWith("(key)", StringComparison.Ordinal))
+            .Select(pair => (pair.Path, ((YamlScalarNode)pair.Node).Value ?? string.Empty));
+
+    // --- The text backstop -------------------------------------------------------------------
+
     /// <summary>The file's lines with comments removed (a `#` at line start or after whitespace).</summary>
     private static IReadOnlyList<string> Code(string text) =>
         text.Split('\n')
@@ -302,21 +399,8 @@ public class PublishingWorkflowTests
             .ToList();
 
     /// <summary>
-    /// Every action a line references, in block style (`uses: x`, `- uses: x`) or flow style
-    /// (`- { uses: x }`), with the key or the value quoted or not. (A quoted key is also refused
-    /// outright by the plain-YAML test; it is still read here, so the two tests do not depend on
-    /// each other.)
-    /// </summary>
-    private static IEnumerable<string> Uses(string line) =>
-        Regex.Matches(line, @"(?<![A-Za-z0-9_-])['""]?uses['""]?\s*:\s*['""]?(?<ref>[^\s'"",}]+)")
-            .Select(match => match.Groups["ref"].Value);
-
-    /// <summary>
-    /// The indexes of lines that are YAML, not the body of a block scalar (`key: |`, `key: >-`,
-    /// `- |`). A block scalar's body is every following line that is blank or indented deeper than
-    /// the KEY that opened it: for `- key: |` that is the key's column, not the dash's, because a
-    /// line at the key's column is a sibling key of the same mapping (QA round 4). Used only to
-    /// scope the backslash rule; every other rule applies to every line.
+    /// The indexes of lines that are YAML, not the body of a block scalar. Used only to exempt
+    /// shell backslashes in the backstop; for `- key: |` the block indent is the key's column.
     /// </summary>
     private static IEnumerable<int> OutsideBlockScalars(IReadOnlyList<string> lines)
     {
@@ -339,73 +423,11 @@ public class PublishingWorkflowTests
 
             if (Regex.IsMatch(line, @"(:|^\s*-)\s*[|>][-+0-9]*\s*$"))
             {
-                // `- key: |` opens a block owned by `key`, whose column is past the dash.
                 var sequenceItemKey = Regex.Match(line, @"^\s*-\s+(?=\S+\s*:)");
                 blockIndent = sequenceItemKey.Success ? sequenceItemKey.Length : indent;
             }
 
             yield return index;
         }
-    }
-
-    private sealed record JobSpan(string Name, int Start, int End);
-
-    /// <summary>
-    /// Each job under `jobs:`, as its name and the half-open range of line indexes its body
-    /// occupies. Used only to know WHICH lines belong to a job; rules about what may appear in a
-    /// workflow are applied to every line, not just to these.
-    /// </summary>
-    private static IReadOnlyList<JobSpan> Jobs(string workflow, IReadOnlyList<string> lines)
-    {
-        var start = lines.ToList().FindIndex(line => Regex.IsMatch(line, @"^jobs:\s*$"));
-        Assert.True(start >= 0, $"{workflow} has no `jobs:` key, so its jobs cannot be read.");
-
-        var jobs = new List<JobSpan>();
-        string? current = null;
-        var bodyStart = 0;
-        var index = start + 1;
-
-        for (; index < lines.Count; index++)
-        {
-            var line = lines[index];
-            if (Regex.IsMatch(line, @"^\S"))
-            {
-                break; // a later top-level key ends `jobs:`
-            }
-
-            // Quoted job names are refused outright by the plain-YAML test; they are still
-            // recognised here, so that a quoted job can never be read as part of the job above it.
-            var header = Regex.Match(line, @"^  (?<quote>[""']?)(?<name>[A-Za-z0-9_-]+)\k<quote>:\s*$");
-            if (header.Success)
-            {
-                if (current is not null)
-                {
-                    jobs.Add(new JobSpan(current, bodyStart, index));
-                }
-
-                current = header.Groups["name"].Value;
-                bodyStart = index + 1;
-            }
-        }
-
-        if (current is not null)
-        {
-            jobs.Add(new JobSpan(current, bodyStart, index));
-        }
-
-        Assert.True(jobs.Count > 0, $"{workflow} has a `jobs:` key but no job could be read under it.");
-        return jobs;
-    }
-
-    private static string Value(IEnumerable<string> lines, string pattern, string what)
-    {
-        var values = lines
-            .Select(line => Regex.Match(line, pattern))
-            .Where(match => match.Success)
-            .Select(match => match.Groups["value"].Value)
-            .ToList();
-
-        Assert.True(values.Count == 1, $"Expected exactly one `{what}` in the '{PublishJob}' job; found {values.Count}.");
-        return values[0];
     }
 }
