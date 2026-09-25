@@ -156,10 +156,12 @@ the workflow uses SHALL be referenced by a full commit identifier.
     bodies, are refused as well, as a backstop against a difference between parsers;
 
   or the publishing step uses any action beyond those that fetch the verified packages, set up
-  the SDK and exchange the token, invokes git or gh, or references the repository's own addresses
-- **THEN** the repository's test suite fails, naming the workflow and the offending line. A step
-  that fetches and runs code from a host other than this repository's is not detected, and rests
-  on review.
+  the SDK and exchange the token, names git or gh as a command word, or references the
+  repository's own addresses
+- **THEN** the repository's test suite fails, naming the workflow and the offending entry. Two
+  things are not detected, and rest on review: a step that fetches and runs code from a host other
+  than this repository's, and git or gh invoked indirectly (a command assembled by the shell
+  rather than named).
 
 ### Requirement: A release that is already on nuget.org is not reported as newly published
 The workflow SHALL push libraries before the meta-package that depends on them. It SHALL push

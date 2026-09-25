@@ -46,8 +46,12 @@ namespace UBookIt.Tests;
 /// parser and this one ever read a construct differently, which nothing here can observe.
 /// </para>
 /// <para>
-/// <b>What these cannot see.</b> A publish-job step fetching code from a host other than this
-/// repository's and running it; that rests on review, and the spec says so. The repository's own
+/// <b>What these cannot see.</b> Two things rest on review, and the spec says so. First, a
+/// publish-job step fetching code from a host other than this repository's and running it.
+/// Second, git or gh invoked indirectly: the check finds either NAMED as a command word, and
+/// shell can assemble a command from pieces no text check can follow (QA round 6: `G=git; $G`
+/// passed the first version, and `g''it` or base64 would pass any version). It is safe in the
+/// other direction too: a step name or a shell comment that merely mentions git fails the run. The repository's own
 /// settings (the <c>release</c> environment's reviewers and tag rule) and the nuget.org policy
 /// live outside the repository. <c>docs/publishing.md</c> records their values, and the last test
 /// holds that record to the workflow, which is as close as a test can get.
@@ -146,11 +150,15 @@ public class PublishingWorkflowTests
 
         foreach (var (path, text) in Scalars(job, $"{PublishWorkflow}/jobs/{PublishJob}"))
         {
-            // A checkout need not be an action: git or gh fetches the repository just as well,
-            // after anything that can start a command word.
-            if (Regex.IsMatch(text, @"(^|[\s;&|(`$""'/])(git|gh)\s", RegexOptions.Multiline))
+            // A checkout need not be an action: git or gh fetches the repository just as well.
+            // This NAMES the command word: after anything that can precede one (including `=`,
+            // quotes and a path separator) and before a word boundary, so `G=git;` and
+            // `$(command -v git)` are caught. It cannot decide whether shell INVOKES git: a
+            // command assembled from pieces (`g''it`, base64, eval) passes, and rests on review,
+            // as the remarks and the spec say. QA round 6.
+            if (Regex.IsMatch(text, @"(^|[\s;&|(`$""'/=])(git|gh)\b", RegexOptions.Multiline))
             {
-                offenders.Add($"{path}: runs git or gh");
+                offenders.Add($"{path}: names git or gh as a command word");
             }
 
             // Nor may it fetch this repository's content over HTTP.
@@ -229,11 +237,18 @@ public class PublishingWorkflowTests
 
             // In the tree: an anchor (so no alias can exist) or a merge key is refused, because
             // the representation model shares aliased nodes and does not apply merges.
-            foreach (var (path, node) in Nodes(stream.Documents[0].RootNode, workflow))
+            // A tag (`!!binary`, `!custom`) changes what a scalar means in ways this model does
+            // not decode and GitHub's handling of which is unobserved, so it is refused too.
+            foreach (var (path, node, _) in Nodes(stream.Documents[0].RootNode, workflow))
             {
                 if (!node.Anchor.IsEmpty)
                 {
                     offenders.Add($"{path}: anchor &{node.Anchor}");
+                }
+
+                if (!node.Tag.IsEmpty)
+                {
+                    offenders.Add($"{path}: tag {node.Tag}");
                 }
             }
 
@@ -352,10 +367,14 @@ public class PublishingWorkflowTests
         _ => node.ToString(),
     };
 
-    /// <summary>Every node in the tree, keys included, with a readable path.</summary>
-    private static IEnumerable<(string Path, YamlNode Node)> Nodes(YamlNode node, string path)
+    /// <summary>
+    /// Every node in the tree, keys included, with a readable path and whether the node is a
+    /// mapping KEY. That is carried as a flag, not read back from the path, so no key's own text
+    /// can make a value look like a key (QA round 6).
+    /// </summary>
+    private static IEnumerable<(string Path, YamlNode Node, bool IsKey)> Nodes(YamlNode node, string path, bool isKey = false)
     {
-        yield return (path, node);
+        yield return (path, node, isKey);
 
         switch (node)
         {
@@ -363,7 +382,7 @@ public class PublishingWorkflowTests
                 foreach (var (key, value) in mapping.Children)
                 {
                     var childPath = $"{path}/{Describe(key)}";
-                    foreach (var inner in Nodes(key, childPath + "(key)")) yield return inner;
+                    foreach (var inner in Nodes(key, childPath + " (key)", isKey: true)) yield return inner;
                     foreach (var inner in Nodes(value, childPath)) yield return inner;
                 }
                 break;
@@ -380,15 +399,15 @@ public class PublishingWorkflowTests
     /// <summary>Every mapping entry in the tree, at any depth, with the path to its value.</summary>
     private static IEnumerable<(string Path, YamlNode Key, YamlNode Value)> Entries(YamlNode node, string path) =>
         Nodes(node, path)
-            .Where(pair => pair.Node is YamlMappingNode)
-            .SelectMany(pair => ((YamlMappingNode)pair.Node).Children
-                .Select(child => ($"{pair.Path}/{Describe(child.Key)}", child.Key, child.Value)));
+            .Where(entry => entry.Node is YamlMappingNode)
+            .SelectMany(entry => ((YamlMappingNode)entry.Node).Children
+                .Select(child => ($"{entry.Path}/{Describe(child.Key)}", child.Key, child.Value)));
 
     /// <summary>Every scalar value in the tree (not keys), with its path.</summary>
     private static IEnumerable<(string Path, string Text)> Scalars(YamlNode node, string path) =>
         Nodes(node, path)
-            .Where(pair => pair.Node is YamlScalarNode && !pair.Path.EndsWith("(key)", StringComparison.Ordinal))
-            .Select(pair => (pair.Path, ((YamlScalarNode)pair.Node).Value ?? string.Empty));
+            .Where(entry => entry.Node is YamlScalarNode && !entry.IsKey)
+            .Select(entry => (entry.Path, ((YamlScalarNode)entry.Node).Value ?? string.Empty));
 
     // --- The text backstop -------------------------------------------------------------------
 
