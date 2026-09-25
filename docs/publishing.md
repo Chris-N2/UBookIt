@@ -78,8 +78,10 @@ expire at the events it describes.**
   below). No branch protection requires a green run, so an untested push is visible rather than
   prevented.
 - **No Trusted Publishing.** Pushes use an API key, which nuget.org now caps at 30 days.
-- **Not submitted to the Umbraco Marketplace.** The package carries the `umbraco-marketplace` tag
-  the listing is picked up from, but the submission has not been made.
+- **The Umbraco Marketplace still lists three libraries.** Listing follows from the
+  `umbraco-marketplace` tag, with no submission. Every package carried the tag until
+  `17.2.1`/`18.1.1`, which carry it on the meta-package alone (see *After the push*). Whether the
+  library listings go away has not yet been seen.
 - **The packages are owned by a personal account**, not by the organisation — see the key
   ownership note under *Pushing*.
 
@@ -380,8 +382,24 @@ libraries it depends on. That is harmless — nuget.org validates each package i
 does not require a dependency to exist at push time — but if you push them individually, push
 the libraries first so the meta-package is never briefly uninstallable.
 
-The Umbraco Marketplace picks the package up separately, via the `umbraco-marketplace` tag it
-already carries, on its own schedule.
+The Umbraco Marketplace picks the package up separately and on its own schedule. There is nothing
+to submit: it lists every package that carries the `umbraco-marketplace` tag and depends on
+Umbraco. **Only the `UBookIt` meta-package carries that tag.** The libraries install an
+incomplete product, so a listing for one of them invites the silent failure the meta-package exists
+to prevent. `PackageCompositionTests` fails if any other package carries it, or if `UBookIt`
+does not. The meta-package has no Umbraco dependency of its own but is listed through its
+children.
+
+**The tag cannot be taken back from a version already pushed.** Until `17.2.1`/`18.1.1`, every
+package carried it, and `UBookIt.Persistence`, `UBookIt.Web` and `UBookIt.Backoffice` got
+listings of their own. Whether the Marketplace drops those once their latest version is untagged
+has **not been observed**. Check `https://marketplace.umbraco.com/package/<id>` after a release
+before saying they are gone.
+
+**The listing's description is the meta-package's `<Description>`**, and it too is frozen at push.
+It names the Umbraco major derived from `<Version>`, because `UBookIt.csproj` is shared by both
+lines. `18.0.0` and `18.1.0` shipped describing themselves as for Umbraco 17 when the major was
+written by hand.
 
 ## The guard that failed when we published — and what it guards now
 
