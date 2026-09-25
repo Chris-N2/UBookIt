@@ -33,9 +33,18 @@ namespace UBookIt.Tests;
 /// no substring search sees. Both were confirmed with a real YAML parser, and both passed. A line
 /// scanner cannot follow everything YAML can say, so it does not pretend to.
 /// <see cref="Every_workflow_is_written_in_the_plain_YAML_these_guards_read"/> rejects every form
-/// the others cannot see through: quoted keys, backslash escapes, anchors, aliases and merge keys
-/// anywhere outside a block scalar. The other rules therefore hold over what is left, which is all
-/// that GitHub can be given.
+/// the others cannot see through. Quoted keys, anchors, aliases and merge keys are refused on
+/// EVERY line, and backslash escapes on every line outside a block scalar. The other rules
+/// therefore hold over what is left, which is all that GitHub can be given.
+/// </para>
+/// <para>
+/// <b>Why "every line", and not "every YAML line".</b> QA round 4 wrote <c>- name: |</c> followed
+/// by <c>"uses": actions/checkout@v4</c> at the step's key column. The block-scalar model called
+/// that line shell; YAML calls it a sibling key. Three rounds running, each fix taught the guard
+/// one more YAML form and the next round found one it did not know. So the rules that decide
+/// what a workflow may say no longer consult that model. It survives only to exempt shell
+/// backslashes, where a misjudged line can at worst let through a backslash, and an escape
+/// cannot form a key without the quotes that are refused everywhere.
 /// </para>
 /// <para>
 /// <b>What these read, and what they cannot.</b> The workflow files, as text. There is no YAML
@@ -174,8 +183,18 @@ public class PublishingWorkflowTests
         foreach (var workflow in Workflows())
         {
             var lines = Code(RepoFiles.Read(workflow));
+            var yamlLines = OutsideBlockScalars(lines).ToHashSet();
 
-            foreach (var index in OutsideBlockScalars(lines))
+            // Quoted keys, anchors, aliases and merge keys are refused on EVERY line, block bodies
+            // included. QA round 4: with the block model deciding which lines were exempt, a
+            // `- name: |` followed by `"uses": actions/checkout@v4` at the step's key column was
+            // "block body" to the guard and a sibling key to YAML. Modelling YAML's block rules
+            // exactly is what three rounds of holes came from, so these rules no longer depend on
+            // the model at all. None of them occurs in a shell body here, and a probe of every line
+            // of every workflow found none before the rule went in. Only the backslash rule stays
+            // scoped to YAML lines, because shell scripts legitimately contain backslashes and a
+            // YAML escape can only spell a key inside quotes, which this rule refuses everywhere.
+            for (var index = 0; index < lines.Count; index++)
             {
                 var line = lines[index];
                 var reasons = new List<string>();
@@ -185,7 +204,7 @@ public class PublishingWorkflowTests
                     reasons.Add("a quoted key");
                 }
 
-                if (line.Contains('\\', StringComparison.Ordinal))
+                if (yamlLines.Contains(index) && line.Contains('\\', StringComparison.Ordinal))
                 {
                     reasons.Add("a backslash (a YAML escape can spell a key these guards search for)");
                 }
@@ -204,9 +223,10 @@ public class PublishingWorkflowTests
 
         Assert.True(
             offenders.Count == 0,
-            "The workflow guards read YAML as text. Outside `run: |` style block scalars, keys must "
-            + "be plain, and escapes, anchors, aliases and merge keys are not allowed, because each "
-            + "can express a permission or an action these guards would not see. Write it plainly:\n  "
+            "The workflow guards read YAML as text. Keys must be plain and there may be no anchors, "
+            + "aliases or merge keys, anywhere in the file; outside `run: |` style block scalars "
+            + "there may be no backslashes either. Each of these can express a permission or an "
+            + "action these guards would not see. Write it plainly:\n  "
             + string.Join("\n  ", offenders));
     }
 
@@ -283,16 +303,20 @@ public class PublishingWorkflowTests
 
     /// <summary>
     /// Every action a line references, in block style (`uses: x`, `- uses: x`) or flow style
-    /// (`- { uses: x }`), quoted or not.
+    /// (`- { uses: x }`), with the key or the value quoted or not. (A quoted key is also refused
+    /// outright by the plain-YAML test; it is still read here, so the two tests do not depend on
+    /// each other.)
     /// </summary>
     private static IEnumerable<string> Uses(string line) =>
-        Regex.Matches(line, @"\buses:\s*['""]?(?<ref>[^\s'"",}]+)")
+        Regex.Matches(line, @"(?<![A-Za-z0-9_-])['""]?uses['""]?\s*:\s*['""]?(?<ref>[^\s'"",}]+)")
             .Select(match => match.Groups["ref"].Value);
 
     /// <summary>
     /// The indexes of lines that are YAML, not the body of a block scalar (`key: |`, `key: >-`,
     /// `- |`). A block scalar's body is every following line that is blank or indented deeper than
-    /// the line that opened it.
+    /// the KEY that opened it: for `- key: |` that is the key's column, not the dash's, because a
+    /// line at the key's column is a sibling key of the same mapping (QA round 4). Used only to
+    /// scope the backslash rule; every other rule applies to every line.
     /// </summary>
     private static IEnumerable<int> OutsideBlockScalars(IReadOnlyList<string> lines)
     {
@@ -315,7 +339,9 @@ public class PublishingWorkflowTests
 
             if (Regex.IsMatch(line, @"(:|^\s*-)\s*[|>][-+0-9]*\s*$"))
             {
-                blockIndent = indent;
+                // `- key: |` opens a block owned by `key`, whose column is past the dash.
+                var sequenceItemKey = Regex.Match(line, @"^\s*-\s+(?=\S+\s*:)");
+                blockIndent = sequenceItemKey.Success ? sequenceItemKey.Length : indent;
             }
 
             yield return index;

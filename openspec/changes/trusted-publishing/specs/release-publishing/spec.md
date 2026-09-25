@@ -150,9 +150,9 @@ the workflow uses SHALL be referenced by a full commit identifier.
   - grants all permissions;
   - omits its workflow-level permissions;
   - references an action by anything but a full commit identifier;
-  - or, outside its shell script bodies, uses a quoted key, an escape sequence, an anchor, an alias
-    or a merge key — the forms a text reading of the file cannot see through, and which are
-    therefore refused rather than interpreted;
+  - or uses, on any line (shell script bodies included), a quoted key, an anchor, an alias or a
+    merge key, or, outside its shell script bodies, an escape sequence. These are the forms a text
+    reading of the file cannot see through, and so they are refused rather than interpreted;
 
   or the publishing step uses any action beyond those that fetch the verified packages, set up
   the SDK and exchange the token, invokes git or gh, or references the repository's own addresses
