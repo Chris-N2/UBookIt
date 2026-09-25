@@ -120,21 +120,61 @@
 
 ## 6. The 18 line
 
-- [ ] 6.1 After QA approval, merge to `main` by PR with a merge commit (Chris). On a branch from
+- [x] 6.1 After QA approval, merge to `main` by PR with a merge commit (Chris). On a branch from
   `dev/v18`, **first** port `The_bound_admits_this_major_and_excludes_the_next` verbatim with its
   `using System.Globalization;` and `using System.Text.RegularExpressions;` lines (D4). QA
   round 1 found that the cherry-pick otherwise conflicts, because its hunk's context is that test,
   and fails to compile, because the new guard needs `Regex`. Verify: it passes on `dev/v18`. Then
   set one library's Umbraco ceiling to `20.0.0` locally, and it fails naming that dependency.
   Revert.
-- [ ] 6.2 Cherry-pick the change's code commit(s) onto that branch. The test file should now apply
+  *Done.* The PR was **#2**, merged as `3eeec9d`. Its CI run on `470eed0` passed every step up to
+  and including strict validation, and failed only *Parity with the other published line*, as
+  expected until dev/v18 carries the props change.
+
+  On branch `marketplace-listing-v18` from `origin/dev/v18` (`6273968`), the port is commit
+  `847f102`. It was spliced from `6d48f59`'s file, and `git diff 6d48f59` of the test file came
+  out **empty** (byte-identical). After a clean dev/v18 build it passed. Widening
+  `Umbraco.Cms.Persistence.EFCore` to `[18.2.0,20.0.0)` failed it: *"UBookIt.Persistence ->
+  Umbraco.Cms.Persistence.EFCore '[18.2.0, 20.0.0)' stops at '20.0.0', not '19.0.0'…"*. Reverted.
+  - **Trap hit:** the first dev/v18 build failed on stale backoffice static-web-asset hashes from
+    main's build, and a "pass" run alongside it came from main's leftover DLL. That result was
+    discarded. I cleared `wwwroot/App_Plugins/UBookItBackoffice` and `obj/Release` and rebuilt
+    with 0 warnings. Every result here is from that clean build.
+  - **Noted, not changed (pre-existing on both lines):** the guard's text for a too-high ceiling
+    says *"A ceiling inside Umbraco N refuses releases this line supports"*, which only describes
+    a too-low one. The detection is right and the explanation is wrong. It is a candidate for the
+    tidy patch.
+- [x] 6.2 Cherry-pick the change's code commit(s) onto that branch. The test file should now apply
   cleanly; resolve by hand if not. Rebuild and verify: the packed `UBookIt` description reads
   "…Umbraco 18…", only `UBookIt` carries the tag, and both new guards pass. Mutate the description
   back to a written "Umbraco 17" on `dev/v18` and watch it fail, then revert.
-- [ ] 6.3 Run the full suites on `dev/v18`. Verify: unit = 1991 + 3 (the two new guards and the
+  *Done.* `fbe36e7` cherry-picked cleanly as `97cb7ee`. Packed on dev/v18, `UBookIt 18.1.0`
+  reads *"A booking system for Umbraco 18: … Requires Umbraco 18 and SQL Server."* Only it carries
+  `umbraco-marketplace`, and the four libraries carry
+  `umbraco booking bookings scheduling reservations`. All three guards pass. With "Umbraco 17"
+  hand-written it failed: *"UBookIt 18.1.0 describes itself as for Umbraco 17."* That is the
+  shipped defect, reproduced and caught. Reverted, and the tree is clean.
+- [x] 6.3 Run the full suites on `dev/v18`. Verify: unit = 1991 + 3 (the two new guards and the
   ported bound guard), and all green. Check that `Directory.Build.props` differs between the lines
   only in `<Version>` (`git diff main dev/v18 -- Directory.Build.props`).
-- [ ] 6.4 Archive on `main`. On `dev/v18`:
+  *Done:*
+  - `CI=true` Release build, 0 warnings.
+  - Unit **1994** (1991 + 3), integration **191**, rendering **1168**, all with 0 skipped.
+    Client **335**. `openspec validate --all --strict`: 26/26.
+  - `git diff marketplace-listing marketplace-listing-v18` over `Directory.Build.props`,
+    `global.json`, `scripts/ci` and `.github/workflows`: only the `<Version>` line.
+  - `UBookIt.csproj` is byte-identical across the lines. `docs/publishing.md` differs by the same
+    32 lines it did before the change (`6d48f59` vs `origin/dev/v18`), which is the known 18-line
+    runbook drift. This change added none.
+- [ ] 6.4 Chris pushes `main` (this record) and fast-forwards `dev/v18` to
+  `marketplace-listing-v18`, both in one sitting, then re-runs main's parity-red run. Verify: the
+  CI runs on both lines are green, parity included. Checked by step through the public API, not
+  just by the run's overall conclusion.
+
+  This comes **before** the archive, because the archive cannot be edited afterwards. Archiving
+  first would leave the record either claiming a CI result nobody had seen or carrying an
+  unticked task forever.
+- [ ] 6.5 Archive on `main`. On `dev/v18`:
   - **merge the two ADDED requirements into dev/v18's own `openspec/specs/packaging/spec.md`**,
     which differs from main's, so it is never copied over;
   - copy the archive folder from `main`, so the change records are byte-identical;
@@ -142,4 +182,4 @@
 
   Verify with `openspec validate --all --strict` on both lines. At release, re-check that
   `publishing.md`'s `17.2.1`/`18.1.1` wording names the versions actually shipped (QA NIT).
-  Chris pushes both lines in one sitting. Verify: both CI runs are green, parity included.
+  Chris pushes both lines again. Verify: both CI runs are green.
