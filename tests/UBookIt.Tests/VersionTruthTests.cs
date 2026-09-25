@@ -618,7 +618,7 @@ public class VersionTruthTests
             + "So a mutation result is evidence only when BOTH hold: the file demonstrably "
             + "changed, and the assembly was built from the source under test."),
 
-        ("openspec/specs/packaging/spec.md", "nuget.org", 6,
+        ("openspec/specs/packaging/spec.md", "nuget.org", 8,
             "Arrived at SYNC, not written by hand — `release-17-0-1`'s requirements moved into "
             + "the main spec and brought the feed's name with them. All five describe what "
             + "nuget.org DOES as a host: it resolves a relative link against the package page, "
@@ -644,7 +644,21 @@ public class VersionTruthTests
             + "on evidence rather than on the behavioural-fact rationale. VERIFIED against "
             + "the feed, not reasoned about: GET .../ubookit/index.json returns 17.0.0, "
             + "17.0.1, 17.1.0, 17.1.1, 17.1.2 and 18.0.0, and those versions do keep the "
-            + "metadata they shipped with — which is the whole reason `17.1.2` exists."),
+            + "metadata they shipped with — which is the whole reason `17.1.2` exists.\n"
+            + "6 -> 8 when `marketplace-listing` synced, on both lines at once, and the guard "
+            + "fired on the archive yet again: both lines' archive commits reached origin red, "
+            + "because the implementing session ran `openspec validate` after the sync and not "
+            + "this suite. The 17 line was fixed by `release-17-2-1`; this is the same edit, "
+            + "written by hand because this entry's prose differs from main's. The seventh, "
+            + "in `A package description names the Umbraco major its line targets`, says a "
+            + "description \"is the first thing nuget.org and the Marketplace show\": what the "
+            + "host DOES, on the behavioural-fact rationale. The eighth, in `Only the package a "
+            + "site installs asks to be listed`, says \"A library version already published "
+            + "keeps its tag, because nuget.org does not allow a pushed version's metadata to "
+            + "be edited\" — a publication claim, allowed on evidence RE-FETCHED for this line "
+            + "on 2026-09-25: the flat container lists 17.0.0-17.2.1, 18.0.0 and 18.1.0 for "
+            + "ubookit.persistence, ubookit.web and ubookit.backoffice; their 17.2.0 and 18.1.0 "
+            + "nuspecs carry `umbraco-marketplace`, and their 17.2.1 nuspecs do not."),
 
         ("docs/publishing.md", "nuget.org", 22,
             "The publishing runbook names the feed as a DESTINATION — what nuget.org will "
