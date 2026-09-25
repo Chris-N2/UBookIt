@@ -194,17 +194,49 @@
 
 - [x] 7.1 Chris pushes the five packages with the API key.
   *Done:* Chris pushed the five `.nupkg` (with their `.snupkg`) on 2026-09-25.
-- [ ] 7.2 Confirm each package on `api.nuget.org/v3-flatcontainer/<id>/index.json`, **per
+- [x] 7.2 Confirm each package on `api.nuget.org/v3-flatcontainer/<id>/index.json`, **per
   package**.
-- [ ] 7.3 Verify the live package page renders its readme, images and links.
+  *Done, per package:* `ubookit`, `ubookit.core`, `ubookit.persistence`, `ubookit.web` and
+  `ubookit.backoffice` all list `17.2.1` on the flat container. Indexing took ~10 min, polled every
+  2 min: 0/5 until 13:53, 1/5 at 13:55, 4/5 at 13:57, 5/5 at 13:59.
+- [x] 7.3 Verify the live package page renders its readme, images and links.
 
+  *Done:* `nuget.org/packages/UBookIt/17.2.1` returns 200. Its rendered readme references 4
+  images and 9 doc links, all pinned to `17.2.1`, with 0 `17.2.0` references and "uBookIt is
+  at `17.2.1`". The live nuspec carries `umbraco-marketplace` and "for Umbraco 17".
 ## 8. Close out, in this order
 
-- [ ] 8.1 Stamp the entry's date once the packages are live.
-- [ ] 8.2 Sibling sweep: sentences this release falsifies, including `docs/publishing.md`'s "until
+- [x] 8.1 Stamp the entry's date once the packages are live.
+  *Done:* the heading is now `## 17.2.1 — 2026-09-25`.
+- [x] 8.2 Sibling sweep: sentences this release falsifies, including `docs/publishing.md`'s "until
   17.2.1/18.1.1" wording (true for this line once live; the 18 half becomes true with `18.1.1`).
   Fix what is falsified, and record the findings here. Record here what `release-18-1-1` must
   carry, including the same `6 → 8` registration.
+  *Done:*
+  - A sweep of `docs/`, `README.md`, `openspec/specs/**` and `CLAUDE.md` for `17.2.0` leaves only
+    the history anchor `publishing.md:282`.
+  - A sweep for `linux|site-relative|PrivacyPolicyUrl|umbraco-marketplace|(LTS)`: every hit is
+    consistent with what shipped (`docs/backoffice.md:293`, the `privacy-notice` requirement
+    and scenarios, the `packaging` Marketplace requirements, and `publishing.md`).
+  - `publishing.md:83` and `:397` ("until `17.2.1`/`18.1.1` … on the meta-package alone") are
+    true for this line now it is live. The 18 half becomes true when `18.1.1` publishes, and
+    `release-18-1-1` verifies it. **Left as is, deliberately.**
+  - Nothing falsified.
+
+  **What `release-18-1-1` must carry:**
+  - the `packaging/spec.md` nuget.org registration `6 → 8`. It is made **by hand**, because
+    dev/v18's `VersionTruthTests` entry differs from main's around that line;
+  - the bump `18.1.0 → 18.1.1` in the README (17 literals), runbook lines 14, 266 and 292–294
+    (line 401 is history), and `<Version>`;
+  - its own entry. The privacy fix is not in `18.1.0` (`9cd14ef` is not an ancestor), and on
+    that line the description change **corrects a shipped defect**: `18.0.0`/`18.1.0` said
+    "for Umbraco 17";
+  - this release's QA lessons:
+    - no category sentence for the refusals;
+    - scope the Linux sentence to a site-relative link;
+    - gate the pack on the merge commit's own run;
+    - check sibling dependency versions;
+    - use the 6.6 recovery.
 - [ ] 8.3 Commit on `main` (D3), run the unit suite, and have Chris push. Verify: `main`'s CI run is
   green at every step.
 - [ ] 8.4 Archive **last**, so that no box it records is still open. **Run the unit suite locally
