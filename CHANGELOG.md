@@ -27,15 +27,16 @@ policy link was missing, the link appears.
 
 ### What changed
 
-The same changes `17.2.1` made on the Umbraco 17 line, plus one that matters more here: **the
+The same changes `17.2.1` made on the Umbraco 17 line. One of them matters more here: **the
 `UBookIt` package now says it is for Umbraco 18.**
 
 **The package description said Umbraco 17.** `18.0.0` and `18.1.0` described themselves in their
 package description as "A booking system for Umbraco 17", requiring "Umbraco 17 (LTS)". The
-dependencies were right: every Umbraco dependency those packages declare requires Umbraco `18.2.0`
-or later and below `19`. The description now takes its Umbraco major from the package's own version
-instead of being written by hand, and it no longer says "(LTS)". Published versions keep their
-description, so `18.0.0` and `18.1.0` go on saying 17. `18.1.1` is the first on this line to say 18.
+dependencies were right: every Umbraco dependency in the `18.0.0` and `18.1.0` packages requires
+Umbraco `18.2.0` or later and below `19`. The description now takes its Umbraco major from the
+package's own version instead of being written by hand, and it no longer says "(LTS)". Published
+versions keep their description, so `18.0.0` and `18.1.0` go on saying 17. `18.1.1` is the first on
+this line to say 18.
 
 **A site-relative privacy policy link now works on Linux.** Setting `UBookIt:PrivacyPolicyUrl` to
 a path on your own site, such as `/privacy`, which is the form the backoffice documentation gives,
@@ -61,9 +62,10 @@ its signature. **A value already stored stays stored**, and your pages look exac
 without that link. Settings are saved one at a time, so it does not stop you saving anything else.
 You will only see the message if you edit that setting.
 
-**Only the `UBookIt` package asks to be listed on the Umbraco Marketplace now.** Up to `18.1.0`,
-every uBookIt package carried the Marketplace's tag, so `UBookIt.Persistence`, `UBookIt.Web` and
-`UBookIt.Backoffice` each had a listing of their own. Installing one of them gives you part of
+**Only the `UBookIt` package asks to be listed on the Umbraco Marketplace now.** On this line,
+`18.0.0` and `18.1.0` tagged every uBookIt package for the Marketplace, and every release on the 17
+line before `17.2.1` tagged the libraries too. `UBookIt.Persistence`, `UBookIt.Web` and
+`UBookIt.Backoffice` each got a listing of their own. Installing one of them gives you part of
 uBookIt, and the part left out fails silently. Install `UBookIt`. Versions already published keep
 their tag, so whether those three listings disappear is up to the Marketplace.
 

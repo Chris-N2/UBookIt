@@ -80,6 +80,17 @@
 ## 5. Review and merge
 
 - [ ] 5.1 QA review in a subagent, reused across rounds.
+  *Round 1: REJECT* on `09121b1`.
+  - **MAJOR:** "Up to `18.1.0`, every uBookIt package carried the tag" is false. `17.2.1` sorts
+    before `18.1.0` and is untagged. True on this line, false in general.
+  - **MINOR:** "plus one that matters more here" counted as extra a change `17.2.1` already
+    made.
+  - **NIT:** "those packages declare" read as the meta-package, which has no Umbraco dependency.
+  - **Plan NIT:** 6.3 should also check "(LTS)" is gone.
+
+  All four fixed. The implementer then re-read the MAJOR's replacement as a claim and removed a
+  causal "so": the library listings also came from every 17.x release before `17.2.1`, verified
+  on the feed for the three libraries at 17.0.0–17.1.2.
 - [ ] 5.2 Chris pushes the branch and opens a PR into `dev/v18`. Verify: the PR run is green at
   every step, parity included.
 - [ ] 5.3 Merged with a merge commit. `origin/dev/v18` = local `dev/v18` = the merge commit.
@@ -96,7 +107,8 @@
   - **every `UBookIt.*` dependency is `18.1.1`**;
   - every `Umbraco.Cms.*` dependency is `[18.2.0, 19.0.0)`;
   - `umbraco-marketplace` on `UBookIt` alone;
-  - `UBookIt`'s description says **Umbraco 18**.
+  - `UBookIt`'s description says **Umbraco 18** and does **not** say "(LTS)", as the entry claims
+    (QA round 1).
 - [ ] 6.4 SourceLink resolves to the merge commit, and a sample source file returns 200.
 - [ ] 6.5 README extracted from the packages: one hash, no relative links, everything pinned to
   `18.1.1`, "is at `18.1.1`". After the tag is pushed, every URL returns 200 (retry a 503), and
