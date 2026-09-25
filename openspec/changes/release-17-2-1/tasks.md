@@ -111,24 +111,38 @@
     site-relative privacy policy link", in QA's wording.
   - The record: this task's round-3 bullet said QA measured "every" value. That is corrected to
     a sample plus reasoning.
-- [ ] 5.2 Chris pushes the branch and opens the PR into `main`. Verify: the PR's CI run is green
+- [x] 5.2 Chris pushes the branch and opens the PR into `main`. Verify: the PR's CI run is green
   **at every step, parity included** (D2), read through the API.
-- [ ] 5.3 Chris merges with **"Create a merge commit"**. Fetch, and verify `origin/main`'s tip is
+  *Done:* PR **#3**. Run `36135686155` on `e57288f` was success at every step, **parity
+  included**, read through the API. D2's prediction held.
+- [x] 5.3 Chris merges with **"Create a merge commit"**. Fetch, and verify `origin/main`'s tip is
   the merge commit and the local `main` equals it.
 
+  *Done:* merged as **`6f0da77`** with a merge commit. After a fetch, `origin/main` = local
+  `main` = `6f0da77`.
 ## 6. Tag, pack and verify, from the merge commit
 
-- [ ] 6.1 On `main` at the merge commit, with a clean tree: `git branch -r --contains HEAD` lists
+- [x] 6.1 On `main` at the merge commit, with a clean tree: `git branch -r --contains HEAD` lists
   `origin/main`. **The merge commit's own `ci` push run on `main` must be green at every step**,
   read through the API. The PR's run tested GitHub's synthetic merge ref, not this SHA, so the
   commit we pack has to be CI-verified in its own right (QA round 1). Tag `17.2.1` and have it
   pushed. Verify
   `curl -sI https://raw.githubusercontent.com/Chris-N2/UBookIt/17.2.1/docs/images/booking-flow.png`
   returns 200.
-- [ ] 6.2 Delete prior build output again (4.1's list), then `dotnet build -c Release
+  *Done:*
+  - `git branch -r --contains 6f0da77` lists `origin/main`.
+  - The merge commit's own push run, `36136147859`, was success at every step, parity included.
+    `main` is green again, after being red since `d3fe838`.
+  - Tag `17.2.1` was created on `6f0da77` and pushed by Chris. `git ls-remote` shows
+    `6f0da775… refs/tags/17.2.1`.
+  - The `curl` of `booking-flow.png` at the tag returned 200 (in the 6.5 sweep).
+- [x] 6.2 Delete prior build output again (4.1's list), then `dotnet build -c Release
   --no-incremental` and `dotnet pack UBookIt.slnx -c Release`. Verify exactly one `.nupkg` per id,
   all `17.2.1`.
-- [ ] 6.3 Read each of the five nuspecs, not one:
+  *Done:* no TestSite running and no leftover `.nupkg`. The 4.1 outputs were deleted, then a
+  `CI=true` build with `--no-incremental` (0 warnings) and `dotnet pack`. Result: exactly five
+  `.nupkg` and four `.snupkg`, all `17.2.1`.
+- [x] 6.3 Read each of the five nuspecs, not one:
   - version, publisher, icon, readme and licence;
   - every `Umbraco.Cms.*` dependency bounded `[17.6.2, 18.0.0)`;
   - **every `UBookIt.*` dependency names `17.2.1`** (QA round 1). A stale sibling version would
@@ -136,13 +150,36 @@
     for;
   - `umbraco-marketplace` on `UBookIt` alone;
   - `UBookIt`'s description names Umbraco 17.
-- [ ] 6.4 SourceLink: the four `.snupkg`/`sourcelink.json` resolve to the tagged merge commit on
+  *Done:* all five read.
+  - Every package: publisher `Norwood Design & Development Ltd.`, licence MIT, and `icon.png` and
+    `README.md` declared **and present** in the zip. Repository commit `6f0da77`.
+  - Sibling dependencies:
+    - `UBookIt` → Backoffice 17.2.1 and Web 17.2.1
+    - Backoffice → Core 17.2.1 and Persistence 17.2.1
+    - Persistence → Core 17.2.1
+    - Web → Core 17.2.1
+  - Every `Umbraco.Cms.*` dependency is `[17.6.2, 18.0.0)`.
+  - `umbraco-marketplace` is on `UBookIt` only, and its description says "for Umbraco 17 …
+    Requires Umbraco 17 and SQL Server."
+- [x] 6.4 SourceLink: the four `.snupkg`/`sourcelink.json` resolve to the tagged merge commit on
   the public repository.
-- [ ] 6.5 Read the README **out of the `.nupkg`**: no relative links, every link and image pinned
+  *Done:* the `sourcelink.json` of all four assemblies maps to
+  `raw.githubusercontent.com/Chris-N2/UBookIt/6f0da775…/*`. A sample file
+  (`src/UBookIt.Core/UBookIt.Core.csproj`) fetched through it returned 200.
+- [x] 6.5 Read the README **out of the `.nupkg`**: no relative links, every link and image pinned
   to `17.2.1`, and "uBookIt is at `17.2.1`". Fetch every link and image address in it. Verify each
   returns 200, retrying a 503 before recording anything.
 
-- [ ] 6.6 **If 6.2–6.5 find a defect that needs a commit, nothing is pushed to nuget.org.**
+  *Done:*
+  - The README was extracted from all five packages, and there is one distinct hash.
+  - 0 relative links. Every repository address is pinned to `17.2.1`, and it says "uBookIt is
+    at `17.2.1`".
+  - 14 unique addresses: 9 doc links, 4 images and the publisher site. The file contains exactly
+    14 URLs, and there are no HTML or reference-style links.
+  - After the tag push, **all 14 returned 200 on the first attempt**.
+  - The one fragment, `#accessibility-what-we-hold-and-what-becomes-yours`, matches GitHub's slug
+    of `### Accessibility: what we hold, and what becomes yours` at `17.2.1:docs/booking-page.md:294`.
+- [x] 6.6 **If 6.2–6.5 find a defect that needs a commit, nothing is pushed to nuget.org.**
   Recovery:
   1. Delete the tag locally and on origin (`git tag -d 17.2.1`,
      `git push origin :refs/tags/17.2.1`). That is safe while no package references it.
@@ -152,9 +189,11 @@
 
   Verify: either nothing was found, or the recovery happened and is recorded here. (QA round 1.)
 
+  *Not needed:* 6.2–6.5 found nothing.
 ## 7. Publish
 
-- [ ] 7.1 Chris pushes the five packages with the API key.
+- [x] 7.1 Chris pushes the five packages with the API key.
+  *Done:* Chris pushed the five `.nupkg` (with their `.snupkg`) on 2026-09-25.
 - [ ] 7.2 Confirm each package on `api.nuget.org/v3-flatcontainer/<id>/index.json`, **per
   package**.
 - [ ] 7.3 Verify the live package page renders its readme, images and links.
