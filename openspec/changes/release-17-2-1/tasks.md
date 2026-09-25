@@ -74,8 +74,22 @@
     - check `UBookIt.*` sibling dependency versions (6.3);
     - an explicit recovery if verification finds a defect after the tag is pushed (6.6).
 
-  All five were fixed in the round-2 commit. QA confirmed all five handover claims by running
+  Round-2 commit `734ae7b` addressed all five. QA confirmed all five handover claims by running
   them, apart from the refuted parts of claim 4.
+
+  *Round 2: REJECT* on `734ae7b`.
+  - The MAJOR and the three plan MINORs were verified fixed. QA measured on Windows that
+    `/privacy` is not absolute there, and read that Linux has no route to rendering a
+    site-relative link at `17.2.0`.
+  - **But the refusal-category rewrite made a new false generalisation**: `mailto:`, `tel:`,
+    `ftp:` and `file:` are refused, yet they neither run script nor disguise an off-site link.
+    The rule is an allow-list, so no single "because" is true. Any category sentence fails on
+    `https://other.example` (round 1) or on `mailto:` (round 2).
+  - Fix: drop the category and state the list, plus the one reason that is true
+    (`javascript:`).
+  - This record's earlier line "All five were fixed in the round-2 commit" was written before
+    review and was not true of the category MINOR. It is corrected here rather than left
+    standing (QA NIT).
 - [ ] 5.2 Chris pushes the branch and opens the PR into `main`. Verify: the PR's CI run is green
   **at every step, parity included** (D2), read through the API.
 - [ ] 5.3 Chris merges with **"Create a merge commit"**. Fetch, and verify `origin/main`'s tip is
