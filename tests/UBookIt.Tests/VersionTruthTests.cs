@@ -660,6 +660,20 @@ public class VersionTruthTests
             + "ubookit.persistence, ubookit.web and ubookit.backoffice; their 17.2.0 and 18.1.0 "
             + "nuspecs carry `umbraco-marketplace`, and their 17.2.1 nuspecs do not."),
 
+        ("openspec/specs/release-publishing/spec.md", "nuget.org", 13,
+            "Arrived at SYNC when `trusted-publishing` created this capability, and the guard fired "
+            + "on the archive, as it has at every sync that carried the feed's name. This time it "
+            + "fired before the archive commit, because the suite was run after the sync. Judged "
+            + "one by one. EIGHT name nuget.org as the DESTINATION or HOST of the procedure the "
+            + "spec defines: where a release goes, the credential for it, the Trusted Publishing "
+            + "policy on it, and leaving it untouched when a check fails. FOUR are CONDITIONS, "
+            + "not assertions: packages being on nuget.org is the premise of the re-run "
+            + "requirement and its scenarios, and a search for a nuget.org API key is a scenario. "
+            + "ONE is BEHAVIOURAL: the token exchange being unavailable. None states that any "
+            + "version has been published, which is the distinction this guard exists to draw. "
+            + "The count is exact, so a later requirement cannot bring in a publication claim "
+            + "under an allowance granted for these."),
+
         ("docs/publishing.md", "nuget.org", 23,
             "The publishing runbook names the feed as a DESTINATION — what nuget.org will "
             + "not let you undo, where the API key lives, which source to push to, how to "
