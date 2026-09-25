@@ -64,6 +64,18 @@
 ## 5. Review and merge
 
 - [ ] 5.1 QA review in a subagent (`qa-review`), reused across rounds.
+  *Round 1: REJECT* on `fe30b10`.
+  - **MAJOR:** the entry said the booking form "has always accepted" a site-relative link,
+    directly under the paragraph saying Linux refused it.
+  - **MINOR:** "lead off-site" misnamed the refusal category, since an absolute
+    `https://other.example` is off-site and accepted.
+  - **Three plan MINORs:**
+    - gate the pack on the merge commit's own push run, not the PR's synthetic merge ref (6.1);
+    - check `UBookIt.*` sibling dependency versions (6.3);
+    - an explicit recovery if verification finds a defect after the tag is pushed (6.6).
+
+  All five were fixed in the round-2 commit. QA confirmed all five handover claims by running
+  them, apart from the refuted parts of claim 4.
 - [ ] 5.2 Chris pushes the branch and opens the PR into `main`. Verify: the PR's CI run is green
   **at every step, parity included** (D2), read through the API.
 - [ ] 5.3 Chris merges with **"Create a merge commit"**. Fetch, and verify `origin/main`'s tip is
@@ -72,7 +84,10 @@
 ## 6. Tag, pack and verify, from the merge commit
 
 - [ ] 6.1 On `main` at the merge commit, with a clean tree: `git branch -r --contains HEAD` lists
-  `origin/main`. Tag `17.2.1` and have it pushed. Verify
+  `origin/main`. **The merge commit's own `ci` push run on `main` must be green at every step**,
+  read through the API. The PR's run tested GitHub's synthetic merge ref, not this SHA, so the
+  commit we pack has to be CI-verified in its own right (QA round 1). Tag `17.2.1` and have it
+  pushed. Verify
   `curl -sI https://raw.githubusercontent.com/Chris-N2/UBookIt/17.2.1/docs/images/booking-flow.png`
   returns 200.
 - [ ] 6.2 Delete prior build output again (4.1's list), then `dotnet build -c Release
@@ -81,6 +96,9 @@
 - [ ] 6.3 Read each of the five nuspecs, not one:
   - version, publisher, icon, readme and licence;
   - every `Umbraco.Cms.*` dependency bounded `[17.6.2, 18.0.0)`;
+  - **every `UBookIt.*` dependency names `17.2.1`** (QA round 1). A stale sibling version would
+    freeze a meta-package that installs `17.2.0` libraries, without the fix this release exists
+    for;
   - `umbraco-marketplace` on `UBookIt` alone;
   - `UBookIt`'s description names Umbraco 17.
 - [ ] 6.4 SourceLink: the four `.snupkg`/`sourcelink.json` resolve to the tagged merge commit on
@@ -88,6 +106,16 @@
 - [ ] 6.5 Read the README **out of the `.nupkg`**: no relative links, every link and image pinned
   to `17.2.1`, and "uBookIt is at `17.2.1`". Fetch every link and image address in it. Verify each
   returns 200, retrying a 503 before recording anything.
+
+- [ ] 6.6 **If 6.2–6.5 find a defect that needs a commit, nothing is pushed to nuget.org.**
+  Recovery:
+  1. Delete the tag locally and on origin (`git tag -d 17.2.1`,
+     `git push origin :refs/tags/17.2.1`). That is safe while no package references it.
+  2. Fix through a PR.
+  3. Re-tag the new merge commit once its own push run is green.
+  4. Redo 6.1–6.5 in full.
+
+  Verify: either nothing was found, or the recovery happened and is recorded here. (QA round 1.)
 
 ## 7. Publish
 

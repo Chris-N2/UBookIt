@@ -34,12 +34,13 @@ startup logged an error saying the value could not be used. Windows hosts were u
 cause was that .NET on Linux reads `/privacy` as a `file:` address, and the package accepts only
 `http` and `https` addresses. A site-relative path is now judged as a path on every platform.
 Nothing that used to be refused as unsafe is accepted now. Refused values are still the ones that
-lead off-site or run script: `//host`, a backslash, a control character, and every scheme except
-`http` and `https`.
+disguise an off-site link as a local one or run script: `//host`, a backslash, a control character,
+and every scheme except `http` and `https`.
 
 **The settings screen accepts a site-relative policy link.** It used to insist on an absolute
-address, although the booking form has always accepted a site-relative one. So a site could set
-the documented form only through configuration.
+address on every platform, even where the booking form accepted a site-relative one, which was
+on Windows hosts. So a Windows site could set the documented form only through configuration, and
+a Linux site could not use it at all.
 
 **The settings screen also now refuses something it used to accept.** It stored an absolute
 `http` or `https` address containing a backslash or a control character, such as
