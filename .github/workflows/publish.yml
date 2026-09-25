@@ -1,0 +1,311 @@
+# Publishes a release to nuget.org by Trusted Publishing. Push the tag; approve the run.
+#
+# This file, like every file under .github/, is held IDENTICAL on main and dev/v18 (ci.yml's parity
+# step fails when it is not). One file name on both lines means ONE nuget.org Trusted Publishing
+# policy serves both. That policy names this file (publish.yml) and the environment (release), so
+# renaming either breaks the token exchange at release time, and nowhere sooner. The setup
+# outside the repository is recorded in docs/publishing.md under "Trusted Publishing setup".
+#
+# Three jobs, and the credential exists only in the last:
+#   check    read-only. scripts/ci/Assert-ReleaseTag.ps1: the tag is the declared <Version>, is
+#            on the published line with that major, and ci succeeded for a push of that commit to
+#            that line. It waits for a ci run still in progress.
+#   pack     read-only. Packs the tagged commit from a clean clone, then
+#            scripts/ci/Assert-PackedRelease.ps1 verifies the package set, versions, repository
+#            commit and SourceLink before anything can be published.
+#   publish  environment `release` (a maintainer must approve). The ONLY job in the repository
+#            with id-token: write. It never checks out the repository, so no script, build logic or
+#            dependency from it runs while the one-hour key exists.
+#
+# A DRY RUN (Actions tab -> publish -> Run workflow, with an existing tag) runs check and pack
+# against that tag and never reaches publish. Because the scripts come from the checkout the run
+# started from (the first checkout below), a tag older than this file can still be dry-run.
+#
+# Third-party actions are pinned to full commit SHAs; the tag in the trailing comment is what the
+# SHA was resolved from. Update both together.
+
+name: publish
+
+on:
+  push:
+    # Release tags only: <major>.<minor>.<patch>. The check job re-tests the shape with an
+    # anchored match, because a filter is not one.
+    tags: ['[0-9]+.[0-9]+.[0-9]+']
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: 'Existing release tag to dry-run (checks and pack only; never publishes)'
+        required: true
+        type: string
+
+permissions:
+  contents: read
+
+env:
+  DOTNET_NOLOGO: 'true'
+  DOTNET_CLI_TELEMETRY_OPTOUT: 'true'
+  # The release tag: pushed, or named for a dry run. Always read through this variable, never
+  # interpolated into a script, because a dispatch input is free text.
+  TAG: ${{ github.event_name == 'workflow_dispatch' && inputs.tag || github.ref_name }}
+
+concurrency:
+  # One run per tag at a time, and a RUNNING one is never cancelled, so a publish is never
+  # interrupted halfway. Not "none cancelled": GitHub keeps one PENDING run per group, so a newer
+  # run for the same tag replaces an older one still waiting to start (see ci.yml's comment).
+  group: publish-${{ github.event_name == 'workflow_dispatch' && inputs.tag || github.ref_name }}
+  cancel-in-progress: false
+
+jobs:
+  check:
+    runs-on: ubuntu-24.04
+    # Longer than the script's own 60-minute wait for ci, so the script's message is what a
+    # timeout looks like.
+    timeout-minutes: 75
+    permissions:
+      contents: read
+      actions: read # to read ci's runs for the tagged commit
+    outputs:
+      sha: ${{ steps.check.outputs.sha }}
+      line: ${{ steps.check.outputs.line }}
+
+    steps:
+      - name: Check out the release scripts
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - name: Check out the release, with full history
+        # Full history and every branch: the checks compare the tag against the published lines'
+        # tips (origin/main, origin/dev/v18).
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: refs/tags/${{ env.TAG }}
+          path: release
+          fetch-depth: 0
+          persist-credentials: false
+
+      - name: The tag names a verified commit on its line, at its declared version
+        id: check
+        shell: pwsh
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
+        run: ./scripts/ci/Assert-ReleaseTag.ps1 -Tag "$env:TAG" -ReleaseRoot release -Repository "${{ github.repository }}"
+
+  pack:
+    needs: check
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+    permissions:
+      contents: read
+
+    env:
+      CLIENT_DIR: release/src/UBookIt.Backoffice/Client
+      PACKAGES_DIR: ${{ github.workspace }}/packages
+
+    steps:
+      - name: Check out the release scripts
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - name: Check out the release, by the commit the check job verified
+        # By SHA, not by tag: a tag moved between the two jobs cannot change what is packed.
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: ${{ needs.check.outputs.sha }}
+          path: release
+          persist-credentials: false
+
+      - name: Set up .NET (from the release's global.json)
+        uses: actions/setup-dotnet@a98b56852c35b8e3190ac28c8c2271da59106c68 # v6.0.0
+        with:
+          global-json-file: release/global.json
+
+      - name: Set up Node
+        uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: release/src/UBookIt.Backoffice/Client/package-lock.json
+
+      - name: Client - install
+        working-directory: ${{ env.CLIENT_DIR }}
+        run: npm ci
+
+      - name: Pack (Release; warnings are errors because CI=true)
+        # ContinuousIntegrationBuild here and NOT in Directory.Build.props: it makes the PDBs'
+        # embedded paths deterministic (/_/...), which is right for a published package and
+        # wrong for a local build a debugger is attached to.
+        run: >-
+          dotnet pack release/UBookIt.slnx
+          --configuration Release
+          -p:ContinuousIntegrationBuild=true
+          --output "${{ env.PACKAGES_DIR }}"
+
+      - name: The packed release is exactly what should be published
+        shell: pwsh
+        run: >-
+          ./scripts/ci/Assert-PackedRelease.ps1
+          -PackagesDirectory "${{ env.PACKAGES_DIR }}"
+          -ReleaseRoot release
+          -Tag "$env:TAG"
+          -Sha "${{ needs.check.outputs.sha }}"
+          -Repository "${{ github.repository }}"
+
+      - name: Keep the verified packages for the publish job
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: packages
+          path: ${{ env.PACKAGES_DIR }}/*
+          if-no-files-found: error
+          retention-days: 7
+          # A re-run of this job replaces the artifact with its own freshly verified pack, rather
+          # than failing on the name or leaving an earlier attempt's files to be published.
+          overwrite: true
+
+  publish:
+    needs: [check, pack]
+    # A dry run never gets here, and so never asks for approval or a credential.
+    if: ${{ github.event_name == 'push' }}
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    # The approval gate. Its protection rules (required reviewer, tags matching *.*.* only) live
+    # in the repository settings, and the nuget.org policy names this environment.
+    environment: release
+    permissions:
+      id-token: write # the Trusted Publishing exchange, and nothing else
+
+    # NO CHECKOUT, deliberately. Everything below is this file's own steps and pinned actions.
+
+    env:
+      PACKAGES_DIR: ${{ github.workspace }}/packages
+      NUGET_SOURCE: https://api.nuget.org/v3/index.json
+      # The account that owns every uBookIt package on nuget.org, and so the owner of the Trusted
+      # Publishing policy. A profile name, not a secret.
+      NUGET_USER: CNorwood69
+      # Pushed LAST, after the libraries it depends on, so it is never briefly uninstallable.
+      META_PACKAGE: UBookIt
+      # The push step classifies the CLI's own messages, so they must be the English ones.
+      DOTNET_CLI_UI_LANGUAGE: en
+
+    steps:
+      - name: Fetch the verified packages
+        uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
+        with:
+          name: packages
+          path: ${{ env.PACKAGES_DIR }}
+
+      - name: Set up .NET
+        # No global.json without a checkout. `dotnet nuget push` does not depend on the SDK band.
+        uses: actions/setup-dotnet@a98b56852c35b8e3190ac28c8c2271da59106c68 # v6.0.0
+        with:
+          dotnet-version: 10.0.x
+
+      - name: Order the push - libraries first, the meta-package last (no credential yet)
+        id: order
+        shell: bash
+        run: |
+          set -euo pipefail
+          libraries=()
+          meta=''
+          for nupkg in "$PACKAGES_DIR"/*.nupkg; do
+            file="$(basename "$nupkg")"
+            id="${file%".$TAG.nupkg"}"
+            if [ "$id" = "$file" ]; then
+              echo "::error title=Push order::$file does not carry the version $TAG."
+              exit 1
+            fi
+            if [ "$id" = "$META_PACKAGE" ]; then meta="$id"; else libraries+=("$id"); fi
+          done
+          if [ -z "$meta" ]; then
+            echo "::error title=Push order::$META_PACKAGE.$TAG.nupkg is not among the verified packages."
+            exit 1
+          fi
+          echo "order=${libraries[*]} $meta" >> "$GITHUB_OUTPUT"
+
+      - name: Log in to nuget.org (OIDC -> one-hour API key)
+        # Immediately before the push: the key lasts one hour, and each token is exchanged once.
+        id: login
+        uses: NuGet/login@8d196754b4036150537f80ac539e15c2f1028841 # v1.2.0
+        with:
+          user: ${{ env.NUGET_USER }}
+
+      - name: Push each package, then its symbols, and say which were new
+        # WHY EACH FILE ON ITS OWN, AND WHY THE OUTPUT IS READ. Observed against a real feed with
+        # the real CLI (QA round 1 asked for exactly that, not a stub):
+        #   - with --skip-duplicate a 409 exits 0 and prints "already exists at feed"; only a new
+        #     package prints "Your package was pushed." So the exit code alone cannot tell a
+        #     publish from a no-op, and a re-run of a finished release would report success.
+        #   - pushing a .nupkg that ALREADY EXISTS never even attempts its sibling .snupkg. So a
+        #     release whose package landed but whose symbols failed could never be repaired by
+        #     pushing the pair together. The .snupkg is therefore pushed by itself, every time.
+        # nuget.org is NOT consulted beforehand. Its flat container lags a push by the whole
+        # validation window, which is exactly when a re-run after a partial failure happens.
+        # Anything but the messages below fails the step, rather than being guessed at.
+        #
+        # ONLY A .nupkg CAN BE "NEWLY PUBLISHED" (QA round 2). nuget.org documents that "symbol
+        # packages with the same ID and version can be submitted multiple times": a resubmitted
+        # .snupkg answers 201 exactly like a new one, and 409 only while an earlier one is not
+        # yet available. So a symbol push's answer cannot tell new from resubmitted. It is
+        # reported as *submitted* (or *pending*), never as *published*, and it never counts
+        # towards "something was published". A run whose packages were all already present
+        # fails, even when its symbol pushes were accepted. It cannot know whether they repaired
+        # anything, so it does not claim to have.
+        shell: bash
+        env:
+          NUGET_API_KEY: ${{ steps.login.outputs.NUGET_API_KEY }}
+          ORDER: ${{ steps.order.outputs.order }}
+        run: |
+          set -euo pipefail
+          read -r -a ids <<< "$ORDER"
+          new_packages=0
+          symbols_submitted=0
+
+          {
+            echo "## $TAG"
+            echo "| File | Result |"
+            echo "|---|---|"
+          } >> "$GITHUB_STEP_SUMMARY"
+
+          # push_one <file> <label if accepted> <label if it already exists> [push options...]
+          # Sets $accepted to 1 when the feed accepted the file, 0 when it already had it.
+          push_one() {
+            local file="$1" on_accept="$2" on_exists="$3" name out code
+            shift 3
+            name="$(basename "$file")"
+            set +e
+            out="$(dotnet nuget push "$file" "$@" --api-key "$NUGET_API_KEY" --source "$NUGET_SOURCE" --skip-duplicate 2>&1)"
+            code=$?
+            set -e
+            printf '%s\n' "$out"
+            if [ "$code" -ne 0 ]; then
+              echo "| \`$name\` | **refused** |" >> "$GITHUB_STEP_SUMMARY"
+              echo "::error title=Push::nuget.org refused $name (exit $code). See the output above."
+              exit 1
+            elif grep -qF 'Your package was pushed.' <<< "$out"; then
+              echo "| \`$name\` | $on_accept |" >> "$GITHUB_STEP_SUMMARY"
+              accepted=1
+            elif grep -qF 'already exists at feed' <<< "$out"; then
+              echo "| \`$name\` | $on_exists |" >> "$GITHUB_STEP_SUMMARY"
+              accepted=0
+            else
+              echo "| \`$name\` | **unrecognised** |" >> "$GITHUB_STEP_SUMMARY"
+              echo "::error title=Push::The push of $name exited 0 but said neither 'pushed' nor 'already exists'. Whether it was published is unknown."
+              exit 1
+            fi
+          }
+
+          for id in "${ids[@]}"; do
+            push_one "$PACKAGES_DIR/$id.$TAG.nupkg" 'published' 'already present' --no-symbols
+            new_packages=$((new_packages + accepted))
+            if [ -f "$PACKAGES_DIR/$id.$TAG.snupkg" ]; then
+              push_one "$PACKAGES_DIR/$id.$TAG.snupkg" 'symbols submitted' 'symbols pending (an earlier submission is not yet available)'
+              symbols_submitted=$((symbols_submitted + accepted))
+            fi
+          done
+
+          if [ "$new_packages" -eq 0 ]; then
+            echo "::error title=Nothing published::Every package of $TAG was already on nuget.org, so this run published nothing. $symbols_submitted symbol package(s) were (re)submitted; nuget.org does not say whether that was new, so check the package page's symbols if you re-ran to repair them."
+            exit 1
+          fi
+          echo "$new_packages package(s) newly published; $symbols_submitted symbol package(s) submitted."
