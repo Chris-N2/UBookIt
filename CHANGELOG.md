@@ -17,7 +17,7 @@ a patch. See [the versioning note](README.md#what-the-version-number-means).
 
 ---
 
-## 18.1.1
+## 18.1.1 — 2026-09-25
 
 ### What you have to do
 

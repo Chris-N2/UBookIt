@@ -162,15 +162,30 @@
 
 - [x] 7.1 Chris pushes the five packages.
   *Done:* Chris pushed the five packages on 2026-09-25.
-- [ ] 7.2 The flat container lists `18.1.1`, checked **per package**.
-- [ ] 7.3 The live page renders the pinned images and links. The live `UBookIt` nuspec says
+- [x] 7.2 The flat container lists `18.1.1`, checked **per package**.
+  *Done, per package:* all five list `18.1.1`. Polled every 2 min: 0/5 at 14:57 and 14:59,
+  2/5 at 15:01, 5/5 at 15:03. Live nuspecs: `umbraco-marketplace` on `ubookit` only (1), and 0
+  on core, persistence, web and backoffice.
+- [x] 7.3 The live page renders the pinned images and links. The live `UBookIt` nuspec says
   Umbraco 18.
 
+  *Done:* `nuget.org/packages/UBookIt/18.1.1` renders 4 images and 9 doc links, all pinned to
+  `18.1.1`, with 0 `18.1.0` references and "uBookIt is at `18.1.1`". The live nuspec description
+  says "A booking system for Umbraco 18".
 ## 8. Close out
 
-- [ ] 8.1 Stamp the date.
-- [ ] 8.2 Sibling sweep. Include `publishing.md:83`/`:397`, which are now true on both lines, and
+- [x] 8.1 Stamp the date.
+  *Done:* the heading is now `## 18.1.1 — 2026-09-25`.
+- [x] 8.2 Sibling sweep. Include `publishing.md:83`/`:397`, which are now true on both lines, and
   record what was found.
+  *Done:*
+  - Only the history anchors (`publishing.md:401`, `packaging/spec.md:1022`) still say `18.1.0`.
+  - `publishing.md:83`/`:397` ("until `17.2.1`/`18.1.1` … on the meta-package alone") are now
+    **true on both lines**. The live 17.2.1 and 18.1.1 nuspecs tag only `ubookit`.
+  - `publishing.md:81` ("still lists three libraries … not yet been seen") is left for the
+    post-release Marketplace check, a recorded obligation.
+  - The privacy and Marketplace prose was swept identically to `release-17-2-1` 8.2, and nothing
+    is falsified on this line.
 - [ ] 8.3 Commit, run the unit suite, and Chris pushes. Verify: `dev/v18`'s run is green at every
   step.
 - [ ] 8.4 Archive **last**, and run the unit suite locally before the push. The CI for that push
