@@ -335,11 +335,14 @@ anchors: the model shares an aliased node, so refusing anchors means no alias ca
 `<<` merge keys, which the model does not apply. More than one document is refused too. The
 round-3/4 text rules survive only as a **backstop** against GitHub's parser and YamlDotNet ever
 disagreeing: no quoted keys or anchors/aliases/merge keys on any line, and no backslash outside a
-block scalar. A precedent exists: AngleSharp is already a test-only parser here, for the same
+block scalar. *(Round 6:)* tags are refused in the tree too. The git/gh check is stated as
+what it is, a check that git or gh is NAMED as a command word, after `=`, quotes or a path
+separator, and before a word boundary. Whether shell *invokes* git cannot be decided from text
+(`g''it`, base64, eval), so indirect invocation rests on review, and the spec says so. A precedent exists: AngleSharp is already a test-only parser here, for the same
 reason.
 
-Twenty-nine mutations each failed the intended test: 14 by round 2, 7 at round 3, 3 at round 4
-and 5 at round 5. Round 5's three forms contain no quote, escape, anchor, alias or merge key, so
+Thirty-three mutations each failed the intended test: 14 by round 2, 7 at round 3, 3 at round 4,
+5 at round 5 and 4 at round 6. Round 5's three forms contain no quote, escape, anchor, alias or merge key, so
 only the parser path can catch them, and it does. They also include a new `.yaml` workflow
 granting `write-all`, QA's `late.yml` verbatim, a flow-style permissions map, a `git clone` in the
 publish job, a SHA-pinned third-party action there, an explicit `? id-token` key, and a second
