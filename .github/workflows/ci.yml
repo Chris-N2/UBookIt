@@ -18,7 +18,9 @@ name: ci
 
 on:
   push:
-    # Branches only: a release tag names a commit whose push has already been verified.
+    # Branches only: a release tag names a commit whose push has already been verified. That is
+    # enforced, not assumed: publish.yml's check job (scripts/ci/Assert-ReleaseTag.ps1) refuses a
+    # tag unless this workflow succeeded for a push of that commit to its line.
     branches: ['**']
   pull_request:
     branches: [main, dev/v18]
