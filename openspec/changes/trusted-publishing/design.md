@@ -298,6 +298,13 @@ cannot slip past) as text, splits it into jobs by indentation, and asserts four 
    remains. Job headers also recognise quoted names, belt and braces. The publish-job check adds
    quoted and path-prefixed `git`/`gh`, and the repository's own URLs. What is left to review is
    named in the spec: a step fetching code from another host.
+   *Revised at QA round 4.* A `- name: |` followed by `"uses": actions/checkout@v4` at the step's
+   key column was "block body" to the guard and a sibling key to YAML. Quoted keys, anchors,
+   aliases and merge keys are now refused on **every** line. Only backslashes stay scoped to YAML
+   lines, because shell needs them and an escape cannot form a key without the quotes refused
+   everywhere. The block model's `- key: |` indent is corrected to the key's column, and `uses` is
+   read quoted too. Three rounds of holes came from teaching a line scanner one more YAML form;
+   these rules no longer depend on that model.
 
 *Revised at QA round 2.* The first version located grants by structure: job bodies, plus the lines
 before `jobs:`. It required `uses:` at the start of a line. QA's `late.yml` (a workflow-level
@@ -308,7 +315,7 @@ tests. The rules now quantify over lines, and structure only locates the one all
 
 *Alternative rejected:* a YAML library in the test project. The files are written in one regular
 style, the parser fails loudly when it finds no `jobs:` or no job, and a new test dependency for
-four assertions is not worth its maintenance. Twenty-one mutations each failed the intended test (fourteen by round 2, seven more at round 3).
+four assertions is not worth its maintenance. Twenty-four mutations each failed the intended test (fourteen by round 2, seven more at round 3, three at round 4).
 They include a new `.yaml` workflow granting `write-all`, QA's `late.yml` verbatim, a flow-style
 permissions map, a `git clone` in the publish job, and a SHA-pinned third-party action there.
 
