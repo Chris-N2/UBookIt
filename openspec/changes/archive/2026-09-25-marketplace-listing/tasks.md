@@ -166,7 +166,7 @@
   - `UBookIt.csproj` is byte-identical across the lines. `docs/publishing.md` differs by the same
     32 lines it did before the change (`6d48f59` vs `origin/dev/v18`), which is the known 18-line
     runbook drift. This change added none.
-- [ ] 6.4 Chris pushes `main` (this record) and fast-forwards `dev/v18` to
+- [x] 6.4 Chris pushes `main` (this record) and fast-forwards `dev/v18` to
   `marketplace-listing-v18`, both in one sitting, then re-runs main's parity-red run. Verify: the
   CI runs on both lines are green, parity included. Checked by step through the public API, not
   just by the run's overall conclusion.
@@ -174,7 +174,15 @@
   This comes **before** the archive, because the archive cannot be edited afterwards. Archiving
   first would leave the record either claiming a CI result nobody had seen or carrying an
   unticked task forever.
-- [ ] 6.5 Archive on `main`. On `dev/v18`:
+  *Done.* Chris pushed both lines. I read every step of both runs through the public API:
+  - **`main` `2f74356`, run `36128143883`: success.** The client tests, the Release build, the
+    tests, *Every suite ran, nothing skipped*, strict validation and **parity** all succeeded.
+  - **`dev/v18` `97cb7ee`, run `36128144025`: success**, with the same steps, parity included.
+
+  The two pushes started in the same second. Main's parity step still saw the new dev/v18 tip, so
+  no re-run was needed. The earlier red run on `main` (`3eeec9d`, before dev/v18 was pushed) was
+  the expected parity failure.
+- [x] 6.5 Archive on `main`. On `dev/v18`:
   - **merge the two ADDED requirements into dev/v18's own `openspec/specs/packaging/spec.md`**,
     which differs from main's, so it is never copied over;
   - copy the archive folder from `main`, so the change records are byte-identical;
@@ -182,4 +190,7 @@
 
   Verify with `openspec validate --all --strict` on both lines. At release, re-check that
   `publishing.md`'s `17.2.1`/`18.1.1` wording names the versions actually shipped (QA NIT).
-  Chris pushes both lines again. Verify: both CI runs are green.
+  *Done.* The archive is written with this box ticked, so it records only what could be verified
+  before the push: strict validation on both lines, after the spec sync. The CI runs for the
+  archive push itself happen after the record is frozen. They are checked and reported in the
+  session, not claimed here.
