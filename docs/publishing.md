@@ -77,17 +77,20 @@ expire at the events it describes.**
   tested unattended, as is the latest push to any other branch (see *Continuous integration*
   below). No branch protection requires a green run, so an untested push is visible rather than
   prevented.
-- **No Trusted Publishing.** Pushes use an API key, which nuget.org now caps at 30 days.
+- **No release has gone through the publishing workflow yet.** A dry run (see *Publishing a
+  release*) exercises everything except the token exchange, which only a real release does. So
+  the manual route stays documented as the fallback until one has.
 - **The Umbraco Marketplace still lists three libraries.** Listing follows from the
   `umbraco-marketplace` tag, with no submission. Every package carried the tag until
   `17.2.1`/`18.1.1`, which carry it on the meta-package alone (see *After the push*). Whether the
   library listings go away has not yet been seen.
-- **The packages are owned by a personal account**, not by the organisation — see the key
-  ownership note under *Pushing*.
+- **The packages are owned by a personal account**, not by the organisation. So is the Trusted
+  Publishing policy (see *Trusted Publishing setup*), and the key ownership note under
+  *Fallback: pushing by hand* applies to both.
 
 ## Continuous integration
 
-Two GitHub Actions workflows, held **identical on `main` and `dev/v18`** together with
+Three GitHub Actions workflows, held **identical on `main` and `dev/v18`** together with
 `global.json`, `scripts/ci/` and `Directory.Build.props` (all of it except the `<Version>` line,
 which is the one thing the lines legitimately disagree on). A push to either line fails its parity
 step while those files
@@ -109,11 +112,113 @@ the lines do differ.
   published against a package, not introduced by a commit, and would otherwise fail unrelated
   work. **GitHub disables scheduled workflows after 60 days without repository activity** — if the
   project goes quiet, run it by hand.
+- **`publish`** — a pushed release tag, or a dry run started by hand. Checks the tag, packs and
+  verifies the release, then publishes it after a maintainer approves. It is the only workflow
+  that can obtain a credential, and only in its last job. See *Publishing a release*.
 
 **To reproduce CI's build locally**, set `CI=true` for the build (`$env:CI='true'` in PowerShell):
 the warnings-as-errors rule and its advisory exception both live in `Directory.Build.props`, not in
 the workflow. `global.json` pins the SDK to the 10.0.3xx band for local builds as well as CI; a
 machine without one is told so rather than silently building with another band.
+
+## Publishing a release
+
+**The route is: merge, push the tag, approve the run.** Pushing a tag of the form
+`<major>.<minor>.<patch>` starts `.github/workflows/publish.yml`, which runs three jobs in order:
+
+1. **check** — `scripts/ci/Assert-ReleaseTag.ps1`. It refuses the tag unless:
+   - the tag equals the `<Version>` the tagged commit declares;
+   - the commit is on the published line whose declared major matches (`17.x` on `main`,
+     `18.x` on `dev/v18`, worked out from each line's own `<Version>`);
+   - `ci` succeeded for a push of that commit to that line.
+
+   If that `ci` run is still going, it waits for up to an hour, so a tag can be pushed straight
+   after the merge.
+2. **pack** — packs the tagged commit from a clean clone, then `scripts/ci/Assert-PackedRelease.ps1`
+   checks what came out:
+   - exactly one package per packable project, and nothing else;
+   - a symbol package exactly where one is expected;
+   - every `.nuspec` at the tag's version, naming this repository and the tagged commit;
+   - every SourceLink URL pointing at this repository at that commit.
+3. **publish** — waits in the GitHub environment `release` until a maintainer **approves** it
+   (the run page shows *Review deployments*). It then exchanges the run's identity token for a
+   one-hour key (Trusted Publishing) and pushes the libraries, then the `UBookIt` meta-package.
+   Each `.nupkg` and each `.snupkg` goes on its own. The run summary marks every package
+   *published* or *already present*, read from what the feed answered to its push, and every
+   symbol package *symbols submitted* or *symbols pending*. A symbol package is never counted as
+   published, because the feed accepts the same one again with the same answer, so its answer
+   cannot say whether it was new. A re-run after a partial push therefore completes it. A run
+   that published no package fails rather than reporting success, even when it resubmitted
+   symbols; if you re-ran to repair symbols, check the package page. The job never checks out
+   the repository, so no code from it runs while the key exists.
+
+**What that replaces, and what it does not.** From a fresh clone, every time:
+- the stale-artifact and commit-SHA problems below cannot arise;
+- of *Verify, do not assume*, the run itself checks each package's version, repository, commit,
+  symbols and SourceLink;
+- authors, licence, readme, icon, project URL, description and title are checked to be
+  **present**, and not framework defaults, by `PackageCompositionTests`, against a pack of the
+  same commit. The same tests check that the readme and icon are inside each package.
+  `VersionTruthTests` checks that the declared project URL is the public home. Both suites run
+  in `ci` for that commit, which the check job requires to have passed.
+
+**Nothing checks that those values are right, and copyright is checked by nothing at all.** So
+read one `.nuspec` from the run's `packages` artifact before you approve. Every one of them is
+frozen at push. The run also makes the tag-before-package order automatic, because the tag
+is what starts it. **It does not replace:**
+- *Before any push* — the version bump and the prose it moves are still yours;
+- the tagged screenshot `curl` in *Tag the release* — **do it before you approve**;
+- *After the push* — indexing, the package page, the Marketplace.
+
+**A dry run** proves the pipeline without publishing: Actions → *publish* → *Run workflow*.
+Choose the line's branch under *Use workflow from*, and give an existing tag. It runs check and
+pack in full and never reaches the publish job, so nothing is approved and no credential is
+requested. It works for tags older than the workflow, because the scripts come from the branch
+the run was started from.
+
+**If the workflow cannot publish** — for example, nuget.org's token exchange is down — use
+*Fallback: pushing by hand* below. It is the fallback, not a second route. Everything in it was
+the procedure for every release up to `17.2.1`/`18.1.1`.
+
+## Trusted Publishing setup
+
+One-time, outside the repository, and recorded here because a mismatch only shows up as a
+failed token exchange at release time. Both halves name each other, so change them together.
+
+**GitHub → Settings → Environments → `release`:**
+- Required reviewer: `Chris-N2`.
+- *Prevent self-review*: **off**. The person who pushes the tag is the person who approves it.
+  With this on, nobody could.
+- Deployment branches and tags: *Selected*, with a single **tag** rule `*.*.*`. So a job on a
+  branch cannot enter the environment.
+- *Allow administrators to bypass configured protection rules*: **on**, GitHub's default, and
+  accepted. The only administrator is the maintainer who would approve anyway. Turn it off if the
+  approval should bind an administrator too.
+
+**nuget.org → your username → Trusted Publishing → the policy:**
+
+| Field | Value |
+|---|---|
+| Owner | `CNorwood69`, the personal account that owns every package |
+| Repository owner | `Chris-N2` |
+| Repository | `UBookIt` |
+| Workflow file | `publish.yml`, the file name only |
+| Environment | `release` |
+| Scope | new versions of existing packages only |
+| Packages | the glob `UBookIt*` |
+
+Notes on the policy:
+- **The scope is deliberately narrow.** A release never creates a package ID, so a misused token
+  cannot either. The cost: a newly added packable project fails its push with a `403`, and
+  because libraries go first, the meta-package is not pushed. Widen the scope, then re-run the
+  publish job, which completes the release and marks what was already there.
+- **An empty package selection is the first-push `403` again**, and fails only at the first real
+  release.
+- **The policy belongs to the account that owns the packages.** Transferring them to the
+  organisation means creating a new policy under the new owner. The workflow's `NUGET_USER` then
+  changes to match.
+- **One policy serves both lines**, because the workflow file is the same on both. Renaming
+  `publish.yml` or the environment breaks it.
 
 ## Before any push
 
@@ -299,6 +404,12 @@ curl -sI https://raw.githubusercontent.com/Chris-N2/UBookIt/17.2.1/docs/images/b
 The `curl` is the point of the step: a `200` means the address the readme carries resolves. Do it
 before the package push, because afterwards it is too late to matter.
 
+**Pushing a release tag starts publishing.** The `git push origin <tag>` above triggers the
+`publish` workflow (see *Publishing a release*), which stops at the approval. So the `curl` goes
+between the tag push and your approval. On the fallback route the order is the same. The tag
+push still starts the workflow whenever the tagged commit carries it, so **reject** that run's
+approval rather than letting two routes race.
+
 > **Nothing automated can catch a missing tag.** `VersionTruthTests` proves each image names an
 > allow-listed host, resolves to a file in this working tree, and is pinned to the declared
 > version. It cannot see whether the tag exists, because the tag lives on a remote — and it
@@ -311,7 +422,12 @@ hosts](https://learn.microsoft.com/nuget/nuget-org/package-readme-on-nuget-org#a
 reported in a warning visible only to the package owner** — so nobody outside the project will
 ever tell you the page is broken.
 
-## Pushing
+## Fallback: pushing by hand
+
+**This is the fallback, not the route** — use it only when *Publishing a release* cannot. It is
+the procedure every release up to `17.2.1`/`18.1.1` followed, kept whole so it still works.
+*The order that makes SourceLink correct* and *Verify, do not assume* above are part of it: on
+this route nobody does them for you.
 
 You need an API key from nuget.org. The route there is not obvious any more: **Account → API Keys
 now lands on Trusted Publishing**, and the API-key form is behind a link on that page.
@@ -328,7 +444,11 @@ There is **no `dotnet nuget setapikey`**. That command belongs to `nuget.exe`, w
 does not install, so the key goes on the command line. To keep it out of PSReadLine history, read
 it into a variable first with `Read-Host` and pass the variable.
 
-The `.snupkg` symbol packages are pushed by the same command alongside their `.nupkg`.
+The `.snupkg` symbol packages are pushed by the same command alongside their `.nupkg`. **Except
+when the `.nupkg` already exists:** then `--skip-duplicate` skips the pair, and the `.snupkg` is
+never attempted (observed against a local BaGet feed while building the workflow; the skipping
+is the client's, so it applies to any feed). To repair symbols
+that failed on an earlier push, push the `.snupkg` by itself.
 
 ### A 403 usually means the key's OWNER, not the key
 
@@ -354,7 +474,13 @@ Ownership is **not** a reason to delay a push: a package can be transferred to a
 afterwards from its Manage Owners page, and owners can be added and removed freely. Unlike the
 metadata, ownership is not a one-way door.
 
-### After the push
+**The same `403` on the workflow route** points at the Trusted Publishing policy, not a key. Check
+its owner can publish, its scope, and its package glob, in that order — see *Trusted Publishing
+setup*.
+
+## After the push
+
+**Either route.** Everything below applies whether the workflow or the fallback pushed.
 
 A push that succeeds does not mean a package anyone can install yet. Three states follow:
 **accepted**, then **validating** (malware and signature checks), then **indexed**. Throughout the
@@ -381,7 +507,8 @@ push the tag if it does not. **A dead documentation link has the same cause and 
 at `https://github.com/Chris-N2/UBookIt/blob/<version>/docs/<file>`. The readme itself cannot be
 corrected for this version, which is why both are worth the minute.
 
-The wildcard resolves alphabetically, so it pushes the `UBookIt` meta-package FIRST, before the
+*On the fallback route only* (the workflow orders the push itself): the wildcard resolves
+alphabetically, so it pushes the `UBookIt` meta-package FIRST, before the
 libraries it depends on. That is harmless — nuget.org validates each package independently and
 does not require a dependency to exist at push time — but if you push them individually, push
 the libraries first so the meta-package is never briefly uninstallable.

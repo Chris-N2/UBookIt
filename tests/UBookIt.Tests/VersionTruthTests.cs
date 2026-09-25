@@ -655,7 +655,7 @@ public class VersionTruthTests
             + "ubookit.web and ubookit.backoffice, and the 17.2.0 and 18.1.0 nuspecs of all "
             + "three carry `umbraco-marketplace`."),
 
-        ("docs/publishing.md", "nuget.org", 22,
+        ("docs/publishing.md", "nuget.org", 23,
             "The publishing runbook names the feed as a DESTINATION — what nuget.org will "
             + "not let you undo, where the API key lives, which source to push to, how to "
             + "tell when indexing has finished — and, since publication, as a RECORD: its "
@@ -672,7 +672,15 @@ public class VersionTruthTests
             + "undo`, so a releaser knows which sentence to move. None asserts anything "
             + "about what has been published. A sixth was written and then removed: a "
             + "parenthetical about the accounting guard itself, which would have spent an "
-            + "allowance on prose about the allowance."),
+            + "allowance on prose about the allowance.\n"
+            + "22 -> 23 at `trusted-publishing`, judged one sentence at a time. REMOVED: the "
+            + "outstanding item saying pushes use an API key nuget.org caps at 30 days, "
+            + "because that item is closed (publishing is by Trusted Publishing now). ADDED, "
+            + "both destinations rather than records: the setup section's navigation "
+            + "(`nuget.org → your username → Trusted Publishing → the policy`), which tells a "
+            + "maintainer where the policy lives; and the fallback trigger (`nuget.org's token "
+            + "exchange is down`), which describes the host's service being unavailable. "
+            + "Neither says what has or has not been published."),
     ];
 
     /// <summary>

@@ -35,5 +35,11 @@
          aria-describedby resolves" want a real DOM rather than a regex. Test-only:
          nothing here ships in the package. -->
     <PackageVersion Include="AngleSharp" Version="1.7.1" />
+
+    <!-- The publishing-workflow guards parse .github/workflows as YAML, for the same reason:
+         four QA rounds each found a YAML form that a line scanner misread (quoted keys, escapes,
+         block-scalar indentation, a value on the next line, the `?` key indicator). Test-only:
+         nothing here ships in the package. MIT. -->
+    <PackageVersion Include="YamlDotNet" Version="18.1.0" />
   </ItemGroup>
 </Project>
