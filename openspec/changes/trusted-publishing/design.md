@@ -275,8 +275,13 @@ runbook requires, not relaxed.
 
 ### D9. The confinement is guarded, not just reviewed *(added at QA round 1)*
 
+**Revised at QA round 5: the tests now parse the workflows with YamlDotNet (test-only, MIT,
+18.1.0) and assert over the tree.** Items 1–5 below record how the rules evolved while the tests
+read text. Each rule now holds over the parsed YAML, so how a key or value is written makes no
+difference. What remains of the text reading is a backstop, described at the end of this section.
+
 `tests/UBookIt.Tests/PublishingWorkflowTests.cs` reads every workflow (`*.y*ml`, so a `.yaml`
-cannot slip past) as text, splits it into jobs by indentation, and asserts four things:
+cannot slip past) and asserts:
 
 1. **Identity tokens.** Every non-comment line of every workflow that mentions `id-token` is
    found, **wherever it sits**, including a workflow-level block after `jobs:` and a flow-style
@@ -313,11 +318,32 @@ tests. The rules now quantify over lines, and structure only locates the one all
 4. **The runbook.** Its policy table and environment heading name the environment, the file and
    the `NUGET_USER` the workflow actually uses, derived from the workflow rather than restated.
 
-*Alternative rejected:* a YAML library in the test project. The files are written in one regular
-style, the parser fails loudly when it finds no `jobs:` or no job, and a new test dependency for
-four assertions is not worth its maintenance. Twenty-four mutations each failed the intended test (fourteen by round 2, seven more at round 3, three at round 4).
-They include a new `.yaml` workflow granting `write-all`, QA's `late.yml` verbatim, a flow-style
-permissions map, a `git clone` in the publish job, and a SHA-pinned third-party action there.
+*Alternative first rejected, then adopted at QA round 5:* a YAML library in the test project.
+Rounds 1–4 rejected it: the files were regular, and a dependency for four assertions seemed not
+worth its maintenance. The text reading then lost to a neighbouring YAML form in four consecutive
+rounds:
+- round 2: a grant after `jobs:`, and flow-style `uses`;
+- round 3: a quoted job name, and `"id-token"`;
+- round 4: a quoted key inside what the scanner took for a block scalar;
+- round 5: a `uses:` value on the next line, the `?` explicit key, and a flow mapping spanning
+  lines.
+
+Each fix taught the scanner one more form, and QA's round-5 diagnosis was that a parser ends the
+series where another patch would not. So the rules are asserted over YamlDotNet's representation
+model. Two things that model does not settle are refused rather than reasoned about. First,
+anchors: the model shares an aliased node, so refusing anchors means no alias can exist. Second,
+`<<` merge keys, which the model does not apply. More than one document is refused too. The
+round-3/4 text rules survive only as a **backstop** against GitHub's parser and YamlDotNet ever
+disagreeing: no quoted keys or anchors/aliases/merge keys on any line, and no backslash outside a
+block scalar. A precedent exists: AngleSharp is already a test-only parser here, for the same
+reason.
+
+Twenty-nine mutations each failed the intended test: 14 by round 2, 7 at round 3, 3 at round 4
+and 5 at round 5. Round 5's three forms contain no quote, escape, anchor, alias or merge key, so
+only the parser path can catch them, and it does. They also include a new `.yaml` workflow
+granting `write-all`, QA's `late.yml` verbatim, a flow-style permissions map, a `git clone` in the
+publish job, a SHA-pinned third-party action there, an explicit `? id-token` key, and a second
+YAML document.
 
 ## Risks / Trade-offs
 

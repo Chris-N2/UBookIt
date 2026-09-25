@@ -144,15 +144,16 @@ the workflow uses SHALL be referenced by a full commit identifier.
   credential exists.
 
 #### Scenario: A workflow that would widen the credential is caught before it runs
-- **WHEN** any workflow, including one added later, does any of the following:
-  - grants an identity token outside the publishing step, at any position in the file, in block
-    or flow style;
+- **WHEN** any workflow, including one added later, does any of the following, judged on the
+  file as a YAML parser reads it, so that the way a key or value is written (quoted, escaped,
+  flow style, an explicit key, a value on a following line) makes no difference:
+  - grants an identity token outside the publishing step;
   - grants all permissions;
   - omits its workflow-level permissions;
   - references an action by anything but a full commit identifier;
-  - or uses, on any line (shell script bodies included), a quoted key, an anchor, an alias or a
-    merge key, or, outside its shell script bodies, an escape sequence. These are the forms a text
-    reading of the file cannot see through, and so they are refused rather than interpreted;
+  - or contains more than one YAML document, an anchor, an alias or a merge key. These forms are
+    refused rather than interpreted. Quoted keys anywhere, and backslashes outside shell script
+    bodies, are refused as well, as a backstop against a difference between parsers;
 
   or the publishing step uses any action beyond those that fetch the verified packages, set up
   the SDK and exchange the token, invokes git or gh, or references the repository's own addresses
