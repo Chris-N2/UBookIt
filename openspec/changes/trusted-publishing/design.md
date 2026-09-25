@@ -93,7 +93,10 @@ A PowerShell script, to match the other `scripts/ci/` scripts, run from the tool
    - If any has `conclusion == success`, pass.
    - If any is `queued` or `in_progress`, poll every 30 s, for up to 60 minutes (`ci` has a
      45-minute timeout).
-   - Otherwise, fail and list the runs found (or say none was found).
+   - Otherwise, fail and list the runs found (or say none was found). *(Revised at QA round 1:)*
+     "none found" is first waited out for up to 5 minutes, because a tag pushed with its merge can
+     beat the run's registration. Up to 3 consecutive API errors are retried rather than ending
+     an hour's wait.
    - The job's `timeout-minutes` is 75, so the step's own bound fires first and gives a message
      rather than a timeout.
 
@@ -124,15 +127,23 @@ none of it is a hand-kept list:
 - **The package set.** The expected set is each project in `release/UBookIt.slnx` whose
   `IsPackable` is true, with its `PackageId` and `IncludeSymbols`, read with
   `dotnet msbuild -getProperty`. Against it, exactly one `<PackageId>.<tag>.nupkg` must exist per
-  project, a `.snupkg` must exist where `IncludeSymbols` is true, none where it is false, and there
-  must be no other files.
+  project, and there must be no files other than those and the expected `.snupkg`s.
+- **Symbols, from the package's contents** *(revised at QA round 1)*. A package "carries
+  assemblies" if its `.nupkg` has any `lib/**/*.dll`.
+  - Such a package must have a `.snupkg` holding the `.pdb` beside every one of those assemblies.
+  - A package without assemblies must have no `.snupkg`.
+  - `IncludeSymbols` is checked **against** the contents, and disagreement fails.
+
+  The first version took the expectation *from* `IncludeSymbols`. So setting it false on a
+  library that ships a dll made the missing symbols expected, and QA's reproduction passed with
+  "3 symbol packages". A guard that reads the setting whose mistake it exists to catch cannot
+  catch it.
 - **Each `.nuspec`.** Read from the zip, `<version>` must equal the tag. `<repository>` must have
   `url` = `https://github.com/${{ github.repository }}` (a trailing `.git` is allowed) and `commit` =
   the tagged SHA.
-- **SourceLink.** Every `release/src/*/obj/Release/*/*.sourcelink.json` produced by this pack must
-  have each value begin
-  `https://raw.githubusercontent.com/${{ github.repository }}/<sha>/`. There must be at least one
-  such file per project that has symbols, so an empty glob cannot pass.
+- **SourceLink, per assembly.** Every assembly a package carries must have
+  `<assembly>.sourcelink.json` under its project's `obj/Release`. Every map there must have each
+  value begin `https://raw.githubusercontent.com/${{ github.repository }}/<sha>/`.
 
 The `.nupkg`/`.snupkg` files are uploaded as artifact `packages`, with 7-day retention.
 
@@ -146,17 +157,41 @@ standing rule that a guard must be shown to fire. It is recorded in the tasks.
 - `environment: release`; `needs: [check, pack]`.
 - `download-artifact` → `setup-dotnet` with `dotnet-version: 10.0.x`. There is no `global.json`
   here without a checkout, and the push command does not depend on the SDK band.
-- **Pre-flight, before any credential.** For each downloaded `.nupkg`, derive the ID by stripping
-  `.<tag>.nupkg`, then query `https://api.nuget.org/v3-flatcontainer/<id-lowercase>/index.json`
-  for the tag's version.
-  - If every package is already present, fail with "nothing was published". The run never logs in.
-  - Otherwise, record which are present, for the summary.
+- **Order, before any credential.** For each downloaded `.nupkg`, derive the ID by stripping
+  `.<tag>.nupkg`. A file not at the tag's version, or a missing `UBookIt` package, fails here.
+  Output: the libraries, then `UBookIt`.
 - **`NuGet/login`** with `user: CNorwood69`, immediately before the push, because the key lasts
   one hour.
-- **Push.** Push each library `.nupkg` that is not yet present, then `UBookIt.<tag>.nupkg` last.
-  Pushes use `--skip-duplicate`, to cover a race with a concurrent attempt. Each `.snupkg` travels
-  with its `.nupkg`, because `dotnet nuget push` picks up a sibling symbol package.
-- **The step summary** lists each package as *pushed* or *already present*.
+- **Push, one file at a time, classified by the feed's answer** *(revised at QA round 1)*. For each
+  ID in order: push the `.nupkg` with `--no-symbols`, then its `.snupkg` if one exists. Each push
+  uses `--skip-duplicate`, and `DOTNET_CLI_UI_LANGUAGE=en` keeps the CLI's messages stable. Each
+  file is classified from its own output:
+  - `Your package was pushed.` means *pushed*;
+  - `already exists at feed` means *already present*;
+  - a non-zero exit means *refused*, and the step fails;
+  - anything else means *unrecognised*, and the step fails rather than guessing.
+
+  If nothing was *pushed*, the step fails with "Nothing published".
+- **The step summary** is a table of every file and its classification.
+
+**Why not the first design's flat-container pre-flight.** It decided "already present" from
+`v3-flatcontainer`, which does not show a pushed version until validation and indexing finish.
+A re-run inside that window saw published packages as missing. `--skip-duplicate` then turned
+nuget.org's 409 into exit 0, and the run reported all five as pushed. That was QA round 1's first
+MAJOR.
+
+**Why each file separately.** Observed with the real CLI against a real feed (BaGet, in Docker):
+- With `--skip-duplicate`, a 409 exits 0 and prints `already exists at feed`. Only a new package
+  prints `Your package was pushed.`
+- A combined push whose `.nupkg` already exists **never attempts its `.snupkg`**. So a release
+  whose package landed and whose symbols failed could never be repaired by re-running a combined
+  push.
+
+Pushing the `.snupkg` alone fixes that. The re-run case was verified end to end: Core's package
+already present, its symbols pushed.
+
+The only credential-free check left is the order step. A re-run of a complete release now logs in
+before learning nothing is new. That costs one token exchange and publishes nothing.
 
 The "meta-package last" rule names `UBookIt` explicitly. It is the product's identity, not a list
 that drifts.
@@ -171,6 +206,9 @@ Concurrency: group `publish-<tag>`, `cancel-in-progress: false`.
   could approve.
 - Deployment branches and tags: *selected*, with a single **tag** rule `*.*.*`. So a job on a
   branch ref cannot enter the environment even if the workflow were edited to try.
+- **Administrators may bypass: on** (GitHub's default, read back as `can_admins_bypass: true`).
+  This is accepted, because the only administrator is the approving maintainer. The runbook
+  records it, and says how to make the approval bind an administrator too.
 
 **The nuget.org Trusted Publishing policy**, owned by `CNorwood69`:
 - repository owner `Chris-N2`;
@@ -180,7 +218,8 @@ Concurrency: group `publish-<tag>`, `cancel-in-progress: false`.
 - **scope: new versions of existing packages only.** A release never creates a package ID, so a
   misused token cannot claim one either. The cost: a newly added packable project fails with a
   `403`. Libraries go first, so the meta-package is then not pushed. The remedy is to widen the
-  scope and re-run the publish job, which pushes only what is missing.
+  scope and re-run the publish job, which completes the release and marks what was already
+  present (D5).
 - **packages: the glob `UBookIt*`.** It needs no edit as packages come and go, and the scope above
   already stops it from reaching new IDs. **An empty package selection is the first-push `403`
   trap again**: it fails only at the first real release.
@@ -219,7 +258,32 @@ The feed-mention guard (`Every_mention_of_the_feed_is_accounted_for`) and the `S
 react to the rewrite. Their counts are updated sentence by sentence, as that guard's section of the
 runbook requires, not relaxed.
 
+### D9. The confinement is guarded, not just reviewed *(added at QA round 1)*
+
+`tests/UBookIt.Tests/PublishingWorkflowTests.cs` reads every workflow (`*.y*ml`, so a `.yaml`
+cannot slip past) as text, splits it into jobs by indentation, and asserts four things:
+
+1. **Identity tokens.** Exactly one `id-token` grant exists, `id-token: write` on the `publish`
+   job of `publish.yml`. No workflow-level grant, no `write-all`, and every workflow declares
+   top-level `permissions:`.
+2. **The publish job.** No `actions/checkout` and no local action. It keeps
+   `environment: release`, `if: ${{ github.event_name == 'push' }}` and `needs: [check, pack]`.
+3. **Pinning.** Every `uses:` is `owner/repo[/path]@<40 hex>`, and at least one was found.
+4. **The runbook.** Its policy table and environment heading name the environment, the file and
+   the `NUGET_USER` the workflow actually uses, derived from the workflow rather than restated.
+
+*Alternative rejected:* a YAML library in the test project. The files are written in one regular
+style, the parser fails loudly when it finds no `jobs:` or no job, and a new test dependency for
+four assertions is not worth its maintenance. Nine mutations, one per guarantee (including a new
+`.yaml` workflow granting `write-all`), each failed the intended test.
+
 ## Risks / Trade-offs
+
+- **How nuget.org answers a duplicate `.snupkg` is unobserved.** BaGet accepts one, and
+  nuget.org is expected to answer 409. If it answers anything else, the push is classified
+  *refused* or *unrecognised* and the step fails loudly, rather than miscounting. The first re-run
+  of a complete release will show which. If it is a benign non-409, the classifier gains a third
+  message, by evidence.
 
 - **`NuGet/login` and the policy are not exercised until the first real release.** A dry run stops
   before `publish`. → The first real release is a patch, the manual fallback remains documented,

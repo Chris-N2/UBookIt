@@ -143,13 +143,26 @@ machine without one is told so rather than silently building with another band.
 3. **publish** — waits in the GitHub environment `release` until a maintainer **approves** it
    (the run page shows *Review deployments*). It then exchanges the run's identity token for a
    one-hour key (Trusted Publishing) and pushes the libraries, then the `UBookIt` meta-package.
-   It first checks which packages are already there. A re-run after a partial push pushes only
-   what is missing, and a run with nothing left to push fails rather than reporting success.
-   The job never checks out the repository, so no code from it runs while the key exists.
+   Each `.nupkg` and each `.snupkg` goes on its own, and the run summary marks every file
+   *pushed* or *already present*, read from what the feed answered. A re-run after a partial
+   push therefore completes it, symbols included, and a run in which nothing was new fails
+   rather than reporting success. The job never checks out the repository, so no code from it
+   runs while the key exists.
 
-**What that replaces, and what it does not.** The run does the stale-artifact, commit-SHA and
-"Verify, do not assume" checks below for you, from a fresh clone, every time. It also makes the
-tag-before-package order automatic, because the tag is what starts it. **It does not replace:**
+**What that replaces, and what it does not.** From a fresh clone, every time:
+- the stale-artifact and commit-SHA problems below cannot arise;
+- of *Verify, do not assume*, the run itself checks each package's version, repository, commit,
+  symbols and SourceLink;
+- authors, licence, readme, icon, project URL, description and title are checked to be
+  **present**, and not framework defaults, by `PackageCompositionTests`, against a pack of the
+  same commit. The same tests check that the readme and icon are inside each package.
+  `VersionTruthTests` checks that the declared project URL is the public home. Both suites run
+  in `ci` for that commit, which the check job requires to have passed.
+
+**Nothing checks that those values are right, and copyright is checked by nothing at all.** So
+read one `.nuspec` from the run's `packages` artifact before you approve. Every one of them is
+frozen at push. The run also makes the tag-before-package order automatic, because the tag
+is what starts it. **It does not replace:**
 - *Before any push* — the version bump and the prose it moves are still yours;
 - the tagged screenshot `curl` in *Tag the release* — **do it before you approve**;
 - *After the push* — indexing, the package page, the Marketplace.
@@ -175,6 +188,9 @@ failed token exchange at release time. Both halves name each other, so change th
   With this on, nobody could.
 - Deployment branches and tags: *Selected*, with a single **tag** rule `*.*.*`. So a job on a
   branch cannot enter the environment.
+- *Allow administrators to bypass configured protection rules*: **on**, GitHub's default, and
+  accepted. The only administrator is the maintainer who would approve anyway. Turn it off if the
+  approval should bind an administrator too.
 
 **nuget.org → your username → Trusted Publishing → the policy:**
 
@@ -192,7 +208,7 @@ Notes on the policy:
 - **The scope is deliberately narrow.** A release never creates a package ID, so a misused token
   cannot either. The cost: a newly added packable project fails its push with a `403`, and
   because libraries go first, the meta-package is not pushed. Widen the scope, then re-run the
-  publish job, which pushes only what is missing.
+  publish job, which completes the release and marks what was already there.
 - **An empty package selection is the first-push `403` again**, and fails only at the first real
   release.
 - **The policy belongs to the account that owns the packages.** Transferring them to the
@@ -451,7 +467,13 @@ Ownership is **not** a reason to delay a push: a package can be transferred to a
 afterwards from its Manage Owners page, and owners can be added and removed freely. Unlike the
 metadata, ownership is not a one-way door.
 
-### After the push
+**The same `403` on the workflow route** points at the Trusted Publishing policy, not a key. Check
+its owner can publish, its scope, and its package glob, in that order — see *Trusted Publishing
+setup*.
+
+## After the push
+
+**Either route.** Everything below applies whether the workflow or the fallback pushed.
 
 A push that succeeds does not mean a package anyone can install yet. Three states follow:
 **accepted**, then **validating** (malware and signature checks), then **indexed**. Throughout the
@@ -478,7 +500,8 @@ push the tag if it does not. **A dead documentation link has the same cause and 
 at `https://github.com/Chris-N2/UBookIt/blob/<version>/docs/<file>`. The readme itself cannot be
 corrected for this version, which is why both are worth the minute.
 
-The wildcard resolves alphabetically, so it pushes the `UBookIt` meta-package FIRST, before the
+*On the fallback route only* (the workflow orders the push itself): the wildcard resolves
+alphabetically, so it pushes the `UBookIt` meta-package FIRST, before the
 libraries it depends on. That is harmless — nuget.org validates each package independently and
 does not require a dependency to exist at push time — but if you push them individually, push
 the libraries first so the meta-package is never briefly uninstallable.
