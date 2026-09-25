@@ -90,6 +90,18 @@
   - This record's earlier line "All five were fixed in the round-2 commit" was written before
     review and was not true of the category MINOR. It is corrected here rather than left
     standing (QA NIT).
+  - `2493142` also fixed a defect the implementer caught before sending round 3. The first
+    rewrite (`d087771`) said "Nothing that used to be refused is accepted now", which is false
+    for `/privacy` on Linux. "Apart from that" scoped it.
+
+  *Round 3: APPROVE WITH NITS* on `2493142`.
+  - QA compared `17.2.0`'s resolver with HEAD's on both platforms. On Windows it measured that
+    every `/`-rooted value `17.2.0` accepted is exactly what the new rule accepts, and `//` is
+    refused by both. So "Apart from that, nothing that used to be refused is accepted now" holds
+    on Windows and Linux.
+  - **NIT, taken:** the refusal list read as complete, but a value with no leading slash
+    (`privacy`) is also refused. It was made non-exhaustive ("including") rather than extended,
+    because a fifth item could itself be incomplete. QA asked to read that edit before the tag.
 - [ ] 5.2 Chris pushes the branch and opens the PR into `main`. Verify: the PR's CI run is green
   **at every step, parity included** (D2), read through the API.
 - [ ] 5.3 Chris merges with **"Create a merge commit"**. Fetch, and verify `origin/main`'s tip is
