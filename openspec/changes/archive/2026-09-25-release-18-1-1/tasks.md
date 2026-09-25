@@ -186,7 +186,14 @@
     post-release Marketplace check, a recorded obligation.
   - The privacy and Marketplace prose was swept identically to `release-17-2-1` 8.2, and nothing
     is falsified on this line.
-- [ ] 8.3 Commit, run the unit suite, and Chris pushes. Verify: `dev/v18`'s run is green at every
+- [x] 8.3 Commit, run the unit suite, and Chris pushes. Verify: `dev/v18`'s run is green at every
   step.
-- [ ] 8.4 Archive **last**, and run the unit suite locally before the push. The CI for that push
+  *Done:* unit 1994/1994 on `49a21aa` (only markdown changed since the clean build of
+  `8551250`). Chris pushed `f38853c` and `49a21aa`. Run `36145131399` on `49a21aa` was success
+  at every step.
+- [x] 8.4 Archive **last**, and run the unit suite locally before the push. The CI for that push
   is reported in the session.
+
+  *Done:* archived with this box ticked, and the unit suite ran locally on the archive commit
+  before the push (result in that commit's message). The push's own CI is checked in the
+  session.
