@@ -98,17 +98,28 @@
   - It confirmed "each got a listing" against the ㊿ proposal's live measurement.
   - It confirmed nothing implies delisting.
   - Plan 5–8 is approved.
-- [ ] 5.2 Chris pushes the branch and opens a PR into `dev/v18`. Verify: the PR run is green at
+- [x] 5.2 Chris pushes the branch and opens a PR into `dev/v18`. Verify: the PR run is green at
   every step, parity included.
-- [ ] 5.3 Merged with a merge commit. `origin/dev/v18` = local `dev/v18` = the merge commit.
+  *Done:* PR **#4**. Run `36142651816` on `ab09ca3` was success at every step, parity included.
+- [x] 5.3 Merged with a merge commit. `origin/dev/v18` = local `dev/v18` = the merge commit.
 
+  *Done:* merged as **`8551250`** with a merge commit. `origin/dev/v18` = local `dev/v18`.
 ## 6. Tag, pack and verify, from the merge commit
 
-- [ ] 6.1 `git branch -r --contains HEAD` lists `origin/dev/v18`. **The merge commit's own push run
+- [x] 6.1 `git branch -r --contains HEAD` lists `origin/dev/v18`. **The merge commit's own push run
   is green at every step.** Tag `18.1.1` on it, and Chris pushes the tag.
-- [ ] 6.2 Clear the outputs, build clean, pack. Verify: exactly five `.nupkg` and four `.snupkg`,
+  *Done:*
+  - `git branch -r --contains 8551250` lists `origin/dev/v18`.
+  - Push run `36143295614` on `8551250` was success at every step, parity included. `dev/v18` is
+    green again, after being red since `5eb344e`.
+  - Tag `18.1.1` was created on `8551250` and pushed by Chris. `ls-remote` shows `8551250…
+    refs/tags/18.1.1`.
+- [x] 6.2 Clear the outputs, build clean, pack. Verify: exactly five `.nupkg` and four `.snupkg`,
   all `18.1.1`.
-- [ ] 6.3 Read all five nuspecs:
+  *Done:* no TestSite; no leftover `.nupkg`; outputs cleared; `CI=true` build with
+  `--no-incremental` (0 warnings), then pack. Result: five `.nupkg` and four `.snupkg`, all
+  `18.1.1`.
+- [x] 6.3 Read all five nuspecs:
   - publisher, licence, and icon and readme present in the zip;
   - repository commit = the merge commit;
   - **every `UBookIt.*` dependency is `18.1.1`**;
@@ -116,19 +127,41 @@
   - `umbraco-marketplace` on `UBookIt` alone;
   - `UBookIt`'s description says **Umbraco 18** and does **not** say "(LTS)", as the entry claims
     (QA round 1).
-- [ ] 6.4 SourceLink resolves to the merge commit, and a sample source file returns 200.
-- [ ] 6.5 README extracted from the packages: one hash, no relative links, everything pinned to
+  *Done:* all five read.
+  - Publisher, MIT licence, and icon and readme present in the zip, with repository commit
+    `8551250`.
+  - Sibling dependencies:
+    - `UBookIt` → Backoffice 18.1.1 and Web 18.1.1
+    - Backoffice → Core 18.1.1 and Persistence 18.1.1
+    - Persistence → Core 18.1.1
+    - Web → Core 18.1.1
+  - Every `Umbraco.Cms.*` dependency is `[18.2.0, 19.0.0)`.
+  - The tag is on `UBookIt` alone.
+  - The `UBookIt` description reads "A booking system for Umbraco 18: … Requires Umbraco 18 and
+    SQL Server.", with no "(LTS)".
+- [x] 6.4 SourceLink resolves to the merge commit, and a sample source file returns 200.
+  *Done:* all four `sourcelink.json` map to `raw.githubusercontent.com/…/8551250…/*`, and
+  `src/UBookIt.Core/UBookIt.Core.csproj` fetched through it returned 200.
+- [x] 6.5 README extracted from the packages: one hash, no relative links, everything pinned to
   `18.1.1`, "is at `18.1.1`". After the tag is pushed, every URL returns 200 (retry a 503), and
   any fragment matches GitHub's slug.
-- [ ] 6.6 If 6.2–6.5 find a defect needing a commit, push nothing to nuget.org:
+  *Done:*
+  - One README hash across the five packages.
+  - 0 relative links, 0 HTML or reference-style links, and 14 unique URLs, all repository ones
+    pinned to `18.1.1`. It says "uBookIt is at `18.1.1`".
+  - After the tag push, all 14 returned 200 on the first attempt.
+  - The fragment matches `18.1.1:docs/booking-page.md:294`.
+- [x] 6.6 If 6.2–6.5 find a defect needing a commit, push nothing to nuget.org:
   1. Delete the tag locally and on origin.
   2. Fix through a PR.
   3. Re-tag after the new merge commit's push run is green.
   4. Redo 6.1–6.5.
 
+  *Not needed:* 6.2–6.5 found nothing.
 ## 7. Publish
 
-- [ ] 7.1 Chris pushes the five packages.
+- [x] 7.1 Chris pushes the five packages.
+  *Done:* Chris pushed the five packages on 2026-09-25.
 - [ ] 7.2 The flat container lists `18.1.1`, checked **per package**.
 - [ ] 7.3 The live page renders the pinned images and links. The live `UBookIt` nuspec says
   Umbraco 18.
