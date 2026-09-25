@@ -102,20 +102,44 @@
   *Done:* `CI=true` Release build, 0 warnings. Unit **1982** (1980 + 2), integration **191**,
   rendering **1168**, all with 0 skipped. Client **335**. `openspec validate --all --strict`:
   26/26.
-- [ ] 5.2 QA review in a subagent (the `qa-review` skill), reused across rounds. Fixes go back
+- [x] 5.2 QA review in a subagent (the `qa-review` skill), reused across rounds. Fixes go back
   through apply.
+  *Done: round 1 APPROVE* on `fbe36e7`. QA confirmed all four handover claims by running them.
+  It also added mutations of its own, all of which fired:
+  - the tag put back in the shared props (names all four libraries);
+  - a mixed-case tag;
+  - "Tested on Umbraco 16." on `UBookIt.Core`.
+
+  Its findings:
+  - **Two MINOR, both about this section's plan, not the code.** 6.1's order conflicts and would
+    not compile, and 6.4 omitted the dev/v18 spec sync. Both are folded into 6.1–6.4 below.
+  - **NIT:** `publishing.md` names `17.2.1`/`18.1.1` in the past tense before they exist. It is
+    re-checked at release (6.4).
+  - **NIT:** the major derivation throws on a dot-less `<Version>`. That never happens in
+    practice, so no action.
 
 ## 6. The 18 line
 
-- [ ] 6.1 After QA approval, merge to `main` by PR with a merge commit (Chris). Then cherry-pick
-  the change's code commits onto `dev/v18`. Rebuild on `dev/v18` and verify: the packed `UBookIt`
-  description reads "…Umbraco 18…", only `UBookIt` carries the tag, and both new guards pass.
-- [ ] 6.2 Port `The_bound_admits_this_major_and_excludes_the_next` (with its `using` lines) to
-  `dev/v18` verbatim (D4). Verify: it passes. Then set one library's Umbraco ceiling to `20.0.0`
-  locally, and it fails naming that dependency. Revert.
-- [ ] 6.3 Run the full suites on `dev/v18`. Verify: unit = 1991 + this change's tests + the ported
-  guard, and all green. Check that `Directory.Build.props` differs between the lines only in
-  `<Version>` (`git diff main dev/v18 -- Directory.Build.props`).
-- [ ] 6.4 Archive on `main`, then copy the archive folder into the `dev/v18` commit so the two
-  records are byte-identical. Chris pushes both lines in one sitting. Verify: both CI runs are
-  green, parity included.
+- [ ] 6.1 After QA approval, merge to `main` by PR with a merge commit (Chris). On a branch from
+  `dev/v18`, **first** port `The_bound_admits_this_major_and_excludes_the_next` verbatim with its
+  `using System.Globalization;` and `using System.Text.RegularExpressions;` lines (D4). QA
+  round 1 found that the cherry-pick otherwise conflicts, because its hunk's context is that test,
+  and fails to compile, because the new guard needs `Regex`. Verify: it passes on `dev/v18`. Then
+  set one library's Umbraco ceiling to `20.0.0` locally, and it fails naming that dependency.
+  Revert.
+- [ ] 6.2 Cherry-pick the change's code commit(s) onto that branch. The test file should now apply
+  cleanly; resolve by hand if not. Rebuild and verify: the packed `UBookIt` description reads
+  "…Umbraco 18…", only `UBookIt` carries the tag, and both new guards pass. Mutate the description
+  back to a written "Umbraco 17" on `dev/v18` and watch it fail, then revert.
+- [ ] 6.3 Run the full suites on `dev/v18`. Verify: unit = 1991 + 3 (the two new guards and the
+  ported bound guard), and all green. Check that `Directory.Build.props` differs between the lines
+  only in `<Version>` (`git diff main dev/v18 -- Directory.Build.props`).
+- [ ] 6.4 Archive on `main`. On `dev/v18`:
+  - **merge the two ADDED requirements into dev/v18's own `openspec/specs/packaging/spec.md`**,
+    which differs from main's, so it is never copied over;
+  - copy the archive folder from `main`, so the change records are byte-identical;
+  - **delete `openspec/changes/marketplace-listing/`**, which the cherry-pick carried across.
+
+  Verify with `openspec validate --all --strict` on both lines. At release, re-check that
+  `publishing.md`'s `17.2.1`/`18.1.1` wording names the versions actually shipped (QA NIT).
+  Chris pushes both lines in one sitting. Verify: both CI runs are green, parity included.
