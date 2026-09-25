@@ -495,4 +495,101 @@ public class PackageCompositionTests(PackedSolutionFixture fixture)
             $"{wrong.Count} Umbraco dependency range(s) do not admit Umbraco {major} and exclude "
             + $"{major + 1}:{Environment.NewLine}  " + string.Join(Environment.NewLine + "  ", wrong));
     }
+
+    /// <summary>
+    /// Only the package a site installs asks to be listed on the Umbraco Marketplace.
+    /// </summary>
+    /// <remarks>
+    /// <para>
+    /// The Marketplace lists every package that carries <c>umbraco-marketplace</c> and depends on
+    /// Umbraco, and Umbraco's guidance is to tag only the installable component. The tag used to
+    /// sit in the shared <c>PackageTags</c>, so every library inherited it, and by 2026-09-25
+    /// <c>UBookIt.Persistence</c>, <c>UBookIt.Web</c> and <c>UBookIt.Backoffice</c> each had a
+    /// listing of their own — each one a way to install uBookIt without the parts that make it
+    /// work, which is the silent failure <see cref="Aggregate"/> exists to prevent.
+    /// </para>
+    /// <para>
+    /// <b>Both directions are checked</b>, so the rule cannot be satisfied by removing the tag from
+    /// everything. The meta-package has no Umbraco dependency of its own and is listed through its
+    /// children; that was observed on the live Marketplace, not assumed.
+    /// </para>
+    /// </remarks>
+    [Fact]
+    public void Only_the_package_a_site_installs_asks_to_be_listed_on_the_marketplace()
+    {
+        const string tag = "umbraco-marketplace";
+
+        // ANTI-VACUITY. With one package produced, "only the aggregate is tagged" is true of any
+        // tagging at all.
+        Assert.True(
+            Packed.Packages.Count > 1,
+            $"Only {Packed.Packages.Count} package(s) were produced, so this guard has nothing to tell apart.");
+
+        // nuget.org packs the semicolon-separated PackageTags as a space-separated <tags>.
+        var tagged = Packed.Packages
+            .Where(p => p.Value("tags").Split((char[]?)null, StringSplitOptions.RemoveEmptyEntries).Contains(tag, StringComparer.OrdinalIgnoreCase))
+            .Select(p => p.Id)
+            .ToHashSet(StringComparer.OrdinalIgnoreCase);
+
+        var wronglyTagged = tagged.Where(id => !id.Equals(Aggregate, StringComparison.OrdinalIgnoreCase)).Order(StringComparer.Ordinal).ToList();
+
+        Assert.True(
+            wronglyTagged.Count == 0,
+            $"{string.Join(", ", wronglyTagged)} carr{(wronglyTagged.Count == 1 ? "ies" : "y")} '{tag}', so the Umbraco "
+            + $"Marketplace lists {(wronglyTagged.Count == 1 ? "it" : "them")} as something to install. Only {Aggregate} "
+            + "installs a working uBookIt; add the tag in src/UBookIt/UBookIt.csproj alone.");
+
+        Assert.True(
+            tagged.Contains(Aggregate),
+            $"{Aggregate} does not carry '{tag}', so the package a site installs is not listed on the Umbraco "
+            + "Marketplace. Append it to PackageTags in src/UBookIt/UBookIt.csproj.");
+    }
+
+    /// <summary>
+    /// Every Umbraco major a package description names is the major of the package's own version,
+    /// and the package a site installs names one.
+    /// </summary>
+    /// <remarks>
+    /// <para>
+    /// <c>src/UBookIt/UBookIt.csproj</c> is shared by both lines, and its description once said
+    /// "Umbraco 17" in words. So <c>UBookIt 18.0.0</c> and <c>18.1.0</c> went to nuget.org — and
+    /// onto the Marketplace listing — describing themselves as a booking system for Umbraco 17. The
+    /// description now derives the major from <c>$(Version)</c>; this checks what was packed.
+    /// </para>
+    /// <para>
+    /// <b>The vocabulary it sees is <c>Umbraco</c>, whitespace, digits</b>, case-sensitive. "Umbraco
+    /// v18" or "Umbraco CMS 18" would pass unseen. A library description that names no major at all
+    /// passes deliberately; the installable package must name one, so the check cannot be satisfied
+    /// by deleting the claim it keeps true.
+    /// </para>
+    /// </remarks>
+    [Fact]
+    public void Every_description_names_the_umbraco_major_its_own_version_targets()
+    {
+        var wrong = new List<string>();
+
+        foreach (var package in Packed.Packages)
+        {
+            var major = package.Version.Split('.')[0];
+            var named = Regex.Matches(package.Value("description"), @"\bUmbraco\s+(\d+)")
+                .Select(m => m.Groups[1].Value)
+                .ToList();
+
+            foreach (var other in named.Where(n => n != major).Distinct())
+            {
+                wrong.Add($"{package.Id} {package.Version} describes itself as for Umbraco {other}.");
+            }
+
+            if (package.Id.Equals(Aggregate, StringComparison.OrdinalIgnoreCase) && named.Count == 0)
+            {
+                wrong.Add($"{package.Id} {package.Version} names no Umbraco major, so a site author cannot tell "
+                    + "from its description which Umbraco it runs on.");
+            }
+        }
+
+        Assert.True(
+            wrong.Count == 0,
+            string.Join(Environment.NewLine, wrong)
+            + $"{Environment.NewLine}Derive the major from $(Version) in the project file rather than writing it.");
+    }
 }

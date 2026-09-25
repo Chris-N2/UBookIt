@@ -70,7 +70,12 @@
       below. NuGet's limits: 1MB, PNG or JPEG, 128x128 recommended.
     -->
     <PackageIcon>icon.png</PackageIcon>
-    <PackageTags>umbraco;umbraco-marketplace;booking;bookings;scheduling;reservations</PackageTags>
+    <!--
+      NO umbraco-marketplace here. The Marketplace lists every package carrying that tag, and
+      only the package a site installs should be listed: src/UBookIt/UBookIt.csproj appends
+      it for itself. PackageCompositionTests checks the packed nuspecs.
+    -->
+    <PackageTags>umbraco;booking;bookings;scheduling;reservations</PackageTags>
 
     <!--
       The package's public home, and the repository the source actually lives in. Both

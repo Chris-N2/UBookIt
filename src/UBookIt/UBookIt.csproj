@@ -20,7 +20,25 @@
     <TargetFramework>net10.0</TargetFramework>
 
     <Title>uBookIt</Title>
-    <Description>A booking system for Umbraco 17: bookable resources, availability rules, services, and a booking flow a visitor can complete without JavaScript. Install this package — it brings the domain, the storage, the backoffice section and the front-end rendering. Requires Umbraco 17 (LTS) and SQL Server.</Description>
+
+    <!--
+      The Umbraco major is DERIVED from the package version, never written. This file is shared
+      by both release lines, and when it said "Umbraco 17" in words, UBookIt 18.0.0 and 18.1.0
+      shipped describing themselves as for Umbraco 17 - frozen at push, and the text of the
+      Marketplace listing. The text before the first '.' rather than System.Version, so a
+      prerelease suffix cannot break evaluation. Whether a major is LTS is not derivable, so
+      the description does not say.
+    -->
+    <UBookItUmbracoMajor>$(Version.Substring(0, $(Version.IndexOf('.'))))</UBookItUmbracoMajor>
+    <Description>A booking system for Umbraco $(UBookItUmbracoMajor): bookable resources, availability rules, services, and a booking flow a visitor can complete without JavaScript. Install this package — it brings the domain, the storage, the backoffice section and the front-end rendering. Requires Umbraco $(UBookItUmbracoMajor) and SQL Server.</Description>
+
+    <!--
+      Only this package asks to be listed on the Umbraco Marketplace. The libraries install an
+      incomplete product, so a listing for one of them is an invitation to the silent failure
+      this package exists to prevent. Appended rather than restated, so the other tags stay in
+      one list in Directory.Build.props.
+    -->
+    <PackageTags>$(PackageTags);umbraco-marketplace</PackageTags>
 
     <!--
       There is nothing to ship: this package exists to name its dependencies. NU5128 is the
