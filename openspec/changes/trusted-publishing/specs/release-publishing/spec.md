@@ -145,20 +145,25 @@ the workflow uses SHALL be referenced by a full commit identifier.
 
 #### Scenario: A workflow that would widen the credential is caught before it runs
 - **WHEN** any workflow, including one added later, grants an identity token outside the
-  publishing step, grants all permissions, omits its workflow-level permissions, references an
-  action by anything but a full commit identifier, or gives the publishing step a checkout
+  publishing step (in any position or YAML style), grants all permissions, omits its workflow-level
+  permissions, or references an action by anything but a full commit identifier (in any YAML
+  style), or the publishing step uses any action beyond those that fetch the verified packages,
+  set up the SDK and exchange the token, or runs git or gh
 - **THEN** the repository's test suite fails, naming the workflow and the offending line
 
 ### Requirement: A release that is already on nuget.org is not reported as newly published
 The workflow SHALL push libraries before the meta-package that depends on them. It SHALL push
 each package and each symbol package separately, so that a symbol package is attempted even when
-its package is already present. It SHALL decide whether each file was newly published or already
-present from the feed's answer to that file's push. It SHALL NOT decide from a lookup made
-beforehand, which can lag a recent push. A push whose answer is neither SHALL fail the run. When
-some of a release's files are already on nuget.org — for example on a re-run after a partial push —
-it SHALL push the remainder and report, file by file, which it pushed and which were already
-present. When no file was newly published, the run SHALL fail, stating that nothing was
-published.
+its package is already present. It SHALL decide whether each package was newly published or
+already present from the feed's answer to that package's push. It SHALL NOT decide from a lookup
+made beforehand, which can lag a recent push. A symbol package SHALL be reported as submitted, or
+as pending, and SHALL NEVER be reported or counted as published. The feed accepts the same symbol
+package again and again with the same answer, so its answer cannot distinguish new from
+resubmitted. A push whose answer is none of these SHALL fail the run. When some of a release's
+packages are already on nuget.org — for example on a re-run after a partial push — it SHALL push
+the remainder and report, file by file, what happened to each. When no package was newly
+published, the run SHALL fail, stating that nothing was published and how many symbol packages
+were submitted, even if every symbol push was accepted.
 
 #### Scenario: A re-run completes a partial publish
 - **WHEN** a publish run is re-run after an earlier attempt pushed some but not all packages
@@ -167,7 +172,16 @@ published.
 #### Scenario: A re-run repairs symbols that failed to publish
 - **WHEN** an earlier attempt published a package but not its symbol package, and the run is
   re-run
-- **THEN** the symbol package is pushed, and the package is reported as already present
+- **THEN** the symbol package is submitted and reported as submitted, not as published, and the
+  package is reported as already present. If no package in the run was newly published, the run
+  fails, stating how many symbol packages were submitted, because it cannot tell whether that
+  repaired anything.
+
+#### Scenario: Symbol packages accepted again do not make a re-run look like a publish
+- **WHEN** a run is re-run after every package and symbol package was published and became
+  available, so that the feed accepts every symbol package again
+- **THEN** every package is reported as already present, every symbol package as submitted, and
+  the run fails, stating that nothing was published
 
 #### Scenario: A re-run straight after a complete publish is not reported as a publish
 - **WHEN** a run is re-run immediately after every file was published, before the feed has

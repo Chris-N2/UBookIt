@@ -241,7 +241,16 @@ jobs:
         #     pushing the pair together. The .snupkg is therefore pushed by itself, every time.
         # nuget.org is NOT consulted beforehand. Its flat container lags a push by the whole
         # validation window, which is exactly when a re-run after a partial failure happens.
-        # Anything but those two messages fails the step, rather than being guessed at.
+        # Anything but the messages below fails the step, rather than being guessed at.
+        #
+        # ONLY A .nupkg CAN BE "NEWLY PUBLISHED" (QA round 2). nuget.org documents that "symbol
+        # packages with the same ID and version can be submitted multiple times": a resubmitted
+        # .snupkg answers 201 exactly like a new one, and 409 only while an earlier one is not
+        # yet available. So a symbol push's answer cannot tell new from resubmitted. It is
+        # reported as *submitted* (or *pending*), never as *published*, and it never counts
+        # towards "something was published". A run whose packages were all already present
+        # fails, even when its symbol pushes were accepted. It cannot know whether they repaired
+        # anything, so it does not claim to have.
         shell: bash
         env:
           NUGET_API_KEY: ${{ steps.login.outputs.NUGET_API_KEY }}
@@ -249,7 +258,8 @@ jobs:
         run: |
           set -euo pipefail
           read -r -a ids <<< "$ORDER"
-          pushed=0
+          new_packages=0
+          symbols_submitted=0
 
           {
             echo "## $TAG"
@@ -257,9 +267,11 @@ jobs:
             echo "|---|---|"
           } >> "$GITHUB_STEP_SUMMARY"
 
+          # push_one <file> <label if accepted> <label if it already exists> [push options...]
+          # Sets $accepted to 1 when the feed accepted the file, 0 when it already had it.
           push_one() {
-            local file="$1" name out code
-            shift
+            local file="$1" on_accept="$2" on_exists="$3" name out code
+            shift 3
             name="$(basename "$file")"
             set +e
             out="$(dotnet nuget push "$file" "$@" --api-key "$NUGET_API_KEY" --source "$NUGET_SOURCE" --skip-duplicate 2>&1)"
@@ -271,10 +283,11 @@ jobs:
               echo "::error title=Push::nuget.org refused $name (exit $code). See the output above."
               exit 1
             elif grep -qF 'Your package was pushed.' <<< "$out"; then
-              echo "| \`$name\` | pushed |" >> "$GITHUB_STEP_SUMMARY"
-              pushed=$((pushed + 1))
+              echo "| \`$name\` | $on_accept |" >> "$GITHUB_STEP_SUMMARY"
+              accepted=1
             elif grep -qF 'already exists at feed' <<< "$out"; then
-              echo "| \`$name\` | already present |" >> "$GITHUB_STEP_SUMMARY"
+              echo "| \`$name\` | $on_exists |" >> "$GITHUB_STEP_SUMMARY"
+              accepted=0
             else
               echo "| \`$name\` | **unrecognised** |" >> "$GITHUB_STEP_SUMMARY"
               echo "::error title=Push::The push of $name exited 0 but said neither 'pushed' nor 'already exists'. Whether it was published is unknown."
@@ -283,14 +296,16 @@ jobs:
           }
 
           for id in "${ids[@]}"; do
-            push_one "$PACKAGES_DIR/$id.$TAG.nupkg" --no-symbols
+            push_one "$PACKAGES_DIR/$id.$TAG.nupkg" 'published' 'already present' --no-symbols
+            new_packages=$((new_packages + accepted))
             if [ -f "$PACKAGES_DIR/$id.$TAG.snupkg" ]; then
-              push_one "$PACKAGES_DIR/$id.$TAG.snupkg"
+              push_one "$PACKAGES_DIR/$id.$TAG.snupkg" 'symbols submitted' 'symbols pending (an earlier submission is not yet available)'
+              symbols_submitted=$((symbols_submitted + accepted))
             fi
           done
 
-          if [ "$pushed" -eq 0 ]; then
-            echo "::error title=Nothing published::Every file of $TAG was already on nuget.org. Nothing was published by this run."
+          if [ "$new_packages" -eq 0 ]; then
+            echo "::error title=Nothing published::Every package of $TAG was already on nuget.org, so this run published nothing. $symbols_submitted symbol package(s) were (re)submitted; nuget.org does not say whether that was new, so check the package page's symbols if you re-ran to repair them."
             exit 1
           fi
-          echo "$pushed file(s) newly published."
+          echo "$new_packages package(s) newly published; $symbols_submitted symbol package(s) submitted."

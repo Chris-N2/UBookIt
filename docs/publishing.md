@@ -143,11 +143,14 @@ machine without one is told so rather than silently building with another band.
 3. **publish** — waits in the GitHub environment `release` until a maintainer **approves** it
    (the run page shows *Review deployments*). It then exchanges the run's identity token for a
    one-hour key (Trusted Publishing) and pushes the libraries, then the `UBookIt` meta-package.
-   Each `.nupkg` and each `.snupkg` goes on its own, and the run summary marks every file
-   *pushed* or *already present*, read from what the feed answered. A re-run after a partial
-   push therefore completes it, symbols included, and a run in which nothing was new fails
-   rather than reporting success. The job never checks out the repository, so no code from it
-   runs while the key exists.
+   Each `.nupkg` and each `.snupkg` goes on its own. The run summary marks every package
+   *published* or *already present*, read from what the feed answered to its push, and every
+   symbol package *symbols submitted* or *symbols pending*. A symbol package is never counted as
+   published, because the feed accepts the same one again with the same answer, so its answer
+   cannot say whether it was new. A re-run after a partial push therefore completes it. A run
+   that published no package fails rather than reporting success, even when it resubmitted
+   symbols; if you re-ran to repair symbols, check the package page. The job never checks out
+   the repository, so no code from it runs while the key exists.
 
 **What that replaces, and what it does not.** From a fresh clone, every time:
 - the stale-artifact and commit-SHA problems below cannot arise;
@@ -439,7 +442,10 @@ There is **no `dotnet nuget setapikey`**. That command belongs to `nuget.exe`, w
 does not install, so the key goes on the command line. To keep it out of PSReadLine history, read
 it into a variable first with `Read-Host` and pass the variable.
 
-The `.snupkg` symbol packages are pushed by the same command alongside their `.nupkg`.
+The `.snupkg` symbol packages are pushed by the same command alongside their `.nupkg`. **Except
+when the `.nupkg` already exists:** then `--skip-duplicate` skips the pair, and the `.snupkg` is
+never attempted (observed against a real feed while building the workflow). To repair symbols
+that failed on an earlier push, push the `.snupkg` by itself.
 
 ### A 403 usually means the key's OWNER, not the key
 
