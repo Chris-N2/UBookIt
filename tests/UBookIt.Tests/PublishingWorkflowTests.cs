@@ -18,13 +18,21 @@ namespace UBookIt.Tests;
 /// nobody has written yet needs a guard that reads every file, every run.
 /// </para>
 /// <para>
-/// <b>What these read, and what they cannot.</b> The workflow files, as text, split into jobs by
-/// indentation. There is no YAML library here, and none is added for this. The files are written
-/// in one regular style, and each test fails loudly if it cannot find the structure it expects,
-/// rather than passing over nothing. They cannot see the repository's own settings (the
-/// <c>release</c> environment's reviewers and tag rule) or the nuget.org policy. Those live
-/// outside the repository, and <c>docs/publishing.md</c> records their values. The last test
-/// holds that record to the workflow, which is as close as a test can get.
+/// <b>They read every LINE, not the shape they expect.</b> The first version found grants by
+/// structure: job bodies, plus the lines before <c>jobs:</c>. QA round 2 put a workflow-level
+/// <c>permissions: id-token: write</c> AFTER <c>jobs:</c> (valid YAML), and a flow-style
+/// <c>- { uses: actions/checkout@v4 }</c>, into a new file, and all four tests passed. A guard that
+/// looks where grants usually are cannot see one placed elsewhere. So the rules are now stated
+/// over every non-comment line of every workflow, and structure is used for one thing only: to
+/// know which lines are the publish job's, where the single allowed grant lives.
+/// </para>
+/// <para>
+/// <b>What these read, and what they cannot.</b> The workflow files, as text. There is no YAML
+/// library here, and none is added for this. Comments are stripped as a <c>#</c> at line start or
+/// after whitespace. The tests cannot see the repository's own settings (the <c>release</c>
+/// environment's reviewers and tag rule) or the nuget.org policy. Those live outside the
+/// repository, and <c>docs/publishing.md</c> records their values. The last test holds that record
+/// to the workflow, which is as close as a test can get.
 /// </para>
 /// </remarks>
 public class PublishingWorkflowTests
@@ -32,72 +40,108 @@ public class PublishingWorkflowTests
     private const string PublishWorkflow = ".github/workflows/publish.yml";
     private const string PublishJob = "publish";
 
+    /// <summary>
+    /// The only actions the publish job may use: none of them touches the repository's code.
+    /// Anything else there (a checkout action of any make, a local action) is refused.
+    /// </summary>
+    private static readonly string[] PublishJobActions =
+    [
+        "actions/download-artifact",
+        "actions/setup-dotnet",
+        "NuGet/login",
+    ];
+
     [Fact]
     public void Only_the_publish_job_can_request_an_identity_token()
     {
-        var grants = new List<string>();
+        var allowed = new List<string>();
+        var offenders = new List<string>();
 
         foreach (var workflow in Workflows())
         {
             var lines = Code(RepoFiles.Read(workflow));
 
-            // A top-level permissions block in every workflow. Without one, jobs get the
-            // repository's default token permissions, which this repository does not control
-            // from here.
+            // A workflow-level permissions block in every workflow, WHEREVER it sits in the file.
+            // Without one, jobs get the repository's default token permissions.
             Assert.True(
                 lines.Any(line => Regex.IsMatch(line, @"^permissions:")),
-                $"{workflow} declares no top-level `permissions:`. Every workflow here states its "
-                + "token's permissions, so that none inherits a repository default.");
+                $"{workflow} declares no workflow-level `permissions:`. Every workflow here states "
+                + "its token's permissions, so that none inherits a repository default.");
 
-            foreach (var line in lines)
-            {
-                Assert.False(
-                    Regex.IsMatch(line, @"permissions:\s*write-all"),
-                    $"{workflow} grants `write-all`, which includes id-token: write. Only the "
-                    + "publish job may request an identity token.");
-            }
+            var publishSpan = workflow == PublishWorkflow
+                ? Jobs(workflow, lines).Single(job => job.Name == PublishJob)
+                : null;
 
-            foreach (var (job, body) in Jobs(workflow, lines))
+            for (var index = 0; index < lines.Count; index++)
             {
-                foreach (var line in body.Where(line => line.Contains("id-token", StringComparison.Ordinal)))
+                var line = lines[index];
+
+                if (Regex.IsMatch(line, @"\bwrite-all\b"))
                 {
-                    grants.Add($"{workflow} job '{job}': {line.Trim()}");
+                    offenders.Add($"{workflow}:{index + 1}: {line.Trim()}  (write-all includes id-token)");
                 }
-            }
 
-            // id-token at WORKFLOW level would reach every job in the file.
-            foreach (var line in TopLevel(lines).Where(line => line.Contains("id-token", StringComparison.Ordinal)))
-            {
-                grants.Add($"{workflow} (workflow level): {line.Trim()}");
+                if (!line.Contains("id-token", StringComparison.Ordinal))
+                {
+                    continue;
+                }
+
+                if (publishSpan is not null && index >= publishSpan.Start && index < publishSpan.End)
+                {
+                    allowed.Add($"{workflow}:{index + 1}: {line.Trim()}");
+                }
+                else
+                {
+                    offenders.Add($"{workflow}:{index + 1}: {line.Trim()}");
+                }
             }
         }
 
         Assert.True(
-            grants.Count == 1 && grants[0].StartsWith($"{PublishWorkflow} job '{PublishJob}': id-token: write", StringComparison.Ordinal),
-            "Exactly one identity-token grant may exist in this repository's workflows: "
-            + $"`id-token: write` on the '{PublishJob}' job of {PublishWorkflow}. Found:\n"
-            + (grants.Count == 0 ? "  (none)" : string.Join("\n", grants.Select(grant => "  " + grant))));
+            offenders.Count == 0,
+            "Only the '" + PublishJob + "' job of " + PublishWorkflow + " may request an identity "
+            + "token. These lines grant one elsewhere, or grant everything:\n  "
+            + string.Join("\n  ", offenders));
+
+        Assert.True(
+            allowed.Count == 1 && Regex.IsMatch(allowed[0], @": id-token:\s*write\s*$"),
+            $"The '{PublishJob}' job must carry exactly one grant, `id-token: write`. Found:\n  "
+            + (allowed.Count == 0 ? "(none)" : string.Join("\n  ", allowed)));
     }
 
     [Fact]
     public void The_publish_job_runs_no_repository_code_and_waits_for_approval()
     {
         var lines = Code(RepoFiles.Read(PublishWorkflow));
-        var job = Jobs(PublishWorkflow, lines).Single(pair => pair.Job == PublishJob).Body;
+        var job = Jobs(PublishWorkflow, lines).Single(candidate => candidate.Name == PublishJob);
+        var body = lines.Skip(job.Start).Take(job.End - job.Start).ToList();
 
-        var offenders = job
-            .Where(line => Regex.IsMatch(line, @"uses:\s*(actions/checkout@|\./)"))
-            .Select(line => line.Trim())
-            .ToList();
+        var offenders = new List<string>();
+
+        foreach (var reference in body.SelectMany(Uses))
+        {
+            var action = Regex.Replace(reference, "@.*$", string.Empty);
+            if (!PublishJobActions.Contains(action, StringComparer.Ordinal))
+            {
+                offenders.Add($"uses {reference}");
+            }
+        }
+
+        // A checkout need not be an action: git or gh on a run line fetches the repository just
+        // as well.
+        offenders.AddRange(body
+            .Where(line => Regex.IsMatch(line, @"(^|[\s;&|(`$])(git|gh)\s"))
+            .Select(line => $"runs {line.Trim()}"));
+
         Assert.True(
             offenders.Count == 0,
-            $"The '{PublishJob}' job must not check out the repository or run a local action, so "
-            + "no code from the repository runs while the one-hour key exists. Found:\n  "
-            + string.Join("\n  ", offenders));
+            $"The '{PublishJob}' job may use only {string.Join(", ", PublishJobActions)} and must "
+            + "not run git or gh, so no code from the repository runs while the one-hour key "
+            + "exists. Found:\n  " + string.Join("\n  ", offenders));
 
-        Assert.Contains(job, line => Regex.IsMatch(line, @"^\s+environment:\s*release\s*$"));
-        Assert.Contains(job, line => Regex.IsMatch(line, @"^\s+if:\s*\$\{\{\s*github\.event_name == 'push'\s*\}\}\s*$"));
-        Assert.Contains(job, line => Regex.IsMatch(line, @"^\s+needs:\s*\[\s*check\s*,\s*pack\s*\]\s*$"));
+        Assert.Contains(body, line => Regex.IsMatch(line, @"^\s+environment:\s*release\s*$"));
+        Assert.Contains(body, line => Regex.IsMatch(line, @"^\s+if:\s*\$\{\{\s*github\.event_name == 'push'\s*\}\}\s*$"));
+        Assert.Contains(body, line => Regex.IsMatch(line, @"^\s+needs:\s*\[\s*check\s*,\s*pack\s*\]\s*$"));
     }
 
     [Fact]
@@ -108,15 +152,8 @@ public class PublishingWorkflowTests
 
         foreach (var workflow in Workflows())
         {
-            foreach (var line in Code(RepoFiles.Read(workflow)))
+            foreach (var reference in Code(RepoFiles.Read(workflow)).SelectMany(Uses))
             {
-                var match = Regex.Match(line, @"^\s*(?:-\s*)?uses:\s*(?<ref>\S+)");
-                if (!match.Success)
-                {
-                    continue;
-                }
-
-                var reference = match.Groups["ref"].Value;
                 if (Regex.IsMatch(reference, @"^[A-Za-z0-9_.-]+/[A-Za-z0-9_.-]+(/[^@\s]+)?@[0-9a-f]{40}$"))
                 {
                     pinned++;
@@ -135,17 +172,18 @@ public class PublishingWorkflowTests
             + string.Join("\n  ", offenders));
 
         // Not vacuous: the three workflows use actions, so a parse that found none is broken.
-        Assert.True(pinned > 0, "No `uses:` lines were found in any workflow. The guard parsed nothing.");
+        Assert.True(pinned > 0, "No `uses:` was found in any workflow. The guard parsed nothing.");
     }
 
     [Fact]
     public void The_runbook_records_what_the_nuget_org_policy_must_match()
     {
         var lines = Code(RepoFiles.Read(PublishWorkflow));
-        var job = Jobs(PublishWorkflow, lines).Single(pair => pair.Job == PublishJob).Body;
+        var job = Jobs(PublishWorkflow, lines).Single(candidate => candidate.Name == PublishJob);
+        var body = lines.Skip(job.Start).Take(job.End - job.Start).ToList();
 
-        var environment = Value(job, @"^\s+environment:\s*(?<value>\S+)\s*$", "environment");
-        var user = Value(job, @"^\s+NUGET_USER:\s*(?<value>\S+)\s*$", "NUGET_USER");
+        var environment = Value(body, @"^\s+environment:\s*(?<value>\S+)\s*$", "environment");
+        var user = Value(body, @"^\s+NUGET_USER:\s*(?<value>\S+)\s*$", "NUGET_USER");
         var fileName = Path.GetFileName(PublishWorkflow);
 
         var runbook = RepoFiles.Read("docs/publishing.md");
@@ -177,21 +215,34 @@ public class PublishingWorkflowTests
             .Select(line => Regex.Replace(line.TrimEnd('\r'), @"(^|\s)#.*$", string.Empty))
             .ToList();
 
-    /// <summary>The lines before `jobs:`, i.e. the workflow-level keys.</summary>
-    private static IEnumerable<string> TopLevel(IReadOnlyList<string> lines) =>
-        lines.TakeWhile(line => !Regex.IsMatch(line, @"^jobs:\s*$"));
+    /// <summary>
+    /// Every action a line references, in block style (`uses: x`, `- uses: x`) or flow style
+    /// (`- { uses: x }`), quoted or not.
+    /// </summary>
+    private static IEnumerable<string> Uses(string line) =>
+        Regex.Matches(line, @"\buses:\s*['""]?(?<ref>[^\s'"",}]+)")
+            .Select(match => match.Groups["ref"].Value);
 
-    /// <summary>Each job under `jobs:`, as its name and the lines of its body.</summary>
-    private static IReadOnlyList<(string Job, IReadOnlyList<string> Body)> Jobs(string workflow, IReadOnlyList<string> lines)
+    private sealed record JobSpan(string Name, int Start, int End);
+
+    /// <summary>
+    /// Each job under `jobs:`, as its name and the half-open range of line indexes its body
+    /// occupies. Used only to know WHICH lines belong to a job; rules about what may appear in a
+    /// workflow are applied to every line, not just to these.
+    /// </summary>
+    private static IReadOnlyList<JobSpan> Jobs(string workflow, IReadOnlyList<string> lines)
     {
-        var jobs = new List<(string, IReadOnlyList<string>)>();
         var start = lines.ToList().FindIndex(line => Regex.IsMatch(line, @"^jobs:\s*$"));
         Assert.True(start >= 0, $"{workflow} has no `jobs:` key, so its jobs cannot be read.");
 
+        var jobs = new List<JobSpan>();
         string? current = null;
-        var body = new List<string>();
-        foreach (var line in lines.Skip(start + 1))
+        var bodyStart = 0;
+        var index = start + 1;
+
+        for (; index < lines.Count; index++)
         {
+            var line = lines[index];
             if (Regex.IsMatch(line, @"^\S"))
             {
                 break; // a later top-level key ends `jobs:`
@@ -202,21 +253,17 @@ public class PublishingWorkflowTests
             {
                 if (current is not null)
                 {
-                    jobs.Add((current, body));
+                    jobs.Add(new JobSpan(current, bodyStart, index));
                 }
 
                 current = header.Groups["name"].Value;
-                body = [];
-            }
-            else if (current is not null)
-            {
-                body.Add(line);
+                bodyStart = index + 1;
             }
         }
 
         if (current is not null)
         {
-            jobs.Add((current, body));
+            jobs.Add(new JobSpan(current, bodyStart, index));
         }
 
         Assert.True(jobs.Count > 0, $"{workflow} has a `jobs:` key but no job could be read under it.");

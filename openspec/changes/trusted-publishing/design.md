@@ -166,12 +166,27 @@ standing rule that a guard must be shown to fire. It is recorded in the tasks.
   ID in order: push the `.nupkg` with `--no-symbols`, then its `.snupkg` if one exists. Each push
   uses `--skip-duplicate`, and `DOTNET_CLI_UI_LANGUAGE=en` keeps the CLI's messages stable. Each
   file is classified from its own output:
-  - `Your package was pushed.` means *pushed*;
-  - `already exists at feed` means *already present*;
+  - for a `.nupkg`: `Your package was pushed.` means *published*, and `already exists at feed`
+    means *already present*;
+  - for a `.snupkg`: `Your package was pushed.` means *symbols submitted*, and `already exists at
+    feed` means *symbols pending*. A symbol package is **never** *published* *(revised at QA
+    round 2, below)*;
   - a non-zero exit means *refused*, and the step fails;
   - anything else means *unrecognised*, and the step fails rather than guessing.
 
-  If nothing was *pushed*, the step fails with "Nothing published".
+  If no `.nupkg` was *published*, the step fails with "Nothing published", and states how many
+  symbol packages were submitted.
+
+**Why a symbol package can never count as published** *(QA round 2)*. nuget.org documents (*Push
+Symbol Packages*, learn.microsoft.com/nuget/api/symbol-package-publish-resource) that "symbol
+packages with the same ID and version can be submitted multiple times". It answers 201 each time,
+and 409 only while an earlier submission "is not available yet". The round-1 version counted every
+accepted push, so re-running a finished release got four 201s from its symbol packages and went
+green, reporting four files published. Its own harness had shown the flaw in the partial re-run
+case, where a resubmitted `.snupkg` was counted, and it was not read. The consequence of
+counting packages only is deliberate: a re-run whose sole effect is resubmitting symbols ends
+red, saying so. The run cannot know whether that repaired anything, so it does not claim to
+have.
 - **The step summary** is a table of every file and its classification.
 
 **Why not the first design's flat-container pre-flight.** It decided "already present" from
@@ -188,7 +203,7 @@ MAJOR.
   push.
 
 Pushing the `.snupkg` alone fixes that. The re-run case was verified end to end: Core's package
-already present, its symbols pushed.
+already present, its symbols submitted.
 
 The only credential-free check left is the order step. A re-run of a complete release now logs in
 before learning nothing is new. That costs one token exchange and publishes nothing.
@@ -263,27 +278,40 @@ runbook requires, not relaxed.
 `tests/UBookIt.Tests/PublishingWorkflowTests.cs` reads every workflow (`*.y*ml`, so a `.yaml`
 cannot slip past) as text, splits it into jobs by indentation, and asserts four things:
 
-1. **Identity tokens.** Exactly one `id-token` grant exists, `id-token: write` on the `publish`
-   job of `publish.yml`. No workflow-level grant, no `write-all`, and every workflow declares
-   top-level `permissions:`.
-2. **The publish job.** No `actions/checkout` and no local action. It keeps
-   `environment: release`, `if: ${{ github.event_name == 'push' }}` and `needs: [check, pack]`.
-3. **Pinning.** Every `uses:` is `owner/repo[/path]@<40 hex>`, and at least one was found.
+1. **Identity tokens.** Every non-comment line of every workflow that mentions `id-token` is
+   found, **wherever it sits**, including a workflow-level block after `jobs:` and a flow-style
+   map. Exactly one is allowed: `id-token: write` inside the `publish` job's line span. There is
+   no `write-all` anywhere, and every workflow declares workflow-level `permissions:`.
+2. **The publish job.** It uses only `actions/download-artifact`, `actions/setup-dotnet` and
+   `NuGet/login` (an allow-list, so a checkout by any action is refused), and it runs no `git` or
+   `gh`. It keeps `environment: release`, `if: ${{ github.event_name == 'push' }}` and
+   `needs: [check, pack]`.
+3. **Pinning.** Every `uses:` anywhere on a line, block or flow style, quoted or not, is
+   `owner/repo[/path]@<40 hex>`, and at least one was found.
+
+*Revised at QA round 2.* The first version located grants by structure: job bodies, plus the lines
+before `jobs:`. It required `uses:` at the start of a line. QA's `late.yml` (a workflow-level
+`id-token: write` placed after `jobs:`, and `- { uses: actions/checkout@v4 }`) passed all four
+tests. The rules now quantify over lines, and structure only locates the one allowed grant.
 4. **The runbook.** Its policy table and environment heading name the environment, the file and
    the `NUGET_USER` the workflow actually uses, derived from the workflow rather than restated.
 
 *Alternative rejected:* a YAML library in the test project. The files are written in one regular
 style, the parser fails loudly when it finds no `jobs:` or no job, and a new test dependency for
-four assertions is not worth its maintenance. Nine mutations, one per guarantee (including a new
-`.yaml` workflow granting `write-all`), each failed the intended test.
+four assertions is not worth its maintenance. Fourteen mutations each failed the intended test.
+They include a new `.yaml` workflow granting `write-all`, QA's `late.yml` verbatim, a flow-style
+permissions map, a `git clone` in the publish job, and a SHA-pinned third-party action there.
 
 ## Risks / Trade-offs
 
-- **How nuget.org answers a duplicate `.snupkg` is unobserved.** BaGet accepts one, and
-  nuget.org is expected to answer 409. If it answers anything else, the push is classified
-  *refused* or *unrecognised* and the step fails loudly, rather than miscounting. The first re-run
-  of a complete release will show which. If it is a benign non-409, the classifier gains a third
-  message, by evidence.
+- **A duplicate `.snupkg` is accepted, by nuget.org's own documentation.** *(This Risk said the
+  opposite at round 1: that nuget.org was "expected to answer 409" and that anything else would
+  "fail loudly". Both were false. A 201 prints `Your package was pushed.` and was counted. QA
+  round 2 found it.)* The push step therefore never counts a symbol package as published. The
+  one remaining unobserved answer is nuget.org's 409 for a symbol package that is still pending.
+  The CLI's `--skip-duplicate` wording for a 409 was observed for packages, and is expected to be
+  the same for symbols. If it is not, the push is *unrecognised* and the step fails. It does not
+  miscount.
 
 - **`NuGet/login` and the policy are not exercised until the first real release.** A dry run stops
   before `publish`. → The first real release is a patch, the manual fallback remains documented,
