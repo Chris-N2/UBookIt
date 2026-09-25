@@ -289,6 +289,16 @@ cannot slip past) as text, splits it into jobs by indentation, and asserts four 
 3. **Pinning.** Every `uses:` anywhere on a line, block or flow style, quoted or not, is
    `owner/repo[/path]@<40 hex>`, and at least one was found.
 
+5. **Plain YAML only** *(added at QA round 3)*. Outside block scalars, there may be no quoted
+   key, no backslash, and no anchor, alias or merge key. QA round 3 passed a quoted job name
+   (`"sneak":`, whose lines fell into the publish job's span) and `"id\x2Dtoken": write`, which a
+   real YAML parser decodes to `id-token` and no substring search sees. Round 2's scenario had
+   been strengthened to "in any position or YAML style", which a line scanner cannot deliver. So
+   the guard refuses every form it cannot read, and the claim holds by construction over what
+   remains. Job headers also recognise quoted names, belt and braces. The publish-job check adds
+   quoted and path-prefixed `git`/`gh`, and the repository's own URLs. What is left to review is
+   named in the spec: a step fetching code from another host.
+
 *Revised at QA round 2.* The first version located grants by structure: job bodies, plus the lines
 before `jobs:`. It required `uses:` at the start of a line. QA's `late.yml` (a workflow-level
 `id-token: write` placed after `jobs:`, and `- { uses: actions/checkout@v4 }`) passed all four
@@ -298,7 +308,7 @@ tests. The rules now quantify over lines, and structure only locates the one all
 
 *Alternative rejected:* a YAML library in the test project. The files are written in one regular
 style, the parser fails loudly when it finds no `jobs:` or no job, and a new test dependency for
-four assertions is not worth its maintenance. Fourteen mutations each failed the intended test.
+four assertions is not worth its maintenance. Twenty-one mutations each failed the intended test (fourteen by round 2, seven more at round 3).
 They include a new `.yaml` workflow granting `write-all`, QA's `late.yml` verbatim, a flow-style
 permissions map, a `git clone` in the publish job, and a SHA-pinned third-party action there.
 

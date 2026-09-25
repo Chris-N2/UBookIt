@@ -27,9 +27,24 @@ namespace UBookIt.Tests;
 /// know which lines are the publish job's, where the single allowed grant lives.
 /// </para>
 /// <para>
+/// <b>What a text guard cannot read, it refuses.</b> QA round 3 took the next step: a quoted job
+/// name (<c>"sneak":</c>), whose lines then fell inside the publish job's span, and a YAML escape
+/// in a double-quoted key (<c>"id\x2Dtoken": write</c>), which decodes to <c>id-token</c> and which
+/// no substring search sees. Both were confirmed with a real YAML parser, and both passed. A line
+/// scanner cannot follow everything YAML can say, so it does not pretend to.
+/// <see cref="Every_workflow_is_written_in_the_plain_YAML_these_guards_read"/> rejects every form
+/// the others cannot see through: quoted keys, backslash escapes, anchors, aliases and merge keys
+/// anywhere outside a block scalar. The other rules therefore hold over what is left, which is all
+/// that GitHub can be given.
+/// </para>
+/// <para>
 /// <b>What these read, and what they cannot.</b> The workflow files, as text. There is no YAML
 /// library here, and none is added for this. Comments are stripped as a <c>#</c> at line start or
-/// after whitespace. The tests cannot see the repository's own settings (the <c>release</c>
+/// after whitespace. Block scalars (<c>run: |</c> bodies) are shell, not YAML, and are exempt from
+/// the plain-YAML rule. Within the publish job they are still searched for <c>git</c>/<c>gh</c> and
+/// for this repository's own URLs. <b>Not guarded, and resting on review:</b> a publish-job step
+/// fetching code from any other host (<c>curl … | bash</c> from somewhere that is not GitHub) and
+/// running it. The tests also cannot see the repository's own settings (the <c>release</c>
 /// environment's reviewers and tag rule) or the nuget.org policy. Those live outside the
 /// repository, and <c>docs/publishing.md</c> records their values. The last test holds that record
 /// to the workflow, which is as close as a test can get.
@@ -128,20 +143,71 @@ public class PublishingWorkflowTests
         }
 
         // A checkout need not be an action: git or gh on a run line fetches the repository just
-        // as well.
+        // as well. Preceded by anything that can start a command word, including a quote (a
+        // quoted `run:` value is ordinary YAML) and a path separator (/usr/bin/git). QA round 3.
         offenders.AddRange(body
-            .Where(line => Regex.IsMatch(line, @"(^|[\s;&|(`$])(git|gh)\s"))
+            .Where(line => Regex.IsMatch(line, @"(^|[\s;&|(`$""'/])(git|gh)\s"))
             .Select(line => $"runs {line.Trim()}"));
+
+        // Nor may it fetch this repository's content over HTTP.
+        offenders.AddRange(body
+            .Where(line => Regex.IsMatch(line, @"github\.com|githubusercontent\.com|codeload\.github|github\.repository\b|github\.server_url", RegexOptions.IgnoreCase))
+            .Select(line => $"references the repository {line.Trim()}"));
 
         Assert.True(
             offenders.Count == 0,
-            $"The '{PublishJob}' job may use only {string.Join(", ", PublishJobActions)} and must "
-            + "not run git or gh, so no code from the repository runs while the one-hour key "
-            + "exists. Found:\n  " + string.Join("\n  ", offenders));
+            $"The '{PublishJob}' job may use only {string.Join(", ", PublishJobActions)}, must not "
+            + "run git or gh, and must not reference the repository's own URLs, so no code from "
+            + "the repository runs while the one-hour key exists. Found:\n  "
+            + string.Join("\n  ", offenders));
 
         Assert.Contains(body, line => Regex.IsMatch(line, @"^\s+environment:\s*release\s*$"));
         Assert.Contains(body, line => Regex.IsMatch(line, @"^\s+if:\s*\$\{\{\s*github\.event_name == 'push'\s*\}\}\s*$"));
         Assert.Contains(body, line => Regex.IsMatch(line, @"^\s+needs:\s*\[\s*check\s*,\s*pack\s*\]\s*$"));
+    }
+
+    [Fact]
+    public void Every_workflow_is_written_in_the_plain_YAML_these_guards_read()
+    {
+        var offenders = new List<string>();
+
+        foreach (var workflow in Workflows())
+        {
+            var lines = Code(RepoFiles.Read(workflow));
+
+            foreach (var index in OutsideBlockScalars(lines))
+            {
+                var line = lines[index];
+                var reasons = new List<string>();
+
+                if (Regex.IsMatch(line, @"^\s*(-\s*)?[""'][^""']*[""']\s*:") || Regex.IsMatch(line, @"[{,]\s*[""'][^""']*[""']\s*:"))
+                {
+                    reasons.Add("a quoted key");
+                }
+
+                if (line.Contains('\\', StringComparison.Ordinal))
+                {
+                    reasons.Add("a backslash (a YAML escape can spell a key these guards search for)");
+                }
+
+                if (Regex.IsMatch(line, @"(^|[:\-\[,{]\s)\s*[&*][A-Za-z0-9_-]") || Regex.IsMatch(line, @"<<\s*:"))
+                {
+                    reasons.Add("an anchor, alias or merge key");
+                }
+
+                if (reasons.Count > 0)
+                {
+                    offenders.Add($"{workflow}:{index + 1}: {string.Join("; ", reasons)}: {line.Trim()}");
+                }
+            }
+        }
+
+        Assert.True(
+            offenders.Count == 0,
+            "The workflow guards read YAML as text. Outside `run: |` style block scalars, keys must "
+            + "be plain, and escapes, anchors, aliases and merge keys are not allowed, because each "
+            + "can express a permission or an action these guards would not see. Write it plainly:\n  "
+            + string.Join("\n  ", offenders));
     }
 
     [Fact]
@@ -223,6 +289,39 @@ public class PublishingWorkflowTests
         Regex.Matches(line, @"\buses:\s*['""]?(?<ref>[^\s'"",}]+)")
             .Select(match => match.Groups["ref"].Value);
 
+    /// <summary>
+    /// The indexes of lines that are YAML, not the body of a block scalar (`key: |`, `key: >-`,
+    /// `- |`). A block scalar's body is every following line that is blank or indented deeper than
+    /// the line that opened it.
+    /// </summary>
+    private static IEnumerable<int> OutsideBlockScalars(IReadOnlyList<string> lines)
+    {
+        var blockIndent = -1;
+
+        for (var index = 0; index < lines.Count; index++)
+        {
+            var line = lines[index];
+            var indent = line.Length - line.TrimStart(' ').Length;
+
+            if (blockIndent >= 0)
+            {
+                if (line.Trim().Length == 0 || indent > blockIndent)
+                {
+                    continue;
+                }
+
+                blockIndent = -1;
+            }
+
+            if (Regex.IsMatch(line, @"(:|^\s*-)\s*[|>][-+0-9]*\s*$"))
+            {
+                blockIndent = indent;
+            }
+
+            yield return index;
+        }
+    }
+
     private sealed record JobSpan(string Name, int Start, int End);
 
     /// <summary>
@@ -248,7 +347,9 @@ public class PublishingWorkflowTests
                 break; // a later top-level key ends `jobs:`
             }
 
-            var header = Regex.Match(line, @"^  (?<name>[A-Za-z0-9_-]+):\s*$");
+            // Quoted job names are refused outright by the plain-YAML test; they are still
+            // recognised here, so that a quoted job can never be read as part of the job above it.
+            var header = Regex.Match(line, @"^  (?<quote>[""']?)(?<name>[A-Za-z0-9_-]+)\k<quote>:\s*$");
             if (header.Success)
             {
                 if (current is not null)

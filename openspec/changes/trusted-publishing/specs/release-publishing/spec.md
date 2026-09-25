@@ -144,12 +144,21 @@ the workflow uses SHALL be referenced by a full commit identifier.
   credential exists.
 
 #### Scenario: A workflow that would widen the credential is caught before it runs
-- **WHEN** any workflow, including one added later, grants an identity token outside the
-  publishing step (in any position or YAML style), grants all permissions, omits its workflow-level
-  permissions, or references an action by anything but a full commit identifier (in any YAML
-  style), or the publishing step uses any action beyond those that fetch the verified packages,
-  set up the SDK and exchange the token, or runs git or gh
-- **THEN** the repository's test suite fails, naming the workflow and the offending line
+- **WHEN** any workflow, including one added later, does any of the following:
+  - grants an identity token outside the publishing step, at any position in the file, in block
+    or flow style;
+  - grants all permissions;
+  - omits its workflow-level permissions;
+  - references an action by anything but a full commit identifier;
+  - or, outside its shell script bodies, uses a quoted key, an escape sequence, an anchor, an alias
+    or a merge key — the forms a text reading of the file cannot see through, and which are
+    therefore refused rather than interpreted;
+
+  or the publishing step uses any action beyond those that fetch the verified packages, set up
+  the SDK and exchange the token, invokes git or gh, or references the repository's own addresses
+- **THEN** the repository's test suite fails, naming the workflow and the offending line. A step
+  that fetches and runs code from a host other than this repository's is not detected, and rests
+  on review.
 
 ### Requirement: A release that is already on nuget.org is not reported as newly published
 The workflow SHALL push libraries before the meta-package that depends on them. It SHALL push
