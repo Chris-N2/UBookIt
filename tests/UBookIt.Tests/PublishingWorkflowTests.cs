@@ -171,7 +171,8 @@ public class PublishingWorkflowTests
         Assert.True(
             offenders.Count == 0,
             $"The '{PublishJob}' job may use only {string.Join(", ", PublishJobActions)}, must not "
-            + "run git or gh, and must not reference the repository's own URLs, so no code from "
+            + "name git or gh as a command word, and must not reference the repository's own URLs, "
+            + "so no code from "
             + "the repository runs while the one-hour key exists. Found:\n  "
             + string.Join("\n  ", offenders));
 

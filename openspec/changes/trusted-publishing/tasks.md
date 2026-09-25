@@ -90,3 +90,8 @@
 - [x] 12.2 NIT (taken): tags are refused in the tree (`!node.Tag.IsEmpty`), so a `!!str` on `runs-on` fails. Keys and values are now told apart by a flag carried through `Nodes()`, not by the path string, so an `A(key): git clone …` entry in the publish job's env fails the scan instead of hiding from it.
 - [x] 12.3 NIT (accepted): the git/gh scan covering step names and shell comments fails closed on text that merely mentions either. The test remarks now say so.
 - Evidence overall: 33 mutations, each failing the intended test, and the restored baseline 5/5.
+
+## 13. QA round 7: APPROVE WITH NITS
+
+- [x] 13.1 NIT: the publish-job assertion message said "must not run git or gh". It now says "must not name git or gh as a command word", matching the narrowed claim. Unit 1987/1987 after the change.
+- [x] 13.2 NIT (already met): every case in `scratchpad/mutate-workflows.ps1` goes through `Sub`, which converts `\n` anchors to the file's own line endings and throws when an anchor is not found. Each case also prints the files it changed. All 33 mutations reported a changed file; only the restored baseline reported none.
