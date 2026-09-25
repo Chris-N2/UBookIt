@@ -22,8 +22,8 @@ a patch. See [the versioning note](README.md#what-the-version-number-means).
 ### What you have to do
 
 **Nothing.** No API signature, schema or migration changes, and no setting you have to change.
-If your site already works, it goes on working. If it runs on Linux and its privacy policy link
-was missing, the link appears.
+If your site already works, it goes on working. If it runs on Linux and its site-relative privacy
+policy link was missing, the link appears.
 
 ### What changed
 

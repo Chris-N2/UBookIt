@@ -63,7 +63,7 @@
   **335**. `openspec validate --all --strict`: 26/26.
 ## 5. Review and merge
 
-- [ ] 5.1 QA review in a subagent (`qa-review`), reused across rounds.
+- [x] 5.1 QA review in a subagent (`qa-review`), reused across rounds.
   *Round 1: REJECT* on `fe30b10`.
   - **MAJOR:** the entry said the booking form "has always accepted" a site-relative link,
     directly under the paragraph saying Linux refused it.
@@ -95,13 +95,22 @@
     for `/privacy` on Linux. "Apart from that" scoped it.
 
   *Round 3: APPROVE WITH NITS* on `2493142`.
-  - QA compared `17.2.0`'s resolver with HEAD's on both platforms. On Windows it measured that
-    every `/`-rooted value `17.2.0` accepted is exactly what the new rule accepts, and `//` is
-    refused by both. So "Apart from that, nothing that used to be refused is accepted now" holds
+  - QA compared `17.2.0`'s resolver with HEAD's on both platforms. On Windows it measured a
+    sample of `/`-rooted values: seven single-slash values, plus `//host/x` and `///x`. It then
+    reasoned from the two rules that the sets `17.2.0`-on-Windows and HEAD accept are equal, and
+    that `//` is refused by both. "Every" is reasoning, not measurement. So "Apart from that, nothing that used to be refused is accepted now" holds
     on Windows and Linux.
   - **NIT, taken:** the refusal list read as complete, but a value with no leading slash
     (`privacy`) is also refused. It was made non-exhaustive ("including") rather than extended,
     because a fifth item could itself be incomplete. QA asked to read that edit before the tag.
+
+  *Round 4: APPROVE* on `52ceb2b`, for the entry as it will be frozen, re-read sentence by
+  sentence against `17.2.0` and HEAD. Two NITs, both taken:
+  - The entry: "If it runs on Linux and its privacy policy link was missing" also covered sites
+    whose link was missing for other reasons, which stay missing. It is now scoped to "its
+    site-relative privacy policy link", in QA's wording.
+  - The record: this task's round-3 bullet said QA measured "every" value. That is corrected to
+    a sample plus reasoning.
 - [ ] 5.2 Chris pushes the branch and opens the PR into `main`. Verify: the PR's CI run is green
   **at every step, parity included** (D2), read through the API.
 - [ ] 5.3 Chris merges with **"Create a merge commit"**. Fetch, and verify `origin/main`'s tip is
