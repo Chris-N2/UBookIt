@@ -79,7 +79,7 @@
   Validate 26/26.
 ## 5. Review and merge
 
-- [ ] 5.1 QA review in a subagent, reused across rounds.
+- [x] 5.1 QA review in a subagent, reused across rounds.
   *Round 1: REJECT* on `09121b1`.
   - **MAJOR:** "Up to `18.1.0`, every uBookIt package carried the tag" is false. `17.2.1` sorts
     before `18.1.0` and is untagged. True on this line, false in general.
@@ -91,6 +91,13 @@
   All four fixed. The implementer then re-read the MAJOR's replacement as a claim and removed a
   causal "so": the library listings also came from every 17.x release before `17.2.1`, verified
   on the feed for the three libraries at 17.0.0–17.1.2.
+
+  *Round 2: APPROVE* on `c5327e2`. QA read all three rewritten sentences as new claims:
+  - It re-fetched all five ids at 17.0.0–17.2.0: 30 nuspecs, all carrying the tag, so "the
+    libraries" is fully true.
+  - It confirmed "each got a listing" against the ㊿ proposal's live measurement.
+  - It confirmed nothing implies delisting.
+  - Plan 5–8 is approved.
 - [ ] 5.2 Chris pushes the branch and opens a PR into `dev/v18`. Verify: the PR run is green at
   every step, parity included.
 - [ ] 5.3 Merged with a merge commit. `origin/dev/v18` = local `dev/v18` = the merge commit.
