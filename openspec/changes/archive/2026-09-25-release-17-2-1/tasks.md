@@ -237,8 +237,15 @@
     - gate the pack on the merge commit's own run;
     - check sibling dependency versions;
     - use the 6.6 recovery.
-- [ ] 8.3 Commit on `main` (D3), run the unit suite, and have Chris push. Verify: `main`'s CI run is
+- [x] 8.3 Commit on `main` (D3), run the unit suite, and have Chris push. Verify: `main`'s CI run is
   green at every step.
-- [ ] 8.4 Archive **last**, so that no box it records is still open. **Run the unit suite locally
+  *Done:* the unit suite passed 1982/1982 on `aebd046` (`--no-build` is valid because only
+  markdown changed since the clean build of `6f0da77`). Chris pushed `6944ceb` and `aebd046`.
+  Run `36138329526` on `aebd046` was success at every step.
+- [x] 8.4 Archive **last**, so that no box it records is still open. **Run the unit suite locally
   before the push** (D3), and verify it is green. The archive push's own CI run is checked and
   reported in the session, because the record is frozen by then.
+
+  *Done:* archived with this box ticked. Before the push, the unit suite ran locally on the
+  archive commit (result in that commit's message). The CI of the push itself is checked in the
+  session.
