@@ -17,6 +17,48 @@ a patch. See [the versioning note](README.md#what-the-version-number-means).
 
 ---
 
+## 17.2.1
+
+### What you have to do
+
+**Nothing.** No API signature, schema or migration changes, and no setting you have to change.
+If your site already works, it goes on working. If it runs on Linux and its site-relative privacy
+policy link was missing, the link appears.
+
+### What changed
+
+**A site-relative privacy policy link now works on Linux.** Setting `UBookIt:PrivacyPolicyUrl` to
+a path on your own site, such as `/privacy`, which is the form the backoffice documentation gives,
+was refused on Linux hosts. The booking form showed its privacy notice with no link, and every
+startup logged an error saying the value could not be used. Windows hosts were unaffected. The
+cause was that .NET on Linux reads `/privacy` as a `file:` address, and the package accepts only
+`http` and `https` addresses. A site-relative path is now judged as a path on every platform.
+Apart from that, nothing that used to be refused is accepted now. The refusals are what they
+were, including `//host`, a backslash, a control character, and every scheme except `http` and
+`https`, which is what keeps `javascript:` out.
+
+**The settings screen accepts a site-relative policy link.** It used to insist on an absolute
+address on every platform, even where the booking form accepted a site-relative one, which was
+on Windows hosts. So a Windows site could set the documented form only through configuration, and
+a Linux site could not use it at all.
+
+**The settings screen also now refuses something it used to accept.** It stored an absolute
+`http` or `https` address containing a backslash or a control character, such as
+`https:\\example.com/privacy` or an address with a tab inside it. The booking form has never
+rendered such a value; it treated it as no link at all. The screen now refuses it and says what
+it accepts. That makes `SettingValidation.IsValid` stricter for this setting, with no change to
+its signature. **A value already stored stays stored**, and your pages look exactly as they did,
+without that link. Settings are saved one at a time, so it does not stop you saving anything else.
+You will only see the message if you edit that setting.
+
+**Only the `UBookIt` package asks to be listed on the Umbraco Marketplace now.** Until this
+release every uBookIt package carried the Marketplace's tag, so `UBookIt.Persistence`,
+`UBookIt.Web` and `UBookIt.Backoffice` each had a listing of their own. Installing one of them
+gives you part of uBookIt, and the part left out fails silently. Install `UBookIt`. Versions
+already published keep their tag, so whether those three listings disappear is up to the
+Marketplace. The `UBookIt` description now takes its Umbraco major from its own version, and it
+no longer says "(LTS)".
+
 ## 17.2.0 — 2026-09-23
 
 ### What you have to do
