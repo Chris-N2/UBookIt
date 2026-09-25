@@ -34,8 +34,8 @@ startup logged an error saying the value could not be used. Windows hosts were u
 cause was that .NET on Linux reads `/privacy` as a `file:` address, and the package accepts only
 `http` and `https` addresses. A site-relative path is now judged as a path on every platform.
 Apart from that, nothing that used to be refused is accepted now. The refusals are what they
-were, including `//host`, a backslash, a control character, and every scheme except `http` and `https`,
-which is what keeps `javascript:` out.
+were, including `//host`, a backslash, a control character, and every scheme except `http` and
+`https`, which is what keeps `javascript:` out.
 
 **The settings screen accepts a site-relative policy link.** It used to insist on an absolute
 address on every platform, even where the booking form accepted a site-relative one, which was
