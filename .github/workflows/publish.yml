@@ -49,7 +49,9 @@ env:
   TAG: ${{ github.event_name == 'workflow_dispatch' && inputs.tag || github.ref_name }}
 
 concurrency:
-  # One run per tag at a time, and none cancelled: a publish must never be interrupted halfway.
+  # One run per tag at a time, and a RUNNING one is never cancelled, so a publish is never
+  # interrupted halfway. Not "none cancelled": GitHub keeps one PENDING run per group, so a newer
+  # run for the same tag replaces an older one still waiting to start (see ci.yml's comment).
   group: publish-${{ github.event_name == 'workflow_dispatch' && inputs.tag || github.ref_name }}
   cancel-in-progress: false
 
@@ -157,6 +159,9 @@ jobs:
           path: ${{ env.PACKAGES_DIR }}/*
           if-no-files-found: error
           retention-days: 7
+          # A re-run of this job replaces the artifact with its own freshly verified pack, rather
+          # than failing on the name or leaving an earlier attempt's files to be published.
+          overwrite: true
 
   publish:
     needs: [check, pack]
@@ -180,6 +185,8 @@ jobs:
       NUGET_USER: CNorwood69
       # Pushed LAST, after the libraries it depends on, so it is never briefly uninstallable.
       META_PACKAGE: UBookIt
+      # The push step classifies the CLI's own messages, so they must be the English ones.
+      DOTNET_CLI_UI_LANGUAGE: en
 
     steps:
       - name: Fetch the verified packages
@@ -194,41 +201,27 @@ jobs:
         with:
           dotnet-version: 10.0.x
 
-      - name: What is already on nuget.org (before any credential exists)
-        id: preflight
+      - name: Order the push - libraries first, the meta-package last (no credential yet)
+        id: order
         shell: bash
         run: |
           set -euo pipefail
-          version_lower="$(echo "$TAG" | tr '[:upper:]' '[:lower:]')"
-          to_push=()
-          present=()
+          libraries=()
+          meta=''
           for nupkg in "$PACKAGES_DIR"/*.nupkg; do
             file="$(basename "$nupkg")"
             id="${file%".$TAG.nupkg"}"
             if [ "$id" = "$file" ]; then
-              echo "::error title=Preflight::$file does not carry the version $TAG."
+              echo "::error title=Push order::$file does not carry the version $TAG."
               exit 1
             fi
-            id_lower="$(echo "$id" | tr '[:upper:]' '[:lower:]')"
-            status="$(curl -s -o index.json -w '%{http_code}' "https://api.nuget.org/v3-flatcontainer/$id_lower/index.json")"
-            case "$status" in
-              200) if jq -e --arg v "$version_lower" '.versions | index($v)' index.json > /dev/null; then present+=("$id"); else to_push+=("$id"); fi ;;
-              404) to_push+=("$id") ;;
-              *)   echo "::error title=Preflight::nuget.org answered $status for $id, so whether $TAG is already published is unknown."; exit 1 ;;
-            esac
+            if [ "$id" = "$META_PACKAGE" ]; then meta="$id"; else libraries+=("$id"); fi
           done
-
-          {
-            echo "## $TAG on nuget.org before this run"
-            for id in "${present[@]}"; do echo "- \`$id\` already present"; done
-            for id in "${to_push[@]}"; do echo "- \`$id\` to push"; done
-          } >> "$GITHUB_STEP_SUMMARY"
-
-          if [ "${#to_push[@]}" -eq 0 ]; then
-            echo "::error title=Nothing published::Every package of $TAG is already on nuget.org. Nothing was published, and no credential was requested."
+          if [ -z "$meta" ]; then
+            echo "::error title=Push order::$META_PACKAGE.$TAG.nupkg is not among the verified packages."
             exit 1
           fi
-          echo "to_push=${to_push[*]}" >> "$GITHUB_OUTPUT"
+          echo "order=${libraries[*]} $meta" >> "$GITHUB_OUTPUT"
 
       - name: Log in to nuget.org (OIDC -> one-hour API key)
         # Immediately before the push: the key lasts one hour, and each token is exchanged once.
@@ -237,26 +230,67 @@ jobs:
         with:
           user: ${{ env.NUGET_USER }}
 
-      - name: Push - libraries first, then the meta-package
+      - name: Push each package, then its symbols, and say which were new
+        # WHY EACH FILE ON ITS OWN, AND WHY THE OUTPUT IS READ. Observed against a real feed with
+        # the real CLI (QA round 1 asked for exactly that, not a stub):
+        #   - with --skip-duplicate a 409 exits 0 and prints "already exists at feed"; only a new
+        #     package prints "Your package was pushed." So the exit code alone cannot tell a
+        #     publish from a no-op, and a re-run of a finished release would report success.
+        #   - pushing a .nupkg that ALREADY EXISTS never even attempts its sibling .snupkg. So a
+        #     release whose package landed but whose symbols failed could never be repaired by
+        #     pushing the pair together. The .snupkg is therefore pushed by itself, every time.
+        # nuget.org is NOT consulted beforehand. Its flat container lags a push by the whole
+        # validation window, which is exactly when a re-run after a partial failure happens.
+        # Anything but those two messages fails the step, rather than being guessed at.
         shell: bash
         env:
           NUGET_API_KEY: ${{ steps.login.outputs.NUGET_API_KEY }}
-          TO_PUSH: ${{ steps.preflight.outputs.to_push }}
+          ORDER: ${{ steps.order.outputs.order }}
         run: |
           set -euo pipefail
-          read -r -a ids <<< "$TO_PUSH"
-          ordered=()
+          read -r -a ids <<< "$ORDER"
+          pushed=0
+
+          {
+            echo "## $TAG"
+            echo "| File | Result |"
+            echo "|---|---|"
+          } >> "$GITHUB_STEP_SUMMARY"
+
+          push_one() {
+            local file="$1" name out code
+            shift
+            name="$(basename "$file")"
+            set +e
+            out="$(dotnet nuget push "$file" "$@" --api-key "$NUGET_API_KEY" --source "$NUGET_SOURCE" --skip-duplicate 2>&1)"
+            code=$?
+            set -e
+            printf '%s\n' "$out"
+            if [ "$code" -ne 0 ]; then
+              echo "| \`$name\` | **refused** |" >> "$GITHUB_STEP_SUMMARY"
+              echo "::error title=Push::nuget.org refused $name (exit $code). See the output above."
+              exit 1
+            elif grep -qF 'Your package was pushed.' <<< "$out"; then
+              echo "| \`$name\` | pushed |" >> "$GITHUB_STEP_SUMMARY"
+              pushed=$((pushed + 1))
+            elif grep -qF 'already exists at feed' <<< "$out"; then
+              echo "| \`$name\` | already present |" >> "$GITHUB_STEP_SUMMARY"
+            else
+              echo "| \`$name\` | **unrecognised** |" >> "$GITHUB_STEP_SUMMARY"
+              echo "::error title=Push::The push of $name exited 0 but said neither 'pushed' nor 'already exists'. Whether it was published is unknown."
+              exit 1
+            fi
+          }
+
           for id in "${ids[@]}"; do
-            if [ "$id" != "$META_PACKAGE" ]; then ordered+=("$id"); fi
-          done
-          for id in "${ids[@]}"; do
-            if [ "$id" = "$META_PACKAGE" ]; then ordered+=("$id"); fi
+            push_one "$PACKAGES_DIR/$id.$TAG.nupkg" --no-symbols
+            if [ -f "$PACKAGES_DIR/$id.$TAG.snupkg" ]; then
+              push_one "$PACKAGES_DIR/$id.$TAG.snupkg"
+            fi
           done
 
-          echo "## Pushed" >> "$GITHUB_STEP_SUMMARY"
-          for id in "${ordered[@]}"; do
-            # A sibling .snupkg is pushed with its .nupkg. --skip-duplicate covers only a race
-            # with a concurrent push; the preflight above already left out what was present.
-            dotnet nuget push "$PACKAGES_DIR/$id.$TAG.nupkg" --api-key "$NUGET_API_KEY" --source "$NUGET_SOURCE" --skip-duplicate
-            echo "- \`$id\` $TAG" >> "$GITHUB_STEP_SUMMARY"
-          done
+          if [ "$pushed" -eq 0 ]; then
+            echo "::error title=Nothing published::Every file of $TAG was already on nuget.org. Nothing was published by this run."
+            exit 1
+          fi
+          echo "$pushed file(s) newly published."

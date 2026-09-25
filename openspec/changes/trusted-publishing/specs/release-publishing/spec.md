@@ -69,10 +69,23 @@ It SHALL fail, naming the offending file, unless:
 
 - exactly one package exists for each packable project in the tagged commit's solution, and each
   carries the tag as its version;
-- each package that carries assemblies has its symbol package, and a package that deliberately
-  carries none has no symbol package;
+- each package that carries assemblies has its symbol package, holding a symbol file for every
+  one of those assemblies, and a package that carries none has no symbol package. Whether a
+  package carries assemblies SHALL be read from the package itself. A project setting that
+  disagrees with the package's contents is itself a failure; it SHALL NOT be where the
+  expectation comes from;
 - every package's manifest names the public repository and the tagged commit;
-- every SourceLink map fetches source from the public repository at the tagged commit.
+- every assembly a package carries has a SourceLink map, and every SourceLink map fetches source
+  from the public repository at the tagged commit.
+
+#### Scenario: Assemblies that would ship without symbols are caught
+- **WHEN** a library's project is set not to produce symbols, while its package still carries an
+  assembly
+- **THEN** the workflow fails, naming the package and the assembly, and nothing is published
+
+#### Scenario: A symbol package missing an assembly's symbols is caught
+- **WHEN** a symbol package lacks the symbol file for an assembly its package carries
+- **THEN** the workflow fails, naming the symbol package and the missing file
 
 #### Scenario: A package at the wrong version is caught before publishing
 - **WHEN** a produced package's manifest carries a version other than the tag
@@ -130,15 +143,36 @@ the workflow uses SHALL be referenced by a full commit identifier.
   pinned actions. So no script, build logic or dependency in the repository can act while the
   credential exists.
 
+#### Scenario: A workflow that would widen the credential is caught before it runs
+- **WHEN** any workflow, including one added later, grants an identity token outside the
+  publishing step, grants all permissions, omits its workflow-level permissions, references an
+  action by anything but a full commit identifier, or gives the publishing step a checkout
+- **THEN** the repository's test suite fails, naming the workflow and the offending line
+
 ### Requirement: A release that is already on nuget.org is not reported as newly published
-The workflow SHALL push libraries before the meta-package that depends on them. When some of a
-release's packages are already on nuget.org — for example on a re-run after a partial push — it
-SHALL push the remainder and report which packages it pushed and which were already present. When
-every package is already present, the run SHALL fail, stating that nothing was published.
+The workflow SHALL push libraries before the meta-package that depends on them. It SHALL push
+each package and each symbol package separately, so that a symbol package is attempted even when
+its package is already present. It SHALL decide whether each file was newly published or already
+present from the feed's answer to that file's push. It SHALL NOT decide from a lookup made
+beforehand, which can lag a recent push. A push whose answer is neither SHALL fail the run. When
+some of a release's files are already on nuget.org — for example on a re-run after a partial push —
+it SHALL push the remainder and report, file by file, which it pushed and which were already
+present. When no file was newly published, the run SHALL fail, stating that nothing was
+published.
 
 #### Scenario: A re-run completes a partial publish
 - **WHEN** a publish run is re-run after an earlier attempt pushed some but not all packages
 - **THEN** the remaining packages are pushed, and the run reports which were already present
+
+#### Scenario: A re-run repairs symbols that failed to publish
+- **WHEN** an earlier attempt published a package but not its symbol package, and the run is
+  re-run
+- **THEN** the symbol package is pushed, and the package is reported as already present
+
+#### Scenario: A re-run straight after a complete publish is not reported as a publish
+- **WHEN** a run is re-run immediately after every file was published, before the feed has
+  finished indexing them
+- **THEN** no file is reported as newly published, and the run fails
 
 #### Scenario: Re-publishing a complete release is reported, not silently green
 - **WHEN** the publish step runs for a version whose packages are all already on nuget.org

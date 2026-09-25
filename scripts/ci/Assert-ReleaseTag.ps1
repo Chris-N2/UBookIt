@@ -20,8 +20,10 @@
                     branch names are the same pair Assert-LineParity.ps1 holds.
       4. VERIFIED.  The ci workflow has a SUCCESSFUL run for a push of this exact commit to
                     that line. A run still queued or in progress is waited for, up to
-                    -WaitMinutes; a run that failed or was cancelled, or no run at all,
-                    fails here. This is what ci.yml's "a release tag names a commit whose
+                    -WaitMinutes. A run that failed or was cancelled fails here. So does no
+                    run at all, but only after a short grace (up to 5 minutes), because a tag
+                    pushed with its merge can arrive before GitHub registers the merge's run.
+                    Up to 3 consecutive API errors are retried rather than ending the wait. This is what ci.yml's "a release tag names a commit whose
                     push has already been verified" is enforced by.
 
     The GitHub API is called with Invoke-RestMethod rather than `gh`, so that a local run and
@@ -165,12 +167,26 @@ if ($env:GITHUB_TOKEN) {
 $runsUri = "https://api.github.com/repos/$Repository/actions/workflows/ci.yml/runs?head_sha=$sha&event=push&per_page=100"
 
 $deadline = (Get-Date).AddMinutes($WaitMinutes)
+# A tag pushed together with its merge can arrive before GitHub has registered the merge's ci
+# run. So "no run at all" is waited out briefly before it counts as "never verified".
+$registrationGrace = (Get-Date).AddMinutes([Math]::Min(5, $WaitMinutes))
+# A single failed API call during an hour's wait should not end it; a run of them should.
+$apiFailures = 0
+$maxApiFailures = 3
+
 while ($true) {
     try {
         $response = Invoke-RestMethod -Uri $runsUri -Headers $headers
+        $apiFailures = 0
     }
     catch {
-        Fail 'verified' "The ci runs for $sha could not be read from the GitHub API: $($_.Exception.Message)"
+        $apiFailures++
+        if ($apiFailures -ge $maxApiFailures -or (Get-Date) -ge $deadline) {
+            Fail 'verified' "The ci runs for $sha could not be read from the GitHub API ($apiFailures attempt(s) in a row): $($_.Exception.Message)"
+        }
+        Write-Host "The GitHub API did not answer ($($_.Exception.Message)); trying again in $PollSeconds s."
+        Start-Sleep -Seconds $PollSeconds
+        continue
     }
 
     $runs = @($response.workflow_runs | Where-Object { $_.head_branch -eq $line })
@@ -183,6 +199,11 @@ while ($true) {
     $pending = @($runs | Where-Object { $_.status -ne 'completed' })
     if ($pending.Count -eq 0) {
         if ($runs.Count -eq 0) {
+            if ((Get-Date) -lt $registrationGrace) {
+                Write-Host "ci has no run for $sha on $line yet; it may not be registered. Checking again in $PollSeconds s."
+                Start-Sleep -Seconds $PollSeconds
+                continue
+            }
             Fail 'verified' "ci has no run for a push of $sha to $line, so this commit has not been verified on its line."
         }
 
