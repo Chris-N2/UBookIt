@@ -1,4 +1,6 @@
+using Microsoft.Extensions.Configuration;
 using UBookIt.Persistence.Composing;
+using UBookIt.Persistence.Entities;
 
 namespace UBookIt.Backoffice.Settings;
 
@@ -22,6 +24,13 @@ namespace UBookIt.Backoffice.Settings;
 public static class SettingValidation
 {
     /// <summary>
+    /// A configuration with nothing in it, for asking <see cref="SettingText.RowsFor"/> which rows a
+    /// value would be stored as. The only rows a site's configuration adds are blank overflow rows,
+    /// and a blank row cannot be too long, so leaving them out changes nothing this is used for.
+    /// </summary>
+    private static readonly IConfiguration NoConfiguration = new ConfigurationBuilder().Build();
+
+    /// <summary>
     /// Whether <paramref name="value"/> may be stored for <paramref name="descriptor"/>.
     /// </summary>
     /// <param name="descriptor">The setting being written.</param>
@@ -41,6 +50,19 @@ public static class SettingValidation
         {
             error = "A value is required. To return this setting to its configured value, reset it "
                 + "rather than clearing it.";
+            return false;
+        }
+
+        // What the store can hold, measured on the rows this value would BECOME rather than on the
+        // submitted text. A recipient list is stored one row per address, so measuring the whole
+        // string would refuse a long list the store holds perfectly well. The rows come from the
+        // same call the controller stores with, so the two cannot disagree about the shape.
+        if (SettingText.RowsFor(descriptor, value, NoConfiguration)
+            .Any(row => row.Value.Length > SettingRow.MaxValueLength))
+        {
+            error = descriptor.ValueKind == SettingValueKind.EmailList
+                ? $"Each address must be no longer than {SettingRow.MaxValueLength} characters."
+                : $"Must be no longer than {SettingRow.MaxValueLength} characters.";
             return false;
         }
 

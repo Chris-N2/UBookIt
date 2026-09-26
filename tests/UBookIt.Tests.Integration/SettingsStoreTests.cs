@@ -1,3 +1,5 @@
+using Microsoft.EntityFrameworkCore;
+using UBookIt.Persistence.Entities;
 using UBookIt.Persistence.Stores;
 using UBookIt.Tests.Integration.Support;
 
@@ -88,6 +90,58 @@ public class SettingsStoreTests(SqlServerFixture fixture)
         // The ordinary case for most settings: reset on something never overridden. The requested
         // state and the resulting state are the same either way.
         await new SqlSettingsStore(context, TimeProvider.System).RemoveAsync(Key(), Ct);
+    }
+
+    /// <summary>
+    /// The store's real capacity is <see cref="SettingRow.MaxValueLength"/> — the constant the
+    /// settings screen's validation refuses beyond. Measured against the column the migrations
+    /// build, so a migration that changed it would fail here rather than let the two disagree.
+    /// </summary>
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public async Task A_value_at_the_declared_capacity_round_trips_intact(bool surrogatePairs)
+    {
+        fixture.EnsureAvailable();
+        var key = Key();
+
+        // U+1F600 is two UTF-16 code units, so this is MaxValueLength units and half as many
+        // characters a reader would count: nvarchar and string.Length both count units, and this
+        // proves they agree rather than asserting it.
+        var value = surrogatePairs
+            ? string.Concat(Enumerable.Repeat("\U0001F600", SettingRow.MaxValueLength / 2))
+            : new string('a', SettingRow.MaxValueLength);
+
+        Assert.Equal(SettingRow.MaxValueLength, value.Length);
+
+        await using (var context = fixture.CreateContext())
+        {
+            await new SqlSettingsStore(context, TimeProvider.System).SetAsync(key, value, Ct);
+        }
+
+        await using var read = fixture.CreateContext();
+
+        Assert.Equal(value, new SqlSettingsStore(read, TimeProvider.System).GetAll()[key]);
+    }
+
+    /// <summary>
+    /// One unit past the capacity fails AT THE STORE — the defect validation now prevents, shown
+    /// to be real rather than inferred from the schema.
+    /// </summary>
+    [Fact]
+    public async Task A_value_past_the_declared_capacity_fails_at_the_store()
+    {
+        fixture.EnsureAvailable();
+
+        await using var context = fixture.CreateContext();
+        var store = new SqlSettingsStore(context, TimeProvider.System);
+
+        // Specific about WHY it failed: any exception would also be thrown by a broken fixture, and
+        // a test that passed on that would prove nothing about the column.
+        var failure = await Assert.ThrowsAsync<DbUpdateException>(
+            () => store.SetAsync(Key(), new string('a', SettingRow.MaxValueLength + 1), Ct));
+
+        Assert.Contains("truncated", failure.InnerException?.Message, StringComparison.OrdinalIgnoreCase);
     }
 
     [Fact]

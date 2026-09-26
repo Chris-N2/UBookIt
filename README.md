@@ -1,55 +1,170 @@
 # uBookIt
 
-A booking system for Umbraco 18.
+Bookings for Umbraco 18: rooms, desks, studios, equipment, and appointments that need a person
+and a place at the same time. You set up what can be booked in the backoffice, and visitors book
+on a page of your own site, in your own layout. Every step works with JavaScript turned off.
 
-Configure what can be booked, publish a page, and take bookings — without writing code.
-Visitors can complete a booking **with JavaScript turned off**, and your site is told when a
-booking is placed or cancelled so it can send whatever it wants to send.
+![A booking page on a site called Fairfield Studios: the site's own header and navigation across the top, then a heading reading Book Studio session and a grouped list of radio buttons headed "Dates with availability for 30 minutes in the next 30 days", one per day from Monday 21 September 2026 onward, the first already selected. The list continues below the visible area.](https://raw.githubusercontent.com/Chris-N2/UBookIt/18.1.2/docs/images/booking-flow.png)
+
+## Get started
 
 ```
 dotnet add package UBookIt
 ```
 
-Then run the site. uBookIt installs its schema on first boot.
+Run the site, and uBookIt installs its schema on first boot. It needs **SQL Server** (not SQLite)
+and Umbraco 18.2.0 or later. The full requirements are further down.
 
-**One step you will otherwise look for:** the **uBookIt** section is not visible until you
-grant it, the same as any other Umbraco section — *Users → User Groups → (a group) → Sections*.
-Grant it deliberately rather than to everyone: it decides who can see the bookings a site has
-taken. Who can see the **name and email address** of the person who booked is a second
-question, answered by Umbraco's built-in **Sensitive data** group — and note that only the
-site's original super user is in that group to begin with, so a newly created administrator
-sees those details hidden until you add them. See [the backoffice docs](https://github.com/Chris-N2/UBookIt/blob/18.1.1/docs/backoffice.md).
+**Then grant the section.** Like any Umbraco section, **uBookIt** stays hidden until you grant it
+to a user group: *Users → User Groups → (a group) → Sections*. Grant it deliberately, because it
+decides who can see the bookings your site has taken.
 
-> **uBookIt is at `18.1.1`, and the public API is a promise.** The promise is not that nothing
-> will ever change — `17.1.0` itself added members to five published interfaces, which is why it
-> is a minor. It is that a change to a published contract is deliberate, is named before you meet
-> it, and never arrives in a patch. What each release asks of a site that is upgrading is the
-> first thing in [the changelog](https://github.com/Chris-N2/UBookIt/blob/18.1.1/CHANGELOG.md).
+The booker's **name and email address** are a second question, and Umbraco's built-in
+**Sensitive data** group answers it. At first that group holds only the site's original super
+user, so an administrator you create later sees those details hidden until you add them. See
+[the backoffice docs](https://github.com/Chris-N2/UBookIt/blob/18.1.2/docs/backoffice.md).
 
-### What the version number means
+## What it does
 
-**The major tracks the Umbraco major**, as Umbraco packages are conventionally versioned:
-uBookIt `17.x` is for Umbraco 17, and the uBookIt for a later Umbraco carries that Umbraco's
-major. You never have to remember which uBookIt went with which CMS.
+**For the people booking**
 
-**That means the major is not a breaking-change signal, and this is where uBookIt departs
-from Semantic Versioning.** The major is spent on the CMS version, so:
+- Book from a page on your site: the whole catalogue, one service, or one resource.
+- Choose from the dates and start times that are actually free, for the length they need.
+- Finish without JavaScript.
+- Receive a confirmation email and cancel from a link in it, if you turn those on.
+
+**For your staff**, in the backoffice
+
+- Set up bookable resources: opening hours, date exceptions, minimum and maximum lengths, and
+  capabilities that describe what each one can do.
+- Build services from roles. For example, "a haircut" can mean one stylist and one chair, and
+  uBookIt works out which combinations are free.
+- Close the whole organisation on chosen dates, from one list, and open individual resources anyway.
+- Import public holidays from a source your own code supplies. uBookIt ships no holiday data.
+- See, find, move, cancel, confirm and decline bookings. Find one by its reference, or every
+  booking made with an email address.
+- Record a booking taken over the telephone, on the caller's behalf.
+- Choose whether bookings confirm immediately or wait for somebody to approve them.
+- Decide who can do what, with permissions per user group in Umbraco's ordinary group editor.
+- See and change uBookIt's settings in one screen, rather than only in `appsettings.json`.
+
+**For developers**
+
+- Handle notifications when a booking is placed, confirmed, declined or cancelled, to send your
+  own messages, write to a log, or push to a CRM.
+- Build your own front end on a JSON delivery API.
+- Restyle with CSS custom properties, or replace the views entirely with a theme in your own
+  Razor class library.
+
+### Off until you turn it on
+
+A new install starts with all four of these off, or granted to nobody:
+
+- **The delivery API.** The API is off by default, and reads and booking placement are turned on
+  separately. Once on, the API is anonymous by design, and uBookIt makes no DDoS-protection
+  claim: volume protection belongs to your host. See
+  [the delivery API](https://github.com/Chris-N2/UBookIt/blob/18.1.2/docs/delivery-api.md).
+- **Emails**, to the booker and to your own people. That means a site-wide list, plus the users
+  and groups made responsible for each resource or service. A mail server is not permission to
+  write to your customers.
+- **Self-service cancellation.** It rides the booker's confirmation email, so it needs those
+  emails on too. Read [the configuration notes](https://github.com/Chris-N2/UBookIt/blob/18.1.2/docs/configuration.md)
+  first, because the link is the credential.
+- **The settings screen.** It needs the *Change site settings* permission, which nobody has,
+  administrators included, until you grant it.
+
+## What it looks like
+
+**Choosing a time, and giving your details.** The start times for the chosen day wrap across
+the page rather than running down it. Every field is labelled, and the notice explaining what
+the site does with the details sits where the details are asked for.
+
+![The lower half of the booking page shown at the top of this readme: a How long do you need? selector reading 30 minutes, a Show times button, and a fieldset headed "Available start times on Monday 21 September 2026 for 30 minutes" whose nine radio options from 12:30 to 16:30 wrap across two rows. Below it a Your details fieldset holds labelled Name, Email and optional Phone fields, a note saying the site will email you about your booking, two paragraphs explaining what the details are used for and how long they are kept, and a Book button.](https://raw.githubusercontent.com/Chris-N2/UBookIt/18.1.2/docs/images/booking-form.png)
+
+**The Bookings screen in the backoffice.** Find a booking by reference or email address, choose a
+date window, filter by status, and act on a row.
+
+![The uBookIt Bookings screen inside the Umbraco backoffice: a Find box for a reference or email address, From and To date fields both set to 5 October 2026, status checkboxes for Requested, Confirmed, Cancelled and Declined, and a New booking button for recording one taken by telephone. Below them a table of four bookings shows reference, date and time, booker name and email, resources, service and status, each row offering Move and Cancel actions.](https://raw.githubusercontent.com/Chris-N2/UBookIt/18.1.2/docs/images/bookings-screen.png)
+
+**Availability, per resource.** Opening hours are windows on each weekday. Add as many as a day
+needs, for a lunch break or a split shift.
+
+![The Opening hours panel of a resource in the uBookIt backoffice, with one section per day of the week. Monday through Friday are shown and the remaining days continue below the picture; each day holds a From and a To time field reading 09:00 and 17:00, a Remove window link beside them, and an Add window link for that day underneath.](https://raw.githubusercontent.com/Chris-N2/UBookIt/18.1.2/docs/images/availability.png)
+
+## Accessibility is a feature here, not a checkbox
+
+Booking interfaces are notorious accessibility failures. So uBookIt's shipped flow is built to
+meet **every WCAG 2.2 AA criterion that markup determines**: labelling, grouping, programmatic
+relationships, keyboard operability, and reading and focus order. Every step stays usable with
+**no stylesheet applied at all**.
+
+That claim names its own boundary, because uBookIt is a component inside *your* page, and WCAG
+conformance is a property of a page. Text contrast, focus appearance and target size are decided
+by CSS. The shipped stylesheet sets no text colour of its own, and non-text contrast for
+decorative borders is explicitly **not** claimed. The full account, including what becomes yours
+the moment you override a token or supply a theme, is in
+[the booking page docs](https://github.com/Chris-N2/UBookIt/blob/18.1.2/docs/booking-page.md#accessibility-what-we-hold-and-what-becomes-yours).
+
+## What it does not do yet
+
+These limits are deliberate, and they're listed here so you know before you install:
+
+- **One booking per resource at a time.** A resource is claimed for the whole interval, so a room
+  that seats twenty is one bookable thing, not twenty.
+- **A move changes when, not what.** If a booking's resource is busy at the new time, the move is
+  refused. It isn't given a different resource.
+- **No search by the booker's name.** You can find a booking by its reference, or every booking
+  made with an email address, which is how an erasure request is honoured. Searching by name is a
+  search over personal data, and uBookIt deliberately doesn't offer one.
+- **No recurring bookings, payment or cancellation windows**, and no language other than `en-US`.
+
+## How it's built
+
+uBookIt is built with AI assistance, under a spec-driven workflow that is in the repository for
+anyone to read:
+
+- **Specs first.** Every change starts as a written proposal and task list, with a design where one
+  is needed, in [OpenSpec](https://github.com/Fission-AI/OpenSpec). No code is written until the
+  change is approved. The requirements agreed so far live in the repository, for example
+  [the site settings spec](https://github.com/Chris-N2/UBookIt/blob/18.1.2/openspec/specs/site-settings/spec.md).
+- **Independent review.** A separate agent that did not write the change reviews it
+  adversarially against its spec. It can reject the change, and when it does, the findings go
+  back through implementation. The reviewer never fixes code itself.
+- **CI that can't pass by skipping.** Every push to a release line is built and tested on Linux
+  against SQL Server, by [the CI workflow](https://github.com/Chris-N2/UBookIt/blob/18.1.2/.github/workflows/ci.yml).
+  The run fails if any .NET test project didn't report, or any of its tests was skipped.
+- **Documentation under test.** The test suite checks key claims in this readme: the version it
+  states, the versioning policy, the delivery API's default, and every link into the repository.
+- **Gated releases.** Releases are published by a workflow. It packs the tagged commit on a clean
+  CI runner, verifies the packages there, and publishes nothing until the maintainer approves. A
+  manual route is documented as the fallback, for when the workflow cannot publish.
+
+The project's rules are in [`CLAUDE.md`](https://github.com/Chris-N2/UBookIt/blob/18.1.2/CLAUDE.md),
+the same file the AI agents working on it read. The release procedure is in
+[the publishing runbook](https://github.com/Chris-N2/UBookIt/blob/18.1.2/docs/publishing.md).
+
+## Versions and the API promise
+
+> **uBookIt is at `18.1.2`, and the public API is a promise.** That doesn't mean nothing will ever
+> change. It means a change to a published contract is deliberate, is named before you meet it,
+> and never arrives in a patch.
+
+**The major tracks the Umbraco major**, as Umbraco packages are conventionally versioned: uBookIt
+`17.x` is for Umbraco 17. That means **the major is not a breaking-change signal, and this is
+where uBookIt departs from Semantic Versioning**:
 
 | | |
 |---|---|
 | **patch** (`x.y.1` → `x.y.2`) | Never breaks. Fixes and internal changes only. |
-| **minor** (`x.1.0` → `x.2.0`) | New features — and the only place a breaking change may appear. |
-| **major** (`17.x` → `18.x`) | A different Umbraco — and the API may change with it, since the CMS it targets did. |
+| **minor** (`x.1.0` → `x.2.0`) | New features, and the only place a breaking change may appear. |
+| **major** (`17.x` → `18.x`) | A different Umbraco. The API may change with it, since the CMS it targets did. |
 
 Breaking changes are avoided: the public interface is kept as consistent as possible, and
-additions are preferred to changes. Where one is genuinely unavoidable it lands in a **minor**
-release, is called out explicitly rather than left to be discovered, and ships with sensible
-defaults or a documented upgrade path so a site that already works keeps working. A patch
-release never carries a breaking change.
-
-**"Called out explicitly" means
-[the changelog](https://github.com/Chris-N2/UBookIt/blob/18.1.1/CHANGELOG.md)**, where each release
-opens with what upgrading asks of you before it says what you gain.
+additions are preferred to changes. Where a break is genuinely unavoidable, it lands in a minor release. It
+is called out in [the changelog](https://github.com/Chris-N2/UBookIt/blob/18.1.2/CHANGELOG.md),
+where each release opens with what upgrading asks of you, and it ships with sensible defaults or a
+documented upgrade path so a site that already works keeps working. A patch release never carries
+a breaking change.
 
 ## Requirements
 
@@ -57,154 +172,47 @@ opens with what upgrading asks of you before it says what you gain.
 |---|---|
 | **Umbraco** | **18.2.0 or later**, and not 19. Not 13, not the 14–16 STS line, and not 17 — uBookIt `17.x` is the release for Umbraco 17. On a site below 18.2.0, installing uBookIt raises the Umbraco packages it depends on and leaves the rest where they are; **upgrade `Umbraco.Cms` itself to 18.2.0 first** so every Umbraco package stays on one version. |
 | **.NET** | 10.0 |
-| **Database** | **SQL Server.** SQLite is not supported — including the SQLite database a `dotnet new umbraco` site gives you by default. |
+| **Database** | **SQL Server.** SQLite is not supported, including the SQLite database a `dotnet new umbraco` site gives you by default. |
 
-The SQLite exclusion is a real constraint rather than an untested configuration: uBookIt's schema and
-its availability queries are written for SQL Server, and a site on SQLite will fail at
-migration time rather than quietly misbehave.
-
-## What it does
-
-- **Bookable resources** — opening hours, date exceptions, minimum and maximum duration, and
-  capabilities describing what a resource can do.
-- **Services** composed of resource *roles*, so "a haircut" can mean "one stylist and one
-  chair" and uBookIt works out which combinations are actually free.
-- **Site-wide closures** — the dates the whole organisation is shut, kept in one list rather
-  than typed into every resource. They close every resource, including ones added later, and
-  take precedence over a resource's own hours and exceptions. Any single resource can be
-  **opened anyway** on a given closure, from its own editor, so "we are closed on Boxing Day
-  except the gym" needs one tick rather than a rethink. Changing the list needs the *Change
-  site settings* grant — one entry shuts everything — while opting one resource out comes with
-  *Configure resources and services*. Seeing the list comes with either.
-- **Public holidays, if your site supplies them** — uBookIt publishes a port your own code
-  implements and ships **no holiday data for any country**. Where a site has registered a
-  source, an operator can fetch a window of holidays and tick which of them the organisation is
-  actually closed on; what that creates is an ordinary closure. Nothing imports on a schedule,
-  and a site that registers no source sees no import control at all.
-- **A booking page** you create like any other page. Point it at the whole catalogue, or at
-  one service or resource. It uses your site's layout.
-- **A booking flow** that works without JavaScript, and a JSON delivery API if you would
-  rather build your own front end. **The API is off by default** — an untouched install
-  exposes no anonymous endpoint, and each half (reads and booking placement) is enabled by
-  its own setting. When you do turn it on it is anonymous by design, it cannot know who is
-  calling (no header check or CORS policy can make an anonymous API know that), and volume
-  protection belongs to your host's rate limiting or edge — uBookIt makes no
-  DDoS-protection claim. The details, including the breaking change if you were already
-  using the API, are in [the delivery API](https://github.com/Chris-N2/UBookIt/blob/18.1.1/docs/delivery-api.md).
-- **A Bookings section** in the backoffice for seeing bookings, cancelling them, moving them
-  to a new time, and — where you have asked for bookings to be approved rather than confirmed
-  on the spot — confirming or declining them. **With permissions per user group**: seeing bookings, acting on them,
-  and configuring resources and services are separate grants within the section, ticked in
-  the ordinary Umbraco group editor.
-- **Finding a booking** from that screen by its **reference** — the code the caller is
-  holding — or by the **email address** it was made with, without knowing when it is. The
-  reference needs only *See bookings*; the email search asks about a person, so it needs
-  Umbraco's **Sensitive data** group too.
-- **Taking a booking over the telephone.** An operator can record one on somebody's behalf
-  from the Bookings screen, with the notice and horizon rules waived — you are the one the
-  site trusts to decide. Needs *Act on bookings* **and** Sensitive data, because you are
-  typing another person's details.
-- **Self-service cancellation**, so a booker can call a booking off from a link in their
-  confirmation email instead of ringing you. **Off by default**, and it needs booker emails
-  on — the link rides that message, so without it the feature stays absent rather than
-  half-working. Read [the configuration notes](https://github.com/Chris-N2/UBookIt/blob/18.1.1/docs/configuration.md) first: the link is the credential.
-- **A settings screen**, so uBookIt's configuration is visible in one place rather than only
-  in `appsettings.json`. Settings that can only come from configuration are shown read-only
-  with where to set them. It needs the *Change site settings* permission, which is
-  deliberately granted to nobody — not even administrators — until you grant it.
-- **Approval, if you want it.** `UBookIt:AutoConfirm` is on by default, so bookings confirm
-  immediately; turn it off and each one waits for somebody to confirm or decline it, holding
-  its time meanwhile.
-- **Optional emails** to the person who booked and to your own people — a site-wide list,
-  plus the users and groups made **responsible** for each resource or service — **off until
-  you ask for them**, because a mail server is not permission to write to your customers.
-- **Notifications** when a booking is placed, confirmed, declined or cancelled, so your site
-  can send its own messages, log, push to a CRM, or anything else.
-- **Restyling** through CSS custom properties, or **theming** by replacing the views
-  entirely with your own Razor class library.
-
-## What it looks like
-
-**The booking flow, inside somebody else's page.** The header, navigation and typeface belong
-to the site; uBookIt supplies the markup and one stylesheet, and sets no text colour of its own,
-so the flow takes the site's. It works with JavaScript turned off.
-
-![A booking page on a site called Fairfield Studios: the site's own header and navigation across the top, then a heading reading Book Studio session and a grouped list of radio buttons headed "Dates with availability for 30 minutes in the next 30 days", one per day from Monday 21 September 2026 onward, the first already selected. The list continues below the visible area.](https://raw.githubusercontent.com/Chris-N2/UBookIt/18.1.1/docs/images/booking-flow.png)
-
-**Choosing a time, and giving your details.** The start times for the chosen day render as a
-wrapping run rather than a long column, every field is labelled, and the notice explaining what
-the site does with the details sits where the details are asked for.
-
-![The lower half of the same booking page: a How long do you need? selector reading 30 minutes, a Show times button, and a fieldset headed "Available start times on Monday 21 September 2026 for 30 minutes" whose nine radio options from 12:30 to 16:30 wrap across two rows. Below it a Your details fieldset holds labelled Name, Email and optional Phone fields, a note saying the site will email you about your booking, two paragraphs explaining what the details are used for and how long they are kept, and a Book button.](https://raw.githubusercontent.com/Chris-N2/UBookIt/18.1.1/docs/images/booking-form.png)
-
-**The Bookings screen in the backoffice.** Find a booking by reference or email address, choose a
-date window, filter by status, and act on a row.
-
-![The uBookIt Bookings screen inside the Umbraco backoffice: a Find box for a reference or email address, From and To date fields both set to 5 October 2026, status checkboxes for Requested, Confirmed, Cancelled and Declined, and a New booking button for recording one taken by telephone. Below them a table of four bookings shows reference, date and time, booker name and email, resources, service and status, each row offering Move and Cancel actions.](https://raw.githubusercontent.com/Chris-N2/UBookIt/18.1.1/docs/images/bookings-screen.png)
-
-**Availability, per resource.** Opening hours are windows on each weekday — add as many as a day
-needs, for a lunch break or a split shift.
-
-![The Opening hours panel of a resource in the uBookIt backoffice, with one section per day of the week. Monday through Friday are shown and the remaining days continue below the picture; each day holds a From and a To time field reading 09:00 and 17:00, a Remove window link beside them, and an Add window link for that day underneath.](https://raw.githubusercontent.com/Chris-N2/UBookIt/18.1.1/docs/images/availability.png)
-
-### Accessibility is a feature here, not a checkbox
-
-Booking interfaces are notorious accessibility failures, so uBookIt's shipped flow is built
-to meet **every WCAG 2.2 AA criterion that markup determines** — labelling, grouping,
-programmatic relationships, keyboard operability, reading and focus order — and every step
-stays usable with **no stylesheet applied at all**.
-
-That claim names its own boundary, because uBookIt is a component inside *your* page and WCAG
-conformance is a property of a page. Text contrast, focus appearance and target size are
-decided by CSS, the shipped stylesheet sets no text colour of its own, and non-text contrast
-for decorative borders is explicitly **not** claimed. The full account, including what becomes
-yours the moment you override a token or supply a theme, is in
-[the booking page docs](https://github.com/Chris-N2/UBookIt/blob/18.1.1/docs/booking-page.md#accessibility-what-we-hold-and-what-becomes-yours).
-
-## What it does not do yet
-
-On the record as decisions, not gaps somebody discovers:
-
-- **Changing which resources a booking claims.** A move changes when, not what: a booking
-  whose resource is busy at the new time is refused rather than given a different one.
-- **Finding a booking by the booker's name.** You can look one up by its reference, and find
-  every booking holding a given email address — which is how an erasure request is honoured —
-  but searching by name is a search over personal data that uBookIt deliberately does not
-  offer.
-- **More than one booking at a time for the same resource.** A resource is claimed
-  exclusively for its interval — a room that seats twenty is one bookable thing, not twenty.
-- **Recurring bookings, payment, cancellation windows**, and any language beyond `en-US`.
+SQLite is excluded for a real reason, not because it's untested: uBookIt's schema and
+availability queries are written for SQL Server, and a site on SQLite fails at migration time
+rather than quietly misbehaving.
 
 ## Documentation
 
-- [The booking page](https://github.com/Chris-N2/UBookIt/blob/18.1.1/docs/booking-page.md) — creating it, the URL parameters, styling, the
-  deployment note about committing the installed template, and the accessibility statement
-- [The backoffice](https://github.com/Chris-N2/UBookIt/blob/18.1.1/docs/backoffice.md) — resources, availability, services and bookings
-- [The delivery API](https://github.com/Chris-N2/UBookIt/blob/18.1.1/docs/delivery-api.md) — turning it on, what anonymous means, and
-  where volume protection belongs
-- [Reacting to bookings](https://github.com/Chris-N2/UBookIt/blob/18.1.1/docs/notifications.md) — the notifications and how to handle them
-- [Writing a theme](https://github.com/Chris-N2/UBookIt/blob/18.1.1/docs/theming.md) — replacing the rendering with your own views
+- [The booking page](https://github.com/Chris-N2/UBookIt/blob/18.1.2/docs/booking-page.md): creating it, URL parameters,
+  styling, the deployment note about committing the installed template, and the accessibility
+  statement
+- [The backoffice](https://github.com/Chris-N2/UBookIt/blob/18.1.2/docs/backoffice.md): resources, availability,
+  services, closures, bookings and permissions
+- [Configuration](https://github.com/Chris-N2/UBookIt/blob/18.1.2/docs/configuration.md): every setting, and what
+  turning each one on means
+- [The delivery API](https://github.com/Chris-N2/UBookIt/blob/18.1.2/docs/delivery-api.md): turning it on, what
+  anonymous means, and where volume protection belongs
+- [Reacting to bookings](https://github.com/Chris-N2/UBookIt/blob/18.1.2/docs/notifications.md): the notifications
+  and how to handle them
+- [Writing a theme](https://github.com/Chris-N2/UBookIt/blob/18.1.2/docs/theming.md): replacing the rendering with
+  your own views
 
 ## The packages
 
-You install `UBookIt`, which contains no code and exists to bring the rest in. They are
-published separately because they are separately useful, and because a headless consumer
-should be able to take the contracts without the backoffice.
+Install `UBookIt`. It contains no code of its own and brings in the rest, which are published
+separately so that a headless consumer can take the contracts without the backoffice.
 
 | Package | |
 |---|---|
 | **`UBookIt`** | What you install. Brings everything below. |
-| `UBookIt.Core` | The domain — resources, availability, slots, bookings. References nothing. |
+| `UBookIt.Core` | The domain: resources, availability, slots, bookings. References nothing. |
 | `UBookIt.Persistence` | EF Core storage and the Umbraco migration plan. |
 | `UBookIt.Backoffice` | The Bookings section and its Management API. |
 | `UBookIt.Web` | The Razor views, the booking page, the delivery API and the stylesheet. |
 
-Installing the individual packages instead is supported, but installing
-`UBookIt.Backoffice` without `UBookIt.Web` **fails silently** — the backoffice works and the
-booking page renders nothing. Install `UBookIt`.
+Installing the packages individually is supported. But installing `UBookIt.Backoffice` without
+`UBookIt.Web` **fails silently**: the backoffice works, and the booking page renders nothing.
+Install `UBookIt`.
 
 ## Licence
 
-[MIT](https://github.com/Chris-N2/UBookIt/blob/18.1.1/LICENSE). Copyright © Norwood Design & Development Ltd.
+[MIT](https://github.com/Chris-N2/UBookIt/blob/18.1.2/LICENSE). Copyright © Norwood Design & Development Ltd.
 
 Built by [Norwood Design & Development Ltd.](https://www.norwood-development.co.uk).
