@@ -77,9 +77,14 @@ expire at the events it describes.**
   tested unattended, as is the latest push to any other branch (see *Continuous integration*
   below). No branch protection requires a green run, so an untested push is visible rather than
   prevented.
-- **No release has gone through the publishing workflow yet.** A dry run (see *Publishing a
-  release*) exercises everything except the token exchange, which only a real release does. So
-  the manual route stays documented as the fallback until one has.
+- **Only the 17 line has released through the publishing workflow.** `17.2.2` was the first
+  release, on 2026-09-26: token exchange, policy and approval all worked, and every package and
+  symbol package went on its first push. No `18.x` release has used it yet. The manual route
+  stays documented as the fallback until one has. A dry run exercises everything except the
+  token exchange (see *Publishing a release*). **What the feed answers when a symbol package is
+  pushed while its predecessor is still pending has not been seen**, because no push has met
+  that case yet. If it isn't the wording the workflow expects, the step fails closed rather than
+  reporting success.
 - **The packages are owned by a personal account**, not by the organisation. So is the Trusted
   Publishing policy (see *Trusted Publishing setup*), and the key ownership note under
   *Fallback: pushing by hand* applies to both.

@@ -145,8 +145,17 @@ artifact is what gets pushed. It is five files.
     stale-artifact and SourceLink work the workflow exists to remove. The exact commands, settled
     before tagging (QA round 1):
 
+    **The `gh` CLI is not installed on the maintainer's machine** (found at task 6.2, after QA
+    approval). The artifact is downloaded from the run page instead: *Summary → Artifacts →
+    `packages`*, which needs the browser's GitHub sign-in. The REST download needs a token even for
+    a public repository. The artifact **expires 7 days after the pack job** (`retention-days: 7`).
+    After that, the fallback has no packages to push, and the pack has to be re-run first. Unzip
+    it into a **new, empty** folder, `<scratchpad>\packages-17.2.2`. The glob below would push any
+    stray `UBookIt.*` package already there, and a leftover local pack at the same version is the
+    stale-artifact case the workflow exists to prevent. Then (both notes from QA, after round 2):
+
     ```powershell
-    gh run download <publish-run-id> -R Chris-N2/UBookIt -n packages -D <scratchpad>\packages-17.2.2
+    # (download and unzip the `packages` artifact as above, no gh needed)
     $key = Read-Host -AsSecureString; $plain = [System.Net.NetworkCredential]::new('', $key).Password
     Get-ChildItem <scratchpad>\packages-17.2.2\UBookIt.*.nupkg | Where-Object Name -ne 'UBookIt.17.2.2.nupkg' | ForEach-Object { dotnet nuget push $_.FullName --api-key $plain --source https://api.nuget.org/v3/index.json --skip-duplicate }
     dotnet nuget push <scratchpad>\packages-17.2.2\UBookIt.17.2.2.nupkg --api-key $plain --source https://api.nuget.org/v3/index.json --skip-duplicate

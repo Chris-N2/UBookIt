@@ -17,7 +17,7 @@ a patch. See [the versioning note](README.md#versions-and-the-api-promise).
 
 ---
 
-## 17.2.2
+## 17.2.2 — 2026-09-26
 
 ### What you have to do
 

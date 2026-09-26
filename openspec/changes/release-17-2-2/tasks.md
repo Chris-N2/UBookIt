@@ -181,7 +181,7 @@
   *Done:* `README-inventory.md` §3 has one row per sentence. "Every link into the repository" is
   deliberately scoped, because external links are unchecked. The link to `CLAUDE.md` says it is
   "the same file the AI agents working on it read", which is how Claude Code loads it.
-- [ ] 3R.5 Render check. View the README as GitHub renders it on the branch, and read it top to
+- [x] 3R.5 Render check. View the README as GitHub renders it on the branch, and read it top to
   bottom as a stranger. The first screen should show what it is, who it's for, a screenshot and
   the install line. Record anything that reads wrong. The Marketplace render is checked after
   `18.1.2`.
@@ -189,6 +189,13 @@
   line, and "all four of these are off" being false for the Settings screen, which is locked
   rather than off; it now reads "off, or granted to nobody". **The GitHub render needs the
   branch pushed.** It is open until Chris pushes.
+  *Done after the push:* GitHub's own renderer (`/readme?ref=release-17-2-2`, HTML) gives:
+  - 13 headings in the intended order;
+  - 4 images, 35 links, and no stray emphasis markers in the rendered text;
+  - the opening reads as intended.
+
+  The images and repository links point at tag `17.2.2`, which doesn't exist until 7.2, so they
+  are broken on the branch view by design. 7.3's sweep covers them after tagging.
 
 ## 3S. The version and the entry
 
@@ -315,19 +322,32 @@
 
   After the NITs: a clean build with 0 warnings, unit **2005**, openspec **27/27**. The other
   suites are unaffected: only a C# comment, a spec note and runbook prose changed.
-- [ ] 6.2 Chris pushes the branch and opens the PR into `main`. Verify, through the API, that the
+- [x] 6.2 Chris pushes the branch and opens the PR into `main`. Verify, through the API, that the
   PR's CI run is green at every step, parity included.
-- [ ] 6.3 Chris merges with "Create a merge commit". Fetch. Verify that `origin/main` = local
+  *Done:* PR **#9**, head `56f1837` = local `HEAD`. Run `36237053839` (pull_request) was success
+  at every step, **parity included**, read through the REST API. The branch's own push run
+  `36236259487` was also success.
+  - **Found:** `gh` is not installed here. D5's fallback depended on `gh run download`, and it now
+    uses the run page's artifact download. It is a plan-only fix to a path that runs only on
+    failure. It was told to QA.
+- [x] 6.3 Chris merges with "Create a merge commit". Fetch. Verify that `origin/main` = local
   `main` = the merge commit, and that **the merge commit's own `ci` push run** is green at every
   step.
+  *Done:* merged as **`5ced980`**, with parents `d6f0199` and `56f1837`. After a fetch,
+  `origin/main` = local `main` = `5ced980`, and `git branch -r --contains` lists `origin/main`.
+  Run `36237443425` (push, `main`, head `5ced980`) was success at every step, **parity
+  included**, read through the REST API. The commit declares `<Version>17.2.2</Version>`, and tag
+  `17.2.2` does not exist on origin yet.
 
 ## 7. Release through the workflow (design D4, D5)
 
-- [ ] 7.1 **Before tagging:** confirm the fallback API key has not expired (D5's fallback depends on
+- [x] 7.1 **Before tagging:** confirm the fallback API key has not expired (D5's fallback depends on
   it).
-- [ ] 7.2 Chris pushes tag `17.2.2` on the merge commit. Verify that `git ls-remote` shows it, and
+  *Done:* Chris confirmed on 2026-09-26 that the key was created last week and is well within its
+  30 days.
+- [x] 7.2 Chris pushes tag `17.2.2` on the merge commit. Verify that `git ls-remote` shows it, and
   that a `publish` run started for it, with `check` and `pack` green.
-- [ ] 7.3 **Before approving:**
+- [x] 7.3 **Before approving:**
   - the tagged `booking-flow.png` `curl` returns 200;
   - from the run's `packages` artifact, read **all five** nuspecs against D4's list, and all four
     `.snupkg` are present;
@@ -336,30 +356,156 @@
     it says "uBookIt is at `17.2.2`".
 
   If anything is wrong, reject and follow D5. Record which path was taken.
-- [ ] 7.4 Chris approves in `release`. Record:
+  *7.2 done:* `git ls-remote` shows `5ced980… refs/tags/17.2.2`. Publish run **`36237696936`**:
+  `check` was success at every step, including "The tag names a verified commit on its line, at
+  its declared version". `pack` was success at every step, including "The packed release is
+  exactly what should be published". `publish` is *waiting*. The artifact `packages` is 844,205
+  bytes and expires 2026-10-03T11:06:16Z.
+
+  *7.3 done, nothing wrong, so no D5 path:*
+  - `booking-flow.png` at the tag returns 200.
+  - **The artifact**, downloaded by Chris to `D:\Downloads\uBookIt\17.2.2`: exactly 5 `.nupkg`
+    and 4 `.snupkg`, all `17.2.2`, and nothing else.
+  - **All five nuspecs were read.** In every one:
+    - authors `Norwood Design & Development Ltd.`;
+    - copyright `Copyright © Norwood Design & Development Ltd.`;
+    - licence `MIT` (expression);
+    - `README.md` and `icon.png` declared and present in the zip;
+    - project URL `https://github.com/Chris-N2/UBookIt`;
+    - repository commit `5ced980…`, the tagged merge commit.
+  - **Dependencies:**
+    - `UBookIt` → Backoffice and Web `17.2.2`;
+    - Backoffice → Core and Persistence `17.2.2`, plus four `Umbraco.Cms.*` at `[17.6.2, 18.0.0)`;
+    - Persistence → Core `17.2.2`, `Umbraco.Cms.Persistence.EFCore` `[17.6.2, 18.0.0)`, and
+      `Microsoft.EntityFrameworkCore.SqlServer` `10.0.10`;
+    - Web → Core `17.2.2`, plus two `Umbraco.Cms.*` at `[17.6.2, 18.0.0)`;
+    - Core → none.
+  - `umbraco-marketplace` is on `UBookIt` only. Its description says "A booking system for
+    Umbraco 17 … Requires Umbraco 17 and SQL Server."
+  - **Symbols:** each of the 4 `.snupkg` holds its own `lib/net10.0/<id>.pdb`.
+  - **The README packed in all five is byte-identical to `README.md` at tag `17.2.2`** (SHA-256
+    `7C68…C04D`). Every address in it, 19 distinct, returns 200 on the first attempt. The 13
+    repository addresses and 4 images are pinned to `17.2.2`. It says "uBookIt is at `17.2.2`",
+    with no `17.2.1`. The `#accessibility-…` fragment matches `docs/booking-page.md:294` at the
+    tag.
+- [x] 7.4 Chris approves in `release`. Record:
   - the run's summary table verbatim;
   - whether any `.snupkg` answered 409, and **the exact CLI text**, including whether the classifier
     recognised it;
   - the run's conclusion.
 
   If the run failed, record the log excerpt and the D5 path taken.
-- [ ] 7.5 Confirm `17.2.2` per package on `api.nuget.org/v3-flatcontainer/<id>/index.json`, and that
+  *Done.* The run concluded **success**; no D5 path was needed. The summary table, verbatim as
+  Chris copied it from the run page (the API does not expose it unauthenticated):
+
+  | File | Result |
+  |---|---|
+  | UBookIt.Backoffice.17.2.2.nupkg | published |
+  | UBookIt.Backoffice.17.2.2.snupkg | symbols submitted |
+  | UBookIt.Core.17.2.2.nupkg | published |
+  | UBookIt.Core.17.2.2.snupkg | symbols submitted |
+  | UBookIt.Persistence.17.2.2.nupkg | published |
+  | UBookIt.Persistence.17.2.2.snupkg | symbols submitted |
+  | UBookIt.Web.17.2.2.nupkg | published |
+  | UBookIt.Web.17.2.2.snupkg | symbols submitted |
+  | UBookIt.17.2.2.nupkg | published |
+
+  Libraries went first and the meta-package last, as designed. **No `.snupkg` got a 409**, so
+  nuget.org's CLI wording for a still-pending symbol package **was not observed**. That
+  obligation from `trusted-publishing` stays open for a later release, most likely a re-run or
+  `18.1.2`. It is not discharged here.
+- [x] 7.5 Confirm `17.2.2` per package on `api.nuget.org/v3-flatcontainer/<id>/index.json`, and that
   the live package page renders its readme, images and links.
+  *Done:* **the first release published by `publish.yml`.**
+  - Chris approved at about 11:16Z. The `publish` job (`108392617206`) ran 11:16:18–11:16:34Z,
+    and was success at every step, including "Log in to nuget.org (OIDC -> one-hour API key)"
+    and "Push each package, then its symbols, and say which were new". So the token exchange, the
+    policy's owner, scope and glob, and approval in `release` all worked on a real release.
+  - **The flat container, per package**, polled every 30 s. All times are UTC; the poller printed
+    local BST, which is UTC+1, and those were converted: 1/5 (`web`) at 11:19:46Z, 3/5 at
+    11:20:48Z (`core`, `ubookit`), and **5/5 at 11:21:50Z** (`persistence`, `backoffice`). That is
+    **about 5 minutes after the push**. nuget.org's own `Last-Modified` on `ubookit/index.json` is
+    11:20:02Z, which agrees. (Chris read the mixed-zone summary in chat as an hour and 5 minutes;
+    the zones were unlabelled there. The record is now in one zone.)
+  - `nuget.org/packages/UBookIt/17.2.2` returns 200. Its rendered readme has "How it's built",
+    the 4 images and 13 repository doc links, all at `17.2.2`, none at `17.2.1`. It says "uBookIt
+    is at 17.2.2", and no rendering warning is shown.
+  - The live `ubookit.nuspec` has version `17.2.2`, `umbraco-marketplace`, "for Umbraco 17", and
+    commit `5ced980`.
 
 ## 8. Close out, in this order
 
-- [ ] 8.1 Stamp the entry's date.
-- [ ] 8.2 Rewrite the *Status* bullet "No release has gone through the publishing workflow yet" to
+- [x] 8.1 Stamp the entry's date.
+  *Done:* `## 17.2.2 — 2026-09-26`.
+- [x] 8.2 Rewrite the *Status* bullet "No release has gone through the publishing workflow yet" to
   what is now true: `17.2.2` went through it, `18.x` has not yet, and the fallback stays until it
   has. Verify: the documentation guards pass.
-- [ ] 8.3 Sibling sweep for sentences this release falsifies: `docs/`, `README.md`,
+  *Done:* the bullet is now "Only the 17 line has released through the publishing workflow". It
+  says:
+  - `17.2.2` was first, on 2026-09-26, with the token exchange, policy and approval all working;
+  - no `18.x` release has used it yet, and the fallback stays until one has;
+  - **the pending-symbols 409 wording has still not been seen**, and the step fails closed if it
+    differs.
+
+  It stays under *outstanding*, which lists the 18 line's first release, not Trusted Publishing
+  setup. So `release-publishing`'s "The status section SHALL no longer list Trusted Publishing as
+  outstanding" still holds. Guards: see 8.5.
+- [x] 8.3 Sibling sweep for sentences this release falsifies: `docs/`, `README.md`,
   `openspec/specs/**`, `CLAUDE.md`. Search for `17.2.1`, `2048`, `Marketplace`, `fallback`,
   `publishing workflow` and `not yet`. Fix or record each.
-- [ ] 8.4 Record what `release-18-1-2` must carry: the D1 constant and check, with both tests; the
+  *Done:*
+  - `17.2.1`: only history remains. That is `CHANGELOG.md`'s entry and `publishing.md` :177,
+    :424, :520 and :523, all still true. The versions in `release-publishing`'s scenarios are
+    worked examples.
+  - `2048`: `CHANGELOG.md`, `docs/configuration.md`, the constant, and generated migrations. The
+    privacy-notice main spec's stale note is superseded by this change's delta at archive.
+  - `not yet`: only `publishing.md:80`, rewritten in 8.2. The other hits are about bookings.
+  - `Marketplace`: `packaging` says the docs "SHALL NOT claim that an earlier library listing
+    disappears until that has been observed on the Marketplace". It has been observed, by Chris on
+    2026-09-25, so the runbook's new claim is permitted and the spec stays true. **Nothing
+    falsified.**
+  - `fallback` / `publishing workflow`: README :140 and the runbook are consistent with a
+    fallback that still exists. `release-publishing`'s runbook requirement still holds.
+- [x] 8.4 Record what `release-18-1-2` must carry: the D1 constant and check, with both tests; the
   D3 message; the README rewrite and its inventory, ported with the line's version, title line and
   Requirements row, and diffed against `main`'s README so those are the only differences; the runbook sentences (3.1 and 8.2, with the 18 half becoming true); its own version
   moves and entry; and what 7.4 observed. Also record the remaining obligation: remove the fallback
   after `18.1.2`.
+  *Done.* **`release-18-1-2` must carry**, on `dev/v18` through its own PR, cherry-picked rather
+  than merged:
+  1. **The setting limit:**
+     - `SettingRow.MaxValueLength`, `HasMaxLength` reading it, and `SettingValidation`'s
+       per-row check through `SettingText.RowsFor`;
+     - the 6 unit tests in `SettingsControllerTests` and the 3 integration cases in
+       `SettingsStoreTests`;
+     - the rewritten remark on `The_screen_accepts_a_policy_link…`;
+     - the `site-settings` ADDED and `privacy-notice` MODIFIED deltas. **Check that v18's
+       `privacy-notice` main spec is byte-identical to main's first. If not, re-diff the
+       guarantees on that line.**
+     - its own task naming the MODIFIED requirement, or `ChangeDeltaIntegrityTests` fails.
+  2. **The ceiling message:** `CeilingFault` and its 11-case theory. On v18, major is 18, so the
+     expected ceiling is `19.0.0`. The theory's literals are written for 17 (`CeilingFault(high,
+     17)`), so they carry over unchanged as a test of the helper, not of the line.
+  3. **The README rewrite and `README-inventory.md`**, with the title line "Bookings for Umbraco
+     18", the v18 Requirements row, and every pin at `18.1.2`. Then `diff` against main's README:
+     the only differences allowed are the version, "Umbraco 17/18" in the opening, and the
+     Requirements row. The "Get started" line "Umbraco 17.6.2 or later" becomes v18's floor,
+     18.2.0. **This README is the Marketplace listing: read it on the Marketplace after the
+     rescan.**
+  4. **The runbook:** the Marketplace paragraph (3.1), the step-3 table rows, "every push"
+     (76/97), and the Status bullet (8.2). There it becomes true that both lines have released
+     through the workflow, so rewrite it again and remove it from *outstanding* if nothing is
+     left.
+  5. `docs/configuration.md`'s limit sentence; the `CHANGELOG.md` header anchor.
+  6. **Its own** `<Version>` 18.1.2, the pins, and an entry. The entry says the same as
+     17.2.2's, for the 18 line.
+  7. **What 7.4 observed:** OIDC publish works; libraries go first; the summary table must be
+     pasted by Chris, because the API needs auth; `gh` is absent here, so the artifact comes from
+     the run page. The 409 wording is **still unobserved**.
+
+  **Obligations that remain after both lines release:** remove the manual API-key fallback from
+  `docs/publishing.md` (its own change); the unobserved 409 wording; the `tree/` link blind spot
+  (inventory §1); the client suite's skip detection (QA round 1, MAJOR 2's root).
 - [ ] 8.5 Commit on `main`, run the unit suite locally, and Chris pushes. Verify: `main`'s CI run is
   green at every step.
 - [ ] 8.6 Archive **last**, running the unit suite locally before the push. Verify: the archive
