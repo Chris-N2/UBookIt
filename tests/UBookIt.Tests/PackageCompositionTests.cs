@@ -481,7 +481,7 @@ public class PackageCompositionTests(PackedSolutionFixture fixture)
                 if (high != expectedCeiling)
                 {
                     wrong.Add($"{package.Id} -> {id} '{version}' stops at '{high}', not '{expectedCeiling}'. "
-                        + $"A ceiling inside Umbraco {major} refuses releases this line supports.");
+                        + CeilingFault(high, major));
                 }
             }
         }
@@ -494,6 +494,83 @@ public class PackageCompositionTests(PackedSolutionFixture fixture)
             wrong.Count == 0,
             $"{wrong.Count} Umbraco dependency range(s) do not admit Umbraco {major} and exclude "
             + $"{major + 1}:{Environment.NewLine}  " + string.Join(Environment.NewLine + "  ", wrong));
+    }
+
+    /// <summary>
+    /// Each kind of wrong ceiling gets its own explanation, and not another kind's. The guard
+    /// above cannot be driven into these branches without packing a wrong package, so the
+    /// explanation is exercised directly.
+    /// </summary>
+    /// <remarks>
+    /// Every case asserts the ABSENCE of the other branches' text as well as the presence of its
+    /// own. "Contains 'ceiling'" would have passed on the defect this replaced, which gave the
+    /// too-low text for every fault.
+    /// </remarks>
+    [Theory]
+    [InlineData("17.7.0", "below")]
+    [InlineData("18.0.0-rc", "below")]
+    [InlineData("16.0.0", "below")]
+    [InlineData("19.0.0", "above")]
+    [InlineData("18.0.1", "above")]
+    [InlineData("18.0", "spelling")]
+    [InlineData("eighteen", "unparseable")]
+    public void A_wrong_ceiling_is_explained_in_the_direction_it_is_wrong(string high, string branch)
+    {
+        var branches = new Dictionary<string, string>
+        {
+            ["below"] = "A ceiling below 18.0.0 refuses Umbraco 17 releases this line supports.",
+            ["above"] = "A ceiling above Umbraco 17 admits Umbraco 18 or later",
+            ["spelling"] = "is 18.0.0 spelled differently",
+            ["unparseable"] = "is not a version this guard can compare",
+        };
+
+        var message = CeilingFault(high, 17);
+
+        Assert.Contains(branches[branch], message, StringComparison.Ordinal);
+
+        foreach (var (_, text) in branches.Where(b => b.Key != branch))
+        {
+            Assert.DoesNotContain(text, message, StringComparison.Ordinal);
+        }
+    }
+
+    /// <summary>
+    /// What a wrong ceiling does, in the direction it is wrong. Detection is the caller's
+    /// <c>high != expectedCeiling</c>; this only chooses the explanation.
+    /// </summary>
+    /// <remarks>
+    /// The message used to describe a too-LOW ceiling whatever the fault, so a ceiling that
+    /// admitted the next Umbraco was reported as refusing this line's own releases — the opposite
+    /// of what it does. A prerelease of the expected ceiling (<c>18.0.0-rc</c>) sorts below it, as
+    /// NuGet orders them, so it is reported as too low.
+    /// </remarks>
+    internal static string CeilingFault(string high, int major)
+    {
+        ArgumentNullException.ThrowIfNull(high);
+
+        var expected = new Version(major + 1, 0, 0);
+        var dash = high.IndexOf('-', StringComparison.Ordinal);
+        var numeric = dash < 0 ? high : high[..dash];
+
+        if (!Version.TryParse(numeric, out var parsed))
+        {
+            return $"'{high}' is not a version this guard can compare, so nobody can say which "
+                + "Umbraco releases the range admits.";
+        }
+
+        var normalised = new Version(parsed.Major, parsed.Minor, Math.Max(parsed.Build, 0));
+
+        if (normalised == expected && dash < 0)
+        {
+            // 18.0 or 18.0.0.0: the right bound, spelled in a form this guard does not compare.
+            return $"'{high}' is {expected} spelled differently. The range is right, but write it "
+                + $"as '{expected}' so this guard can check it.";
+        }
+
+        return normalised > expected
+            ? $"A ceiling above Umbraco {major} admits Umbraco {major + 1} or later, which this line "
+                + "is not built against."
+            : $"A ceiling below {expected} refuses Umbraco {major} releases this line supports.";
     }
 
     /// <summary>

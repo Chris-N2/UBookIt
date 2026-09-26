@@ -205,9 +205,10 @@ public class SettingsControllerTests
     /// value whose resolved link differs from its configured text.
     /// </para>
     /// <para>
-    /// <b>What it cannot see:</b> the store. <c>FakeSettingsStore</c> holds any length, while the
-    /// real <c>uBookItSetting.Value</c> column holds 2048 characters and no layer checks length on
-    /// write — a pre-existing gap for every setting, recorded as a deferred obligation.
+    /// <b>What it cannot see:</b> the store. <c>FakeSettingsStore</c> holds any length, so the
+    /// store's real capacity is pinned elsewhere: the length tests below refuse anything longer
+    /// than <c>SettingRow.MaxValueLength</c>, and the integration suite's <c>SettingsStoreTests</c>
+    /// prove that constant IS the column's capacity against SQL Server.
     /// </para>
     /// </remarks>
     [Theory]
@@ -255,6 +256,129 @@ public class SettingsControllerTests
 
         Assert.Contains("http or https address", problem.Detail);
         Assert.Contains("site-relative path beginning with a single '/'", problem.Detail);
+    }
+
+    // ---- nothing reaches the store that the store cannot hold ---------------------------------
+
+    private const int Limit = UBookIt.Persistence.Entities.SettingRow.MaxValueLength;
+
+    /// <summary>A usable policy link exactly <paramref name="length"/> characters long.</summary>
+    private static string LinkOfLength(int length)
+    {
+        const string prefix = "https://example.com/";
+
+        return prefix + new string('a', length - prefix.Length);
+    }
+
+    /// <summary>An email address exactly <paramref name="length"/> characters long.</summary>
+    private static string AddressOfLength(int length)
+    {
+        const string domain = "@example.com";
+
+        return new string('a', length - domain.Length) + domain;
+    }
+
+    [Fact]
+    public async Task A_value_longer_than_the_store_holds_is_refused_before_the_store()
+    {
+        // Without this the value passed validation and failed at SQL Server, as a 500 rather than
+        // a message against the setting. The link is otherwise usable, so length is the only
+        // reason left for the refusal.
+        var store = new FakeSettingsStore();
+        var value = LinkOfLength(Limit + 1);
+
+        Assert.True(UBookItPersistenceComposer.TryGetUsablePolicyLink(value, out _));
+
+        var result = await Controller(store, Config()).PutSetting(
+            UBookItPersistenceComposer.PrivacyPolicyUrlSettingKey, new SettingWriteModel { Value = value });
+
+        var problem = Assert.IsAssignableFrom<ProblemDetails>(
+            Assert.IsType<BadRequestObjectResult>(result).Value);
+
+        Assert.Equal(SettingsController.SettingValueInvalid, problem.Type);
+        Assert.Contains(Limit.ToString(System.Globalization.CultureInfo.InvariantCulture), problem.Detail);
+        Assert.Empty(store.Written);
+    }
+
+    [Fact]
+    public async Task A_value_at_the_store_limit_is_written_as_the_rows_the_store_will_hold()
+    {
+        var store = new FakeSettingsStore();
+        var key = UBookItPersistenceComposer.PrivacyPolicyUrlSettingKey;
+        var value = LinkOfLength(Limit);
+
+        var result = await Controller(store, Config()).PutSetting(key, new SettingWriteModel { Value = value });
+
+        Assert.IsType<OkResult>(result);
+
+        // The rows written are the rows validation measured, and every one fits.
+        var expected = SettingText.RowsFor(SettingCatalogue.All.Single(s => s.Key == key), value, Config());
+
+        Assert.Equal(expected.Select(r => (r.Key, r.Value)), store.Written);
+        Assert.All(store.Written, row => Assert.True(row.Value.Length <= Limit));
+    }
+
+    [Fact]
+    public async Task A_recipient_list_longer_than_the_store_limit_in_total_is_still_stored()
+    {
+        // THE REGRESSION GUARD. A list is stored one row per address, so the store has never
+        // limited its total length — only each address. A check on the submitted string would
+        // have refused a list that works today, which a patch must never do.
+        var addresses = Enumerable.Range(0, 200).Select(i => $"person{i}@example.com").ToList();
+        var value = string.Join(", ", addresses);
+
+        Assert.True(value.Length > Limit);
+
+        var store = new FakeSettingsStore();
+        var result = await Controller(store, Config()).PutSetting(
+            UBookItPersistenceComposer.InternalRecipientsSettingKey, new SettingWriteModel { Value = value });
+
+        Assert.IsType<OkResult>(result);
+        Assert.Equal(addresses, store.Written.Select(row => row.Value));
+    }
+
+    [Fact]
+    public async Task A_recipient_list_with_one_address_the_store_cannot_hold_is_refused_whole()
+    {
+        var value = $"ops@example.com, {AddressOfLength(Limit + 1)}";
+        var store = new FakeSettingsStore();
+
+        var result = await Controller(store, Config()).PutSetting(
+            UBookItPersistenceComposer.InternalRecipientsSettingKey, new SettingWriteModel { Value = value });
+
+        var problem = Assert.IsAssignableFrom<ProblemDetails>(
+            Assert.IsType<BadRequestObjectResult>(result).Value);
+
+        Assert.Contains("Each address", problem.Detail);
+        Assert.Contains(Limit.ToString(System.Globalization.CultureInfo.InvariantCulture), problem.Detail);
+
+        // Whole: not the first address alone. Nothing is written, so no stale rows are swept either.
+        Assert.Empty(store.Written);
+        Assert.Empty(store.Removed);
+    }
+
+    [Theory]
+    [InlineData(SettingValueKind.Text)]
+    [InlineData(SettingValueKind.Url)]
+    public void The_limit_is_the_boundary_whatever_the_setting_type(SettingValueKind kind)
+    {
+        // No catalogue setting is free text today, but the kind exists and the requirement says
+        // every type. A constructed descriptor reaches it without inventing a setting.
+        var descriptor = new SettingDescriptor("UBookIt:Test", SettingTier.Editable, kind);
+
+        Assert.True(SettingValidation.IsValid(descriptor, LinkOfLength(Limit), out var atLimit), atLimit);
+        Assert.False(SettingValidation.IsValid(descriptor, LinkOfLength(Limit + 1), out var over));
+        Assert.Equal($"Must be no longer than {Limit} characters.", over);
+    }
+
+    [Fact]
+    public void A_blank_value_is_still_told_it_is_blank()
+    {
+        var descriptor = SettingCatalogue.All.Single(
+            s => s.Key == UBookItPersistenceComposer.PrivacyPolicyUrlSettingKey);
+
+        Assert.False(SettingValidation.IsValid(descriptor, "   ", out var error));
+        Assert.StartsWith("A value is required.", error);
     }
 
     // ---- the read shows what is being overridden ----------------------------------------------
