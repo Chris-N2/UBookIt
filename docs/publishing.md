@@ -77,11 +77,12 @@ expire at the events it describes.**
   tested unattended, as is the latest push to any other branch (see *Continuous integration*
   below). No branch protection requires a green run, so an untested push is visible rather than
   prevented.
-- **Only the 17 line has released through the publishing workflow.** `17.2.2` was the first
-  release, on 2026-09-26: token exchange, policy and approval all worked, and every package and
-  symbol package went on its first push. No `18.x` release has used it yet. The manual route
-  stays documented as the fallback until one has. A dry run exercises everything except the
-  token exchange (see *Publishing a release*). **What the feed answers when a symbol package is
+- **The manual fallback is still documented, although both lines now release through the
+  workflow.** `17.2.2` and `18.1.2` were the first releases through it, both on 2026-09-26: token
+  exchange, policy and approval all worked, and every package and symbol package went on its first
+  push. Removing *Fallback: pushing by hand* is the next change. Until then it stays, labelled as
+  the fallback. A dry run exercises everything except the token exchange (see *Publishing a
+  release*). **What the feed answers when a symbol package is
   pushed while its predecessor is still pending has not been seen**, because no push has met
   that case yet. If it isn't the wording the workflow expects, the step fails closed rather than
   reporting success.
