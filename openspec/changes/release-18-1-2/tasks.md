@@ -112,8 +112,24 @@
 
 ## 6. Review and merge
 
-- [ ] 6.1 QA review in a subagent, reused across rounds. Fixes are handed back as new code, and
+- [x] 6.1 QA review in a subagent, reused across rounds. Fixes are handed back as new code, and
   claims are given to verify.
+
+  *Round 1: REJECT* on `8c0a5cc`. QA verified all 8 claims independently, including the build and
+  every suite.
+  - **MAJOR:** the v18 runbook's "No release has gone through the publishing workflow yet" was
+    false once `17.2.2` published. The tag freezes it, and the Marketplace README links there.
+    *Fix:* task 3.3, with `main`'s `39610f0` wording ported before the tag.
+  - **NIT, pre-existing:** v18's SourceLink section names `main`/`origin/main`. It is pinned by
+    `VersionTruthTests.cs:983` and recorded in 8.4. QA ruled deferral acceptable.
+  - **NIT:** the 18 README's only major-tracks example is `17.x`. Left as is, per the non-goal
+    that the READMEs read the same.
+
+  *Round 2: APPROVE WITH NITS* on `e1895c1`. The MAJOR was verified fixed: lines 74–95 are
+  identical to `39610f0`, true at tag time, and consistent with `release-publishing`. There is
+  nothing to fix before merge. The cosmetic NITs are 3.3 sitting before 3.2 and uneven wrapping in
+  D3 and 8.2. The first is left, because renumbering would break references. My first citation
+  of the pin as `:988` was the end of the call; it is corrected to `:983`.
 - [ ] 6.2 Chris pushes and opens a PR into **`dev/v18`**. Verify through the REST API: the PR run is
   green at every step, parity included.
 - [ ] 6.3 Merged with a merge commit. Verify: `origin/dev/v18` = local = the merge commit, and the
@@ -152,7 +168,7 @@
   - `main`'s runbook Status bullet, which still says only the 17 line has released;
   - **v18 runbook (QA round 1, NIT, pre-existing):** *The order that makes SourceLink correct*
     says "Pack from the merge commit on main" and "`# must list origin/main`". On this line it
-    should name `dev/v18`. The sentence is pinned verbatim by `VersionTruthTests.cs:988`
+    should name `dev/v18`. The sentence is pinned verbatim by `VersionTruthTests.cs:983`
     (`SaysOnce`), so fixing it means a line-specific guard change. It is left for its own change
     rather than taken into a patch unplanned. The fallback reader must substitute the line.
 - [ ] 8.5 Commit on `dev/v18`, run the unit suite locally, and Chris pushes. Verify: CI is green at
