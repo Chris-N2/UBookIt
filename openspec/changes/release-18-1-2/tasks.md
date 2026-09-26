@@ -95,6 +95,8 @@
 ## 5. Clean build and suites
 
 - [x] 5.1 Clean build (client first, `CI=true --no-incremental`). Verify: 0 warnings.
+  *Done:* the outputs were cleared, the client built, then `CI=true --no-incremental`: **0
+  warnings, 0 errors**, first attempt.
 - [x] 5.2 Per project: unit **2017**, integration **194**, rendering 1168, client 335, all 0
   skipped. `openspec validate --all --strict` passes.
   *Done*, all with 0 skipped: unit **2017**, integration **194**, rendering **1168**, client
