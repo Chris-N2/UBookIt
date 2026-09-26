@@ -130,16 +130,23 @@
   nothing to fix before merge. The cosmetic NITs are 3.3 sitting before 3.2 and uneven wrapping in
   D3 and 8.2. The first is left, because renumbering would break references. My first citation
   of the pin as `:988` was the end of the call; it is corrected to `:983`.
-- [ ] 6.2 Chris pushes and opens a PR into **`dev/v18`**. Verify through the REST API: the PR run is
+- [x] 6.2 Chris pushes and opens a PR into **`dev/v18`**. Verify through the REST API: the PR run is
   green at every step, parity included.
-- [ ] 6.3 Merged with a merge commit. Verify: `origin/dev/v18` = local = the merge commit, and the
+  *Done:* PR **#10**, base `dev/v18`, head `76eeff5` = local `HEAD`. Run `36254397633`
+  (pull_request) was success at all 16 steps, **parity included**, read through the REST API. The
+  branch's push run `36254343543` was also success.
+- [x] 6.3 Merged with a merge commit. Verify: `origin/dev/v18` = local = the merge commit, and the
   merge commit's own push run is green at every step.
+  *Done:* merged as **`befc4c5`**, with parents `14cf33f` and `76eeff5`. After a fetch,
+  `origin/dev/v18` = local `dev/v18` = `befc4c5`, and `git branch -r --contains` lists
+  `origin/dev/v18`. Run `36254684346` (push, `dev/v18`, head `befc4c5`) was success at all 16
+  steps. The commit declares `18.1.2`, and tag `18.1.2` did not yet exist on origin.
 
 ## 7. Release through the workflow (design D5)
 
-- [ ] 7.1 Chris pushes tag `18.1.2` on the merge commit. Verify: `check` and `pack` are green and
+- [x] 7.1 Chris pushes tag `18.1.2` on the merge commit. Verify: `check` and `pack` are green and
   `publish` is waiting.
-- [ ] 7.2 **Before approving:**
+- [x] 7.2 **Before approving:**
   - the tagged `booking-flow.png` returns 200;
   - the artifact is in a new, empty folder: exactly 5 `.nupkg` + 4 `.snupkg` at `18.1.2`;
   - all five nuspecs: publisher, copyright, licence, readme and icon present, commit = the merge
@@ -147,20 +154,95 @@
     `UBookIt` alone, the description naming Umbraco 18;
   - the packed README is byte-identical to the tag's, and every address returns 200, with
     repository addresses pinned to `18.1.2`.
-- [ ] 7.3 Chris approves. Record the summary table as he pastes it, and the 409 wording if one
+
+  *7.1 done:* `git ls-remote` shows `befc4c5… refs/tags/18.1.2`. Publish run **`36256190310`**:
+  `check` and `pack` were success at every step, and `publish` is waiting. The artifact
+  `packages` is 872,460 bytes and expires 2026-10-03T16:40:17Z.
+
+  *7.2 done, nothing wrong:*
+  - `booking-flow.png` at the tag returns 200.
+  - **The artifact**, which Chris downloaded to `D:\Downloads\uBookIt\18.1.2`, a new folder: exactly
+    5 `.nupkg` and 4 `.snupkg`, all `18.1.2`, and nothing else.
+  - **All five nuspecs were read.** In every one:
+    - authors and copyright `Norwood Design & Development Ltd.`;
+    - licence MIT;
+    - readme and icon declared and present;
+    - project URL public;
+    - commit **`befc4c5…`**.
+  - **Every `Umbraco.Cms.*` is `[18.2.0, 19.0.0)`.**
+  - **Every sibling is at `18.1.2`.**
+  - `umbraco-marketplace` is on `UBookIt` only. Its description says "A booking system for
+    **Umbraco 18** … Requires Umbraco 18 and SQL Server."
+  - **The v18-only dependencies predate this change:** `Microsoft.AspNetCore.OpenApi` 10.0.11 on
+    Backoffice and Web, and EF Core SqlServer 10.0.11. Both are at the same versions in `18.1.1`'s
+    `Directory.Packages.props`, and both come from the Umbraco 18 port.
+  - **Symbols:** each `.snupkg` holds its own `.pdb`.
+  - **The packed README in all five is byte-identical to `README.md` at tag `18.1.2`** (SHA-256
+    `B6B7…96F3`).
+  - Every one of its 19 distinct addresses returns 200. All 16 repository links are
+    `blob/18.1.2/`, and none name `17.2.2` or `18.1.1`. It says "uBookIt is at `18.1.2`". The
+    fragment matches `booking-page.md:294` at the tag.
+- [x] 7.3 Chris approves. Record the summary table as he pastes it, and the 409 wording if one
   occurs.
-- [ ] 7.4 The flat container lists `18.1.2` per package, with times in **UTC**. The live page
+  *Done.* The `publish` job ran 16:46:04–16:46:20Z and was **success** at every step. The summary
+  table, verbatim as Chris copied it:
+
+  | File | Result |
+  |---|---|
+  | UBookIt.Backoffice.18.1.2.nupkg | published |
+  | UBookIt.Backoffice.18.1.2.snupkg | symbols submitted |
+  | UBookIt.Core.18.1.2.nupkg | published |
+  | UBookIt.Core.18.1.2.snupkg | symbols submitted |
+  | UBookIt.Persistence.18.1.2.nupkg | published |
+  | UBookIt.Persistence.18.1.2.snupkg | symbols submitted |
+  | UBookIt.Web.18.1.2.nupkg | published |
+  | UBookIt.Web.18.1.2.snupkg | symbols submitted |
+  | UBookIt.18.1.2.nupkg | published |
+
+  **No `.snupkg` got a 409**, so the pending-symbols wording is **still unobserved**, now after
+  both lines' first workflow releases.
+- [x] 7.4 The flat container lists `18.1.2` per package, with times in **UTC**. The live page
   renders the new readme, and the live nuspec is right.
+  *Done:*
+  - Polled every 30 s, with the times printed by `date -u`:
+    - 0/5 until 16:48:37Z;
+    - 2/5 (`persistence`, `web`) at 16:49:09Z;
+    - 3/5 (`ubookit`) at 16:50:11Z;
+    - **5/5 at 16:51:12Z**, about 5 minutes after the job finished.
+  - nuget.org's `Last-Modified` on `ubookit/index.json` is 16:50:04Z, which agrees.
+  - `nuget.org/packages/UBookIt/18.1.2` returns 200. Its rendered readme has "Bookings for
+    Umbraco 18", "How it's built", the 4 images and 13 repository links, all at `18.1.2`. It says
+    "uBookIt is at 18.1.2", and no rendering warning is shown.
+  - The live `ubookit.nuspec` has `18.1.2`, `umbraco-marketplace`, "for Umbraco 18", and commit
+    `befc4c5`.
 
 ## 8. Close out, in this order
 
-- [ ] 8.1 Stamp the `18.1.2` entry's date.
-- [ ] 8.2 The runbook's workflow Status bullet, which is at `main`'s wording since 3.3: **both
+- [x] 8.1 Stamp the `18.1.2` entry's date.
+  *Done:* `## 18.1.2 — 2026-09-26`.
+- [x] 8.2 The runbook's workflow Status bullet, which is at `main`'s wording since 3.3: **both
   lines have now released through the workflow**. Rewrite it to say so, and name the fallback removal as the next change. Keep the
   unobserved 409 wording, if still unobserved.
-- [ ] 8.3 Sibling sweep on this line, over `docs/`, `README.md`, `openspec/specs/**` and
+  *Done:* the bullet now reads "The manual fallback is still documented, although both lines now
+  release through the workflow". It says:
+  - `17.2.2` and `18.1.2`, both 2026-09-26, worked on their first push;
+  - removing *Fallback: pushing by hand* is the next change;
+  - the 409 sentence stands unchanged, because the wording is still unobserved.
+
+  It stays under *outstanding*, because what is outstanding is the fallback's removal, not
+  Trusted Publishing setup, so `release-publishing` still holds.
+- [x] 8.3 Sibling sweep on this line, over `docs/`, `README.md`, `openspec/specs/**` and
   `CLAUDE.md`: `18.1.1`, `2048`, `Marketplace`, `fallback`, `publishing workflow`, `not yet`.
-- [ ] 8.4 Record the obligations that remain on both lines:
+  *Done:*
+  - `18.1.1`: only the four history sentences (`publishing.md` 183, 428, 522, 525).
+  - `not yet`: the runbook's "CI … does not yet gate" is true. The rest are about bookings and
+    services, apart from `privacy-notice:288`, the "known gap" note, which this change's delta
+    supersedes at archive.
+  - `Marketplace`, `2048` and `fallback`: consistent, as on `main` (release-17-2-2 8.3). The
+    packaging spec's "SHALL NOT claim … until … observed" is satisfied by the 2026-09-25
+    observation.
+  - **Nothing falsified on this line.**
+- [x] 8.4 Record the obligations that remain on both lines:
   - fallback removal;
   - the 409 wording;
   - the `tree/` link blind spot;
@@ -171,6 +253,17 @@
     should name `dev/v18`. The sentence is pinned verbatim by `VersionTruthTests.cs:983`
     (`SaysOnce`), so fixing it means a line-specific guard change. It is left for its own change
     rather than taken into a patch unplanned. The fallback reader must substitute the line.
+
+  *Recorded*, in order of urgency:
+  1. **`main`'s runbook Status bullet**, which is false as of today: it says "No `18.x` release has
+     used it yet". It is fixed on `main` in the same sitting, straight after this archive, with this
+     line's 8.2 wording. **Do not leave it for the fallback-removal change.** A one-line-only fix
+     is the recurring defect.
+  2. **Fallback removal** on both lines, in its own change. Chris's key expires around
+     mid-October.
+  3. **The pending-symbols 409 wording**, unobserved after two releases.
+  4. **v18 SourceLink wording** (above).
+  5. **The `tree/` link blind spot** and **client-suite skip detection** (`release-17-2-2`).
 - [ ] 8.5 Commit on `dev/v18`, run the unit suite locally, and Chris pushes. Verify: CI is green at
   every step.
 - [ ] 8.6 Archive **last**, running the unit suite locally before the push. The push's CI is checked
