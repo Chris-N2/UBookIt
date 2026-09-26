@@ -152,6 +152,9 @@ chosen to keep data rather than to keep the feature.
 
 The settings screen validates what you type before storing it, so you are told rather than silently
 given the fallback. The fallbacks still apply to anything that reached the database another way.
+It also refuses a value longer than the 2048 characters the store holds. For the internal
+recipients list, that limit applies to each address, because each one is stored separately. A
+longer value can still be set in configuration.
 
 ## Upgrading to this version
 

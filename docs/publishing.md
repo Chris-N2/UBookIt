@@ -11,7 +11,7 @@ only the first: `17.0.0` is already out, and all of it applies unchanged to the 
   copyright are named explicitly because they have been wrong in this repository before, and
   a list that omits them is how that goes unnoticed. A wrong URL is fixed by publishing a *new
   version*, and the wrong one stays visible on the version history forever.
-- **A version number cannot be reused**, even after unlisting. uBookIt is at `17.2.1`, and
+- **A version number cannot be reused**, even after unlisting. uBookIt is at `17.2.2`, and
   that number is spent the moment it is pushed, successfully or not. This is no longer
   hypothetical: `17.0.0` was published on 2026-09-15 carrying a readme whose documentation links
   were relative, every one of them resolved against nuget.org rather than the repository, and
@@ -73,17 +73,13 @@ expire at the events it describes.**
 
 **What is still outstanding**, stated here so this section cannot be read as "everything is done":
 
-- **CI verifies, but does not yet gate.** Every commit pushed to `main` or `dev/v18` is built and
+- **CI verifies, but does not yet gate.** Every push to `main` or `dev/v18` is built and
   tested unattended, as is the latest push to any other branch (see *Continuous integration*
   below). No branch protection requires a green run, so an untested push is visible rather than
   prevented.
 - **No release has gone through the publishing workflow yet.** A dry run (see *Publishing a
   release*) exercises everything except the token exchange, which only a real release does. So
   the manual route stays documented as the fallback until one has.
-- **The Umbraco Marketplace still lists three libraries.** Listing follows from the
-  `umbraco-marketplace` tag, with no submission. Every package carried the tag until
-  `17.2.1`/`18.1.1`, which carry it on the meta-package alone (see *After the push*). Whether the
-  library listings go away has not yet been seen.
 - **The packages are owned by a personal account**, not by the organisation. So is the Trusted
   Publishing policy (see *Trusted Publishing setup*), and the key ownership note under
   *Fallback: pushing by hand* applies to both.
@@ -98,7 +94,7 @@ differ from the other line's tip — so after changing CI on one line, **expect 
 red until the same change is pushed to the other**, then re-run it. The red is true: at that moment
 the lines do differ.
 
-- **`ci`** — every commit pushed to either line, each with its own run that nothing cancels; the
+- **`ci`** — every push to either line, each with its own run that nothing cancels; the
   latest push to any other branch; and pull requests into either line. On Linux, from a clean
   clone with full history: the client's tests, a Release build with warnings as errors, the three
   .NET suites against a SQL Server started for the run, and `openspec validate --all --strict`.
@@ -236,8 +232,8 @@ Notes on the policy:
 
    | Where | What moves |
    |---|---|
-   | `README.md`, near the top | the sentence naming the version uBookIt is currently at |
-   | `README.md`, *What it looks like* | **every** screenshot URL, each pinned to the release tag |
+   | `README.md`, *Versions and the API promise* | the sentence naming the version uBookIt is currently at |
+   | `README.md`, the opening and *What it looks like* | **every** screenshot URL, each pinned to the release tag |
    | `README.md`, throughout | **every** documentation link — pinned to the release tag too, not to a branch, for the reason the screenshots are |
    | `docs/publishing.md` | the *"uBookIt is at"* sentence under **What nuget.org will not let you undo** |
    | `CHANGELOG.md` | a new entry for the version, its heading left undated until it is live |
@@ -368,7 +364,7 @@ git branch -r --contains HEAD            # must list origin/main
 after the version**, like this:
 
 ```
-https://raw.githubusercontent.com/Chris-N2/UBookIt/17.2.1/docs/images/booking-flow.png
+https://raw.githubusercontent.com/Chris-N2/UBookIt/17.2.2/docs/images/booking-flow.png
 ```
 
 That is deliberate. A readme is frozen at push and can never be corrected, but the images in it
@@ -396,9 +392,9 @@ bump therefore edits the readme's image refs in the same commit as `Directory.Bu
 *Before any push*, step 3, for the full list of what a bump touches.
 
 ```bash
-git tag 17.2.1                  # on the commit you are packing from
-git push origin 17.2.1
-curl -sI https://raw.githubusercontent.com/Chris-N2/UBookIt/17.2.1/docs/images/booking-flow.png
+git tag 17.2.2                  # on the commit you are packing from
+git push origin 17.2.2
+curl -sI https://raw.githubusercontent.com/Chris-N2/UBookIt/17.2.2/docs/images/booking-flow.png
 ```
 
 The `curl` is the point of the step: a `200` means the address the readme carries resolves. Do it
@@ -523,9 +519,11 @@ children.
 
 **The tag cannot be taken back from a version already pushed.** Until `17.2.1`/`18.1.1`, every
 package carried it, and `UBookIt.Persistence`, `UBookIt.Web` and `UBookIt.Backoffice` got
-listings of their own. Whether the Marketplace drops those once their latest version is untagged
-has **not been observed**. Check `https://marketplace.umbraco.com/package/<id>` after a release
-before saying they are gone.
+listings of their own. **The Marketplace dropped them once their latest version was untagged.**
+This was seen on 2026-09-25, after the rescan that followed `17.2.1`/`18.1.1`: only `UBookIt` was
+listed, showing the `18.x` line and support for Umbraco 17 and 18. That was one observation, not a
+rule the Marketplace promises, so still check `https://marketplace.umbraco.com/package/<id>` after
+a release that changes the tag.
 
 **The listing's description is the meta-package's `<Description>`**, and it too is frozen at push.
 It names the Umbraco major derived from `<Version>`, because `UBookIt.csproj` is shared by both

@@ -244,7 +244,7 @@ public sealed class UBookItDbContext(DbContextOptions<UBookItDbContext> options)
             // per key" in the schema rather than in the store's code.
             setting.HasKey(s => s.Key);
             setting.Property(s => s.Key).HasMaxLength(256);
-            setting.Property(s => s.Value).HasMaxLength(2048);
+            setting.Property(s => s.Value).HasMaxLength(SettingRow.MaxValueLength);
         });
 
         modelBuilder.Entity<CancellationSecretRow>(secret =>
