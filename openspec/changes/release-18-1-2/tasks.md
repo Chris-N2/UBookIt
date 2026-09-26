@@ -74,6 +74,13 @@
   (line 14, the example URL, and the tag commands). They were resolved to this line's side with
   `18.1.2`. No conflict markers remain. `18.1.1` is left only at the history sentences 177, 422,
   516 and 519. `dev/v18`'s own tag-section wording about two lines is kept.
+- [x] 3.3 (Added in QA round 1, MAJOR.) Port `main`'s workflow Status bullet (`39610f0`) **before
+  the tag**. The runbook is frozen at the tag, and the Marketplace README links to it, so "No
+  release has gone through the publishing workflow yet", which has been false since `17.2.2`
+  published, would stay false at that address for good.
+  *Done:* the bullet was replaced by `main`'s text, extracted from `39610f0`. Lines 74–95 of the
+  *outstanding* list are now identical to `main`'s `39610f0` (`diff --strip-trailing-cr`). No test
+  or spec pins that bullet (QA grepped).
 - [x] 3.2 CHANGELOG:
   - the header anchor becomes `#versions-and-the-api-promise`;
   - `main`'s `## 17.2.2 — 2026-09-26` entry is copied **unedited** above `## 17.2.1`;
@@ -132,8 +139,8 @@
 ## 8. Close out, in this order
 
 - [ ] 8.1 Stamp the `18.1.2` entry's date.
-- [ ] 8.2 The runbook's workflow Status bullet: **both lines have now released through the
-  workflow**. Rewrite it to say so, and name the fallback removal as the next change. Keep the
+- [ ] 8.2 The runbook's workflow Status bullet, which is at `main`'s wording since 3.3: **both
+  lines have now released through the workflow**. Rewrite it to say so, and name the fallback removal as the next change. Keep the
   unobserved 409 wording, if still unobserved.
 - [ ] 8.3 Sibling sweep on this line, over `docs/`, `README.md`, `openspec/specs/**` and
   `CLAUDE.md`: `18.1.1`, `2048`, `Marketplace`, `fallback`, `publishing workflow`, `not yet`.
@@ -142,7 +149,12 @@
   - the 409 wording;
   - the `tree/` link blind spot;
   - client skip detection;
-  - `main`'s runbook Status bullet, which still says only the 17 line has released.
+  - `main`'s runbook Status bullet, which still says only the 17 line has released;
+  - **v18 runbook (QA round 1, NIT, pre-existing):** *The order that makes SourceLink correct*
+    says "Pack from the merge commit on main" and "`# must list origin/main`". On this line it
+    should name `dev/v18`. The sentence is pinned verbatim by `VersionTruthTests.cs:988`
+    (`SaysOnce`), so fixing it means a line-specific guard change. It is left for its own change
+    rather than taken into a patch unplanned. The fallback reader must substitute the line.
 - [ ] 8.5 Commit on `dev/v18`, run the unit suite locally, and Chris pushes. Verify: CI is green at
   every step.
 - [ ] 8.6 Archive **last**, running the unit suite locally before the push. The push's CI is checked

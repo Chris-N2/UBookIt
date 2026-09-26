@@ -47,9 +47,13 @@ the four. This is the same check `release-17-2-2` task 8.4 prescribed.
 section's wording about two published lines). So `main`'s runbook diff
 `d6f0199..56f1837 -- docs/publishing.md` is applied hunk by hunk with `--3way`. Its version
 literals are then corrected to `18.1.2`: the *is at* sentence and the *Tag the release* example
-URL and commands. The history sentences ("up to `17.2.1`/`18.1.1`") stay. The post-publication
-Status bullet (`main`'s `39610f0`) is **not** ported as is. On this line, after `18.1.2` publishes,
-both lines have released through the workflow, and it is rewritten to say so (task 8.2).
+URL and commands. The history sentences ("up to `17.2.1`/`18.1.1`") stay. **The workflow Status bullet is ported from `main`'s `39610f0` before the tag** (QA round 1,
+MAJOR). This line's runbook still said "No release has gone through the publishing workflow yet",
+which was already false once `17.2.2` published. The tag freezes the runbook, and the 18.1.2
+README, which is the Marketplace page, links to that frozen copy. So the bullet must be true **at
+tag time**: only the 17 line has released through the workflow. After `18.1.2` publishes, task
+8.2 rewrites it again, for both lines. The first plan deferred all of it to 8.2, and missed that
+8.2 cannot reach the tagged copy.
 
 ### D4. The changelog: copy `17.2.2`'s entry, write `18.1.2`'s
 
