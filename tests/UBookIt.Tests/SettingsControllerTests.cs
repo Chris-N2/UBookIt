@@ -282,8 +282,8 @@ public class SettingsControllerTests
     public async Task A_value_longer_than_the_store_holds_is_refused_before_the_store()
     {
         // Without this the value passed validation and failed at SQL Server (see the integration
-        // suite's SettingsStoreTests) instead of being refused with a message against the setting. The link is otherwise usable, so length is the only
-        // reason left for the refusal.
+        // suite's SettingsStoreTests) instead of being refused with a message against the setting.
+        // The link is otherwise usable, so length is the only reason left for the refusal.
         var store = new FakeSettingsStore();
         var value = LinkOfLength(Limit + 1);
 

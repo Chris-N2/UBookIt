@@ -25,8 +25,8 @@ accepted forms.
 
 *A value longer than the settings store can hold (2048 characters) is outside this requirement.
 The site can use such a value from configuration, but the screen cannot store it. The screen
-refuses it for its length and states the limit, as the `site-settings` requirement *A value longer
-than the store holds is refused, not attempted* provides. That refusal is about length, not form,
+refuses it for its length and states the limit, as the `site-settings` requirement "A value longer
+than the store holds is refused, not attempted" provides. That refusal is about length, not form,
 so it does not name the two forms.*
 
 #### Scenario: A site-relative link is used on a Linux host

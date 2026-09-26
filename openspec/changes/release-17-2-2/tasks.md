@@ -244,7 +244,7 @@
 
 ## 6. Review and merge
 
-- [ ] 6.1 QA review (`qa-review`) in one subagent, reused across rounds. Hand each round's fixes
+- [x] 6.1 QA review (`qa-review`) in one subagent, reused across rounds. Hand each round's fixes
   over as new code, and give it every claim as something to verify.
 
   *Round 1: REJECT* on `fb9ce74`. QA confirmed all build, suite and validate claims by running
@@ -294,6 +294,27 @@
     because the new MODIFIED delta was not named in these tasks. The guard did its job, and task
     1.4 now carries the name and the guarantee diff. **Mutation** (prerelease branch disabled):
     exactly the `18.0.0-rc` case fails.
+
+  *Round 2: APPROVE WITH NITS* on `ee4c184`. There is nothing to fix before merge.
+  - QA re-ran every claim.
+  - It diffed the privacy-notice delta against the main spec itself and found exactly three
+    hunks.
+  - **It ruled the narrowing right**: naming URL forms for an over-long value would point the
+    editor at the wrong fix.
+  - It checked the D5 command block end to end.
+
+  NITs:
+  - **Taken:**
+    - the nested italic in the delta's note, now quotation marks;
+    - a 170-character comment line, re-wrapped;
+    - `publishing.md:76/97` "every commit pushed" changed to "every push". QA ruled it optional,
+      and it costs one word each.
+  - **Noted, not changed:** `docs/configuration.md`'s literal "2048" is tied to the constant by
+    no guard. It is accurate today, and it only matters if the constant changes, which would need
+    a migration and a change of its own.
+
+  After the NITs: a clean build with 0 warnings, unit **2005**, openspec **27/27**. The other
+  suites are unaffected: only a C# comment, a spec note and runbook prose changed.
 - [ ] 6.2 Chris pushes the branch and opens the PR into `main`. Verify, through the API, that the
   PR's CI run is green at every step, parity included.
 - [ ] 6.3 Chris merges with "Create a merge commit". Fetch. Verify that `origin/main` = local

@@ -73,7 +73,7 @@ expire at the events it describes.**
 
 **What is still outstanding**, stated here so this section cannot be read as "everything is done":
 
-- **CI verifies, but does not yet gate.** Every commit pushed to `main` or `dev/v18` is built and
+- **CI verifies, but does not yet gate.** Every push to `main` or `dev/v18` is built and
   tested unattended, as is the latest push to any other branch (see *Continuous integration*
   below). No branch protection requires a green run, so an untested push is visible rather than
   prevented.
@@ -94,7 +94,7 @@ differ from the other line's tip — so after changing CI on one line, **expect 
 red until the same change is pushed to the other**, then re-run it. The red is true: at that moment
 the lines do differ.
 
-- **`ci`** — every commit pushed to either line, each with its own run that nothing cancels; the
+- **`ci`** — every push to either line, each with its own run that nothing cancels; the
   latest push to any other branch; and pull requests into either line. On Linux, from a clean
   clone with full history: the client's tests, a Release build with warnings as errors, the three
   .NET suites against a SQL Server started for the run, and `openspec validate --all --strict`.
