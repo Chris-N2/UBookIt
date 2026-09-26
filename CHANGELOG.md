@@ -13,9 +13,34 @@ revising it, and nothing else about it moves afterwards.
 
 The major tracks the **Umbraco** major, not uBookIt's own breaking changes — uBookIt `17.x` is for
 Umbraco 17. That means the major cannot signal a break, so a break lands in a **minor** and never in
-a patch. See [the versioning note](README.md#what-the-version-number-means).
+a patch. See [the versioning note](README.md#versions-and-the-api-promise).
 
 ---
+
+## 18.1.2
+
+### What you have to do
+
+**Nothing.** No API signature, schema or migration changes, and no setting you have to change.
+If your site already works, it goes on working.
+
+### What changed
+
+The same changes `17.2.2` made on the Umbraco 17 line.
+
+**A setting value too long to store is refused with a message.** Settings are stored in a column
+that holds 2048 characters. The settings screen used to accept a longer value, such as a very
+long privacy policy link, and the save then failed at the database instead of being refused.
+Now the screen refuses the value and states the limit. That makes `SettingValidation.IsValid`
+stricter, with no change to its signature. It refuses only what the database could never have
+held, so no value you have stored is affected. For the internal recipients list, the limit
+applies to **each address**, because each one is stored separately. A long list of ordinary
+addresses is accepted exactly as before.
+
+**The readme has been rewritten**, and on this line it is also the package's Umbraco Marketplace
+listing. It now leads with what uBookIt does, who it is for and how to install it, and it adds a
+section on how the package is built. Nothing it promised has been withdrawn. The detail it no
+longer carries is in the documentation it links to.
 
 ## 18.1.1 — 2026-09-25
 
@@ -178,6 +203,29 @@ They now name `18.0.0`, so what you read is what this version shipped.
 
 **The Bookings screenshot was retaken on Umbraco 18**, because 18 rounds the backoffice's buttons
 and the shipped image still showed 17's square ones.
+
+## 17.2.2 — 2026-09-26
+
+### What you have to do
+
+**Nothing.** No API signature, schema or migration changes, and no setting you have to change.
+If your site already works, it goes on working.
+
+### What changed
+
+**A setting value too long to store is refused with a message.** Settings are stored in a column
+that holds 2048 characters. The settings screen used to accept a longer value, such as a very
+long privacy policy link, and the save then failed at the database instead of being refused.
+Now the screen refuses the value and states the limit. That
+makes `SettingValidation.IsValid` stricter, with no change to its signature. It refuses only what
+the database could never have held, so no value you have stored is affected. For the internal
+recipients list, the limit applies to **each address**, because each one is stored separately. A
+long list of ordinary addresses is accepted exactly as before.
+
+**The readme has been rewritten**, and it is also the package page. It now leads with what uBookIt
+does, who it is for and how to install it, and it adds a section on how the package is built.
+Nothing it promised has been withdrawn. The detail it no longer carries is in the documentation
+it links to.
 
 ## 17.2.1 — 2026-09-25
 

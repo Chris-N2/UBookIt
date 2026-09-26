@@ -299,6 +299,14 @@ internal sealed class FlagRow
 /// </summary>
 internal sealed class SettingRow
 {
+    /// <summary>
+    /// The longest <see cref="Value"/> the column holds, in UTF-16 code units — the unit both
+    /// <c>nvarchar</c> and <see cref="string.Length"/> count in. The schema and the settings
+    /// screen's validation both read this, so what validation accepts is exactly what the store
+    /// can hold.
+    /// </summary>
+    internal const int MaxValueLength = 2048;
+
     public required string Key { get; set; }
 
     public required string Value { get; set; }
