@@ -112,6 +112,16 @@ A **patch**: no signature, schema or migration change. The one behavioural narro
 
 ### Modified Capabilities
 
+- `privacy-notice`: a MODIFIED requirement, *A usable policy link is defined once, and means the
+  same on every host* (QA round 1, MAJOR: the change falsified it). Its italic note described the
+  over-long write as a "known gap, not yet addressed" that fails at the database. It now points at
+  the `site-settings` refusal. **Guarantees diffed:** all seven scenarios and every SHALL carry
+  forward word for word except one, which is **deliberately narrowed**. "The screen's refusal
+  SHALL name both accepted forms" now applies to a value *within the store's capacity*. An
+  over-long link is refused for its length and states the limit instead, because naming the two
+  forms there would tell the editor the wrong thing to fix. Nothing that was refused with the
+  forms message before is affected: an over-long value used to fail at the database, with no
+  message at all.
 - `site-settings`: an ADDED requirement. A submitted value longer than the store can hold is
   refused, naming the limit, and is never passed to the store. The existing validation requirement
   is not rewritten.

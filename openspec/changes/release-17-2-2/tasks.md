@@ -81,6 +81,25 @@
   - **The remarks on `The_screen_accepts_a_policy_link…`** said "no layer checks length on write".
     That is now false, and it has been rewritten to point at the new tests.
 
+- [x] 1.4 (Added in QA round 1.) The privacy-notice MODIFIED requirement, *A usable policy link is
+  defined once, and means the same on every host*: diff its guarantees against
+  `openspec/specs/privacy-notice/spec.md`, not its prose.
+
+  | Guarantee as it stands | Decision |
+  |---|---|
+  | SHALL: usable = trimmed, non-blank, no control character or backslash, and site-relative (one `/`) or absolute http(s) | carried word for word |
+  | SHALL: every other value is unusable and treated as absent | carried word for word |
+  | SHALL NOT depend on the host OS; a `/` value SHALL be judged site-relative, never as an absolute URI | carried word for word |
+  | SHALL accept exactly when the site would use it, within the store's capacity; validation and resolution stay separate and SHALL apply the same definition | carried word for word |
+  | SHALL: "The screen's refusal SHALL name both accepted forms" | **narrowed, deliberately**: "When the screen refuses a value within the store's capacity". An over-long link is refused for length and states the limit. Stated in the proposal |
+  | Italic note: over-long is a "known gap, not yet addressed", and the write "fails at the database" | **superseded**: it now points at the `site-settings` refusal. It is informative, not a SHALL |
+  | 7 scenarios: Linux `/privacy`; Windows `/privacy`; absolute http(s); refusals unchanged; screen accepts site-relative; screen and site agree within capacity | 6 carried word for word |
+  | Scenario: *The screen's refusal names both forms* | carried, with its WHEN scoped "within the settings store's capacity", to match the narrowed SHALL |
+
+  Verify: `ChangeDeltaIntegrityTests` passes, and the existing tests on this requirement pass
+  unchanged: `The_policy_link_refusal_names_both_accepted_forms` uses `privacy`, which is within
+  capacity.
+
 ## 2. The bound guard's message
 
 - [x] 2.1 In `PackageCompositionTests`, choose the ceiling message by comparing versions (design
@@ -151,7 +170,9 @@
       longer exists. It now links `#versions-and-the-api-promise`. That is the header paragraph,
       not a released entry.
   - Documentation guards 122/122 on the final text. The full-suite totals are in 5.2.
-  - Links: 10 into the repository, all `blob/17.2.2/…` and resolving; 4 images on
+  - Links (after round 1, counted with `grep -o`, not estimated): 16 into the repository, 13
+    distinct addresses, all `blob/17.2.2/…` and resolving, now
+    including `openspec/specs/site-settings/spec.md` and `.github/workflows/ci.yml`; 4 images on
     `raw.githubusercontent.com/…/17.2.2/`; 2 external (the publisher site, and OpenSpec, which
     returned 200).
 - [x] 3R.4 Check every sentence of "How it's built" against the repository, and record the evidence
@@ -225,6 +246,54 @@
 
 - [ ] 6.1 QA review (`qa-review`) in one subagent, reused across rounds. Hand each round's fixes
   over as new code, and give it every claim as something to verify.
+
+  *Round 1: REJECT* on `fb9ce74`. QA confirmed all build, suite and validate claims by running
+  them.
+  - **MAJOR:** `openspec/specs/privacy-notice/spec.md` still called the over-long write a "known
+    gap, not yet addressed". My sibling sweep had not looked in `openspec/specs/**`. *Fix:* a
+    MODIFIED delta with every guarantee diffed. One is deliberately narrowed: "the refusal names
+    both forms" now applies within the store's capacity, because an over-long link is refused for
+    its length. That narrowing was found while writing the fix; QA had not raised it. It is stated
+    in the proposal.
+  - **MAJOR:** README "The run fails if any test suite didn't report or any test was skipped" is
+    false for the client suite, where vitest fails only on zero files. *Fix:* scoped to ".NET test
+    project".
+  - **MAJOR:** README "Gated releases", and the inventory's evidence for it: the documented
+    fallback pushes a local pack, not the run's artifact. *Fix:* the sentence names the manual
+    fallback, and the inventory's false evidence is corrected in place, with the correction stated.
+  - **MINORs, all taken:**
+    - "every commit" becomes "every push";
+    - "design" is dropped from the universal claim, because `release-17-2-0` has none;
+    - links added to a spec (`site-settings`) and to `ci.yml`, as D7.4 said;
+    - the template-commit pointer restored;
+    - "additions are preferred to changes" restored, now inventory 9a;
+    - ceiling messages: a **prerelease** branch (`18.0.0-rc` refuses no 17 release, it admits
+      earlier 18 prereleases), and four-part comparison (`18.0.0.1` is above, not "spelled
+      differently"). The D3 deviation from `NuGetVersion` is recorded;
+    - D5 now states the exact artifact-download and push commands. **Found while writing them:**
+      my first glob `UBookIt.*.nupkg` also matched the meta-package, which would have pushed it
+      among the libraries. That is corrected before this round.
+  - **NITs, all taken:**
+    - the test comment's unmeasured "500";
+    - the second screenshot's alt text no longer says "same";
+    - D6's item number;
+    - 7.3 scoped "pinned" to repository links;
+    - the `Text` case uses plain letters.
+  - **Also added:** `docs/configuration.md` gets one sentence saying the screen refuses values
+    over 2048, per address for the recipients list. It is where validation is described, and it
+    said nothing about length.
+  - **Not changed:** `publishing.md:76/97` ("every commit pushed"). That is inherited wording in
+    the runbook, and QA raised it only as the README's source. It is left for QA to rule on.
+  - **Round-2 state** (after a clean `--no-incremental` build, 0 warnings), all 0 skipped:
+    - unit **2005** (the ceiling theory went from 7 to 11 cases: `17.7.0-rc`, `18.0.0.1`,
+      `18.0.0.0` and `18.x` added, and `18.0.0-rc` moved to *prerelease*);
+    - integration **194**, rendering **1168**, client **335**;
+    - openspec **27/27**.
+
+    The first run failed `ChangeDeltaIntegrityTests.Every_modified_requirement_is_named_in_its_change_tasks`,
+    because the new MODIFIED delta was not named in these tasks. The guard did its job, and task
+    1.4 now carries the name and the guarantee diff. **Mutation** (prerelease branch disabled):
+    exactly the `18.0.0-rc` case fails.
 - [ ] 6.2 Chris pushes the branch and opens the PR into `main`. Verify, through the API, that the
   PR's CI run is green at every step, parity included.
 - [ ] 6.3 Chris merges with "Create a merge commit". Fetch. Verify that `origin/main` = local
@@ -241,7 +310,8 @@
   - the tagged `booking-flow.png` `curl` returns 200;
   - from the run's `packages` artifact, read **all five** nuspecs against D4's list, and all four
     `.snupkg` are present;
-  - from the README extracted from a `.nupkg`: every address returns 200, pinned to `17.2.2`, and
+  - from the README extracted from a `.nupkg`: every address returns 200, every **repository**
+    address is pinned to `17.2.2` (the two external links can't be), and
     it says "uBookIt is at `17.2.2`".
 
   If anything is wrong, reject and follow D5. Record which path was taken.

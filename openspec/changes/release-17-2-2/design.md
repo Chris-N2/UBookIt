@@ -83,12 +83,24 @@ where it actually runs:
 
 ### D3. The ceiling message is chosen by comparing versions, detection untouched
 
-`high != expectedCeiling` stays the detection. The message branches on
-`NuGetVersion.TryParse(high)` compared with the expected ceiling:
+`high != expectedCeiling` stays the detection. The message branches on how `high` compares with
+the expected ceiling:
 - **lower:** the existing text, which is true for this case;
 - **higher:** "A ceiling above Umbraco {major} admits Umbraco {major+1} or later, which this
   line is not built against."
 - **unparseable:** says so.
+
+*Revised during apply and in QA round 1.* Two more branches:
+- **the right bound spelled differently** (`18.0`, `18.0.0.0`). Detection flags it, and "lower"
+  or "higher" would be false of it;
+- **a prerelease of the ceiling** (`18.0.0-rc`). It sorts below `18.0.0`, but it refuses no
+  Umbraco 17 release. It admits the next major's earlier prereleases, so "lower" would be false of
+  it too.
+
+The comparison uses all four numeric parts, with missing parts as zero, as NuGet does, so
+`18.0.0.1` is "higher" and not "spelled differently". It is **hand-rolled rather than
+`NuGetVersion`**, because the test project doesn't reference `NuGet.Versioning`, and a dependency
+for a failure message's wording isn't worth taking.
 
 The message is built in a small static helper so each branch can be fired directly. It is proved
 by one test case per branch. The guard itself can't be driven into the high branch without
@@ -127,8 +139,23 @@ artifact is what gets pushed. It is five files.
   - check the policy per *Trusted Publishing setup*;
   - re-run the job once only if the cause was outside the repository, like the policy's package
     selection;
-  - otherwise **reject/cancel** and publish with the fallback from the same artifact's packages,
-    using the still-valid key.
+  - otherwise **reject/cancel**, and publish with the fallback key from **the run's own
+    verified packages**, not a local pack. The runbook's fallback command globs
+    `src/**/bin/Release`, so it would not see them, and a local pack would repeat the
+    stale-artifact and SourceLink work the workflow exists to remove. The exact commands, settled
+    before tagging (QA round 1):
+
+    ```powershell
+    gh run download <publish-run-id> -R Chris-N2/UBookIt -n packages -D <scratchpad>\packages-17.2.2
+    $key = Read-Host -AsSecureString; $plain = [System.Net.NetworkCredential]::new('', $key).Password
+    Get-ChildItem <scratchpad>\packages-17.2.2\UBookIt.*.nupkg | Where-Object Name -ne 'UBookIt.17.2.2.nupkg' | ForEach-Object { dotnet nuget push $_.FullName --api-key $plain --source https://api.nuget.org/v3/index.json --skip-duplicate }
+    dotnet nuget push <scratchpad>\packages-17.2.2\UBookIt.17.2.2.nupkg --api-key $plain --source https://api.nuget.org/v3/index.json --skip-duplicate
+    ```
+
+    The libraries go first, then the meta-package, as the workflow orders them. Each push takes
+    its `.snupkg` alongside. The runbook's `--skip-duplicate` caveat applies: an existing `.nupkg`
+    skips its symbols, so on a partial push, check the symbols on the package page. Chris runs
+    these commands, because the key is his.
 - **A partial push:** a re-run completes it, by design.
 
 Any of these is recorded, and it becomes an obligation against `trusted-publishing`, not a fix in
@@ -136,7 +163,7 @@ this change.
 
 ### D6. Post-publication edits go straight to `main`
 
-As in `17.2.1`'s D3: stamp the date, then the *Status* bullet from proposal item 6, then archive.
+As in `17.2.1`'s D3: stamp the date, then the *Status* bullet from proposal item 7, then archive.
 The unit suite runs locally before each push.
 
 ### D7. The README rewrite: diff the reader's guarantees, not the prose

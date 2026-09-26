@@ -44,6 +44,7 @@ file instead. The guard gap is a candidate obligation, not part of this patch.
 | 8 | uBookIt is at X; the API is a promise; changes are deliberate, named first, never in a patch; the changelog leads with what upgrading asks | kept | *Versions and the API promise* |
 | 8a | "`17.1.0` itself added members to five published interfaces" (illustration) | **dropped** | Illustrative history. The `17.1.0` changelog entry records it ("Five published interfaces gained members", `CHANGELOG.md`) |
 | 9 | Versioning policy and table | kept | verbatim pins and table |
+| 9a | "the public interface is kept as consistent as possible, and additions are preferred to changes" | kept | *Versions and the API promise*. Dropped in the first draft without being listed; restored in QA round 1 |
 | 10 | Requirements table (Umbraco, .NET, SQL Server) and the SQLite reason | kept | *Requirements*, table row unchanged |
 | 11 | Resources: hours, exceptions, min/max duration, capabilities | kept | *For your staff* |
 | 12 | Services from roles; uBookIt finds free combinations | kept | *For your staff* |
@@ -65,7 +66,7 @@ file instead. The guard gap is a candidate obligation, not part of this patch.
 | 26a | First screenshot's caption: the header, navigation and typeface are the site's; uBookIt supplies markup and one stylesheet and sets no text colour | **dropped** | Duplicated: "in your own layout" in the opening; "sets no text colour of its own" in the accessibility section |
 | 27 | Accessibility claim and boundary | kept | nearly verbatim, same link and fragment |
 | 28 | Four not-yet items | kept | all four, in plainer words |
-| 29 | Documentation list | kept, plus *Configuration* | the list now links `docs/configuration.md` too |
+| 29 | Documentation list | kept, plus *Configuration* | the list now links `docs/configuration.md` too. The booking-page entry's "the deployment note about committing the installed template" was shortened to "deployment" in the first draft, which weakened an actionable trap. It was restored in QA round 1 |
 | 30 | Packages table; Backoffice without Web fails silently; install `UBookIt` | kept | *The packages* |
 | 31 | Licence and publisher | kept | verbatim |
 
@@ -78,10 +79,10 @@ file instead. The guard gap is a candidate obligation, not part of this patch.
 | Sentence | Evidence |
 |---|---|
 | Built with AI assistance under a spec-driven workflow | `CLAUDE.md` invariant 6; Chris, 2026-09-26, asked for it to be said |
-| Every change starts as a proposal, design and task list in OpenSpec; no code until approved | `CLAUDE.md` invariant 6, "No code without an approved change"; `openspec/changes/` |
+| Every change starts as a proposal and task list, with a design where needed, in OpenSpec; no code until approved; the requirements are in the repository (linked: `openspec/specs/site-settings/spec.md`). **Round 1:** "design" dropped from the universal claim, because `archive/2026-09-23-release-17-2-0/` has none | `CLAUDE.md` invariant 6, "No code without an approved change"; `openspec/changes/` |
 | A separate agent that didn't write the change reviews it adversarially against its spec; it can reject; findings go back through implementation; it never fixes code | `CLAUDE.md` invariant 6 and *How QA actually runs*: "QA never fixes code itself", "A REJECT is a gate"; `.claude/skills/qa-review` |
-| Every commit to a release line is built and tested on Linux against SQL Server; fails if a suite didn't report or a test was skipped | `docs/publishing.md` *Continuous integration*: "every commit pushed to either line", Linux, SQL Server started for the run, `Assert-TestResults.ps1` fails the run if any test project "did not report or any test was skipped" |
+| Every push to a release line is built and tested on Linux against SQL Server; the run fails if any .NET test project didn't report or any of its tests was skipped | `.github/workflows/ci.yml` (push to `main`/`dev/v18`); `docs/publishing.md` *Continuous integration*: Linux, SQL Server started for the run, `Assert-TestResults.ps1` fails "if any test project on disk did not report or any test was skipped". **Round 1 corrected two overclaims.** (a) "any test suite": the check reads TRX files from `tests/*.csproj` only, and the client suite (`npm test`, vitest) fails only on zero test files, so an `it.skip` passes CI. It is now scoped to .NET test projects. (b) "every commit": a push runs once, on its head, so it now says "every push". |
 | The suite checks the version, the versioning policy, the API default, and every link into the repository | §1 above: `Every_documented_version…`, `TheVersioningPolicyIsStated`, `Both_documents_state_the_api_is_off_by_default`, and the link guards for `blob/` links. Scoped to "into the repository" because external links are unchecked |
-| A release is packed from its tagged commit on a clean CI runner, its packages verified there, and nothing published until the maintainer approves | `docs/publishing.md` *Publishing a release*: pack from a clean clone, `Assert-PackedRelease.ps1`, the `release` environment's required reviewer. It stays true if D5's fallback is used: the fallback pushes the same run's artifact by hand |
+| Releases are published by a workflow that packs the tagged commit on a clean CI runner, verifies the packages there, and publishes nothing until the maintainer approves; a manual route is documented as the fallback | `docs/publishing.md` *Publishing a release* (clean clone, `Assert-PackedRelease.ps1`, the `release` environment's required reviewer) and *Fallback: pushing by hand*. **Round 1 found the previous evidence false.** It said the fallback "pushes the same run's artifact by hand", but the runbook's fallback pushes a local pack (`src/**/bin/Release/*.nupkg`), and only this change's D5 meant the artifact. The sentence now names the fallback instead of claiming every release goes through the workflow. |
 
 No history ("since …"), counts, or model name.

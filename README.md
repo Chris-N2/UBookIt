@@ -79,7 +79,7 @@ A new install starts with all four of these off, or granted to nobody:
 the page rather than running down it. Every field is labelled, and the notice explaining what
 the site does with the details sits where the details are asked for.
 
-![The lower half of the same booking page: a How long do you need? selector reading 30 minutes, a Show times button, and a fieldset headed "Available start times on Monday 21 September 2026 for 30 minutes" whose nine radio options from 12:30 to 16:30 wrap across two rows. Below it a Your details fieldset holds labelled Name, Email and optional Phone fields, a note saying the site will email you about your booking, two paragraphs explaining what the details are used for and how long they are kept, and a Book button.](https://raw.githubusercontent.com/Chris-N2/UBookIt/17.2.2/docs/images/booking-form.png)
+![The lower half of the booking page shown at the top of this readme: a How long do you need? selector reading 30 minutes, a Show times button, and a fieldset headed "Available start times on Monday 21 September 2026 for 30 minutes" whose nine radio options from 12:30 to 16:30 wrap across two rows. Below it a Your details fieldset holds labelled Name, Email and optional Phone fields, a note saying the site will email you about your booking, two paragraphs explaining what the details are used for and how long they are kept, and a Book button.](https://raw.githubusercontent.com/Chris-N2/UBookIt/17.2.2/docs/images/booking-form.png)
 
 **The Bookings screen in the backoffice.** Find a booking by reference or email address, choose a
 date window, filter by status, and act on a row.
@@ -123,18 +123,21 @@ These limits are deliberate, and they're listed here so you know before you inst
 uBookIt is built with AI assistance, under a spec-driven workflow that is in the repository for
 anyone to read:
 
-- **Specs first.** Every change starts as a written proposal, design and task list, in
-  [OpenSpec](https://github.com/Fission-AI/OpenSpec). No code is written until the change is
-  approved.
+- **Specs first.** Every change starts as a written proposal and task list, with a design where one
+  is needed, in [OpenSpec](https://github.com/Fission-AI/OpenSpec). No code is written until the
+  change is approved. The requirements agreed so far live in the repository, for example
+  [the site settings spec](https://github.com/Chris-N2/UBookIt/blob/17.2.2/openspec/specs/site-settings/spec.md).
 - **Independent review.** A separate agent that did not write the change reviews it
   adversarially against its spec. It can reject the change, and when it does, the findings go
   back through implementation. The reviewer never fixes code itself.
-- **CI that can't pass by skipping.** Every commit to a release line is built and tested on Linux
-  against SQL Server. The run fails if any test suite didn't report or any test was skipped.
+- **CI that can't pass by skipping.** Every push to a release line is built and tested on Linux
+  against SQL Server, by [the CI workflow](https://github.com/Chris-N2/UBookIt/blob/17.2.2/.github/workflows/ci.yml).
+  The run fails if any .NET test project didn't report, or any of its tests was skipped.
 - **Documentation under test.** The test suite checks key claims in this readme: the version it
   states, the versioning policy, the delivery API's default, and every link into the repository.
-- **Gated releases.** A release is packed from its tagged commit on a clean CI runner, and its
-  packages are verified there. Nothing is published until the maintainer approves.
+- **Gated releases.** Releases are published by a workflow. It packs the tagged commit on a clean
+  CI runner, verifies the packages there, and publishes nothing until the maintainer approves. A
+  manual route is documented as the fallback, for when the workflow cannot publish.
 
 The project's rules are in [`CLAUDE.md`](https://github.com/Chris-N2/UBookIt/blob/17.2.2/CLAUDE.md),
 the same file the AI agents working on it read. The release procedure is in
@@ -156,7 +159,8 @@ where uBookIt departs from Semantic Versioning**:
 | **minor** (`x.1.0` → `x.2.0`) | New features, and the only place a breaking change may appear. |
 | **major** (`17.x` → `18.x`) | A different Umbraco. The API may change with it, since the CMS it targets did. |
 
-Breaking changes are avoided. Where one is genuinely unavoidable, it lands in a minor release. It
+Breaking changes are avoided: the public interface is kept as consistent as possible, and
+additions are preferred to changes. Where a break is genuinely unavoidable, it lands in a minor release. It
 is called out in [the changelog](https://github.com/Chris-N2/UBookIt/blob/17.2.2/CHANGELOG.md),
 where each release opens with what upgrading asks of you, and it ships with sensible defaults or a
 documented upgrade path so a site that already works keeps working. A patch release never carries
@@ -177,7 +181,8 @@ rather than quietly misbehaving.
 ## Documentation
 
 - [The booking page](https://github.com/Chris-N2/UBookIt/blob/17.2.2/docs/booking-page.md): creating it, URL parameters,
-  styling, deployment, and the accessibility statement
+  styling, the deployment note about committing the installed template, and the accessibility
+  statement
 - [The backoffice](https://github.com/Chris-N2/UBookIt/blob/17.2.2/docs/backoffice.md): resources, availability,
   services, closures, bookings and permissions
 - [Configuration](https://github.com/Chris-N2/UBookIt/blob/17.2.2/docs/configuration.md): every setting, and what

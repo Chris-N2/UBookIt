@@ -281,8 +281,8 @@ public class SettingsControllerTests
     [Fact]
     public async Task A_value_longer_than_the_store_holds_is_refused_before_the_store()
     {
-        // Without this the value passed validation and failed at SQL Server, as a 500 rather than
-        // a message against the setting. The link is otherwise usable, so length is the only
+        // Without this the value passed validation and failed at SQL Server (see the integration
+        // suite's SettingsStoreTests) instead of being refused with a message against the setting. The link is otherwise usable, so length is the only
         // reason left for the refusal.
         var store = new FakeSettingsStore();
         var value = LinkOfLength(Limit + 1);
@@ -363,11 +363,15 @@ public class SettingsControllerTests
     public void The_limit_is_the_boundary_whatever_the_setting_type(SettingValueKind kind)
     {
         // No catalogue setting is free text today, but the kind exists and the requirement says
-        // every type. A constructed descriptor reaches it without inventing a setting.
+        // every type. A constructed descriptor reaches it without inventing a setting. The free
+        // text is plain letters, so nothing but length can be in play for it (QA round 1).
         var descriptor = new SettingDescriptor("UBookIt:Test", SettingTier.Editable, kind);
+        Func<int, string> ofLength = kind == SettingValueKind.Url
+            ? LinkOfLength
+            : length => new string('a', length);
 
-        Assert.True(SettingValidation.IsValid(descriptor, LinkOfLength(Limit), out var atLimit), atLimit);
-        Assert.False(SettingValidation.IsValid(descriptor, LinkOfLength(Limit + 1), out var over));
+        Assert.True(SettingValidation.IsValid(descriptor, ofLength(Limit), out var atLimit), atLimit);
+        Assert.False(SettingValidation.IsValid(descriptor, ofLength(Limit + 1), out var over));
         Assert.Equal($"Must be no longer than {Limit} characters.", over);
     }
 
