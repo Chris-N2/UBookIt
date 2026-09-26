@@ -264,7 +264,15 @@
   3. **The pending-symbols 409 wording**, unobserved after two releases.
   4. **v18 SourceLink wording** (above).
   5. **The `tree/` link blind spot** and **client-suite skip detection** (`release-17-2-2`).
-- [ ] 8.5 Commit on `dev/v18`, run the unit suite locally, and Chris pushes. Verify: CI is green at
+- [x] 8.5 Commit on `dev/v18`, run the unit suite locally, and Chris pushes. Verify: CI is green at
   every step.
-- [ ] 8.6 Archive **last**, running the unit suite locally before the push. The push's CI is checked
+  *Done:* **`afcaa98`** was committed after unit 2017/2017 and openspec 27/27 ran on it locally.
+  `--no-build` was valid, because only markdown changed since the clean build of the same code.
+  Chris pushed it. Run `36257188937` (push, `dev/v18`, head `afcaa98`) was success at all 16 steps,
+  read through the REST API.
+- [x] 8.6 Archive **last**, running the unit suite locally before the push. The push's CI is checked
   in the session.
+  *Done:* archived with this box ticked. The deltas are synced into `site-settings` (ADDED) and
+  `privacy-notice` (MODIFIED, guarantees diffed in 1.3). The unit suite ran locally on the archive
+  commit before the push; the result is in the commit message. The push's CI is checked in the
+  session, because this record is frozen by then.
