@@ -506,7 +506,15 @@
   **Obligations that remain after both lines release:** remove the manual API-key fallback from
   `docs/publishing.md` (its own change); the unobserved 409 wording; the `tree/` link blind spot
   (inventory §1); the client suite's skip detection (QA round 1, MAJOR 2's root).
-- [ ] 8.5 Commit on `main`, run the unit suite locally, and Chris pushes. Verify: `main`'s CI run is
+- [x] 8.5 Commit on `main`, run the unit suite locally, and Chris pushes. Verify: `main`'s CI run is
   green at every step.
-- [ ] 8.6 Archive **last**, running the unit suite locally before the push. Verify: the archive
+  *Done:* **`39610f0`** was committed after unit 2005/2005 and openspec 27/27 ran on it locally.
+  `--no-build` was valid, because only markdown changed since the clean build of the same code.
+  Chris pushed it. Run `36239391216` (push, `main`, head `39610f0`) was success at every step,
+  with no step failed or skipped, read through the REST API.
+- [x] 8.6 Archive **last**, running the unit suite locally before the push. Verify: the archive
   push's own CI run is checked and reported in the session.
+  *Done:* archived with this box ticked. The deltas are synced into `site-settings` (ADDED) and
+  `privacy-notice` (MODIFIED, guarantees diffed in 1.4). Before the push, the unit suite ran
+  locally on the archive commit; the result is in that commit's message. The push's CI run is
+  checked in the session, because this record is frozen by then.

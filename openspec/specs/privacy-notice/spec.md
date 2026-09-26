@@ -279,13 +279,14 @@ cannot change the answer.
 for any value within the settings store's capacity. Validation on write and resolution remain
 separate checks, as `site-settings` requires; they SHALL apply the same definition of usable, so
 that the screen neither refuses a value the site would use nor stores one the site would treat as
-absent. The screen's refusal SHALL name both accepted forms.
+absent. When the screen refuses a value within the store's capacity, the refusal SHALL name both
+accepted forms.
 
-*A value longer than the settings store can hold — currently 2048 characters, the
-`uBookItSetting.Value` column — is outside this requirement: the site can use such a value from
-configuration, but the screen cannot store it, and today the write fails at the database rather
-than being refused. That limit applies to every setting and predates this requirement; it is a
-known gap, not yet addressed, rather than something settled here.*
+*A value longer than the settings store can hold (2048 characters) is outside this requirement.
+The site can use such a value from configuration, but the screen cannot store it. The screen
+refuses it for its length and states the limit, as the `site-settings` requirement "A value longer
+than the store holds is refused, not attempted" provides. That refusal is about length, not form,
+so it does not name the two forms.*
 
 #### Scenario: A site-relative link is used on a Linux host
 - **WHEN** the site runs on Linux and the policy link is configured as `/privacy`
@@ -316,6 +317,6 @@ known gap, not yet addressed, rather than something settled here.*
   the link
 
 #### Scenario: The screen's refusal names both forms
-- **WHEN** the settings screen refuses a policy link
+- **WHEN** the settings screen refuses a policy link within the settings store's capacity
 - **THEN** the reason given names both an absolute http or https address and a site-relative path
   beginning with a single `/`
