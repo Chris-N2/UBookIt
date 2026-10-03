@@ -23,7 +23,7 @@ values each needs. It SHALL state that the policy belongs to the account that ow
 so a change of ownership requires a new policy. The status section SHALL NOT list Trusted
 Publishing as outstanding.
 
-The runbook SHALL NOT give a procedure for pushing a release to nuget.org by hand. It SHALL say
+The runbook SHALL NOT give a procedure for pushing a release to the feed by hand. It SHALL say
 that no such route exists, and what to do instead when the workflow cannot publish: the release
 waits, or the workflow is repaired in a change of its own and the release then goes through it.
 It SHALL state why: a release pushed by hand bypasses every check the workflow makes.
