@@ -80,7 +80,7 @@ decides otherwise deliberately.
 
 The workflow's `dotnet nuget push` uses the key the token exchange returns. A policy whose owner
 cannot publish therefore produces the same 403 text, which names only the key. The section keeps
-its three checks, reordered for the policy:
+its checks, reordered for the policy and, after QA round 1, grown to four:
 
 1. Can the policy's owner publish? An organization's email must be confirmed separately.
 2. The scope. The policy's *new versions of existing packages only* cannot create a package ID.
