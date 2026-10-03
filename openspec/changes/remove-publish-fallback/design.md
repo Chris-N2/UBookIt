@@ -84,7 +84,17 @@ its three checks, reordered for the policy:
 
 1. Can the policy's owner publish? An organization's email must be confirmed separately.
 2. The scope. The policy's *new versions of existing packages only* cannot create a package ID.
-3. Is the ID owned by someone else?
+3. The package selection. A glob that does not match the ID, or an empty selection.
+4. Is the ID owned by someone else?
+
+*QA round 1 corrections.* (a) The order now matches the spec (owner, scope, selection). (b)
+According to Microsoft Learn (*Trusted Publishing on nuget.org*, Policy Ownership), an ownership
+problem marks the policy **inactive** with a warning in the UI. So it may surface as a refused
+token exchange rather than a push 403, and the runbook says so, noting that neither has been seen.
+(c) The isolation step adapted from the key lesson ("try a personally owned policy") was wrong,
+because a policy applies only to its owner's packages. It is replaced by "open the policy on the
+Trusted Publishing page", plus checking the organization's address directly. That page shows the
+inactive state.
 
 It also keeps the ownership-is-transferable paragraph. The existing *"The same `403` on the
 workflow route"* paragraph and the policy-notes bullet about the narrow scope are merged into it,

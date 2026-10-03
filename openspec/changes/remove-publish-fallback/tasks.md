@@ -38,7 +38,9 @@
       `git branch -r --contains` block with the check job's refusal of a commit no published line
       contains. Verify: the section names no branch, so it is true on both lines.
 - [x] 2.4 Move the 403 lesson under *Trusted Publishing setup* (design D3). Order it: policy owner,
-      then scope, then package ID. Say in one clause that the key the message names is the one
+      then scope, then package selection (the spec's order), then whether the ID is somebody
+      else's. *(QA round 1 corrected this from "owner, scope, package ID", which disagreed with
+      the spec.)* Say in one clause that the key the message names is the one
       the token exchange returned. Merge in the old *"The same `403` on the workflow route"*
       paragraph and the narrow-scope policy note so the lesson is stated once. Keep the
       ownership-is-transferable paragraph. Verify: `packaging`'s three *records what a publish
@@ -64,7 +66,10 @@
       `ClosuresControllerTests.The_list_omits_past_closures_by_default`. Date its closures from
       `TestData.Now` (the controller's fixed clock), not `DateTime.UtcNow`. Verify: the test
       fails before the fix (deterministically since 2026-10-02) and passes after it, and a search
-      for `DateTime(Offset)?.(UtcNow|Now|Today)` in `tests/` finds no other code use.
+      for `DateTime(Offset)?.(UtcNow|Now|Today)` in `tests/` finds no other code use. That
+      search does not cover `TimeProvider.System`, which other tests pass (`BookingEmailTests`,
+      `ResponsibilityGateTests`, integration stores). QA round 1 found no date-dependent assertion
+      behind any of them.
 - [x] 3.4 Full verification on `main`: client build first, then a Release build with 0 warnings,
       then the unit, integration and rendering suites per project, sequentially. Then run
       `openspec validate --all --strict`. Verify: all green at the recorded baselines (unit 2005
