@@ -92,8 +92,8 @@
 
 ## 5. QA, merge, archive (both lines)
 
-- [ ] 5.1 QA review in a fresh subagent, covering both branches in one review. Give the reviewer
-      the claims (counts, greps, the D5 pin pairs) to verify rather than trust. Verify: APPROVE.
+- [x] 5.1 QA review in a fresh subagent, covering both branches in one review. Give the reviewer
+      the claims (counts, greps, the D5 pin pairs) to verify rather than trust. Verify: APPROVE. *(Round 1 REJECT: 1 MAJOR, 3 MINOR. Round 2 APPROVE WITH NITS, both branches; two cosmetic nits taken.)*
 - [ ] 5.2 Chris pushes both branches and opens PRs into `main` and `dev/v18`, and CI is green on
       each. Verify: run IDs recorded.
 - [ ] 5.3 After merge, archive on each line so its `release-publishing` spec gains the ADDED
