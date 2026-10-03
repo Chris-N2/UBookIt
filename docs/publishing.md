@@ -19,7 +19,7 @@ only the first: `17.0.0` is already out, and all of it applies unchanged to the 
 - **Unlisting is not deletion.** An unlisted package stays resolvable by exact version, so
   anything published by mistake remains installable by anyone who knows the number.
 
-The practical consequence: **check the produced `.nuspec`, not the source, before you push.**
+The practical consequence: **check the produced `.nuspec`, not the source, before you approve the publish.**
 
 ## Status
 
@@ -160,8 +160,8 @@ machine without one is told so rather than silently building with another band.
 
 **Nothing checks that those values are right, and copyright is checked by nothing at all.** So
 read the `.nuspec` files from the run's `packages` artifact before you approve (see *Verify, do
-not assume*). Every one of them is frozen at push. The run also makes the tag-before-package order automatic, because the tag
-is what starts it. **It does not replace:**
+not assume*). Every one of them is frozen at push. The run also makes the tag-before-package
+order automatic, because the tag is what starts it. **It does not replace:**
 - *Before any push* — the version bump and the prose it moves are still yours;
 - the tagged screenshot `curl` in *Tag the release* — **do it before you approve**;
 - *After the push* — indexing, the package page, the Marketplace.
@@ -217,27 +217,39 @@ Notes on the policy:
 
 ### A 403 usually means the policy's OWNER, not the key
 
-The workflow pushes with the one-hour key that the token exchange returns. So a policy that cannot
-publish fails exactly as a hand-made key did:
-`403 (The specified API key is invalid, has expired, or does not have permission to access the
-specified package.)`. This one message covers several conditions, and it names only the key. That
-sends you to check the thing least likely to be wrong, since the key is the one the exchange just
-issued. It cost the first publish attempt, when the key was made by hand. Check these in order:
+The workflow pushes with the one-hour key that the token exchange returns. So a policy problem can
+surface in either of two places, and **neither has yet been seen on this workflow**:
 
-1. **Can the policy's owner publish at all?** A policy, like a key, is owned either by your account
-   or by a nuget.org **organization**, and an organization has its own email address that must be
-   confirmed separately from yours. nuget.org requires that address to be distinct from any member
-   account's. So if you give the organization the address you already use, it stays permanently
-   unconfirmed, and a push under a policy it owns returns exactly this 403. **The fastest way to
-   isolate this is a policy owned by your personal account**: if that works, the policy's settings
-   were never the problem.
+- **At the login step**, when the exchange refuses the run's token. nuget.org marks a policy
+  *inactive*, with a warning on its Trusted Publishing page, when the organization that owns it is
+  locked or deleted, or when the member who created it leaves that organization.
+- **At the push**, as `403 (The specified API key is invalid, has expired, or does not have
+  permission to access the specified package.)`. That one message covers several conditions,
+  and it names only the key. That sends you to check the thing least likely to be wrong, since
+  the exchange has just issued the key. This 403 cost the first publish attempt, when the key was
+  made by hand.
+
+Check these in order:
+
+1. **Can the policy's owner publish?** The owner is your account or a nuget.org **organization**
+   you belong to, and the policy applies to the packages that owner owns. And an organization has
+   its own email address that must be confirmed separately from yours. nuget.org requires that address
+   to be distinct from any member account's. So if you give the organization the address you
+   already use, it stays permanently unconfirmed. That is what made the first publish's hand-made
+   key fail with this 403. **To isolate it, open the policy on the Trusted Publishing page**: an
+   ownership problem shows there as a warning on an inactive policy. If the owner is an
+   organization, also check its address is confirmed on the organization's own page. It has not
+   been observed whether an unconfirmed address marks the policy inactive, or only fails the push.
 2. **Does the scope cover what is being pushed?** The policy is scoped to new versions of existing
    packages (see the notes above), so it cannot create an ID that does not exist yet. A newly added
    packable project therefore fails its push with this 403. Libraries go first, so the
    meta-package is not pushed either. Widen the scope, then re-run the publish job, which
-   completes the release and marks what was already there. **An empty package selection** fails
-   the same way, on every package, and only at the first real release.
-3. **Is the package ID already owned by somebody else?** If
+   completes the release and marks what was already there.
+3. **Does the package selection match it?** The selection is the glob in the table above. A
+   package whose ID the glob does not match is refused the same way. **An empty selection**
+   refuses every package, and shows only at the first real release. Correct the selection, then
+   re-run the publish job.
+4. **Is the package ID already owned by somebody else?** If
    `GET https://api.nuget.org/v3-flatcontainer/<id>/index.json` returns 404, the ID is unclaimed.
 
 Ownership is **not** a reason to delay a push. A package can be transferred to an organization
@@ -251,9 +263,7 @@ ownership note above.
    `PackageProjectUrl` and `RepositoryUrl`; `VersionTruthTests.The_package_points_at_a_public_home`
    asserts they are `https`, not a known-private host, and name the repository the source lives
    in. It cannot check the URL actually resolves — open it in a browser once, logged out.
-2. **The git remote must already be the public one.** This is not cosmetic: see the ordering
-   section below.
-3. **The version must be the one you mean.** `<Version>` in `Directory.Build.props` is the only
+2. **The version must be the one you mean.** `<Version>` in `Directory.Build.props` is the only
    place it is **declared**; every package and the backoffice manifest derive from it.
    **Prose is a different matter, and a bump has to move it by hand.** Three documents state a
    version in words, in a URL or in a command — `README.md` in **three** places and this runbook
@@ -297,7 +307,7 @@ ownership note above.
    naming the version the public API was declared stable from. Both are pinned against the
    archived release change, and editing them forward turns them into falsehoods and turns the
    suite red. Never find-and-replace the version across the repository.
-4. **The suite must be green from a clean build.** Never accept a `--no-build` run as evidence —
+3. **The suite must be green from a clean build.** Never accept a `--no-build` run as evidence —
    it can execute stale assemblies and report green.
 
 ## The order that makes SourceLink correct
@@ -383,7 +393,7 @@ ever packs a commit the public repository already has. That is why the release t
 pushed merge commit of the line being released. Tag anything else and the run stops before it
 packs.
 
-## Tag the release before you push the package
+## Tag the release before you approve the publish
 
 **The packed readme's screenshots AND its documentation links are addressed to a git tag named
 after the version**, like this:
@@ -414,7 +424,7 @@ from anything — the guards check that they agree with `<Version>`, they do not
 is true of the four screenshot URLs and of every documentation link alike; bumping one set and not
 the other is the half-done state the checklist above exists to prevent. A
 bump therefore edits the readme's image refs in the same commit as `Directory.Build.props`; see
-*Before any push*, step 3, for the full list of what a bump touches.
+*Before any push*, step 2, for the full list of what a bump touches.
 
 ```bash
 git tag 17.2.2                  # on the pushed merge commit you are releasing

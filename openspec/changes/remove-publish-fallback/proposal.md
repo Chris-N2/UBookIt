@@ -42,7 +42,8 @@ runbooks already name this removal as the next change (`docs/publishing.md`, *St
   `TestData.Now` (2026-09-01). From 2026-10-02 the "past" closure counts as upcoming and the test
   fails every time, on both lines. That turns CI red for any push, this change's PRs included. The
   fix is test-only: date the closures from the controller's clock. A search of `tests/` found no
-  other test that reads the machine clock.
+  other use of `DateTime.UtcNow`/`Now`/`Today`. Tests that pass `TimeProvider.System` were checked
+  by QA, and none of them asserts anything that depends on the date.
 
 **Deliberately removed** (a removal, not an omission): the `release-publishing` guarantee that
 *"the manual API-key procedure SHALL remain documented, labelled as the fallback"*, and its

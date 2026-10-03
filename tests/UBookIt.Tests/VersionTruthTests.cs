@@ -669,10 +669,10 @@ public class VersionTruthTests
             + "The count is exact, so a later requirement cannot bring in a publication claim "
             + "under an allowance granted for these."),
 
-        ("docs/publishing.md", "nuget.org", 20,
+        ("docs/publishing.md", "nuget.org", 21,
             "The publishing runbook names the feed as a DESTINATION — what nuget.org will "
-            + "not let you undo, where the API key lives, which source to push to, how to "
-            + "tell when indexing has finished — and, since publication, as a RECORD: its "
+            + "not let you undo, where the Trusted Publishing policy lives, how to tell when "
+            + "indexing has finished — and, since publication, as a RECORD: its "
             + "Status section states that 17.0.0 shipped on 2026-09-15. Both are legitimate "
             + "here, and this is the one document where they should be. The count is "
             + "deliberately exact, so editing the runbook forces a fresh look at whether "
@@ -703,7 +703,13 @@ public class VersionTruthTests
             + "and the 403 section's three (an organization owner, the requirement for a "
             + "distinct address, the flat-container ID check), now under Trusted Publishing "
             + "setup. Nothing ADDED. None of the twenty says what has or has not been published "
-            + "beyond the Status record already accepted above."),
+            + "beyond the Status record already accepted above. The lead-in of this entry lost "
+            + "`where the API key lives` and `which source to push to` with them (QA round 1).\n"
+            + "20 -> 21 at the same change, QA round 1: the 403 section was corrected to say a "
+            + "policy problem can surface at the token exchange as well as at the push. ADDED, a "
+            + "BEHAVIOURAL fact about the host, from Microsoft Learn's Trusted Publishing page: "
+            + "`nuget.org marks a policy inactive` when its owning organization is locked or "
+            + "deleted, or its creator leaves it. It says nothing about what has been published."),
     ];
 
     /// <summary>
@@ -941,7 +947,10 @@ public class VersionTruthTests
         // rather than trust that the procedure worked. Both halves, because deleting either
         // left the suite green (QA rounds 1 and 2).
         DocumentationAssert.SaysOnce(
-            runbook, "check the produced `.nuspec`, not the source, before you push");
+            // "before you push" until `remove-publish-fallback`: with no hand route a maintainer
+            // never pushes a package, and the last moment the .nuspec can still be stopped is the
+            // approval. Same guarantee — inspect what was produced, before it is irreversible.
+            runbook, "check the produced `.nuspec`, not the source, before you approve the publish");
         DocumentationAssert.SaysOnce(
             runbook, "Each package carries its own metadata, so check all five");
 
