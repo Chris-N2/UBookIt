@@ -73,16 +73,16 @@
 
 ## 4. Port to `dev/v18`
 
-- [ ] 4.1 Branch `remove-publish-fallback-v18` from `dev/v18`. Apply the `docs/publishing.md` and
+- [x] 4.1 Branch `remove-publish-fallback-v18` from `dev/v18`. Apply the `docs/publishing.md` and
       `README.md` hunks, keeping v18's version literals (`18.1.2`). Verify:
       `git diff remove-publish-fallback remove-publish-fallback-v18 -- docs/publishing.md` shows
       only version-literal differences and v18's existing unrelated wording.
-- [ ] 4.2 Redo 3.2, 3.3 and 3.3a by hand in v18's `VersionTruthTests.cs`. Do not cherry-pick it: the file
+- [x] 4.2 Redo 3.2, 3.3 and 3.3a by hand in v18's `VersionTruthTests.cs`. Do not cherry-pick it: the file
       differs by about 290 lines. Verify: the same pins exist on both lines (compare the
       `SaysOnce` lists), and v18's `nuget.org` count matches its own recount.
-- [ ] 4.3 Copy the change folder (`openspec/changes/remove-publish-fallback/`) onto the v18 branch.
+- [x] 4.3 Copy the change folder (`openspec/changes/remove-publish-fallback/`) onto the v18 branch.
       Verify: `openspec validate remove-publish-fallback --type change --strict` is valid there.
-- [ ] 4.4 Full verification on v18, as in 3.4. Verify: green at v18's baselines (unit 2017 ± delta,
+- [x] 4.4 Full verification on v18, as in 3.4. Verify: green at v18's baselines (unit 2017 ± delta,
       integration 194, rendering 1168, client 335).
 
 ## 5. QA, merge, archive (both lines)
