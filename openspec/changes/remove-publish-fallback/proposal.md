@@ -36,6 +36,14 @@ runbooks already name this removal as the next change (`docs/publishing.md`, *St
 - **Both lines.** The fallback text is identical on `main` and `dev/v18` apart from version
   literals; the port is part of this change.
 
+- **Scope addition, found at apply, Chris's call (2026-10-03): fix a test time bomb on both
+  lines.** `ClosuresControllerTests.The_list_omits_past_closures_by_default` (from ㊺) dated its
+  closures from `DateTime.UtcNow` while the controller under test runs on the fixed clock
+  `TestData.Now` (2026-09-01). From 2026-10-02 the "past" closure counts as upcoming and the test
+  fails every time, on both lines. That turns CI red for any push, this change's PRs included. The
+  fix is test-only: date the closures from the controller's clock. A search of `tests/` found no
+  other test that reads the machine clock.
+
 **Deliberately removed** (a removal, not an omission): the `release-publishing` guarantee that
 *"the manual API-key procedure SHALL remain documented, labelled as the fallback"*, and its
 scenario *"The manual route remains available"*. It is replaced by the opposite guarantee: the

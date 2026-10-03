@@ -136,8 +136,8 @@ anyone to read:
 - **Documentation under test.** The test suite checks key claims in this readme: the version it
   states, the versioning policy, the delivery API's default, and every link into the repository.
 - **Gated releases.** Releases are published by a workflow. It packs the tagged commit on a clean
-  CI runner, verifies the packages there, and publishes nothing until the maintainer approves. A
-  manual route is documented as the fallback, for when the workflow cannot publish.
+  CI runner, verifies the packages there, and publishes nothing until the maintainer approves.
+  There is no manual route around it.
 
 The project's rules are in [`CLAUDE.md`](https://github.com/Chris-N2/UBookIt/blob/17.2.2/CLAUDE.md),
 the same file the AI agents working on it read. The release procedure is in
