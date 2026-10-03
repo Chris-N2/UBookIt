@@ -19,7 +19,8 @@ only the first: `17.0.0` is already out, and all of it applies unchanged to the 
 - **Unlisting is not deletion.** An unlisted package stays resolvable by exact version, so
   anything published by mistake remains installable by anyone who knows the number.
 
-The practical consequence: **check the produced `.nuspec`, not the source, before you approve the publish.**
+The practical consequence: **check the produced `.nuspec`, not the source, before you approve the
+publish.**
 
 ## Status
 
