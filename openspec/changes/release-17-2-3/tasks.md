@@ -56,6 +56,22 @@
 - [ ] 3.1 QA review (`qa-review`) in one subagent, reused across rounds, covering this change and
   `release-18-1-3`. Hand each round's fixes over as new code, and give every claim as something to
   verify.
+  *Round 1: REJECT for this change; `release-18-1-3` was APPROVE WITH NITS.* QA independently
+  verified all six claims in the handover, reproducing the builds and suites.
+  - **MAJOR:** the proposal's first ground for the patch ruling said "17.6 → 17.7.1" was a patch
+    of Umbraco. It is not: 17.6 → 17.7 is an Umbraco minor. *Fix:* the ground now says the step
+    stays inside Umbraco's major, as a minor plus its patch. The ruling itself is unchanged.
+  - **MINOR:** the entry named only `Microsoft.EntityFrameworkCore.SqlServer` as a reference a
+    site might have to raise. Umbraco 17.7.1 moves its whole set of Microsoft.Extensions and EF
+    Core dependencies, and `Microsoft.Data.Sqlite`, from 10.0.10 to 10.0.11. I re-read the
+    `Umbraco.Cms` and `Umbraco.Cms.Persistence.EFCore` 17.6.2 and 17.7.1 nuspecs from the feed's
+    flat container to confirm it. *Fix:* *What you have to do* now says that, and names SqlServer
+    as the example uBookIt also declares.
+  - **NIT:** the proposal's item 2 still carried the pre-apply ImageSharp path and "Otherwise
+    nothing". *Fix:* both now carry correction notes pointing here.
+  - **NIT, no change:** a mixed-version site would likely lose the preview hub, because
+    GHSA-4c5q's client half ships in `Umbraco.Cms.StaticAssets`. That backs the existing "upgrade
+    first" advice, so the frozen entry was left alone.
 - [ ] 3.2 Chris pushes the branch and opens the PR into `main`. Verify, through the API, that the
   PR's CI run is green at every step, **parity included** (only `<Version>` differs in a parity
   file, and parity exempts it).

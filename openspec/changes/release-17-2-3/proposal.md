@@ -15,7 +15,7 @@ minimum to **17.7.1**, which closes four Umbraco advisories published on 6 Octob
 a site below it, which is the kind of change `CLAUDE.md` sends to a minor. The ruling holds
 because:
 
-- the step is a patch of Umbraco itself (17.6 → 17.7.1 inside the same major);
+- the step stays inside Umbraco's own major (17.6.x → 17.7.1, an Umbraco minor plus its patch);
 - it is a security fix;
 - the package manager enforces the minimum, so a site cannot end up on a combination the package
   does not support.
@@ -29,14 +29,17 @@ The entry says plainly what a site below 17.7.1 has to do.
 2. **A `17.2.3` changelog entry**, undated until it is live. Every claim is checked against the
    repository or the packed nuspecs, not against this list.
    - **What you have to do:** on a site below Umbraco 17.7.1, upgrade `Umbraco.Cms` to 17.7.1
-     first, as the README already says. Otherwise nothing.
+     first, as the README already says. Otherwise nothing. *(Corrected at apply, tasks 1.2 and
+     QA round 1: a site's own direct references to Umbraco's Microsoft.Extensions, EF Core or
+     `Microsoft.Data.Sqlite` dependencies must also be 10.0.11 or later.)*
    - **What changed:**
      - **The minimum Umbraco is 17.7.1**, naming the four advisories. They are Umbraco's
        advisories, and uBookIt's own code is not what they describe.
      - **The minimum Entity Framework Core SQL Server provider is 10.0.11**, because Umbraco 17.7.1
        requires it. `UBookIt.Persistence` declares what Umbraco needs.
      - **ImageSharp:** a site on Umbraco 17.7.1 may still report advisories against SixLabors
-       ImageSharp 3.1.12. They arrive through Umbraco's imaging package, not through uBookIt,
+       ImageSharp 3.1.12. They arrive through Umbraco, not through uBookIt *(apply found
+       `Umbraco.Cms` depends on it directly as well as through its imaging package, tasks 1.2)*,
        and no Umbraco release yet takes a fixed ImageSharp. Claimed only after the packed
        nuspecs and the audit confirm that no uBookIt package reaches ImageSharp.
 3. **Pack from the merged, pushed commit, tag it, verify, and publish through `publish.yml`.** Then
