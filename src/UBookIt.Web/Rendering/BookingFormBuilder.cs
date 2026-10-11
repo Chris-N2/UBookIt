@@ -122,7 +122,8 @@ public static class BookingFormBuilder
         int windowDays,
         FailedSubmission? failed = null,
         string? flowToken = null,
-        IReadOnlyList<PreservedQueryPair>? preservedQuery = null)
+        IReadOnlyList<PreservedQueryPair>? preservedQuery = null,
+        (DateOnly From, DateOnly To)? window = null)
     {
         var constraints = resource.Availability.Constraints;
 
@@ -142,6 +143,7 @@ public static class BookingFormBuilder
             AvailableDates = dates,
             SelectedDateIsListed = dates.Any(date => date.IsSelected),
             WindowDays = windowDays,
+            ShiftedWindowFrom = window is { } shifted && shifted.From != today ? shifted.From : null,
             LongestAvailableInWindowMinutes = LongestAvailableMinutes(windowStarts),
             PrivacyNotice = privacyNotice,
             FlowToken = flowToken,

@@ -453,6 +453,20 @@ public class SensitiveDataRedactionTests
             // records that consequence where an operator performing an erasure will meet it.
             "CancellationSecretRow: BookingId,ExpiresUtc,Hash,IssuedUtc,RedeemedUtc",
             "ClaimRow: BookingId,Id,ResourceId",
+
+            // Decision, closure-date-ranges (roadmap 17.3.0): one row per run of dates on which
+            // a resource is closed by its own rule — the resource's id, two dates, and an
+            // optional NOTE. No booker detail can reach it: it is written only through a resource
+            // save, under the configure verb, and nothing a booker supplies is ever copied into it.
+            //
+            // THE NOTE IS NOT GUARANTEED FREE OF PERSONAL DATA, and saying otherwise would be
+            // false. It is the site's own free text, and where a resource is a person an operator
+            // may well write "broken leg". That is data about the site's own staff, entered by the
+            // site, never disclosed through the delivery API or the front end — and it is the
+            // site's to manage: booker erasure does not reach it, because it is not a booker's.
+            // docs/backoffice.md says so where the field is described, so an operator choosing
+            // what to type is told before they type it.
+            "ClosedPeriodRow: EndDate,Id,Note,ResourceId,StartDate",
             "ExceptionRow: Date,EndTime,Id,ResourceId,StartTime",
             // Decision, permissions-model (roadmap 0.10.0): a one-shot marker — an
             // operation key and when it was applied, nothing else. No personal data can
@@ -467,7 +481,7 @@ public class SensitiveDataRedactionTests
             // carries no text at all, so erasure has no business with it, and deleting either
             // parent removes it by cascade.
             "ResourceClosureOptOutRow: ClosureId,ResourceId",
-            "ResourceRow: Capabilities,ClosureOptOuts,Description,DirectlyBookable,DisplayName,Exceptions,GranularityMinutes,HorizonDays,Id,LeadTimeMinutes,MaxDurationMinutes,MinDurationMinutes,OpenHours,Type",
+            "ResourceRow: Capabilities,ClosedPeriods,ClosureOptOuts,Description,DirectlyBookable,DisplayName,Exceptions,GranularityMinutes,HorizonDays,Id,LeadTimeMinutes,MaxDurationMinutes,MinDurationMinutes,OpenHours,Type",
 
             // Decision, resource-responsibility (roadmap 0.8.0): four keys and nothing
             // else. The party columns reference an Umbraco user or group BY KEY — no
@@ -498,7 +512,10 @@ public class SensitiveDataRedactionTests
             // matched against anything a booker supplied, and it is never disclosed through the
             // delivery API or the front end, where a closed date is indistinguishable from any
             // other unavailable one. No booker detail can reach this table by any route.
-            "SiteClosureRow: Date,Id,Label,OptOuts",
+            //
+            // closure-date-ranges (roadmap 17.3.0) added EndDate: a closure became a range. A
+            // second date changes nothing above.
+            "SiteClosureRow: Date,EndDate,Id,Label,OptOuts",
         ];
 
         Assert.True(

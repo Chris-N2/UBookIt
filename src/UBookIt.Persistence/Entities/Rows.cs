@@ -43,6 +43,32 @@ internal sealed class ResourceRow
     /// site and are never written from here.
     /// </summary>
     public List<ResourceClosureOptOutRow> ClosureOptOuts { get; set; } = [];
+
+    /// <summary>The resource's own closed periods. Resource-owned, written with its other availability rows.</summary>
+    public List<ClosedPeriodRow> ClosedPeriods { get; set; } = [];
+}
+
+/// <summary>
+/// Table: uBookItResourceClosedPeriod. One row per closed period: a run of dates, both
+/// ends inclusive, on which the resource is closed by its own rule.
+/// </summary>
+/// <remarks>
+/// The rules that keep periods from overlapping each other or a date the resource has an
+/// exception for are judged by the domain over the complete set a write submits, and the
+/// write replaces the set wholesale under the resource's configuration lock — so no index
+/// is needed to make them hold in storage.
+/// </remarks>
+internal sealed class ClosedPeriodRow
+{
+    public long Id { get; set; }
+
+    public Guid ResourceId { get; set; }
+
+    public DateOnly StartDate { get; set; }
+
+    public DateOnly EndDate { get; set; }
+
+    public string? Note { get; set; }
 }
 
 /// <summary>
@@ -368,10 +394,18 @@ internal sealed class SiteClosureRow
     public Guid Id { get; set; }
 
     /// <summary>
-    /// Uniquely indexed: at most one closure per date is a property of the schema rather
-    /// than of the store's code, because a check performed before writing is a race.
+    /// The first date the closure covers. Uniquely indexed: with overlaps refused, two
+    /// closures can never share a start, so the index is a storage backstop for the rule
+    /// the store enforces under its lock.
     /// </summary>
     public DateOnly Date { get; set; }
+
+    /// <summary>
+    /// The last date the closure covers, inclusive. Added after closures existed, and filled
+    /// from <see cref="Date"/> for every row that predates it, so an existing closure keeps
+    /// covering exactly its one date.
+    /// </summary>
+    public DateOnly EndDate { get; set; }
 
     public required string Label { get; set; }
 

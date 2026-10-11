@@ -3,8 +3,8 @@ using UBookIt.Core.Common;
 namespace UBookIt.Core.Availability;
 
 /// <summary>
-/// A date on which the organisation itself is closed, inherited by every resource
-/// unless that resource opts out of this particular closure.
+/// A run of dates — one or many — on which the organisation itself is closed, inherited
+/// by every resource unless that resource opts out of this particular closure.
 /// </summary>
 /// <remarks>
 /// <b>A closure is not one of a resource's exceptions, and is never stored as one.</b>
@@ -30,10 +30,11 @@ public sealed class SiteClosure
     /// </remarks>
     public const int MaxLabelLength = 512;
 
-    private SiteClosure(Guid id, DateOnly date, string label)
+    private SiteClosure(Guid id, DateOnly date, DateOnly endDate, string label)
     {
         Id = id;
         Date = date;
+        EndDate = endDate;
         Label = label;
     }
 
@@ -45,7 +46,24 @@ public sealed class SiteClosure
     /// </summary>
     public Guid Id { get; }
 
+    /// <summary>
+    /// The first date the closure covers. Named <c>Date</c> because a closure was a single
+    /// date before it was a range, and every existing reader of it still means "where it
+    /// begins".
+    /// </summary>
     public DateOnly Date { get; }
+
+    /// <summary>
+    /// The last date the closure covers, inclusive. Equal to <see cref="Date"/> for a closure
+    /// of one day — which is not a separate kind of closure, only a short range.
+    /// </summary>
+    public DateOnly EndDate { get; }
+
+    /// <summary>Whether the closure covers <paramref name="date"/>.</summary>
+    public bool Covers(DateOnly date) => date >= Date && date <= EndDate;
+
+    /// <summary>Whether this closure and <paramref name="other"/> share any date.</summary>
+    public bool Overlaps(SiteClosure other) => Date <= other.EndDate && other.Date <= EndDate;
 
     /// <summary>
     /// The site's own name for the date. Required, because this is what a resource
@@ -53,8 +71,23 @@ public sealed class SiteClosure
     /// </summary>
     public string Label { get; }
 
-    public static DomainResult<SiteClosure> Create(DateOnly date, string? label, Guid? id = null)
+    /// <param name="date">The first date the closure covers.</param>
+    /// <param name="label">The site's own name for it; required.</param>
+    /// <param name="id">An existing closure's id, when rebuilding or editing one.</param>
+    /// <param name="endDate">The last date covered, inclusive. Absent means the one day.</param>
+    public static DomainResult<SiteClosure> Create(
+        DateOnly date, string? label, Guid? id = null, DateOnly? endDate = null)
     {
+        var end = endDate ?? date;
+
+        if (end < date)
+        {
+            return DomainResult<SiteClosure>.Failure(
+                FailureCodes.ClosureRangeInvalid,
+                $"A closure cannot end ({end:yyyy-MM-dd}) before it starts ({date:yyyy-MM-dd}).",
+                nameof(EndDate));
+        }
+
         if (string.IsNullOrWhiteSpace(label))
         {
             return DomainResult<SiteClosure>.Failure(
@@ -75,6 +108,6 @@ public sealed class SiteClosure
                 nameof(Label));
         }
 
-        return DomainResult<SiteClosure>.Success(new SiteClosure(id ?? Guid.NewGuid(), date, trimmed));
+        return DomainResult<SiteClosure>.Success(new SiteClosure(id ?? Guid.NewGuid(), date, end, trimmed));
     }
 }

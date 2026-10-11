@@ -2,6 +2,57 @@
 
 - [ ] 0.1 Branch `closure-date-ranges` from `origin/main` (at `c63dbe6`), with the upstream unset.
   Verify: the branch exists, and `openspec validate closure-date-ranges --strict` passes.
+- [ ] 0.2 Diff the guarantees of every requirement this change replaces wholesale. For each one,
+  check every SHALL and scenario in `openspec/specs/` against the delta, and record what was
+  carried, superseded or dropped:
+  - `site-closures`:
+    - "The site closure list"
+    - "A closure closes every resource for its date"
+    - "A resource opts out of an individual closure by id"
+    - "The closures view"
+    - "Inheritance is visible where a resource is edited"
+    - "Closures are managed through versioned management endpoints"
+  - `availability`: "Date exceptions"
+  - `resource-management`: "Resource CRUD endpoints" and "Workspace editor for a resource"
+  - `persistence`: "Site closures and their opt-outs are held in their own additive tables"
+  - `public-holidays`: "The preview is a selection, not a confirmation"
+
+  Verify: every original scenario is accounted for here, and `ChangeDeltaIntegrityTests` passes.
+  *Done 2026-10-11, at propose time, and re-checked here. Nothing was dropped:*
+  - *"The site closure list": all 6 scenarios carried.*
+    - *"one per date" is superseded by the stronger "no date covered twice", and its scenario is
+      kept verbatim.*
+    - *"Editing preserves identity" now covers dates (plural).*
+    - *Added: range, inverted range, overlap, extension of itself.*
+  - *"A closure closes every resource for its date": all 5 scenarios carried.*
+    - *"Saving does not absorb" now also says no closed period is written.*
+    - *Added: every date in a range; shortening releases dates.*
+  - *"Opts out … by id": all 8 carried.*
+    - *"Editing a closure's date" now says dates.*
+    - *Added: the opt-out covers the whole range; opting out reveals the resource's own closed
+      period.*
+  - *"The closures view": all 5 carried. Upcoming is now judged by END date, which changes no
+    existing closure because all are single days. Added: in progress, From/To, single day.*
+  - *"Inheritance is visible": all 5 carried, with "date" → "range".*
+  - *"Managed through versioned endpoints": all 6 carried.*
+    - *The upcoming-filter scenario says "end date today or later" instead of "future", a
+      deliberate supersession for in-progress closures.*
+    - *Added: no endDate means a single day, both on create and update; overlap is problem
+      details.*
+  - *"Date exceptions": all 5 carried. The precedence ladder names closed periods at the
+    exception rung.*
+  - *"Resource CRUD endpoints": all 11 carried. Added: closed periods round-trip, replace, omitted
+    means unchanged, empty clears, applied closures carry their range.*
+  - *"Workspace editor": all 9 carried. Added: closed period end to end, its failure, keyboard.*
+  - *Persistence "Site closures … additive tables": all 5 carried.*
+    - *The first scenario is pinned to the migration that created the tables, since a later
+      migration now adds a column.*
+    - *"Date uniquely indexed" stays, as the start-date index.*
+    - *Added: end-date migration preserves closures; concurrent overlapping ranges.*
+  - *"The preview is a selection": all 5 carried.*
+    - *"Already closed" now means covered by any closure.*
+    - *Added: a date inside a range.*
+    - *"Only the selected rows" now says each is one day.*
 
 ## 1. Core: ranges and closed periods
 

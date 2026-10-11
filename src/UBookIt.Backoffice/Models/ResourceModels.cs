@@ -51,6 +51,18 @@ public class ResourceRequestModel
     /// </remarks>
     public List<Guid> ClosureOptOuts { get; set; } = [];
 
+    /// <summary>
+    /// The resource's own closed periods. <b>Absent leaves them unchanged on update</b> (and
+    /// means none on create); an empty list clears them.
+    /// </summary>
+    /// <remarks>
+    /// Deliberately unlike <see cref="ClosureOptOuts"/> and the capability list, whose absence
+    /// means "none": those were in the contract from its first version, so every caller sends
+    /// them. A caller written before closed periods existed cannot send a collection it has
+    /// never heard of, and treating its silence as "none" would erase periods an operator set.
+    /// </remarks>
+    public List<ClosedPeriodModel>? ClosedPeriods { get; set; }
+
     /// <summary>Null applies the package defaults.</summary>
     public ConstraintsModel? Constraints { get; set; }
 }
@@ -82,6 +94,9 @@ public class ResourceResponseModel
     /// resource writes only <see cref="ResourceRequestModel.ClosureOptOuts"/>.
     /// </summary>
     public List<ResourceClosureModel> Closures { get; set; } = [];
+
+    /// <summary>The resource's own closed periods, ordered by start date.</summary>
+    public List<ClosedPeriodModel> ClosedPeriods { get; set; } = [];
 
     public ConstraintsModel Constraints { get; set; } = new();
 }
@@ -128,6 +143,19 @@ public class AvailabilityExceptionModel
     /// </para>
     /// </remarks>
     public bool? Superseded { get; set; }
+}
+
+/// <summary>
+/// A run of dates, both inclusive, on which the resource is closed by its own rule. The note
+/// is the site's own and is never shown to visitors.
+/// </summary>
+public class ClosedPeriodModel
+{
+    public DateOnly StartDate { get; set; }
+
+    public DateOnly EndDate { get; set; }
+
+    public string? Note { get; set; }
 }
 
 public class TimeWindowModel
@@ -204,7 +232,11 @@ public class ResourceClosureModel
 {
     public Guid Id { get; set; }
 
+    /// <summary>The first date the closure covers.</summary>
     public DateOnly Date { get; set; }
+
+    /// <summary>The last date the closure covers, inclusive; equal to <see cref="Date"/> for one day.</summary>
+    public DateOnly EndDate { get; set; }
 
     public string Label { get; set; } = string.Empty;
 
@@ -220,7 +252,14 @@ public class SiteClosureModel
 {
     public Guid Id { get; set; }
 
+    /// <summary>The first date the closure covers.</summary>
     public DateOnly Date { get; set; }
+
+    /// <summary>
+    /// The last date the closure covers, inclusive. Always present, and equal to
+    /// <see cref="Date"/> for a closure of one day.
+    /// </summary>
+    public DateOnly EndDate { get; set; }
 
     public string Label { get; set; } = string.Empty;
 }
@@ -228,7 +267,14 @@ public class SiteClosureModel
 /// <summary>A closure being created or edited.</summary>
 public class SiteClosureRequestModel
 {
+    /// <summary>The first date the closure covers.</summary>
     public DateOnly Date { get; set; }
+
+    /// <summary>
+    /// The last date the closure covers, inclusive. Absent means the one day <see cref="Date"/>,
+    /// so a caller written before closures were ranges creates and updates exactly what it did.
+    /// </summary>
+    public DateOnly? EndDate { get; set; }
 
     /// <summary>
     /// Required. A closure is offered for opt-out where a resource is edited, and a bare

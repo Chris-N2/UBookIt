@@ -199,6 +199,22 @@ public static class ServiceBookingFormBuilder
     /// bounds use.
     /// </para>
     /// </summary>
+    /// <summary>
+    /// The first date from <paramref name="today"/> on which ANY candidate is not closed by a
+    /// closure or closed period — where the service's date window starts.
+    /// </summary>
+    /// <remarks>
+    /// The earliest of any candidate, not the latest across roles: a date one candidate is open
+    /// on might offer the service, and the window must never skip a date that could. Only ranges
+    /// are consulted — a cheap fact, not an availability search.
+    /// </remarks>
+    public static DateOnly FirstOpenDate(IReadOnlyList<RoleCandidates> pools, DateOnly today)
+        => pools
+            .SelectMany(pool => pool.Candidates)
+            .Select(candidate => ClosedRanges.FirstUncovered(today, ClosedRanges.Of(candidate.Resource.Availability)))
+            .DefaultIfEmpty(today)
+            .Min();
+
     public static int HorizonDays(IReadOnlyList<RoleCandidates> pools)
         => pools.Min(pool => pool.Candidates.Max(c => c.Resource.Availability.Constraints.HorizonDays));
 
@@ -271,7 +287,8 @@ public static class ServiceBookingFormBuilder
         FailedSubmission? failed = null,
         string? flowToken = null,
         ResourceChoiceState choice = default,
-        IReadOnlyList<PreservedQueryPair>? preservedQuery = null)
+        IReadOnlyList<PreservedQueryPair>? preservedQuery = null,
+        (DateOnly From, DateOnly To)? window = null)
     {
         var duration = TimeSpan.FromMinutes(durationMinutes);
 
@@ -289,6 +306,7 @@ public static class ServiceBookingFormBuilder
             AvailableDates = dates,
             SelectedDateIsListed = dates.Any(date => date.IsSelected),
             WindowDays = windowDays,
+            ShiftedWindowFrom = window is { } shifted && shifted.From != today ? shifted.From : null,
             LongestAvailableInWindowMinutes = LongestAvailableMinutes(windowStarts),
             PrivacyNotice = privacyNotice,
             ResourceChoices = choice.Choices ?? [],
