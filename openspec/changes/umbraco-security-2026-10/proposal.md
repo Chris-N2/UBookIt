@@ -78,7 +78,17 @@ _None._
 - `continuous-integration`: *Vulnerability advisories are audited separately from the build*
   gains the narrow exception: an advisory a non-packable project declares as suppressed is
   accepted there, a stale or packable-project suppression fails the audit, and accepted findings
-  are reported. Every existing guarantee is carried forward.
+  are reported. All three existing scenarios are carried forward word for word. **Two existing
+  guarantees are deliberately NARROWED, not carried unchanged**, and both qualifications are
+  written into the SHALLs themselves:
+  - the audit "SHALL fail when any package … has a known advisory" now holds *except as the
+    exception provides*;
+  - an advisory "SHALL remain a visible warning" in the build *unless it falls under the
+    exception*, in which case the audit reports it instead.
+
+  Neither narrowing reaches a packable project. A shipped package still cannot accept an advisory
+  in any form. *(Correction, QA round 1: this paragraph first said "every existing guarantee is
+  carried forward", which was false. CLAUDE.md requires a narrowing to be stated as one.)*
 
 ## Impact
 

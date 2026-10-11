@@ -9,7 +9,10 @@
       against a package, not introduced by a commit: promoted to an error, a new one would
       fail every CI run on code nobody touched. They stay visible as warnings here and are
       checked instead by .github/workflows/audit.yml, on a schedule and on demand, which
-      FAILS on any advisory in either published line.
+      FAILS on any advisory in either published line - except one a NON-packable project
+      suppresses for itself (NuGetAuditSuppress, which also silences its warning here). The
+      audit reports that one as accepted, and fails if the suppression goes stale or a packable
+      project declares one (scripts/ci/Assert-NoVulnerablePackages.ps1).
 
       Here rather than as a -p: in the workflow so that `CI=true dotnet build` on a dev
       machine reproduces CI exactly, and so the exception sits next to the rule it narrows.

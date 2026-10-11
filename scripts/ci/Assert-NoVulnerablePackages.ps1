@@ -27,14 +27,22 @@
       - a suppression in a packable project FAILS, matched or not: a shipped package never
         accepts an advisory.
 
-    Suppressions and packability are read from each project's OWN file as XML, not evaluated
-    by MSBuild. That is deliberate, and it errs in one direction only. A suppression declared
-    anywhere else (an import, Directory.Build.props) is invisible here, so its finding stays
-    unaccepted and the audit FAILS; a project counts as non-packable only when its own file
-    says `<IsPackable>false</IsPackable>` unconditionally, so anything unclear counts as
-    packable and its suppressions FAIL. A conditional suppression fails outright, because
-    whether it applies is an evaluation question this script does not answer. It can refuse an
-    exception it cannot see; it can never accept one.
+    Suppressions and packability come from MSBuild's OWN EVALUATION of each project
+    (`dotnet msbuild <project> -getProperty:IsPackable -getItem:NuGetAuditSuppress`), the same
+    evaluation NuGet's audit reads them from. So conditions, `<Choose>`, document order (the
+    last IsPackable wins) and imports such as Directory.Build.targets all mean here exactly what
+    they mean to the build, and an item inside a `<Target>` - which no evaluation sees - is no
+    suppression here either.
+
+    That replaced reading the project file as XML, which QA showed could ACCEPT an advisory
+    MSBuild would not (round 1: a later IsPackable=true, a <Choose> condition, an item in a
+    <Target>, an override from an import). An earlier version of this very paragraph called that
+    reading fail-closed. It was not: a second, weaker model of MSBuild disagrees with MSBuild in
+    both directions. Ask the thing that decides.
+
+    Fail-closed where it truly can be: a project counts as non-packable only when its evaluated
+    IsPackable is `false`, and a project MSBuild cannot evaluate FAILS the audit and accepts
+    nothing.
 
 .PARAMETER Target
     The solution or project to audit. Named in every message.
@@ -98,35 +106,33 @@ function ConvertTo-AdvisoryKey([string] $url) {
     return $url.Trim().TrimEnd('/').ToLowerInvariant()
 }
 
-# What a project's own file says, read as XML (see the header for why, and which way it errs).
+# What MSBuild's evaluation of a project says (see the header for why it must be MSBuild's).
+# Starts packable with no suppressions, so anything that goes wrong below accepts nothing.
 function Get-ProjectPolicy([string] $path) {
     $policy = [pscustomobject]@{
         Packable     = $true
         Suppressions = [System.Collections.Generic.List[string]]::new()
-        Conditional  = [System.Collections.Generic.List[string]]::new()
+        Error        = $null
     }
 
-    if (-not (Test-Path -LiteralPath $path)) {
+    $output = dotnet msbuild $path -nologo -getProperty:IsPackable -getItem:NuGetAuditSuppress 2>&1
+    if ($LASTEXITCODE -ne 0) {
+        $policy.Error = "MSBuild could not evaluate it (exit $LASTEXITCODE): $(($output | Select-Object -First 3) -join ' ')"
         return $policy
     }
 
-    [xml] $xml = Get-Content -LiteralPath $path -Raw
-
-    foreach ($node in @($xml.SelectNodes("//*[local-name()='IsPackable']"))) {
-        $conditional = $node.HasAttribute('Condition') -or $node.ParentNode.HasAttribute('Condition')
-        if (-not $conditional -and $node.InnerText.Trim() -ieq 'false') {
-            $policy.Packable = $false
-        }
+    try {
+        $evaluation = ($output -join "`n") | ConvertFrom-Json
+    }
+    catch {
+        $policy.Error = "MSBuild's evaluation was not the JSON expected: $(($output | Select-Object -First 3) -join ' ')"
+        return $policy
     }
 
-    foreach ($node in @($xml.SelectNodes("//*[local-name()='NuGetAuditSuppress']"))) {
-        $include = $node.GetAttribute('Include')
-        if ($node.HasAttribute('Condition') -or $node.ParentNode.HasAttribute('Condition')) {
-            $policy.Conditional.Add($include)
-        }
-        else {
-            $policy.Suppressions.Add($include)
-        }
+    $policy.Packable = -not ("$($evaluation.Properties.IsPackable)".Trim() -ieq 'false')
+
+    foreach ($item in @($evaluation.Items.NuGetAuditSuppress)) {
+        $policy.Suppressions.Add($item.Identity)
     }
 
     return $policy
@@ -139,15 +145,15 @@ foreach ($project in $projects) {
     $name = [System.IO.Path]::GetFileNameWithoutExtension($project.path)
     $policy = Get-ProjectPolicy $project.path
 
-    foreach ($suppression in $policy.Conditional) {
-        $failures.Add("$name declares a CONDITIONAL suppression of $suppression. Declare it unconditionally or not at all: this audit does not evaluate conditions, so it cannot tell whether it applies.")
+    if ($policy.Error) {
+        $failures.Add("$name ($($project.path)): $($policy.Error) Nothing in it can be accepted.")
     }
 
     if ($policy.Packable -and $policy.Suppressions.Count -gt 0) {
         $failures.Add("$name is packable and suppresses $($policy.Suppressions -join ', '). A package uBookIt ships never accepts an advisory - remove the suppression and fix the dependency.")
     }
 
-    # Only a non-packable project's own, unconditional suppressions can accept anything.
+    # Only the suppressions MSBuild evaluates for a non-packable project can accept anything.
     $accepts = @{}
     if (-not $policy.Packable) {
         foreach ($suppression in $policy.Suppressions) {

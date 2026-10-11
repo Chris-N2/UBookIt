@@ -10,9 +10,11 @@
       - a suppression in a packable project fails;
       - an unmatched finding fails, as before.
 
-      Read suppressions and `IsPackable` from each project's own file as XML, and state that
-      limit, and why it errs safe, in the script's header. The summary line states the accepted
-      count. Verify by 1.3's tests.
+      Read suppressions and `IsPackable` from MSBuild's evaluation of each project (design D3).
+      A project that cannot be evaluated fails and accepts nothing. The summary line states the
+      accepted count. Verify by 1.3's tests. *(QA round 1 rejected the first version, which read
+      each project file as XML: it accepted advisories MSBuild would not, in four reproduced
+      ways. It was replaced by MSBuild's evaluation, see design D3.)*
 - [x] 1.3 Add a test class to `UBookIt.Tests` that runs the script through `pwsh` with `-Report`
       against fixtures written to a temp directory. Cover one case per row of D3, plus:
       - a clean report, which passes;
@@ -23,7 +25,28 @@
 
       Each test asserts the exit code AND the output names the thing it should. Verify: green,
       and each new branch in the script, when disabled by hand, turns at least one test red
-      (record which). *(14 tests. Mutations, each caught: accept-never-matches -> 4 tests; stale check removed -> the stale test; packable check removed -> 3; packable-may-accept -> the matching-packable test; conditional suppression honoured -> the conditional test; conditional IsPackable honoured -> its test; normalisation removed -> the case/slash test. Apply found a real bug on 1.1's first run: the parsed report was assigned to ``, which is the `[string]` `-Report` parameter under case-insensitive names, so every property read empty. Renamed to `` with a comment.)*
+      (record which).
+      - *Round 0: 14 tests over the XML version. Apply also found a real bug on 1.1's first run:
+        the parsed report was assigned to `$report`, which under PowerShell's case-insensitive
+        names IS the `[string]` `-Report` parameter, so it was coerced to a string and every
+        property read empty. Renamed to `$parsed`, with a comment. (This note first lost both
+        variable names to shell `$`-expansion when it was written; QA round 1 caught it, and it
+        is now edited without a shell.)*
+      - *Round 1 (after QA), **19 tests** over the MSBuild version. Added: one test per QA
+        reproduction (later IsPackable wins, Choose condition, item in a Target, a
+        Directory.Build.targets override); false conditions on the item and on its ItemGroup (the
+        latter had no test, QA MINOR); a true condition accepted; an unevaluable project fails.
+        **All four QA cases fail when the new tests run against the old XML script**: 6 red,
+        those four plus the two deliberate behaviour changes.*
+      - *Round 1 mutations on the new script, each caught:*
+        - *accept-never-matches: 5 tests;*
+        - *stale check removed: the stale test;*
+        - *packable check removed: 4;*
+        - *packable-may-accept: 2;*
+        - *evaluation error ignored: the unevaluable test;*
+        - *IsPackable forced false: 4;*
+        - *normalisation removed: the case/slash test.*
+      - *The real solution's audit: exit 0, 5 accepted, 57 s.*
 - [x] 1.4 Declare the five ImageSharp advisories as `NuGetAuditSuppress` in
       `src/UBookIt.TestSite/UBookIt.TestSite.csproj`, under a comment giving the reason (design
       D2). Verify: a restore shows no NU190x warnings, and the script with no `-Report` exits 0,

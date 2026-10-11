@@ -5,7 +5,7 @@ A NuGet vulnerability advisory against a package in the dependency graph SHALL N
 verification build; it SHALL remain a visible warning there, unless it falls under the exception
 below, in which case the audit reports it instead. A separate audit SHALL run on a
 schedule at least weekly, and on demand, and SHALL fail when any package in either published line's
-graph — direct or transitive — has a known advisory. Because scheduled runs execute only from the
+graph — direct or transitive — has a known advisory, except as the exception below provides. Because scheduled runs execute only from the
 default branch, the audit SHALL check `dev/v18` explicitly rather than relying on that branch's own
 copy of the schedule.
 
@@ -14,7 +14,10 @@ declares a specific advisory as suppressed, the audit SHALL accept that advisory
 only** and SHALL report it as accepted rather than pass over it silently. This is for an advisory
 that no reachable version can fix yet, because the dependency arrives through another product.
 The suppression, the build warning it silences and its stated reason all live in that one project
-file. The audit SHALL evaluate each suppression rather than obey it:
+file. Whether a project is packable, and which advisories it suppresses, SHALL be what the build
+system's own evaluation of that project says, the same evaluation the package manager's audit
+uses, and not a separate reading of the file. A project that cannot be evaluated SHALL fail the
+audit and accept nothing. The audit SHALL evaluate each suppression rather than obey it:
 
 - a finding SHALL be accepted only when the project it occurs in declares that exact advisory;
   the same advisory in any other project SHALL still fail the audit;

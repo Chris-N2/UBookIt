@@ -22,8 +22,16 @@ namespace UBookIt.Tests;
 /// </para>
 /// <para>
 /// The script reads <c>-Report</c> instead of running <c>dotnet list</c>; nothing else differs
-/// between this and the workflow. Project files are written beside the report, because the
-/// script reads each project's own file to learn what it suppresses and whether it is packable.
+/// between this and the workflow. The fixture projects are real SDK projects written beside the
+/// report, because the script asks MSBuild to EVALUATE each one for its suppressions and its
+/// packability. Its first version read the files as XML instead, and QA round 1 showed that
+/// reading accepting advisories MSBuild would not — the tests named
+/// <c>…_as_MSBuild_does</c> below are those four cases, so the class of mistake stays caught.
+/// </para>
+/// <para>
+/// Conditions use a property nothing sets (<c>UBookItNeverSet</c>), never something like
+/// <c>$(CI)</c>: MSBuild reads environment variables as properties, so a condition on one would
+/// evaluate differently on a CI runner than on a maintainer's machine.
 /// </para>
 /// </summary>
 public sealed class AuditScriptTests : IDisposable
@@ -31,6 +39,9 @@ public sealed class AuditScriptTests : IDisposable
     private const string Source = "https://api.nuget.org/v3/index.json";
     private const string AdvisoryA = "https://github.com/advisories/GHSA-aaaa-aaaa-aaaa";
     private const string AdvisoryB = "https://github.com/advisories/GHSA-bbbb-bbbb-bbbb";
+
+    private const string NotPackable = "<PropertyGroup><IsPackable>false</IsPackable></PropertyGroup>";
+    private const string NeverTrue = "'$(UBookItNeverSet)' == 'yes'";
 
     private static readonly string Script =
         Path.Combine(RepoFiles.Root, "scripts", "ci", "Assert-NoVulnerablePackages.ps1");
@@ -42,10 +53,12 @@ public sealed class AuditScriptTests : IDisposable
 
     public void Dispose() => Directory.Delete(_directory, recursive: true);
 
+    // --- The unchanged behaviour ------------------------------------------------------------
+
     [Fact]
     public void A_clean_report_passes()
     {
-        var site = Project("Site", packable: false);
+        var site = Project("Site", NotPackable);
 
         var (exit, output) = Audit([Source], Entry(site));
 
@@ -56,7 +69,7 @@ public sealed class AuditScriptTests : IDisposable
     [Fact]
     public void A_report_that_consulted_no_vulnerability_source_fails()
     {
-        var site = Project("Site", packable: false);
+        var site = Project("Site", NotPackable);
 
         var (exit, output) = Audit(["C:/local/feed/"], Entry(site));
 
@@ -76,18 +89,20 @@ public sealed class AuditScriptTests : IDisposable
     [Fact]
     public void A_finding_nobody_suppressed_fails_naming_the_project_and_package()
     {
-        var site = Project("Site", packable: false);
+        var site = Project("Site", NotPackable);
 
         var (exit, output) = Audit([Source], Entry(site, Finding("Some.Package", AdvisoryA)));
 
         Assert.Equal(1, exit);
-        Assert.Contains($"Vulnerable package: Site (net10.0): Some.Package 1.0.0 - High - {AdvisoryA}", output);
+        Assert.Contains(Vulnerable("Site", AdvisoryA), output);
     }
+
+    // --- The exception ----------------------------------------------------------------------
 
     [Fact]
     public void An_advisory_its_own_non_packable_project_suppresses_is_accepted_and_reported()
     {
-        var site = Project("Site", packable: false, suppressions: [AdvisoryA]);
+        var site = Project("Site", NotPackable + Suppress(AdvisoryA));
 
         var (exit, output) = Audit([Source], Entry(site, Finding("Some.Package", AdvisoryA)));
 
@@ -103,7 +118,7 @@ public sealed class AuditScriptTests : IDisposable
     [Fact]
     public void A_suppression_matches_regardless_of_case_and_a_trailing_slash()
     {
-        var site = Project("Site", packable: false, suppressions: [AdvisoryA.ToUpperInvariant() + "/"]);
+        var site = Project("Site", NotPackable + Suppress(AdvisoryA.ToUpperInvariant() + "/"));
 
         var (exit, output) = Audit([Source], Entry(site, Finding("Some.Package", AdvisoryA)));
 
@@ -114,22 +129,22 @@ public sealed class AuditScriptTests : IDisposable
     [Fact]
     public void A_suppression_accepts_only_the_advisory_it_names()
     {
-        var site = Project("Site", packable: false, suppressions: [AdvisoryA]);
+        var site = Project("Site", NotPackable + Suppress(AdvisoryA));
 
         var (exit, output) = Audit(
             [Source],
             Entry(site, Finding("Some.Package", AdvisoryA), Finding("Some.Package", AdvisoryB)));
 
         Assert.Equal(1, exit);
-        Assert.Contains($"Vulnerable package: Site (net10.0): Some.Package 1.0.0 - High - {AdvisoryB}", output);
+        Assert.Contains(Vulnerable("Site", AdvisoryB), output);
         Assert.Contains("1 finding(s) accepted", output);
     }
 
     [Fact]
     public void A_suppression_does_not_reach_another_project()
     {
-        var site = Project("Site", packable: false, suppressions: [AdvisoryA]);
-        var tests = Project("Tests", packable: false);
+        var site = Project("Site", NotPackable + Suppress(AdvisoryA));
+        var tests = Project("Tests", NotPackable);
 
         var (exit, output) = Audit(
             [Source],
@@ -137,14 +152,14 @@ public sealed class AuditScriptTests : IDisposable
             Entry(tests, Finding("Some.Package", AdvisoryA)));
 
         Assert.Equal(1, exit);
-        Assert.Contains($"Vulnerable package: Tests (net10.0): Some.Package 1.0.0 - High - {AdvisoryA}", output);
+        Assert.Contains(Vulnerable("Tests", AdvisoryA), output);
         Assert.DoesNotContain("Vulnerable package: Site", output);
     }
 
     [Fact]
     public void A_stale_suppression_fails_naming_the_project_and_advisory()
     {
-        var site = Project("Site", packable: false, suppressions: [AdvisoryA]);
+        var site = Project("Site", NotPackable + Suppress(AdvisoryA));
 
         var (exit, output) = Audit([Source], Entry(site));
 
@@ -155,22 +170,22 @@ public sealed class AuditScriptTests : IDisposable
     [Fact]
     public void A_packable_project_cannot_suppress_even_a_matching_advisory()
     {
-        // No IsPackable at all is packable: the SDK default, and the script's fail-closed reading.
-        var library = Project("Library", packable: null, suppressions: [AdvisoryA]);
+        // No IsPackable at all: the SDK's default, true.
+        var library = Project("Library", Suppress(AdvisoryA));
 
         var (exit, output) = Audit([Source], Entry(library, Finding("Some.Package", AdvisoryA)));
 
         Assert.Equal(1, exit);
         Assert.Contains($"Library is packable and suppresses {AdvisoryA}", output);
         // And the suppression accepted nothing: the finding fails in its own right.
-        Assert.Contains($"Vulnerable package: Library (net10.0): Some.Package 1.0.0 - High - {AdvisoryA}", output);
+        Assert.Contains(Vulnerable("Library", AdvisoryA), output);
         Assert.Contains("0 finding(s) accepted", output);
     }
 
     [Fact]
     public void A_packable_project_cannot_suppress_an_advisory_it_does_not_even_have()
     {
-        var library = Project("Library", packable: true, suppressions: [AdvisoryA]);
+        var library = Project("Library", "<PropertyGroup><IsPackable>true</IsPackable></PropertyGroup>" + Suppress(AdvisoryA));
 
         var (exit, output) = Audit([Source], Entry(library));
 
@@ -179,9 +194,112 @@ public sealed class AuditScriptTests : IDisposable
     }
 
     [Fact]
-    public void A_conditional_IsPackable_counts_as_packable()
+    public void A_suppression_whose_own_condition_is_false_accepts_nothing()
     {
-        var site = Project("Site", packable: false, conditionalPackable: true, suppressions: [AdvisoryA]);
+        var site = Project(
+            "Site",
+            NotPackable + $"<ItemGroup><NuGetAuditSuppress Include=\"{AdvisoryA}\" Condition=\"{NeverTrue}\" /></ItemGroup>");
+
+        var (exit, output) = Audit([Source], Entry(site, Finding("Some.Package", AdvisoryA)));
+
+        Assert.Equal(1, exit);
+        Assert.Contains(Vulnerable("Site", AdvisoryA), output);
+    }
+
+    [Fact]
+    public void A_suppression_whose_ItemGroup_condition_is_false_accepts_nothing()
+    {
+        // QA round 1: the parent-ItemGroup half of the old condition check had no test.
+        var site = Project(
+            "Site",
+            NotPackable + $"<ItemGroup Condition=\"{NeverTrue}\"><NuGetAuditSuppress Include=\"{AdvisoryA}\" /></ItemGroup>");
+
+        var (exit, output) = Audit([Source], Entry(site, Finding("Some.Package", AdvisoryA)));
+
+        Assert.Equal(1, exit);
+        Assert.Contains(Vulnerable("Site", AdvisoryA), output);
+    }
+
+    [Fact]
+    public void A_suppression_whose_condition_is_true_is_accepted()
+    {
+        // The other side of the two above: a condition is not refused for being a condition.
+        // What decides is what it evaluates to — as it is for NuGet's audit.
+        var site = Project(
+            "Site",
+            NotPackable + $"<ItemGroup Condition=\"'1' == '1'\"><NuGetAuditSuppress Include=\"{AdvisoryA}\" /></ItemGroup>");
+
+        var (exit, output) = Audit([Source], Entry(site, Finding("Some.Package", AdvisoryA)));
+
+        Assert.Equal(0, exit);
+        Assert.Contains("1 finding(s) accepted", output);
+    }
+
+    [Fact]
+    public void A_project_MSBuild_cannot_evaluate_fails_and_accepts_nothing()
+    {
+        var missing = Path.Combine(_directory, "Missing.csproj").Replace('\\', '/');
+
+        var (exit, output) = Audit([Source], Entry(missing, Finding("Some.Package", AdvisoryA)));
+
+        Assert.Equal(1, exit);
+        Assert.Contains("MSBuild could not evaluate it", output);
+        Assert.Contains(Vulnerable("Missing", AdvisoryA), output);
+    }
+
+    // --- QA round 1: each place the XML reading disagreed with MSBuild ------------------------
+
+    [Fact]
+    public void The_last_IsPackable_decides_as_MSBuild_does()
+    {
+        var project = Project(
+            "Library",
+            NotPackable + "<PropertyGroup><IsPackable>true</IsPackable></PropertyGroup>" + Suppress(AdvisoryA));
+
+        var (exit, output) = Audit([Source], Entry(project, Finding("Some.Package", AdvisoryA)));
+
+        Assert.Equal(1, exit);
+        Assert.Contains($"Library is packable and suppresses {AdvisoryA}", output);
+        Assert.Contains(Vulnerable("Library", AdvisoryA), output);
+    }
+
+    [Fact]
+    public void A_condition_on_a_Choose_applies_as_MSBuild_does()
+    {
+        var site = Project(
+            "Site",
+            NotPackable
+            + $"<Choose><When Condition=\"{NeverTrue}\"><ItemGroup><NuGetAuditSuppress Include=\"{AdvisoryA}\" /></ItemGroup></When></Choose>");
+
+        var (exit, output) = Audit([Source], Entry(site, Finding("Some.Package", AdvisoryA)));
+
+        Assert.Equal(1, exit);
+        Assert.Contains(Vulnerable("Site", AdvisoryA), output);
+    }
+
+    [Fact]
+    public void An_item_inside_a_Target_is_no_suppression_as_MSBuild_does()
+    {
+        var site = Project(
+            "Site",
+            NotPackable
+            + $"<Target Name=\"Never\"><ItemGroup><NuGetAuditSuppress Include=\"{AdvisoryA}\" /></ItemGroup></Target>");
+
+        var (exit, output) = Audit([Source], Entry(site, Finding("Some.Package", AdvisoryA)));
+
+        Assert.Equal(1, exit);
+        Assert.Contains(Vulnerable("Site", AdvisoryA), output);
+    }
+
+    [Fact]
+    public void An_import_that_makes_the_project_packable_counts_as_MSBuild_does()
+    {
+        // Directory.Build.targets is imported AFTER the project body, so it overrides the
+        // project's own IsPackable — invisible to anything reading only the project file.
+        File.WriteAllText(
+            Path.Combine(_directory, "Directory.Build.targets"),
+            "<Project><PropertyGroup><IsPackable>true</IsPackable></PropertyGroup></Project>");
+        var site = Project("Site", NotPackable + Suppress(AdvisoryA));
 
         var (exit, output) = Audit([Source], Entry(site, Finding("Some.Package", AdvisoryA)));
 
@@ -189,52 +307,21 @@ public sealed class AuditScriptTests : IDisposable
         Assert.Contains($"Site is packable and suppresses {AdvisoryA}", output);
     }
 
-    [Fact]
-    public void A_conditional_suppression_fails_and_accepts_nothing()
-    {
-        var site = Project("Site", packable: false, conditionalSuppressions: [AdvisoryA]);
-
-        var (exit, output) = Audit([Source], Entry(site, Finding("Some.Package", AdvisoryA)));
-
-        Assert.Equal(1, exit);
-        Assert.Contains($"Site declares a CONDITIONAL suppression of {AdvisoryA}", output);
-        Assert.Contains($"Vulnerable package: Site (net10.0): Some.Package 1.0.0 - High - {AdvisoryA}", output);
-    }
-
-    [Fact]
-    public void A_project_whose_file_cannot_be_found_suppresses_nothing()
-    {
-        var missing = Path.Combine(_directory, "Missing.csproj").Replace('\\', '/');
-
-        var (exit, output) = Audit([Source], Entry(missing, Finding("Some.Package", AdvisoryA)));
-
-        Assert.Equal(1, exit);
-        Assert.Contains($"Vulnerable package: Missing (net10.0): Some.Package 1.0.0 - High - {AdvisoryA}", output);
-    }
-
     // --- Fixtures ----------------------------------------------------------------------------
 
-    private string Project(
-        string name,
-        bool? packable,
-        bool conditionalPackable = false,
-        string[]? suppressions = null,
-        string[]? conditionalSuppressions = null)
+    private static string Suppress(string advisory) =>
+        $"<ItemGroup><NuGetAuditSuppress Include=\"{advisory}\" /></ItemGroup>";
+
+    private static string Vulnerable(string project, string advisory) =>
+        $"Vulnerable package: {project} (net10.0): Some.Package 1.0.0 - High - {advisory}";
+
+    private string Project(string name, string body)
     {
-        var condition = conditionalPackable ? " Condition=\"'$(Configuration)' == 'Release'\"" : string.Empty;
-        var isPackable = packable is { } value
-            ? $"<PropertyGroup{condition}><IsPackable>{(value ? "true" : "false")}</IsPackable></PropertyGroup>"
-            : string.Empty;
-
-        var items = string.Concat((suppressions ?? []).Select(url => $"<NuGetAuditSuppress Include=\"{url}\" />"));
-        var conditionalItems = string.Concat(
-            (conditionalSuppressions ?? []).Select(url => $"<NuGetAuditSuppress Include=\"{url}\" Condition=\"'$(CI)' == 'true'\" />"));
-
         var path = Path.Combine(_directory, name + ".csproj");
         File.WriteAllText(
             path,
-            $"<Project Sdk=\"Microsoft.NET.Sdk\">{isPackable}<ItemGroup>{items}</ItemGroup>"
-            + $"<ItemGroup>{conditionalItems}</ItemGroup></Project>");
+            "<Project Sdk=\"Microsoft.NET.Sdk\"><PropertyGroup><TargetFramework>net10.0</TargetFramework></PropertyGroup>"
+            + body + "</Project>");
 
         // dotnet list reports forward slashes on every platform; so do the fixtures.
         return path.Replace('\\', '/');
@@ -271,6 +358,10 @@ public sealed class AuditScriptTests : IDisposable
             info.ArgumentList.Add(argument);
         }
 
+        // The script runs `dotnet msbuild` per project; without this its worker nodes outlive it
+        // and hold the redirected pipes open (see PackedSolution.Run for the cost of learning that).
+        info.Environment["MSBUILDDISABLENODEREUSE"] = "1";
+
         using var process = Process.Start(info)
             ?? throw new InvalidOperationException("Could not start pwsh.");
 
@@ -278,10 +369,10 @@ public sealed class AuditScriptTests : IDisposable
         var stdout = process.StandardOutput.ReadToEndAsync();
         var stderr = process.StandardError.ReadToEndAsync();
 
-        if (!process.WaitForExit(milliseconds: 60_000))
+        if (!process.WaitForExit(milliseconds: 120_000))
         {
             process.Kill(entireProcessTree: true);
-            throw new InvalidOperationException("The audit script did not finish within a minute.");
+            throw new InvalidOperationException("The audit script did not finish within two minutes.");
         }
 
         Task.WaitAll([stdout, stderr], TimeSpan.FromSeconds(10));
