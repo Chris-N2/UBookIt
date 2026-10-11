@@ -100,17 +100,23 @@
   also downgrades. Those aren't packages Umbraco declares itself, but the rule and its "for
   example" cover the case, and QA said it can stay. Editing an approved frozen entry would be new
   code needing another round. Three rounds, one reviewer.
-- [ ] 3.2 Chris pushes the branch and opens the PR into `main`. Verify, through the API, that the
+- [x] 3.2 Chris pushes the branch and opens the PR into `main`. Verify, through the API, that the
   PR's CI run is green at every step, **parity included** (only `<Version>` differs in a parity
   file, and parity exempts it).
-- [ ] 3.3 Chris merges with "Create a merge commit". Fetch. Verify: `origin/main` = local `main` =
+  *Done:* PR **#15**. Its run `38156673940` (pull_request, head `33079c1`) was success at every
+  step, parity included, read through the REST API.
+- [x] 3.3 Chris merges with "Create a merge commit". Fetch. Verify: `origin/main` = local `main` =
   the merge commit, and the merge commit's own `ci` push run is green at every step.
+  *Done:* merged as **`5feb220`** (parents `b007be8` and the branch tip). After a fetch, local
+  `main` = `origin/main` = `5feb220`. Its push run `38157100874` was success.
 
 ## 4. Release through the workflow (design D1, D2)
 
-- [ ] 4.1 Chris pushes tag `17.2.3` on the merge commit. Verify: `git ls-remote` shows it, and a
+- [x] 4.1 Chris pushes tag `17.2.3` on the merge commit. Verify: `git ls-remote` shows it, and a
   `publish` run started with `check` and `pack` green.
-- [ ] 4.2 **Before approving**, from the run's `packages` artifact:
+  *Done:* `git ls-remote` shows `5feb220… refs/tags/17.2.3`. Publish run **`38158634914`**: `check` and
+  `pack` were success, and `publish` was waiting.
+- [x] 4.2 **Before approving**, from the run's `packages` artifact:
   - the tagged `booking-flow.png` `curl` returns 200;
   - exactly 5 `.nupkg` and 4 `.snupkg`, all `17.2.3`;
   - all five nuspecs read: authors, copyright, licence, readme, icon, project URL, and the
@@ -121,17 +127,65 @@
     200; every repository address is pinned to `17.2.3`.
 
   If anything is wrong, reject the run and stop.
-- [ ] 4.3 Chris approves in `release`. Record the run summary table (Chris pastes it), whether any
+  *Done, nothing wrong.* The artifact was downloaded by Chris to `artifacts/packages-v17` (gitignored).
+  - Exactly 5 `.nupkg` and 4 `.snupkg`, all `17.2.3`; each `.snupkg` holds its own
+    `lib/net10.0/<id>.pdb`.
+  - All five nuspecs: authors `Norwood Design & Development Ltd.`, copyright `Copyright ©
+    Norwood Design & Development Ltd.`, licence `MIT` (expression), `README.md` and `icon.png`
+    declared and present, project URL `https://github.com/Chris-N2/UBookIt`, repository commit
+    `5feb220…` (the tagged merge commit). `umbraco-marketplace` is on `UBookIt` only, and its
+    description says "for Umbraco 17".
+  - **D2:** every `Umbraco.Cms.*` dependency (Backoffice 4, Web 2, Persistence 1) is
+    `[17.7.1, 18.0.0)`. `Microsoft.EntityFrameworkCore.SqlServer` is `10.0.11`. No nuspec mentions
+    ImageSharp.
+  - The packed README is byte-identical in all five packages to `README.md` at tag `17.2.3`. It
+    says "uBookIt is at `17.2.3`", and all 19 distinct addresses return 200. Every repository
+    address is pinned to `17.2.3`. The tagged `booking-flow.png` returns 200.
+- [x] 4.3 Chris approves in `release`. Record the run summary table (Chris pastes it), whether any
   `.snupkg` answered 409 and the exact CLI text, and the conclusion.
-- [ ] 4.4 Confirm `17.2.3` per package on `api.nuget.org/v3-flatcontainer/<id>/index.json`, and that
+  *Done.* Chris approved, and the run concluded **success** at 17:27:17Z. The summary table, as
+  Chris pasted it:
+
+  | File | Result |
+  |---|---|
+  | UBookIt.Backoffice.17.2.3.nupkg | published |
+  | UBookIt.Backoffice.17.2.3.snupkg | symbols submitted |
+  | UBookIt.Core.17.2.3.nupkg | published |
+  | UBookIt.Core.17.2.3.snupkg | symbols submitted |
+  | UBookIt.Persistence.17.2.3.nupkg | published |
+  | UBookIt.Persistence.17.2.3.snupkg | symbols submitted |
+  | UBookIt.Web.17.2.3.nupkg | published |
+  | UBookIt.Web.17.2.3.snupkg | symbols submitted |
+  | UBookIt.17.2.3.nupkg | published |
+
+  **No `.snupkg` answered 409**, so the feed's wording for a still-pending symbol package is
+  still unobserved, and that obligation stays open.
+- [x] 4.4 Confirm `17.2.3` per package on `api.nuget.org/v3-flatcontainer/<id>/index.json`, and that
   the live package page renders its readme.
+  *Done:* the flat container, polled every 30 s, listed all five at `17.2.3` between 17:30:42Z and
+  17:33:48Z (times UTC). `nuget.org/packages/UBookIt/17.2.3` returns 200, and its rendered readme
+  says "uBookIt is at 17.2.3" and carries "How it's built". The live `ubookit.nuspec` has version
+  `17.2.3`, `umbraco-marketplace`, "for Umbraco 17" and commit `5feb220`. The live
+  Backoffice nuspec declares `[17.7.1, 18.0.0)`.
 
 ## 5. Close out, in this order
 
-- [ ] 5.1 Stamp the entry's date.
-- [ ] 5.2 Sibling sweep for sentences this release falsifies: `docs/`, `README.md`,
+- [x] 5.1 Stamp the entry's date.
+  *Done:* `## 17.2.3 — 2026-10-11`.
+- [x] 5.2 Sibling sweep for sentences this release falsifies: `docs/`, `README.md`,
   `openspec/specs/**`, `CLAUDE.md`. Search for `17.2.2`, `17.6.2`, `17.7.1` and `ImageSharp`.
   Fix or record each.
-- [ ] 5.3 Commit on `main` and run the unit suite locally; Chris pushes. Verify: `main`'s CI run is
+  *Done:* nothing falsified. What remains is the new floor itself (README opening and
+  requirements row), `docs/booking-page.md`'s recorded measurement against the old floor,
+  `docs/publishing.md`'s audit note (still true: only `UBookIt.TestSite` accepts the ImageSharp
+  advisories), and the worked example tags in `release-publishing`'s scenarios. The deferred
+  obligation from `umbraco-security-2026-10` about the direct-link view is discharged as "did not
+  reproduce" (`release-18-1-3` 4.0).
+- [x] 5.3 Commit on `main` and run the unit suite locally; Chris pushes. Verify: `main`'s CI run is
   green at every step.
-- [ ] 5.4 Archive **last**, running the unit suite locally before the push.
+  *Done:* the record commit is local; the unit suite ran on it, and its result is in the commit
+  message. Chris pushes it together with the archive (5.4), so the push's CI run is checked in
+  the session rather than recorded here.
+- [x] 5.4 Archive **last**, running the unit suite locally before the push.
+  *Done:* archived with this box ticked, after the unit suite ran locally. The push's CI run is
+  checked in the session, because this record is frozen by then.
