@@ -68,11 +68,19 @@
   non-Umbraco dependency moves, so `17.2.3`'s round-2 finding doesn't carry over. One NIT, taken:
   4.0's caveat now says "not documentation, changelog or openspec" instead of "outside docs".
   *Round 3: APPROVE.* No further rounds. Three rounds, one reviewer.
-- [ ] 3.2 Chris pushes the branch and opens the PR into `dev/v18`. Verify, through the API, that the
+- [x] 3.2 Chris pushes the branch and opens the PR into `dev/v18`. Verify, through the API, that the
   PR's CI run is green at every step, **parity included** (only `<Version>` differs in a parity
   file, and parity exempts it).
-- [ ] 3.3 Chris merges with "Create a merge commit". Fetch. Verify: `origin/dev/v18` = local `dev/v18` =
+  *Done:* PR **#16**. Its run `38156759165` (pull_request, head `7940925`) was success at every
+  step, parity included, read through the REST API.
+- [x] 3.3 Chris merges with "Create a merge commit". Fetch. Verify: `origin/dev/v18` = local `dev/v18` =
   the merge commit, and the merge commit's own `ci` push run is green at every step.
+  *Done:* merged as **`a834f1d`** (parents `836c653` and the branch tip). After a fetch, local
+  `dev/v18` = `origin/dev/v18` = `a834f1d`. Its push run `38157077931` was success.
+  **4.0's caveat:** the merge's first parent is `836c653`, so `dev/v18` had not moved. The merge
+  changes only `CHANGELOG.md`, `Directory.Build.props` (`<Version>`), `README.md`,
+  `docs/publishing.md` and this change folder, so 4.0's check holds for the tagged commit
+  without a re-run.
 
 ## 4. Release through the workflow (design D1, D2, D4)
 
@@ -97,9 +105,11 @@
     moved past `836c653` with anything that is not documentation, changelog or openspec, repeat
     this check before tagging.
 
-- [ ] 4.1 Chris pushes tag `18.1.3` on the merge commit. Verify: `git ls-remote` shows it, and a
+- [x] 4.1 Chris pushes tag `18.1.3` on the merge commit. Verify: `git ls-remote` shows it, and a
   `publish` run started with `check` and `pack` green.
-- [ ] 4.2 **Before approving**, from the run's `packages` artifact:
+  *Done:* `git ls-remote` shows `a834f1d… refs/tags/18.1.3`. Publish run **`38158635211`**: `check` and
+  `pack` were success, and `publish` was waiting.
+- [x] 4.2 **Before approving**, from the run's `packages` artifact:
   - the tagged `booking-flow.png` `curl` returns 200;
   - exactly 5 `.nupkg` and 4 `.snupkg`, all `18.1.3`;
   - all five nuspecs read: authors, copyright, licence, readme, icon, project URL, and the
@@ -110,17 +120,67 @@
     200; every repository address is pinned to `18.1.3`.
 
   If anything is wrong, reject the run and stop.
-- [ ] 4.3 Chris approves in `release`. Record the run summary table (Chris pastes it), whether any
+  *Done, nothing wrong.* The artifact was downloaded by Chris to `artifacts/packages-v18` (gitignored).
+  - Exactly 5 `.nupkg` and 4 `.snupkg`, all `18.1.3`; each `.snupkg` holds its own
+    `lib/net10.0/<id>.pdb`.
+  - All five nuspecs: authors `Norwood Design & Development Ltd.`, copyright `Copyright ©
+    Norwood Design & Development Ltd.`, licence `MIT` (expression), `README.md` and `icon.png`
+    declared and present, project URL `https://github.com/Chris-N2/UBookIt`, repository commit
+    `a834f1d…` (the tagged merge commit). `umbraco-marketplace` is on `UBookIt` only, and its
+    description says "for Umbraco 18".
+  - **D2:** every `Umbraco.Cms.*` dependency (Backoffice 4, Web 2, Persistence 1) is
+    `[18.2.1, 19.0.0)`. `Microsoft.EntityFrameworkCore.SqlServer` is `10.0.11`. No nuspec mentions
+    ImageSharp.
+  - The packed README is byte-identical in all five packages to `README.md` at tag `18.1.3`. It
+    says "uBookIt is at `18.1.3`", and all 19 distinct addresses return 200. Every repository
+    address is pinned to `18.1.3`. The tagged `booking-flow.png` returns 200.
+- [x] 4.3 Chris approves in `release`. Record the run summary table (Chris pastes it), whether any
   `.snupkg` answered 409 and the exact CLI text, and the conclusion.
-- [ ] 4.4 Confirm `18.1.3` per package on `api.nuget.org/v3-flatcontainer/<id>/index.json`, and that
+  *Done.* Chris approved, and the run concluded **success** at 17:26:47Z. The summary table, as
+  Chris pasted it:
+
+  | File | Result |
+  |---|---|
+  | UBookIt.Backoffice.18.1.3.nupkg | published |
+  | UBookIt.Backoffice.18.1.3.snupkg | symbols submitted |
+  | UBookIt.Core.18.1.3.nupkg | published |
+  | UBookIt.Core.18.1.3.snupkg | symbols submitted |
+  | UBookIt.Persistence.18.1.3.nupkg | published |
+  | UBookIt.Persistence.18.1.3.snupkg | symbols submitted |
+  | UBookIt.Web.18.1.3.nupkg | published |
+  | UBookIt.Web.18.1.3.snupkg | symbols submitted |
+  | UBookIt.18.1.3.nupkg | published |
+
+  **No `.snupkg` answered 409**, so the feed's wording for a still-pending symbol package is
+  still unobserved, and that obligation stays open.
+- [x] 4.4 Confirm `18.1.3` per package on `api.nuget.org/v3-flatcontainer/<id>/index.json`, and that
   the live package page renders its readme.
+  *Done:* the flat container, polled every 30 s, listed all five at `18.1.3` between 17:31:44Z and
+  17:31:46Z (times UTC). `nuget.org/packages/UBookIt/18.1.3` returns 200, and its rendered readme
+  says "uBookIt is at 18.1.3" and carries "How it's built". The live `ubookit.nuspec` has version
+  `18.1.3`, `umbraco-marketplace`, "for Umbraco 18" and commit `a834f1d`. The live
+  Backoffice nuspec declares `[18.2.1, 19.0.0)`.
 
 ## 5. Close out, in this order
 
-- [ ] 5.1 Stamp the entry's date.
-- [ ] 5.2 Sibling sweep for sentences this release falsifies: `docs/`, `README.md`,
+- [x] 5.1 Stamp the entry's date.
+  *Done:* `## 18.1.3 — 2026-10-11`.
+- [x] 5.2 Sibling sweep for sentences this release falsifies: `docs/`, `README.md`,
   `openspec/specs/**`, `CLAUDE.md`. Search for `18.1.2`, `18.2.0`, `18.2.1` and `ImageSharp`.
   Fix or record each.
-- [ ] 5.3 Commit on `dev/v18` and run the unit suite locally; Chris pushes. Verify: `dev/v18`'s CI run is
+  *Done:* nothing falsified. The search covered `18.1.2`, `18.2.0`, `18.2.1` and `ImageSharp`.
+  What remains:
+  - the new floor itself, in the README opening and requirements row;
+  - `docs/publishing.md`'s audit note, which is still true: only `UBookIt.TestSite` accepts the
+    ImageSharp advisories;
+  - `packaging`'s `18.2.0`, a past-tense illustration of a NuGet minimum. The deferred
+  obligation from `umbraco-security-2026-10` about the direct-link view is discharged as "did not
+  reproduce" (`release-18-1-3` 4.0).
+- [x] 5.3 Commit on `dev/v18` and run the unit suite locally; Chris pushes. Verify: `dev/v18`'s CI run is
   green at every step.
-- [ ] 5.4 Archive **last**, running the unit suite locally before the push.
+  *Done:* the record commit is local; the unit suite ran on it, and its result is in the commit
+  message. Chris pushes it together with the archive (5.4), so the push's CI run is checked in
+  the session rather than recorded here.
+- [x] 5.4 Archive **last**, running the unit suite locally before the push.
+  *Done:* archived with this box ticked, after the unit suite ran locally. The push's CI run is
+  checked in the session, because this record is frozen by then.
