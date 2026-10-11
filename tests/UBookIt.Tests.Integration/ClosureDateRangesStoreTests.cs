@@ -191,6 +191,47 @@ public class ClosureDateRangesStoreTests(SqlServerFixture fixture) : IAsyncLifet
         Assert.NotEmpty(resource.Availability.EffectiveWindows(Start.AddDays(6)));
     }
 
+    private async Task InsertAsOlderVersionAsync(DateOnly date, string label)
+    {
+        await using var setup = fixture.CreateContext();
+        await setup.Database.ExecuteSqlAsync(
+            $"INSERT INTO uBookItSiteClosure (Id, Date, Label) VALUES ({Guid.NewGuid()}, {date}, {label})", Ct);
+    }
+
+    /// <summary>
+    /// The Closures view's default filter reads the corrected end, so a future closure written
+    /// while downgraded is still listed — it still closes the site, and an operator told to check
+    /// their closures must be able to see it (release QA round 2).
+    /// </summary>
+    [Fact]
+    public async Task A_closure_written_without_an_end_is_still_listed_as_upcoming()
+    {
+        fixture.EnsureAvailable();
+        await InsertAsOlderVersionAsync(Start.AddDays(5), "Written while downgraded");
+
+        await using var context = fixture.CreateContext();
+        var upcoming = await new SqlSiteClosureManagementStore(context).ListAsync(Start, Ct);
+
+        Assert.Equal("Written while downgraded", Assert.Single(upcoming).Label);
+    }
+
+    /// <summary>
+    /// The overlap check reads the corrected end too, so a new range over a closure written while
+    /// downgraded is refused — otherwise two closures would cover one day, which the unique start
+    /// index cannot see unless they share a start (release QA round 2).
+    /// </summary>
+    [Fact]
+    public async Task A_range_over_a_closure_written_without_an_end_is_refused()
+    {
+        fixture.EnsureAvailable();
+        await InsertAsOlderVersionAsync(Start.AddDays(5), "Written while downgraded");
+
+        await using var context = fixture.CreateContext();
+        var result = await new SqlSiteClosureManagementStore(context).CreateAsync(Range(0, 10), Ct);
+
+        Assert.Equal(FailureCodes.DuplicateClosureDate, Assert.Single(result.Failures).Code);
+    }
+
     // ── Closed periods ───────────────────────────────────────────────────────────────────
 
     private async Task<Resource> LoadAsync(Guid resourceId)

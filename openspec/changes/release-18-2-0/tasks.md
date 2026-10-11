@@ -39,6 +39,24 @@
     today.
   - **5 (nit).** README "What it does" names ranges and closed periods.
   - **6 (nit).** `FirstOpenDate`'s doc comment no longer sits inside `HorizonDays`'s.
+
+  *Round 2: REJECT on both changes.* QA verified fixes 2–6 and judged the clamp acceptable in the
+  release, as long as it is complete. It was not.
+  - **1. The clamp covered reads only.** Two queries still used the stored end (0001-01-01), and a
+    QA probe showed both failing:
+    - the Closures view's default "upcoming" filter hid a future closure written while
+      downgraded, though it still closed the site;
+    - the overlap check missed it, so a new range over its date was accepted.
+
+    *Fix:* both queries now use the end as read, `(c.EndDate < c.Date ? c.Date : c.EndDate)`.
+    Tests: `A_closure_written_without_an_end_is_still_listed_as_upcoming` and
+    `A_range_over_a_closure_written_without_an_end_is_refused`, each inserting the older build's
+    row. **Shown to fire:** reverting each query to the stored end fails exactly its own test, and
+    restoring passes all three.
+  - **2. The downgrade paragraph was wrong about moves.** The older build's update sets only
+    `Date`, so a moved closure keeps its old end. *Fix:* the entry now separates creates (single
+    day) from moves (old end kept; one day if moved past it, otherwise from the new start to the
+    old end). It notes these closures appear in the view and are guarded against overlap.
 - [ ] 3.2 Chris pushes `dev/v18` (the archive), then this branch, and opens the PR into `dev/v18`.
   Verify: the PR's CI
   is green at every step, parity included.

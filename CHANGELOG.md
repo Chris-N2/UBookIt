@@ -33,11 +33,14 @@ knowing.
 **Going back to 18.1.x afterwards is possible, but avoid changing closures while you are there.**
 The older version ignores the extra column and table, so while on it a closure running over
 several days applies on its first day only, and closed periods do not apply at all. The older
-version also does not know about end dates: a closure it creates, or moves to another date, is
-stored without one. Coming forward again, 18.2.0 reads each such closure as the single day it
-starts on. That is safe, but a closure the older version moved later loses the range it had. A
-closure it moved EARLIER keeps its old end and so covers more dates than you meant. Check your
-closures after coming forward.
+version also does not know about end dates.
+- A closure it **creates** is stored without an end, and comes back as the single day it starts on.
+- A closure it **moves** keeps its old end. Moved past that end, it comes back as one day.
+  Otherwise it runs from its new start to its old end, so a closure moved earlier covers more
+  dates than you meant.
+
+Check your closures after coming forward. They all appear in the Closures view, and 18.2.0 refuses
+overlaps with them, as with any other closure.
 
 ### What changed
 
