@@ -13,11 +13,16 @@ There is one exception, and it is deliberately narrow. When a project that is **
 declares a specific advisory as suppressed, the audit SHALL accept that advisory **in that project
 only** and SHALL report it as accepted rather than pass over it silently. This is for an advisory
 that no reachable version can fix yet, because the dependency arrives through another product.
-The suppression, the build warning it silences and its stated reason all live in that one project
-file. Whether a project is packable, and which advisories it suppresses, SHALL be what the build
-system's own evaluation of that project says, the same evaluation the package manager's audit
-uses, and not a separate reading of the file. A project that cannot be evaluated SHALL fail the
-audit and accept nothing. The audit SHALL evaluate each suppression rather than obey it:
+By convention, the suppression and its stated reason are written in that project's own file.
+Whether a project is packable, and which advisories it suppresses, SHALL be taken from the build
+system's own evaluation of that project, not from a separate reading of the file. It SHALL be
+evaluated under every configuration a release is restored or packed in. A project SHALL count as
+not packable only if it is not packable under all of them, and an advisory SHALL count as
+suppressed only if it is suppressed under all of them. The package manager reads suppressions
+per target framework, so a project that targets more than one framework SHALL NOT have any
+suppression accepted, and a suppression it declares SHALL fail the audit. A project that cannot be
+evaluated SHALL fail the audit and accept nothing. The audit SHALL evaluate each suppression rather
+than obey it:
 
 - a finding SHALL be accepted only when the project it occurs in declares that exact advisory;
   the same advisory in any other project SHALL still fail the audit;
@@ -56,5 +61,10 @@ audit and accept nothing. The audit SHALL evaluate each suppression rather than 
   be removed
 
 #### Scenario: A shipped package cannot suppress an advisory
-- **WHEN** a packable project declares any advisory as suppressed
+- **WHEN** a packable project declares any advisory as suppressed, including a project that is
+  packable in only one of the configurations a release is restored or packed in
 - **THEN** the audit fails, naming the project, whether or not the advisory is found
+
+#### Scenario: A multi-targeted project cannot suppress an advisory
+- **WHEN** a project that targets more than one framework declares any advisory as suppressed
+- **THEN** the audit fails, naming the project, and accepts none of that project's findings

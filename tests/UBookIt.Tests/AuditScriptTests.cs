@@ -307,6 +307,57 @@ public sealed class AuditScriptTests : IDisposable
         Assert.Contains($"Site is packable and suppresses {AdvisoryA}", output);
     }
 
+    // --- QA round 2: asked MSBuild, but not under the conditions that decide ------------------
+
+    [Fact]
+    public void A_project_non_packable_only_in_Debug_counts_as_packable_because_Release_ships()
+    {
+        // publish.yml packs Release. Evaluated only as Debug (MSBuild's default), this project
+        // looked non-packable and was let accept an advisory it would then have shipped.
+        var library = Project(
+            "Library",
+            "<PropertyGroup Condition=\"'$(Configuration)' == 'Debug'\"><IsPackable>false</IsPackable></PropertyGroup>"
+            + Suppress(AdvisoryA));
+
+        var (exit, output) = Audit([Source], Entry(library, Finding("Some.Package", AdvisoryA)));
+
+        Assert.Equal(1, exit);
+        Assert.Contains($"Library is packable and suppresses {AdvisoryA}", output);
+        Assert.Contains(Vulnerable("Library", AdvisoryA), output);
+    }
+
+    [Fact]
+    public void A_suppression_in_only_one_configuration_accepts_nothing()
+    {
+        var site = Project(
+            "Site",
+            NotPackable
+            + $"<ItemGroup Condition=\"'$(Configuration)' == 'Debug'\"><NuGetAuditSuppress Include=\"{AdvisoryA}\" /></ItemGroup>");
+
+        var (exit, output) = Audit([Source], Entry(site, Finding("Some.Package", AdvisoryA)));
+
+        Assert.Equal(1, exit);
+        Assert.Contains(Vulnerable("Site", AdvisoryA), output);
+        Assert.Contains("0 finding(s) accepted", output);
+    }
+
+    [Fact]
+    public void A_multi_targeted_project_may_not_suppress()
+    {
+        // NuGet reads suppressions per framework, from inner evaluations; the outer one this
+        // script reads can disagree in both directions (QA round 2, measured with a real restore).
+        var site = Project(
+            "Site",
+            "<PropertyGroup><TargetFrameworks>net10.0;net9.0</TargetFrameworks></PropertyGroup>"
+            + NotPackable + Suppress(AdvisoryA));
+
+        var (exit, output) = Audit([Source], Entry(site, Finding("Some.Package", AdvisoryA)));
+
+        Assert.Equal(1, exit);
+        Assert.Contains($"Site targets more than one framework and suppresses {AdvisoryA}", output);
+        Assert.Contains(Vulnerable("Site", AdvisoryA), output);
+    }
+
     // --- Fixtures ----------------------------------------------------------------------------
 
     private static string Suppress(string advisory) =>
