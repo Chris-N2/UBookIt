@@ -131,6 +131,7 @@ the site's closures to the resources you hydrate is yours to do**, exactly as th
 hours and exceptions already are: availability is computed from the resource you return, and
 a resource returned without its closures is one the package will happily offer on a date the
 site has closed. **The same is true of a resource's own closed periods:** pass them to
-`AvailabilityConfiguration.Create` with the rest of its availability, or a closed period you
+`AvailabilityConfiguration.CreateWithClosedPeriods` with the rest of its availability (the older
+`Create` takes none), or a closed period you
 return without will read as open. The shipped SQL Server store does this; nothing in the domain can do it on
 your behalf, because the domain never loads a resource.
