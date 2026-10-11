@@ -34,11 +34,12 @@ The entry says plainly what a site below 18.2.1 has to do.
      - **The minimum Umbraco is 18.2.1**, naming the four advisories. They are Umbraco's
        advisories, and uBookIt's own code is not what they describe.
      - **ImageSharp:** a site on Umbraco 18.2.1 may still report advisories against SixLabors
-       ImageSharp 3.1.12. They arrive through Umbraco's imaging package, not through uBookIt,
+       ImageSharp 3.1.12. They arrive through Umbraco, not through uBookIt *(apply found
+       `Umbraco.Cms` depends on it directly as well as through its imaging package, tasks 1.2)*,
        and no Umbraco release yet takes a fixed ImageSharp. Claimed only after the packed
        nuspecs and the audit confirm that no uBookIt package reaches ImageSharp.
    - Unlike `17.2.3`, there is no Entity Framework Core change: `18.1.2` already declared
-     `10.0.11`.
+     `10.0.11`, and its floor, Umbraco 18.2.0, already required it (QA round 1).
 3. **Before tagging, the direct-link check** that `umbraco-security-2026-10` left open (its
    deferred obligation): on the 18.2.1 TestSite, navigate straight to
    `/umbraco/section/ubookit/view/bookings`. If it renders blank, repeat on 18.2.0 (`080dc6e`) and

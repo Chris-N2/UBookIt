@@ -55,6 +55,15 @@
 - [ ] 3.1 QA review (`qa-review`) in one subagent, reused across rounds, covering this change and
   `release-17-2-3`. Hand each round's fixes over as new code, and give every claim as something to
   verify.
+  *Round 1: APPROVE WITH NITS for this change* (`release-17-2-3` was REJECT, MAJOR and MINOR,
+  both on that line only). QA independently verified all six claims, reproducing the builds and
+  suites. Two NITs here, both taken:
+  - the proposal's ImageSharp path now carries its correction note;
+  - 4.0's run on the branch rather than the merge commit now carries a caveat, re-checked at 3.3.
+
+  QA also noted that 18.2.0, `18.1.2`'s floor, already required EF Core 10.0.11, which is a
+  stronger reason than our declaration for the entry having no EF item. That is added to the
+  proposal.
 - [ ] 3.2 Chris pushes the branch and opens the PR into `dev/v18`. Verify, through the API, that the
   PR's CI run is green at every step, **parity included** (only `<Version>` differs in a parity
   file, and parity exempts it).
@@ -79,6 +88,9 @@
     came straight after a TestSite restart and re-login, during which Umbraco core logged auth
     and SignalR errors. That's a plausible cause, but it is not shown. The deferred obligation
     is discharged as "did not reproduce".
+  - **Caveat (QA round 1 NIT):** this ran on the branch, not on the merge commit. It stands only if
+    the merge brings in no code commit from `dev/v18`. Re-check at 3.3: if `origin/dev/v18` has
+    moved past `836c653` with anything outside docs, repeat this check before tagging.
 
 - [ ] 4.1 Chris pushes tag `18.1.3` on the merge commit. Verify: `git ls-remote` shows it, and a
   `publish` run started with `check` and `pack` green.
