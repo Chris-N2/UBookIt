@@ -66,9 +66,30 @@ JSON it returns:
 - **A project MSBuild cannot evaluate** (a non-zero exit, or output that is not the expected
   JSON) fails the audit by name, and accepts nothing.
 
-This is the evaluation NuGet's own audit reads suppressions from. So conditions, `<Choose>`,
-document order (the last `IsPackable` wins) and imports such as `Directory.Build.targets` mean
-exactly what they mean to the build. An item inside a `<Target>` is a suppression to neither.
+So conditions, `<Choose>`, document order (the last `IsPackable` wins) and imports such as
+`Directory.Build.targets` mean what they mean to the build. An item inside a `<Target>` is a
+suppression to neither.
+
+**And it is asked under the conditions that decide (QA round 2).** Round 1's version asked MSBuild
+once, with its defaults (Debug, outer evaluation). QA reproduced two disagreements:
+
+1. **Configuration.** A project non-packable only in Debug was let accept an advisory, though
+   `publish.yml` packs Release, where it is packable.
+2. **Multi-targeting.** NuGet reads suppressions per target framework, from inner evaluations.
+   An outer-only suppression was accepted although NuGet still warned, and a per-framework one
+   was refused although NuGet honoured it.
+
+So each project is evaluated as **Debug and as Release**. It counts as non-packable only if it is
+non-packable under both, and an advisory counts as suppressed only if it is suppressed under
+both. A **multi-targeted project may not suppress at all**: its suppressions fail and accept
+nothing. Each rule refuses wherever the script and the thing that decides could disagree,
+instead of modelling the disagreement. Per-framework evaluation was rejected for this change:
+no project here multi-targets, so it would be machinery with no user. The refusal is stated in
+the spec rather than hidden.
+
+The same class failed twice: first a model of MSBuild, then MSBuild asked about the wrong build.
+The test for "does the gate check the guarantee" is *which build ships* and *which evaluation
+NuGet reads*, not "is the answer from MSBuild".
 
 **Superseded at QA round 1. The first version read each project file as XML** and claimed that
 erred safe ("it can reject an exception it cannot see, but never accept one"). QA disproved
@@ -84,8 +105,8 @@ a test that fails against the XML version (verified by running the new tests aga
 the earlier rule "a conditional suppression fails outright" is dropped in favour of what the
 condition evaluates to.
 
-Cost: one MSBuild evaluation per project. The real solution's audit takes about a minute (57 s
-locally for 10 projects), which is acceptable for a weekly job. Environment variables are
+Cost: two MSBuild evaluations per project. The real solution's audit takes a minute or two
+locally for 10 projects, which is acceptable for a weekly job. Environment variables are
 MSBuild properties, so the evaluation sees the same environment the audit's restore does.
 
 Outcomes, per project:

@@ -47,6 +47,24 @@
         - *IsPackable forced false: 4;*
         - *normalisation removed: the case/slash test.*
       - *The real solution's audit: exit 0, 5 accepted, 57 s.*
+      - *Round 2 (after QA), **22 tests**. QA showed MSBuild being asked under the wrong conditions:
+        Debug only, while publish.yml packs Release, and the outer evaluation, while NuGet reads
+        suppressions per framework. Now each project is evaluated as Debug and as Release. It is
+        non-packable only if both say so, an advisory is suppressed only if both say so, and a
+        multi-targeted project may not suppress. Added three tests: non-packable only in Debug;
+        suppressed only in Debug; multi-targeted. **Exactly those three fail against the round-2
+        script (`0caa532`).***
+      - *Round 2 mutations, each caught:*
+        - *accept-never-matches: 5;*
+        - *stale removed: 1;*
+        - *packable check removed: 5;*
+        - *packable-may-accept: 3;*
+        - *multi-target-may-accept: 1;*
+        - *multi-target check removed: 1;*
+        - *evaluation error ignored: 1;*
+        - *Debug only: 2;*
+        - *union instead of intersection: 1;*
+        - *no normalisation: 1.*
 - [x] 1.4 Declare the five ImageSharp advisories as `NuGetAuditSuppress` in
       `src/UBookIt.TestSite/UBookIt.TestSite.csproj`, under a comment giving the reason (design
       D2). Verify: a restore shows no NU190x warnings, and the script with no `-Report` exits 0,

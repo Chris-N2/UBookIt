@@ -105,10 +105,14 @@ the lines do differ.
   any test was skipped. It publishes nothing and holds no secrets.
 - **`audit`** — Mondays 06:00 UTC, and on demand from the Actions tab. Audits the NuGet graph of
   **both** lines for known vulnerabilities, direct and transitive, and fails on any, with one
-  narrow exception: a project that is not packable can accept an advisory it declares as
-  `NuGetAuditSuppress` in its own file, for one no reachable version can fix yet. The audit
-  reports each accepted finding as a notice, and fails on a suppression that matches nothing
-  (stale) or that a packable project declares. Today the only one is `UBookIt.TestSite`
+  narrow exception: a project that is not packable can accept an advisory it suppresses
+  (`NuGetAuditSuppress`), for one no reachable version can fix yet. What a project suppresses,
+  and whether it is packable, are taken from MSBuild's evaluation of it, as Debug and as Release,
+  so imports count, and so does anything else MSBuild sees. The audit reports each accepted
+  finding as a notice, and fails on a suppression that:
+  - matches nothing (stale);
+  - is declared by a project that is packable in either configuration; or
+  - is declared by a project that targets more than one framework. Today the only one is `UBookIt.TestSite`
   accepting ImageSharp 3.1.12's advisories, which it reaches through Umbraco; see the comment
   there. Advisories are
   deliberately *not* errors in the `ci` build (see `Directory.Build.props`): an advisory is

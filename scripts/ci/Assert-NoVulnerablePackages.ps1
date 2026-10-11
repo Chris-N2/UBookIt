@@ -28,21 +28,27 @@
         accepts an advisory.
 
     Suppressions and packability come from MSBuild's OWN EVALUATION of each project
-    (`dotnet msbuild <project> -getProperty:IsPackable -getItem:NuGetAuditSuppress`), the same
-    evaluation NuGet's audit reads them from. So conditions, `<Choose>`, document order (the
-    last IsPackable wins) and imports such as Directory.Build.targets all mean here exactly what
-    they mean to the build, and an item inside a `<Target>` - which no evaluation sees - is no
-    suppression here either.
+    (`dotnet msbuild <project> -getProperty:IsPackable -getItem:NuGetAuditSuppress`), so
+    conditions, `<Choose>`, document order (the last IsPackable wins) and imports such as
+    Directory.Build.targets mean here what they mean to the build, and an item inside a
+    `<Target>` - which no evaluation sees - is no suppression here either.
 
     That replaced reading the project file as XML, which QA showed could ACCEPT an advisory
     MSBuild would not (round 1: a later IsPackable=true, a <Choose> condition, an item in a
-    <Target>, an override from an import). An earlier version of this very paragraph called that
+    <Target>, an override from an import). An earlier version of this paragraph called that
     reading fail-closed. It was not: a second, weaker model of MSBuild disagrees with MSBuild in
-    both directions. Ask the thing that decides.
+    both directions.
 
-    Fail-closed where it truly can be: a project counts as non-packable only when its evaluated
-    IsPackable is `false`, and a project MSBuild cannot evaluate FAILS the audit and accepts
-    nothing.
+    Asking MSBuild is not enough on its own: it has to be asked UNDER THE CONDITIONS THAT DECIDE
+    (QA round 2). So each project is evaluated twice, as Debug (what restore and `dotnet list`
+    see) and as Release (what publish.yml packs). It counts as non-packable only if it is
+    non-packable under both, and an advisory counts as suppressed only if it is suppressed under
+    both. And NuGet reads suppressions per TARGET FRAMEWORK, from inner evaluations this script
+    does not make. Rather than model that too, a project that targets more than one framework
+    may not suppress anything: its suppressions FAIL and accept nothing. Each rule refuses where
+    this script and the thing that decides could disagree, rather than guessing which way.
+
+    A project MSBuild cannot evaluate FAILS the audit and accepts nothing.
 
 .PARAMETER Target
     The solution or project to audit. Named in every message.
@@ -110,29 +116,57 @@ function ConvertTo-AdvisoryKey([string] $url) {
 # Starts packable with no suppressions, so anything that goes wrong below accepts nothing.
 function Get-ProjectPolicy([string] $path) {
     $policy = [pscustomobject]@{
-        Packable     = $true
-        Suppressions = [System.Collections.Generic.List[string]]::new()
-        Error        = $null
+        Packable      = $true
+        MultiTargeted = $false
+        # Suppressed under EVERY configuration evaluated: only these can accept anything.
+        Suppressions  = [System.Collections.Generic.List[string]]::new()
+        # Suppressed under ANY configuration: what a packable or multi-targeted project is
+        # refused for, so that a suppression cannot hide from the refusal in one configuration.
+        Declared      = [System.Collections.Generic.List[string]]::new()
+        Error         = $null
     }
 
-    $output = dotnet msbuild $path -nologo -getProperty:IsPackable -getItem:NuGetAuditSuppress 2>&1
-    if ($LASTEXITCODE -ne 0) {
-        $policy.Error = "MSBuild could not evaluate it (exit $LASTEXITCODE): $(($output | Select-Object -First 3) -join ' ')"
-        return $policy
+    # Debug is what a plain restore and this audit's own `dotnet list` evaluate; Release is what
+    # publish.yml packs. A project counts as non-packable only if it is non-packable under BOTH,
+    # and an advisory counts as suppressed only if it is suppressed under BOTH — QA round 2
+    # showed a project non-packable in Debug alone being let accept an advisory it then shipped.
+    $evaluations = @()
+    foreach ($configuration in 'Debug', 'Release') {
+        $output = dotnet msbuild $path -nologo "-p:Configuration=$configuration" `
+            -getProperty:IsPackable -getProperty:TargetFrameworks -getItem:NuGetAuditSuppress 2>&1
+        if ($LASTEXITCODE -ne 0) {
+            $policy.Error = "MSBuild could not evaluate it as $configuration (exit $LASTEXITCODE): $(($output | Select-Object -First 3) -join ' ')"
+            return $policy
+        }
+
+        try {
+            $evaluations += ,(($output -join "`n") | ConvertFrom-Json)
+        }
+        catch {
+            $policy.Error = "MSBuild's $configuration evaluation was not the JSON expected: $(($output | Select-Object -First 3) -join ' ')"
+            return $policy
+        }
     }
 
-    try {
-        $evaluation = ($output -join "`n") | ConvertFrom-Json
-    }
-    catch {
-        $policy.Error = "MSBuild's evaluation was not the JSON expected: $(($output | Select-Object -First 3) -join ' ')"
-        return $policy
-    }
+    $policy.Packable = @($evaluations | Where-Object { -not ("$($_.Properties.IsPackable)".Trim() -ieq 'false') }).Count -gt 0
+    $policy.MultiTargeted = @($evaluations | Where-Object { "$($_.Properties.TargetFrameworks)".Trim() -ne '' }).Count -gt 0
 
-    $policy.Packable = -not ("$($evaluation.Properties.IsPackable)".Trim() -ieq 'false')
+    $sets = @(foreach ($evaluation in $evaluations) {
+        $set = @{}
+        foreach ($item in @($evaluation.Items.NuGetAuditSuppress)) {
+            $set[(ConvertTo-AdvisoryKey $item.Identity)] = $item.Identity
+        }
+        ,$set
+    })
 
-    foreach ($item in @($evaluation.Items.NuGetAuditSuppress)) {
-        $policy.Suppressions.Add($item.Identity)
+    $union = @{}
+    foreach ($set in $sets) { foreach ($key in $set.Keys) { $union[$key] = $set[$key] } }
+
+    foreach ($key in $union.Keys) {
+        $policy.Declared.Add($union[$key])
+        if (@($sets | Where-Object { -not $_.ContainsKey($key) }).Count -eq 0) {
+            $policy.Suppressions.Add($union[$key])
+        }
     }
 
     return $policy
@@ -149,13 +183,20 @@ foreach ($project in $projects) {
         $failures.Add("$name ($($project.path)): $($policy.Error) Nothing in it can be accepted.")
     }
 
-    if ($policy.Packable -and $policy.Suppressions.Count -gt 0) {
-        $failures.Add("$name is packable and suppresses $($policy.Suppressions -join ', '). A package uBookIt ships never accepts an advisory - remove the suppression and fix the dependency.")
+    if ($policy.Packable -and $policy.Declared.Count -gt 0) {
+        $failures.Add("$name is packable and suppresses $($policy.Declared -join ', '). A package uBookIt ships never accepts an advisory - remove the suppression and fix the dependency.")
     }
 
-    # Only the suppressions MSBuild evaluates for a non-packable project can accept anything.
+    # NuGet reads suppressions per target framework (the inner evaluations); this reads the outer
+    # one. Rather than model that, a multi-targeted project may not suppress at all (QA round 2).
+    if ($policy.MultiTargeted -and $policy.Declared.Count -gt 0) {
+        $failures.Add("$name targets more than one framework and suppresses $($policy.Declared -join ', '). This audit does not judge per-framework suppressions, so it accepts none - suppress in a single-targeted project, or fix the dependency.")
+    }
+
+    # Only suppressions MSBuild evaluates under every configuration, for a project that is
+    # non-packable under every configuration and targets one framework, can accept anything.
     $accepts = @{}
-    if (-not $policy.Packable) {
+    if (-not $policy.Packable -and -not $policy.MultiTargeted) {
         foreach ($suppression in $policy.Suppressions) {
             $accepts[(ConvertTo-AdvisoryKey $suppression)] = $suppression
         }

@@ -43,7 +43,11 @@ cannot be fixed yet, and nothing broader.
     exception cannot outlive its reason (Umbraco moving to ImageSharp 4 makes it stale);
   - **fail** if any packable project declares a suppression, because a shipped package must never
     accept an advisory;
-  - report each accepted finding visibly (a notice, not silence).
+  - report each accepted finding visibly (a notice, not silence);
+  - take suppressions and packability from MSBuild's evaluation as Debug AND as Release: non-packable
+    only if both say so, suppressed only if both say so;
+  - **fail** on any suppression in a project that targets more than one framework, because NuGet
+    reads those per framework. *(The last two are from QA rounds 1-2; see design D3.)*
 - **Upgrade checklist, as in August, on both lines**: regenerate the backoffice client and read
   the diff, confirm the migration list still holds, and do a live TestSite pass (the section
   loads and a booking can be placed and seen).
