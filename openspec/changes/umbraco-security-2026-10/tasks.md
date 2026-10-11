@@ -31,12 +31,18 @@
 
 ## 2. The Umbraco floor on `main`
 
-- [ ] 2.1 Move all seven `Umbraco.Cms.*` entries in `Directory.Packages.props` to
+- [x] 2.1 Move all seven `Umbraco.Cms.*` entries in `Directory.Packages.props` to
       `[17.7.1,18.0.0)`. Verify: restore resolves 17.7.1 for every `Umbraco.Cms*` package
       (check `project.assets.json` or `dotnet list package`), and nothing resolves 18.x.
-- [ ] 2.2 `README.md`: the opening's floor sentence and the Requirements table row say `17.7.1`.
+      *(`dotnet list --include-transitive`: 73 `Umbraco.Cms*` references, all 17.7.1. **Found at
+      apply:** restore failed with NU1605. Umbraco.Cms.Persistence.EFCore 17.7.1 requires
+      Microsoft.EntityFrameworkCore.SqlServer >= 10.0.11 against our 10.0.10 pin. Both EF Core
+      pins (SqlServer, Design) moved to 10.0.11 together, so shipped `UBookIt.Persistence` now
+      declares >= 10.0.11, the same requirement 17.7.1 imposes. The migrations'
+      `ProductVersion "10.0.10"` annotations are generation-time history and stay.)*
+- [x] 2.2 `README.md`: the opening's floor sentence and the Requirements table row say `17.7.1`.
       Verify: no README sentence states `17.6.2` as the floor, and the README guards pass.
-- [ ] 2.3 Run the design D5 checklist on `main`:
+- [x] 2.3 Run the design D5 checklist on `main`:
       - a clean `--no-incremental` Release build with 0 warnings (record the count);
       - client regeneration against the running TestSite, with the diff read and recorded
         (expected empty);
@@ -45,8 +51,17 @@
         end and seen on the Bookings screen;
       - the vulnerable-package listing shows only the 5 accepted findings.
 
-      Verify: each result recorded here.
-- [ ] 2.4 `openspec validate --all --strict`. Verify: all pass.
+      Verify: each result recorded here. *(2026-10-11, `main`:
+      - clean `--no-incremental` Release build: **0 warnings, 0 errors**;
+      - client regenerated against the running TestSite: the files differ only in line endings,
+        and `git diff --ignore-cr-at-eol` is empty, so the API surface is unchanged across
+        17.6 → 17.7 (the working copies were restored);
+      - client 335, unit 2019 (2005 + 14), integration 194, rendering 1168, all passing;
+      - live, in Chrome: the uBookIt section with all five views, and Resources rendering its data;
+        booking PX85-4CZR placed on the harness for Closure Live Room, Mon 12 Oct 11:00–12:00,
+        and found by reference on the Bookings screen as Confirmed; no console errors;
+      - the audit script against the solution exits 0, with 5 accepted, all in `UBookIt.TestSite`.)*
+- [x] 2.4 `openspec validate --all --strict`. Verify: all pass. *(27/27.)*
 
 ## 3. Port to `dev/v18`
 
