@@ -113,10 +113,10 @@ the lines do differ.
   - matches nothing (stale);
   - is declared in one configuration but not the other;
   - is declared by a project that is packable in either configuration; or
-  - is declared by a project that targets more than one framework. Today the only one is `UBookIt.TestSite`
-  accepting ImageSharp 3.1.12's advisories, which it reaches through Umbraco; see the comment
-  there. Advisories are
-  deliberately *not* errors in the `ci` build (see `Directory.Build.props`): an advisory is
+  - is declared by a project that targets more than one framework.
+
+  Today the only accepted advisories are `UBookIt.TestSite`'s, for ImageSharp 3.1.12, which it
+  reaches through Umbraco; see the comment there. Advisories are deliberately *not* errors in the `ci` build (see `Directory.Build.props`): an advisory is
   published against a package, not introduced by a commit, and would otherwise fail unrelated
   work. **GitHub disables scheduled workflows after 60 days without repository activity** — if the
   project goes quiet, run it by hand.

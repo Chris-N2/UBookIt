@@ -64,7 +64,8 @@ than obey it:
 
 #### Scenario: A shipped package cannot suppress an advisory
 - **WHEN** a packable project declares any advisory as suppressed, including a project that is
-  packable in only one of the configurations a release is restored or packed in
+  packable in only one of the configurations the audit restores in or a release is built or
+  packed in
 - **THEN** the audit fails, naming the project, whether or not the advisory is found
 
 #### Scenario: A suppression that depends on the configuration fails the audit
