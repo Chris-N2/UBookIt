@@ -174,7 +174,7 @@ public class ClosureDateRangesStoreTests(SqlServerFixture fixture) : IAsyncLifet
             displayName: resource.DisplayName,
             description: resource.Description,
             capabilities: resource.Capabilities.Keys,
-            availability: AvailabilityConfiguration.Create(
+            availability: AvailabilityConfiguration.CreateWithClosedPeriods(
                 resource.Availability.OpenHours,
                 periods,
                 exceptions ?? resource.Availability.Exceptions,
@@ -281,7 +281,7 @@ public class ClosureDateRangesStoreTests(SqlServerFixture fixture) : IAsyncLifet
             displayName: current.DisplayName,
             description: current.Description,
             capabilities: current.Capabilities.Keys,
-            availability: AvailabilityConfiguration.Create(
+            availability: AvailabilityConfiguration.CreateWithClosedPeriods(
                 current.Availability.OpenHours, closedPeriods: [Period(30, 31)]).Value,
             directlyBookable: current.DirectlyBookable,
             id: current.Id,

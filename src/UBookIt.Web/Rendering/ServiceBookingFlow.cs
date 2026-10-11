@@ -141,7 +141,7 @@ public sealed class ServiceBookingFlow(
         }
 
         return new ServiceFlowOutcome(
-            ServiceBookingFormBuilder.Build(
+            ServiceBookingFormBuilder.BuildForWindow(
                 service, pools, selectedDate, today, windowStarts, dayStarts, duration, zone,
                 PrivacyNoticeView.From(settings, HostMailAvailability.CanSend(emailSender)), windowDays, windowFrom, failed, input.FlowToken, choice,
                 input.PreservedQueryPairs),

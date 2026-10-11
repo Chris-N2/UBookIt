@@ -141,7 +141,9 @@ so the existing rendering tests and screenshots stay valid.
 
 - **Closures view:** a From and a To `uui-input type="date"`, with To defaulting to From when it
   is left empty. Rows render "1 Feb 2027 – 31 Mar 2027", or one date when start equals end.
-  Overlap and inverted-range failures surface on the To control.
+  A failure surfaces on the input its `field` names: To for an inverted range (`EndDate`), From
+  for an overlap (`Date`, the field the overlap code has always carried), Name for the label.
+  *(Changed in QA rounds 1 and 2: this first said both surface on To.)*
 - **Resource editor:** a **Closed periods** section after Exceptions, with repeatable rows (From,
   To, Note, Remove) following the Exceptions section's own row pattern. It carries a hint that the
   note isn't shown to visitors. Its failures surface on the section, as the Exceptions section's do.

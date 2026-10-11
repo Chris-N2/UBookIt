@@ -60,7 +60,7 @@ internal static class ResourceRowMapper
             .Select(p => ClosedPeriod.Create(p.StartDate, p.EndDate, p.Note).Value);
 
         var availability = AvailabilityConfiguration
-            .Create(openHours, closedPeriods, exceptions, constraints, applicableClosures).Value;
+            .CreateWithClosedPeriods(openHours, closedPeriods, exceptions, constraints, applicableClosures).Value;
 
         // Named rather than positional, deliberately. This call passed `row.Id`
         // as the sixth argument; adding one before it shifted the meaning of

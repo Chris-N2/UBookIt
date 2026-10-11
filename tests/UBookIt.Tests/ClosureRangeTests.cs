@@ -27,7 +27,7 @@ public class ClosureRangeTests
         IEnumerable<DateException>? exceptions = null,
         IEnumerable<SiteClosure>? closures = null,
         IEnumerable<ClosedPeriod>? periods = null)
-        => AvailabilityConfiguration.Create(
+        => AvailabilityConfiguration.CreateWithClosedPeriods(
             Weekly("09:00", "17:00", Weekdays), periods ?? [], exceptions, null, closures).Value;
 
     // ── SiteClosure as a range ────────────────────────────────────────────────────────────
@@ -191,7 +191,7 @@ public class ClosureRangeTests
     [Fact]
     public void Overlapping_periods_are_refused()
     {
-        var result = AvailabilityConfiguration.Create(
+        var result = AvailabilityConfiguration.CreateWithClosedPeriods(
             WeeklyOpenHours.Empty,
             closedPeriods: [Period(Monday, Monday.AddDays(13)), Period(Monday.AddDays(9), Monday.AddDays(19))]);
 
@@ -201,7 +201,7 @@ public class ClosureRangeTests
     [Fact]
     public void Adjacent_periods_are_not_an_overlap()
     {
-        var result = AvailabilityConfiguration.Create(
+        var result = AvailabilityConfiguration.CreateWithClosedPeriods(
             WeeklyOpenHours.Empty,
             closedPeriods: [Period(Monday, Monday.AddDays(13)), Period(Monday.AddDays(14), Monday.AddDays(19))]);
 
@@ -211,7 +211,7 @@ public class ClosureRangeTests
     [Fact]
     public void A_period_covering_an_exception_is_refused()
     {
-        var result = AvailabilityConfiguration.Create(
+        var result = AvailabilityConfiguration.CreateWithClosedPeriods(
             WeeklyOpenHours.Empty,
             exceptions: [DateException.Override(Monday.AddDays(4), [Win("10:00", "14:00")]).Value],
             closedPeriods: [Period(Monday, Monday.AddDays(13))]);
@@ -223,7 +223,7 @@ public class ClosureRangeTests
     public void A_period_covering_a_closure_exception_is_refused_too()
     {
         // Closed either way, but still two rules for one date: the operator decides which stays.
-        var result = AvailabilityConfiguration.Create(
+        var result = AvailabilityConfiguration.CreateWithClosedPeriods(
             WeeklyOpenHours.Empty,
             exceptions: [DateException.Closure(Monday.AddDays(4))],
             closedPeriods: [Period(Monday, Monday.AddDays(13))]);

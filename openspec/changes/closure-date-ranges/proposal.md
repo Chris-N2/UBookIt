@@ -63,10 +63,13 @@ the maintainer's own site going live this week.
 - **Release:** a minor, `17.3.0` on `main` and then `18.2.0` on `dev/v18`. It adds a feature and
   an additive migration, and it breaks nothing at the binary level either.
   - Every published signature it extends is kept exactly. The new behaviour is in new members:
-    `SiteClosure.CreateRange`, an `AvailabilityConfiguration.Create` overload taking closed
-    periods, an `AvailableDateWindow.Compute` overload taking the first open date, and
-    `Build` overloads on both form builders taking the window's start. A guard pins the old
-    signatures.
+    `SiteClosure.CreateRange`, `AvailabilityConfiguration.CreateWithClosedPeriods`, an
+    `AvailableDateWindow.Compute` overload taking the first open date, and `BuildForWindow` on
+    both form builders. `PublishedSignatureTests` pins the old signatures, and
+    `PublishedCallShapeTests` is a compile-time guard that the call shapes a 17.2.x caller could
+    have written still bind to them. *(QA round 2: an overload of `Create` named `Create` had
+    made `Create(hours, null)` and `Create(hours, [])` ambiguous, so they are now separate
+    names.)*
   - Two published interfaces gain a member each, and each has a default implementation:
     - `IResourceManagementStore.UpdateKeepingClosedPeriodsAsync`;
     - `IBookingFormView.ShiftedWindowFrom`.

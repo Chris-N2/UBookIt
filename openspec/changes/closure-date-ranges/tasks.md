@@ -378,6 +378,31 @@
     custom `IResourceStore` must pass closed periods.
   - **Mutations run:** the controller seam; the holiday clipping (start date only); each failed
     as described above.
+
+  *Round 2: REJECT*, one must-fix. QA re-verified every claim and ran the mutations I had not;
+  all but R8 were caught.
+  - **1. The round-1 fix introduced a source break.** An overload of `Create` named `Create`, whose
+    second parameter was an unrelated collection type, made `Create(hours, null)`,
+    `Create(hours, [])` and `Create(hours, null, null)` ambiguous (CS0121).
+    `PublishedSignatureTests` could not see it: it proves the old signature exists, not that
+    callers still bind to it.
+
+    *Fix:* the new members have names of their own: `AvailabilityConfiguration.CreateWithClosedPeriods`
+    and `BuildForWindow` on both form builders. The latter also removes QA's lesser ambiguity,
+    `Build(..., windowDays, default)`.
+
+    **New guard:** `PublishedCallShapeTests` makes exactly those calls, plus the other published
+    shapes and `Build(..., 30, default)`, so an ambiguity fails the build. **Shown to fire:** with
+    `CreateWithClosedPeriods` turned back into a `Create` overload, the guard file fails with
+    CS0121 on exactly the three shapes QA named. Restored.
+  - **2. Mutation R8 survived** (the service flow's selected date defaulting to today). *Fix:* the
+    service window test asserts `SelectedDate` and `SelectedDateIsListed`. **Shown to fire:** R8
+    reapplied, with the build checked clean first, fails the test. Restored.
+  - **3 (nit).** The in-memory store's kept-periods update now re-judges the exceptions and returns
+    `closed-period-conflicts-with-exception`, as its comment always claimed.
+  - **4 (nit).** Design D8 now says a failure surfaces on the input its `field` names: To for an
+    inverted range, From for an overlap.
+  - **5 (nit).** The placement test's comment says what it can and cannot tell apart.
 - [ ] 8.2 Port to `dev/v18` on `closure-date-ranges-v18`: cherry-pick, then **regenerate** the
   migration Designer and model snapshot for the 18 line, and the generated client against the v18
   TestSite. Re-run 7.1 and 7.2 there. Verify: records match `main`'s, and the reviewer from 8.1 has
