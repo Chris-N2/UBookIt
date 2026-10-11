@@ -52,7 +52,7 @@
 
 ## 3. Review and merge
 
-- [ ] 3.1 QA review (`qa-review`) in one subagent, reused across rounds, covering this change and
+- [x] 3.1 QA review (`qa-review`) in one subagent, reused across rounds, covering this change and
   `release-17-2-3`. Hand each round's fixes over as new code, and give every claim as something to
   verify.
   *Round 1: APPROVE WITH NITS for this change* (`release-17-2-3` was REJECT, MAJOR and MINOR,
@@ -67,6 +67,7 @@
   *Round 2: APPROVE WITH NITS.* QA diffed every `Umbraco.Cms*` package from 18.2.0 to 18.2.1. No
   non-Umbraco dependency moves, so `17.2.3`'s round-2 finding doesn't carry over. One NIT, taken:
   4.0's caveat now says "not documentation, changelog or openspec" instead of "outside docs".
+  *Round 3: APPROVE.* No further rounds. Three rounds, one reviewer.
 - [ ] 3.2 Chris pushes the branch and opens the PR into `dev/v18`. Verify, through the API, that the
   PR's CI run is green at every step, **parity included** (only `<Version>` differs in a parity
   file, and parity exempts it).
