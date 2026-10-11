@@ -39,7 +39,8 @@ user, so an administrator you create later sees those details hidden until you a
   capabilities that describe what each one can do.
 - Build services from roles. For example, "a haircut" can mean one stylist and one chair, and
   uBookIt works out which combinations are free.
-- Close the whole organisation on chosen dates, from one list, and open individual resources anyway.
+- Close the whole organisation for a day or a run of dates, from one list, and open individual
+  resources anyway; close a single resource for a period of its own.
 - Import public holidays from a source your own code supplies. uBookIt ships no holiday data.
 - See, find, move, cancel, confirm and decline bookings. Find one by its reference, or every
   booking made with an email address.

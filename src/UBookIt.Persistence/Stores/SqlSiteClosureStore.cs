@@ -15,8 +15,18 @@ internal static class SiteClosureRowMapper
     /// exception rather than as a silently-wrong domain object — the same arrangement
     /// <see cref="ResourceRowMapper"/> has.
     /// </summary>
+    /// <remarks>
+    /// <b>One corruption is tolerated rather than thrown: an end before the start.</b> A site that
+    /// goes back to a version from before closures were ranges keeps the <c>EndDate</c> column, and
+    /// that version writes closures without it — so a closure it creates or moves gets the column's
+    /// default, 0001-01-01. Coming forward again, such a row would otherwise throw here, and
+    /// because every resource read loads the closures, take every booking page and the backoffice
+    /// down with it. It is read as the single day it was written as. Anything else wrong with a row
+    /// still throws.
+    /// </remarks>
     internal static SiteClosure ToDomain(SiteClosureRow row)
-        => SiteClosure.CreateRange(row.Date, row.EndDate, row.Label, row.Id).Value;
+        => SiteClosure.CreateRange(
+            row.Date, row.EndDate < row.Date ? row.Date : row.EndDate, row.Label, row.Id).Value;
 
     internal static SiteClosureRow ToRow(SiteClosure closure)
         => new() { Id = closure.Id, Date = closure.Date, EndDate = closure.EndDate, Label = closure.Label };

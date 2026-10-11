@@ -30,9 +30,14 @@ as it did.
 removed or changed, so code built against 17.2.x keeps working. Two of its behaviours are worth
 knowing.
 
-**Going back to 17.2.x afterwards loses ranges.** The extra column and table are simply ignored,
-so a closure running over several days reads as its first day only, and closed periods stop
-applying. Nothing breaks, but the dates you closed would open again.
+**Going back to 17.2.x afterwards is possible, but avoid changing closures while you are there.**
+The older version ignores the extra column and table, so while on it a closure running over
+several days applies on its first day only, and closed periods do not apply at all. The older
+version also does not know about end dates: a closure it creates, or moves to another date, is
+stored without one. Coming forward again, 17.3.0 reads each such closure as the single day it
+starts on. That is safe, but a closure the older version moved later loses the range it had. A
+closure it moved EARLIER keeps its old end and so covers more dates than you meant. Check your
+closures after coming forward.
 
 ### What changed
 
@@ -53,7 +58,9 @@ has a From and a To date and an optional note.
 - Bookings already placed keep their times, exactly as with closures.
 
 **The booking page looks past a closure.** When a closure, or a resource's closed period, covers
-today, the list of dates with availability starts on the first day after it. It names the dates it
+today, the list of dates with availability starts on the first day after it. On a service's
+page it moves only when every resource that could provide the service is closed today, and then
+to the first day any of them reopens. It names the dates it
 covers, for example "from Monday 21 December 2026 to Tuesday 19 January 2027", not "the next 30
 days". It never says why. That does let a visitor infer that the dates before the list are closed
 rather than booked; nothing names the closure or its reason. The list still stops at how far ahead
@@ -73,12 +80,16 @@ for dates after a long closure.
 - **On a closure update, a body without `endDate` makes the closure a single day.** Code written
   before ranges, that renames a range closure an operator created, will shrink it to its start date.
   Send `endDate` with the closure's current end to keep it.
+- **New failure codes:** `closure-range-invalid`, `closed-period-invalid`,
+  `closed-period-overlap`, `closed-period-conflicts-with-exception`. The existing
+  `duplicate-closure-date` now also covers a closure whose range overlaps another's.
 - **New members.** Every existing signature is unchanged; each new member sits beside the old one:
-  - `SiteClosure.CreateRange` and `SiteClosure.EndDate`;
-  - `ClosedPeriod`, and `AvailabilityConfiguration.CreateWithClosedPeriods` and `.ClosedPeriods`;
+  - `SiteClosure.CreateRange`, `.EndDate`, `.Covers` and `.Overlaps`;
+  - `ClosedPeriod`, and `AvailabilityConfiguration.CreateWithClosedPeriods`, `.ClosedPeriods` and
+    `.ClosedPeriodFor`;
   - `ClosedRanges`;
   - `AvailableDateWindow.Compute` taking the first open date;
-  - `BuildForWindow` on both form builders.
+  - `BuildForWindow` on both form builders, and `ServiceBookingFormBuilder.FirstOpenDate`.
 - **Interfaces with new members.** Each has a default, so an existing implementation still
   compiles:
   - `IResourceManagementStore.UpdateKeepingClosedPeriodsAsync`;
