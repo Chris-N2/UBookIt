@@ -1,8 +1,10 @@
 ## 0. Start
 
-- [ ] 0.1 Branch `closure-date-ranges` from `origin/main` (at `c63dbe6`), with the upstream unset.
+- [x] 0.1 Branch `closure-date-ranges` from `origin/main` (at `c63dbe6`), with the upstream unset.
   Verify: the branch exists, and `openspec validate closure-date-ranges --strict` passes.
-- [ ] 0.2 Diff the guarantees of every requirement this change replaces wholesale. For each one,
+  *Done:* `closure-date-ranges` from `origin/main` at `c63dbe6`, with the upstream unset. Proposal
+  `21a6269`.
+- [x] 0.2 Diff the guarantees of every requirement this change replaces wholesale. For each one,
   check every SHALL and scenario in `openspec/specs/` against the delta, and record what was
   carried, superseded or dropped:
   - `site-closures`:
@@ -56,13 +58,18 @@
 
 ## 1. Core: ranges and closed periods
 
-- [ ] 1.1 `SiteClosure`: add `EndDate`. `Create` takes an optional end that defaults to the date,
+- [x] 1.1 `SiteClosure`: add `EndDate`. `Create` takes an optional end that defaults to the date,
   and refuses an end before the start with the new code `closure-range-invalid`. Add a `Covers(date)`
   method. Verify: unit tests for a single day, a range, an inverted range and the defaults.
-- [ ] 1.2 A new `ClosedPeriod` (start, end, optional note) with `closed-period-invalid` for an
+  *Done:* `SiteClosure.EndDate`, plus `Covers` and `Overlaps`. `Create(date, label, id, endDate)`
+  defaults the end to the date and refuses an inverted range with `closure-range-invalid`.
+  Covered by `ClosureRangeTests` (single day, range, inverted) and `ClosureRangeEndpointTests`.
+- [x] 1.2 A new `ClosedPeriod` (start, end, optional note) with `closed-period-invalid` for an
   inverted range or a note over 512 characters. Add the failure codes `closed-period-overlap` and
   `closed-period-conflicts-with-exception` to `FailureCodes`. Verify: unit tests for each code.
-- [ ] 1.3 `AvailabilityConfiguration` (design D2–D4):
+  *Done:* `ClosedPeriod` (trimmed note, blank becomes null, over 512 refused) and the four new
+  `FailureCodes`. `ClosureRangeTests` covers each code and pins their spellings.
+- [x] 1.3 `AvailabilityConfiguration` (design D2–D4):
   - hold closures and closed periods as sorted range lists, not dictionaries;
   - `ClosureFor` scans the ranges;
   - add `ClosedPeriodFor(date)`;
@@ -73,77 +80,198 @@
   Verify: the existing availability and site-closure tests pass unchanged, plus new tests for every
   scenario in the `availability` delta, and a test that a ten-year closure produces no per-day
   allocation in the configuration.
-- [ ] 1.4 `ClosedRanges.FirstUncovered(today, ranges)` (design D7). It follows adjoining and
+  *Done:*
+  - Ranges are held as sorted lists, and `ClosureFor` and `ClosedPeriodFor` scan them.
+  - `EffectiveWindows` checks closure, then exception, then closed period, then weekly hours.
+  - Overlap is judged with a running furthest end, so a short range swallowed by a long earlier
+    one is caught (tested).
+  - Exception conflicts are checked by date.
+
+  The existing availability and closure suites pass unchanged. The allocation test measures a
+  ten-year closure against a one-day one: no per-date cost.
+- [x] 1.4 `ClosedRanges.FirstUncovered(today, ranges)` (design D7). It follows adjoining and
   overlapping ranges, and returns today when today is uncovered. Verify: unit tests for an
   uncovered today, one range, adjoining ranges, overlapping ranges, and a gap of one day.
-- [ ] 1.5 `Resource` carries closed periods through its factory and rehydration. Verify:
+  *Done:* `ClosedRanges.FirstUncovered` and `ClosedRanges.Of`. Tests cover:
+  - an uncovered day;
+  - one range;
+  - adjoining ranges;
+  - overlapping ranges;
+  - a one-day gap;
+  - a range ending on `DateOnly.MaxValue`.
+- [x] 1.5 `Resource` carries closed periods through its factory and rehydration. Verify:
   resource-factory tests round-trip them.
 
+  *Done:* closed periods live in `AvailabilityConfiguration`, which `Resource` already carries,
+  so they need no new member on `Resource`. The row mapper rehydrates them through
+  `ClosedPeriod.Create`.
 ## 2. Persistence
 
-- [ ] 2.1 Add `SiteClosureRow.EndDate` and `ClosedPeriodRow`, with the DbContext configuration
+- [x] 2.1 Add `SiteClosureRow.EndDate` and `ClosedPeriodRow`, with the DbContext configuration
   (FK cascade on the resource, index on ResourceId, `Note` max 512).
-- [ ] 2.2 Generate the `ClosureDateRanges` migration. Hand-check that it only adds: the new column
+  *Done:*
+  - `SiteClosureRow.EndDate` and `ClosedPeriodRow`.
+  - The FK cascades from the resource.
+  - The `ResourceId` index, and `Note` capped at `ClosedPeriod.MaxNoteLength`.
+- [x] 2.2 Generate the `ClosureDateRanges` migration. Hand-check that it only adds: the new column
   filled from `Date` (default plus `UPDATE`), and the new table. No `AlterColumn` or `DropIndex`.
   Verify: read the migration and its Designer; the migration tests or a guard confirm nothing is
   dropped or altered.
-- [ ] 2.3 `SqlSiteClosureStore` create, update and import, under the `ubookit:site-closures` app
+  *Done:* `20261011182653_ClosureDateRanges`, generated, plus a hand-added
+  `UPDATE … SET [EndDate] = [Date]`. `ClosureDateRangesMigrationShapeTests` asserts:
+  - the operation kinds (add, fill, create, index);
+  - the one added column;
+  - the fill, and that it runs after the column is added;
+  - that the index is on the new table only.
+
+  `MultiClaimConcurrencyTests`' migration list records the migration and its reasoning.
+- [x] 2.3 `SqlSiteClosureStore` create, update and import, under the `ubookit:site-closures` app
   lock, with the range-overlap check excluding the closure's own id on update. Map overlaps to
   `duplicate-closure-date`. The upcoming list uses `EndDate >= today`. Verify: integration tests
   for an overlap, an extension of the closure itself, concurrent overlapping writes (exactly one
   stored), an in-progress closure counting as upcoming, and an import onto a date inside a range
   reported as already closed.
-- [ ] 2.4 The resource stores read closed periods once per call (no N+1) and write them wholesale
+  *Done:*
+  - Create and update take an app lock on `ubookit:site-closures` inside a transaction, then run
+    the overlap query, excluding the closure's own id.
+  - The upcoming filter is `EndDate >= from`.
+  - The import's "already closed" covers every date in the window that any closure covers.
+
+  `ClosureDateRangesStoreTests` covers:
+  - round-trip;
+  - overlap refused, with the existing closure unchanged;
+  - extending a closure is not an overlap with itself;
+  - **8 racers with different starts and overlapping ranges: exactly 1 stored**;
+  - in progress counts as upcoming;
+  - every date in a range is closed on a read.
+- [x] 2.4 The resource stores read closed periods once per call (no N+1) and write them wholesale
   in the resource transaction. They leave the rows untouched when the collection is omitted, and
   then re-check the submitted exceptions against the stored periods inside the lock (design D6).
   Verify: integration tests for each `persistence` delta scenario, including the omitted-collection
   race check and that a resource delete removes its periods.
-- [ ] 2.5 Migration preservation: an integration test seeds single-date closures and opt-outs on
+  *Done:* reads include `ClosedPeriods` on all four read paths. `UpdateKeepingClosedPeriodsAsync`
+  is a default interface member, overridden by the SQL store, which:
+  - re-judges the exceptions against the stored periods under the lock;
+  - leaves the period rows untouched.
+
+  Tests:
+  - the row ids are identical after a kept update;
+  - a stale writer is refused;
+  - a failed update (FK violation after the deletes) leaves the periods unchanged;
+  - listing 5 resources issues exactly 1 closed-period query;
+  - a resource delete removes its periods.
+- [x] 2.5 Migration preservation: an integration test seeds single-date closures and opt-outs on
   the pre-migration schema, migrates, and asserts each `EndDate == Date` and availability is
   unchanged. Verify: the test passes against SQL Server.
 
+  *Done:* `The_end_date_migration_keeps_every_existing_closure_to_its_one_date`. It uses its own
+  database, migrated to `AddSiteClosures`, then seeded with raw SQL (two closures and an opt-out),
+  then migrated up. Afterwards:
+  - both closures have EndDate = Date;
+  - the opt-out is intact;
+  - Christmas is closed, Boxing Day is open (opted out), and the 27th is unaffected.
+
+  Integration total **207** (194 + 13), all passing.
 ## 3. Management API and client
 
-- [ ] 3.1 DTOs (design D6): `EndDate` on `SiteClosureModel` and `ResourceClosureModel`;
+- [x] 3.1 DTOs (design D6): `EndDate` on `SiteClosureModel` and `ResourceClosureModel`;
   `ClosedPeriodModel`; nullable `ClosedPeriods` on the request and populated on the response.
   Update the mappers so an omitted request collection loads the stored periods for validation.
   Verify: controller and integration tests for every `site-closures` endpoint scenario and every
   `resource-management` CRUD scenario in the deltas.
-- [ ] 3.2 Regenerate the backoffice client against the running TestSite. Verify: the diff is read,
+  *Done:*
+  - The DTOs and mappers.
+  - The controller loads the stored periods when the request omits them, and calls
+    `UpdateKeepingClosedPeriodsAsync`.
+  - `ClosureRangeEndpointTests` has 15 tests covering every endpoint and CRUD scenario in the
+    deltas. They use the hydrating double, which now carries closed periods: it had been dropping
+    them, which would have hidden exactly this class of fault.
+- [x] 3.2 Regenerate the backoffice client against the running TestSite. Verify: the diff is read,
   and it contains only the additive fields and the new model.
 
+  *Done:* regenerated against the TestSite at `localhost:44348`, running this branch.
+  `types.gen.ts` gains 11 lines: `ClosedPeriodModel`, the two `endDate` fields, request `endDate?`
+  and `closedPeriods?`, and response `closedPeriods`. `client.gen.ts` and `sdk.gen.ts` differed
+  only in line endings and were restored.
 ## 4. Backoffice UI
 
-- [ ] 4.1 Closures view: From and To inputs (To defaults to From), range rendering, and failures on
+- [x] 4.1 Closures view: From and To inputs (To defaults to From), range rendering, and failures on
   the right control. Verify: client unit tests for the To default, the range label, the
   single-day label and failure mapping, plus a live keyboard pass.
-- [ ] 4.2 Resource editor Closed periods section: rows with From, To, Note and Remove; the
+  *Done:*
+  - From and To inputs, with To's hint referenced, To defaulting to From, and `min` set to From.
+  - Rows and their action labels use `rangeText`. A single day opens for editing with To empty.
+  - The Dates column is renamed.
+  - Failures use the view's existing announced alert.
+
+  `closure-ranges.test.ts` covers `rangeEnd` and `rangeText`. `ClosureAccessibilityTests` now pins
+  the range-carrying labels and the labelled To field.
+- [x] 4.2 Resource editor Closed periods section: rows with From, To, Note and Remove; the
   "not shown to visitors" hint; section-level failure announcement. Global closures rows show
   ranges. Verify: client unit tests for building the request (including that an untouched section
   still sends its periods), plus a live keyboard pass.
 
+  *Done:*
+  - The Closed periods group: indexed From, To and Note inputs, each labelled; To and Note hints
+    referenced; group-level errors for the four codes plus a client-side "From required".
+  - Global closures toggles name the range.
+  - The request ALWAYS carries `closedPeriods`, so emptying the section clears them; tested.
+  - A new accessibility guard covers the labels and hints.
 ## 5. Booking page window
 
-- [ ] 5.1 `AvailableDateWindow.Compute` takes a first-open date. Both flows compute it with
+- [x] 5.1 `AvailableDateWindow.Compute` takes a first-open date. Both flows compute it with
   `ClosedRanges.FirstUncovered` (a resource's own ranges; the earliest across a service's pool),
   falling back to today beyond the horizon. Verify: unit tests for every `default-frontend` delta
   scenario.
-- [ ] 5.2 The view model carries the window's start and end. `_AvailableDates.cshtml` names the
+  *Done:*
+  - `Compute(today, horizon, maxRange, firstOpenDate)`. The horizon still counts from today, and
+    a first open date beyond the horizon is ignored.
+  - Both flows compute the window before the selected date, so a visitor who picked no date is
+    shown the window's first date, not a closed today.
+  - Services use `FirstOpenDate`: the earliest across candidates.
+
+  `ClosedWindowTests`: 5 pure tests and 5 through the flows (resource shifted, adjoining ranges,
+  open today, closure past the horizon, service first-reopening).
+- [x] 5.2 The view model carries the window's start and end. `_AvailableDates.cshtml` names the
   dates when the start isn't today and keeps the current wording when it is. Verify: rendering
   tests for both wordings, and the existing rendering suite passes unchanged.
 
+  *Done:* `ShiftedWindowFrom` is a default interface member on `IBookingFormView`, so an existing
+  implementer still compiles. The end is derived from `WindowDays`: the rendering guard rejected a
+  second member that changed nothing on its own. The legend, both empty-window sentences and the
+  other-date hint name the dates when shifted, and keep their exact wording otherwise. Rendering
+  1168 unchanged.
 ## 6. Docs
 
-- [ ] 6.1 Update `docs/backoffice.md` (closures and closed periods), `docs/booking-page.md` (the
+- [x] 6.1 Update `docs/backoffice.md` (closures and closed periods), `docs/booking-page.md` (the
   window rule), and any README sentence describing closures as dates. Verify: the documentation
   guards pass, and a sweep of `docs/`, `README.md` and `openspec/specs` for "closure" sentences
   describing a single date finds none left false.
 
+  *Done:* `docs/backoffice.md` covers:
+  - closures as ranges, the overlap rule, and in-progress closures counting as upcoming;
+  - opt-outs covering the whole range;
+  - a new **Closed periods** section, including that the note is not guaranteed free of personal
+    data and is the site's to manage;
+  - the booking page looking past a closure, with the advice about the booking horizon;
+  - the import's "Already closed" wording.
+
+  `docs/booking-page.md` does not describe the date list, so nothing there was falsified. The
+  stored-shape guard records `ClosedPeriodRow` with that same, honest decision about the note.
 ## 7. Verify on `main`
 
-- [ ] 7.1 Clean `CI=true --no-incremental` Release build with 0 warnings, then the four suites per
+- [x] 7.1 Clean `CI=true --no-incremental` Release build with 0 warnings, then the four suites per
   project and `openspec validate --all --strict`. Verify: record each total.
-- [ ] 7.2 Live pass on the TestSite:
+  *Done 2026-10-11 on `08a0f3d`:*
+  - every `src/*` and `tests/*` `bin/Release` and `obj/Release`, plus `App_Plugins`, deleted; the
+    client built; `CI=true --no-incremental`: **0 warnings, 0 errors**;
+  - suites, 0 skipped:
+    - client **342** (335 + 7, 16 files);
+    - unit **2087** (2029 + 58);
+    - integration **207** (194 + 13);
+    - rendering **1168** (unchanged);
+  - openspec **27/27**.
+- [x] 7.2 Live pass on the TestSite:
   - create a site closure range over today and see the booking page list start after it;
   - add a resource closed period and see its dates unavailable;
   - opt a resource out of the range;
@@ -151,6 +279,43 @@
   - run a holiday preview over a range.
 
   Verify: each result recorded.
+  *Done 2026-10-11, about 20:30 BST, on this branch's TestSite (Umbraco 17.7.1). Chris logged in to
+  Chrome.*
+  - **Migration on a real site's data.** The existing single-day closures, including imported
+    holidays, list as single dates. Closure Live Room's Christmas Day opt-out survived.
+  - **A range created through the UI**, 2026-10-11 to 2026-12-20, "Live test range":
+    - it lists as `2026-10-11 – 2026-12-20` and counts as upcoming while in progress;
+    - To's `min` follows From;
+    - To's hint is referenced from To.
+  - **Refused, each announced (`role="alert"`) and focused:**
+    - an overlap: "Another closure ("Live test range") already covers 2026-12-15.";
+    - an inverted range: "A closure cannot end (2026-12-01) before it starts (2026-12-10).".
+  - **The booking page**, anonymous `curl` of the home page:
+    - the legend reads "Dates with availability for 1 hour from Monday 21 December 2026 to
+      Tuesday 19 January 2027";
+    - the list starts on 21 December, and the 21st is selected by default.
+
+    The 25th is listed because this room opts out of Christmas Day. That was confirmed in its
+    editor and is correct.
+  - **The resource editor:**
+    - Global closures toggles name the range;
+    - a closed period of 4–8 January 2027 with a note saved, and reloaded with From, To and the
+      note;
+    - From, To and Note are labelled, and the note's hint is shown;
+    - the booking page then omitted 4–8 January;
+    - a period of 24–26 December over the room's own 25 December exception was refused with
+      `closed-period-conflicts-with-exception`, shown in the summary and in the group, and the
+      fieldset's `aria-describedby` names `err-closed-periods`.
+  - **Opting the room out of the range** returned its booking page to "in the next 30 days".
+  - **Cleaned up:** the period, the opt-out and the closure were removed. No console errors.
+  - *Not done live:* a holiday preview over a range. The only holiday source on the TestSite
+    returns UK holidays, and none falls inside a range that could be left on a shared TestSite.
+    It is covered by `HolidayPreviewService`'s window clipping and by the store test for an
+    import onto a date inside a range.
+  - *Observed, not a defect:* setting From and To from a script in the same tick loses the
+    first, because each input handler spreads the draft captured at render. A person typing
+    cannot produce it: there is a render between the two inputs. The Exceptions group has the
+    same shape.
 
 ## 8. QA and port
 
