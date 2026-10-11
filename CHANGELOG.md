@@ -38,6 +38,9 @@ version also does not know about end dates.
 - A closure it **moves** keeps its old end. Moved past that end, it comes back as one day.
   Otherwise it runs from its new start to its old end, so a closure moved earlier covers more
   dates than you meant.
+- It checks overlaps by start date only, so it can add a closure — by hand or by importing
+  holidays — inside an existing range. Coming forward, the two overlap, and neither can be edited
+  until you delete one of them.
 
 Check your closures after coming forward. They all appear in the Closures view, and 18.2.0 refuses
 overlaps with them, as with any other closure.

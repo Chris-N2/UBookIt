@@ -16,7 +16,7 @@
 
 ## 3. Review and merge
 
-- [ ] 3.1 QA (`qa-review`) in one subagent, reused across rounds, covering this change and
+- [x] 3.1 QA (`qa-review`) in one subagent, reused across rounds, covering this change and
   `release-17-3-0`. Verify: APPROVE.
   *Round 1: REJECT on both changes*, two must-fix findings. QA re-verified the version mentions,
   the history anchors, and both lines' clean builds and suites.
@@ -57,6 +57,17 @@
     `Date`, so a moved closure keeps its old end. *Fix:* the entry now separates creates (single
     day) from moves (old end kept; one day if moved past it, otherwise from the new start to the
     old end). It notes these closures appear in the view and are guarded against overlap.
+
+  *Round 3: APPROVE WITH NITS on both changes.*
+  - QA re-ran clean builds of both lines; they match.
+  - It checked every use of `db.SiteClosures` in `src`: each reads through the clamped mapper,
+    queries with the corrected end, or works by id.
+  - It confirmed the downgrade paragraph against the old build's `ToRow` and update.
+  - One optional nit, **taken in QA's own words**: the older build checks overlap by start date
+    only, so it can add a closure inside an existing range. The entry now says so, and that
+    neither can be edited until one is deleted.
+
+  Three rounds, one reviewer.
 - [ ] 3.2 Chris pushes `dev/v18` (the archive), then this branch, and opens the PR into `dev/v18`.
   Verify: the PR's CI
   is green at every step, parity included.
