@@ -1,16 +1,41 @@
 ## 0. Start from origin
 
-- [ ] 0.1 Branch `release-17-2-3` from `origin/main`, which must include `umbraco-security-2026-10`'s
+- [x] 0.1 Branch `release-17-2-3` from `origin/main`, which must include `umbraco-security-2026-10`'s
   merge (`29f020d`) and archive (`b007be8`). Verify: `Directory.Packages.props` declares
   `[17.7.1,18.0.0)` for every `Umbraco.Cms*` entry.
+  *Done:* branched at `b007be8` with the upstream unset. All seven `Umbraco.Cms*` entries are
+  `[17.7.1,18.0.0)`, and both EF Core pins are `10.0.11`.
 
 ## 1. The version and the entry
 
-- [ ] 1.1 Bump `<Version>` to `17.2.3` and move every row of `docs/publishing.md` step 2's table.
+- [x] 1.1 Bump `<Version>` to `17.2.3` and move every row of `docs/publishing.md` step 2's table.
   Re-read the *Tag the release* literals by eye. Verify: `git grep 17.2.2` over README and the
   runbook leaves only history anchors, each named here.
-- [ ] 1.2 Write the `17.2.3` entry, undated, per the proposal's item 2. **Check every claim
+  *Done:* every `17.2.2` in `Directory.Build.props` (1), `README.md` (21) and `docs/publishing.md`
+  (5) was a current-version mention, and all now read `17.2.3`. That covers the *is at*
+  sentences, the screenshot and documentation pins, the example URL, and the `git tag` /
+  `git push` / `curl` lines, which were re-read by eye. `git grep 17.2.2` over README and the
+  runbook is now empty.
+- [x] 1.2 Write the `17.2.3` entry, undated, per the proposal's item 2. **Check every claim
   against the repository, not against the proposal.** Verify: `ChangelogTests` passes.
+  *Done.* It is the `18.1.3` entry with this line's values, plus the EF Core item. The checks
+  are the same as `release-18-1-3` 1.2, and two corrections to this proposal came out of them:
+  - **The advisories are Umbraco's repository advisories.** The global `github.com/advisories/…`
+    address is 404 for all four. The entry links
+    `github.com/umbraco/Umbraco-CMS/security/advisories/…`, and all four return 200. Read
+    through the API, each is published 2026-10-06, affects `Umbraco.Cms` `>=17.0.0, <=17.7.0`,
+    and is patched in `17.7.1`. Severities are medium, medium, low, low.
+  - **ImageSharp comes through `Umbraco.Cms` itself.** On this line's restored graph,
+    `Umbraco.Cms/17.7.1` depends on `SixLabors.ImageSharp 3.1.12` directly, as well as through
+    `Umbraco.Cms.Imaging.ImageSharp`.
+  - No uBookIt package reaches ImageSharp. `dotnet list package --include-transitive` after a
+    fresh restore on this branch shows 0 for `UBookIt`, `.Core`, `.Persistence`, `.Backoffice`
+    and `.Web`. The control `UBookIt.TestSite` shows 3, so the instrument sees it.
+  - **EF Core:** `Umbraco.Cms.Persistence.EFCore/17.7.1` requires
+    `Microsoft.EntityFrameworkCore.SqlServer` `10.0.11`, read from the restored assets.
+    `17.2.2` declared `10.0.10`, read from the tag's `Directory.Packages.props`. A site's own
+    direct reference below that is the one thing beyond `Umbraco.Cms` it might have to move, so
+    it sits under *What you have to do*.
 
 ## 2. Clean build and suites
 
