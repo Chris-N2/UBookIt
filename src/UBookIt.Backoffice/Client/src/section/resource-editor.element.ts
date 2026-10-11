@@ -13,6 +13,10 @@ import {
   isSuperseded,
   optOutIds,
   supersededId,
+  closedPeriodMissingStart,
+  closedPeriodsForSave,
+  rangeText,
+  type ClosedPeriodDraft,
 } from "./closure-fields.js";
 import "./capability-input.element.js";
 import "./responsibility-editor.element.js";
@@ -52,6 +56,9 @@ const toInputTime = (value: string) => value.slice(0, 5);
 
 /** Client-only code for the pre-submit empty-date guard; rendered in the Exceptions group. */
 const EXCEPTION_DATE_REQUIRED = "exception-date-required";
+
+/** Client-only code for a closed period whose From was never picked; rendered in its group. */
+const CLOSED_PERIOD_START_REQUIRED = "closed-period-start-required";
 
 /**
  * Workspace editor for one resource: Details, Opening hours, Exceptions, and
@@ -116,6 +123,10 @@ export class UBookItResourceEditorElement extends UmbLitElement {
 
   @state()
   private _exceptions: ExceptionForm[] = [];
+
+  /** The resource's own closed periods. To left empty means the one day From names. */
+  @state()
+  private _closedPeriods: ClosedPeriodDraft[] = [];
 
   /**
    * Every site closure, with whether this resource is exempt from it. Read-only apart
@@ -188,6 +199,12 @@ export class UBookItResourceEditorElement extends UmbLitElement {
       windows: exception.windows.map((w) => ({ start: toInputTime(w.start), end: toInputTime(w.end) })),
       superseded: isSuperseded(exception),
     }));
+    this._closedPeriods = data.closedPeriods.map((period) => ({
+      startDate: period.startDate,
+      // A one-day period opens with To empty, as it would have been entered.
+      endDate: period.endDate === period.startDate ? "" : period.endDate,
+      note: period.note ?? "",
+    }));
     this._closures = [...data.closures];
     this._constraints = { ...data.constraints };
     this._capabilities = [...data.capabilities];
@@ -227,6 +244,9 @@ export class UBookItResourceEditorElement extends UmbLitElement {
       // Full replacement, like the capabilities above: an exemption left out is an
       // exemption withdrawn.
       closureOptOuts: optOutIds(this._closures),
+      // ALWAYS sent, even untouched: an absent collection would mean "leave them", and this
+      // editor knows exactly what it holds — so emptying the section clears them.
+      closedPeriods: closedPeriodsForSave(this._closedPeriods),
       constraints: { ...this._constraints },
     };
   }
@@ -239,8 +259,15 @@ export class UBookItResourceEditorElement extends UmbLitElement {
     // Client-side guard for a state only the UI can create: an exception row
     // whose date was never picked. The server would reject it with a raw
     // binding error; catch it here with a stable message instead.
+    const missing: ApiError[] = [];
     if (this._exceptions.some((exception) => exception.date === "")) {
-      this._errors = [{ code: EXCEPTION_DATE_REQUIRED, message: this.#term("exceptionNeedsDate") }];
+      missing.push({ code: EXCEPTION_DATE_REQUIRED, message: this.#term("exceptionNeedsDate") });
+    }
+    if (closedPeriodMissingStart(this._closedPeriods)) {
+      missing.push({ code: CLOSED_PERIOD_START_REQUIRED, message: this.#term("closedPeriodNeedsStart") });
+    }
+    if (missing.length > 0) {
+      this._errors = missing;
       this._saving = false;
       await this.updateComplete;
       this.shadowRoot?.querySelector<HTMLElement>("#error-summary")?.focus();
@@ -315,7 +342,8 @@ export class UBookItResourceEditorElement extends UmbLitElement {
 
       <form @submit=${this.#save} novalidate>
         ${this.#renderDetails()} ${this.#renderCapabilities()} ${this.#renderResponsibility()}
-        ${this.#renderOpeningHours()} ${this.#renderExceptions()} ${this.#renderGlobalClosures()}
+        ${this.#renderOpeningHours()} ${this.#renderExceptions()} ${this.#renderClosedPeriods()}
+        ${this.#renderGlobalClosures()}
         ${this.#renderConstraints()}
 
         <div class="actions">
@@ -562,7 +590,7 @@ export class UBookItResourceEditorElement extends UmbLitElement {
             (closure, index) => html`
               <li>
                 <uui-toggle
-                  label="${this.#term("closureOpenAnyway")}: ${closure.date} ${closure.label}"
+                  label="${this.#term("closureOpenAnyway")}: ${rangeText(closure.date, closure.endDate)} ${closure.label}"
                   ?checked=${closure.excluded}
                   @change=${(e: Event) =>
                     this.#mutateClosures(
@@ -573,6 +601,90 @@ export class UBookItResourceEditorElement extends UmbLitElement {
             `,
           )}
         </ul>
+      </uui-box>
+    `;
+  }
+
+  #mutateClosedPeriods(mutate: (periods: ClosedPeriodDraft[]) => void) {
+    const periods = this._closedPeriods.map((period) => ({ ...period }));
+    mutate(periods);
+    this._closedPeriods = periods;
+  }
+
+  #renderClosedPeriods() {
+    const codes = [
+      "closed-period-invalid",
+      "closed-period-overlap",
+      "closed-period-conflicts-with-exception",
+      CLOSED_PERIOD_START_REQUIRED,
+    ];
+    const hasErrors = this.#errorsFor(...codes).length > 0;
+
+    return html`
+      <uui-box headline=${this.#term("closedPeriods")}>
+        <p class="group-intro" id="closed-periods-intro">${this.#term("closedPeriodsIntro")}</p>
+        ${this.#renderGroupErrors("err-closed-periods", ...codes)}
+        ${this._closedPeriods.map(
+          (period, index) => html`
+            <fieldset
+              class="exception"
+              aria-describedby=${hasErrors ? "err-closed-periods closed-periods-intro" : "closed-periods-intro"}
+            >
+              <legend>${this.#term("closedPeriod")} ${index + 1}</legend>
+              <div class="window-row">
+                <label for="cp-${index}-from">${this.#term("from")}</label>
+                <input
+                  id="cp-${index}-from"
+                  type="date"
+                  .value=${period.startDate}
+                  @input=${(e: InputEvent) =>
+                    this.#mutateClosedPeriods(
+                      (list) => (list[index].startDate = (e.target as HTMLInputElement).value),
+                    )}
+                />
+                <label for="cp-${index}-to">${this.#term("to")}</label>
+                <input
+                  id="cp-${index}-to"
+                  type="date"
+                  aria-describedby="cp-to-hint"
+                  min=${period.startDate || nothing}
+                  .value=${period.endDate}
+                  @input=${(e: InputEvent) =>
+                    this.#mutateClosedPeriods(
+                      (list) => (list[index].endDate = (e.target as HTMLInputElement).value),
+                    )}
+                />
+                <uui-button
+                  look="secondary"
+                  compact
+                  label="${this.#term("removeClosedPeriod")} ${index + 1}"
+                  @click=${() => this.#mutateClosedPeriods((list) => list.splice(index, 1))}
+                ></uui-button>
+              </div>
+              <div class="field">
+                <label for="cp-${index}-note">${this.#term("closedPeriodNote")}</label>
+                <input
+                  id="cp-${index}-note"
+                  type="text"
+                  maxlength="512"
+                  aria-describedby="cp-note-hint"
+                  .value=${period.note}
+                  @input=${(e: InputEvent) =>
+                    this.#mutateClosedPeriods((list) => (list[index].note = (e.target as HTMLInputElement).value))}
+                />
+              </div>
+            </fieldset>
+          `,
+        )}
+        ${this._closedPeriods.length > 0
+          ? html`<p id="cp-to-hint" class="hint">${this.#term("closedPeriodToHint")}</p>
+              <p id="cp-note-hint" class="hint">${this.#term("closedPeriodNoteHint")}</p>`
+          : nothing}
+        <uui-button
+          look="secondary"
+          label=${this.#term("addClosedPeriod")}
+          @click=${() => this.#mutateClosedPeriods((list) => list.push({ startDate: "", endDate: "", note: "" }))}
+        ></uui-button>
       </uui-box>
     `;
   }

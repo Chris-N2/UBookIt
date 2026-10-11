@@ -5,7 +5,7 @@ import { canManageClosures, canReadClosures } from "./permission-verbs.js";
 import { UBookItBackofficeService } from "../api/index.js";
 import type { HolidayRowModel, SiteClosureModel } from "../api/index.js";
 import { toApiErrors } from "./api-errors.js";
-import { listQuery, showsEditingControls } from "./closure-fields.js";
+import { listQuery, rangeEnd, rangeText, showsEditingControls } from "./closure-fields.js";
 import {
   chosenRows,
   defaultWindow,
@@ -22,6 +22,8 @@ import {
 interface ClosureDraft {
   id?: string;
   date: string;
+  /** Empty means the one day {@link date} names. */
+  endDate: string;
   label: string;
 }
 
@@ -152,11 +154,17 @@ export class UBookItClosuresViewElement extends UmbLitElement {
   }
 
   #startAdd() {
-    this._draft = { date: "", label: "" };
+    this._draft = { date: "", endDate: "", label: "" };
   }
 
   #startEdit(closure: SiteClosureModel) {
-    this._draft = { id: closure.id, date: closure.date, label: closure.label };
+    // A single day opens with To empty, as it was entered: To defaults to From.
+    this._draft = {
+      id: closure.id,
+      date: closure.date,
+      endDate: closure.endDate === closure.date ? "" : closure.endDate,
+      label: closure.label,
+    };
   }
 
   #cancelDraft() {
@@ -182,7 +190,7 @@ export class UBookItClosuresViewElement extends UmbLitElement {
     this._error = undefined;
 
     try {
-      const body = { date: draft.date, label: draft.label };
+      const body = { date: draft.date, endDate: rangeEnd(draft.date, draft.endDate), label: draft.label };
       const result = draft.id
         ? await UBookItBackofficeService.updateClosure({ path: { id: draft.id }, body })
         : await UBookItBackofficeService.createClosure({ body });
@@ -416,7 +424,7 @@ export class UBookItClosuresViewElement extends UmbLitElement {
           ${this._closures.map(
             (closure) => html`
               <tr>
-                <td>${closure.date}</td>
+                <td>${rangeText(closure.date, closure.endDate)}</td>
                 <td>${closure.label}</td>
                 ${showsEditingControls(this._canWrite)
                   ? html`<td class="row-actions">
@@ -424,14 +432,14 @@ export class UBookItClosuresViewElement extends UmbLitElement {
                         look="secondary"
                         compact
                         ?disabled=${this._busy}
-                        label="${this.#term("edit")} ${closure.date} ${closure.label}"
+                        label="${this.#term("edit")} ${rangeText(closure.date, closure.endDate)} ${closure.label}"
                         @click=${() => this.#startEdit(closure)}
                       ></uui-button>
                       <uui-button
                         look="secondary"
                         compact
                         ?disabled=${this._busy}
-                        label="${this.#term("delete")} ${closure.date} ${closure.label}"
+                        label="${this.#term("delete")} ${rangeText(closure.date, closure.endDate)} ${closure.label}"
                         @click=${() => void this.#delete(closure)}
                       ></uui-button>
                     </td>`
@@ -586,7 +594,7 @@ export class UBookItClosuresViewElement extends UmbLitElement {
       <fieldset>
         <legend>${draft.id ? this.#term("edit") : this.#term("add")}</legend>
         <div class="field">
-          <label for="closure-date">${this.#term("date")}</label>
+          <label for="closure-date">${this.#term("rangeFrom")}</label>
           <input
             id="closure-date"
             type="date"
@@ -594,6 +602,19 @@ export class UBookItClosuresViewElement extends UmbLitElement {
             @input=${(e: InputEvent) =>
               (this._draft = { ...draft, date: (e.target as HTMLInputElement).value })}
           />
+        </div>
+        <div class="field">
+          <label for="closure-end-date">${this.#term("rangeTo")}</label>
+          <input
+            id="closure-end-date"
+            type="date"
+            aria-describedby="closure-end-date-hint"
+            min=${draft.date || nothing}
+            .value=${draft.endDate}
+            @input=${(e: InputEvent) =>
+              (this._draft = { ...draft, endDate: (e.target as HTMLInputElement).value })}
+          />
+          <p id="closure-end-date-hint" class="hint">${this.#term("rangeToHint")}</p>
         </div>
         <div class="field">
           <label for="closure-label">${this.#term("labelField")}</label>
