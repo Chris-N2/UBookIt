@@ -65,6 +65,25 @@ public interface IResourceManagementStore
     Task<DomainResult<Resource>> UpdateAsync(Resource resource, CancellationToken cancellationToken = default);
 
     /// <summary>
+    /// A full update that leaves the resource's stored closed periods as they are, for a
+    /// caller that did not send any — one written before closed periods existed cannot
+    /// send a collection it has never heard of, and treating its silence as "none" would
+    /// erase periods an operator set. Fails with
+    /// <see cref="FailureCodes.ClosedPeriodConflictsWithException"/> when an exception it
+    /// sends falls inside a stored period.
+    /// </summary>
+    /// <remarks>
+    /// The default delegates to <see cref="UpdateAsync"/>, writing whatever periods
+    /// <paramref name="resource"/> carries — correct for a store that serialises nothing,
+    /// and the reason a caller should load the stored periods onto the resource before
+    /// calling. The package's own store overrides it to leave the rows untouched and to
+    /// re-judge the exceptions under its lock.
+    /// </remarks>
+    Task<DomainResult<Resource>> UpdateKeepingClosedPeriodsAsync(
+        Resource resource, CancellationToken cancellationToken = default)
+        => UpdateAsync(resource, cancellationToken);
+
+    /// <summary>
     /// Fails with <see cref="FailureCodes.ResourceInUse"/> when the resource
     /// has any booking claims (including a claim placed concurrently with the
     /// delete), and <see cref="FailureCodes.ResourceNotFound"/> for unknown ids.

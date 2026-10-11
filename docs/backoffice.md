@@ -316,7 +316,7 @@ theming guide. Nothing about it will look broken if a theme leaves it out.
 | **Resources** | The bookable things themselves: opening hours, exceptions, duration limits, capabilities, and whether each may be booked directly |
 | **Services** | What a visitor books by name, and the resource roles each service resolves to |
 | **Bookings** | What the site has taken: a window you choose, filtered by status, showing the reference, when, who booked *(if you may see it — below)*, which resources, which service, and status |
-| **Closures** | The dates the whole organisation is shut. Every resource inherits them; any resource can be opened anyway on a given date from its own editor |
+| **Closures** | The dates the whole organisation is shut, one day or a run of them. Every resource inherits them; any resource can be opened anyway from its own editor |
 
 **The reference is the first column, because it is the one you scan.** Every booking carries a
 short reference — `7QX4-M2NP` — which the person who booked was shown on their confirmation.
@@ -520,21 +520,35 @@ one a resource allows is the *booked directly* setting on the resource itself.
 
 ## Closures
 
-A **closure** is a date the organisation itself is shut — a bank holiday, a stocktake, the
-week between Christmas and New Year. It is kept once, in the Closures view, instead of being
-typed into every resource's exception list.
+A **closure** is a date, or a run of dates, on which the organisation itself is shut — a bank
+holiday, a stocktake, the week between Christmas and New Year, a refurbishment from February to
+March. It is kept once, in the Closures view, instead of being typed into every resource's
+exception list.
 
-**A closure closes every resource for that date**, including resources created after it, and
+Each closure has a **From** and a **To** date, and covers both and every day between. Leave **To**
+empty to close just the From date. **Two closures may not cover the same day**: to close for
+longer, extend the closure you already have rather than adding another beside it. The list shows
+upcoming closures by default — including one that is in progress today — and past ones on request.
+
+**A closure closes every resource for every date it covers**, including resources created after it, and
 it wins over both a resource's weekly hours and its own date exceptions. Bookers see the date
 simply as unavailable: nothing on the booking page or the delivery API says a closure exists
 or what it is called.
 
+**During a closure, the booking page looks past it.** The page's list of dates with availability
+normally starts today. When a closure (or a resource's own closed period) covers today, the list
+starts on the first day after it instead, and names the dates it covers rather than "the next 30
+days". It never says why. A closure reaching past how far ahead a resource can be booked leaves the
+list where it was, so raise that resource's booking horizon if you are taking bookings now for
+dates after a long closure.
+
 ### Opening one resource anyway
 
 Every resource's editor carries a **Global closures** group listing the site's closures, each
-with an **Open anyway** tick. Ticking one exempts *that resource* from *that closure*, and the
-date then behaves exactly as if the closure had never existed — the resource's own exception
-for the day if it has one, otherwise its weekly hours.
+with an **Open anyway** tick. Ticking one exempts *that resource* from *that closure* — all of
+it, not part — and every date it covers then behaves exactly as if the closure had never existed:
+the resource's own exception or closed period for the day if it has one, otherwise its weekly
+hours.
 
 Where a resource has an exception that a closure is currently overriding, the editor says so
 against that exception. It says it only when the exception would otherwise change the day: an
@@ -580,8 +594,8 @@ holiday the source returns for that window is listed, each in one of three state
 
 | | |
 |---|---|
-| **New** | No closure exists for the date. Ticked for you, and yours to untick. |
-| **Already closed** | A closure already exists for that date. Not offered: only one closure may exist per date, and the one already there — which may carry a name somebody chose — is not the import's to overwrite. |
+| **New** | No closure covers the date. Ticked for you, and yours to untick. |
+| **Already closed** | A closure already covers that date — a single day, or a range it falls inside. Not offered: no date may be covered by two closures, and the one already there — which may carry a name somebody chose — is not the import's to overwrite. |
 | **Cannot import** | The holiday cannot become a closure, most often because its name is longer than a closure name may be. Not offered, and shown with the reason rather than quietly dropped. |
 
 The list is a **selection, not a confirmation**. Every new date starts ticked because most
@@ -623,6 +637,26 @@ backwards into what has been.
 It also has no notion of a half day — closing at one o'clock on Christmas Eve is a resource's
 own exception, which can set any hours for a single date — and no notion of recurrence: each
 year's date is its own entry.
+
+## Closed periods
+
+A **closed period** is a run of dates on which *one resource* is closed by its own rule — a room
+being painted for a fortnight, a therapist away for six weeks. It is set in that resource's editor,
+in the **Closed periods** group: a **From** date, a **To** date (empty means just the From date),
+and an optional note.
+
+- **It only closes.** Different hours on a date are still a single-day exception.
+- **It cannot overlap another of the resource's closed periods**, or a date the resource has an
+  exception for. Both are refused with a message saying which, so you decide which rule stands
+  rather than the package choosing for you.
+- **A site closure still comes first.** If the resource is opened anyway on a closure, its closed
+  period still closes the dates it covers.
+- **Bookings already placed keep their times**, exactly as for a closure.
+
+**The note is only ever shown in the backoffice.** Nothing on the booking page or the delivery API
+says a resource has a closed period, or why. Even so, where a resource is a person, keep personal
+details out of the note: it is your site's own text, it is kept until you change it, and erasing a
+booker's details — which is about the people who book — does not reach it.
 
 ## What the section does not do
 

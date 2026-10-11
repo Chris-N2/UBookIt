@@ -17,6 +17,7 @@ function closure(overrides: Partial<Parameters<typeof optOutIds>[0][number]> = {
   return {
     id: "11111111-1111-1111-1111-111111111111",
     date: "2026-12-25",
+    endDate: "2026-12-25",
     label: "Christmas Day",
     excluded: false,
     ...overrides,

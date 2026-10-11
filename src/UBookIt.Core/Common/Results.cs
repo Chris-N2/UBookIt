@@ -248,12 +248,36 @@ public static class FailureCodes
     public const string ClosureLabelInvalid = "closure-label-invalid";
 
     /// <summary>
-    /// A second site closure was offered for a date that already carries one.
+    /// A site closure was offered whose range shares a date with another closure's —
+    /// including, as it always did, a second closure on a date that already carries one.
     /// Distinct from <see cref="DuplicateExceptionDate"/>, which is about a single
     /// resource's own exceptions: a date may legitimately carry both a closure and
     /// a resource's exception, and only the closure layer is site-wide.
     /// </summary>
+    /// <remarks>
+    /// The code kept its name when closures became ranges, so that a client handling it
+    /// goes on handling the same refusal: "another closure already covers a date here".
+    /// </remarks>
     public const string DuplicateClosureDate = "duplicate-closure-date";
+
+    /// <summary>A site closure's end date is before its start date.</summary>
+    public const string ClosureRangeInvalid = "closure-range-invalid";
+
+    /// <summary>
+    /// A resource's closed period ends before it starts, or carries a note longer than
+    /// the package's name columns hold.
+    /// </summary>
+    public const string ClosedPeriodInvalid = "closed-period-invalid";
+
+    /// <summary>Two of one resource's closed periods share a date.</summary>
+    public const string ClosedPeriodOverlap = "closed-period-overlap";
+
+    /// <summary>
+    /// A resource's closed period covers a date for which the same resource carries an
+    /// exception. Refused rather than resolved: "closed for the period" and "open
+    /// 10:00–14:00 that day" contradict each other, and the operator decides which they meant.
+    /// </summary>
+    public const string ClosedPeriodConflictsWithException = "closed-period-conflicts-with-exception";
 
     /// <summary>
     /// A resource's closure opt-out named an id no closure carries. Refused rather
