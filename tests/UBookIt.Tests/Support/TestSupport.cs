@@ -75,7 +75,11 @@ public sealed class InMemoryResourceStore : IResourceStore, IResourceManagementS
             resource.Availability.OpenHours,
             resource.Availability.Exceptions,
             resource.Availability.Constraints,
-            applicable).Value;
+            applicable,
+
+            // Carried through, as the SQL store's read carries them: a hydrate that dropped the
+            // resource's own closed periods would answer every closed-period question "open".
+            resource.Availability.ClosedPeriods).Value;
 
         return Resource.Create(
             type: resource.Type,
@@ -201,7 +205,8 @@ public sealed class InMemorySiteClosureStore : ISiteClosureStore, ISiteClosureMa
     public Task<DomainResult<SiteClosure>> CreateAsync(
         SiteClosure closure, CancellationToken cancellationToken = default)
     {
-        if (_closures.Values.Any(c => c.Date == closure.Date))
+        // Overlap, as the SQL store judges it: a closure sharing any date with another.
+        if (_closures.Values.Any(c => c.Overlaps(closure)))
         {
             return Task.FromResult(DomainResult<SiteClosure>.Failure(
                 FailureCodes.DuplicateClosureDate, $"A closure already exists for {closure.Date:yyyy-MM-dd}."));
@@ -220,7 +225,7 @@ public sealed class InMemorySiteClosureStore : ISiteClosureStore, ISiteClosureMa
                 FailureCodes.ClosureNotFound, $"No closure exists with id {closure.Id}."));
         }
 
-        if (_closures.Values.Any(c => c.Date == closure.Date && c.Id != closure.Id))
+        if (_closures.Values.Any(c => c.Id != closure.Id && c.Overlaps(closure)))
         {
             return Task.FromResult(DomainResult<SiteClosure>.Failure(
                 FailureCodes.DuplicateClosureDate, $"A closure already exists for {closure.Date:yyyy-MM-dd}."));
@@ -237,7 +242,7 @@ public sealed class InMemorySiteClosureStore : ISiteClosureStore, ISiteClosureMa
 
     private IReadOnlyList<SiteClosure> Ordered(DateOnly? from)
         => _closures.Values
-            .Where(c => from is null || c.Date >= from)
+            .Where(c => from is null || c.EndDate >= from)
             .OrderBy(c => c.Date)
             .ToList();
 }
