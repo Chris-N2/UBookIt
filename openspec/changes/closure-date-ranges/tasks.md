@@ -409,10 +409,41 @@
   rebuilt its round-2 probe against the new `UBookIt.Core.dll`: all the published call shapes
   bind, and no same-named overload pair remains. No findings on either line. Three rounds, one
   reviewer.
-- [ ] 8.2 Port to `dev/v18` on `closure-date-ranges-v18`: cherry-pick, then **regenerate** the
+- [x] 8.2 Port to `dev/v18` on `closure-date-ranges-v18`: cherry-pick, then **regenerate** the
   migration Designer and model snapshot for the 18 line, and the generated client against the v18
   TestSite. Re-run 7.1 and 7.2 there. Verify: records match `main`'s, and the reviewer from 8.1 has
   checked the port.
+  *Done 2026-10-11, port branch `closure-date-ranges-v18` built in a separate worktree (`uBookIt-v18`).*
+  - **Cherry-picked.** The only conflict was the generated `types.gen.ts`, and v18's own version
+    was kept.
+  - **Migration not regenerated, on evidence.** `src/UBookIt.Persistence` has no diff between
+    `c63dbe6` and `882e6d9`, and `dotnet ef migrations has-pending-model-changes` on v18 reports
+    "No changes have been made to the model since the last migration". The migration id is
+    therefore the same on both lines.
+  - **Client regenerated** against the running v18 TestSite (Umbraco 18.2.1,
+    `/umbraco/openapi/ubookitbackoffice.json`) in `aa349e9`. It is additive only, in v18's
+    generator style.
+  - **7.1 on v18:** clean `CI=true --no-incremental` build with 0 warnings; client 346; unit 2120
+    (2041 + 79); integration 207; rendering 1178; openspec 27/27; 0 skipped.
+  - **7.2 on v18, live** (TestSite from the worktree, logged in by Chris):
+    - a range of 2026-10-11 to 2026-12-20 saved and listed as a range;
+    - the overlap was refused, with From marked `aria-invalid` and described by `closure-error`;
+    - the inverted range was refused, with To marked and described by
+      `closure-end-date-hint closure-error`;
+    - both errors were focused;
+    - the booking page (DBO Granted) read "from Monday 21 December 2026 to Saturday 9 January
+      2027", ending at its 90-day horizon;
+    - a one-day closed period (To empty) on 28 December saved, reloaded with To still empty, and
+      removed the 28th from the booking page;
+    - an exception on that date was refused with `closed-period-conflicts-with-exception`;
+    - cleaned up afterwards, leaving no closures.
+
+    Console errors were Umbraco core only: SignalR 1006 and token refresh 400 around restarts and
+    login. One finding along the way, not a product fault: QA's clean builds in the shared
+    worktree deleted the `App_Plugins` output under the running TestSite, causing a 500 on the
+    backoffice until the client was rebuilt.
+  - **QA:** reviewed in round 3 by the same reviewer: the content is identical to `main` (5591
+    against 5591 changed lines, excluding `types.gen.ts`), and rounds 1–2's fixes hold on v18.
 - [ ] 8.3 Chris pushes both branches and merges them by PR. Verify: CI is green on both PRs and on
   both merge commits.
 - [ ] 8.4 Archive on both lines after an outward sweep. Then the releases `17.3.0` and `18.2.0`,
