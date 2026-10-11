@@ -43,7 +43,8 @@
     (QA round 2). So each project is evaluated twice, as Debug (what restore and `dotnet list`
     see) and as Release (what publish.yml packs). It counts as non-packable only if it is
     non-packable under both, and an advisory counts as suppressed only if it is suppressed under
-    both. And NuGet reads suppressions per TARGET FRAMEWORK, from inner evaluations this script
+    both. A suppression declared under one but not the other FAILS outright (QA round 3: left
+    alone it was judged by nothing, neither accepted nor ever found stale). And NuGet reads suppressions per TARGET FRAMEWORK, from inner evaluations this script
     does not make. Rather than model that too, a project that targets more than one framework
     may not suppress anything: its suppressions FAIL and accept nothing. Each rule refuses where
     this script and the thing that decides could disagree, rather than guessing which way.
@@ -112,6 +113,12 @@ function ConvertTo-AdvisoryKey([string] $url) {
     return $url.Trim().TrimEnd('/').ToLowerInvariant()
 }
 
+# The configurations each project is evaluated in: Debug, which this audit's restore and
+# `dotnet list` use (audit.yml); Release, which ci.yml builds and tests in and publish.yml packs.
+# HARD-CODED: a workflow that starts restoring, building or packing in another configuration must
+# add it here too.
+$configurations = @('Debug', 'Release')
+
 # What MSBuild's evaluation of a project says (see the header for why it must be MSBuild's).
 # Starts packable with no suppressions, so anything that goes wrong below accepts nothing.
 function Get-ProjectPolicy([string] $path) {
@@ -123,15 +130,21 @@ function Get-ProjectPolicy([string] $path) {
         # Suppressed under ANY configuration: what a packable or multi-targeted project is
         # refused for, so that a suppression cannot hide from the refusal in one configuration.
         Declared      = [System.Collections.Generic.List[string]]::new()
+        # Suppressed under SOME configurations but not all: refused outright (QA round 3). Left
+        # alone, such a suppression silences one configuration's build warning while nothing
+        # here ever judges it - not accepted, so never found stale either.
+        Partial       = [System.Collections.Generic.List[string]]::new()
         Error         = $null
     }
 
-    # Debug is what a plain restore and this audit's own `dotnet list` evaluate; Release is what
-    # publish.yml packs. A project counts as non-packable only if it is non-packable under BOTH,
-    # and an advisory counts as suppressed only if it is suppressed under BOTH — QA round 2
-    # showed a project non-packable in Debug alone being let accept an advisory it then shipped.
+    # Debug is what this audit's own restore and `dotnet list` evaluate (audit.yml); Release is
+    # what ci.yml builds and tests and publish.yml packs. A project counts as non-packable only
+    # if it is non-packable under BOTH, and an advisory counts as suppressed only if it is
+    # suppressed under BOTH - QA round 2 showed a project non-packable in Debug alone being let
+    # accept an advisory it then shipped. The list is $configurations, at script scope below the
+    # report checks.
     $evaluations = @()
-    foreach ($configuration in 'Debug', 'Release') {
+    foreach ($configuration in $configurations) {
         $output = dotnet msbuild $path -nologo "-p:Configuration=$configuration" `
             -getProperty:IsPackable -getProperty:TargetFrameworks -getItem:NuGetAuditSuppress 2>&1
         if ($LASTEXITCODE -ne 0) {
@@ -164,8 +177,12 @@ function Get-ProjectPolicy([string] $path) {
 
     foreach ($key in $union.Keys) {
         $policy.Declared.Add($union[$key])
-        if (@($sets | Where-Object { -not $_.ContainsKey($key) }).Count -eq 0) {
+        $in = @(for ($i = 0; $i -lt $sets.Count; $i++) { if ($sets[$i].ContainsKey($key)) { $configurations[$i] } })
+        if ($in.Count -eq $sets.Count) {
             $policy.Suppressions.Add($union[$key])
+        }
+        else {
+            $policy.Partial.Add("$($union[$key]) (declared in $($in -join ', ') only)")
         }
     }
 
@@ -181,6 +198,10 @@ foreach ($project in $projects) {
 
     if ($policy.Error) {
         $failures.Add("$name ($($project.path)): $($policy.Error) Nothing in it can be accepted.")
+    }
+
+    foreach ($partial in $policy.Partial) {
+        $failures.Add("$name suppresses $partial. This audit accepts only a suppression declared in every configuration it evaluates ($($configurations -join ', ')) - declare it unconditionally or remove it.")
     }
 
     if ($policy.Packable -and $policy.Declared.Count -gt 0) {

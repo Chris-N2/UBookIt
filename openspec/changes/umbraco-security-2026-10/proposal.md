@@ -45,7 +45,8 @@ cannot be fixed yet, and nothing broader.
     accept an advisory;
   - report each accepted finding visibly (a notice, not silence);
   - take suppressions and packability from MSBuild's evaluation as Debug AND as Release: non-packable
-    only if both say so, suppressed only if both say so;
+    only if both say so, suppressed only if both say so, and a suppression declared in only one
+    of them **fails**;
   - **fail** on any suppression in a project that targets more than one framework, because NuGet
     reads those per framework. *(The last two are from QA rounds 1-2; see design D3.)*
 - **Upgrade checklist, as in August, on both lines**: regenerate the backoffice client and read

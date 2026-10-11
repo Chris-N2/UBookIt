@@ -16,9 +16,11 @@ that no reachable version can fix yet, because the dependency arrives through an
 By convention, the suppression and its stated reason are written in that project's own file.
 Whether a project is packable, and which advisories it suppresses, SHALL be taken from the build
 system's own evaluation of that project, not from a separate reading of the file. It SHALL be
-evaluated under every configuration a release is restored or packed in. A project SHALL count as
-not packable only if it is not packable under all of them, and an advisory SHALL count as
-suppressed only if it is suppressed under all of them. The package manager reads suppressions
+evaluated under every configuration the audit restores in or a release is built or packed in. A
+project SHALL count as not packable only if it is not packable under all of them, and an advisory
+SHALL count as suppressed only if it is suppressed under all of them. A suppression declared under
+some of those configurations but not all SHALL fail the audit, naming it, whether or not anything
+matches it. The package manager reads suppressions
 per target framework, so a project that targets more than one framework SHALL NOT have any
 suppression accepted, and a suppression it declares SHALL fail the audit. A project that cannot be
 evaluated SHALL fail the audit and accept nothing. The audit SHALL evaluate each suppression rather
@@ -64,6 +66,12 @@ than obey it:
 - **WHEN** a packable project declares any advisory as suppressed, including a project that is
   packable in only one of the configurations a release is restored or packed in
 - **THEN** the audit fails, naming the project, whether or not the advisory is found
+
+#### Scenario: A suppression that depends on the configuration fails the audit
+- **WHEN** a project declares an advisory as suppressed under some of the evaluated
+  configurations but not all, whether or not that advisory is found
+- **THEN** the audit fails, naming the project, the advisory and the configurations it is
+  declared in
 
 #### Scenario: A multi-targeted project cannot suppress an advisory
 - **WHEN** a project that targets more than one framework declares any advisory as suppressed
