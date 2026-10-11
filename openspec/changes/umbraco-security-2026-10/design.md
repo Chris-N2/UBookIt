@@ -87,6 +87,15 @@ instead of modelling the disagreement. Per-framework evaluation was rejected for
 no project here multi-targets, so it would be machinery with no user. The refusal is stated in
 the spec rather than hidden.
 
+**QA round 3: the round-2 fix left one suppression judged by nothing.** Acceptance and the stale
+check both ran over the suppressions present in every configuration. A suppression present in
+one configuration only was never accepted, so it could never be found stale either: it silenced
+that configuration's build warning while the audit stayed green. Such a suppression now
+**fails outright**, whether or not anything matches it. That is simpler than giving it a stale
+check of its own, and more honest: a suppression that depends on the configuration is not one
+this audit can stand behind. The configuration list (`$configurations`) is hard-coded in the
+script, with a comment saying a new workflow configuration must be added to it.
+
 The same class failed twice: first a model of MSBuild, then MSBuild asked about the wrong build.
 The test for "does the gate check the guarantee" is *which build ships* and *which evaluation
 NuGet reads*, not "is the answer from MSBuild".

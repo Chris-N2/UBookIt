@@ -65,6 +65,21 @@
         - *Debug only: 2;*
         - *union instead of intersection: 1;*
         - *no normalisation: 1.*
+      - *Round 3 (after QA), **24 tests**. A suppression in one configuration only was judged by
+        nothing: neither accepted, nor ever found stale. It now fails outright. Added a test for
+        that case with no finding, which fails against the round-3 script (`edf244e`) and is the
+        only test that does. Also added a test for an evaluation that fails only in Release (QA
+        NIT; it passes against round 3 too, since the path existed but was untested). The
+        configuration list is now script-scope `$configurations`, with a comment that it is
+        hard-coded.*
+      - *Round 3 mutations, each caught:*
+        - *partial check removed: 1;*
+        - *partial counted as complete: 2;*
+        - *Debug only: 4;*
+        - *evaluation error ignored: 2;*
+        - *stale removed: 1;*
+        - *packable check removed: 5;*
+        - *multi-target check removed: 1.*
 - [x] 1.4 Declare the five ImageSharp advisories as `NuGetAuditSuppress` in
       `src/UBookIt.TestSite/UBookIt.TestSite.csproj`, under a comment giving the reason (design
       D2). Verify: a restore shows no NU190x warnings, and the script with no `-Report` exits 0,

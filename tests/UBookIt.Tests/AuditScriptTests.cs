@@ -342,6 +342,40 @@ public sealed class AuditScriptTests : IDisposable
     }
 
     [Fact]
+    public void A_suppression_in_only_one_configuration_fails_even_with_nothing_to_match()
+    {
+        // QA round 3: the round-2 fix accepted only suppressions present in every configuration,
+        // and checked staleness only over those — so a Debug-only suppression with no finding was
+        // judged by nothing. It silenced Debug's build warning while the audit stayed green. The
+        // one-configuration test above has a finding, which is why it could not see this.
+        var site = Project(
+            "Site",
+            NotPackable
+            + $"<ItemGroup Condition=\"'$(Configuration)' == 'Debug'\"><NuGetAuditSuppress Include=\"{AdvisoryA}\" /></ItemGroup>");
+
+        var (exit, output) = Audit([Source], Entry(site));
+
+        Assert.Equal(1, exit);
+        Assert.Contains($"Site suppresses {AdvisoryA} (declared in Debug only)", output);
+    }
+
+    [Fact]
+    public void A_project_that_fails_to_evaluate_only_as_Release_fails_and_accepts_nothing()
+    {
+        // The Debug evaluation succeeds; Release imports a file that does not exist.
+        var site = Project(
+            "Site",
+            NotPackable + Suppress(AdvisoryA)
+            + "<Import Project=\"missing.props\" Condition=\"'$(Configuration)' == 'Release'\" />");
+
+        var (exit, output) = Audit([Source], Entry(site, Finding("Some.Package", AdvisoryA)));
+
+        Assert.Equal(1, exit);
+        Assert.Contains("MSBuild could not evaluate it as Release", output);
+        Assert.Contains(Vulnerable("Site", AdvisoryA), output);
+    }
+
+    [Fact]
     public void A_multi_targeted_project_may_not_suppress()
     {
         // NuGet reads suppressions per framework, from inner evaluations; the outer one this

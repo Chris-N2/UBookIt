@@ -111,6 +111,7 @@ the lines do differ.
   so imports count, and so does anything else MSBuild sees. The audit reports each accepted
   finding as a notice, and fails on a suppression that:
   - matches nothing (stale);
+  - is declared in one configuration but not the other;
   - is declared by a project that is packable in either configuration; or
   - is declared by a project that targets more than one framework. Today the only one is `UBookIt.TestSite`
   accepting ImageSharp 3.1.12's advisories, which it reaches through Umbraco; see the comment
