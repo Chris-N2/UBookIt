@@ -17,6 +17,36 @@ a patch. See [the versioning note](README.md#versions-and-the-api-promise).
 
 ---
 
+## 18.1.3
+
+### What you have to do
+
+**If your site runs Umbraco below 18.2.1, upgrade `Umbraco.Cms` to 18.2.1 first, then update
+uBookIt.** uBookIt now requires 18.2.1. Installing it on an older site raises only the Umbraco
+packages uBookIt depends on and leaves the rest where they are, so upgrading `Umbraco.Cms` first
+keeps every Umbraco package on one version.
+
+Otherwise, **nothing.** No API signature, schema or migration changes, and no setting you have to
+change.
+
+### What changed
+
+**uBookIt requires Umbraco 18.2.1 or later**, and still not 19. Umbraco 18.2.1 fixes four
+advisories Umbraco published on 6 October 2026:
+
+- [GHSA-w5jr-cmfx-544x](https://github.com/umbraco/Umbraco-CMS/security/advisories/GHSA-w5jr-cmfx-544x) (medium)
+- [GHSA-7pj9-jmp9-p86q](https://github.com/umbraco/Umbraco-CMS/security/advisories/GHSA-7pj9-jmp9-p86q) (medium)
+- [GHSA-h5wj-vpvj-mprp](https://github.com/umbraco/Umbraco-CMS/security/advisories/GHSA-h5wj-vpvj-mprp) (low)
+- [GHSA-4c5q-6c64-96j7](https://github.com/umbraco/Umbraco-CMS/security/advisories/GHSA-4c5q-6c64-96j7) (low)
+
+They describe Umbraco itself, not uBookIt's code. Requiring the fixed version means a site that
+installs or updates uBookIt is on an Umbraco where they are closed.
+
+**Your site may still report advisories against SixLabors ImageSharp 3.1.12.** They reach it
+through `Umbraco.Cms` itself, which depends on ImageSharp. No uBookIt package depends on
+ImageSharp. When this release was prepared, no Umbraco version took a fixed ImageSharp, so
+updating uBookIt does not clear them; that waits on Umbraco.
+
 ## 18.1.2 — 2026-09-26
 
 ### What you have to do
