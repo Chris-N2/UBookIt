@@ -67,7 +67,8 @@
       recorded.
 - [ ] 4.3 After both merge, run the `audit` workflow on demand. Verify: green, with 5 accepted
       notices per line, and its run ID recorded.
-- [ ] 4.4 Archive on each line, after an outward search of `openspec/specs` and `docs/` for any
+- [ ] 4.4 Archive on each line, syncing the MODIFIED `continuous-integration` requirement
+      *Vulnerability advisories are audited separately from the build*, after an outward search of `openspec/specs` and `docs/` for any
       sentence the floor raise or the exception falsifies. Verify: `openspec validate --all
       --strict` passes on both lines, and the search result is recorded.
 - [ ] 4.5 Then the releases: `17.2.3` and `18.1.3` as their own release changes, carrying the
