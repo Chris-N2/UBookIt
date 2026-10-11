@@ -313,6 +313,15 @@ public class MultiClaimConcurrencyTests(SqlServerFixture fixture)
                 // re-check are untouched. Closures change which times are OFFERED, never how a
                 // claim on an offered time is written.
                 "20260923094150_AddSiteClosures",
+
+                // closure-date-ranges: adds uBookItSiteClosure.EndDate (filled from Date, so every
+                // existing closure keeps its one date) and creates uBookItResourceClosedPeriod
+                // (resource id, two dates, a note; cascading from uBookItResource). Confirmed
+                // against the rule above — one AddColumn on a closure table, one CreateTable, one
+                // index on the new table, and a fill statement; nothing altered or dropped.
+                // Neither uBookItResourceClaim nor uBookItBooking is referenced: closed periods,
+                // like closures, change which times are OFFERED, never how a claim is written.
+                "20261011182653_ClosureDateRanges",
             ],
             applied.OrderBy(name => name, StringComparer.Ordinal));
 

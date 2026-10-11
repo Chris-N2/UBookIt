@@ -183,7 +183,15 @@ public class ResourcesController(
     {
         var closures = await ClosuresAsync(cancellationToken);
 
-        var resource = ResourceModelMapper.ToDomain(model, id);
+        // A request without closed periods leaves the stored ones in force, so they are what
+        // its exceptions are judged against. The store judges again under its lock, since
+        // another writer may store a period between this read and that write.
+        var keepClosedPeriods = model.ClosedPeriods is null;
+        var storedClosedPeriods = keepClosedPeriods
+            ? (await resourceStore.GetAsync(id, cancellationToken))?.Availability.ClosedPeriods
+            : null;
+
+        var resource = ResourceModelMapper.ToDomain(model, id, storedClosedPeriods);
         var unknown = UnknownClosures(model, closures);
 
         if (!resource.Succeeded || unknown.Length > 0)
@@ -191,7 +199,9 @@ public class ResourcesController(
             return resource.Failures.Concat(unknown).ToList().ToProblemResult();
         }
 
-        var updated = await managementStore.UpdateAsync(resource.Value, cancellationToken);
+        var updated = keepClosedPeriods
+            ? await managementStore.UpdateKeepingClosedPeriodsAsync(resource.Value, cancellationToken)
+            : await managementStore.UpdateAsync(resource.Value, cancellationToken);
 
         return updated.Succeeded
             ? await SavedResourceAsync(updated.Value.Id, closures, cancellationToken)

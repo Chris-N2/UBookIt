@@ -56,8 +56,11 @@ internal static class ResourceRowMapper
         // on a site that never had the closure — which is exactly what opting out means.
         var applicableClosures = siteClosures.Where(c => !optOuts.Contains(c.Id));
 
+        var closedPeriods = row.ClosedPeriods
+            .Select(p => ClosedPeriod.Create(p.StartDate, p.EndDate, p.Note).Value);
+
         var availability = AvailabilityConfiguration
-            .Create(openHours, exceptions, constraints, applicableClosures).Value;
+            .CreateWithClosedPeriods(openHours, closedPeriods, exceptions, constraints, applicableClosures).Value;
 
         // Named rather than positional, deliberately. This call passed `row.Id`
         // as the sixth argument; adding one before it shifted the meaning of
@@ -87,6 +90,7 @@ internal static class ResourceRowMapper
             Exceptions = ToExceptionRows(resource),
             Capabilities = ToCapabilityRows(resource),
             ClosureOptOuts = ToClosureOptOutRows(resource),
+            ClosedPeriods = ToClosedPeriodRows(resource),
         };
         ApplyScalars(resource, row);
         return row;
@@ -122,6 +126,18 @@ internal static class ResourceRowMapper
                     StartTime = window.Start,
                     EndTime = window.End,
                 }))
+            .ToList();
+
+    /// <summary>The resource's own closed periods, written with its other availability rows.</summary>
+    internal static List<ClosedPeriodRow> ToClosedPeriodRows(Resource resource)
+        => resource.Availability.ClosedPeriods
+            .Select(period => new ClosedPeriodRow
+            {
+                ResourceId = resource.Id,
+                StartDate = period.StartDate,
+                EndDate = period.EndDate,
+                Note = period.Note,
+            })
             .ToList();
 
     internal static List<ResourceCapabilityRow> ToCapabilityRows(Resource resource)

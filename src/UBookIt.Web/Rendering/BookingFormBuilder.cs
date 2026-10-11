@@ -123,6 +123,33 @@ public static class BookingFormBuilder
         FailedSubmission? failed = null,
         string? flowToken = null,
         IReadOnlyList<PreservedQueryPair>? preservedQuery = null)
+        => BuildForWindow(resource, selectedDate, today, windowStarts, dayStarts, duration, zone, privacyNotice, windowDays, windowFrom: today, failed: failed, flowToken: flowToken, preservedQuery: preservedQuery);
+
+    /// <summary>
+    /// As the published <c>Build</c>, with the window's first date: where it is not
+    /// <paramref name="today"/> — because a closure covers today — the form names the dates it
+    /// lists rather than "the next N days".
+    /// </summary>
+    /// <remarks>
+    /// A member of its own name rather than an overload of <c>Build</c>: as an overload, its
+    /// tenth parameter (a <see cref="DateOnly"/>) made <c>Build(..., windowDays, default)</c>
+    /// ambiguous with the published <c>FailedSubmission?</c> (QA round 2). The published
+    /// <c>Build</c> is kept exactly and delegates here.
+    /// </remarks>
+    public static BookingFormModel BuildForWindow(
+        Resource resource,
+        DateOnly selectedDate,
+        DateOnly today,
+        IReadOnlyList<BookableStart> windowStarts,
+        IReadOnlyList<BookableStart> dayStarts,
+        TimeSpan duration,
+        TimeZoneInfo zone,
+        PrivacyNoticeView privacyNotice,
+        int windowDays,
+        DateOnly windowFrom,
+        FailedSubmission? failed = null,
+        string? flowToken = null,
+        IReadOnlyList<PreservedQueryPair>? preservedQuery = null)
     {
         var constraints = resource.Availability.Constraints;
 
@@ -142,6 +169,7 @@ public static class BookingFormBuilder
             AvailableDates = dates,
             SelectedDateIsListed = dates.Any(date => date.IsSelected),
             WindowDays = windowDays,
+            ShiftedWindowFrom = windowFrom != today ? windowFrom : null,
             LongestAvailableInWindowMinutes = LongestAvailableMinutes(windowStarts),
             PrivacyNotice = privacyNotice,
             FlowToken = flowToken,

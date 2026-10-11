@@ -51,7 +51,28 @@ public static class AvailableDateWindow
     /// <param name="maxQueryRangeDays">The site's guardrail on how wide one availability read may be.</param>
     public static (DateOnly From, DateOnly To) Compute(
         DateOnly today, int horizonDays, int maxQueryRangeDays)
+        => Compute(today, horizonDays, maxQueryRangeDays, today);
+
+    /// <inheritdoc cref="Compute(DateOnly, int, int)"/>
+    /// <param name="firstOpenDate">
+    /// The first date from today that no closure or closed period applying to the subject covers
+    /// (<see cref="ClosedRanges.FirstUncovered"/>). The window starts there rather than today, so a
+    /// visitor arriving during a long closure is offered the weeks after it. Ignored when it lies
+    /// beyond the horizon, in which case the window starts today exactly as it would without it.
+    /// </param>
+    /// <remarks>
+    /// A separate overload rather than a widened signature: the three-argument form was
+    /// published, and an assembly compiled against it binds to that exact signature.
+    /// </remarks>
+    public static (DateOnly From, DateOnly To) Compute(
+        DateOnly today, int horizonDays, int maxQueryRangeDays, DateOnly firstOpenDate)
     {
+        // The horizon is counted from TODAY, not from the window's start: a resource bookable
+        // 90 days ahead is bookable up to today + 90 however the window is placed.
+        var lastBookable = CalendarBounds.AddDaysSaturating(today, Math.Max(horizonDays, 0));
+        var from = firstOpenDate > today && firstOpenDate <= lastBookable ? firstOpenDate : today;
+        var daysLeft = lastBookable.DayNumber - from.DayNumber;
+
         // Every term is an INCLUSIVE day count, because that is what the guardrail counts:
         // the availability service computes `to - from + 1` and refuses a span above the
         // maximum. Mixing an inclusive count with an exclusive one here is how a window ends
@@ -61,11 +82,11 @@ public static class AvailableDateWindow
         var span = Math.Min(
             PreferredDays,
             Math.Min(
-                horizonDays >= 0 ? horizonDays + 1 : 1,
+                daysLeft + 1,
                 Math.Max(maxQueryRangeDays, 1)));
 
         // Saturating, like the date field's own upper bound: HorizonDays is validated as
         // positive but not as small, so a large one must not throw while rendering a form.
-        return (today, CalendarBounds.AddDaysSaturating(today, span - 1));
+        return (from, CalendarBounds.AddDaysSaturating(from, span - 1));
     }
 }

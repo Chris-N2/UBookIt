@@ -30,6 +30,7 @@ internal sealed class SqlResourceStore(UBookItDbContext db, ISiteClosureStore cl
             .Include(r => r.Exceptions)
             .Include(r => r.Capabilities)
             .Include(r => r.ClosureOptOuts)
+            .Include(r => r.ClosedPeriods)
             .AsSplitQuery()
             .FirstOrDefaultAsync(r => r.Id == resourceId, cancellationToken)
             .ConfigureAwait(false);
@@ -57,6 +58,7 @@ internal sealed class SqlResourceStore(UBookItDbContext db, ISiteClosureStore cl
             .Include(r => r.Exceptions)
             .Include(r => r.Capabilities)
             .Include(r => r.ClosureOptOuts)
+            .Include(r => r.ClosedPeriods)
             .AsSplitQuery()
             .OrderBy(r => r.DisplayName).ThenBy(r => r.Id)
             .Skip(skip)
@@ -83,6 +85,7 @@ internal sealed class SqlResourceStore(UBookItDbContext db, ISiteClosureStore cl
             .Include(r => r.Exceptions)
             .Include(r => r.Capabilities)
             .Include(r => r.ClosureOptOuts)
+            .Include(r => r.ClosedPeriods)
             .AsSplitQuery()
             .Where(r => r.Type == type)
             .OrderBy(r => r.Id)

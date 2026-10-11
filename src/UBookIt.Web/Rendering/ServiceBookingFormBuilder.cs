@@ -199,6 +199,22 @@ public static class ServiceBookingFormBuilder
     /// bounds use.
     /// </para>
     /// </summary>
+    /// <summary>
+    /// The first date from <paramref name="today"/> on which ANY candidate is not closed by a
+    /// closure or closed period — where the service's date window starts.
+    /// </summary>
+    /// <remarks>
+    /// The earliest of any candidate, not the latest across roles: a date one candidate is open
+    /// on might offer the service, and the window must never skip a date that could. Only ranges
+    /// are consulted — a cheap fact, not an availability search.
+    /// </remarks>
+    public static DateOnly FirstOpenDate(IReadOnlyList<RoleCandidates> pools, DateOnly today)
+        => pools
+            .SelectMany(pool => pool.Candidates)
+            .Select(candidate => ClosedRanges.FirstUncovered(today, ClosedRanges.Of(candidate.Resource.Availability)))
+            .DefaultIfEmpty(today)
+            .Min();
+
     public static int HorizonDays(IReadOnlyList<RoleCandidates> pools)
         => pools.Min(pool => pool.Candidates.Max(c => c.Resource.Availability.Constraints.HorizonDays));
 
@@ -272,6 +288,35 @@ public static class ServiceBookingFormBuilder
         string? flowToken = null,
         ResourceChoiceState choice = default,
         IReadOnlyList<PreservedQueryPair>? preservedQuery = null)
+        => BuildForWindow(service, pools, selectedDate, today, windowStarts, dayStarts, durationMinutes, zone, privacyNotice, windowDays, windowFrom: today, failed: failed, flowToken: flowToken, choice: choice, preservedQuery: preservedQuery);
+
+    /// <summary>
+    /// As the published <c>Build</c>, with the window's first date: where it is not
+    /// <paramref name="today"/> — because a closure covers today — the form names the dates it
+    /// lists rather than "the next N days".
+    /// </summary>
+    /// <remarks>
+    /// A member of its own name rather than an overload of <c>Build</c>: as an overload, its
+    /// tenth parameter (a <see cref="DateOnly"/>) made <c>Build(..., windowDays, default)</c>
+    /// ambiguous with the published <c>FailedSubmission?</c> (QA round 2). The published
+    /// <c>Build</c> is kept exactly and delegates here.
+    /// </remarks>
+    public static ServiceFormModel BuildForWindow(
+        Service service,
+        IReadOnlyList<RoleCandidates> pools,
+        DateOnly selectedDate,
+        DateOnly today,
+        IReadOnlyList<ServiceBookableStart> windowStarts,
+        IReadOnlyList<ServiceBookableStart> dayStarts,
+        int durationMinutes,
+        TimeZoneInfo zone,
+        PrivacyNoticeView privacyNotice,
+        int windowDays,
+        DateOnly windowFrom,
+        FailedSubmission? failed = null,
+        string? flowToken = null,
+        ResourceChoiceState choice = default,
+        IReadOnlyList<PreservedQueryPair>? preservedQuery = null)
     {
         var duration = TimeSpan.FromMinutes(durationMinutes);
 
@@ -289,6 +334,7 @@ public static class ServiceBookingFormBuilder
             AvailableDates = dates,
             SelectedDateIsListed = dates.Any(date => date.IsSelected),
             WindowDays = windowDays,
+            ShiftedWindowFrom = windowFrom != today ? windowFrom : null,
             LongestAvailableInWindowMinutes = LongestAvailableMinutes(windowStarts),
             PrivacyNotice = privacyNotice,
             ResourceChoices = choice.Choices ?? [],

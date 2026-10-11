@@ -79,7 +79,7 @@ public class ClosuresController(
     public async Task<IActionResult> CreateClosure(
         SiteClosureRequestModel model, CancellationToken cancellationToken = default)
     {
-        var closure = SiteClosure.Create(model.Date, model.Label);
+        var closure = SiteClosure.CreateRange(model.Date, model.EndDate ?? model.Date, model.Label);
         if (!closure.Succeeded)
         {
             return closure.Failures.ToProblemResult();
@@ -100,7 +100,7 @@ public class ClosuresController(
     public async Task<IActionResult> UpdateClosure(
         Guid id, SiteClosureRequestModel model, CancellationToken cancellationToken = default)
     {
-        var closure = SiteClosure.Create(model.Date, model.Label, id);
+        var closure = SiteClosure.CreateRange(model.Date, model.EndDate ?? model.Date, model.Label, id);
         if (!closure.Succeeded)
         {
             return closure.Failures.ToProblemResult();
@@ -303,7 +303,7 @@ public class ClosuresController(
     }
 
     private static SiteClosureModel ToModel(SiteClosure closure)
-        => new() { Id = closure.Id, Date = closure.Date, Label = closure.Label };
+        => new() { Id = closure.Id, Date = closure.Date, EndDate = closure.EndDate, Label = closure.Label };
 
     private IActionResult NotFoundProblem(Guid id)
         => NotFound(new ProblemDetails

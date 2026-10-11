@@ -4,6 +4,15 @@
 @{
     var hasDates = Model.AvailableDates.Count > 0;
     var lengthLabel = BookingDurations.Label(Model.DurationMinutes);
+
+    // A window that does not start today is named by its dates: "the next N days" would be
+    // false. It never says WHY it moved — a closure is not disclosed publicly.
+    DateOnly? shiftedTo = Model.ShiftedWindowFrom is { } first
+        ? first.AddDays(Math.Max(Model.WindowDays, 1) - 1)
+        : null;
+    var span = Model.ShiftedWindowFrom is { } windowFrom && shiftedTo is { } windowTo
+        ? $"from {windowFrom.ToString("dddd d MMMM yyyy", CultureInfo.InvariantCulture)} to {windowTo.ToString("dddd d MMMM yyyy", CultureInfo.InvariantCulture)}"
+        : $"in the next {Model.WindowDays} days";
 }
 @*
     Which dates can actually be booked, so a visitor chooses one knowing it is bookable
@@ -21,7 +30,7 @@
 @if (hasDates)
 {
     <fieldset id="@BookingFieldIds.Dates" class="ubookit-dates">
-        <legend>Dates with availability for @lengthLabel in the next @Model.WindowDays days</legend>
+        <legend>Dates with availability for @lengthLabel @span</legend>
         @foreach (var (available, index) in Model.AvailableDates.Select((available, index) => (available, index)))
         {
             var id = $"ubookit-date-{index}";
@@ -42,7 +51,7 @@ else if (Model.LongestAvailableInWindowMinutes is { } longest)
        something turns "nothing" into a choice — and this is the case where the difference
        matters most, because a window empty at two hours may be full of half-hour gaps. *@
     <p class="ubookit-no-dates" id="ubookit-window-unavailable">
-        No date in the next @Model.WindowDays days has @lengthLabel available.
+        No date @span has @lengthLabel available.
         The longest available in that time is @BookingDurations.Label(longest).
         Please choose a shorter length, or a date further ahead.
     </p>
@@ -52,7 +61,7 @@ else
     @* Nothing at any length. A shorter length would not help, so it is not suggested —
        offering a next move that leads nowhere is worse than naming the one that remains. *@
     <p class="ubookit-no-dates">
-        No date in the next @Model.WindowDays days has any availability.
+        No date @span has any availability.
         Please choose a date further ahead.
     </p>
 }
@@ -99,6 +108,8 @@ else
            max="@Model.MaxDate.ToString("yyyy-MM-dd")"
            aria-describedby="ubookit-other-date-hint" />
     <span id="ubookit-other-date-hint" class="ubookit-hint">
-        For a date beyond the next @Model.WindowDays days. Availability is shown once you choose.
+        @(shiftedTo is { } lastListed
+            ? $"For a date after {lastListed.ToString("dddd d MMMM yyyy", CultureInfo.InvariantCulture)}."
+            : $"For a date beyond the next {Model.WindowDays} days.") Availability is shown once you choose.
     </span>
 </div>

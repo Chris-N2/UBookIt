@@ -25,6 +25,23 @@ export default {
     capabilityNone: "This resource has no capabilities.",
     capabilityHint: "Lower-case, hyphenated, e.g. cert-x. Choose one already in use, or enter a new one.",
 
+    // ---------------------------------------------------------- closed periods
+    //
+    // The resource's OWN closures, as runs of dates: "being painted", "on leave". The note is
+    // the site's own and never reaches a visitor, and the hint says so where it is typed, because
+    // where a resource is a person an operator may write something about that person.
+    closedPeriods: "Closed periods",
+    closedPeriodsIntro:
+      "Runs of dates this resource is closed, on top of its opening hours — for example while a room is being painted, or someone is away. A period cannot overlap another, or a date that has an exception of its own.",
+    closedPeriod: "Closed period",
+    addClosedPeriod: "Add closed period",
+    removeClosedPeriod: "Remove closed period",
+    closedPeriodNote: "Note (optional)",
+    closedPeriodNoteHint:
+      "Only shown here in the backoffice — never to people booking. Keep personal details out of it: it is kept until you remove it.",
+    closedPeriodToHint: "The last day closed. Leave To empty to close just the From date.",
+    closedPeriodNeedsStart: "Each closed period needs a From date before saving.",
+
     // ---------------------------------------------------------- site closures
     //
     // What the editor of ONE resource sees of a SITE-WIDE decision. The wording says
@@ -664,7 +681,10 @@ export default {
     showPast: "Show past closures",
     hidePast: "Hide past closures",
     dateRequired: "Each closure needs a date before saving.",
-    columnDate: "Date",
+    rangeFrom: "From",
+    rangeTo: "To",
+    rangeToHint: "The last day closed. Leave it empty to close just the From date.",
+    columnDate: "Dates",
     columnLabel: "Name",
     columnActions: "Actions",
 

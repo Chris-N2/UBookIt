@@ -172,6 +172,19 @@ public interface IBookingFormView
     int WindowDays { get; }
 
     /// <summary>
+    /// The window's first date, when it does NOT start today — because a closure covers today —
+    /// and null when it does. Where it is set the step names the dates it lists (this date, and
+    /// the one <see cref="WindowDays"/> spans to) rather than saying "the next N days", which
+    /// would be false.
+    /// </summary>
+    /// <remarks>
+    /// It says nothing about why the window moved: a closure is not disclosed publicly. Defaulted
+    /// on the interface so that an implementation written before it existed still compiles, and
+    /// reads as a window starting today, which is what it always was.
+    /// </remarks>
+    DateOnly? ShiftedWindowFrom => null;
+
+    /// <summary>
     /// The longest length, in whole minutes, bookable anywhere in the window — or null when the
     /// window holds no availability at all.
     /// </summary>

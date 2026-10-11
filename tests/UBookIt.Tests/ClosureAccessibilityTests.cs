@@ -26,17 +26,19 @@ public class ClosureAccessibilityTests
     public void Every_closure_row_control_names_the_closure_it_acts_on()
     {
         // A list of identical "Edit" and "Delete" buttons is unusable without sight of the
-        // row: the accessible name has to carry the date and the label, not just the verb.
+        // row: the accessible name has to carry the dates and the label, not just the verb.
+        // The dates are the closure's RANGE since closure-date-ranges — a start date alone would
+        // name two different closures that begin on neighbouring days identically.
         var source = RepoFiles.Read(ClosuresView);
 
         // No colon: the house form is "Edit <thing>", as the Resources list already does.
         Assert.Contains(
-            "label=\"${this.#term(\"edit\")} ${closure.date} ${closure.label}\"",
+            "label=\"${this.#term(\"edit\")} ${rangeText(closure.date, closure.endDate)} ${closure.label}\"",
             source,
             StringComparison.Ordinal);
 
         Assert.Contains(
-            "label=\"${this.#term(\"delete\")} ${closure.date} ${closure.label}\"",
+            "label=\"${this.#term(\"delete\")} ${rangeText(closure.date, closure.endDate)} ${closure.label}\"",
             source,
             StringComparison.Ordinal);
     }
@@ -49,7 +51,7 @@ public class ClosureAccessibilityTests
         var source = RepoFiles.Read(ResourceEditor);
 
         Assert.Contains(
-            "label=\"${this.#term(\"closureOpenAnyway\")}: ${closure.date} ${closure.label}\"",
+            "label=\"${this.#term(\"closureOpenAnyway\")}: ${rangeText(closure.date, closure.endDate)} ${closure.label}\"",
             source,
             StringComparison.Ordinal);
     }
@@ -61,14 +63,25 @@ public class ClosureAccessibilityTests
         // not a <label> and cannot pierce a component's shadow root.
         var source = RepoFiles.Read(ClosuresView);
 
-        foreach (var id in new[] { "closure-date", "closure-label" })
+        foreach (var id in new[] { "closure-date", "closure-end-date", "closure-label" })
         {
             Assert.Contains($"<label for=\"{id}\">", source, StringComparison.Ordinal);
             Assert.Contains($"id=\"{id}\"", source, StringComparison.Ordinal);
         }
 
-        // The hint is referenced from the input, not merely rendered under it.
-        Assert.Contains("aria-describedby=\"closure-label-hint\"", source, StringComparison.Ordinal);
+        // To's hint ("leave it empty for one day") is referenced from To, not merely rendered.
+        Assert.Contains(
+            "aria-describedby=${closureDescribedBy(\"closure-end-date\", this._errorControl, \"closure-end-date-hint\")}",
+            source,
+            StringComparison.Ordinal);
+        Assert.Contains("id=\"closure-end-date-hint\"", source, StringComparison.Ordinal);
+
+        // The hint is referenced from the input, not merely rendered under it — through the shared
+        // helper, which also adds the error's id when a failure concerns this input.
+        Assert.Contains(
+            "aria-describedby=${closureDescribedBy(\"closure-label\", this._errorControl, \"closure-label-hint\")}",
+            source,
+            StringComparison.Ordinal);
         Assert.Contains("id=\"closure-label-hint\"", source, StringComparison.Ordinal);
     }
 
@@ -213,5 +226,44 @@ public class ClosureAccessibilityTests
         }
 
         return count;
+    }
+
+    [Fact]
+    public void Closed_period_inputs_are_labelled_and_their_hints_referenced()
+    {
+        // Indexed ids, one set per period: label[for] must name the same index as the input.
+        var source = RepoFiles.Read(ResourceEditor);
+
+        foreach (var part in new[] { "from", "to", "note" })
+        {
+            Assert.Contains($"<label for=\"cp-${{index}}-{part}\">", source, StringComparison.Ordinal);
+            Assert.Contains($"id=\"cp-${{index}}-{part}\"", source, StringComparison.Ordinal);
+        }
+
+        // The note's hint is the one that says it never reaches a visitor and should not hold
+        // personal details — it must be read with the field, not only seen beneath it.
+        Assert.Contains("aria-describedby=\"cp-note-hint\"", source, StringComparison.Ordinal);
+        Assert.Contains("id=\"cp-note-hint\"", source, StringComparison.Ordinal);
+        Assert.Contains("aria-describedby=\"cp-to-hint\"", source, StringComparison.Ordinal);
+        Assert.Contains("id=\"cp-to-hint\"", source, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public void A_closure_save_failure_is_associated_with_the_input_it_concerns()
+    {
+        // Announcing the failure is not enough on the project's bar: the input it concerns must
+        // say it is invalid and point at the message. Each of the three inputs is wired, so a
+        // failure about any of them reaches the right one.
+        var source = RepoFiles.Read(ClosuresView);
+
+        foreach (var id in new[] { "closure-date", "closure-end-date", "closure-label" })
+        {
+            Assert.Contains(
+                $"aria-invalid=${{this._errorControl === \"{id}\" ? \"true\" : nothing}}",
+                source,
+                StringComparison.Ordinal);
+        }
+
+        Assert.Contains("this._errorControl = closureErrorControl(failure?.field);", source, StringComparison.Ordinal);
     }
 }

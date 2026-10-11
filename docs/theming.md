@@ -204,9 +204,21 @@ same four facts yourself.
 
 Your views never see why a date is unavailable. A date the whole organisation is closed on, a
 date the resource is simply not open on, and a date that is fully booked all reach a theme the
-same way: with nothing to render. There is no closure, label or reason in any view model, so a
-theme cannot say "closed for Christmas" — and one that hard-codes such a message will be wrong
-on every other unavailable date.
+same way: with nothing to render. There is no closure, label, note or reason in any view model,
+so a theme cannot say "closed for Christmas" — and one that hard-codes such a message will be
+wrong on every other unavailable date.
+
+**One thing does move because of a closure: where the list of dates starts.** When a closure, or
+a resource's own closed period, covers today, `_AvailableDates` lists the weeks after it rather than
+today's. `IBookingFormView.ShiftedWindowFrom` is then set to the window's first date, and null when
+the window starts today; the window spans `WindowDays` days from it. **If your theme replaces
+`_AvailableDates`, name the dates when `ShiftedWindowFrom` is set** — "in the next 30 days" would
+be false. The shipped view says "from Monday 21 December 2026 to Tuesday 19 January 2027".
+
+That is the one thing a visitor can infer from a closure — that the dates before the window are
+closed rather than booked — and it is deliberate: the alternative is telling them nothing is
+available for the length of the closure. The view model still carries nothing about which closure,
+what it is called, or why.
 
 This is the same decision the delivery API makes, for the same reason: a closure's name is the
 site's own operational note, and the booking flow is public.
