@@ -160,10 +160,16 @@ public sealed class AvailabilityConfiguration
         IEnumerable<DateException>? exceptions = null,
         BookingConstraints? constraints = null,
         IEnumerable<SiteClosure>? closures = null)
-        => Create(openHours, closedPeriods: [], exceptions, constraints, closures);
+        => CreateWithClosedPeriods(openHours, [], exceptions, constraints, closures);
 
     /// <summary>A configuration including the resource's own closed periods.</summary>
-    public static DomainResult<AvailabilityConfiguration> Create(
+    /// <remarks>
+    /// A member of its own name rather than an overload of <see cref="Create"/>. As an overload,
+    /// its second parameter and <c>Create</c>'s are unrelated collection types, so
+    /// <c>Create(hours, null)</c> and <c>Create(hours, [])</c> — which compiled against 17.2.x —
+    /// became ambiguous (QA round 2). <c>PublishedCallShapeTests</c> makes exactly those calls.
+    /// </remarks>
+    public static DomainResult<AvailabilityConfiguration> CreateWithClosedPeriods(
         WeeklyOpenHours openHours,
         IEnumerable<ClosedPeriod> closedPeriods,
         IEnumerable<DateException>? exceptions = null,

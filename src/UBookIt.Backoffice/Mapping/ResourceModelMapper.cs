@@ -125,7 +125,7 @@ internal static class ResourceModelMapper
         // like duplicate-exception-date still surface in the same response —
         // one save reports every failed rule.
         AvailabilityConfiguration? availability = null;
-        var availabilityResult = AvailabilityConfiguration.Create(
+        var availabilityResult = AvailabilityConfiguration.CreateWithClosedPeriods(
             weekly.Succeeded ? weekly.Value : WeeklyOpenHours.Empty, closedPeriods, exceptions, constraints);
         if (availabilityResult.Succeeded)
         {

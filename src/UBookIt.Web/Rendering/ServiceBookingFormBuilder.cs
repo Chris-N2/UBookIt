@@ -288,18 +288,20 @@ public static class ServiceBookingFormBuilder
         string? flowToken = null,
         ResourceChoiceState choice = default,
         IReadOnlyList<PreservedQueryPair>? preservedQuery = null)
-        => Build(service, pools, selectedDate, today, windowStarts, dayStarts, durationMinutes, zone, privacyNotice, windowDays, windowFrom: today, failed: failed, flowToken: flowToken, choice: choice, preservedQuery: preservedQuery);
+        => BuildForWindow(service, pools, selectedDate, today, windowStarts, dayStarts, durationMinutes, zone, privacyNotice, windowDays, windowFrom: today, failed: failed, flowToken: flowToken, choice: choice, preservedQuery: preservedQuery);
 
     /// <summary>
-    /// As the published overload, with the window's first date: where it is not
+    /// As the published <c>Build</c>, with the window's first date: where it is not
     /// <paramref name="today"/> — because a closure covers today — the form names the dates it
     /// lists rather than "the next N days".
     /// </summary>
     /// <remarks>
-    /// A new overload rather than a widened signature, so an assembly compiled against the
-    /// published one still binds at run time.
+    /// A member of its own name rather than an overload of <c>Build</c>: as an overload, its
+    /// tenth parameter (a <see cref="DateOnly"/>) made <c>Build(..., windowDays, default)</c>
+    /// ambiguous with the published <c>FailedSubmission?</c> (QA round 2). The published
+    /// <c>Build</c> is kept exactly and delegates here.
     /// </remarks>
-    public static ServiceFormModel Build(
+    public static ServiceFormModel BuildForWindow(
         Service service,
         IReadOnlyList<RoleCandidates> pools,
         DateOnly selectedDate,

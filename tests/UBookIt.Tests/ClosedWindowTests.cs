@@ -114,7 +114,7 @@ public class ClosedWindowTests
     public async Task Adjoining_closure_and_closed_period_are_followed()
     {
         var form = await ResourceForm(
-            AvailabilityConfiguration.Create(
+            AvailabilityConfiguration.CreateWithClosedPeriods(
                 EveryDay(),
                 closures: [Closure(Today, Today.AddDays(4))],
                 closedPeriods: [ClosedPeriod.Create(Today.AddDays(5), Today.AddDays(9)).Value]).Value);
@@ -228,7 +228,7 @@ public class ClosedWindowTests
                 "room",
                 $"Room {id}",
                 directlyBookable: true,
-                availability: AvailabilityConfiguration.Create(
+                availability: AvailabilityConfiguration.CreateWithClosedPeriods(
                     EveryDay(),
                     closedPeriods: [ClosedPeriod.Create(Today, Today.AddDays(closedForDays - 1)).Value]).Value,
                 id: new Guid($"00000000-0000-0000-0000-00000000040{id}")).Value;
@@ -249,5 +249,10 @@ public class ClosedWindowTests
 
         Assert.Equal(Today.AddDays(5), form!.ShiftedWindowFrom);
         Assert.Equal(Today.AddDays(5), form.AvailableDates.First().Date);
+
+        // And a visitor who chose no date is shown the window's first, not a closed today — the
+        // line QA's mutation R8 showed was guarded for resources only.
+        Assert.Equal(Today.AddDays(5), form.SelectedDate);
+        Assert.True(form.SelectedDateIsListed);
     }
 }

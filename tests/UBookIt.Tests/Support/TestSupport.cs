@@ -71,7 +71,7 @@ public sealed class InMemoryResourceStore : IResourceStore, IResourceManagementS
         var applicable = ((ISiteClosureStore)_closures).ListAsync().GetAwaiter().GetResult()
             .Where(closure => !resource.ClosureOptOuts.Contains(closure.Id));
 
-        var availability = AvailabilityConfiguration.Create(
+        var availability = AvailabilityConfiguration.CreateWithClosedPeriods(
             resource.Availability.OpenHours,
 
             // Carried through, as the SQL store's read carries them: a hydrate that dropped the
@@ -158,7 +158,8 @@ public sealed class InMemoryResourceStore : IResourceStore, IResourceManagementS
 
     /// <summary>
     /// As the SQL store: everything replaced except the closed periods, which stay as stored —
-    /// whatever the resource passed in carries.
+    /// whatever the resource passed in carries — and the submitted exceptions re-judged against
+    /// them, failing with the same code rather than storing a contradiction.
     /// </summary>
     public Task<DomainResult<Resource>> UpdateKeepingClosedPeriodsAsync(
         Resource resource, CancellationToken cancellationToken = default)
@@ -169,12 +170,23 @@ public sealed class InMemoryResourceStore : IResourceStore, IResourceManagementS
                 FailureCodes.ResourceNotFound, $"No resource exists with id {resource.Id}."));
         }
 
+        var conflict = resource.Availability.Exceptions
+            .Any(e => stored.Availability.ClosedPeriods.Any(p => p.Covers(e.Date)));
+
+        if (conflict)
+        {
+            return Task.FromResult(DomainResult<Resource>.Failure(
+                FailureCodes.ClosedPeriodConflictsWithException,
+                "An exception falls inside one of the resource's stored closed periods.",
+                "ClosedPeriods"));
+        }
+
         var kept = Resource.Create(
             type: resource.Type,
             displayName: resource.DisplayName,
             description: resource.Description,
             capabilities: resource.Capabilities.Keys,
-            availability: AvailabilityConfiguration.Create(
+            availability: AvailabilityConfiguration.CreateWithClosedPeriods(
                 resource.Availability.OpenHours,
                 stored.Availability.ClosedPeriods,
                 resource.Availability.Exceptions,

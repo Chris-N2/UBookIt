@@ -26,7 +26,7 @@ public class ClosedPeriodPlacementTests
             ResourceTypes.Room,
             "Painted Room",
             directlyBookable: true,
-            availability: AvailabilityConfiguration.Create(
+            availability: AvailabilityConfiguration.CreateWithClosedPeriods(
                 TestData.Weekly("08:00", "18:00", Enum.GetValues<DayOfWeek>()),
                 periods ?? [],
                 closures: closures).Value,
@@ -102,7 +102,10 @@ public class ClosedPeriodPlacementTests
         var again = await bookings.PlaceAsync(At(open.Id, Date));
         Assert.False(again.Succeeded);
 
-        // And the day offers no free time at all.
+        // And the day offers no free time at all. NOTE (QA round 2): with the whole day closed,
+        // these two assertions cannot tell the booking blocking its hour from the period closing
+        // the day — both refuse. What this test proves is the SURVIVAL half: the booking is kept,
+        // with its reference and status, after a period is laid over it.
         var free = await availability.GetFreeTimeAsync(open.Id, Date, Date);
         Assert.True(free.Succeeded);
         Assert.Empty(free.Value);

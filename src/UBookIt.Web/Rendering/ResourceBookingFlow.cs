@@ -145,7 +145,7 @@ public sealed class ResourceBookingFlow(
         }
 
         return new ResourceFlowOutcome(
-            BookingFormBuilder.Build(
+            BookingFormBuilder.BuildForWindow(
                 resource, selectedDate, today, windowStarts, dayStarts, duration, zone,
                 PrivacyNoticeView.From(settings, HostMailAvailability.CanSend(emailSender)), windowDays, windowFrom, failed, input.FlowToken,
                 input.PreservedQueryPairs),
