@@ -27,6 +27,9 @@ public sealed class ServiceFormModel : IBookingFormView
     public int WindowDays { get; init; }
 
     /// <inheritdoc />
+    public DateOnly? ShiftedWindowFrom { get; init; }
+
+    /// <inheritdoc />
     public int? LongestAvailableInWindowMinutes { get; init; }
 
     public required Guid ServiceId { get; init; }

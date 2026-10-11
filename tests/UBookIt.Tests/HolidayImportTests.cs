@@ -118,9 +118,10 @@ public class HolidayImportTests
             .Select(property => property.Name)
             .ToList();
 
-        // The whole of it: an id, a date, a label. No origin, no source, no "imported" flag.
+        // The whole of it: an id, a start and end date, a label. No origin, no source, no
+        // "imported" flag. (EndDate arrived with closure-date-ranges: a range, not a provenance.)
         Assert.Equal(
-            new[] { nameof(SiteClosure.Date), nameof(SiteClosure.Id), nameof(SiteClosure.Label) },
+            new[] { nameof(SiteClosure.Date), nameof(SiteClosure.EndDate), nameof(SiteClosure.Id), nameof(SiteClosure.Label) },
             closureMembers.OrderBy(name => name, StringComparer.Ordinal));
 
         // And the classification is handed dates, not closures, so it could not read an origin

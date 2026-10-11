@@ -17,7 +17,7 @@ namespace UBookIt.Persistence.Migrations
         {
 #pragma warning disable 612, 618
             modelBuilder
-                .HasAnnotation("ProductVersion", "10.0.10")
+                .HasAnnotation("ProductVersion", "10.0.11")
                 .HasAnnotation("Relational:MaxIdentifierLength", 128);
 
             SqlServerModelBuilderExtensions.UseIdentityColumns(modelBuilder);
@@ -143,6 +143,34 @@ namespace UBookIt.Persistence.Migrations
                         .IsUnique();
 
                     b.ToTable("uBookItResourceClaim", (string)null);
+                });
+
+            modelBuilder.Entity("UBookIt.Persistence.Entities.ClosedPeriodRow", b =>
+                {
+                    b.Property<long>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("bigint");
+
+                    SqlServerPropertyBuilderExtensions.UseIdentityColumn(b.Property<long>("Id"));
+
+                    b.Property<DateOnly>("EndDate")
+                        .HasColumnType("date");
+
+                    b.Property<string>("Note")
+                        .HasMaxLength(512)
+                        .HasColumnType("nvarchar(512)");
+
+                    b.Property<Guid>("ResourceId")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<DateOnly>("StartDate")
+                        .HasColumnType("date");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("ResourceId");
+
+                    b.ToTable("uBookItResourceClosedPeriod", (string)null);
                 });
 
             modelBuilder.Entity("UBookIt.Persistence.Entities.ExceptionRow", b =>
@@ -408,6 +436,9 @@ namespace UBookIt.Persistence.Migrations
                     b.Property<DateOnly>("Date")
                         .HasColumnType("date");
 
+                    b.Property<DateOnly>("EndDate")
+                        .HasColumnType("date");
+
                     b.Property<string>("Label")
                         .IsRequired()
                         .HasMaxLength(512)
@@ -433,6 +464,15 @@ namespace UBookIt.Persistence.Migrations
                         .WithMany()
                         .HasForeignKey("ResourceId")
                         .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+                });
+
+            modelBuilder.Entity("UBookIt.Persistence.Entities.ClosedPeriodRow", b =>
+                {
+                    b.HasOne("UBookIt.Persistence.Entities.ResourceRow", null)
+                        .WithMany("ClosedPeriods")
+                        .HasForeignKey("ResourceId")
+                        .OnDelete(DeleteBehavior.Cascade)
                         .IsRequired();
                 });
 
@@ -504,6 +544,8 @@ namespace UBookIt.Persistence.Migrations
             modelBuilder.Entity("UBookIt.Persistence.Entities.ResourceRow", b =>
                 {
                     b.Navigation("Capabilities");
+
+                    b.Navigation("ClosedPeriods");
 
                     b.Navigation("ClosureOptOuts");
 

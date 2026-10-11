@@ -65,7 +65,7 @@ public static class HolidayImport
     /// Classifies what a source returned for a window against the dates already closed.
     /// </summary>
     /// <param name="holidays">What the source returned, in its own order.</param>
-    /// <param name="closedDates">Every date the site already has a closure for.</param>
+    /// <param name="closedDates">Every date in the window that a closure already covers.</param>
     /// <param name="from">Inclusive start of the window the operator asked for.</param>
     /// <param name="to">Inclusive end of the window the operator asked for.</param>
     /// <returns>One row per distinct in-window date, ordered by date.</returns>

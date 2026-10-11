@@ -13,7 +13,15 @@ namespace UBookIt.Backoffice.Mapping;
 /// </summary>
 internal static class ResourceModelMapper
 {
-    internal static DomainResult<Resource> ToDomain(ResourceRequestModel model, Guid? id = null)
+    /// <param name="model">The request.</param>
+    /// <param name="id">The resource's id on update; null on create.</param>
+    /// <param name="closedPeriodsWhenOmitted">
+    /// The resource's stored closed periods, used when the request carries none — so that the
+    /// rules relating periods to exceptions are judged over the set that will actually be in
+    /// force. Ignored when the request carries the collection.
+    /// </param>
+    internal static DomainResult<Resource> ToDomain(
+        ResourceRequestModel model, Guid? id = null, IEnumerable<ClosedPeriod>? closedPeriodsWhenOmitted = null)
     {
         var failures = new List<DomainFailure>();
 
@@ -91,13 +99,35 @@ internal static class ResourceModelMapper
             }
         }
 
+        var closedPeriods = new List<ClosedPeriod>();
+        if (model.ClosedPeriods is { } periodModels)
+        {
+            foreach (var periodModel in periodModels)
+            {
+                var period = ClosedPeriod.Create(periodModel.StartDate, periodModel.EndDate, periodModel.Note);
+                if (period.Succeeded)
+                {
+                    closedPeriods.Add(period.Value);
+                }
+                else
+                {
+                    failures.AddRange(period.Failures);
+                }
+            }
+        }
+        else
+        {
+            closedPeriods.AddRange(closedPeriodsWhenOmitted ?? []);
+        }
+
         // Run configuration assembly even when the weekly pattern failed
         // (using an empty pattern as a stand-in) so exception-level failures
         // like duplicate-exception-date still surface in the same response —
         // one save reports every failed rule.
         AvailabilityConfiguration? availability = null;
         var availabilityResult = AvailabilityConfiguration.Create(
-            weekly.Succeeded ? weekly.Value : WeeklyOpenHours.Empty, exceptions, constraints);
+            weekly.Succeeded ? weekly.Value : WeeklyOpenHours.Empty, exceptions, constraints,
+            closedPeriods: closedPeriods);
         if (availabilityResult.Succeeded)
         {
             availability = weekly.Succeeded ? availabilityResult.Value : null;
@@ -185,8 +215,17 @@ internal static class ResourceModelMapper
                 {
                     Id = closure.Id,
                     Date = closure.Date,
+                    EndDate = closure.EndDate,
                     Label = closure.Label,
                     Excluded = resource.ClosureOptOuts.Contains(closure.Id),
+                })
+                .ToList(),
+            ClosedPeriods = resource.Availability.ClosedPeriods
+                .Select(period => new ClosedPeriodModel
+                {
+                    StartDate = period.StartDate,
+                    EndDate = period.EndDate,
+                    Note = period.Note,
                 })
                 .ToList(),
             Constraints = new ConstraintsModel

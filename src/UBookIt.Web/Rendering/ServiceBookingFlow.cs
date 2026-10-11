@@ -57,7 +57,16 @@ public sealed class ServiceBookingFlow(
         var today = BookingForm.TodayIn(timeProvider.GetUtcNow(), zone);
         var failed = input.Failed;
 
-        var selectedDate = BookingForm.NotBefore(failed?.Date ?? input.Date ?? today, today);
+        // THE WINDOW, placed before the selected date so that a visitor who chose no date is
+        // shown the window's first one: during a closure that covers today, defaulting to today
+        // would show times for a date the list deliberately skips.
+        var (windowFrom, windowTo) = AvailableDateWindow.Compute(
+            today,
+            ServiceBookingFormBuilder.HorizonDays(pools),
+            settings.MaxQueryRangeDays,
+            ServiceBookingFormBuilder.FirstOpenDate(pools, today));
+
+        var selectedDate = BookingForm.NotBefore(failed?.Date ?? input.Date ?? windowFrom, today);
 
         // Who, before when. The choice joins this step rather than introducing a
         // page between the times and the contact details, and the start list below
@@ -105,9 +114,6 @@ public sealed class ServiceBookingFlow(
         // for a date the window does not contain — so no day is in both and there is nothing
         // for them to disagree about. Inside the window, where the risk is real, it stays one
         // read exactly as D1 requires.
-        var (windowFrom, windowTo) = AvailableDateWindow.Compute(
-            today, ServiceBookingFormBuilder.HorizonDays(pools), settings.MaxQueryRangeDays);
-
         var windowDays = windowTo.DayNumber - windowFrom.DayNumber + 1;
         var selectedIsInWindow = selectedDate >= windowFrom && selectedDate <= windowTo;
 
@@ -138,7 +144,7 @@ public sealed class ServiceBookingFlow(
             ServiceBookingFormBuilder.Build(
                 service, pools, selectedDate, today, windowStarts, dayStarts, duration, zone,
                 PrivacyNoticeView.From(settings, HostMailAvailability.CanSend(emailSender)), windowDays, failed, input.FlowToken, choice,
-                input.PreservedQueryPairs),
+                input.PreservedQueryPairs, (windowFrom, windowTo)),
             null);
     }
 }

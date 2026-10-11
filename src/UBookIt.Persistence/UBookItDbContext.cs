@@ -44,6 +44,8 @@ public sealed class UBookItDbContext(DbContextOptions<UBookItDbContext> options)
 
     internal DbSet<ResourceClosureOptOutRow> ResourceClosureOptOuts => Set<ResourceClosureOptOutRow>();
 
+    internal DbSet<ClosedPeriodRow> ClosedPeriods => Set<ClosedPeriodRow>();
+
     /// <summary>
     /// Single place that configures the SQL Server provider (uBookIt requires
     /// SQL Server 2019+) with the package-private migrations history table.
@@ -66,6 +68,17 @@ public sealed class UBookItDbContext(DbContextOptions<UBookItDbContext> options)
             resource.HasMany(r => r.ClosureOptOuts).WithOne()
                 .HasForeignKey(o => o.ResourceId).OnDelete(DeleteBehavior.Cascade);
             resource.HasMany(r => r.Capabilities).WithOne().HasForeignKey(c => c.ResourceId).OnDelete(DeleteBehavior.Cascade);
+            resource.HasMany(r => r.ClosedPeriods).WithOne().HasForeignKey(p => p.ResourceId).OnDelete(DeleteBehavior.Cascade);
+        });
+
+        modelBuilder.Entity<ClosedPeriodRow>(period =>
+        {
+            period.ToTable("uBookItResourceClosedPeriod");
+            period.HasKey(p => p.Id);
+            period.HasIndex(p => p.ResourceId);
+
+            // Held on the domain type so the column and the validation cannot drift apart.
+            period.Property(p => p.Note).HasMaxLength(ClosedPeriod.MaxNoteLength);
         });
 
         modelBuilder.Entity<ResourceCapabilityRow>(capability =>
@@ -272,9 +285,9 @@ public sealed class UBookItDbContext(DbContextOptions<UBookItDbContext> options)
             // the arrangement BookingReference.Length already has with the reference column.
             closure.Property(c => c.Label).HasMaxLength(SiteClosure.MaxLabelLength);
 
-            // UNIQUE, so "at most one closure per date" is enforced by the schema. A check
-            // before writing is a race, and two closures on one date can only repeat or
-            // contradict each other.
+            // UNIQUE on the start date. Overlap across a range is the store's to refuse,
+            // under a lock; with overlaps refused two closures can never share a start, so
+            // this index stays a true backstop rather than a rule the lock could contradict.
             closure.HasIndex(c => c.Date).IsUnique();
 
             // Deleting a closure takes its exemptions with it: an exemption cannot outlive the

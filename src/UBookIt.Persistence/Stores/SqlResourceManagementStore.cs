@@ -33,7 +33,15 @@ internal sealed class SqlResourceManagementStore(UBookItDbContext db, ISiteClosu
         return DomainResult<Resource>.Success(resource);
     }
 
-    public async Task<DomainResult<Resource>> UpdateAsync(Resource resource, CancellationToken cancellationToken = default)
+    public Task<DomainResult<Resource>> UpdateAsync(Resource resource, CancellationToken cancellationToken = default)
+        => UpdateCoreAsync(resource, keepClosedPeriods: false, cancellationToken);
+
+    public Task<DomainResult<Resource>> UpdateKeepingClosedPeriodsAsync(
+        Resource resource, CancellationToken cancellationToken = default)
+        => UpdateCoreAsync(resource, keepClosedPeriods: true, cancellationToken);
+
+    private async Task<DomainResult<Resource>> UpdateCoreAsync(
+        Resource resource, bool keepClosedPeriods, CancellationToken cancellationToken)
     {
         await using var transaction = await db.Database
             .BeginTransactionAsync(cancellationToken).ConfigureAwait(false);
@@ -56,6 +64,35 @@ internal sealed class SqlResourceManagementStore(UBookItDbContext db, ISiteClosu
                 FailureCodes.ResourceNotFound, $"No resource exists with id {resource.Id}.");
         }
 
+        if (keepClosedPeriods)
+        {
+            // The caller did not send closed periods, so the stored ones stay — and the
+            // exceptions it did send must not contradict them. The caller's own check ran
+            // against periods it read before taking this lock; another writer may have
+            // stored a period since. Judged again here, under the lock, so last-writer-wins
+            // can never store "closed for the period" beside "open 10:00–14:00 that day".
+            var stored = await db.ClosedPeriods
+                .AsNoTracking()
+                .Where(p => p.ResourceId == resource.Id)
+                .ToListAsync(cancellationToken)
+                .ConfigureAwait(false);
+
+            var conflict = resource.Availability.Exceptions
+                .Select(e => e.Date)
+                .Where(date => stored.Any(p => date >= p.StartDate && date <= p.EndDate))
+                .Order()
+                .Select(date => (DateOnly?)date)
+                .FirstOrDefault();
+
+            if (conflict is { } date)
+            {
+                return DomainResult<Resource>.Failure(
+                    FailureCodes.ClosedPeriodConflictsWithException,
+                    $"{date:yyyy-MM-dd} is inside one of the resource's closed periods, so it cannot also carry an exception.",
+                    "ClosedPeriods");
+            }
+        }
+
         ResourceRowMapper.ApplyScalars(resource, row);
 
         // Full replace of availability child rows (never a merge).
@@ -75,6 +112,15 @@ internal sealed class SqlResourceManagementStore(UBookItDbContext db, ISiteClosu
         // inside the same transaction and under the same per-resource lock, so a write can
         // neither merge two writers' sets nor leave a resource half-exempted.
         db.ResourceClosureOptOuts.AddRange(ResourceRowMapper.ToClosureOptOutRows(resource));
+
+        // Closed periods likewise — unless the caller did not send them, in which case
+        // their rows are not touched at all rather than read and re-written.
+        if (!keepClosedPeriods)
+        {
+            await db.ClosedPeriods.Where(p => p.ResourceId == resource.Id)
+                .ExecuteDeleteAsync(cancellationToken).ConfigureAwait(false);
+            db.ClosedPeriods.AddRange(ResourceRowMapper.ToClosedPeriodRows(resource));
+        }
 
         await db.SaveChangesAsync(cancellationToken).ConfigureAwait(false);
         await transaction.CommitAsync(cancellationToken).ConfigureAwait(false);
@@ -177,6 +223,7 @@ internal sealed class SqlResourceManagementStore(UBookItDbContext db, ISiteClosu
             .Include(r => r.Exceptions)
             .Include(r => r.Capabilities)
             .Include(r => r.ClosureOptOuts)
+            .Include(r => r.ClosedPeriods)
             .AsSplitQuery()
             .OrderBy(r => r.DisplayName).ThenBy(r => r.Id)
             .Skip(skip)

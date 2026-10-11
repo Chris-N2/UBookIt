@@ -103,10 +103,30 @@ public sealed class HolidayPreviewService(
                 $"The site's public holiday source failed ({exception.GetType().Name}).");
         }
 
+        // Every date a closure covers, clipped to the window: a holiday inside a range is
+        // already closed exactly as one on a single-day closure is. Clipping keeps the cost
+        // to the window's length, however long a closure runs.
         var closedDates = (await closures.ListAsync(cancellationToken).ConfigureAwait(false))
-            .Select(closure => closure.Date);
+            .Where(closure => closure.Date <= to && closure.EndDate >= from)
+            .SelectMany(closure => CoveredWithin(closure, from, to));
 
         return DomainResult<IReadOnlyList<HolidayRow>>.Success(
             HolidayImport.Classify(holidays ?? [], closedDates, from, to));
+    }
+
+    private static IEnumerable<DateOnly> CoveredWithin(SiteClosure closure, DateOnly from, DateOnly to)
+    {
+        var first = closure.Date > from ? closure.Date : from;
+        var last = closure.EndDate < to ? closure.EndDate : to;
+
+        for (var date = first; date <= last; date = date.AddDays(1))
+        {
+            yield return date;
+
+            if (date == DateOnly.MaxValue)
+            {
+                yield break;
+            }
+        }
     }
 }

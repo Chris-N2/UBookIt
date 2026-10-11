@@ -16,10 +16,10 @@ internal static class SiteClosureRowMapper
     /// <see cref="ResourceRowMapper"/> has.
     /// </summary>
     internal static SiteClosure ToDomain(SiteClosureRow row)
-        => SiteClosure.Create(row.Date, row.Label, row.Id).Value;
+        => SiteClosure.Create(row.Date, row.Label, row.Id, row.EndDate).Value;
 
     internal static SiteClosureRow ToRow(SiteClosure closure)
-        => new() { Id = closure.Id, Date = closure.Date, Label = closure.Label };
+        => new() { Id = closure.Id, Date = closure.Date, EndDate = closure.EndDate, Label = closure.Label };
 }
 
 /// <summary>
@@ -44,18 +44,32 @@ internal sealed class SqlSiteClosureStore(UBookItDbContext db) : ISiteClosureSto
 /// SQL Server implementation of <see cref="ISiteClosureManagementStore"/>.
 /// </summary>
 /// <remarks>
-/// <b>Uniqueness is the index's job; the pre-check is for reportability.</b> Both are
-/// present for the reason the booking reference has both: a check before writing is a
-/// race, so the index is what guarantees one closure per date — but an unguarded race
-/// would then surface as a database exception rather than as the stable
-/// <see cref="FailureCodes.DuplicateClosureDate"/> code, so the violation is translated
-/// rather than left to escape.
+/// <para>
+/// <b>No date is covered twice, and that is guaranteed by a lock, not an index.</b> SQL
+/// Server has no exclusion constraint for ranges, so every write that could change
+/// coverage — create, update, and the import, which creates — takes one site-wide
+/// application lock inside its transaction and checks for an overlapping closure while
+/// holding it. A check before writing is otherwise a race; under the lock it is not.
+/// </para>
+/// <para>
+/// <b>The unique index on the start date stays, as a backstop.</b> With overlaps refused,
+/// two closures can never share a start, so the index can never reject a write the lock
+/// let through — but if it ever did, the violation is translated to the stable
+/// <see cref="FailureCodes.DuplicateClosureDate"/> code rather than escaping as a database
+/// exception.
+/// </para>
 /// </remarks>
 internal sealed class SqlSiteClosureManagementStore(UBookItDbContext db) : ISiteClosureManagementStore
 {
     private const int SqlUniqueIndexViolation = 2601;
 
     private const int SqlUniqueConstraintViolation = 2627;
+
+    /// <summary>
+    /// One name for every closure write: overlap is a property of the whole list, so
+    /// writers of different closures must still serialise against each other.
+    /// </summary>
+    private const string ClosureWriteLock = "ubookit:site-closures";
 
     public async Task<IReadOnlyList<SiteClosure>> ListAsync(
         DateOnly? from = null, CancellationToken cancellationToken = default)
@@ -65,8 +79,9 @@ internal sealed class SqlSiteClosureManagementStore(UBookItDbContext db) : ISite
         if (from is { } earliest)
         {
             // Filtered here rather than by the client hiding rows, so the view's default
-            // does not depend on fetching every closure a site has ever recorded.
-            query = query.Where(c => c.Date >= earliest);
+            // does not depend on fetching every closure a site has ever recorded. By END
+            // date, so a closure already in progress is still upcoming.
+            query = query.Where(c => c.EndDate >= earliest);
         }
 
         var rows = await query
@@ -90,23 +105,29 @@ internal sealed class SqlSiteClosureManagementStore(UBookItDbContext db) : ISite
     public async Task<DomainResult<SiteClosure>> CreateAsync(
         SiteClosure closure, CancellationToken cancellationToken = default)
     {
-        var taken = await db.SiteClosures
-            .AnyAsync(c => c.Date == closure.Date, cancellationToken)
-            .ConfigureAwait(false);
+        await using var transaction = await db.Database
+            .BeginTransactionAsync(cancellationToken).ConfigureAwait(false);
 
-        if (taken)
+        await AppLock.AcquireAsync(db, ClosureWriteLock, cancellationToken).ConfigureAwait(false);
+
+        if (await OverlapsAnotherAsync(closure, cancellationToken).ConfigureAwait(false) is { } clash)
         {
-            return DuplicateDate(closure.Date);
+            return clash;
         }
 
         db.SiteClosures.Add(SiteClosureRowMapper.ToRow(closure));
 
-        return await SaveTranslatingDuplicateAsync(closure, cancellationToken).ConfigureAwait(false);
+        return await SaveTranslatingDuplicateAsync(closure, transaction, cancellationToken).ConfigureAwait(false);
     }
 
     public async Task<DomainResult<SiteClosure>> UpdateAsync(
         SiteClosure closure, CancellationToken cancellationToken = default)
     {
+        await using var transaction = await db.Database
+            .BeginTransactionAsync(cancellationToken).ConfigureAwait(false);
+
+        await AppLock.AcquireAsync(db, ClosureWriteLock, cancellationToken).ConfigureAwait(false);
+
         var row = await db.SiteClosures
             .FirstOrDefaultAsync(c => c.Id == closure.Id, cancellationToken)
             .ConfigureAwait(false);
@@ -117,21 +138,19 @@ internal sealed class SqlSiteClosureManagementStore(UBookItDbContext db) : ISite
                 FailureCodes.ClosureNotFound, $"No closure exists with id {closure.Id}.");
         }
 
-        var taken = await db.SiteClosures
-            .AnyAsync(c => c.Date == closure.Date && c.Id != closure.Id, cancellationToken)
-            .ConfigureAwait(false);
-
-        if (taken)
+        // Its own previous range is excluded: extending a closure is not an overlap with itself.
+        if (await OverlapsAnotherAsync(closure, cancellationToken).ConfigureAwait(false) is { } clash)
         {
-            return DuplicateDate(closure.Date);
+            return clash;
         }
 
         // The id is kept, which is what carries a resource's exemption with the closure
-        // when its date moves.
+        // when its dates move.
         row.Date = closure.Date;
+        row.EndDate = closure.EndDate;
         row.Label = closure.Label;
 
-        return await SaveTranslatingDuplicateAsync(closure, cancellationToken).ConfigureAwait(false);
+        return await SaveTranslatingDuplicateAsync(closure, transaction, cancellationToken).ConfigureAwait(false);
     }
 
     public async Task<DomainResult> DeleteAsync(Guid closureId, CancellationToken cancellationToken = default)
@@ -149,6 +168,33 @@ internal sealed class SqlSiteClosureManagementStore(UBookItDbContext db) : ISite
             : DomainResult.Success();
     }
 
+    /// <summary>
+    /// The refusal for a closure sharing any date with another, or null when none does.
+    /// Must run under <see cref="ClosureWriteLock"/>.
+    /// </summary>
+    private async Task<DomainResult<SiteClosure>?> OverlapsAnotherAsync(
+        SiteClosure closure, CancellationToken cancellationToken)
+    {
+        var other = await db.SiteClosures
+            .AsNoTracking()
+            .Where(c => c.Id != closure.Id && c.Date <= closure.EndDate && c.EndDate >= closure.Date)
+            .OrderBy(c => c.Date)
+            .FirstOrDefaultAsync(cancellationToken)
+            .ConfigureAwait(false);
+
+        if (other is null)
+        {
+            return null;
+        }
+
+        var shared = other.Date > closure.Date ? other.Date : closure.Date;
+
+        return DomainResult<SiteClosure>.Failure(
+            FailureCodes.DuplicateClosureDate,
+            $"Another closure (\"{other.Label}\") already covers {shared:yyyy-MM-dd}.",
+            nameof(SiteClosure.Date));
+    }
+
     private static DomainResult<SiteClosure> DuplicateDate(DateOnly date)
         => DomainResult<SiteClosure>.Failure(
             FailureCodes.DuplicateClosureDate,
@@ -156,11 +202,14 @@ internal sealed class SqlSiteClosureManagementStore(UBookItDbContext db) : ISite
             nameof(SiteClosure.Date));
 
     private async Task<DomainResult<SiteClosure>> SaveTranslatingDuplicateAsync(
-        SiteClosure closure, CancellationToken cancellationToken)
+        SiteClosure closure,
+        Microsoft.EntityFrameworkCore.Storage.IDbContextTransaction transaction,
+        CancellationToken cancellationToken)
     {
         try
         {
             await db.SaveChangesAsync(cancellationToken).ConfigureAwait(false);
+            await transaction.CommitAsync(cancellationToken).ConfigureAwait(false);
             return DomainResult<SiteClosure>.Success(closure);
         }
         catch (DbUpdateException ex) when (ex.InnerException is SqlException sql
