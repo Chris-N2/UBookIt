@@ -13,7 +13,7 @@ dotnet add package UBookIt
 ```
 
 Run the site, and uBookIt installs its schema on first boot. It needs **SQL Server** (not SQLite)
-and Umbraco 17.6.2 or later. The full requirements are further down.
+and Umbraco 17.7.1 or later. The full requirements are further down.
 
 **Then grant the section.** Like any Umbraco section, **uBookIt** stays hidden until you grant it
 to a user group: *Users → User Groups → (a group) → Sections*. Grant it deliberately, because it
@@ -170,7 +170,7 @@ a breaking change.
 
 | | |
 |---|---|
-| **Umbraco** | **17.6.2 or later, and not 18 or anything after it** — from `17.1.2` the packages say so, so your package manager refuses a mismatch instead of installing one. Not 13, and not the 14–16 STS line. For Umbraco 18, install uBookIt `18.x`. |
+| **Umbraco** | **17.7.1 or later, and not 18 or anything after it** — from `17.1.2` the packages say so, so your package manager refuses a mismatch instead of installing one. Not 13, and not the 14–16 STS line. For Umbraco 18, install uBookIt `18.x`. On a site below 17.7.1, installing uBookIt raises the Umbraco packages it depends on and leaves the rest where they are; **upgrade `Umbraco.Cms` itself to 17.7.1 first** so every Umbraco package stays on one version. |
 | **.NET** | 10.0 |
 | **Database** | **SQL Server.** SQLite is not supported, including the SQLite database a `dotnet new umbraco` site gives you by default. |
 

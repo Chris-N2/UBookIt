@@ -104,8 +104,19 @@ the lines do differ.
   `scripts/ci/Assert-TestResults.ps1` fails the run if any test project on disk did not report or
   any test was skipped. It publishes nothing and holds no secrets.
 - **`audit`** — Mondays 06:00 UTC, and on demand from the Actions tab. Audits the NuGet graph of
-  **both** lines for known vulnerabilities, direct and transitive, and fails on any. Advisories are
-  deliberately *not* errors in the `ci` build (see `Directory.Build.props`): an advisory is
+  **both** lines for known vulnerabilities, direct and transitive, and fails on any, with one
+  narrow exception: a project that is not packable can accept an advisory it suppresses
+  (`NuGetAuditSuppress`), for one no reachable version can fix yet. What a project suppresses,
+  and whether it is packable, are taken from MSBuild's evaluation of it, as Debug and as Release,
+  so imports count, and so does anything else MSBuild sees. The audit reports each accepted
+  finding as a notice, and fails on a suppression that:
+  - matches nothing (stale);
+  - is declared in one configuration but not the other;
+  - is declared by a project that is packable in either configuration; or
+  - is declared by a project that targets more than one framework.
+
+  Today the only accepted advisories are `UBookIt.TestSite`'s, for ImageSharp 3.1.12, which it
+  reaches through Umbraco; see the comment there. Advisories are deliberately *not* errors in the `ci` build (see `Directory.Build.props`): an advisory is
   published against a package, not introduced by a commit, and would otherwise fail unrelated
   work. **GitHub disables scheduled workflows after 60 days without repository activity** — if the
   project goes quiet, run it by hand.

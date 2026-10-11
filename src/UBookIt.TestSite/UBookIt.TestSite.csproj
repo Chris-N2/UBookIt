@@ -48,6 +48,29 @@
     <ProjectReference Include="..\..\tests\UBookIt.Tests.ThemeFixture\UBookIt.Tests.ThemeFixture.csproj" />
   </ItemGroup>
 
+  <!--
+    ACCEPTED ADVISORIES (umbraco-security-2026-10, 2026-10-11) - SixLabors.ImageSharp 3.1.12.
+
+    Every one is fixed only in ImageSharp 4.1.2 and later, a major version, and no Umbraco release
+    depends on one: Umbraco.Cms.Imaging.ImageSharp 17.7.1 and 18.2.1 both still take 3.1.12, and
+    ImageSharp.Web 3.2.0 is built against 3.x. This project is the only one that reaches it, through
+    the full Umbraco install, and it is never deployed. No package uBookIt ships depends on it.
+
+    Forcing 4.x here would put a major version under code compiled against 3.x in order to protect
+    nobody. So these are suppressed HERE, unconditionally, and nowhere else. The audit
+    (scripts/ci/Assert-NoVulnerablePackages.ps1) still sees each finding and reports it as accepted.
+    It FAILS if any of these stops matching, because the suppression would then be stale: remove the
+    line when Umbraco moves to a fixed ImageSharp. It also fails if a packable project ever suppresses
+    anything.
+  -->
+  <ItemGroup>
+    <NuGetAuditSuppress Include="https://github.com/advisories/GHSA-gwg2-r3hj-4w44" /> <!-- moderate: ICC CLUT allocation -->
+    <NuGetAuditSuppress Include="https://github.com/advisories/GHSA-wmxv-xphr-5c9g" /> <!-- moderate: BigTIFF IFD loop -->
+    <NuGetAuditSuppress Include="https://github.com/advisories/GHSA-j3p4-wp97-rph4" /> <!-- high: HistogramEqualization index -->
+    <NuGetAuditSuppress Include="https://github.com/advisories/GHSA-j9gm-c75j-xc9q" /> <!-- high: TIFF CCITT T4 encoder overrun -->
+    <NuGetAuditSuppress Include="https://github.com/advisories/GHSA-jjfr-hcj7-qf5w" /> <!-- high: TIFF CCITT T6 encoder overrun -->
+  </ItemGroup>
+
 
   <PropertyGroup>
     <!-- Razor files are needed for the backoffice to work correctly -->
