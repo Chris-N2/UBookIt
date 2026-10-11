@@ -54,20 +54,39 @@ with the first. Because `scripts/ci/` is parity-checked, it would also have to b
 both lines, while the need for it is per line: the two lines' Umbraco versions could adopt
 ImageSharp 4 at different times.
 
-### D3. The audit reads suppressions from the project file, and is fail-closed where it cannot tell
+### D3. The audit asks MSBuild what each project suppresses and whether it is packable
 
-For each project in the `dotnet list` report, the script reads that project's own file as XML:
+For each project in the `dotnet list` report, the script runs
+`dotnet msbuild <project> -getProperty:IsPackable -getItem:NuGetAuditSuppress` and reads the
+JSON it returns:
 
-- **Suppressions:** the `NuGetAuditSuppress` items' `Include` values, compared with the finding's
-  advisory URL ignoring case and a trailing slash.
-- **Packability:** a project is non-packable only if its own file sets `IsPackable` to `false`.
-  Anything else, including a value inherited from an import, counts as packable.
+- **Suppressions:** the evaluated `NuGetAuditSuppress` items' `Identity`, compared with the
+  finding's advisory URL ignoring case and a trailing slash.
+- **Packability:** a project is non-packable only if its evaluated `IsPackable` is `false`.
+- **A project MSBuild cannot evaluate** (a non-zero exit, or output that is not the expected
+  JSON) fails the audit by name, and accepts nothing.
 
-Reading the file as XML, rather than evaluating it with MSBuild, makes the script blind to
-suppressions declared through imports. That blindness errs in the safe direction. A suppression
-declared in `Directory.Build.props` would silence the build warning, but the audit would not
-see it, so the finding would stay unaccepted and the audit would fail. The script can reject an
-exception it cannot see, but never accept one. That limit is written into the script's header.
+This is the evaluation NuGet's own audit reads suppressions from. So conditions, `<Choose>`,
+document order (the last `IsPackable` wins) and imports such as `Directory.Build.targets` mean
+exactly what they mean to the build. An item inside a `<Target>` is a suppression to neither.
+
+**Superseded at QA round 1. The first version read each project file as XML** and claimed that
+erred safe ("it can reject an exception it cannot see, but never accept one"). QA disproved
+that with four reproductions where it **accepted** an advisory MSBuild would not:
+- a later `IsPackable=true` after an earlier `false`;
+- a suppression under `<Choose><When Condition>`;
+- a suppression inside a `<Target>`;
+- by reasoning, a `Directory.Build.targets` override.
+
+A second, weaker model of MSBuild disagrees with MSBuild in *both* directions, so "fail-closed"
+was never available to it. The lesson is to ask the thing that decides. Each of the four is now
+a test that fails against the XML version (verified by running the new tests against it), and
+the earlier rule "a conditional suppression fails outright" is dropped in favour of what the
+condition evaluates to.
+
+Cost: one MSBuild evaluation per project. The real solution's audit takes about a minute (57 s
+locally for 10 projects), which is acceptable for a weekly job. Environment variables are
+MSBuild properties, so the evaluation sees the same environment the audit's restore does.
 
 Outcomes, per project:
 
@@ -86,8 +105,9 @@ green run with accepted findings does not read as "no advisories".
 
 `Assert-NoVulnerablePackages.ps1` gains an optional `-Report <path>`. When given, it reads that
 JSON instead of running `dotnet list`. The workflow does not change. Project paths in a report
-are resolved as given. The test fixtures write a report and small project files into a temporary
-directory.
+are resolved as given. The test fixtures write a report and small, real SDK projects into a
+temporary directory, because the script evaluates them. Fixture conditions use a property nothing
+sets, never one an environment variable could supply: `CI` is set on the runner.
 
 A test class in `UBookIt.Tests`, the first to run one of the CI scripts, invokes `pwsh` against
 fixtures for each row of D3. It also covers the unchanged cases (a plain finding fails; a clean
