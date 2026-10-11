@@ -154,8 +154,14 @@
 
 ## 4. QA, merge, archive
 
-- [ ] 4.1 QA in a fresh subagent, covering both branches in one review. Hand over the claims and
-      the evidence, to be verified rather than trusted. Verify: APPROVE.
+- [x] 4.1 QA in a fresh subagent, covering both branches in one review. Hand over the claims and
+      the evidence, to be verified rather than trusted. Verify: APPROVE. *(Four rounds, one
+      reviewer:*
+      - *Round 1 REJECT. The XML reading accepted advisories MSBuild would not, plus 5 MINORs.*
+      - *Round 2 REJECT. MSBuild was asked as Debug only, and only the outer evaluation.*
+      - *Round 3 REJECT. A one-configuration suppression was judged by nothing.*
+      - *Round 4 APPROVE WITH NITS. 9 of 9 scenarios hold, and every suppression is judged by
+        something. Both NITs taken: scenario wording, runbook wrap.)*
 - [ ] 4.2 Chris pushes both branches and opens PRs. CI is expected red on parity until both
       branches carry the script (design D6), and goes green once both are pushed. Verify: run IDs
       recorded.
