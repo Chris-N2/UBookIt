@@ -39,12 +39,17 @@
 
 ## 2. Clean build and suites
 
-- [ ] 2.1 Stop the TestSite. Delete `src/*/bin/Release`, `src/*/obj/Release` and the backoffice
+- [x] 2.1 Stop the TestSite. Delete `src/*/bin/Release`, `src/*/obj/Release` and the backoffice
   `App_Plugins` output. Build the client first, then `CI=true dotnet build UBookIt.slnx -c Release
   --no-incremental`. Verify: 0 warnings.
-- [ ] 2.2 Run the suites per project, sequentially. Verify: unit **2029**, integration **194**,
+  *Done 2026-10-11 on `c26527e`:* the TestSite was stopped, and every `src/*` and `tests/*`
+  `bin/Release` and `obj/Release`, plus the `App_Plugins` output, was deleted. The client was
+  built, then `CI=true … --no-incremental`: **0 warnings, 0 errors**.
+- [x] 2.2 Run the suites per project, sequentially. Verify: unit **2029**, integration **194**,
   rendering **1168**, client **335**, each with 0 skipped. `openspec validate --all --strict`
   passes.
+  *Done, all 0 skipped:* unit **2029**, integration **194**, rendering **1168**, client **335**
+  (15 files). `openspec validate --all --strict`: **27/27**.
 
 ## 3. Review and merge
 
