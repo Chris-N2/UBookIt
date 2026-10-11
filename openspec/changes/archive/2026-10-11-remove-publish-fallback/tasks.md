@@ -84,7 +84,10 @@
       only version-literal differences and v18's existing unrelated wording.
 - [x] 4.2 Redo 3.2, 3.3 and 3.3a by hand in v18's `VersionTruthTests.cs`. Do not cherry-pick it: the file
       differs by about 290 lines. Verify: the same pins exist on both lines (compare the
-      `SaysOnce` lists), and v18's `nuget.org` count matches its own recount.
+      `SaysOnce` lists), and v18's `nuget.org` count matches its own recount. *(What happened: the
+      cherry-pick applied the test hunks cleanly despite the file's differences, so it was used
+      and then checked. The pin lists matched, 24 each, v18's count matched its recount, and all
+      six new pins were mutation-proved on v18, by apply and again by QA.)*
 - [x] 4.3 Copy the change folder (`openspec/changes/remove-publish-fallback/`) onto the v18 branch.
       Verify: `openspec validate remove-publish-fallback --type change --strict` is valid there.
 - [x] 4.4 Full verification on v18, as in 3.4. Verify: green at v18's baselines (unit 2017 ± delta,
@@ -94,11 +97,20 @@
 
 - [x] 5.1 QA review in a fresh subagent, covering both branches in one review. Give the reviewer
       the claims (counts, greps, the D5 pin pairs) to verify rather than trust. Verify: APPROVE. *(Round 1 REJECT: 1 MAJOR, 3 MINOR. Round 2 APPROVE WITH NITS, both branches; two cosmetic nits taken.)*
-- [ ] 5.2 Chris pushes both branches and opens PRs into `main` and `dev/v18`, and CI is green on
-      each. Verify: run IDs recorded.
-- [ ] 5.3 After merge, archive on each line so its `release-publishing` spec gains the ADDED
+- [x] 5.2 Chris pushes both branches and opens PRs into `main` and `dev/v18`, and CI is green on
+      each. Verify: run IDs recorded. *(PR #11 → `main`, merge `e5c6e52`, PR CI run
+      `38120898159` green. PR #12 → `dev/v18`, merge `474405d`, PR CI run `38120993295` green.
+      2026-10-11.)*
+- [x] 5.3 After merge, archive on each line so its `release-publishing` spec gains the ADDED
       requirement and loses the REMOVED one. Do the outward grep of `openspec/specs/` for any
       sibling sentence that still promises a manual route. Verify: `openspec validate --all
-      --strict` passes on both lines, and the grep result is recorded.
+      --strict` passes on both lines, and the grep result is recorded. *(Grep before the archive,
+      2026-10-11, across `openspec/specs/*/spec.md`, for fallback/by hand/manual route/manual
+      push/manual procedure/API-key procedure/pushing by hand/hand route: the only hits are in
+      the requirement this change REMOVES (`release-publishing` lines 233, 247, 249). No sibling
+      sentence elsewhere. `packaging`'s "a `403` naming the API key" stays true, because the
+      workflow's push key is the exchanged one.)*
 - [ ] 5.4 Outside the repository (Chris): delete the remaining nuget.org API key, and confirm no
       nuget.org key exists among the repository's Actions secrets. Verify: Chris confirms both.
+      *(Open at archive. Not a repository task: carried in the maintainer's notes until Chris
+      confirms.)*
