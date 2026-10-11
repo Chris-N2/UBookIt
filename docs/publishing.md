@@ -19,7 +19,8 @@ only the first: `17.0.0` is already out, and all of it applies unchanged to the 
 - **Unlisting is not deletion.** An unlisted package stays resolvable by exact version, so
   anything published by mistake remains installable by anyone who knows the number.
 
-The practical consequence: **check the produced `.nuspec`, not the source, before you push.**
+The practical consequence: **check the produced `.nuspec`, not the source, before you approve the
+publish.**
 
 ## Status
 
@@ -77,18 +78,12 @@ expire at the events it describes.**
   tested unattended, as is the latest push to any other branch (see *Continuous integration*
   below). No branch protection requires a green run, so an untested push is visible rather than
   prevented.
-- **The manual fallback is still documented, although both lines now release through the
-  workflow.** `17.2.2` and `18.1.2` were the first releases through it, both on 2026-09-26: token
-  exchange, policy and approval all worked, and every package and symbol package went on its first
-  push. Removing *Fallback: pushing by hand* is the next change. Until then it stays, labelled as
-  the fallback. A dry run exercises everything except the token exchange (see *Publishing a
-  release*). **What the feed answers when a symbol package is
-  pushed while its predecessor is still pending has not been seen**, because no push has met
-  that case yet. If it isn't the wording the workflow expects, the step fails closed rather than
-  reporting success.
+- **What the feed answers when a symbol package is pushed while its predecessor is still pending
+  has not been seen**, because no push has met that case yet. If it isn't the wording the workflow
+  expects, the step fails closed rather than reporting success.
 - **The packages are owned by a personal account**, not by the organisation. So is the Trusted
-  Publishing policy (see *Trusted Publishing setup*), and the key ownership note under
-  *Fallback: pushing by hand* applies to both.
+  Publishing policy. Read *Trusted Publishing setup*, including its 403 section, before moving
+  either.
 
 ## Continuous integration
 
@@ -165,9 +160,9 @@ machine without one is told so rather than silently building with another band.
   in `ci` for that commit, which the check job requires to have passed.
 
 **Nothing checks that those values are right, and copyright is checked by nothing at all.** So
-read one `.nuspec` from the run's `packages` artifact before you approve. Every one of them is
-frozen at push. The run also makes the tag-before-package order automatic, because the tag
-is what starts it. **It does not replace:**
+read the `.nuspec` files from the run's `packages` artifact before you approve (see *Verify, do
+not assume*). Every one of them is frozen at push. The run also makes the tag-before-package
+order automatic, because the tag is what starts it. **It does not replace:**
 - *Before any push* — the version bump and the prose it moves are still yours;
 - the tagged screenshot `curl` in *Tag the release* — **do it before you approve**;
 - *After the push* — indexing, the package page, the Marketplace.
@@ -178,9 +173,12 @@ pack in full and never reaches the publish job, so nothing is approved and no cr
 requested. It works for tags older than the workflow, because the scripts come from the branch
 the run was started from.
 
-**If the workflow cannot publish** — for example, nuget.org's token exchange is down — use
-*Fallback: pushing by hand* below. It is the fallback, not a second route. Everything in it was
-the procedure for every release up to `17.2.1`/`18.1.1`.
+**There is no hand route.** If the workflow cannot publish (for example, nuget.org's token
+exchange is down, or the workflow itself is broken), the release waits. If the workflow needs
+fixing, fix it in a change of its own and then release through it. Do not create an API key and
+push a local pack. That would skip the tag check, the clean-clone pack, the package verification,
+the approval and the push order, and those checks are the reason the workflow exists. Every
+release up to `17.2.1`/`18.1.1` was pushed by hand, and the sections below record what that cost.
 
 ## Trusted Publishing setup
 
@@ -211,16 +209,54 @@ failed token exchange at release time. Both halves name each other, so change th
 
 Notes on the policy:
 - **The scope is deliberately narrow.** A release never creates a package ID, so a misused token
-  cannot either. The cost: a newly added packable project fails its push with a `403`, and
-  because libraries go first, the meta-package is not pushed. Widen the scope, then re-run the
-  publish job, which completes the release and marks what was already there.
-- **An empty package selection is the first-push `403` again**, and fails only at the first real
-  release.
+  cannot either. What that costs, when a new package is added, is check 2 in the section below.
 - **The policy belongs to the account that owns the packages.** Transferring them to the
   organisation means creating a new policy under the new owner. The workflow's `NUGET_USER` then
   changes to match.
 - **One policy serves both lines**, because the workflow file is the same on both. Renaming
   `publish.yml` or the environment breaks it.
+
+### A 403 usually means the policy's OWNER, not the key
+
+The workflow pushes with the one-hour key that the token exchange returns. So a policy problem can
+surface in either of two places, and **neither has yet been seen on this workflow**:
+
+- **At the login step**, when the exchange refuses the run's token. nuget.org marks a policy
+  *inactive*, with a warning on its Trusted Publishing page, when the organization that owns it is
+  locked or deleted, or when the member who created it leaves that organization.
+- **At the push**, as `403 (The specified API key is invalid, has expired, or does not have
+  permission to access the specified package.)`. That one message covers several conditions,
+  and it names only the key. That sends you to check the thing least likely to be wrong, since
+  the exchange has just issued the key. This 403 cost the first publish attempt, when the key was
+  made by hand.
+
+Check these in order:
+
+1. **Can the policy's owner publish?** The owner is your account or a nuget.org **organization**
+   you belong to, and the policy applies to the packages that owner owns. And an organization has
+   its own email address that must be confirmed separately from yours. nuget.org requires that address
+   to be distinct from any member account's. So if you give the organization the address you
+   already use, it stays permanently unconfirmed. That is what made the first publish's hand-made
+   key fail with this 403. **To isolate it, open the policy on the Trusted Publishing page**: an
+   ownership problem shows there as a warning on an inactive policy. If the owner is an
+   organization, also check its address is confirmed on the organization's own page. It has not
+   been observed whether an unconfirmed address marks the policy inactive, or only fails the push.
+2. **Does the scope cover what is being pushed?** The policy is scoped to new versions of existing
+   packages (see the notes above), so it cannot create an ID that does not exist yet. A newly added
+   packable project therefore fails its push with this 403. Libraries go first, so the
+   meta-package is not pushed either. Widen the scope, then re-run the publish job, which
+   completes the release and marks what was already there.
+3. **Does the package selection match it?** The selection is the glob in the table above. A
+   package whose ID the glob does not match is refused the same way. **An empty selection**
+   refuses every package, and shows only at the first real release. Correct the selection, then
+   re-run the publish job.
+4. **Is the package ID already owned by somebody else?** If
+   `GET https://api.nuget.org/v3-flatcontainer/<id>/index.json` returns 404, the ID is unclaimed.
+
+Ownership is **not** a reason to delay a push. A package can be transferred to an organization
+afterwards from its Manage Owners page, and owners can be added and removed freely. Unlike the
+metadata, ownership is not a one-way door. The policy does not move with it, though: see the
+ownership note above.
 
 ## Before any push
 
@@ -228,9 +264,7 @@ Notes on the policy:
    `PackageProjectUrl` and `RepositoryUrl`; `VersionTruthTests.The_package_points_at_a_public_home`
    asserts they are `https`, not a known-private host, and name the repository the source lives
    in. It cannot check the URL actually resolves — open it in a browser once, logged out.
-2. **The git remote must already be the public one.** This is not cosmetic: see the ordering
-   section below.
-3. **The version must be the one you mean.** `<Version>` in `Directory.Build.props` is the only
+2. **The version must be the one you mean.** `<Version>` in `Directory.Build.props` is the only
    place it is **declared**; every package and the backoffice manifest derive from it.
    **Prose is a different matter, and a bump has to move it by hand.** Three documents state a
    version in words, in a URL or in a command — `README.md` in **three** places and this runbook
@@ -274,7 +308,7 @@ Notes on the policy:
    naming the version the public API was declared stable from. Both are pinned against the
    archived release change, and editing them forward turns them into falsehoods and turns the
    suite red. Never find-and-replace the version across the repository.
-4. **The suite must be green from a clean build.** Never accept a `--no-build` run as evidence —
+3. **The suite must be green from a clean build.** Never accept a `--no-build` run as evidence —
    it can execute stale assemblies and report green.
 
 ## The order that makes SourceLink correct
@@ -292,42 +326,44 @@ So a package built before the remote moved carries the old SourceLink URLs *even
 properties are right* — and a consumer stepping into uBookIt in a debugger is sent to a
 repository they cannot open.
 
-```
-1. correct the properties        (committed AND PUSHED - see the SHA section below)
-2. switch the git remote         git remote set-url origin <public URL>
-3. DELETE the old artifacts      dotnet clean UBookIt.slnx -c Release
-                                 Remove-Item -Recurse -Force src/*/bin/Release
-4. clean rebuild                 dotnet build UBookIt.slnx -c Release --no-incremental
-5. pack                          dotnet pack UBookIt.slnx -c Release
-6. VERIFY before pushing         (below)
-```
+The order that makes both right is: correct the properties, move the remote, then rebuild from
+nothing. **The workflow makes that order a property of where it packs, not a sequence somebody
+follows.** Its pack job clones the public repository afresh at the tagged commit. So the
+properties are the ones that commit declares, the remote *is* the public repository, and there are
+no earlier build outputs. Its verification then fails the run if any SourceLink URL names another
+repository or another commit. Nothing about this order is left to a maintainer, and there are no
+local pack steps to follow for a release.
 
-**Step 3 is not housekeeping — without it steps 4 and 5 can produce nothing.** `--no-incremental`
-governs the *build*; it does not force `GenerateNuspec`, which skips when its outputs look
-up-to-date (`Skipping target "GenerateNuspec" because all output files are up-to-date`). A
-`.nupkg` produced *before* the remote moved therefore survives this whole procedure untouched
-and is then matched by the push wildcard below — the exact failure this document exists to
-prevent, hiding inside its own instructions.
+**A fresh clone is what keeps a stale package out.** `--no-incremental` governs the *build*; it
+does not force `GenerateNuspec`, which skips when its outputs look up-to-date
+(`Skipping target "GenerateNuspec" because all output files are up-to-date`). In a working tree
+that has packed before, a `.nupkg` made before the remote moved can survive a clean rebuild
+untouched and be picked up as if it were new. That was the exact failure this document existed to
+prevent, and it hid inside the manual procedure's own instructions. A clone that has never been
+built has no earlier `.nupkg` to survive. That is why the workflow packs from one, and why a
+package packed in a working copy is never a release candidate.
 
 ### Verify, do not assume
 
+The workflow verifies, for every package, the version, repository, commit, symbols and SourceLink.
+It does that before the publish job can be approved (see *Publishing a release*). **It does not
+verify the values a person chose**, such as authors, copyright, licence, description, icon and
+readme. So before you approve, download the run's `packages` artifact from the run page, unzip it,
+and read what was produced:
+
 ```powershell
-# The packed metadata a consumer sees. A .nupkg is a zip; PowerShell reads one without unzip.
+# Run in the folder the artifact was unzipped into. A .nupkg is a zip; PowerShell reads one
+# without unzip. `[0-9]` selects the meta-package, not the UBookIt.Core/Persistence/... libraries.
 Add-Type -AssemblyName System.IO.Compression.FileSystem
 
-# More than one match here IS the stale-artifact defect Step 3 exists for - a .nupkg from an
-# earlier version surviving the rebuild - so say so rather than failing with a null reference.
-$found = @(Get-ChildItem src/UBookIt/bin/Release/UBookIt.*.nupkg)
-if ($found.Count -ne 1) { throw "Expected exactly one .nupkg, found $($found.Count): $($found.Name -join ', '). Delete them and repack (Step 3)." }
+$found = @(Get-ChildItem 'UBookIt.[0-9]*.nupkg')
+if ($found.Count -ne 1) { throw "Expected exactly one UBookIt meta-package, found $($found.Count): $($found.Name -join ', ')." }
 
 $pkg = [IO.Compression.ZipFile]::OpenRead($found[0].FullName)
 $reader = New-Object IO.StreamReader ($pkg.GetEntry('UBookIt.nuspec').Open())
 $reader.ReadToEnd() -split "`n" |
   Select-String -Pattern 'projectUrl|repository|license|authors|copyright|icon|readme|version'
 $pkg.Dispose()
-
-# Where a debugger will be sent for source
-Get-Content src/UBookIt.Core/obj/Release/net10.0/UBookIt.Core.sourcelink.json
 ```
 
 **`icon` and `readme` are in that pattern deliberately.** Each names a file that must also BE in
@@ -336,11 +372,8 @@ both are frozen at push. A declaration pointing at nothing renders as a blank on
 life of that version.
 
 **Each package carries its own metadata, so check all five** — the commands above read one as
-an example. (Five `.nupkg`, but only four `.snupkg`/`sourcelink.json`: the `UBookIt`
-meta-package contains no assemblies and sets `IncludeSymbols=false`.)
-
-If any `sourcelink.json` still names the old host, step 2 or step 3 did not happen: repack,
-do not push.
+an example. (Five `.nupkg`, but only four `.snupkg`: the `UBookIt` meta-package contains no
+assemblies and sets `IncludeSymbols=false`.)
 
 ## Publish only from a commit that is already on the public repository
 
@@ -356,15 +389,12 @@ version cannot be corrected. A local-only commit, an unmerged branch, or a commi
 after packing all produce this, and every other check in this repository still passes: the
 URLs are right, the host is right, the nuspec is right. Only the SHA is unreachable.
 
-**Pack from the merge commit on main, after it is pushed**, and confirm the SHA the pack will
-embed is one the public repository actually has:
+**The check job refuses a tag whose commit no published line contains**, so the workflow only
+ever packs a commit the public repository already has. That is why the release tag goes on the
+pushed merge commit of the line being released. Tag anything else and the run stops before it
+packs.
 
-```bash
-git rev-parse HEAD                       # the SHA the pack will embed
-git branch -r --contains HEAD            # must list origin/main
-```
-
-## Tag the release before you push the package
+## Tag the release before you approve the publish
 
 **The packed readme's screenshots AND its documentation links are addressed to a git tag named
 after the version**, like this:
@@ -395,22 +425,20 @@ from anything — the guards check that they agree with `<Version>`, they do not
 is true of the four screenshot URLs and of every documentation link alike; bumping one set and not
 the other is the half-done state the checklist above exists to prevent. A
 bump therefore edits the readme's image refs in the same commit as `Directory.Build.props`; see
-*Before any push*, step 3, for the full list of what a bump touches.
+*Before any push*, step 2, for the full list of what a bump touches.
 
 ```bash
-git tag 17.2.2                  # on the commit you are packing from
+git tag 17.2.2                  # on the pushed merge commit you are releasing
 git push origin 17.2.2
 curl -sI https://raw.githubusercontent.com/Chris-N2/UBookIt/17.2.2/docs/images/booking-flow.png
 ```
 
 The `curl` is the point of the step: a `200` means the address the readme carries resolves. Do it
-before the package push, because afterwards it is too late to matter.
+before you approve the publish, because afterwards it is too late to matter.
 
 **Pushing a release tag starts publishing.** The `git push origin <tag>` above triggers the
 `publish` workflow (see *Publishing a release*), which stops at the approval. So the `curl` goes
-between the tag push and your approval. On the fallback route the order is the same. The tag
-push still starts the workflow whenever the tagged commit carries it, so **reject** that run's
-approval rather than letting two routes race.
+between the tag push and your approval.
 
 > **Nothing automated can catch a missing tag.** `VersionTruthTests` proves each image names an
 > allow-listed host, resolves to a file in this working tree, and is pinned to the declared
@@ -424,65 +452,7 @@ hosts](https://learn.microsoft.com/nuget/nuget-org/package-readme-on-nuget-org#a
 reported in a warning visible only to the package owner** — so nobody outside the project will
 ever tell you the page is broken.
 
-## Fallback: pushing by hand
-
-**This is the fallback, not the route** — use it only when *Publishing a release* cannot. It is
-the procedure every release up to `17.2.1`/`18.1.1` followed, kept whole so it still works.
-*The order that makes SourceLink correct* and *Verify, do not assume* above are part of it: on
-this route nobody does them for you.
-
-You need an API key from nuget.org. The route there is not obvious any more: **Account → API Keys
-now lands on Trusted Publishing**, and the API-key form is behind a link on that page.
-
-One command pushes everything. It is written for PowerShell, which is the shell this project is
-driven from — **do not carry a trailing `\` over onto a second line**, that is bash syntax and
-PowerShell will treat the two lines as two commands:
-
-```powershell
-dotnet nuget push "src/**/bin/Release/*.nupkg" --api-key <key> --source https://api.nuget.org/v3/index.json --skip-duplicate
-```
-
-There is **no `dotnet nuget setapikey`**. That command belongs to `nuget.exe`, which the .NET SDK
-does not install, so the key goes on the command line. To keep it out of PSReadLine history, read
-it into a variable first with `Read-Host` and pass the variable.
-
-The `.snupkg` symbol packages are pushed by the same command alongside their `.nupkg`. **Except
-when the `.nupkg` already exists:** then `--skip-duplicate` skips the pair, and the `.snupkg` is
-never attempted (observed against a local BaGet feed while building the workflow; the skipping
-is the client's, so it applies to any feed). To repair symbols
-that failed on an earlier push, push the `.snupkg` by itself.
-
-### A 403 usually means the key's OWNER, not the key
-
-`403 (The specified API key is invalid, has expired, or does not have permission to access the
-specified package.)` is one message covering several conditions, and it names only the key — which
-sends you to check the thing that is least likely to be wrong. This cost the first publish attempt.
-In the order worth checking:
-
-1. **Can the key's owner publish at all?** A key can be owned by your account or by a nuget.org
-   **organization**, and an organization has its own email address that must be confirmed
-   separately from yours. nuget.org requires that address to be distinct from any member
-   account's, so giving the organization the address you already use leaves it permanently
-   unconfirmed — and a key owned by it returns exactly this 403. **The fastest way to isolate
-   this is a second key owned by your personal account**: if that works, the key was never the
-   problem.
-2. **Is the scope "push new packages and package versions"?** The narrower *push only new versions
-   of existing packages* cannot create an ID that does not exist yet, so a first publish fails on
-   every package.
-3. **Is the package ID already owned by somebody else?** `GET https://api.nuget.org/v3-flatcontainer/<id>/index.json`
-   returning 404 means the ID is unclaimed.
-
-Ownership is **not** a reason to delay a push: a package can be transferred to an organization
-afterwards from its Manage Owners page, and owners can be added and removed freely. Unlike the
-metadata, ownership is not a one-way door.
-
-**The same `403` on the workflow route** points at the Trusted Publishing policy, not a key. Check
-its owner can publish, its scope, and its package glob, in that order — see *Trusted Publishing
-setup*.
-
 ## After the push
-
-**Either route.** Everything below applies whether the workflow or the fallback pushed.
 
 A push that succeeds does not mean a package anyone can install yet. Three states follow:
 **accepted**, then **validating** (malware and signature checks), then **indexed**. Throughout the
@@ -508,12 +478,6 @@ usual cause is the tag — confirm
 push the tag if it does not. **A dead documentation link has the same cause and the same cure**,
 at `https://github.com/Chris-N2/UBookIt/blob/<version>/docs/<file>`. The readme itself cannot be
 corrected for this version, which is why both are worth the minute.
-
-*On the fallback route only* (the workflow orders the push itself): the wildcard resolves
-alphabetically, so it pushes the `UBookIt` meta-package FIRST, before the
-libraries it depends on. That is harmless — nuget.org validates each package independently and
-does not require a dependency to exist at push time — but if you push them individually, push
-the libraries first so the meta-package is never briefly uninstallable.
 
 The Umbraco Marketplace picks the package up separately and on its own schedule. There is nothing
 to submit: it lists every package that carries the `umbraco-marketplace` tag and depends on
