@@ -444,7 +444,21 @@
     backoffice until the client was rebuilt.
   - **QA:** reviewed in round 3 by the same reviewer: the content is identical to `main` (5591
     against 5591 changed lines, excluding `types.gen.ts`), and rounds 1–2's fixes hold on v18.
-- [ ] 8.3 Chris pushes both branches and merges them by PR. Verify: CI is green on both PRs and on
+- [x] 8.3 Chris pushes both branches and merges them by PR. Verify: CI is green on both PRs and on
   both merge commits.
-- [ ] 8.4 Archive on both lines after an outward sweep. Then the releases `17.3.0` and `18.2.0`,
+  *Done 2026-10-11:*
+  - PR **#17**: run `38169978931` green; merged as **`4bdeeab`**, push run `38170222558` green.
+  - PR **#18**: run `38170045672` green; merged as **`8aea5aa`**, push run `38170077101` green.
+- [x] 8.4 Archive on both lines after an outward sweep. Then the releases `17.3.0` and `18.2.0`,
   each as its own release change.
+
+  *Done for the archive:* the outward sweep covered `openspec/specs`, `docs/`, `README.md` and
+  `CLAUDE.md`, searching for single-date closure wording ("closure date", "per date", "date and
+  label").
+  - Every hit is inside a requirement this change replaces at archive (resource-management,
+    public-holidays, availability).
+  - Or it reads correctly as "a date a closure covers": `bookings` scenarios 161-166.
+
+  Nothing outside is falsified. The releases `17.3.0` and `18.2.0` follow as their own changes.
+  The 17.3.0 changelog must state the trade-off that an update with no `endDate` makes a
+  single-day closure (proposal).
