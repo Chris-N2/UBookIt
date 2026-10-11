@@ -1,10 +1,10 @@
 ## 1. The audit exception (`main` first; the script is identical on both lines)
 
-- [ ] 1.1 Add `-Report <path>` to `scripts/ci/Assert-NoVulnerablePackages.ps1` (design D4). With it,
+- [x] 1.1 Add `-Report <path>` to `scripts/ci/Assert-NoVulnerablePackages.ps1` (design D4). With it,
       the script reads that JSON instead of running `dotnet list`, and everything after the read
       is unchanged. Verify: running it with no `-Report` against the restored solution behaves
       exactly as before. It fails today, naming the five ImageSharp findings in `UBookIt.TestSite`.
-- [ ] 1.2 Implement design D3's four outcomes:
+- [x] 1.2 Implement design D3's four outcomes:
       - accepted findings produce a `::notice` and are counted;
       - stale suppressions fail;
       - a suppression in a packable project fails;
@@ -13,7 +13,7 @@
       Read suppressions and `IsPackable` from each project's own file as XML, and state that
       limit, and why it errs safe, in the script's header. The summary line states the accepted
       count. Verify by 1.3's tests.
-- [ ] 1.3 Add a test class to `UBookIt.Tests` that runs the script through `pwsh` with `-Report`
+- [x] 1.3 Add a test class to `UBookIt.Tests` that runs the script through `pwsh` with `-Report`
       against fixtures written to a temp directory. Cover one case per row of D3, plus:
       - a clean report, which passes;
       - an unconsulted source, which fails;
@@ -23,11 +23,11 @@
 
       Each test asserts the exit code AND the output names the thing it should. Verify: green,
       and each new branch in the script, when disabled by hand, turns at least one test red
-      (record which).
-- [ ] 1.4 Declare the five ImageSharp advisories as `NuGetAuditSuppress` in
+      (record which). *(14 tests. Mutations, each caught: accept-never-matches -> 4 tests; stale check removed -> the stale test; packable check removed -> 3; packable-may-accept -> the matching-packable test; conditional suppression honoured -> the conditional test; conditional IsPackable honoured -> its test; normalisation removed -> the case/slash test. Apply found a real bug on 1.1's first run: the parsed report was assigned to ``, which is the `[string]` `-Report` parameter under case-insensitive names, so every property read empty. Renamed to `` with a comment.)*
+- [x] 1.4 Declare the five ImageSharp advisories as `NuGetAuditSuppress` in
       `src/UBookIt.TestSite/UBookIt.TestSite.csproj`, under a comment giving the reason (design
       D2). Verify: a restore shows no NU190x warnings, and the script with no `-Report` exits 0,
-      reporting 5 accepted findings, all in `UBookIt.TestSite`.
+      reporting 5 accepted findings, all in `UBookIt.TestSite`. *(Measured: 0 NU190x on restore. The script exits 0: `audited 10 project(s) in UBookIt.slnx; 5 finding(s) accepted`.)*
 
 ## 2. The Umbraco floor on `main`
 
