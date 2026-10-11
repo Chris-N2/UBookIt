@@ -73,13 +73,13 @@ public sealed class InMemoryResourceStore : IResourceStore, IResourceManagementS
 
         var availability = AvailabilityConfiguration.Create(
             resource.Availability.OpenHours,
-            resource.Availability.Exceptions,
-            resource.Availability.Constraints,
-            applicable,
 
             // Carried through, as the SQL store's read carries them: a hydrate that dropped the
             // resource's own closed periods would answer every closed-period question "open".
-            resource.Availability.ClosedPeriods).Value;
+            resource.Availability.ClosedPeriods,
+            resource.Availability.Exceptions,
+            resource.Availability.Constraints,
+            applicable).Value;
 
         return Resource.Create(
             type: resource.Type,
@@ -133,6 +133,15 @@ public sealed class InMemoryResourceStore : IResourceStore, IResourceManagementS
         return Task.FromResult(DomainResult<Resource>.Success(resource));
     }
 
+    /// <summary>Which update the last write went through: true for the one that keeps closed periods.</summary>
+    /// <remarks>
+    /// Recorded because the two paths otherwise look identical through this double: the controller
+    /// loads the stored periods onto the resource before calling either, so the stored result is
+    /// the same. In production they are not the same — one deletes and rewrites the rows and skips
+    /// the re-check under the lock — so a test of the controller has to see WHICH it called.
+    /// </remarks>
+    public bool? LastUpdateKeptClosedPeriods { get; private set; }
+
     /// <summary>Full replace, as the SQL store does — never a merge.</summary>
     public Task<DomainResult<Resource>> UpdateAsync(Resource resource, CancellationToken cancellationToken = default)
     {
@@ -142,8 +151,41 @@ public sealed class InMemoryResourceStore : IResourceStore, IResourceManagementS
                 FailureCodes.ResourceNotFound, $"No resource exists with id {resource.Id}."));
         }
 
+        LastUpdateKeptClosedPeriods = false;
         _resources[resource.Id] = resource;
         return Task.FromResult(DomainResult<Resource>.Success(resource));
+    }
+
+    /// <summary>
+    /// As the SQL store: everything replaced except the closed periods, which stay as stored —
+    /// whatever the resource passed in carries.
+    /// </summary>
+    public Task<DomainResult<Resource>> UpdateKeepingClosedPeriodsAsync(
+        Resource resource, CancellationToken cancellationToken = default)
+    {
+        if (!_resources.TryGetValue(resource.Id, out var stored))
+        {
+            return Task.FromResult(DomainResult<Resource>.Failure(
+                FailureCodes.ResourceNotFound, $"No resource exists with id {resource.Id}."));
+        }
+
+        var kept = Resource.Create(
+            type: resource.Type,
+            displayName: resource.DisplayName,
+            description: resource.Description,
+            capabilities: resource.Capabilities.Keys,
+            availability: AvailabilityConfiguration.Create(
+                resource.Availability.OpenHours,
+                stored.Availability.ClosedPeriods,
+                resource.Availability.Exceptions,
+                resource.Availability.Constraints).Value,
+            directlyBookable: resource.DirectlyBookable,
+            id: resource.Id,
+            closureOptOuts: resource.ClosureOptOuts).Value;
+
+        LastUpdateKeptClosedPeriods = true;
+        _resources[resource.Id] = kept;
+        return Task.FromResult(DomainResult<Resource>.Success(kept));
     }
 
     public Task<DomainResult> DeleteAsync(Guid resourceId, CancellationToken cancellationToken = default)

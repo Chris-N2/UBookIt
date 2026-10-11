@@ -287,8 +287,34 @@ public static class ServiceBookingFormBuilder
         FailedSubmission? failed = null,
         string? flowToken = null,
         ResourceChoiceState choice = default,
-        IReadOnlyList<PreservedQueryPair>? preservedQuery = null,
-        (DateOnly From, DateOnly To)? window = null)
+        IReadOnlyList<PreservedQueryPair>? preservedQuery = null)
+        => Build(service, pools, selectedDate, today, windowStarts, dayStarts, durationMinutes, zone, privacyNotice, windowDays, windowFrom: today, failed: failed, flowToken: flowToken, choice: choice, preservedQuery: preservedQuery);
+
+    /// <summary>
+    /// As the published overload, with the window's first date: where it is not
+    /// <paramref name="today"/> — because a closure covers today — the form names the dates it
+    /// lists rather than "the next N days".
+    /// </summary>
+    /// <remarks>
+    /// A new overload rather than a widened signature, so an assembly compiled against the
+    /// published one still binds at run time.
+    /// </remarks>
+    public static ServiceFormModel Build(
+        Service service,
+        IReadOnlyList<RoleCandidates> pools,
+        DateOnly selectedDate,
+        DateOnly today,
+        IReadOnlyList<ServiceBookableStart> windowStarts,
+        IReadOnlyList<ServiceBookableStart> dayStarts,
+        int durationMinutes,
+        TimeZoneInfo zone,
+        PrivacyNoticeView privacyNotice,
+        int windowDays,
+        DateOnly windowFrom,
+        FailedSubmission? failed = null,
+        string? flowToken = null,
+        ResourceChoiceState choice = default,
+        IReadOnlyList<PreservedQueryPair>? preservedQuery = null)
     {
         var duration = TimeSpan.FromMinutes(durationMinutes);
 
@@ -306,7 +332,7 @@ public static class ServiceBookingFormBuilder
             AvailableDates = dates,
             SelectedDateIsListed = dates.Any(date => date.IsSelected),
             WindowDays = windowDays,
-            ShiftedWindowFrom = window is { } shifted && shifted.From != today ? shifted.From : null,
+            ShiftedWindowFrom = windowFrom != today ? windowFrom : null,
             LongestAvailableInWindowMinutes = LongestAvailableMinutes(windowStarts),
             PrivacyNotice = privacyNotice,
             ResourceChoices = choice.Choices ?? [],

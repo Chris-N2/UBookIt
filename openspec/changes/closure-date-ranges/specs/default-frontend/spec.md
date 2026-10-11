@@ -21,8 +21,9 @@ nothing in the next few weeks is available.
   start today, exactly as it does without this rule, so the step explains itself as it already does.
 - **What the step says SHALL name the window truthfully.** Where the window does not start today, the
   list's legend and every statement about an empty window SHALL name the dates the window spans,
-  rather than "the next N days". It SHALL NOT say why the window moved: a closure is not disclosed
-  publicly, and a shifted window looks the same as any other.
+  rather than "the next N days". It SHALL NOT say why the window moved. **A shifted window does
+  reveal that the dates before its start are closed rather than booked** — the narrowing
+  `site-closures` states in *Closures are not disclosed publicly* — and nothing beyond that.
 
 Where today is not closed for the subject, the window SHALL start today, exactly as before.
 

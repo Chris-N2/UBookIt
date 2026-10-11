@@ -52,9 +52,31 @@ the maintainer's own site going live this week.
   - A resource body takes an optional `closedPeriods` list. **Absent means "leave the resource's
     closed periods unchanged"**, so a caller written before this version cannot erase periods it
     has never heard of.
+  - **The two absences are treated differently, and that is a trade-off, not an oversight** (QA
+    round 1). An absent `endDate` on a closure UPDATE means one day. So a caller written before
+    ranges, that renames a range closure an operator created in the backoffice, shrinks it to its
+    start date. The alternative was to read an absent `endDate` as "keep the stored end". It was
+    rejected because it would make one body mean different things on create and update, and a
+    pre-range caller creating a closure must keep getting exactly one day. The hazard is narrow:
+    such a caller has to edit a closure it did not create. The changelog states it.
 - **Holiday import:** a holiday on a date that any closure covers is reported as already closed.
 - **Release:** a minor, `17.3.0` on `main` and then `18.2.0` on `dev/v18`. It adds a feature and
-  an additive migration, and it breaks nothing.
+  an additive migration, and it breaks nothing at the binary level either.
+  - Every published signature it extends is kept exactly. The new behaviour is in new members:
+    `SiteClosure.CreateRange`, an `AvailabilityConfiguration.Create` overload taking closed
+    periods, an `AvailableDateWindow.Compute` overload taking the first open date, and
+    `Build` overloads on both form builders taking the window's start. A guard pins the old
+    signatures.
+  - Two published interfaces gain a member each, and each has a default implementation:
+    - `IResourceManagementStore.UpdateKeepingClosedPeriodsAsync`;
+    - `IBookingFormView.ShiftedWindowFrom`.
+
+    An existing implementer still compiles and loads. *(QA round 1 found the first version had
+    widened five signatures in place: source-compatible, but `MissingMethodException` for an
+    assembly built against 17.2.x.)*
+- **One narrowing of what the booking page discloses**, stated in `site-closures`: a window that
+  starts after today reveals that the dates before it are closed rather than booked. It never
+  reveals which closure, its name, or why.
 
 ## Capabilities
 
@@ -85,8 +107,8 @@ the maintainer's own site going live this week.
   filled from the existing date, and a new `uBookItResourceClosedPeriod` table. Nothing is altered
   or dropped. The unique index on the closure's date stays and now indexes its start: under
   refused overlaps, two closures can never share a start date, so the index remains a true
-  storage backstop. Overlap across a range is checked under an app lock. The store reads closures
-  that overlap the requested span.
+  storage backstop. Overlap across a range is checked under an app lock. The read store still reads
+  the whole closure list once per call (design D2): it is short, and the configuration scans it.
 - **Backoffice:** `ClosuresController` and `ResourcesController` models (additive), and the
   generated client. The closures view gains From and To; the resource editor gains a Closed
   periods section.

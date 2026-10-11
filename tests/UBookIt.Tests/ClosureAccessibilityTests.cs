@@ -70,11 +70,18 @@ public class ClosureAccessibilityTests
         }
 
         // To's hint ("leave it empty for one day") is referenced from To, not merely rendered.
-        Assert.Contains("aria-describedby=\"closure-end-date-hint\"", source, StringComparison.Ordinal);
+        Assert.Contains(
+            "aria-describedby=${closureDescribedBy(\"closure-end-date\", this._errorControl, \"closure-end-date-hint\")}",
+            source,
+            StringComparison.Ordinal);
         Assert.Contains("id=\"closure-end-date-hint\"", source, StringComparison.Ordinal);
 
-        // The hint is referenced from the input, not merely rendered under it.
-        Assert.Contains("aria-describedby=\"closure-label-hint\"", source, StringComparison.Ordinal);
+        // The hint is referenced from the input, not merely rendered under it — through the shared
+        // helper, which also adds the error's id when a failure concerns this input.
+        Assert.Contains(
+            "aria-describedby=${closureDescribedBy(\"closure-label\", this._errorControl, \"closure-label-hint\")}",
+            source,
+            StringComparison.Ordinal);
         Assert.Contains("id=\"closure-label-hint\"", source, StringComparison.Ordinal);
     }
 
@@ -239,5 +246,24 @@ public class ClosureAccessibilityTests
         Assert.Contains("id=\"cp-note-hint\"", source, StringComparison.Ordinal);
         Assert.Contains("aria-describedby=\"cp-to-hint\"", source, StringComparison.Ordinal);
         Assert.Contains("id=\"cp-to-hint\"", source, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public void A_closure_save_failure_is_associated_with_the_input_it_concerns()
+    {
+        // Announcing the failure is not enough on the project's bar: the input it concerns must
+        // say it is invalid and point at the message. Each of the three inputs is wired, so a
+        // failure about any of them reaches the right one.
+        var source = RepoFiles.Read(ClosuresView);
+
+        foreach (var id in new[] { "closure-date", "closure-end-date", "closure-label" })
+        {
+            Assert.Contains(
+                $"aria-invalid=${{this._errorControl === \"{id}\" ? \"true\" : nothing}}",
+                source,
+                StringComparison.Ordinal);
+        }
+
+        Assert.Contains("this._errorControl = closureErrorControl(failure?.field);", source, StringComparison.Ordinal);
     }
 }

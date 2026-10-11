@@ -14,6 +14,7 @@
     - "The closures view"
     - "Inheritance is visible where a resource is edited"
     - "Closures are managed through versioned management endpoints"
+    - "Closures are not disclosed publicly" (added in QA round 1)
   - `availability`: "Date exceptions"
   - `resource-management`: "Resource CRUD endpoints" and "Workspace editor for a resource"
   - `persistence`: "Site closures and their opt-outs are held in their own additive tables"
@@ -21,6 +22,10 @@
 
   Verify: every original scenario is accounted for here, and `ChangeDeltaIntegrityTests` passes.
   *Done 2026-10-11, at propose time, and re-checked here. Nothing was dropped:*
+  - *"Closures are not disclosed publicly" (QA round 1): both scenarios carried; the public read
+    model scenario now also names closed periods and notes. The SHALL "indistinguishable from any
+    other date" is NARROWED, stated as an exception with its reason: a shifted window reveals that
+    the dates before it are closed. Added scenario: a shifted window names dates, never a reason.*
   - *"The site closure list": all 6 scenarios carried.*
     - *"one per date" is superseded by the stronger "no date covered twice", and its scenario is
       kept verbatim.*
@@ -144,6 +149,10 @@
   - **8 racers with different starts and overlapping ranges: exactly 1 stored**;
   - in progress counts as upcoming;
   - every date in a range is closed on a read.
+
+  **Correction (QA round 1):** the "import onto a date inside a range" test this task promised was
+  never written. It now exists as `HolidayPreviewRangeTests`, at the service where "already
+  closed" is decided. See 7.2.
 - [x] 2.4 The resource stores read closed periods once per call (no N+1) and write them wholesale
   in the resource transaction. They leave the rows untouched when the collection is omitted, and
   then re-check the submitted exceptions against the stored periods inside the lock (design D6).
@@ -308,10 +317,17 @@
       fieldset's `aria-describedby` names `err-closed-periods`.
   - **Opting the room out of the range** returned its booking page to "in the next 30 days".
   - **Cleaned up:** the period, the opt-out and the closure were removed. No console errors.
-  - *Not done live:* a holiday preview over a range. The only holiday source on the TestSite
-    returns UK holidays, and none falls inside a range that could be left on a shared TestSite.
-    It is covered by `HolidayPreviewService`'s window clipping and by the store test for an
-    import onto a date inside a range.
+  - *Not done live:* a holiday preview over a range.
+  - **Correction (QA round 1):** this bullet first said the case was "covered by
+    `HolidayPreviewService`'s window clipping and by the store test for an import onto a date
+    inside a range". **That was false.** No such store test existed, and nothing exercised the
+    clipping. It is now covered by `HolidayPreviewRangeTests`, through `HolidayPreviewService`:
+    - a date inside a range;
+    - both ends of a range;
+    - a range clipped at the window's start;
+    - a ten-year range.
+
+    All four fail with the clipping mutated to compare start dates only.
   - *Observed, not a defect:* setting From and To from a script in the same tick loses the
     first, because each input handler spreads the draft captured at render. A person typing
     cannot produce it: there is a render between the two inputs. The Exceptions group has the
@@ -321,6 +337,47 @@
 
 - [ ] 8.1 QA (`qa-review`) in one subagent, reused across rounds. Hand each round's fixes over as
   new code. Verify: APPROVE.
+  *Round 1: REJECT*, six must-fix findings. QA re-verified every build, suite and migration claim
+  by running them, and found the core logic sound. Each fix below was handled as new code.
+  - **1. Binary break.** Five published signatures had been widened in place: source-compatible,
+    but a `MissingMethodException` for an assembly built against 17.2.x. *Fix:* each signature is
+    restored exactly, and the new behaviour lives in new members:
+    - `SiteClosure.CreateRange`;
+    - an `AvailabilityConfiguration.Create` overload that takes closed periods;
+    - a `Compute` overload that takes the first open date;
+    - `Build` overloads on both form builders that take the window's start.
+
+    `PublishedSignatureTests` pins all five by exact parameter types. The proposal states it.
+  - **2. Sibling spec contradicted.** *Fix:* a MODIFIED delta for *Closures are not disclosed
+    publicly*, which states the narrowing; the default-frontend delta now points at it instead of
+    contradicting it. `docs/theming.md` documents `ShiftedWindowFrom` and what a theme replacing
+    `_AvailableDates` must do.
+  - **3. Uncovered scenarios.** *Fix:*
+    - `AvailableDatesShiftedWindowRenderingTests` (10 tests) renders, in each of three window
+      states, the shifted and unshifted wording: legend, both empty-window sentences, the
+      other-date hint, and no disclosure.
+    - `ClosedPeriodPlacementTests` (4 tests), through `BookingService.PlaceAsync`: the middle of a
+      range, inside a period and the day after, the refusal disclosing nothing, and an existing
+      booking surviving and still blocking.
+    - `ClosedWindowTests`: a real opt-out through the hydrating store, and a fully booked today.
+  - **4. Holiday preview untested, plus a false claim in this record.** *Fix:*
+    `HolidayPreviewRangeTests` (4 tests). The 2.3 and 7.2 records are corrected in place, saying
+    what was false.
+  - **5. Controller seam untested.** *Fix:* the in-memory store overrides
+    `UpdateKeepingClosedPeriodsAsync` with the SQL store's semantics and records which path ran.
+    `An_omitted_collection_goes_through_the_update_that_keeps_closed_periods` asserts the
+    controller's choice both ways. It fails when the controller is mutated to always call
+    `UpdateAsync`.
+  - **6. Closure errors not associated with their input.** *Fix:* the failure's `field` maps to
+    its input (`closureErrorControl`). That input gets `aria-invalid` and an `aria-describedby`
+    naming `closure-error` after its hint (`closureDescribedBy`). The client-side "date required"
+    marks From. Covered by 4 client tests and an accessibility guard.
+  - **7.** *Fix:* the proposal states the `endDate` and `closedPeriods` asymmetry as a trade-off,
+    with the rejected alternative and its reason.
+  - **8.** *Fix:* the proposal's Impact sentence is corrected. `docs/delivery-api.md` says a
+    custom `IResourceStore` must pass closed periods.
+  - **Mutations run:** the controller seam; the holiday clipping (start date only); each failed
+    as described above.
 - [ ] 8.2 Port to `dev/v18` on `closure-date-ranges-v18`: cherry-pick, then **regenerate** the
   migration Designer and model snapshot for the 18 line, and the generated client against the v18
   TestSite. Re-run 7.1 and 7.2 there. Verify: records match `main`'s, and the reviewer from 8.1 has

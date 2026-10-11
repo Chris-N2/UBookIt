@@ -101,6 +101,37 @@ export function rangeText(start: string, end: string | undefined | null): string
   return !end || end === start ? start : `${start} – ${end}`;
 }
 
+/** The closure form's inputs, by id. */
+export type ClosureControl = "closure-date" | "closure-end-date" | "closure-label";
+
+/**
+ * Which input a closure save's failure concerns, read from the failure's `field` — so the
+ * failure is associated with that control (`aria-invalid`, and `aria-describedby` naming the
+ * error) rather than only announced. Unknown or absent fields concern no single control.
+ */
+export function closureErrorControl(field: string | null | undefined): ClosureControl | undefined {
+  switch (field?.toLowerCase()) {
+    case "date":
+      return "closure-date";
+    case "enddate":
+      return "closure-end-date";
+    case "label":
+      return "closure-label";
+    default:
+      return undefined;
+  }
+}
+
+/** The `aria-describedby` of one closure input: its own hint, then the error when it concerns it. */
+export function closureDescribedBy(
+  control: ClosureControl,
+  failed: ClosureControl | undefined,
+  hintId?: string,
+): string | undefined {
+  const ids = [hintId, failed === control ? "closure-error" : undefined].filter((id): id is string => !!id);
+  return ids.length > 0 ? ids.join(" ") : undefined;
+}
+
 /** A closed period as the editor holds it, before it is sent. */
 export interface ClosedPeriodDraft {
   startDate: string;

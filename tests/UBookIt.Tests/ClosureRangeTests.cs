@@ -18,7 +18,7 @@ public class ClosureRangeTests
         [DayOfWeek.Monday, DayOfWeek.Tuesday, DayOfWeek.Wednesday, DayOfWeek.Thursday, DayOfWeek.Friday];
 
     private static SiteClosure Range(DateOnly from, DateOnly to, string label = "Refurbishment", Guid? id = null)
-        => SiteClosure.Create(from, label, id, to).Value;
+        => SiteClosure.CreateRange(from, to, label, id).Value;
 
     private static ClosedPeriod Period(DateOnly from, DateOnly to, string? note = null)
         => ClosedPeriod.Create(from, to, note).Value;
@@ -28,7 +28,7 @@ public class ClosureRangeTests
         IEnumerable<SiteClosure>? closures = null,
         IEnumerable<ClosedPeriod>? periods = null)
         => AvailabilityConfiguration.Create(
-            Weekly("09:00", "17:00", Weekdays), exceptions, null, closures, periods).Value;
+            Weekly("09:00", "17:00", Weekdays), periods ?? [], exceptions, null, closures).Value;
 
     // ── SiteClosure as a range ────────────────────────────────────────────────────────────
 
@@ -58,7 +58,7 @@ public class ClosureRangeTests
     [Fact]
     public void An_inverted_range_is_refused_with_its_own_code()
     {
-        var result = SiteClosure.Create(Monday, "Backwards", endDate: Monday.AddDays(-1));
+        var result = SiteClosure.CreateRange(Monday, Monday.AddDays(-1), "Backwards");
 
         Assert.False(result.Succeeded);
         Assert.Equal(FailureCodes.ClosureRangeInvalid, Assert.Single(result.Failures).Code);

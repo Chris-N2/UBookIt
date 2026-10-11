@@ -71,14 +71,25 @@ public sealed class SiteClosure
     /// </summary>
     public string Label { get; }
 
+    /// <summary>A closure of the one day <paramref name="date"/>.</summary>
+    /// <remarks>
+    /// The signature published before closures were ranges, kept exactly — an assembly compiled
+    /// against it binds to this method by its full signature, and widening it in place would
+    /// break that assembly at run time even though its source still compiles. New behaviour is
+    /// a new member: <see cref="CreateRange"/>.
+    /// </remarks>
+    public static DomainResult<SiteClosure> Create(DateOnly date, string? label, Guid? id = null)
+        => CreateRange(date, date, label, id);
+
+    /// <summary>A closure covering every date from <paramref name="date"/> to <paramref name="endDate"/>, both inclusive.</summary>
     /// <param name="date">The first date the closure covers.</param>
+    /// <param name="endDate">The last date covered; the same date for a closure of one day.</param>
     /// <param name="label">The site's own name for it; required.</param>
     /// <param name="id">An existing closure's id, when rebuilding or editing one.</param>
-    /// <param name="endDate">The last date covered, inclusive. Absent means the one day.</param>
-    public static DomainResult<SiteClosure> Create(
-        DateOnly date, string? label, Guid? id = null, DateOnly? endDate = null)
+    public static DomainResult<SiteClosure> CreateRange(
+        DateOnly date, DateOnly endDate, string? label, Guid? id = null)
     {
-        var end = endDate ?? date;
+        var end = endDate;
 
         if (end < date)
         {

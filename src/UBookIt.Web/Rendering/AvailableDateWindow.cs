@@ -49,19 +49,28 @@ public static class AvailableDateWindow
     /// <param name="today">Today in the site zone.</param>
     /// <param name="horizonDays">How many days ahead the subject may be booked.</param>
     /// <param name="maxQueryRangeDays">The site's guardrail on how wide one availability read may be.</param>
+    public static (DateOnly From, DateOnly To) Compute(
+        DateOnly today, int horizonDays, int maxQueryRangeDays)
+        => Compute(today, horizonDays, maxQueryRangeDays, today);
+
+    /// <inheritdoc cref="Compute(DateOnly, int, int)"/>
     /// <param name="firstOpenDate">
     /// The first date from today that no closure or closed period applying to the subject covers
     /// (<see cref="ClosedRanges.FirstUncovered"/>). The window starts there rather than today, so a
     /// visitor arriving during a long closure is offered the weeks after it. Ignored when it lies
     /// beyond the horizon, in which case the window starts today exactly as it would without it.
     /// </param>
+    /// <remarks>
+    /// A separate overload rather than a widened signature: the three-argument form was
+    /// published, and an assembly compiled against it binds to that exact signature.
+    /// </remarks>
     public static (DateOnly From, DateOnly To) Compute(
-        DateOnly today, int horizonDays, int maxQueryRangeDays, DateOnly? firstOpenDate = null)
+        DateOnly today, int horizonDays, int maxQueryRangeDays, DateOnly firstOpenDate)
     {
         // The horizon is counted from TODAY, not from the window's start: a resource bookable
         // 90 days ahead is bookable up to today + 90 however the window is placed.
         var lastBookable = CalendarBounds.AddDaysSaturating(today, Math.Max(horizonDays, 0));
-        var from = firstOpenDate is { } open && open > today && open <= lastBookable ? open : today;
+        var from = firstOpenDate > today && firstOpenDate <= lastBookable ? firstOpenDate : today;
         var daysLeft = lastBookable.DayNumber - from.DayNumber;
 
         // Every term is an INCLUSIVE day count, because that is what the guardrail counts:

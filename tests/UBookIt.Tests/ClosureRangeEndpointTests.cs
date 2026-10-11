@@ -29,9 +29,15 @@ public class ClosureRangeEndpointTests
 
     private static (ResourcesController Controller, InMemorySiteClosureStore Closures) WireResources()
     {
+        var (controller, closures, _) = WireResourcesWithStore();
+        return (controller, closures);
+    }
+
+    private static (ResourcesController Controller, InMemorySiteClosureStore Closures, InMemoryResourceStore Store) WireResourcesWithStore()
+    {
         var closures = new InMemorySiteClosureStore();
         var resources = new InMemoryResourceStore().Hydrating(closures);
-        return (new ResourcesController(resources, resources, closures), closures);
+        return (new ResourcesController(resources, resources, closures), closures, resources);
     }
 
     private static T Ok<T>(IActionResult result)
@@ -129,8 +135,8 @@ public class ClosureRangeEndpointTests
     {
         // "Now" is TestData.Now (1 September 2026): a closure from August to October is in progress.
         var (controller, store) = WireClosures();
-        store.Add(SiteClosure.Create(new DateOnly(2026, 8, 1), "Summer works", endDate: new DateOnly(2026, 10, 31)).Value);
-        store.Add(SiteClosure.Create(new DateOnly(2026, 7, 1), "Last month", endDate: new DateOnly(2026, 7, 5)).Value);
+        store.Add(SiteClosure.CreateRange(new DateOnly(2026, 8, 1), new DateOnly(2026, 10, 31), "Summer works").Value);
+        store.Add(SiteClosure.CreateRange(new DateOnly(2026, 7, 1), new DateOnly(2026, 7, 5), "Last month").Value);
 
         var upcoming = Ok<List<SiteClosureModel>>(await controller.ListClosures(includePast: false, Ct));
 
@@ -191,6 +197,25 @@ public class ClosureRangeEndpointTests
         Assert.Equal(Start, Assert.Single(updated.ClosedPeriods).StartDate);
     }
 
+    /// <summary>
+    /// The production seam. Through this double both store paths leave the same stored result —
+    /// so what is asserted is which one the controller CHOSE. Calling the plain update for an
+    /// omitted collection would, against SQL Server, delete and rewrite the rows and skip the
+    /// re-check under the lock.
+    /// </summary>
+    [Fact]
+    public async Task An_omitted_collection_goes_through_the_update_that_keeps_closed_periods()
+    {
+        var (controller, _, store) = WireResourcesWithStore();
+        var created = Ok<ResourceResponseModel>(await controller.CreateResource(Request([PeriodModel(0, 5)]), Ct));
+
+        Ok<ResourceResponseModel>(await controller.UpdateResource(created.Id, Request(periods: null), Ct));
+        Assert.True(store.LastUpdateKeptClosedPeriods);
+
+        Ok<ResourceResponseModel>(await controller.UpdateResource(created.Id, Request([PeriodModel(0, 5)]), Ct));
+        Assert.False(store.LastUpdateKeptClosedPeriods);
+    }
+
     [Fact]
     public async Task An_empty_collection_clears_the_periods()
     {
@@ -232,7 +257,7 @@ public class ClosureRangeEndpointTests
     public async Task Applied_closures_carry_their_range()
     {
         var (controller, closures) = WireResources();
-        closures.Add(SiteClosure.Create(Start, "Refurbishment", endDate: Start.AddDays(58)).Value);
+        closures.Add(SiteClosure.CreateRange(Start, Start.AddDays(58), "Refurbishment").Value);
 
         var created = Ok<ResourceResponseModel>(await controller.CreateResource(Request(periods: null), Ct));
 
@@ -245,7 +270,7 @@ public class ClosureRangeEndpointTests
     public async Task An_override_inside_a_closure_range_is_marked_superseded()
     {
         var (controller, closures) = WireResources();
-        closures.Add(SiteClosure.Create(Start, "Refurbishment", endDate: Start.AddDays(58)).Value);
+        closures.Add(SiteClosure.CreateRange(Start, Start.AddDays(58), "Refurbishment").Value);
 
         var created = Ok<ResourceResponseModel>(await controller.CreateResource(
             Request(

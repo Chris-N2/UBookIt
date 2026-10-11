@@ -122,8 +122,32 @@ public static class BookingFormBuilder
         int windowDays,
         FailedSubmission? failed = null,
         string? flowToken = null,
-        IReadOnlyList<PreservedQueryPair>? preservedQuery = null,
-        (DateOnly From, DateOnly To)? window = null)
+        IReadOnlyList<PreservedQueryPair>? preservedQuery = null)
+        => Build(resource, selectedDate, today, windowStarts, dayStarts, duration, zone, privacyNotice, windowDays, windowFrom: today, failed: failed, flowToken: flowToken, preservedQuery: preservedQuery);
+
+    /// <summary>
+    /// As the published overload, with the window's first date: where it is not
+    /// <paramref name="today"/> — because a closure covers today — the form names the dates it
+    /// lists rather than "the next N days".
+    /// </summary>
+    /// <remarks>
+    /// A new overload rather than a widened signature, so an assembly compiled against the
+    /// published one still binds at run time.
+    /// </remarks>
+    public static BookingFormModel Build(
+        Resource resource,
+        DateOnly selectedDate,
+        DateOnly today,
+        IReadOnlyList<BookableStart> windowStarts,
+        IReadOnlyList<BookableStart> dayStarts,
+        TimeSpan duration,
+        TimeZoneInfo zone,
+        PrivacyNoticeView privacyNotice,
+        int windowDays,
+        DateOnly windowFrom,
+        FailedSubmission? failed = null,
+        string? flowToken = null,
+        IReadOnlyList<PreservedQueryPair>? preservedQuery = null)
     {
         var constraints = resource.Availability.Constraints;
 
@@ -143,7 +167,7 @@ public static class BookingFormBuilder
             AvailableDates = dates,
             SelectedDateIsListed = dates.Any(date => date.IsSelected),
             WindowDays = windowDays,
-            ShiftedWindowFrom = window is { } shifted && shifted.From != today ? shifted.From : null,
+            ShiftedWindowFrom = windowFrom != today ? windowFrom : null,
             LongestAvailableInWindowMinutes = LongestAvailableMinutes(windowStarts),
             PrivacyNotice = privacyNotice,
             FlowToken = flowToken,
