@@ -17,6 +17,46 @@ a patch. See [the versioning note](README.md#versions-and-the-api-promise).
 
 ---
 
+## 17.2.3
+
+### What you have to do
+
+**If your site runs Umbraco below 17.7.1, upgrade `Umbraco.Cms` to 17.7.1 first, then update
+uBookIt.** uBookIt now requires 17.7.1. Installing it on an older site raises only the Umbraco
+packages uBookIt depends on and leaves the rest where they are, so upgrading `Umbraco.Cms` first
+keeps every Umbraco package on one version.
+
+Umbraco 17.7.1 also requires newer versions of some of the packages it depends on. For example,
+most of its Microsoft.Extensions packages and its Entity Framework Core packages move to 10.0.11,
+`Microsoft.Extensions.Caching.Hybrid` to 10.9.0, and Examine to 3.10.0. If your site references
+one of those packages directly at a lower version than Umbraco 17.7.1 requires, restore reports a
+downgrade: raise that reference to the version Umbraco requires.
+`Microsoft.EntityFrameworkCore.SqlServer`, which uBookIt also declares, is one of them.
+
+Otherwise, **nothing.** No API signature, schema or migration changes, and no setting you have to
+change.
+
+### What changed
+
+**uBookIt requires Umbraco 17.7.1 or later**, and still not 18. Umbraco 17.7.1 fixes four
+advisories Umbraco published on 6 October 2026:
+
+- [GHSA-w5jr-cmfx-544x](https://github.com/umbraco/Umbraco-CMS/security/advisories/GHSA-w5jr-cmfx-544x) (medium)
+- [GHSA-7pj9-jmp9-p86q](https://github.com/umbraco/Umbraco-CMS/security/advisories/GHSA-7pj9-jmp9-p86q) (medium)
+- [GHSA-h5wj-vpvj-mprp](https://github.com/umbraco/Umbraco-CMS/security/advisories/GHSA-h5wj-vpvj-mprp) (low)
+- [GHSA-4c5q-6c64-96j7](https://github.com/umbraco/Umbraco-CMS/security/advisories/GHSA-4c5q-6c64-96j7) (low)
+
+They describe Umbraco itself, not uBookIt's code. Requiring the fixed version means a site that
+installs or updates uBookIt is on an Umbraco where they are closed.
+
+**The Entity Framework Core SQL Server provider uBookIt requires is now 10.0.11**, up from 10.0.10,
+because Umbraco 17.7.1 requires it.
+
+**Your site may still report advisories against SixLabors ImageSharp 3.1.12.** They reach it
+through `Umbraco.Cms` itself, which depends on ImageSharp. No uBookIt package depends on
+ImageSharp. When this release was prepared, no Umbraco version took a fixed ImageSharp, so
+updating uBookIt does not clear them; that waits on Umbraco.
+
 ## 17.2.2 — 2026-09-26
 
 ### What you have to do
