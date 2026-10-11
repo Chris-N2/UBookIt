@@ -64,6 +64,12 @@ export type CapabilityUsageModel = {
     count: number;
 };
 
+export type ClosedPeriodModel = {
+    startDate: string;
+    endDate: string;
+    note?: string | null;
+};
+
 export type ConfirmedBookingModel = {
     bookingId: string;
     status: string;
@@ -221,6 +227,7 @@ export type ProblemDetails = {
 export type ResourceClosureModel = {
     id: string;
     date: string;
+    endDate: string;
     label: string;
     excluded: boolean;
 };
@@ -234,6 +241,7 @@ export type ResourceRequestModel = {
     capabilities: Array<string>;
     directlyBookable: boolean;
     closureOptOuts: Array<string>;
+    closedPeriods?: Array<ClosedPeriodModel> | null;
     constraints?: ConstraintsModel | null;
 };
 
@@ -247,6 +255,7 @@ export type ResourceResponseModel = {
     capabilities: Array<string>;
     directlyBookable: boolean;
     closures: Array<ResourceClosureModel>;
+    closedPeriods: Array<ClosedPeriodModel>;
     constraints: ConstraintsModel;
 };
 
@@ -364,11 +373,13 @@ export type ShortfallRoleModel = {
 export type SiteClosureModel = {
     id: string;
     date: string;
+    endDate: string;
     label: string;
 };
 
 export type SiteClosureRequestModel = {
     date: string;
+    endDate?: string | null;
     label: string;
 };
 
