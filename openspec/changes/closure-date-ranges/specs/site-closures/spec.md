@@ -1,5 +1,36 @@
 ## MODIFIED Requirements
 
+### Requirement: Closures are not disclosed publicly
+
+The delivery API and the shipped front end SHALL NOT name closures, their labels, or the fact that a
+date's unavailability is due to one. A closed date SHALL be indistinguishable from any other date
+carrying no availability, **with one stated exception: where the booking page's date window starts
+after today because a closure or closed period covers today, a visitor can infer that the dates
+before the window's start are closed rather than merely booked.** This is the price of not
+answering a visitor with "nothing in the next few weeks" for the length of a closure, and it is
+paid knowingly. The shifted window SHALL still say nothing about which closure, what it is called,
+why, or for what reason any individual date in the window is unavailable. Every date INSIDE the
+window remains indistinguishable as before.
+
+This matches the existing rule that the public resource read model exposes neither the weekly
+open-hours pattern nor date exceptions. A closure label is the site's own operational note — "Staff
+training", "Stocktake" — and publishing it to anonymous callers discloses more about the
+organisation than the booking flow needs. The same holds for a resource's closed-period note, which
+may concern a person.
+
+#### Scenario: The public read model carries no closures
+- **WHEN** the public resource read model is inspected
+- **THEN** it exposes no closure, no closure label, no closed period, no note, and no opt-out
+
+#### Scenario: A closed date looks like any unavailable date
+- **WHEN** an anonymous caller queries availability over a range containing a closure date
+- **THEN** the date carries no availability, with no reason given and nothing distinguishing it from a date the resource is simply not open on
+
+#### Scenario: A shifted window names dates, never a reason
+- **WHEN** the booking page's window has moved past a closure covering today
+- **THEN** the page names the dates the window spans, and nothing it renders names the closure, its label, a closed-period note, or why the window moved
+
+
 ### Requirement: The site closure list
 
 The package SHALL hold a site-level list of closures. Each closure SHALL carry a **start date, an
@@ -315,6 +346,7 @@ details, so a client never has to tell one shape of absence from another.
 #### Scenario: Absence is reported behind the verb, not in front of it
 - **WHEN** any of the three holiday endpoints is called without backoffice authentication
 - **THEN** the response is 401, whether or not a source is registered, because authentication precedes the question
+
 
 ## ADDED Requirements
 

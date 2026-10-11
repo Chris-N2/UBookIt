@@ -16,7 +16,7 @@ internal static class SiteClosureRowMapper
     /// <see cref="ResourceRowMapper"/> has.
     /// </summary>
     internal static SiteClosure ToDomain(SiteClosureRow row)
-        => SiteClosure.Create(row.Date, row.Label, row.Id, row.EndDate).Value;
+        => SiteClosure.CreateRange(row.Date, row.EndDate, row.Label, row.Id).Value;
 
     internal static SiteClosureRow ToRow(SiteClosure closure)
         => new() { Id = closure.Id, Date = closure.Date, EndDate = closure.EndDate, Label = closure.Label };

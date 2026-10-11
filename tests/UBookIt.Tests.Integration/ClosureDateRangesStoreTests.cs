@@ -42,7 +42,7 @@ public class ClosureDateRangesStoreTests(SqlServerFixture fixture) : IAsyncLifet
     }
 
     private static SiteClosure Range(int fromDay, int toDay, string label = "Refurbishment", Guid? id = null)
-        => SiteClosure.Create(Start.AddDays(fromDay), label, id, Start.AddDays(toDay)).Value;
+        => SiteClosure.CreateRange(Start.AddDays(fromDay), Start.AddDays(toDay), label, id).Value;
 
     // ── Closure ranges ───────────────────────────────────────────────────────────────────
 
@@ -176,9 +176,9 @@ public class ClosureDateRangesStoreTests(SqlServerFixture fixture) : IAsyncLifet
             capabilities: resource.Capabilities.Keys,
             availability: AvailabilityConfiguration.Create(
                 resource.Availability.OpenHours,
+                periods,
                 exceptions ?? resource.Availability.Exceptions,
-                resource.Availability.Constraints,
-                closedPeriods: periods).Value,
+                resource.Availability.Constraints).Value,
             directlyBookable: resource.DirectlyBookable,
             id: resource.Id,
             closureOptOuts: resource.ClosureOptOuts).Value;

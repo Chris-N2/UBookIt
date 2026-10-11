@@ -5,7 +5,15 @@ import { canManageClosures, canReadClosures } from "./permission-verbs.js";
 import { UBookItBackofficeService } from "../api/index.js";
 import type { HolidayRowModel, SiteClosureModel } from "../api/index.js";
 import { toApiErrors } from "./api-errors.js";
-import { listQuery, rangeEnd, rangeText, showsEditingControls } from "./closure-fields.js";
+import {
+  closureDescribedBy,
+  closureErrorControl,
+  listQuery,
+  rangeEnd,
+  rangeText,
+  showsEditingControls,
+  type ClosureControl,
+} from "./closure-fields.js";
 import {
   chosenRows,
   defaultWindow,
@@ -63,6 +71,10 @@ export class UBookItClosuresViewElement extends UmbLitElement {
 
   @state()
   private _error?: string;
+
+  /** The input {@link _error} concerns, if it concerns one — marked invalid and pointed at it. */
+  @state()
+  private _errorControl?: ClosureControl;
 
   @state()
   private _draft?: ClosureDraft;
@@ -154,10 +166,12 @@ export class UBookItClosuresViewElement extends UmbLitElement {
   }
 
   #startAdd() {
+    this._errorControl = undefined;
     this._draft = { date: "", endDate: "", label: "" };
   }
 
   #startEdit(closure: SiteClosureModel) {
+    this._errorControl = undefined;
     // A single day opens with To empty, as it was entered: To defaults to From.
     this._draft = {
       id: closure.id,
@@ -170,6 +184,7 @@ export class UBookItClosuresViewElement extends UmbLitElement {
   #cancelDraft() {
     this._draft = undefined;
     this._error = undefined;
+    this._errorControl = undefined;
   }
 
   async #saveDraft() {
@@ -182,12 +197,14 @@ export class UBookItClosuresViewElement extends UmbLitElement {
     // reject it as a binding error; this is the stable message instead.
     if (draft.date === "") {
       this._error = this.#term("dateRequired");
+      this._errorControl = "closure-date";
       await this.#focusError();
       return;
     }
 
     this._busy = true;
     this._error = undefined;
+    this._errorControl = undefined;
 
     try {
       const body = { date: draft.date, endDate: rangeEnd(draft.date, draft.endDate), label: draft.label };
@@ -196,8 +213,9 @@ export class UBookItClosuresViewElement extends UmbLitElement {
         : await UBookItBackofficeService.createClosure({ body });
 
       if (result.error) {
-        this._error = toApiErrors(result.error, this.#term("saveFailed"))[0]?.message
-          ?? this.#term("saveFailed");
+        const failure = toApiErrors(result.error, this.#term("saveFailed"))[0];
+        this._error = failure?.message ?? this.#term("saveFailed");
+        this._errorControl = closureErrorControl(failure?.field);
         await this.#focusError();
         return;
       }
@@ -205,7 +223,9 @@ export class UBookItClosuresViewElement extends UmbLitElement {
       this._draft = undefined;
       await this.#load();
     } catch (thrown) {
-      this._error = toApiErrors(thrown, this.#term("saveFailed"))[0]?.message ?? this.#term("saveFailed");
+      const failure = toApiErrors(thrown, this.#term("saveFailed"))[0];
+      this._error = failure?.message ?? this.#term("saveFailed");
+      this._errorControl = closureErrorControl(failure?.field);
       await this.#focusError();
     } finally {
       this._busy = false;
@@ -598,6 +618,8 @@ export class UBookItClosuresViewElement extends UmbLitElement {
           <input
             id="closure-date"
             type="date"
+            aria-invalid=${this._errorControl === "closure-date" ? "true" : nothing}
+            aria-describedby=${closureDescribedBy("closure-date", this._errorControl) ?? nothing}
             .value=${draft.date}
             @input=${(e: InputEvent) =>
               (this._draft = { ...draft, date: (e.target as HTMLInputElement).value })}
@@ -608,7 +630,8 @@ export class UBookItClosuresViewElement extends UmbLitElement {
           <input
             id="closure-end-date"
             type="date"
-            aria-describedby="closure-end-date-hint"
+            aria-invalid=${this._errorControl === "closure-end-date" ? "true" : nothing}
+            aria-describedby=${closureDescribedBy("closure-end-date", this._errorControl, "closure-end-date-hint")}
             min=${draft.date || nothing}
             .value=${draft.endDate}
             @input=${(e: InputEvent) =>
@@ -621,7 +644,8 @@ export class UBookItClosuresViewElement extends UmbLitElement {
           <input
             id="closure-label"
             type="text"
-            aria-describedby="closure-label-hint"
+            aria-invalid=${this._errorControl === "closure-label" ? "true" : nothing}
+            aria-describedby=${closureDescribedBy("closure-label", this._errorControl, "closure-label-hint")}
             .value=${draft.label}
             @input=${(e: InputEvent) =>
               (this._draft = { ...draft, label: (e.target as HTMLInputElement).value })}

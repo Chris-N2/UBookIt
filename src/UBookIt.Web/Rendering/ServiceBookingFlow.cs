@@ -143,8 +143,8 @@ public sealed class ServiceBookingFlow(
         return new ServiceFlowOutcome(
             ServiceBookingFormBuilder.Build(
                 service, pools, selectedDate, today, windowStarts, dayStarts, duration, zone,
-                PrivacyNoticeView.From(settings, HostMailAvailability.CanSend(emailSender)), windowDays, failed, input.FlowToken, choice,
-                input.PreservedQueryPairs, (windowFrom, windowTo)),
+                PrivacyNoticeView.From(settings, HostMailAvailability.CanSend(emailSender)), windowDays, windowFrom, failed, input.FlowToken, choice,
+                input.PreservedQueryPairs),
             null);
     }
 }

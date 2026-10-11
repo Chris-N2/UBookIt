@@ -79,7 +79,7 @@ public class ClosuresController(
     public async Task<IActionResult> CreateClosure(
         SiteClosureRequestModel model, CancellationToken cancellationToken = default)
     {
-        var closure = SiteClosure.Create(model.Date, model.Label, endDate: model.EndDate);
+        var closure = SiteClosure.CreateRange(model.Date, model.EndDate ?? model.Date, model.Label);
         if (!closure.Succeeded)
         {
             return closure.Failures.ToProblemResult();
@@ -100,7 +100,7 @@ public class ClosuresController(
     public async Task<IActionResult> UpdateClosure(
         Guid id, SiteClosureRequestModel model, CancellationToken cancellationToken = default)
     {
-        var closure = SiteClosure.Create(model.Date, model.Label, id, model.EndDate);
+        var closure = SiteClosure.CreateRange(model.Date, model.EndDate ?? model.Date, model.Label, id);
         if (!closure.Succeeded)
         {
             return closure.Failures.ToProblemResult();

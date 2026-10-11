@@ -149,12 +149,26 @@ public sealed class AvailabilityConfiguration
         return ClosedPeriodFor(date) is not null ? [] : OpenHours.WindowsFor(date.DayOfWeek);
     }
 
+    /// <summary>A configuration with no closed periods of the resource's own.</summary>
+    /// <remarks>
+    /// The signature published before closed periods existed, kept exactly so that an assembly
+    /// compiled against it — a host's own <c>IResourceStore</c>, for one — still binds at run
+    /// time. Closed periods are taken by the overload that names them.
+    /// </remarks>
     public static DomainResult<AvailabilityConfiguration> Create(
         WeeklyOpenHours openHours,
         IEnumerable<DateException>? exceptions = null,
         BookingConstraints? constraints = null,
-        IEnumerable<SiteClosure>? closures = null,
-        IEnumerable<ClosedPeriod>? closedPeriods = null)
+        IEnumerable<SiteClosure>? closures = null)
+        => Create(openHours, closedPeriods: [], exceptions, constraints, closures);
+
+    /// <summary>A configuration including the resource's own closed periods.</summary>
+    public static DomainResult<AvailabilityConfiguration> Create(
+        WeeklyOpenHours openHours,
+        IEnumerable<ClosedPeriod> closedPeriods,
+        IEnumerable<DateException>? exceptions = null,
+        BookingConstraints? constraints = null,
+        IEnumerable<SiteClosure>? closures = null)
     {
         var byDate = new Dictionary<DateOnly, DateException>();
 
@@ -187,7 +201,7 @@ public sealed class AvailabilityConfiguration
             furthestEnd = closure.EndDate > furthestEnd ? closure.EndDate : furthestEnd;
         }
 
-        var orderedPeriods = (closedPeriods ?? []).OrderBy(p => p.StartDate).ToArray();
+        var orderedPeriods = closedPeriods.OrderBy(p => p.StartDate).ToArray();
         furthestEnd = DateOnly.MinValue;
 
         foreach (var period in orderedPeriods)

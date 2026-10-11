@@ -126,8 +126,7 @@ internal static class ResourceModelMapper
         // one save reports every failed rule.
         AvailabilityConfiguration? availability = null;
         var availabilityResult = AvailabilityConfiguration.Create(
-            weekly.Succeeded ? weekly.Value : WeeklyOpenHours.Empty, exceptions, constraints,
-            closedPeriods: closedPeriods);
+            weekly.Succeeded ? weekly.Value : WeeklyOpenHours.Empty, closedPeriods, exceptions, constraints);
         if (availabilityResult.Succeeded)
         {
             availability = weekly.Succeeded ? availabilityResult.Value : null;

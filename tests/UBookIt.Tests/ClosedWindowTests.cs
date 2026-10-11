@@ -28,7 +28,7 @@ public class ClosedWindowTests
             DayOfWeek.Friday, DayOfWeek.Saturday, DayOfWeek.Sunday);
 
     private static SiteClosure Closure(DateOnly from, DateOnly to)
-        => SiteClosure.Create(from, "Notice period", endDate: to).Value;
+        => SiteClosure.CreateRange(from, to, "Notice period").Value;
 
     // ── Pure ─────────────────────────────────────────────────────────────────────────────
 
@@ -131,6 +131,79 @@ public class ClosedWindowTests
 
         Assert.Null(form!.ShiftedWindowFrom);
         Assert.Equal(Today, form.AvailableDates.First().Date);
+    }
+
+    /// <summary>
+    /// A real opt-out: the closure covers today, the resource is exempt, and the read port's
+    /// hydration is what leaves it out — the path production takes.
+    /// </summary>
+    [Fact]
+    public async Task An_opted_out_closure_covering_today_does_not_move_the_window()
+    {
+        var settings = TestData.Settings;
+        var closures = new InMemorySiteClosureStore();
+        var closure = Closure(Today.AddDays(-3), Today.AddDays(20));
+        closures.Add(closure);
+
+        var room = UBookIt.Core.Resources.Resource.Create(
+            "room",
+            "Exempt Room",
+            directlyBookable: true,
+            availability: AvailabilityConfiguration.Create(EveryDay()).Value,
+            closureOptOuts: [closure.Id]).Value;
+
+        var resources = new InMemoryResourceStore().Add(room).Hydrating(closures);
+        var time = new FixedTimeProvider(TestData.Now);
+        var flow = new ResourceBookingFlow(
+            resources,
+            new AvailabilityService(resources, new InMemoryBookingStore(), time, settings),
+            settings,
+            time,
+            new TestEmailSender());
+
+        var form = (await flow.BuildAsync(room.Id, new BookingFlowInput { DurationMinutes = 60 })).Form;
+
+        Assert.Null(form!.ShiftedWindowFrom);
+        Assert.Equal(Today, form.AvailableDates.First().Date);
+    }
+
+    [Fact]
+    public async Task A_fully_booked_today_does_not_move_the_window()
+    {
+        var settings = TestData.Settings;
+        var room = UBookIt.Core.Resources.Resource.Create(
+            "room",
+            "Busy Room",
+            directlyBookable: true,
+            availability: AvailabilityConfiguration.Create(
+                EveryDay(),
+                constraints: BookingConstraints.Create(
+                    granularity: TimeSpan.FromMinutes(60),
+                    minDuration: TimeSpan.FromMinutes(60),
+                    maxDuration: TimeSpan.FromHours(10)).Value).Value).Value;
+
+        var resources = new InMemoryResourceStore().Add(room);
+        var store = new InMemoryBookingStore();
+        var time = new FixedTimeProvider(TestData.Now);
+
+        // The whole of today's opening, taken.
+        var placed = await new BookingService(resources, store, time, settings).PlaceAsync(new BookingRequest
+        {
+            ResourceId = room.Id,
+            Start = TestData.Utc(Today, "08:00"),
+            Duration = TimeSpan.FromHours(10),
+            Booker = TestData.Booker(),
+        });
+        Assert.True(placed.Succeeded, string.Join(", ", placed.Failures.Select(f => f.Code)));
+
+        var flow = new ResourceBookingFlow(
+            resources, new AvailabilityService(resources, store, time, settings), settings, time, new TestEmailSender());
+        var form = (await flow.BuildAsync(room.Id, new BookingFlowInput { DurationMinutes = 60 })).Form;
+
+        // Not shifted — a full day is not a closure — and today is simply not listed.
+        Assert.Null(form!.ShiftedWindowFrom);
+        Assert.DoesNotContain(form.AvailableDates, date => date.Date == Today);
+        Assert.Equal(Today.AddDays(1), form.AvailableDates.First().Date);
     }
 
     [Fact]

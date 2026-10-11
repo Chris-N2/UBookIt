@@ -147,8 +147,8 @@ public sealed class ResourceBookingFlow(
         return new ResourceFlowOutcome(
             BookingFormBuilder.Build(
                 resource, selectedDate, today, windowStarts, dayStarts, duration, zone,
-                PrivacyNoticeView.From(settings, HostMailAvailability.CanSend(emailSender)), windowDays, failed, input.FlowToken,
-                input.PreservedQueryPairs, (windowFrom, windowTo)),
+                PrivacyNoticeView.From(settings, HostMailAvailability.CanSend(emailSender)), windowDays, windowFrom, failed, input.FlowToken,
+                input.PreservedQueryPairs),
             null);
     }
 }
