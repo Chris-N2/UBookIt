@@ -674,10 +674,10 @@ public class VersionTruthTests
             + "The count is exact, so a later requirement cannot bring in a publication claim "
             + "under an allowance granted for these."),
 
-        ("docs/publishing.md", "nuget.org", 23,
+        ("docs/publishing.md", "nuget.org", 21,
             "The publishing runbook names the feed as a DESTINATION — what nuget.org will "
-            + "not let you undo, where the API key lives, which source to push to, how to "
-            + "tell when indexing has finished — and, since publication, as a RECORD: its "
+            + "not let you undo, where the Trusted Publishing policy lives, how to tell when "
+            + "indexing has finished — and, since publication, as a RECORD: its "
             + "Status section states that 17.0.0 shipped on 2026-09-15. Both are legitimate "
             + "here, and this is the one document where they should be. The count is "
             + "deliberately exact, so editing the runbook forces a fresh look at whether "
@@ -699,7 +699,22 @@ public class VersionTruthTests
             + "(`nuget.org → your username → Trusted Publishing → the policy`), which tells a "
             + "maintainer where the policy lives; and the fallback trigger (`nuget.org's token "
             + "exchange is down`), which describes the host's service being unavailable. "
-            + "Neither says what has or has not been published."),
+            + "Neither says what has or has not been published.\n"
+            + "23 -> 20 at `remove-publish-fallback`, which removed the hand route. REMOVED, all "
+            + "three inside the deleted fallback: where to get an API key from nuget.org, the "
+            + "push command's source URL, and the wildcard paragraph's note that nuget.org "
+            + "validates each package independently. MOVED, text unchanged in substance: the "
+            + "token-exchange trigger, now inside the sentence saying there is no hand route; "
+            + "and the 403 section's three (an organization owner, the requirement for a "
+            + "distinct address, the flat-container ID check), now under Trusted Publishing "
+            + "setup. Nothing ADDED. None of the twenty says what has or has not been published "
+            + "beyond the Status record already accepted above. The lead-in of this entry lost "
+            + "`where the API key lives` and `which source to push to` with them (QA round 1).\n"
+            + "20 -> 21 at the same change, QA round 1: the 403 section was corrected to say a "
+            + "policy problem can surface at the token exchange as well as at the push. ADDED, a "
+            + "BEHAVIOURAL fact about the host, from Microsoft Learn's Trusted Publishing page: "
+            + "`nuget.org marks a policy inactive` when its owning organization is locked or "
+            + "deleted, or its creator leaves it. It says nothing about what has been published."),
     ];
 
     /// <summary>
@@ -937,7 +952,10 @@ public class VersionTruthTests
         // rather than trust that the procedure worked. Both halves, because deleting either
         // left the suite green (QA rounds 1 and 2).
         DocumentationAssert.SaysOnce(
-            runbook, "check the produced `.nuspec`, not the source, before you push");
+            // "before you push" until `remove-publish-fallback`: with no hand route a maintainer
+            // never pushes a package, and the last moment the .nuspec can still be stopped is the
+            // approval. Same guarantee — inspect what was produced, before it is irreversible.
+            runbook, "check the produced `.nuspec`, not the source, before you approve the publish");
         DocumentationAssert.SaysOnce(
             runbook, "Each package carries its own metadata, so check all five");
 
@@ -949,12 +967,21 @@ public class VersionTruthTests
         // The ordering, which is the finding this change was built on.
         DocumentationAssert.SaysOnce(runbook, "This order is load-bearing, not tidiness");
 
-        // The STEP, not just the narrative about it: QA round 2 deleted this line and the
-        // suite stayed green while the document still claimed its order was load-bearing.
-        // `dotnet pack` is incremental and `--no-incremental` does not govern it, so without
-        // this step a stale .nupkg survives the whole procedure and is pushed by the wildcard.
-        DocumentationAssert.SaysOnce(runbook, "DELETE the old artifacts");
-        DocumentationAssert.SaysOnce(runbook, "Step 3 is not housekeeping");
+        // The MECHANISM, not just the narrative about it: QA round 2 deleted the step that
+        // removed old artifacts and the suite stayed green while the document still claimed its
+        // order was load-bearing. `dotnet pack` is incremental and `--no-incremental` does not
+        // govern it, so in a tree that has packed before a stale .nupkg survives a clean rebuild.
+        //
+        // These two pins replaced "DELETE the old artifacts" and "Step 3 is not housekeeping" at
+        // `remove-publish-fallback`, which removed the hand pack those named. The hazard is the
+        // same and still has to be stated (packaging, "The ordering that makes source links
+        // correct is documented"); what removes it is now the workflow's fresh clone, so the
+        // pins are on the sentences that say so. The first is the order itself — properties,
+        // remote, rebuild from nothing — because the spec requires the order, not just the
+        // hazard; the second is why a fresh clone, specifically, is what makes it safe.
+        DocumentationAssert.SaysOnce(
+            runbook, "correct the properties, move the remote, then rebuild from nothing");
+        DocumentationAssert.SaysOnce(runbook, "A fresh clone is what keeps a stale package out");
         DocumentationAssert.SaysOnce(
             runbook,
             "a package built before the remote moved carries the old SourceLink URLs");
@@ -984,8 +1011,18 @@ public class VersionTruthTests
         // it: a pack from an unpushed commit yields source links that 404 for every consumer,
         // permanently, and passes every other check here.
         DocumentationAssert.SaysOnce(runbook, "SourceLink embeds the commit SHA");
+        // What stops it, which replaced "Pack from the merge commit on main, after it is pushed"
+        // at `remove-publish-fallback`. Same guarantee (packaging, "Publishing from an
+        // unpublished commit is documented as unrecoverable": the packed commit must be one the
+        // public repository has), now enforced by the check job rather than asked of a person —
+        // and worded without a branch name, because "on main" was false on `dev/v18`.
         DocumentationAssert.SaysOnce(
-            runbook, "Pack from the merge commit on main, after it is pushed");
+            runbook, "The check job refuses a tag whose commit no published line contains");
+
+        // What replaced the hand route (release-publishing, "The workflow cannot publish"). The
+        // fallback section was removed rather than left to rot, and the statement that removed
+        // it is the guarantee now — so it must not be the one sentence here nothing watches.
+        DocumentationAssert.SaysOnce(runbook, "There is no hand route.");
         // And the guard that is meant to fail, so a red test is not read as an obstacle.
         //
         // The sentence pinned here used to be "When you publish, that guard will start failing"
@@ -1004,9 +1041,19 @@ public class VersionTruthTests
         // The 403 is the sharpest of them. Its text names only the API key, which sends a
         // maintainer to check the one thing that is almost never wrong, and the real cause —
         // an organization owner that cannot publish — is invisible from the message.
+        //
+        // At `remove-publish-fallback` the lesson moved under Trusted Publishing setup: the
+        // workflow pushes with the key the token exchange returns, so a policy whose owner cannot
+        // publish produces the same 403 naming the same key.
         DocumentationAssert.SaysOnce(
             runbook, "an organization has its own email address that must be confirmed");
-        DocumentationAssert.SaysOnce(runbook, "push new packages and package versions");
+        DocumentationAssert.SaysOnce(
+            runbook, "A 403 usually means the policy's OWNER, not the key");
+        // The scope lesson, which replaced "push new packages and package versions" — the scope a
+        // hand-made KEY needed for a first publish. The guarantee is the same: a narrow scope
+        // cannot create a package ID, so a new package fails with this 403. It is now stated of
+        // the policy, which is what a release's push is scoped by.
+        DocumentationAssert.SaysOnce(runbook, "it cannot create an ID that does not exist yet");
 
         // That ownership is not a reason to delay a push. Without this a maintainer blocks a
         // release on an account problem that is fixable afterwards.

@@ -98,8 +98,14 @@ public class ClosuresControllerTests
     public async Task The_list_omits_past_closures_by_default()
     {
         var (controller, store) = Wire();
-        var past = TestData.Closure(DateOnly.FromDateTime(DateTime.UtcNow).AddDays(-30), "Last month");
-        var future = TestData.Closure(DateOnly.FromDateTime(DateTime.UtcNow).AddDays(30), "Next month");
+
+        // Dated from the clock the controller was given, never the machine's. This test once
+        // used DateTime.UtcNow while Wire() fixes the controller's "now" at TestData.Now
+        // (2026-09-01), so from 2026-10-02 "thirty days ago" was AFTER the controller's today and
+        // the past closure was listed as upcoming — a test that passed only until a calendar date.
+        var today = DateOnly.FromDateTime(TestData.Now.UtcDateTime);
+        var past = TestData.Closure(today.AddDays(-30), "Last month");
+        var future = TestData.Closure(today.AddDays(30), "Next month");
         store.Add(past).Add(future);
 
         var byDefault = Ok<List<SiteClosureModel>>(await controller.ListClosures(cancellationToken: Ct));
