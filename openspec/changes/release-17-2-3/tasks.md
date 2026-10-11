@@ -53,7 +53,7 @@
 
 ## 3. Review and merge
 
-- [ ] 3.1 QA review (`qa-review`) in one subagent, reused across rounds, covering this change and
+- [x] 3.1 QA review (`qa-review`) in one subagent, reused across rounds, covering this change and
   `release-18-1-3`. Hand each round's fixes over as new code, and give every claim as something to
   verify.
   *Round 1: REJECT for this change; `release-18-1-3` was APPROVE WITH NITS.* QA independently
@@ -88,6 +88,18 @@
       deliberately not a list: enumerating went wrong twice.
   - **NIT:** this record and the proposal's correction note repeated round 1's list. Both now
     describe the rule.
+  *Round 3: APPROVE* (both changes). QA rebuilt clean on `1647321`: 0 warnings, guards 20/20,
+  validate 27/27. Checked against every `Umbraco.Cms*` 17.7.1 nuspec:
+  - "its Entity Framework Core packages" means SqlServer and Sqlite, both at 10.0.11;
+  - "most of its Microsoft.Extensions" is exact, because only Hybrid differs;
+  - "downgrade" holds for every case the rule covers, Examine included, since
+    `Umbraco.Cms.Examine.Lucene` pulls `Examine` 3.10.0 itself;
+  - nothing reads as a complete set.
+
+  Optional NIT, **not taken**: a direct `Microsoft.EntityFrameworkCore` or `.Relational` 10.0.10
+  also downgrades. Those aren't packages Umbraco declares itself, but the rule and its "for
+  example" cover the case, and QA said it can stay. Editing an approved frozen entry would be new
+  code needing another round. Three rounds, one reviewer.
 - [ ] 3.2 Chris pushes the branch and opens the PR into `main`. Verify, through the API, that the
   PR's CI run is green at every step, **parity included** (only `<Version>` differs in a parity
   file, and parity exempts it).
