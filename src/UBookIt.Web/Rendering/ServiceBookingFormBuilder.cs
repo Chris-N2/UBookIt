@@ -199,6 +199,9 @@ public static class ServiceBookingFormBuilder
     /// bounds use.
     /// </para>
     /// </summary>
+    public static int HorizonDays(IReadOnlyList<RoleCandidates> pools)
+        => pools.Min(pool => pool.Candidates.Max(c => c.Resource.Availability.Constraints.HorizonDays));
+
     /// <summary>
     /// The first date from <paramref name="today"/> on which ANY candidate is not closed by a
     /// closure or closed period — where the service's date window starts.
@@ -214,9 +217,6 @@ public static class ServiceBookingFormBuilder
             .Select(candidate => ClosedRanges.FirstUncovered(today, ClosedRanges.Of(candidate.Resource.Availability)))
             .DefaultIfEmpty(today)
             .Min();
-
-    public static int HorizonDays(IReadOnlyList<RoleCandidates> pools)
-        => pools.Min(pool => pool.Candidates.Max(c => c.Resource.Availability.Constraints.HorizonDays));
 
     /// <summary>
     /// The confirmation for a placed service booking, naming <b>every</b> resource

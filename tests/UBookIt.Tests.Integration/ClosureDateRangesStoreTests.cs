@@ -160,6 +160,37 @@ public class ClosureDateRangesStoreTests(SqlServerFixture fixture) : IAsyncLifet
         Assert.NotEmpty(resource.Availability.EffectiveWindows(Start.AddDays(10)));
     }
 
+    /// <summary>
+    /// A closure written by a version from before ranges, after a downgrade: that version does not
+    /// know the column, so the row takes its default end, 0001-01-01. Coming forward again it must
+    /// read as the single day it was written as — and above all must not throw, because every
+    /// resource read loads the closures (release-17-3-0 QA round 1).
+    /// </summary>
+    [Fact]
+    public async Task A_closure_written_without_an_end_reads_as_its_one_day_and_does_not_throw()
+    {
+        fixture.EnsureAvailable();
+
+        var resourceId = await Seed.EveryDayRoomAsync(fixture, Ct);
+
+        await using (var setup = fixture.CreateContext())
+        {
+            // Exactly what the older build's INSERT produces: no EndDate, so the column default.
+            await setup.Database.ExecuteSqlAsync(
+                $"INSERT INTO uBookItSiteClosure (Id, Date, Label) VALUES ({Guid.NewGuid()}, {Start.AddDays(5)}, {"Written while downgraded"})",
+                Ct);
+        }
+
+        await using var read = fixture.CreateContext();
+        var closure = Assert.Single(await new SqlSiteClosureStore(read).ListAsync(Ct));
+        Assert.Equal(Start.AddDays(5), closure.Date);
+        Assert.Equal(Start.AddDays(5), closure.EndDate);
+
+        var resource = await new SqlResourceStore(read, new SqlSiteClosureStore(read)).GetAsync(resourceId, Ct);
+        Assert.Empty(resource!.Availability.EffectiveWindows(Start.AddDays(5)));
+        Assert.NotEmpty(resource.Availability.EffectiveWindows(Start.AddDays(6)));
+    }
+
     // ── Closed periods ───────────────────────────────────────────────────────────────────
 
     private async Task<Resource> LoadAsync(Guid resourceId)

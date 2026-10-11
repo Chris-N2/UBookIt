@@ -17,8 +17,30 @@
 ## 3. Review and merge
 
 - [ ] 3.1 QA (`qa-review`) in one subagent, reused across rounds, covering this change and
-  `release-18-2-0`. Verify: APPROVE.
-- [ ] 3.2 Chris pushes `dev/v18` (the archive), then this branch, and opens the PR into `dev/v18`. Verify: the PR's CI
+  `release-17-3-0`. Verify: APPROVE.
+  *Round 1: REJECT on both changes*, two must-fix findings. QA re-verified the version mentions,
+  the history anchors, and both lines' clean builds and suites.
+  - **1. Downgrade then upgrade crashes the site.** On the older version a closure created or
+    moved gets the column's default end, 0001-01-01. Back on this version, reading it threw
+    `closure-range-invalid`, and since every resource read loads closures, the site went down.
+    The entry said "nothing breaks".
+    - *Fix, in code:* `SiteClosureRowMapper.ToDomain` reads an end before its start as the
+      single day the row was written as.
+    - *Fix, in the entry:* it now says what a round trip does: single days, and a closure moved
+      earlier keeps its old end. It advises checking closures afterwards.
+    - *Guard:* `A_closure_written_without_an_end_reads_as_its_one_day_and_does_not_throw` inserts
+      the older build's exact row with raw SQL. **Shown to fire:** with the clamp removed it fails
+      with the `InvalidOperationException`. Restored.
+  - **2.** `docs/delivery-api.md` named `Create` for closed periods; it is now
+    `CreateWithClosedPeriods`.
+  - **3 (minor).** The entry lists the new failure codes, the wider meaning of
+    `duplicate-closure-date`, and the missing members.
+  - **4 (minor).** The entry says how a service's page moves: only when every candidate is closed
+    today.
+  - **5 (nit).** README "What it does" names ranges and closed periods.
+  - **6 (nit).** `FirstOpenDate`'s doc comment no longer sits inside `HorizonDays`'s.
+- [ ] 3.2 Chris pushes `dev/v18` (the archive), then this branch, and opens the PR into `dev/v18`.
+  Verify: the PR's CI
   is green at every step, parity included.
 - [ ] 3.3 Chris merges with "Create a merge commit". Verify: `origin/dev/v18` is the merge commit, and
   its push run is green.
