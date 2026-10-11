@@ -162,11 +162,26 @@
       - *Round 3 REJECT. A one-configuration suppression was judged by nothing.*
       - *Round 4 APPROVE WITH NITS. 9 of 9 scenarios hold, and every suppression is judged by
         something. Both NITs taken: scenario wording, runbook wrap.)*
-- [ ] 4.2 Chris pushes both branches and opens PRs. CI is expected red on parity until both
+- [x] 4.2 Chris pushes both branches and opens PRs. CI is expected red on parity until both
       branches carry the script (design D6), and goes green once both are pushed. Verify: run IDs
-      recorded.
-- [ ] 4.3 After both merge, run the `audit` workflow on demand. Verify: green, with 5 accepted
-      notices per line, and its run ID recorded.
+      recorded. *(2026-10-11. **The expectation above was wrong.** Parity compares a PR with the
+      other line's branch on origin, not with the other PR, so pushing both changed nothing. One
+      line had to merge red first. Both PR runs failed on parity alone, flagging the same two
+      files: `Directory.Build.props` and `scripts/ci/Assert-NoVulnerablePackages.ps1`. Those were
+      `main`'s PR #13 (run `38143956503`) and `dev/v18`'s PR #14 (run `38143993793`). The order
+      was:*
+      1. *PR #13 merged red, as `29f020d`.*
+      2. *PR #14's re-run went green (`38143993793`, attempt 2), and it merged as `8bc5361`.*
+      3. *`main`'s push run went green on re-run (`38146951272`, attempt 2).*
+
+      *`dev/v18`'s push run (`38147559409`) was green first time.)*
+- [x] 4.3 After both merge, run the `audit` workflow on demand. Verify: green, with 5 accepted
+      notices per line, and its run ID recorded. *(2026-10-11, run `38148082536` on `main` at
+      `29f020d`. Both jobs passed: `audit (main)` and `audit (dev/v18)`. Each carries exactly
+      five `Accepted advisory` notices, all `UBookIt.TestSite (net10.0)`, SixLabors.ImageSharp
+      3.1.12. They are GHSA-wmxv-xphr-5c9g and GHSA-gwg2-r3hj-4w44 (Moderate), and
+      GHSA-jjfr-hcj7-qf5w, GHSA-j9gm-c75j-xc9q and GHSA-j3p4-wp97-rph4 (High). No other
+      annotations.)*
 - [ ] 4.4 Archive on each line, syncing the MODIFIED `continuous-integration` requirement
       *Vulnerability advisories are audited separately from the build*, after an outward search of `openspec/specs` and `docs/` for any
       sentence the floor raise or the exception falsifies. Verify: `openspec validate --all
