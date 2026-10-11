@@ -90,8 +90,10 @@ internal sealed class SqlSiteClosureManagementStore(UBookItDbContext db) : ISite
         {
             // Filtered here rather than by the client hiding rows, so the view's default
             // does not depend on fetching every closure a site has ever recorded. By END
-            // date, so a closure already in progress is still upcoming.
-            query = query.Where(c => c.EndDate >= earliest);
+            // date, so a closure already in progress is still upcoming — the end as READ,
+            // corrected for a row an older version wrote without one (see ToDomain), or a
+            // future closure written while downgraded would vanish from the default list.
+            query = query.Where(c => (c.EndDate < c.Date ? c.Date : c.EndDate) >= earliest);
         }
 
         var rows = await query
@@ -187,7 +189,11 @@ internal sealed class SqlSiteClosureManagementStore(UBookItDbContext db) : ISite
     {
         var other = await db.SiteClosures
             .AsNoTracking()
-            .Where(c => c.Id != closure.Id && c.Date <= closure.EndDate && c.EndDate >= closure.Date)
+            // The other closure's end as READ (see ToDomain): a row an older version wrote
+            // without an end still covers its start date, and must still refuse an overlap.
+            .Where(c => c.Id != closure.Id
+                && c.Date <= closure.EndDate
+                && (c.EndDate < c.Date ? c.Date : c.EndDate) >= closure.Date)
             .OrderBy(c => c.Date)
             .FirstOrDefaultAsync(cancellationToken)
             .ConfigureAwait(false);
