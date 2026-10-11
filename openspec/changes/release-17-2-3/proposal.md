@@ -30,8 +30,8 @@ The entry says plainly what a site below 17.7.1 has to do.
    repository or the packed nuspecs, not against this list.
    - **What you have to do:** on a site below Umbraco 17.7.1, upgrade `Umbraco.Cms` to 17.7.1
      first, as the README already says. Otherwise nothing. *(Corrected at apply, tasks 1.2 and
-     QA round 1: a site's own direct references to Umbraco's Microsoft.Extensions, EF Core or
-     `Microsoft.Data.Sqlite` dependencies must also be 10.0.11 or later.)*
+     QA rounds 1–2: a site's own direct reference to any package whose minimum Umbraco 17.7.1
+     raises must be raised to match, stated as a rule with examples, not as a list.)*
    - **What changed:**
      - **The minimum Umbraco is 17.7.1**, naming the four advisories. They are Umbraco's
        advisories, and uBookIt's own code is not what they describe.

@@ -62,16 +62,32 @@
     of Umbraco. It is not: 17.6 → 17.7 is an Umbraco minor. *Fix:* the ground now says the step
     stays inside Umbraco's major, as a minor plus its patch. The ruling itself is unchanged.
   - **MINOR:** the entry named only `Microsoft.EntityFrameworkCore.SqlServer` as a reference a
-    site might have to raise. Umbraco 17.7.1 moves its whole set of Microsoft.Extensions and EF
-    Core dependencies, and `Microsoft.Data.Sqlite`, from 10.0.10 to 10.0.11. I re-read the
-    `Umbraco.Cms` and `Umbraco.Cms.Persistence.EFCore` 17.6.2 and 17.7.1 nuspecs from the feed's
-    flat container to confirm it. *Fix:* *What you have to do* now says that, and names SqlServer
-    as the example uBookIt also declares.
+    site might have to raise. Umbraco 17.7.1 moves more of its dependencies than that. *Fix,
+    superseded in round 2:* a list of "Microsoft.Extensions, EF Core and `Microsoft.Data.Sqlite`
+    at 10.0.11".
   - **NIT:** the proposal's item 2 still carried the pre-apply ImageSharp path and "Otherwise
     nothing". *Fix:* both now carry correction notes pointing here.
   - **NIT, no change:** a mixed-version site would likely lose the preview hub, because
     GHSA-4c5q's client half ships in `Umbraco.Cms.StaticAssets`. That backs the existing "upgrade
     first" advice, so the frozen entry was left alone.
+  *Round 2: REJECT for this change; `release-18-1-3` APPROVE WITH NITS.*
+  - **MINOR, the round-1 fix was itself wrong in both directions.** QA diffed every `Umbraco.Cms*`
+    package's non-Umbraco dependencies, 17.6.2 → 17.7.1. Round 1 had read only two packages.
+    - **Overclaim:** `Microsoft.Extensions.Caching.Hybrid` goes 10.8.0 → **10.9.0**, not to
+      10.0.11.
+    - **Underclaim:** a direct Hybrid 10.8.0 reference satisfies "10.0.11 or later" and still
+      fails with a downgrade. Examine and Examine.Core (3.9.0 → **3.10.0**) and
+      `SQLitePCLRaw.lib.e_sqlite3` (2.1.12 → 2.1.13) were missing.
+    - Hybrid and Examine come in through uBookIt's own closure (`PublishedCache.HybridCache`,
+      `Examine.Lucene`, `Infrastructure`). I re-read those three nuspecs at 17.6.2 and 17.7.1 from
+      the feed's flat container, and they confirm it.
+    - *Fix:* *What you have to do* now states a rule with examples, marked as examples: a direct
+      reference below the version Umbraco 17.7.1 requires reports a downgrade, so raise it. The
+      examples are most Microsoft.Extensions and the EF Core packages at 10.0.11, Hybrid at
+      10.9.0, and Examine at 3.10.0, with SqlServer named as the one uBookIt also declares. It is
+      deliberately not a list: enumerating went wrong twice.
+  - **NIT:** this record and the proposal's correction note repeated round 1's list. Both now
+    describe the rule.
 - [ ] 3.2 Chris pushes the branch and opens the PR into `main`. Verify, through the API, that the
   PR's CI run is green at every step, **parity included** (only `<Version>` differs in a parity
   file, and parity exempts it).

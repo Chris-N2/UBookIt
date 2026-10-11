@@ -26,10 +26,12 @@ uBookIt.** uBookIt now requires 17.7.1. Installing it on an older site raises on
 packages uBookIt depends on and leaves the rest where they are, so upgrading `Umbraco.Cms` first
 keeps every Umbraco package on one version.
 
-Umbraco 17.7.1 requires its Microsoft.Extensions and Entity Framework Core dependencies, and
-`Microsoft.Data.Sqlite`, at 10.0.11 where 17.6.2 took 10.0.10. If your site references any of
-them directly, such as `Microsoft.EntityFrameworkCore.SqlServer`, which uBookIt also declares,
-that reference must be 10.0.11 or later.
+Umbraco 17.7.1 also requires newer versions of some of the packages it depends on. For example,
+most of its Microsoft.Extensions packages and its Entity Framework Core packages move to 10.0.11,
+`Microsoft.Extensions.Caching.Hybrid` to 10.9.0, and Examine to 3.10.0. If your site references
+one of those packages directly at a lower version than Umbraco 17.7.1 requires, restore reports a
+downgrade: raise that reference to the version Umbraco requires.
+`Microsoft.EntityFrameworkCore.SqlServer`, which uBookIt also declares, is one of them.
 
 Otherwise, **nothing.** No API signature, schema or migration changes, and no setting you have to
 change.
