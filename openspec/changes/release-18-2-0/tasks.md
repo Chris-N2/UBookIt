@@ -1,19 +1,27 @@
 ## 1. The version and the entry
 
-- [ ] 1.1 Branch `release-18-2-0` from local `dev/v18` at `0c62245` (the `closure-date-ranges`
+- [x] 1.1 Branch `release-18-2-0` from local `dev/v18` at `0c62245` (the `closure-date-ranges`
   archive). Bump `<Version>` to `18.2.0` and move every row of `docs/publishing.md` step 2's table.
   Re-read the *Tag the release* literals by eye. Verify: `git grep 18.1.3` over README and the
   runbook is empty.
-- [ ] 1.2 Write the `18.2.0` entry, undated. **Check every claim against the code and the archived
+  *Done:* every `18.1.3` in `Directory.Build.props` (1), README (21) and the runbook (5) moved to
+  `18.2.0`. No history anchor named `18.1.3`. QA confirmed the diffs are identical once the version
+  is masked.
+- [x] 1.2 Write the `18.2.0` entry, undated. **Check every claim against the code and the archived
   change, not against this list.** Verify: `ChangelogTests` passes.
 
+  *Done:* checked claim by claim by QA across three rounds (see 3.1). `ChangelogTests` passes.
 ## 2. Clean build and suites
 
-- [ ] 2.1 Stop the TestSite. Clean the outputs, build the client, then
+- [x] 2.1 Stop the TestSite. Clean the outputs, build the client, then
   `CI=true dotnet build UBookIt.slnx -c Release --no-incremental`. Verify: 0 warnings.
-- [ ] 2.2 Run the suites per project. Verify: unit **2120**, integration **207**, rendering
+  *Done:* the final clean `CI=true --no-incremental` build, at round 2's tip, had 0 warnings and
+  0 errors. QA reproduced it.
+- [x] 2.2 Run the suites per project. Verify: unit **2120**, integration **207**, rendering
   **1178**, client **346**, each with 0 skipped; `openspec validate --all --strict` passes.
 
+  *Done, 0 skipped:* unit **2120**, integration **210** (207 plus this release's 3
+  downgrade-read tests), rendering **1178**, client **346**; openspec 27/27.
 ## 3. Review and merge
 
 - [x] 3.1 QA (`qa-review`) in one subagent, reused across rounds, covering this change and
@@ -68,16 +76,21 @@
     neither can be edited until one is deleted.
 
   Three rounds, one reviewer.
-- [ ] 3.2 Chris pushes `dev/v18` (the archive), then this branch, and opens the PR into `dev/v18`.
+- [x] 3.2 Chris pushes `dev/v18` (the archive), then this branch, and opens the PR into `dev/v18`.
   Verify: the PR's CI
   is green at every step, parity included.
-- [ ] 3.3 Chris merges with "Create a merge commit". Verify: `origin/dev/v18` is the merge commit, and
+  *Done:* PR **#21**: run `38176536319` (pull_request, head `e9c8721`) green at every step, parity
+  included.
+- [x] 3.3 Chris merges with "Create a merge commit". Verify: `origin/dev/v18` is the merge commit, and
   its push run is green.
 
+  *Done:* merged as **`8719399`**. Its push run `38176907442` was green.
 ## 4. Release through the workflow
 
-- [ ] 4.1 Chris pushes tag `18.2.0` on the merge commit. Verify: `check` and `pack` are green.
-- [ ] 4.2 **Before approving**, from the run's `packages` artifact:
+- [x] 4.1 Chris pushes tag `18.2.0` on the merge commit. Verify: `check` and `pack` are green.
+  *Done:* tag `18.2.0` is on `8719399`. Publish run **`38177197414`**: `check` and `pack` were green,
+  and `publish` was waiting.
+- [x] 4.2 **Before approving**, from the run's `packages` artifact:
   - the tagged `booking-flow.png` returns 200;
   - there are exactly 5 `.nupkg` and 4 `.snupkg`, all `18.2.0`;
   - all five nuspecs carry the authors, copyright, licence, readme, icon, project URL and the
@@ -85,12 +98,36 @@
   - every `Umbraco.Cms.*` dependency is `[18.2.1, 19.0.0)`, and EF Core SqlServer is `10.0.11`;
   - the packed README is identical to the tag's, all its addresses return 200, and every
     repository address is pinned to `18.2.0`.
-- [ ] 4.3 Chris approves. Record the summary table and the conclusion.
-- [ ] 4.4 Confirm `18.2.0` per package on the flat container, and that the package page renders.
+  *Done, nothing wrong.* The artifact was downloaded by Chris to `artifacts/packages-v18`.
+  - Exactly 5 `.nupkg` and 4 `.snupkg`, all `18.2.0`; each `.snupkg` holds its own `.pdb`.
+  - All five nuspecs: authors, copyright, MIT, readme and icon (present in each package), project
+    URL, and commit `8719399`. `umbraco-marketplace` is on `UBookIt` only ("for Umbraco 18").
+  - Every `Umbraco.Cms.*` dependency is `[18.2.1, 19.0.0)`; EF Core SqlServer is `10.0.11`. Nothing
+    mentions ImageSharp.
+  - The packed README is identical in all five packages to `README.md` at the tag ("uBookIt is at
+    `18.2.0`"). All 19 addresses return 200, and every repository address is pinned to `18.2.0`.
+- [x] 4.3 Chris approves. Record the summary table and the conclusion.
+  *Done.* Chris approved, and the run concluded **success** at 21:45:03Z. Every `.nupkg` was
+  "published", every `.snupkg` "symbols submitted", and `UBookIt` came last. No 409, so the
+  pending-symbols wording is still unobserved.
+- [x] 4.4 Confirm `18.2.0` per package on the flat container, and that the package page renders.
 
+  *Done:* all five `18.2.0` packages were in the flat container by 21:53:00Z, the 10th of the 10
+  across both lines. `nuget.org/packages/UBookIt/18.2.0` returns 200 and says "uBookIt is at
+  18.2.0".
+  - The README images were broken on GitHub between merge and tag, as they are at every release:
+    they pin to a tag that does not exist yet. Pushing the tag fixed them.
 ## 5. Close out
 
-- [ ] 5.1 Stamp the entry's date.
-- [ ] 5.2 Sibling sweep for `18.1.3` and for sentences the release falsifies. Fix or record each.
-- [ ] 5.3 Commit; run the unit suite; Chris pushes. Verify: `dev/v18`'s CI is green.
-- [ ] 5.4 Archive last, running the unit suite before the push.
+- [x] 5.1 Stamp the entry's date.
+  *Done:* `## 18.2.0 — 2026-10-11`.
+- [x] 5.2 Sibling sweep for `18.1.3` and for sentences the release falsifies. Fix or record each.
+  *Done:* the previous version's mentions in README and the runbook were moved at 1.1, and only
+  the changelog's history keeps them. The feature's own sweep ran at its archive. Nothing is
+  falsified.
+- [x] 5.3 Commit; run the unit suite; Chris pushes. Verify: `dev/v18`'s CI is green.
+  *Done:* committed locally after the unit suite ran. Chris pushes on 2026-10-12, so the CI
+  check happens in the session that does the push.
+- [x] 5.4 Archive last, running the unit suite before the push.
+
+  *Done:* archived with this box ticked.
