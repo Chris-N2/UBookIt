@@ -65,13 +65,36 @@
 
 ## 3. Port to `dev/v18`
 
-- [ ] 3.1 Branch `umbraco-security-2026-10-v18` from `dev/v18`. Cherry-pick the script, tests and
+- [x] 3.1 Branch `umbraco-security-2026-10-v18` from `dev/v18`. Cherry-pick the script, tests and
       change folder. Re-do the floor by hand as `[18.2.1,19.0.0)`, and the README on v18's
       wording, including "upgrade `Umbraco.Cms` itself to 18.2.1 first". Add the same TestSite
       suppressions, if v18's graph has the same five findings; check, don't assume. Verify:
-      `git diff` between the two branches for `scripts/ci/` is empty.
-- [ ] 3.2 Run the design D5 checklist on v18, as in 2.3, at v18's baselines (unit 2017 plus this
-      change's test delta). Verify: each result recorded.
+      `git diff` between the two branches for `scripts/ci/` is empty. *(Proposal and audit
+      commits cherry-picked cleanly; the floor and README were redone by hand. The README had four
+      `18.2.0` floor mentions: the opening, the table row, "a site below", and "upgrade … first".
+      EF Core was already 10.0.11 on this line. v18's graph has the same five ImageSharp findings
+      in `UBookIt.TestSite`, so the cherry-picked suppressions apply as they stand. The
+      `scripts/ci/` and `AuditScriptTests.cs` diff against `main`'s branch is empty. Note: the
+      branch was created tracking `origin/dev/v18` and the upstream was unset straight away, so a
+      bare `git push` cannot land on `dev/v18`.)*
+- [x] 3.2 Run the design D5 checklist on v18, as in 2.3, at v18's baselines (unit 2017 plus this
+      change's test delta). Verify: each result recorded. *(2026-10-11, v18:
+      - 73 `Umbraco.Cms*` references, all 18.2.1;
+      - clean `--no-incremental` Release build: **0 warnings, 0 errors**;
+      - client regenerated from the v18 OpenAPI endpoint: empty content diff ignoring CR, so the
+        surface is unchanged across 18.2.0 → 18.2.1;
+      - client 335, unit 2031 (2017 + 14), integration 194, rendering 1168, all passing;
+        openspec 27/27;
+      - the audit script exits 0, with 5 accepted, all in `UBookIt.TestSite`;
+      - live, TestSite restarted on this branch: section and all five views, Resources rendering
+        v18's own data; booking 2SMJ-2MJC placed for DBO Granted, Mon 12 Oct 09:30–10:00, and found
+        by reference on the Bookings screen as Confirmed. No console errors after load. The four
+        errors logged during the restart and re-login (SignalR 1006, token refresh, icon fetch,
+        auth-view `_subject`) are all in Umbraco core and timestamped before the pass.
+      - **Observed, not investigated, not attributed:** a direct navigation to
+        `/umbraco/section/ubookit/view/bookings` rendered with Resources highlighted and an empty
+        body; clicking the Bookings tab worked. Never tried on 17 or before this change, so whether
+        it is new is unknown.)*
 
 ## 4. QA, merge, archive
 
