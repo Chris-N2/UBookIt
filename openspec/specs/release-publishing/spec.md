@@ -225,14 +225,28 @@ SHALL NOT request a credential or publish. It SHALL work for tags that predate t
 - **WHEN** a dry run's checks and pack succeed
 - **THEN** the run ends without offering the publish step for approval
 
-### Requirement: The runbook describes the workflow as the route and the key as the fallback
-`docs/publishing.md` SHALL describe publishing by tag push through the workflow as the route. It
-SHALL state the one-time setup the workflow depends on outside the repository: the approval
-environment and the nuget.org Trusted Publishing policy, with the exact values each needs. It SHALL
-state that the policy belongs to the account that owns the packages, so a change of ownership
-requires a new policy. The manual API-key procedure SHALL remain documented, labelled as the
-fallback for when the workflow cannot be used. The status section SHALL no longer list Trusted
+### Requirement: The runbook describes the workflow as the only route
+`docs/publishing.md` SHALL describe publishing by tag push through the workflow as the route, and
+as the only one. It SHALL state the one-time setup the workflow depends on outside the
+repository: the approval environment and the nuget.org Trusted Publishing policy, with the exact
+values each needs. It SHALL state that the policy belongs to the account that owns the packages,
+so a change of ownership requires a new policy. The status section SHALL NOT list Trusted
 Publishing as outstanding.
+
+The runbook SHALL NOT give a procedure for pushing a release to the feed by hand. It SHALL say
+that no such route exists, and what to do instead when the workflow cannot publish: the release
+waits, or the workflow is repaired in a change of its own and the release then goes through it.
+It SHALL state why: a release pushed by hand bypasses every check the workflow makes.
+
+Where the runbook explains a hazard the workflow guards against, such as stale artifacts, source
+links following the remote, or a commit absent from the public repository, it SHALL describe it
+as the reason for a check the workflow makes. It SHALL NOT present it as steps a maintainer
+performs to pack a release.
+
+The runbook SHALL record that a `403` from the workflow's push names only the API key, as it did
+for a key created by hand, because the workflow pushes with a key obtained by the token exchange.
+It SHALL direct the maintainer to the Trusted Publishing policy first: whether the policy's owner
+can publish, then the policy's scope, then its package selection.
 
 #### Scenario: A maintainer releasing follows the workflow
 - **WHEN** a maintainer reads the runbook to publish a release
@@ -244,7 +258,25 @@ Publishing as outstanding.
 - **THEN** the runbook gives every value each one needs, including the workflow file name and the
   environment name the policy must match
 
-#### Scenario: The manual route remains available
-- **WHEN** the workflow cannot publish (for example, nuget.org's token exchange is unavailable)
-- **THEN** the runbook's fallback section still gives a working manual procedure, and says it is
-  the fallback
+#### Scenario: A change of package ownership is recognised as needing a new policy
+- **WHEN** a maintainer reads the runbook before transferring the packages to another account
+- **THEN** it states that the policy belongs to the owning account, so the new owner needs a new
+  policy
+
+#### Scenario: The workflow cannot publish
+- **WHEN** the workflow cannot publish a release (for example, nuget.org's token exchange is
+  unavailable)
+- **THEN** the runbook states that there is no hand route, gives no procedure for pushing by hand,
+  and says the release waits or the workflow is repaired first, because a hand push skips every
+  check the workflow makes
+
+#### Scenario: A hazard the workflow guards against is explained, not prescribed
+- **WHEN** a maintainer reads why source links depend on the remote and the commit, or why stale
+  artifacts are dangerous
+- **THEN** the runbook presents each as a reason for something the workflow checks, and gives no
+  sequence of local pack commands to follow for a release
+
+#### Scenario: A 403 on the workflow's push is traced to the policy
+- **WHEN** the workflow's push fails with a `403` whose message names only the API key
+- **THEN** the runbook directs the maintainer to check the policy's owner can publish, then its
+  scope, then its package selection, rather than the key the message names
