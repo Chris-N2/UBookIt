@@ -17,6 +17,77 @@ a patch. See [the versioning note](README.md#versions-and-the-api-promise).
 
 ---
 
+## 17.3.0
+
+### What you have to do
+
+**Nothing to make it work.** The database change applies itself when the site starts, as uBookIt's
+earlier ones have. It only adds things: one column, and one table. Every closure you already have
+becomes a closure of that one day, every opt-out stays as it was, and every date resolves exactly
+as it did.
+
+**If your code calls uBookIt directly, read *For developers* below.** Nothing published has been
+removed or changed, so code built against 17.2.x keeps working. Two of its behaviours are worth
+knowing.
+
+**Going back to 17.2.x afterwards loses ranges.** The extra column and table are simply ignored,
+so a closure running over several days reads as its first day only, and closed periods stop
+applying. Nothing breaks, but the dates you closed would open again.
+
+### What changed
+
+**A closure can now cover a run of dates.** In the Closures view, a closure has a **From** and a
+**To** date. Leave To empty to close just the From date. Closing the organisation from now until
+the new year, or a gym for a two-month refurbishment, is one entry, not one per day. Two closures
+may not cover the same day: to close for longer, extend the one you have. A resource opted out of a
+closure is opted out of all of it. A closure in progress counts as upcoming.
+
+**A resource can have closed periods of its own.** The resource editor has a new **Closed periods**
+group, for runs of dates when one resource is closed: a room being painted, someone on leave. Each
+has a From and a To date and an optional note.
+- A closed period may not overlap another, or a date the resource has an exception for. You are
+  told which, and decide.
+- The note is shown only in the backoffice, never to anyone booking. Keep personal details out of
+  it.
+- A site-wide closure still comes first.
+- Bookings already placed keep their times, exactly as with closures.
+
+**The booking page looks past a closure.** When a closure, or a resource's closed period, covers
+today, the list of dates with availability starts on the first day after it. It names the dates it
+covers, for example "from Monday 21 December 2026 to Tuesday 19 January 2027", not "the next 30
+days". It never says why. That does let a visitor infer that the dates before the list are closed
+rather than booked; nothing names the closure or its reason. The list still stops at how far ahead
+the resource can be booked, so raise that resource's booking horizon if you are taking bookings now
+for dates after a long closure.
+
+**A holiday falling inside a closure's range** is shown by the holiday import as already closed.
+
+### For developers
+
+- **The management API gains fields; it loses and renames nothing.**
+  - A closure has `endDate`, always present in responses.
+  - A resource has `closedPeriods`.
+- **On a resource update, a body without `closedPeriods` leaves the stored periods as they are.**
+  An empty list clears them. This is unlike the other lists on a resource, and deliberate: code
+  written before closed periods existed cannot erase them by not knowing about them.
+- **On a closure update, a body without `endDate` makes the closure a single day.** Code written
+  before ranges, that renames a range closure an operator created, will shrink it to its start date.
+  Send `endDate` with the closure's current end to keep it.
+- **New members.** Every existing signature is unchanged; each new member sits beside the old one:
+  - `SiteClosure.CreateRange` and `SiteClosure.EndDate`;
+  - `ClosedPeriod`, and `AvailabilityConfiguration.CreateWithClosedPeriods` and `.ClosedPeriods`;
+  - `ClosedRanges`;
+  - `AvailableDateWindow.Compute` taking the first open date;
+  - `BuildForWindow` on both form builders.
+- **Interfaces with new members.** Each has a default, so an existing implementation still
+  compiles:
+  - `IResourceManagementStore.UpdateKeepingClosedPeriodsAsync`;
+  - `IBookingFormView.ShiftedWindowFrom`.
+- **If you supply your own `IResourceStore`,** pass each resource's closed periods into its
+  availability, or they read as open. See the delivery API documentation.
+- **If your theme replaces `_AvailableDates`,** name the window's dates when `ShiftedWindowFrom` is
+  set. See the theming documentation.
+
 ## 17.2.3 — 2026-10-11
 
 ### What you have to do
