@@ -335,7 +335,7 @@
 
 ## 8. QA and port
 
-- [ ] 8.1 QA (`qa-review`) in one subagent, reused across rounds. Hand each round's fixes over as
+- [x] 8.1 QA (`qa-review`) in one subagent, reused across rounds. Hand each round's fixes over as
   new code. Verify: APPROVE.
   *Round 1: REJECT*, six must-fix findings. QA re-verified every build, suite and migration claim
   by running them, and found the core logic sound. Each fix below was handled as new code.
@@ -403,6 +403,12 @@
   - **4 (nit).** Design D8 now says a failure surfaces on the input its `field` names: To for an
     inverted range, From for an overlap.
   - **5 (nit).** The placement test's comment says what it can and cannot tell apart.
+
+  *Round 3: APPROVE on `main` at `d79f5ce`. The port at `aa349e9` is approved on code and suites,
+  with its live pass owed (8.2).* QA re-ran every build, suite and mutation (R8 now caught). It
+  rebuilt its round-2 probe against the new `UBookIt.Core.dll`: all the published call shapes
+  bind, and no same-named overload pair remains. No findings on either line. Three rounds, one
+  reviewer.
 - [ ] 8.2 Port to `dev/v18` on `closure-date-ranges-v18`: cherry-pick, then **regenerate** the
   migration Designer and model snapshot for the 18 line, and the generated client against the v18
   TestSite. Re-run 7.1 and 7.2 there. Verify: records match `main`'s, and the reviewer from 8.1 has
