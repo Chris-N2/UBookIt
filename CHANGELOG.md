@@ -12,7 +12,7 @@ when its release date is stamped at publication — that stamp completes the ent
 revising it, and nothing else about it moves afterwards.
 
 The major tracks the **Umbraco** major, not uBookIt's own breaking changes — uBookIt `17.x` is for
-Umbraco 17. That means the major cannot signal a break, so a break lands in a **minor** and never in
+Umbraco 17 and `18.x` for Umbraco 18. That means the major cannot signal a break, so a break lands in a **minor** and never in
 a patch. See [the versioning note](README.md#versions-and-the-api-promise).
 
 ---
@@ -35,16 +35,19 @@ described by its hint for a screen reader.
 skipped." It now says "Created 1 closure.", and mentions skipped rows only when there were some:
 "1 row was skipped." or "3 rows were skipped."
 
-**A refused holiday request says it was refused.** If the site refuses a holiday preview or import
-because your session has ended or you no longer have permission to change closures, the screen
-used to say the site's holiday source could not be reached, and sent you to check a source that
-was fine. It now says: "The site refused this request. Your session may have ended, or you may no
-longer have permission to change closures. This is not a problem with the holiday source."
+**A refused holiday request says it was refused.** The site refuses a holiday request when you
+are no longer allowed to make it, for example because your permission to change closures was
+removed while the Closures view was open. A refused preview used to say the site's holiday source
+could not be reached, which sent you to check a source that was fine. A refused import used to say
+only that the closures could not be created. Both now say: "The site refused this request. Your
+session may have ended, or you may no longer have permission to change closures. This is not a
+problem with the holiday source."
 
 **The holiday import disappears again if the site stops supplying holidays.** If a developer
 removes the site's holiday source while the Closures view is open, the next request is meant to
-take the import away, because the site no longer has the feature. Since 17.2.0 it instead said
-the source could not be reached. It now removes the import, as intended.
+take the import away, because the site no longer has the feature. Since 17.2.0 it instead
+showed a failure: a preview said the source could not be reached, and an import said the closures
+could not be created. It now removes the import, as intended.
 
 **If your site overrides uBookIt's backoffice wording**, your translation of the summary still
 receives the same two counts (`%0%` created, `%1%` skipped) and keeps working. The refusal is a

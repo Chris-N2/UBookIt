@@ -56,6 +56,28 @@
 
 - [ ] 3.1 QA (`qa-review`) in one subagent, reused across rounds, covering this change and
   `release-18-2-1`. Verify: APPROVE.
+  *Round 1: REJECT on both changes.* QA reproduced both clean builds (0 warnings) and every
+  suite, with the counts in 2.2. It confirmed the version moves, the anchors, patch eligibility
+  (no `.cs` under `src/`, no migration, no package change since `17.3.0`), the 4.2 checklist, and
+  that the two entries differ only in the version lines. Every fix below is new text.
+  - **1, 2 (MAJOR): two sentences were true for a preview only.** At `17.3.0`, `#import` showed
+    `importFailed` ("Those closures could not be created.") on both its error branch and its
+    `catch`, never "could not be reached". The refusal paragraph and the 404 paragraph both
+    claimed the preview's message for the import too.
+    - *Fix:* each paragraph now names each call's old message: a preview said the source could
+      not be reached; an import said the closures could not be created. Checked against `17.3.0`'s
+      `#preview` and `#import`.
+  - **3 (NIT): "session has ended" is not observed.** Umbraco's auth interceptor re-prompts and
+    retries a 401 on a GET, and the tidy live checks measured 403 only.
+    - *Fix:* the paragraph now leads with the observed cause, a permission removed while the
+      Closures view is open. "Session may have ended" stays only inside the quoted message, which
+      is what the screen says.
+    - `docs/backoffice.md`'s refusal sentence is left as tidy shipped it. It describes the message,
+      and changing shipped docs is not this release's job.
+  - **4 (NIT): the changelog preamble named `17.x` only.** It now reads "uBookIt `17.x` is for
+    Umbraco 17 and `18.x` for Umbraco 18", matching the README, on both lines. The preamble is not
+    a release entry, so the never-edit rule does not apply, and no test pins it.
+  - Since 17.2.0's entry is untouched. `ChangelogTests` and `VersionTruthTests` re-ran: 20 passed.
 - [ ] 3.2 Chris pushes this branch and opens the PR. Verify: the PR's CI is green at every step,
   parity included. The release changes no CI file, so parity has no reason to fail.
 - [ ] 3.3 Chris merges with "Create a merge commit". Verify: `origin/main` is the merge commit, and
