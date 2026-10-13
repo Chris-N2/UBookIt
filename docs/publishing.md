@@ -110,9 +110,8 @@ the lines do differ.
   restored and listed as Debug and again as Release, so an advisory reachable only from the graph
   that ships is still found. There is one narrow exception: a project that is not packable can
   accept an advisory it suppresses (`NuGetAuditSuppress`), for one no reachable version can fix
-  yet. What a project suppresses,
-  and whether it is packable, are taken from MSBuild's evaluation of it, as Debug and as Release,
-  so imports count, and so does anything else MSBuild sees. The audit reports each accepted
+  yet. What a project suppresses, and whether it is packable, are taken from MSBuild's evaluation
+  of it, as Debug and as Release, so imports count, and so does anything else MSBuild sees. The audit reports each accepted
   finding as a notice, and fails on a suppression that:
   - matches nothing (stale);
   - is declared in one configuration but not the other;

@@ -293,7 +293,7 @@
   - *"rows were skipped": only the new tests.*
 ## 7. QA and port
 
-- [ ] 7.1 QA (`qa-review`) in one subagent, reused across rounds. Hand each round's fixes over as
+- [x] 7.1 QA (`qa-review`) in one subagent, reused across rounds. Hand each round's fixes over as
   new code, with every claim to verify rather than trust. Verify: APPROVE.
   *Round 1: REJECT* (on `b98ed99`). QA re-ran the build, all four suites, validation, M1, H1 and
   the real vitest skip/todo probe, and all reproduced. Every fix below is new code.
@@ -327,6 +327,25 @@
     "refused", and a 404 never withdrew the panel; the latter is pre-existing, from the holiday
     import. *Fix:* `thrownStatus` and a single decision per call, with 3 vitest tests and a new
     seam test. Re-verified live: 403 shows the refusal message.
+  *Round 2: APPROVE WITH NITS on `main` at `9f15c65`.* QA reproduced every claim:
+  - clean Release build, 0 warnings; unit 2129, rendering 1178, integration 210; client 355;
+    openspec 27/27;
+  - the audit against its Rel/Unc/Dbg probes and against `UBookIt.slnx` (5 accepted, exit 0, and
+    `Configuration` empty afterwards); no repo file assigns or conditions on `Configuration`.
+
+  Mutations, each caught:
+  - the round-1 audit script restored: the real-CLI test fails;
+  - `importSourceFailed` renamed: `ElementLocalizationKeyTests` now fails;
+  - the import's thrown classification replaced by `"failed"`: the seam test fails.
+
+  It confirmed that `#load` catches its own errors, so a failed reload after a successful import
+  shows `loadFailed`, never `importFailed`. Nits:
+  - a short line left by a re-wrap in `docs/publishing.md`: taken;
+  - the real-CLI audit test needs nuget.org: accepted, and stated in its remarks.
+
+  Still owed: the 7.2 port, against the checklist QA gave (parity of the CI files, the
+  PackageCompositionTests remark, the packaging delta dropped, the thrown-status fix, v18's
+  `UmbLocalizationEntry`, the real-CLI test on v18).
 - [ ] 7.2 Port to `dev/v18` on `tidy-2026-10-v18`, from `origin/dev/v18`, by cherry-pick.
   **Drop the `packaging` delta** from the port's change folder: `dev/v18` already has that text, so
   archiving it there would be a no-op MODIFIED. Check that the v18 backoffice package's
