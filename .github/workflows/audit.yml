@@ -67,9 +67,10 @@ jobs:
           global-json-file: global.json
 
       - name: Audit ${{ matrix.line }}
-        # The script restores the line itself, once per configuration it audits (Debug and
-        # Release), and lists each restore's graph before the next overwrites the assets file.
-        # A single restore here would audit one configuration's graph only, and Release is what
-        # ships. Nothing needs building.
+        # The script lists the line once per configuration it audits (Debug and Release), with
+        # the configuration set in the environment so that `dotnet list`'s own implicit restore
+        # is that configuration's. A restore step here would be overwritten by that implicit
+        # restore and would audit one configuration only - and Release is what ships. Nothing
+        # needs building.
         shell: pwsh
         run: ./scripts/ci/Assert-NoVulnerablePackages.ps1 -Target line/UBookIt.slnx

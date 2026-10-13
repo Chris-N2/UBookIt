@@ -55,10 +55,13 @@
     configurations was not enough while the FINDINGS came from one: the workflow restored, and
     `dotnet list` read, Debug only, so an advisory reachable only from the Release graph (a
     conditional PackageReference, say) was never seen at all, and Release is what ships. So the
-    script now restores and lists once per configuration, IN SEQUENCE: `dotnet list` reads the
-    assets file, which the last restore wrote, so a union taken after both restores would be one
-    configuration twice. A finding present in every configuration is reported once, as before; a
-    finding present in some is reported with the configurations it was seen in.
+    script now lists once per configuration, with `Configuration` set in the ENVIRONMENT for each
+    pass: `dotnet list package` takes no configuration option and restores implicitly before it
+    lists, so a separate `dotnet restore -p:Configuration=Release` is overwritten by a Debug
+    restore before anything is read (QA round 1 — the first version did exactly that, and audited
+    Debug twice). AuditScriptTests drives the real CLI with a Release-only package to hold this.
+    A finding present in every configuration is reported once, as before; a finding present in
+    some is reported with the configurations it was seen in.
 
 .PARAMETER Target
     The solution or project to audit. Named in every message. Restored by this script, once per
@@ -107,14 +110,23 @@ $reports = @(foreach ($configuration in $configurations) {
         $raw = Get-Content -LiteralPath $file -Raw
     }
     else {
-        $restore = dotnet restore $Target "-p:Configuration=$configuration" 2>&1
-        if ($LASTEXITCODE -ne 0) {
-            Write-Host "::error title=Audit::dotnet restore failed for $Target as $configuration (exit $LASTEXITCODE). The audit was not made."
-            $restore | Write-Host
-            exit 1
+        # THE CONFIGURATION IS SET IN THE ENVIRONMENT, NOT PASSED TO A RESTORE (QA round 1).
+        # `dotnet list package` takes no configuration option and RESTORES IMPLICITLY before it
+        # lists, as Debug, overwriting whatever assets file a `dotnet restore -p:Configuration=…`
+        # just wrote. A restore-then-list pass therefore audited Debug twice, and a package
+        # referenced only under Release was never seen. MSBuild reads environment variables as
+        # properties, so with `Configuration` set the implicit restore, and the evaluation the
+        # listing reads, are both that configuration's. `--no-restore` is no alternative: the
+        # listing still evaluates as Debug and refuses an assets file from another configuration.
+        $previous = $env:Configuration
+        try {
+            $env:Configuration = $configuration
+            $raw = dotnet list $Target package --vulnerable --include-transitive --format json
+        }
+        finally {
+            $env:Configuration = $previous
         }
 
-        $raw = dotnet list $Target package --vulnerable --include-transitive --format json
         if ($LASTEXITCODE -ne 0) {
             Write-Host "::error title=Audit::dotnet list package failed for $Target as $configuration (exit $LASTEXITCODE). The audit was not made."
             $raw | Write-Host

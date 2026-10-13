@@ -156,3 +156,19 @@ export function previewFailure(status: number | undefined): PreviewFailure {
 
   return status === 401 || status === 403 ? "refused" : "failed";
 }
+
+/**
+ * The HTTP status a thrown failure carries, if it carries one.
+ *
+ * **The holiday calls do not RETURN their failures, they THROW them.** The generated client
+ * inherits Umbraco's configuration, which throws on a non-2xx — and what it throws is Umbraco's
+ * problem details, with the status on it: a 403 arrives as `{ status: 403, title, type }`
+ * (measured against the running backoffice, tidy-2026-10). So {@link previewFailure} must be
+ * asked about the THROWN value; asking only about a returned response classified nothing, and
+ * every 404 and 401/403 read as a failed source. Anything thrown without a numeric status — a
+ * network failure, a bug — is `undefined`, which {@link previewFailure} calls `failed`.
+ */
+export function thrownStatus(thrown: unknown): number | undefined {
+  const status = (thrown as { status?: unknown } | null | undefined)?.status;
+  return typeof status === "number" ? status : undefined;
+}

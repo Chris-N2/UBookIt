@@ -483,6 +483,49 @@ public sealed class AuditScriptTests : IDisposable
         Assert.Contains("The Release report for Fixture.slnx consulted no source", output);
     }
 
+    /// <summary>
+    /// The real CLI, not a fixture: a package referenced only under Release is found.
+    /// </summary>
+    /// <remarks>
+    /// <para>
+    /// <b>The fixtures above cannot catch the defect this exists for, and did not.</b> They hand
+    /// the script a report per configuration, so they prove what it does WITH two graphs and
+    /// nothing about how it GETS them. Its first version restored as Release and then ran
+    /// <c>dotnet list</c> — which restores again, implicitly, as Debug, so the Release pass listed
+    /// the Debug graph. Six fixture tests and a mutation stayed green while a Release-only advisory
+    /// went unseen (QA round 1, reproduced against the real CLI).
+    /// </para>
+    /// <para>
+    /// <b>It needs nuget.org</b> — for the package, and for the advisory data the audit reads —
+    /// as every restore in this repository already does. <c>System.Text.Json 8.0.0</c> carries
+    /// published advisories (GHSA-8g4q-xg66-9fp4, GHSA-hh2w-p6rv-4g7w); an advisory is not
+    /// withdrawn once published, so the expectation is stable. The project is written outside
+    /// the repository, so nothing of this repository's build is imported into it.
+    /// </para>
+    /// </remarks>
+    [Fact]
+    public void A_package_only_the_Release_configuration_references_is_found_by_the_real_listing()
+    {
+        File.WriteAllText(
+            Path.Combine(_directory, "nuget.config"),
+            "<?xml version=\"1.0\" encoding=\"utf-8\"?><configuration><packageSources><clear />"
+            + $"<add key=\"nuget.org\" value=\"{Source}\" /></packageSources></configuration>");
+
+        var probe = Project(
+            "Probe",
+            "<PropertyGroup><NuGetAudit>false</NuGetAudit></PropertyGroup>"
+            + "<ItemGroup Condition=\"'$(Configuration)' == 'Release'\">"
+            + "<PackageReference Include=\"System.Text.Json\" Version=\"8.0.0\" /></ItemGroup>");
+
+        var (exit, output) = Run(probe);
+
+        Assert.Equal(1, exit);
+        Assert.Contains("(Debug, Release)", output);
+        Assert.Contains(
+            "Vulnerable package: Probe (net10.0): System.Text.Json 8.0.0 - High - https://github.com/advisories/GHSA-8g4q-xg66-9fp4 (in Release only)",
+            output);
+    }
+
     private static int Occurrences(string haystack, string needle)
     {
         var count = 0;
@@ -535,7 +578,7 @@ public sealed class AuditScriptTests : IDisposable
         var report = Path.Combine(_directory, "report.json");
         File.WriteAllText(report, JsonSerializer.Serialize(new { version = 1, sources, projects }));
 
-        return Run("-Report", report);
+        return Run("Fixture.slnx", "-Report", report);
     }
 
     /// <summary>A Debug report and a Release report, so the two graphs can differ.</summary>
@@ -547,10 +590,10 @@ public sealed class AuditScriptTests : IDisposable
         File.WriteAllText(debugReport, JsonSerializer.Serialize(new { version = 1, sources = new[] { Source }, projects = debug }));
         File.WriteAllText(releaseReport, JsonSerializer.Serialize(new { version = 1, sources = releaseSources ?? [Source], projects = release }));
 
-        return Run("-Report", debugReport, "-ReleaseReport", releaseReport);
+        return Run("Fixture.slnx", "-Report", debugReport, "-ReleaseReport", releaseReport);
     }
 
-    private static (int Exit, string Output) Run(params string[] reports)
+    private static (int Exit, string Output) Run(string target, params string[] arguments)
     {
         var info = new ProcessStartInfo("pwsh")
         {
@@ -558,7 +601,7 @@ public sealed class AuditScriptTests : IDisposable
             RedirectStandardError = true,
             UseShellExecute = false,
         };
-        foreach (var argument in new[] { "-NoProfile", "-NonInteractive", "-File", Script, "-Target", "Fixture.slnx" }.Concat(reports))
+        foreach (var argument in new[] { "-NoProfile", "-NonInteractive", "-File", Script, "-Target", target }.Concat(arguments))
         {
             info.ArgumentList.Add(argument);
         }

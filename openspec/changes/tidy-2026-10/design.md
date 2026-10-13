@@ -193,8 +193,9 @@ the port carries no packaging delta at all (see tasks).
 - **[D8 doubles audit time]** → Restore and list take seconds per line, and the audit is weekly and
   on demand.
 - **[D7: vitest's JSON shape changes in a minor]** → The script fails closed when the file lacks
-  `testResults`/`numTotalTests`, with a message naming the vitest version. A silent pass is the only
-  unacceptable outcome.
+  `testResults`/`numTotalTests`, with a message saying the format is not the one it reads. (The
+  report does not carry vitest's version, so the message cannot name it; QA round 1 nit.) A silent
+  pass is the only unacceptable outcome.
 - **[D3 changes a test that pinned the old mapping]** → That test's own comment states the goal
   (a refusal is not an absence). The new expectation is stricter, not looser.
 

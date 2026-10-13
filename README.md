@@ -152,8 +152,8 @@ the same file the AI agents working on it read. The release procedure is in
 > and never arrives in a patch.
 
 **The major tracks the Umbraco major**, as Umbraco packages are conventionally versioned: uBookIt
-`17.x` is for Umbraco 17 and `18.x` for Umbraco 18. That means **the major is not a breaking-change signal, and this is
-where uBookIt departs from Semantic Versioning**:
+`17.x` is for Umbraco 17 and `18.x` for Umbraco 18. That means **the major is not a breaking-change
+signal, and this is where uBookIt departs from Semantic Versioning**:
 
 | | |
 |---|---|
