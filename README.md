@@ -133,7 +133,8 @@ anyone to read:
   back through implementation. The reviewer never fixes code itself.
 - **CI that can't pass by skipping.** Every push to a release line is built and tested on Linux
   against SQL Server, by [the CI workflow](https://github.com/Chris-N2/UBookIt/blob/18.2.0/.github/workflows/ci.yml).
-  The run fails if any .NET test project didn't report, or any of its tests was skipped.
+  The run fails if any .NET test project didn't report, or any test, .NET or backoffice client,
+  was skipped.
 - **Documentation under test.** The test suite checks key claims in this readme: the version it
   states, the versioning policy, the delivery API's default, and every link into the repository.
 - **Gated releases.** Releases are published by a workflow. It packs the tagged commit on a clean
@@ -151,7 +152,7 @@ the same file the AI agents working on it read. The release procedure is in
 > and never arrives in a patch.
 
 **The major tracks the Umbraco major**, as Umbraco packages are conventionally versioned: uBookIt
-`17.x` is for Umbraco 17. That means **the major is not a breaking-change signal, and this is
+`17.x` is for Umbraco 17 and `18.x` for Umbraco 18. That means **the major is not a breaking-change signal, and this is
 where uBookIt departs from Semantic Versioning**:
 
 | | |

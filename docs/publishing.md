@@ -102,10 +102,13 @@ the lines do differ.
   **A green run means every suite demonstrably ran**: the integration fixture runs with
   `UBOOKIT_TEST_DB_REQUIRED=true`, so an unreachable database fails instead of skipping, and
   `scripts/ci/Assert-TestResults.ps1` fails the run if any test project on disk did not report or
-  any test was skipped. It publishes nothing and holds no secrets.
+  any test was skipped. `scripts/ci/Assert-ClientTestResults.ps1` does the same for the client's
+  tests, from the report vitest writes: a skipped or todo test, or a report that ran none, fails
+  the run. It publishes nothing and holds no secrets.
 - **`audit`** — Mondays 06:00 UTC, and on demand from the Actions tab. Audits the NuGet graph of
-  **both** lines for known vulnerabilities, direct and transitive, and fails on any, with one
-  narrow exception: a project that is not packable can accept an advisory it suppresses
+  **both** lines for known vulnerabilities, direct and transitive, and fails on any. Each line is
+  restored and listed as Debug and again as Release, so an advisory reachable only from the graph
+  that ships is still found. There is one narrow exception: a project that is not packable can accept an advisory it suppresses
   (`NuGetAuditSuppress`), for one no reachable version can fix yet. What a project suppresses,
   and whether it is packable, are taken from MSBuild's evaluation of it, as Debug and as Release,
   so imports count, and so does anything else MSBuild sees. The audit reports each accepted

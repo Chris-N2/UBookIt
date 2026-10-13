@@ -426,7 +426,7 @@ describe("eligibility is not availability (design D5)", () => {
     // easiest way to get this subtly wrong is to add a fourth surface with its
     // own vocabulary rule.
     const { default: terms } = await import("../localization/en-us.js");
-    const services = (terms as Record<string, Record<string, string>>).ubookitServices;
+    const services = (terms as unknown as Record<string, Record<string, string>>).ubookitServices;
 
     const forbidden = /\b(available|availability|free|bookable)\b/i;
 

@@ -82,14 +82,18 @@ export function defaultWindow(now: Date): { from: string; to: string } {
  * all, and showing it as "no holidays" would tell an operator their calendar is clear when it
  * is unknown.
  */
-export type PreviewOutcome = "rows" | "empty" | "failed";
+export type PreviewOutcome = "rows" | "empty" | "failed" | "refused";
 
+/**
+ * `failure` is what went wrong, when something did: `failed` (the source) or `refused` (the
+ * site, about who is asking). Either one outranks rows, for the reason below.
+ */
 export function previewOutcome(
   rows: ReadonlyArray<HolidayRowModel> | undefined,
-  failed: boolean,
+  failure: Exclude<PreviewFailure, "absent"> | undefined,
 ): PreviewOutcome {
-  if (failed) {
-    return "failed";
+  if (failure) {
+    return failure;
   }
 
   return rows && rows.length > 0 ? "rows" : "empty";
@@ -136,9 +140,19 @@ export function shouldAskForSource(canWrite: boolean, hasSource: boolean | undef
  * So the two are kept apart at exactly the point the rest of this capability keeps them apart.
  * `absent` withdraws the panel, as though the probe had said no in the first place; `failed`
  * says the source was asked and did not answer.
+ *
+ * **A 401 or 403 is neither** (tidy-2026-10). The site refused the request because of who is
+ * asking — a session that ended, or a permission withdrawn while the screen was open — so the
+ * source was never asked. Calling that `failed` sent an operator to debug a feed that is fine;
+ * calling it `absent` would withdraw a feature the site still has. `refused` keeps the panel and
+ * says what happened.
  */
-export type PreviewFailure = "absent" | "failed";
+export type PreviewFailure = "absent" | "failed" | "refused";
 
 export function previewFailure(status: number | undefined): PreviewFailure {
-  return status === 404 ? "absent" : "failed";
+  if (status === 404) {
+    return "absent";
+  }
+
+  return status === 401 || status === 403 ? "refused" : "failed";
 }

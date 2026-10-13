@@ -1,4 +1,5 @@
 import { describe, expect, it } from "vitest";
+import terms from "../localization/en-us.js";
 import {
   chosenRows,
   defaultWindow,
@@ -142,21 +143,28 @@ describe("the window a preview opens on", () => {
 
 describe("what the screen says about a preview", () => {
   it("distinguishes rows, emptiness, and failure", () => {
-    expect(previewOutcome([row()], false)).toBe("rows");
-    expect(previewOutcome([], false)).toBe("empty");
-    expect(previewOutcome(undefined, true)).toBe("failed");
+    expect(previewOutcome([row()], undefined)).toBe("rows");
+    expect(previewOutcome([], undefined)).toBe("empty");
+    expect(previewOutcome(undefined, "failed")).toBe("failed");
+  });
+
+  it("calls a refusal a refusal, not a failure of the source", () => {
+    // The site refused the request because of who is asking; the source was never asked.
+    // Reporting it as "failed" sends an operator to debug a feed that is fine.
+    expect(previewOutcome(undefined, "refused")).toBe("refused");
+    expect(previewOutcome([row()], "refused")).toBe("refused");
   });
 
   it("calls a failure a failure even when rows are somehow present", () => {
     // Failure wins. Conflating a broken source with an empty window tells an operator their
     // calendar is clear when it is unknown — the distinction the server keeps, kept here too.
-    expect(previewOutcome([row()], true)).toBe("failed");
+    expect(previewOutcome([row()], "failed")).toBe("failed");
   });
 
   it("calls an empty window empty rather than failed", () => {
     // The other direction: a site with no holidays in the window is a correct answer, and
     // reporting it as a broken source would send somebody to debug a feed that is fine.
-    expect(previewOutcome([], false)).toBe("empty");
+    expect(previewOutcome([], undefined)).toBe("empty");
   });
 });
 
@@ -215,13 +223,54 @@ describe("what a failed preview means", () => {
   it("treats anything else as the source having failed", () => {
     expect(previewFailure(500)).toBe("failed");
     expect(previewFailure(502)).toBe("failed");
+    expect(previewFailure(400)).toBe("failed");
     expect(previewFailure(undefined)).toBe("failed");
   });
 
-  it("does not call a refusal an absence", () => {
-    // 401/403 mean this user may not, which is neither "no source" nor "source broken" — it
-    // must not silently withdraw the feature from a site that has it.
-    expect(previewFailure(401)).toBe("failed");
-    expect(previewFailure(403)).toBe("failed");
+  it("calls a refusal a refusal: neither an absence nor a failure of the source", () => {
+    // 401/403 mean the site refused because of who is asking. Not "no source" — that would
+    // silently withdraw the feature from a site that has it — and not "source broken" — that
+    // would send somebody to debug a feed that is fine (tidy-2026-10).
+    expect(previewFailure(401)).toBe("refused");
+    expect(previewFailure(403)).toBe("refused");
+  });
+});
+
+describe("the import summary", () => {
+  // A function term: Umbraco's localizer calls it with the arguments `localize.term` was given,
+  // so this is exactly what the screen shows.
+  const summary = terms.ubookitClosures.importSummary;
+
+  it("pluralises what was created", () => {
+    expect(summary(1, 0)).toBe("Created 1 closure.");
+    expect(summary(4, 0)).toBe("Created 4 closures.");
+    expect(summary(0, 0)).toBe("Created 0 closures.");
+  });
+
+  it("says nothing about skipped rows when none were skipped", () => {
+    expect(summary(4, 0)).not.toMatch(/skipped/);
+  });
+
+  it("pluralises what was skipped", () => {
+    expect(summary(4, 1)).toBe("Created 4 closures. 1 row was skipped.");
+    expect(summary(1, 2)).toBe("Created 1 closure. 2 rows were skipped.");
+  });
+});
+
+describe("the refusal message", () => {
+  const refused = terms.ubookitClosures.importRefused;
+
+  it("names both causes the screen cannot tell apart, and clears the source", () => {
+    // An ended session and a withdrawn permission both answer 401/403 by the time the screen
+    // sees them, so the message guesses neither (public-holidays, "A refused request is
+    // reported as a refusal").
+    expect(refused).toMatch(/session/i);
+    expect(refused).toMatch(/permission/i);
+    expect(refused).toMatch(/not a problem with the holiday source/i);
+  });
+
+  it("is not the source-failure message", () => {
+    expect(refused).not.toBe(terms.ubookitClosures.importSourceFailed);
+    expect(refused).not.toMatch(/could not be reached/i);
   });
 });

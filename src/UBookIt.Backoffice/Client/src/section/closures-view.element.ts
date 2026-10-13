@@ -100,9 +100,13 @@ export class UBookItClosuresViewElement extends UmbLitElement {
   @state()
   private _selectedDates: string[] = [];
 
-  /** A source that threw — kept apart from "no rows", which is a real answer. */
+  /**
+   * Why the last preview has no answer, if it has none: the source failed, or the site refused
+   * the request. Kept apart from "no rows", which is a real answer, and from each other, since
+   * each sends the operator somewhere different.
+   */
   @state()
-  private _holidaySourceFailed = false;
+  private _holidayFailure?: "failed" | "refused";
 
   @state()
   private _importSummary?: string;
@@ -269,7 +273,7 @@ export class UBookItClosuresViewElement extends UmbLitElement {
     this._busy = true;
     this._error = undefined;
     this._importSummary = undefined;
-    this._holidaySourceFailed = false;
+    this._holidayFailure = undefined;
     this._holidayRows = undefined;
 
     try {
@@ -283,19 +287,23 @@ export class UBookItClosuresViewElement extends UmbLitElement {
         //
         // A 404 is a third fact again: the site has no source, which can become true while this
         // screen is open. That withdraws the panel rather than blaming a feed.
-        if (previewFailure(response?.status) === "absent") {
+        //
+        // A 401/403 is a fourth: the site refused the request because of who is asking. That
+        // keeps the panel, as a failure does, and says so rather than blaming the feed.
+        const failure = previewFailure(response?.status);
+        if (failure === "absent") {
           this.#withdrawImport();
           return;
         }
 
-        this._holidaySourceFailed = true;
+        this._holidayFailure = failure;
         return;
       }
 
       this._holidayRows = data.rows;
       this._selectedDates = initialSelection(data.rows);
     } catch {
-      this._holidaySourceFailed = true;
+      this._holidayFailure = "failed";
     } finally {
       this._busy = false;
     }
@@ -314,7 +322,7 @@ export class UBookItClosuresViewElement extends UmbLitElement {
     this._importOpen = false;
     this._holidayRows = undefined;
     this._selectedDates = [];
-    this._holidaySourceFailed = false;
+    this._holidayFailure = undefined;
   }
 
   async #import() {
@@ -336,16 +344,20 @@ export class UBookItClosuresViewElement extends UmbLitElement {
         // endpoints for the same reason: the site has no source. A source deregistered between
         // fetching and confirming must withdraw the feature rather than report that closures
         // "could not be created" for a feature this site no longer has.
-        if (previewFailure(response?.status) === "absent") {
+        const failure = previewFailure(response?.status);
+        if (failure === "absent") {
           this.#withdrawImport();
           return;
         }
 
-        this._error = this.#term("importFailed");
+        // A refusal is the site's answer about who is asking, not about these closures.
+        this._error = this.#term(failure === "refused" ? "importRefused" : "importFailed");
         await this.#focusError();
         return;
       }
 
+      // One term, a function of both counts, so the sentence's grammar (and whether the
+      // skipped half is said at all) lives with its wording rather than here.
       this._importSummary = this.localize.term(
         "ubookitClosures_importSummary",
         data.created,
@@ -535,13 +547,14 @@ export class UBookItClosuresViewElement extends UmbLitElement {
   }
 
   #renderHolidayRows() {
-    const outcome = previewOutcome(this._holidayRows, this._holidaySourceFailed);
+    const outcome = previewOutcome(this._holidayRows, this._holidayFailure);
 
-    // THREE outcomes, three messages. "Failed" must never read as "empty": a window with no
-    // holidays is a correct answer, and a source that threw is not an answer at all.
-    if (outcome === "failed") {
+    // FOUR outcomes, four messages. "Failed" must never read as "empty": a window with no
+    // holidays is a correct answer, and a source that threw is not an answer at all. "Refused"
+    // must never read as "failed": the source was never asked.
+    if (outcome === "failed" || outcome === "refused") {
       return html`<p id="holiday-error" class="error" role="alert" tabindex="-1">
-        ${this.#term("importSourceFailed")}
+        ${this.#term(outcome === "refused" ? "importRefused" : "importSourceFailed")}
       </p>`;
     }
 

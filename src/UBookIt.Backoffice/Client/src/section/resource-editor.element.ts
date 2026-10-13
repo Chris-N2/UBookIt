@@ -646,7 +646,7 @@ export class UBookItResourceEditorElement extends UmbLitElement {
                 <input
                   id="cp-${index}-to"
                   type="date"
-                  aria-describedby="cp-to-hint"
+                  aria-describedby="cp-${index}-to-hint"
                   min=${period.startDate || nothing}
                   .value=${period.endDate}
                   @input=${(e: InputEvent) =>
@@ -661,25 +661,23 @@ export class UBookItResourceEditorElement extends UmbLitElement {
                   @click=${() => this.#mutateClosedPeriods((list) => list.splice(index, 1))}
                 ></uui-button>
               </div>
+              <p id="cp-${index}-to-hint" class="hint">${this.#term("closedPeriodToHint")}</p>
               <div class="field">
                 <label for="cp-${index}-note">${this.#term("closedPeriodNote")}</label>
                 <input
                   id="cp-${index}-note"
                   type="text"
                   maxlength="512"
-                  aria-describedby="cp-note-hint"
+                  aria-describedby="cp-${index}-note-hint"
                   .value=${period.note}
                   @input=${(e: InputEvent) =>
                     this.#mutateClosedPeriods((list) => (list[index].note = (e.target as HTMLInputElement).value))}
                 />
+                <p id="cp-${index}-note-hint" class="hint">${this.#term("closedPeriodNoteHint")}</p>
               </div>
             </fieldset>
           `,
         )}
-        ${this._closedPeriods.length > 0
-          ? html`<p id="cp-to-hint" class="hint">${this.#term("closedPeriodToHint")}</p>
-              <p id="cp-note-hint" class="hint">${this.#term("closedPeriodNoteHint")}</p>`
-          : nothing}
         <uui-button
           look="secondary"
           label=${this.#term("addClosedPeriod")}

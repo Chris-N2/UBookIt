@@ -214,6 +214,39 @@ public class ClosureAccessibilityTests
         Assert.Equal(2, Occurrences(source, "this.#withdrawImport()"));
     }
 
+    /// <summary>
+    /// Both holiday calls word a refusal as a refusal (public-holidays, "A refused request is
+    /// reported as a refusal").
+    /// </summary>
+    /// <remarks>
+    /// <c>previewFailure</c> and <c>previewOutcome</c> are tested in <c>holiday-fields.test.ts</c>;
+    /// this pins the view's use of them, which no client test renders — the seam the 404 rule
+    /// above is held at too. A 401/403 must reach <c>importRefused</c> from the preview AND from
+    /// the import, and a refused preview must render in the same announced alert as a failed one,
+    /// since the operator's next move depends on it just as much.
+    /// </remarks>
+    [Fact]
+    public void Both_holiday_calls_word_a_refusal_as_a_refusal()
+    {
+        var source = RepoFiles.Read(ClosuresView);
+
+        // The preview: a refusal keeps the panel and records why, rather than collapsing to the
+        // source-failure flag it used to set.
+        Assert.Contains("this._holidayFailure = failure;", source, StringComparison.Ordinal);
+        Assert.Contains("previewOutcome(this._holidayRows, this._holidayFailure)", source, StringComparison.Ordinal);
+        Assert.Contains("if (outcome === \"failed\" || outcome === \"refused\") {", source, StringComparison.Ordinal);
+        Assert.Contains(
+            "${this.#term(outcome === \"refused\" ? \"importRefused\" : \"importSourceFailed\")}",
+            source,
+            StringComparison.Ordinal);
+
+        // The import.
+        Assert.Contains(
+            "this._error = this.#term(failure === \"refused\" ? \"importRefused\" : \"importFailed\");",
+            source,
+            StringComparison.Ordinal);
+    }
+
     private static int Occurrences(string haystack, string needle)
     {
         var count = 0;
@@ -242,10 +275,39 @@ public class ClosureAccessibilityTests
 
         // The note's hint is the one that says it never reaches a visitor and should not hold
         // personal details — it must be read with the field, not only seen beneath it.
-        Assert.Contains("aria-describedby=\"cp-note-hint\"", source, StringComparison.Ordinal);
-        Assert.Contains("id=\"cp-note-hint\"", source, StringComparison.Ordinal);
-        Assert.Contains("aria-describedby=\"cp-to-hint\"", source, StringComparison.Ordinal);
-        Assert.Contains("id=\"cp-to-hint\"", source, StringComparison.Ordinal);
+        //
+        // ONE HINT PER PERIOD, inside that period's fieldset (tidy-2026-10). The hints used to be
+        // rendered once, after every period, to keep their ids unique: each input still named
+        // them, but on screen they floated under the whole section as stray text, apart from
+        // every field they described. So the guard now asserts WHERE they are rendered, not
+        // merely that some element carries the id.
+        var fieldset = ClosedPeriodFieldset(source);
+
+        foreach (var part in new[] { "to", "note" })
+        {
+            Assert.Contains($"aria-describedby=\"cp-${{index}}-{part}-hint\"", fieldset, StringComparison.Ordinal);
+            Assert.Contains($"id=\"cp-${{index}}-{part}-hint\"", fieldset, StringComparison.Ordinal);
+
+            // And the shared, unindexed hint is gone from the whole file, so a second copy of it
+            // cannot return beside the per-period ones.
+            Assert.DoesNotContain($"cp-{part}-hint", source, StringComparison.Ordinal);
+        }
+    }
+
+    /// <summary>
+    /// The template one closed period renders: from its <c>&lt;fieldset</c> to its
+    /// <c>&lt;/fieldset&gt;</c>, inside <c>#renderClosedPeriods</c>.
+    /// </summary>
+    private static string ClosedPeriodFieldset(string source)
+    {
+        var method = source.IndexOf("#renderClosedPeriods() {", StringComparison.Ordinal);
+        Assert.True(method >= 0, "resource-editor.element.ts no longer has #renderClosedPeriods.");
+
+        var open = source.IndexOf("<fieldset", method, StringComparison.Ordinal);
+        var close = source.IndexOf("</fieldset>", open, StringComparison.Ordinal);
+        Assert.True(open >= 0 && close > open, "#renderClosedPeriods no longer renders a fieldset per period.");
+
+        return source[open..close];
     }
 
     [Fact]
