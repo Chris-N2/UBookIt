@@ -91,15 +91,19 @@
   - **NIT: the round 1 record understated `docs/backoffice.md`'s session sentence.** *Taken:* the
     record above now says what that sentence claims, and the sentence is recorded as debt.
   - No must-fix. Two rounds, one reviewer.
-- [ ] 3.2 Chris pushes this branch and opens the PR. Verify: the PR's CI is green at every step,
+- [x] 3.2 Chris pushes this branch and opens the PR. Verify: the PR's CI is green at every step,
   parity included. The release changes no CI file, so parity has no reason to fail.
-- [ ] 3.3 Chris merges with "Create a merge commit". Verify: `origin/main` is the merge commit, and
+  *Done:* PR **#24**. Its CI run `38452381372` (pull_request) was green at every step, parity included.
+- [x] 3.3 Chris merges with "Create a merge commit". Verify: `origin/main` is the merge commit, and
   its push run is green.
+  *Done:* merged as **`e111018`**, with the release branch head as its second parent. Its push run `38452993553` was green.
 
 ## 4. Release through the workflow
 
-- [ ] 4.1 Chris pushes tag `17.3.1` on the merge commit. Verify: `check` and `pack` are green.
-- [ ] 4.2 **Before approving**, check the run's `packages` artifact:
+- [x] 4.1 Chris pushes tag `17.3.1` on the merge commit. Verify: `check` and `pack` are green.
+  *Done:* tag `17.3.1` on `e111018` (checked on origin with `ls-remote`). Publish run **`38454063673`**:
+  `check` and `pack` were green, and `publish` was waiting.
+- [x] 4.2 **Before approving**, check the run's `packages` artifact:
   - the tagged `booking-flow.png` returns 200;
   - there are exactly 5 `.nupkg` and 4 `.snupkg`, all `17.3.1`, each `.snupkg` holding its `.pdb`;
   - all five nuspecs carry the authors, copyright, licence, readme, icon, project URL and the
@@ -109,12 +113,34 @@
     at the tag, not this list;
   - the packed README is identical to the tag's, all its addresses return 200, and every
     repository address is pinned to `17.3.1`.
-- [ ] 4.3 Chris approves. Record the summary table and the conclusion.
-- [ ] 4.4 Confirm `17.3.1` per package on the flat container, and that the package page renders.
+  *Done, nothing wrong.* Chris downloaded the artifact to `artifacts/packages-v17`. It was
+  extracted to a scratch folder and checked by script:
+  - exactly 5 `.nupkg` and 4 `.snupkg`, all `17.3.1`; each `.snupkg` holds its own `.pdb`;
+  - all five nuspecs: authors, copyright (`©` checked as bytes `C2 A9`), MIT, readme and icon
+    (present in each package), project URL, and commit `e111018`. `umbraco-marketplace` is on
+    `UBookIt` only;
+  - every `Umbraco.Cms.*` dependency is `[17.7.1, 18.0.0)`; EF Core SqlServer is `10.0.11`; the inter-package
+    dependencies are at `17.3.1`.
+  - the packed README is identical in all five packages to `README.md` at the tag. All 19
+    addresses return 200, all 17 repository addresses are pinned to `17.3.1`, and the tagged
+    `booking-flow.png` returns 200.
+- [x] 4.3 Chris approves. Record the summary table and the conclusion.
+  *Done.* Chris approved, and the run concluded **success** at 19:27:11Z. Every `.nupkg` was
+  "published", every `.snupkg` "symbols submitted", and `UBookIt` came last (summary pasted by
+  Chris). There was no 409, so the pending-symbols wording is still unobserved.
+- [x] 4.4 Confirm `17.3.1` per package on the flat container, and that the package page renders.
+  *Done:* all five `17.3.1` packages were in the flat container by 19:56:24Z (polled every 30 s;
+  `UBookIt.Backoffice` had appeared by 19:44:53Z), about 29 minutes after the run concluded, which is
+  slower than last release. `nuget.org/packages/UBookIt/17.3.1` returns 200 and says "uBookIt is at
+  17.3.1".
 
 ## 5. Close out
 
-- [ ] 5.1 Stamp the entry's date.
-- [ ] 5.2 Sibling sweep for `17.3.0` and for sentences the release falsifies. Fix or record each.
+- [x] 5.1 Stamp the entry's date.
+  *Done:* `## 17.3.1 — 2026-10-13`.
+- [x] 5.2 Sibling sweep for `17.3.0` and for sentences the release falsifies. Fix or record each.
+  *Done:* `git grep 17.3.0` over `docs/`, README, `openspec/specs` and CLAUDE.md finds nothing
+  that names this package's version. The runbook's *Status* section names only the
+  `17.0.0` history anchor. Nothing is falsified.
 - [ ] 5.3 Commit and run the unit suite. Chris pushes. Verify: `main`'s CI is green.
 - [ ] 5.4 Archive last, running the unit suite before the push.
