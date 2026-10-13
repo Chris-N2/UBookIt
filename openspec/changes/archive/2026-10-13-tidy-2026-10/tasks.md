@@ -355,7 +355,7 @@
   - `git diff origin/dev/v18 -- .github scripts/ci` equals `main`'s CI diff;
   - the 7.1 reviewer has checked the port.
 
-  *Port done 2026-10-13, awaiting the reviewer.* Cherry-picked `main`'s four commits (`a4374b9`,
+  *Port done 2026-10-13.* Cherry-picked `main`'s four commits (`a4374b9`,
   `8274ea8`, `358d0f3`, `5e0808a`), then `bd21166` dropped the packaging delta.
   - *Conflicts:* the README keeps v18's `blob/18.2.0` link. `VersionTruthTests` had v18's own
     version text around the guards, so the `RepositoryAddress` change was re-applied by script
@@ -392,12 +392,63 @@
   - *Not reproduced by QA:* the clean Release build, because the v18 TestSite was still running.
     Run by me once it was stopped: client build, then `--no-incremental` Release build, 0
     warnings, 0 errors.
-- [ ] 7.3 PRs into `main` and `dev/v18`. Both are expected red on parity until the first merges.
+- [x] 7.3 PRs into `main` and `dev/v18`. Both are expected red on parity until the first merges.
   Merge `main`'s first, then re-run the v18 PR. Verify: both green after the second run.
-- [ ] 7.4 Archive on each line, syncing `public-holidays` on both and `packaging` on `main` only.
+
+  *Done 2026-10-13.* PR #23 (`main`) and PR #22 (`dev/v18`) merged within a minute of each other,
+  so neither PR run was re-run.
+  - *PR runs:* the only failure in either was the step "Parity with the other published line".
+    That failure was expected: each PR was compared with the other line's origin branch, which did
+    not yet carry the CI change. The push runs on both heads (`12e1c8c`, `a812435`) passed in full.
+  - *Verify, as amended:* "both green after the second run" was not observed on the PRs. It is
+    observed instead on the post-merge push runs of `5269a2b` and `1e05ccd`, which compare the
+    two lines after both carry the change. They are recorded with 7.4.
+- [x] 7.4 Archive on each line, syncing `public-holidays` on both and `packaging` on `main` only.
   Re-run 6.2's grep after the sync. Verify: `openspec validate --all --strict` passes on both lines,
   and `main`'s and `dev/v18`'s *The package declares which Umbraco majors it accepts* are
   identical (`diff` of the extracted requirement is empty).
-- [ ] 7.5 Hand over to the release change (`release-17-3-1` / `release-18-2-1`). Its changelog
+
+  *Done 2026-10-13, as `2026-10-13-tidy-2026-10` on both lines.*
+  - *Sync:* `main` updated `packaging` (~1 modified) and `public-holidays` (+1 added). `dev/v18`
+    updated `public-holidays` only (+1 added); its `packaging` spec is byte-unchanged.
+  - *Packaging:* the extracted requirement *The package declares which Umbraco majors it accepts*
+    diffs empty between the lines. The two packaging specs now hold the same 24 requirements with
+    identical content. Before the archive this requirement was the only difference.
+    - The ORDER of requirements still differs between the lines. That predates this change and
+      has no effect on what either spec requires.
+  - *`public-holidays`:* identical on both lines after the sync.
+  - *`openspec validate --all --strict`:* 26/26 on both lines. That is 27 less this archived
+    change.
+  - *6.2's grep, re-run on both lines after the sync:* the hits are the same and all true.
+    - `packaging/spec.md:1017` now reads "would live only in prose".
+    - `public-holidays/spec.md:84` is the 404 rule, which the thrown-status fix makes true again.
+    - `public-holidays/spec.md:253` is the new refusal scenario.
+    - The "2048" and ".NET test project" hits are as classified in 6.2.
+  - *Stale `.openspec-archive.lock` files* left by the CLI on both lines: their pids were not
+    running, so both were deleted and not committed.
+  - *Post-merge CI:*
+    - `dev/v18` `1e05ccd` (run 38440570698): **success**, parity included.
+    - `main` `5269a2b` (run 38440483443): **failed on parity only**; every build, test and
+      validation step passed. It is a race, not drift: that run started at 17:39:58Z, before PR
+      #22 merged into `dev/v18` (17:40:33Z), so it compared against a `dev/v18` without the CI
+      change.
+    - Run locally against the current `origin/dev/v18`, `Assert-LineParity.ps1 -Line main` exits 0
+      ("identical to origin/dev/v18"). **Owed: Chris re-runs run 38440483443** so that `main` is
+      green on origin. This archive's own push also starts a fresh run.
+- [x] 7.5 Hand over to the release change (`release-17-3-1` / `release-18-2-1`). Its changelog
   must name the two visible wording changes (items 2 and 3) and the corrected hint placement.
   Verify: a note in `ubookit-deferred-obligations` striking each item discharged here.
+
+  *Done 2026-10-13.* The release change (`release-17-3-1` / `release-18-2-1`) inherits these.
+  - *Changelog:* name the two wording changes the operator sees: the pluralised import summary,
+    and the refusal message for 401/403. Also name the closed-period hints now sitting under each
+    period.
+  - *Behaviour fix:* holiday failures are now read from the thrown status too. That also restores
+    the `public-holidays` rule that a source gone away (404) withdraws the panel, which had been
+    broken since the holiday import. This is a bug fix the changelog may name.
+  - *Nothing public changed* (no type, member, endpoint, setting or migration), so a patch is
+    right.
+  - *Obligations:* `ubookit-deferred-obligations` strikes the closed-period hints, the docs line,
+    the Release-only audit, the README `tree/` links, client skip detection, the v18 README
+    example, the 2048 literal, and holiday items 1 and 2. `main`'s packaging sentences are struck
+    at this archive's sync.
