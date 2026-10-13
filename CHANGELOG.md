@@ -12,8 +12,9 @@ when its release date is stamped at publication — that stamp completes the ent
 revising it, and nothing else about it moves afterwards.
 
 The major tracks the **Umbraco** major, not uBookIt's own breaking changes — uBookIt `17.x` is for
-Umbraco 17 and `18.x` for Umbraco 18. That means the major cannot signal a break, so a break lands in a **minor** and never in
-a patch. See [the versioning note](README.md#versions-and-the-api-promise).
+Umbraco 17 and `18.x` for Umbraco 18. That means the major cannot signal a break, so a break lands
+in a **minor** and never in a patch.
+See [the versioning note](README.md#versions-and-the-api-promise).
 
 ---
 
