@@ -392,6 +392,108 @@ public sealed class AuditScriptTests : IDisposable
         Assert.Contains(Vulnerable("Site", AdvisoryA), output);
     }
 
+    // --- Findings from every configuration (tidy-2026-10) -----------------------------------
+
+    [Fact]
+    public void A_finding_only_the_Release_graph_holds_fails_naming_the_configuration()
+    {
+        // The case the audit used to be blind to: it restored, and `dotnet list` read, Debug only,
+        // and Release is what ships.
+        var site = Project("Site", NotPackable);
+
+        var (exit, output) = AuditPerConfiguration(
+            debug: [Entry(site)],
+            release: [Entry(site, Finding("Some.Package", AdvisoryA))]);
+
+        Assert.Equal(1, exit);
+        Assert.Contains(Vulnerable("Site", AdvisoryA) + " (in Release only)", output);
+    }
+
+    [Fact]
+    public void A_finding_only_the_Debug_graph_holds_still_fails()
+    {
+        var site = Project("Site", NotPackable);
+
+        var (exit, output) = AuditPerConfiguration(
+            debug: [Entry(site, Finding("Some.Package", AdvisoryA))],
+            release: [Entry(site)]);
+
+        Assert.Equal(1, exit);
+        Assert.Contains(Vulnerable("Site", AdvisoryA) + " (in Debug only)", output);
+    }
+
+    [Fact]
+    public void A_finding_every_configuration_holds_is_reported_once_without_a_qualifier()
+    {
+        var site = Project("Site", NotPackable);
+
+        var (exit, output) = AuditPerConfiguration(
+            debug: [Entry(site, Finding("Some.Package", AdvisoryA))],
+            release: [Entry(site, Finding("Some.Package", AdvisoryA))]);
+
+        Assert.Equal(1, exit);
+        Assert.Equal(1, Occurrences(output, Vulnerable("Site", AdvisoryA)));
+        Assert.DoesNotContain(" only)", output);
+    }
+
+    [Fact]
+    public void A_suppression_matched_only_in_Release_is_not_stale()
+    {
+        // The suppression is judged against the union of the graphs: an advisory the shipped
+        // configuration still holds is a live reason, wherever else it is absent.
+        var site = Project("Site", NotPackable + Suppress(AdvisoryA));
+
+        var (exit, output) = AuditPerConfiguration(
+            debug: [Entry(site)],
+            release: [Entry(site, Finding("Some.Package", AdvisoryA))]);
+
+        Assert.Equal(0, exit);
+        Assert.Contains($"::notice title=Accepted advisory::Site (net10.0): Some.Package 1.0.0 - High - {AdvisoryA} (in Release only)", output);
+        Assert.DoesNotContain("stale", output);
+    }
+
+    [Fact]
+    public void A_project_only_the_Release_report_names_is_audited()
+    {
+        var site = Project("Site", NotPackable);
+        var tool = Project("Tool", NotPackable);
+
+        var (exit, output) = AuditPerConfiguration(
+            debug: [Entry(site)],
+            release: [Entry(site), Entry(tool, Finding("Some.Package", AdvisoryB))]);
+
+        Assert.Equal(1, exit);
+        Assert.Contains(Vulnerable("Tool", AdvisoryB) + " (in Release only)", output);
+        Assert.Contains("audited 2 project(s)", output);
+    }
+
+    [Fact]
+    public void A_Release_report_that_consulted_no_vulnerability_source_fails()
+    {
+        // Non-vacuity holds per configuration: a Release graph checked against nothing is not
+        // rescued by a Debug graph checked properly.
+        var site = Project("Site", NotPackable);
+
+        var (exit, output) = AuditPerConfiguration(
+            debug: [Entry(site)],
+            release: [Entry(site)],
+            releaseSources: ["C:/local/feed/"]);
+
+        Assert.Equal(1, exit);
+        Assert.Contains("The Release report for Fixture.slnx consulted no source", output);
+    }
+
+    private static int Occurrences(string haystack, string needle)
+    {
+        var count = 0;
+        for (var at = haystack.IndexOf(needle, StringComparison.Ordinal); at >= 0; at = haystack.IndexOf(needle, at + needle.Length, StringComparison.Ordinal))
+        {
+            count++;
+        }
+
+        return count;
+    }
+
     // --- Fixtures ----------------------------------------------------------------------------
 
     private static string Suppress(string advisory) =>
@@ -427,18 +529,36 @@ public sealed class AuditScriptTests : IDisposable
             frameworks = new[] { new { framework = "net10.0", transitivePackages = findings } },
         };
 
+    /// <summary>One report standing for every configuration: the graphs are identical.</summary>
     private (int Exit, string Output) Audit(string[] sources, params object[] projects)
     {
         var report = Path.Combine(_directory, "report.json");
         File.WriteAllText(report, JsonSerializer.Serialize(new { version = 1, sources, projects }));
 
+        return Run("-Report", report);
+    }
+
+    /// <summary>A Debug report and a Release report, so the two graphs can differ.</summary>
+    private (int Exit, string Output) AuditPerConfiguration(
+        object[] debug, object[] release, string[]? releaseSources = null)
+    {
+        var debugReport = Path.Combine(_directory, "debug.json");
+        var releaseReport = Path.Combine(_directory, "release.json");
+        File.WriteAllText(debugReport, JsonSerializer.Serialize(new { version = 1, sources = new[] { Source }, projects = debug }));
+        File.WriteAllText(releaseReport, JsonSerializer.Serialize(new { version = 1, sources = releaseSources ?? [Source], projects = release }));
+
+        return Run("-Report", debugReport, "-ReleaseReport", releaseReport);
+    }
+
+    private static (int Exit, string Output) Run(params string[] reports)
+    {
         var info = new ProcessStartInfo("pwsh")
         {
             RedirectStandardOutput = true,
             RedirectStandardError = true,
             UseShellExecute = false,
         };
-        foreach (var argument in new[] { "-NoProfile", "-NonInteractive", "-File", Script, "-Target", "Fixture.slnx", "-Report", report })
+        foreach (var argument in new[] { "-NoProfile", "-NonInteractive", "-File", Script, "-Target", "Fixture.slnx" }.Concat(reports))
         {
             info.ArgumentList.Add(argument);
         }

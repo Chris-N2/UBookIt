@@ -199,7 +199,7 @@ describe("every key it can emit has a string", () => {
     // editor cannot act on, and for the absence case indistinguishable from the
     // silence that means something else entirely.
     const { default: terms } = await import("../localization/en-us.js");
-    const services = (terms as Record<string, Record<string, string>>).ubookitServices;
+    const services = (terms as unknown as Record<string, Record<string, string>>).ubookitServices;
 
     for (const key of [
       "sufficiencyReport",

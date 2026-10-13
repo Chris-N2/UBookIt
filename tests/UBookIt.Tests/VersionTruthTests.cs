@@ -1247,7 +1247,7 @@ public class VersionTruthTests
             "Directory.Build.props declares no <RepositoryUrl>, so the repository a readme link "
             + "may point into cannot be derived.");
 
-        var blobPrefix = Regex.Replace(repositoryUrl, @"\.git$", string.Empty) + "/blob/";
+        var repository = Regex.Replace(repositoryUrl, @"\.git$", string.Empty);
 
         var readme = RepoFiles.Read(readmeFile);
 
@@ -1282,21 +1282,20 @@ public class VersionTruthTests
                 continue;
             }
 
-            if (!target.StartsWith(blobPrefix, StringComparison.Ordinal))
+            if (RepositoryAddress(target, repository) is not (var form, var afterPrefix))
             {
                 // An absolute URL to somewhere else. Accepted unchecked — see the remarks.
                 continue;
             }
 
-            // blob/<ref>/<path in the repository>
-            var afterPrefix = target[blobPrefix.Length..];
+            // blob/<ref>/<file> or tree/<ref>/<folder>
             var firstSlash = afterPrefix.IndexOf('/');
 
             if (firstSlash < 0)
             {
                 offenders.Add(
-                    $"{kind} '{text}' targets '{target}', which names a git ref but no file "
-                    + "beneath it.");
+                    $"{kind} '{text}' targets '{target}', which names a git ref but no "
+                    + $"{(form == "tree" ? "folder" : "file")} beneath it.");
 
                 continue;
             }
@@ -1314,16 +1313,19 @@ public class VersionTruthTests
             var full = Path.Combine(
                 RepoFiles.Root, relativePath.Replace('/', Path.DirectorySeparatorChar));
 
-            if (File.Exists(full))
+            // GitHub serves a file under blob/ and a folder under tree/, and answers the other
+            // with a redirect at best — so each form must name what it can show.
+            if (form == "tree" ? Directory.Exists(full) : File.Exists(full))
             {
                 resolvedIntoRepository++;
             }
             else
             {
                 offenders.Add(
-                    $"{kind} '{text}' targets '{target}', but this repository has no file at "
-                    + $"'{relativePath}'. A renamed or deleted document is caught here rather "
-                    + "than after it has been frozen into a published version.");
+                    $"{kind} '{text}' targets '{target}', but this repository has no "
+                    + $"{(form == "tree" ? "folder" : "file")} at '{relativePath}'. A renamed or "
+                    + "deleted document is caught here rather than after it has been frozen into "
+                    + "a published version.");
             }
         }
 
@@ -1341,7 +1343,32 @@ public class VersionTruthTests
             resolvedIntoRepository > 0,
             $"No link in {readmeFile} resolved to a file in this repository, so the half of this "
             + "guard that checks link TARGETS proved nothing. Either the documentation links "
-            + $"stopped pointing at '{blobPrefix}...', or the derivation of that prefix is wrong.");
+            + $"stopped pointing at '{repository}/blob/...', or the derivation of that prefix is wrong.");
+    }
+
+    /// <summary>
+    /// The part of <paramref name="target"/> after <c>&lt;repository&gt;/blob/</c> or
+    /// <c>&lt;repository&gt;/tree/</c>, with which of the two it was; null for any other URL.
+    /// </summary>
+    /// <remarks>
+    /// <b>Both forms address this repository, so both readme link guards ask this one question.</b>
+    /// They used to recognise <c>blob/</c> only, so a folder link — <c>tree/main/docs</c> — was
+    /// waved through as "somebody else's site" by both: neither its path nor its ref was ever
+    /// checked, although the requirement covers every link that addresses a document here.
+    /// </remarks>
+    internal static (string Form, string AfterPrefix)? RepositoryAddress(string target, string repository)
+    {
+        foreach (var form in new[] { "blob", "tree" })
+        {
+            var prefix = $"{repository}/{form}/";
+
+            if (target.StartsWith(prefix, StringComparison.Ordinal))
+            {
+                return (form, target[prefix.Length..]);
+            }
+        }
+
+        return null;
     }
 
     /// <summary>
@@ -1617,7 +1644,7 @@ public class VersionTruthTests
             "Directory.Build.props must declare <PackageReadmeFile> and <RepositoryUrl> for the "
             + "readme's documentation refs to be derived and checked.");
 
-        var blobPrefix = Regex.Replace(repositoryUrl, @"\.git$", string.Empty) + "/blob/";
+        var repository = Regex.Replace(repositoryUrl, @"\.git$", string.Empty);
 
         var readme = RepoFiles.Read(readmeFile);
 
@@ -1638,20 +1665,19 @@ public class VersionTruthTests
 
             var target = link.Groups["target"].Value;
 
-            if (!target.StartsWith(blobPrefix, StringComparison.Ordinal))
+            if (RepositoryAddress(target, repository) is not (_, var afterPrefix))
             {
                 // Somebody else's site. It names no release of ours to pin to.
                 continue;
             }
 
             var text = link.Groups["text"].Value;
-            var afterPrefix = target[blobPrefix.Length..];
             var firstSlash = afterPrefix.IndexOf('/');
 
             if (firstSlash < 0)
             {
                 offenders.Add(
-                    $"link '{text}' targets '{target}', which names a git ref but no file "
+                    $"link '{text}' targets '{target}', which names a git ref but nothing "
                     + "beneath it.");
 
                 continue;
@@ -1688,7 +1714,7 @@ public class VersionTruthTests
             pinnedToThisRelease > 0,
             $"No documentation link in {readmeFile} is pinned to '{declaredVersion}', so this "
             + "guard proved nothing. Either the links stopped pointing at "
-            + $"'{blobPrefix}...', or the derivation of that prefix is wrong.");
+            + $"'{repository}/blob/...', or the derivation of that prefix is wrong.");
     }
 
     [Fact]

@@ -57,6 +57,8 @@ jobs:
       UBOOKIT_TEST_DB_REQUIRED: 'true'
       CLIENT_DIR: src/UBookIt.Backoffice/Client
       RESULTS_DIR: ${{ github.workspace }}/../test-results
+      # Its own file, outside RESULTS_DIR, so the TRX check never meets a format it does not read.
+      CLIENT_REPORT: ${{ github.workspace }}/../client-test-results/vitest.json
 
     steps:
       - name: Check out, with full history
@@ -126,10 +128,16 @@ jobs:
         run: npm ci
 
       - name: Client - tests
-        # vitest fails on zero test files by default (no --passWithNoTests), which is what
-        # makes this step's green mean the suite ran.
+        # vitest fails on zero test files by default (no --passWithNoTests), but it exits 0 with
+        # a skipped or todo test, so the JSON report is what the next step judges.
         working-directory: ${{ env.CLIENT_DIR }}
-        run: npm test
+        run: npm test -- --reporter=default --reporter=json --outputFile.json="${{ env.CLIENT_REPORT }}"
+
+      - name: Client - every test ran, nothing skipped
+        # Runs even when tests failed, so a run that failed AND skipped says both.
+        if: ${{ !cancelled() }}
+        shell: pwsh
+        run: ./scripts/ci/Assert-ClientTestResults.ps1 -Report "${{ env.CLIENT_REPORT }}"
 
       - name: Build (Release; warnings are errors because CI=true)
         # The Backoffice project builds the client itself (npm run build) and adds the

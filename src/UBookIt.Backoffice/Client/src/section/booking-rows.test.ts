@@ -272,7 +272,7 @@ describe("what the cancel and decline confirmations say about notification", () 
   // hide behind; a plain substring check is wrap-safe here by construction.
   it("cancel states the truthful conditional, not the falsified claim", async () => {
     const { default: terms } = await import("../localization/en-us.js");
-    const bookings = (terms as Record<string, Record<string, string>>).ubookitBookings;
+    const bookings = (terms as unknown as Record<string, Record<string, string>>).ubookitBookings;
 
     expect(bookings.confirmCancelContent).toContain(
       "only tells the person who booked if booking emails are configured",
@@ -285,7 +285,7 @@ describe("what the cancel and decline confirmations say about notification", () 
 
   it("decline states the same conditional on the same terms", async () => {
     const { default: terms } = await import("../localization/en-us.js");
-    const bookings = (terms as Record<string, Record<string, string>>).ubookitBookings;
+    const bookings = (terms as unknown as Record<string, Record<string, string>>).ubookitBookings;
 
     expect(bookings.confirmDeclineContent).toContain(
       "only tells the person who booked if booking emails are configured",
@@ -299,7 +299,7 @@ describe("what the cancel and decline confirmations say about notification", () 
     // live, but a new string making the same false assertion anywhere in this section
     // is the same defect. Swept rather than enumerated.
     const { default: terms } = await import("../localization/en-us.js");
-    const bookings = (terms as Record<string, Record<string, string>>).ubookitBookings;
+    const bookings = (terms as unknown as Record<string, Record<string, string>>).ubookitBookings;
 
     for (const [key, value] of Object.entries(bookings)) {
       expect(`${key}: ${value}`).not.toContain("does not tell");
@@ -311,7 +311,7 @@ describe("what the cancel and decline confirmations say about notification", () 
     // A missing key renders as the raw key or as nothing — and for a confirmation dialog,
     // "nothing" is a destructive action with no explanation attached to it.
     const { default: terms } = await import("../localization/en-us.js");
-    const bookings = (terms as Record<string, Record<string, string>>).ubookitBookings;
+    const bookings = (terms as unknown as Record<string, Record<string, string>>).ubookitBookings;
 
     for (const key of [
       "cancel",
@@ -329,7 +329,7 @@ describe("what the cancel and decline confirmations say about notification", () 
 
   it("has a string for every key the confirm and decline flows can emit", async () => {
     const { default: terms } = await import("../localization/en-us.js");
-    const bookings = (terms as Record<string, Record<string, string>>).ubookitBookings;
+    const bookings = (terms as unknown as Record<string, Record<string, string>>).ubookitBookings;
 
     for (const key of [
       "confirm",
@@ -387,7 +387,7 @@ describe("which bookings offer a move", () => {
 
   it("has a string for every key the move flow can emit", async () => {
     const { default: terms } = await import("../localization/en-us.js");
-    const bookings = (terms as Record<string, Record<string, string>>).ubookitBookings;
+    const bookings = (terms as unknown as Record<string, Record<string, string>>).ubookitBookings;
 
     for (const key of [
       "move",
@@ -596,7 +596,7 @@ describe("the strings a withheld booker is explained with", () => {
   // extending it is how the next edit removes one silently.
   it("has a string for every key the withheld booker can emit", async () => {
     const { default: terms } = await import("../localization/en-us.js");
-    const bookings = (terms as Record<string, Record<string, string>>).ubookitBookings;
+    const bookings = (terms as unknown as Record<string, Record<string, string>>).ubookitBookings;
 
     for (const key of ["bookerHidden", "bookerHiddenNote", "bookerErased"]) {
       expect(typeof bookings[key]).toBe("string");
@@ -613,7 +613,7 @@ describe("the strings a withheld booker is explained with", () => {
     // not: Umbraco seeds only the original super user, so a new administrator sees every
     // cell hidden.
     const { default: terms } = await import("../localization/en-us.js");
-    const bookings = (terms as Record<string, Record<string, string>>).ubookitBookings;
+    const bookings = (terms as unknown as Record<string, Record<string, string>>).ubookitBookings;
 
     expect(bookings.bookerHiddenNote).toContain("Sensitive data");
     expect(bookings.bookerHiddenNote).toContain("administrator");
@@ -623,7 +623,7 @@ describe("the strings a withheld booker is explained with", () => {
     // Asterisks or a masked form would imply a value of a particular length and invite
     // guessing at it; "Not permitted" would describe the reader rather than the data.
     const { default: terms } = await import("../localization/en-us.js");
-    const bookings = (terms as Record<string, Record<string, string>>).ubookitBookings;
+    const bookings = (terms as unknown as Record<string, Record<string, string>>).ubookitBookings;
 
     expect(bookings.bookerHidden).not.toMatch(/[*•]/);
     expect(bookings.bookerHidden.toLowerCase()).toContain("hidden");
@@ -807,7 +807,7 @@ describe("the strings an erased booker is explained with", () => {
     // extended rather than duplicated — the same reason that guard enumerates keys instead
     // of naming one per test.
     const { default: terms } = await import("../localization/en-us.js");
-    const bookings = (terms as Record<string, Record<string, string>>).ubookitBookings;
+    const bookings = (terms as unknown as Record<string, Record<string, string>>).ubookitBookings;
 
     expect(bookings.bookerErased.toLowerCase()).toContain("erased");
     expect(bookings.bookerErased.toLowerCase()).not.toContain("hidden");
