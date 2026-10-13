@@ -20,11 +20,13 @@ import {
   initialSelection,
   isSelectable,
   previewFailure,
+  thrownStatus,
   previewOutcome,
   shouldAskForSource,
   showsImport,
   toggleDate,
 } from "./holiday-fields.js";
+import type { PreviewFailure } from "./holiday-fields.js";
 
 /** A closure being added or edited, before it is sent. */
 interface ClosureDraft {
@@ -100,9 +102,13 @@ export class UBookItClosuresViewElement extends UmbLitElement {
   @state()
   private _selectedDates: string[] = [];
 
-  /** A source that threw — kept apart from "no rows", which is a real answer. */
+  /**
+   * Why the last preview has no answer, if it has none: the source failed, or the site refused
+   * the request. Kept apart from "no rows", which is a real answer, and from each other, since
+   * each sends the operator somewhere different.
+   */
   @state()
-  private _holidaySourceFailed = false;
+  private _holidayFailure?: "failed" | "refused";
 
   @state()
   private _importSummary?: string;
@@ -269,36 +275,45 @@ export class UBookItClosuresViewElement extends UmbLitElement {
     this._busy = true;
     this._error = undefined;
     this._importSummary = undefined;
-    this._holidaySourceFailed = false;
+    this._holidayFailure = undefined;
     this._holidayRows = undefined;
 
+    let failure: PreviewFailure;
     try {
-      const { data, error, response } = await UBookItBackofficeService.previewHolidays({
+      const { data, response } = await UBookItBackofficeService.previewHolidays({
         query: { from: this._window.from, to: this._window.to },
       });
 
-      if (error || !data) {
-        // NOT an empty list. A broken source and a window with no holidays are different
-        // facts, and this is the branch that keeps them apart.
-        //
-        // A 404 is a third fact again: the site has no source, which can become true while this
-        // screen is open. That withdraws the panel rather than blaming a feed.
-        if (previewFailure(response?.status) === "absent") {
-          this.#withdrawImport();
-          return;
-        }
-
-        this._holidaySourceFailed = true;
+      if (data) {
+        this._holidayRows = data.rows;
+        this._selectedDates = initialSelection(data.rows);
         return;
       }
 
-      this._holidayRows = data.rows;
-      this._selectedDates = initialSelection(data.rows);
-    } catch {
-      this._holidaySourceFailed = true;
+      failure = previewFailure(response?.status);
+    } catch (thrown) {
+      // WHERE A FAILURE ACTUALLY ARRIVES. The generated client inherits Umbraco's configuration,
+      // which THROWS on a non-2xx, with the status on the thrown problem details (measured live,
+      // tidy-2026-10; `isMiss` in find-fields.ts records the same fact for bookings). Reading
+      // only `response?.status` above meant no 404 or 401/403 was ever classified: every one
+      // landed here and read "the source failed". Anything thrown without a status — a network
+      // failure — is still a failure of the source.
+      failure = previewFailure(thrownStatus(thrown));
     } finally {
       this._busy = false;
     }
+
+    // NOT an empty list. A broken source and a window with no holidays are different facts, and
+    // this is where they are kept apart. A 404 is a third fact: the site has no source, which
+    // can become true while this screen is open, and it withdraws the panel rather than blaming
+    // a feed. A 401/403 is a fourth: the site refused the request because of who is asking,
+    // which keeps the panel, as a failure does, and says so rather than blaming the feed.
+    if (failure === "absent") {
+      this.#withdrawImport();
+      return;
+    }
+
+    this._holidayFailure = failure;
   }
 
   /**
@@ -314,7 +329,7 @@ export class UBookItClosuresViewElement extends UmbLitElement {
     this._importOpen = false;
     this._holidayRows = undefined;
     this._selectedDates = [];
-    this._holidaySourceFailed = false;
+    this._holidayFailure = undefined;
   }
 
   async #import() {
@@ -326,43 +341,50 @@ export class UBookItClosuresViewElement extends UmbLitElement {
     this._busy = true;
     this._error = undefined;
 
+    let failure: PreviewFailure;
     try {
-      const { data, error, response } = await UBookItBackofficeService.importHolidays({
+      const { data, response } = await UBookItBackofficeService.importHolidays({
         body: { holidays: chosenRows(rows, this._selectedDates) },
       });
 
-      if (error || !data) {
-        // The SAME rule the preview applies, because the server answers 404 from BOTH
-        // endpoints for the same reason: the site has no source. A source deregistered between
-        // fetching and confirming must withdraw the feature rather than report that closures
-        // "could not be created" for a feature this site no longer has.
-        if (previewFailure(response?.status) === "absent") {
-          this.#withdrawImport();
-          return;
-        }
+      if (data) {
+        // One term, a function of both counts, so the sentence's grammar (and whether the
+        // skipped half is said at all) lives with its wording rather than here.
+        this._importSummary = this.localize.term(
+          "ubookitClosures_importSummary",
+          data.created,
+          data.skipped.length,
+        );
 
-        this._error = this.#term("importFailed");
-        await this.#focusError();
+        // The preview is stale the moment anything is created, and the list behind it has
+        // changed too.
+        this._holidayRows = undefined;
+        this._selectedDates = [];
+        await this.#load();
         return;
       }
 
-      this._importSummary = this.localize.term(
-        "ubookitClosures_importSummary",
-        data.created,
-        data.skipped.length,
-      );
-
-      // The preview is stale the moment anything is created, and the list behind it has
-      // changed too.
-      this._holidayRows = undefined;
-      this._selectedDates = [];
-      await this.#load();
-    } catch {
-      this._error = this.#term("importFailed");
-      await this.#focusError();
+      failure = previewFailure(response?.status);
+    } catch (thrown) {
+      // Thrown, not returned, for the reason #preview gives.
+      failure = previewFailure(thrownStatus(thrown));
     } finally {
       this._busy = false;
     }
+
+    // The SAME rule the preview applies, because the server answers 404 from BOTH endpoints for
+    // the same reason: the site has no source. A source deregistered between fetching and
+    // confirming must withdraw the feature rather than report that closures "could not be
+    // created" for a feature this site no longer has.
+    if (failure === "absent") {
+      this.#withdrawImport();
+      return;
+    }
+
+    // A refusal is the site's answer about who is asking, not about these closures.
+    // Each key a literal #term("…") call, so ElementLocalizationKeyTests can see it.
+    this._error = failure === "refused" ? this.#term("importRefused") : this.#term("importFailed");
+    await this.#focusError();
   }
 
   async #focusError() {
@@ -535,13 +557,14 @@ export class UBookItClosuresViewElement extends UmbLitElement {
   }
 
   #renderHolidayRows() {
-    const outcome = previewOutcome(this._holidayRows, this._holidaySourceFailed);
+    const outcome = previewOutcome(this._holidayRows, this._holidayFailure);
 
-    // THREE outcomes, three messages. "Failed" must never read as "empty": a window with no
-    // holidays is a correct answer, and a source that threw is not an answer at all.
-    if (outcome === "failed") {
+    // FOUR outcomes, four messages. "Failed" must never read as "empty": a window with no
+    // holidays is a correct answer, and a source that threw is not an answer at all. "Refused"
+    // must never read as "failed": the source was never asked.
+    if (outcome === "failed" || outcome === "refused") {
       return html`<p id="holiday-error" class="error" role="alert" tabindex="-1">
-        ${this.#term("importSourceFailed")}
+        ${outcome === "refused" ? this.#term("importRefused") : this.#term("importSourceFailed")}
       </p>`;
     }
 

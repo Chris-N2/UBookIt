@@ -358,10 +358,11 @@ public class PackageCompositionTests(PackedSolutionFixture fixture)
     /// <para>
     /// A NuGet dependency version is a <b>minimum</b>, so <c>Umbraco.Cms.Web.Website 18.2.0</c>
     /// says "18.2.0 or higher" and nothing else. For as long as uBookIt published one line that
-    /// was merely imprecise — it is why the Umbraco Marketplace lists uBookIt as running on v17
-    /// <i>and</i> v18, which is false, and why nothing a resolver reads has ever contradicted
-    /// that. With two lines published against two Umbraco majors it stops being imprecise: the
-    /// constraint exists only in prose, and no package manager reads prose.
+    /// was merely imprecise — it is why the Umbraco Marketplace was able to describe uBookIt as
+    /// running on v17 <i>and</i> v18, with nothing a resolver reads to contradict it. With two
+    /// lines published against two Umbraco majors it stops being imprecise: without this bound the
+    /// constraint would live only in prose, and no package manager reads prose. From
+    /// <c>17.1.2</c> and <c>18.0.0</c> every published version carries it.
     /// </para>
     /// <para>
     /// <b>Read from the packed nuspec, not from <c>Directory.Packages.props</c>, and that is the

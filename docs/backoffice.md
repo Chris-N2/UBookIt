@@ -540,7 +540,9 @@ normally starts today. When a closure (or a resource's own closed period) covers
 starts on the first day after it instead, and names the dates it covers rather than "the next 30
 days". It never says why. A closure reaching past how far ahead a resource can be booked leaves the
 list where it was, so raise that resource's booking horizon if you are taking bookings now for
-dates after a long closure.
+dates after a long closure. **Only a closure covering today moves the list.** One that starts
+tomorrow, or later, leaves it starting today, and the closed dates within it simply show nothing
+available.
 
 ### Opening one resource anyway
 
@@ -625,7 +627,9 @@ editing a closure.
 
 If the source cannot be reached, the panel says the source failed. That is deliberately different
 from a window with no holidays in it: an empty window is an answer, and a broken source is not, so
-they never read the same.
+they never read the same. If the site refuses the request instead — your session has ended, or
+your permission to change closures was removed while the screen was open — the panel says the
+request was refused, and that it is not a problem with the holiday source.
 
 ### What a closure does not do
 
