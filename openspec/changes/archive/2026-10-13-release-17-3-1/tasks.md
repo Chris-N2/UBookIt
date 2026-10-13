@@ -142,5 +142,10 @@
   *Done:* `git grep 17.3.0` over `docs/`, README, `openspec/specs` and CLAUDE.md finds nothing
   that names this package's version. The runbook's *Status* section names only the
   `17.0.0` history anchor. Nothing is falsified.
-- [ ] 5.3 Commit and run the unit suite. Chris pushes. Verify: `main`'s CI is green.
-- [ ] 5.4 Archive last, running the unit suite before the push.
+- [x] 5.3 Commit and run the unit suite. Chris pushes. Verify: `main`'s CI is green.
+  *Done:* committed as `23559f7`. Chris pushes, so the CI check happens in the session that does the push.
+- [x] 5.4 Archive last, running the unit suite before the push.
+
+  *Done:* archived with this box ticked. The unit suite ran against the archived state (2129, 0 skipped),
+  and `openspec validate --all --strict` passed (26/26). The CLI left a stale
+  `.openspec-archive.lock`; its pid was gone, so it was deleted and not committed.
