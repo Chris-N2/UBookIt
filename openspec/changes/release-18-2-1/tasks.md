@@ -65,7 +65,7 @@
   - **4 (NIT): the changelog preamble named `17.x` only.** It now reads "uBookIt `17.x` is for
     Umbraco 17 and `18.x` for Umbraco 18", matching the README, on both lines. The preamble is not
     a release entry, so the never-edit rule does not apply, and no test pins it.
-  - Since 18.1.0's entry is untouched. `ChangelogTests` and `VersionTruthTests` re-ran: 20 passed.
+  - No published entry was edited. `ChangelogTests` and `VersionTruthTests` re-ran: 20 passed.
 - [ ] 3.2 Chris pushes this branch and opens the PR. Verify: the PR's CI is green at every step,
   parity included. The release changes no CI file, so parity has no reason to fail.
 - [ ] 3.3 Chris merges with "Create a merge commit". Verify: `origin/dev/v18` is the merge commit, and
