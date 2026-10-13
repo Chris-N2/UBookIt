@@ -715,7 +715,24 @@ export default {
       "The site's holiday source could not be reached, so there is nothing to show. This is not the same as there being no holidays — try again, or ask a developer to check the source.",
     importNone: "The source returned no holidays for those dates.",
     importFailed: "Those closures could not be created.",
-    importSummary: "Created %0% closures. %1% rows were skipped.",
+
+    // The site refused the request because of who is asking: neither the source's failure nor
+    // its absence. The screen cannot tell an ended session from a withdrawn permission, so it
+    // names both rather than guessing.
+    importRefused:
+      "The site refused this request. Your session may have ended, or you may no longer have permission to change closures. This is not a problem with the holiday source.",
+
+    // A function, so the counts decide the grammar: "1 closure", and no skipped sentence at all
+    // when nothing was skipped. Umbraco calls a function term with the arguments given. The only
+    // function in this file, which is why tests reading another section as plain strings cast
+    // `terms` through `unknown`: the dictionary as a whole is no longer string-valued.
+    importSummary: (created: number, skipped: number) =>
+      [
+        `Created ${created} ${created === 1 ? "closure" : "closures"}.`,
+        skipped > 0 ? `${skipped} ${skipped === 1 ? "row was" : "rows were"} skipped.` : "",
+      ]
+        .filter((sentence) => sentence !== "")
+        .join(" "),
   },
   ubookitResponsibility: {
     headline: "Responsibility",

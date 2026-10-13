@@ -95,7 +95,7 @@ describe("the report never claims the positive (design D1)", () => {
     // sentence the editor cannot act on — and, for the absence case, would be
     // indistinguishable from the silence that means something else entirely.
     return import("../localization/en-us.js").then(({ default: terms }) => {
-      const services = (terms as Record<string, Record<string, string>>).ubookitServices;
+      const services = (terms as unknown as Record<string, Record<string, string>>).ubookitServices;
 
       for (const key of ["alignmentReport", "alignmentNever", "alignmentWindow", "alignmentFix"]) {
         expect(typeof services[key]).toBe("string");

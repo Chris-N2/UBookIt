@@ -117,7 +117,7 @@ describe("what a refusal says", () => {
 
   it("has a string in the localisation for every term it can name", async () => {
     const { default: terms } = await import("../localization/en-us.js");
-    const bookings = (terms as Record<string, Record<string, string>>).ubookitBookings;
+    const bookings = (terms as unknown as Record<string, Record<string, string>>).ubookitBookings;
 
     for (const code of [
       "outside-open-hours",

@@ -82,14 +82,18 @@ export function defaultWindow(now: Date): { from: string; to: string } {
  * all, and showing it as "no holidays" would tell an operator their calendar is clear when it
  * is unknown.
  */
-export type PreviewOutcome = "rows" | "empty" | "failed";
+export type PreviewOutcome = "rows" | "empty" | "failed" | "refused";
 
+/**
+ * `failure` is what went wrong, when something did: `failed` (the source) or `refused` (the
+ * site, about who is asking). Either one outranks rows, for the reason below.
+ */
 export function previewOutcome(
   rows: ReadonlyArray<HolidayRowModel> | undefined,
-  failed: boolean,
+  failure: Exclude<PreviewFailure, "absent"> | undefined,
 ): PreviewOutcome {
-  if (failed) {
-    return "failed";
+  if (failure) {
+    return failure;
   }
 
   return rows && rows.length > 0 ? "rows" : "empty";
@@ -136,9 +140,35 @@ export function shouldAskForSource(canWrite: boolean, hasSource: boolean | undef
  * So the two are kept apart at exactly the point the rest of this capability keeps them apart.
  * `absent` withdraws the panel, as though the probe had said no in the first place; `failed`
  * says the source was asked and did not answer.
+ *
+ * **A 401 or 403 is neither** (tidy-2026-10). The site refused the request because of who is
+ * asking — a session that ended, or a permission withdrawn while the screen was open — so the
+ * source was never asked. Calling that `failed` sent an operator to debug a feed that is fine;
+ * calling it `absent` would withdraw a feature the site still has. `refused` keeps the panel and
+ * says what happened.
  */
-export type PreviewFailure = "absent" | "failed";
+export type PreviewFailure = "absent" | "failed" | "refused";
 
 export function previewFailure(status: number | undefined): PreviewFailure {
-  return status === 404 ? "absent" : "failed";
+  if (status === 404) {
+    return "absent";
+  }
+
+  return status === 401 || status === 403 ? "refused" : "failed";
+}
+
+/**
+ * The HTTP status a thrown failure carries, if it carries one.
+ *
+ * **The holiday calls do not RETURN their failures, they THROW them.** The generated client
+ * inherits Umbraco's configuration, which throws on a non-2xx — and what it throws is Umbraco's
+ * problem details, with the status on it: a 403 arrives as `{ status: 403, title, type }`
+ * (measured against the running backoffice, tidy-2026-10). So {@link previewFailure} must be
+ * asked about the THROWN value; asking only about a returned response classified nothing, and
+ * every 404 and 401/403 read as a failed source. Anything thrown without a numeric status — a
+ * network failure, a bug — is `undefined`, which {@link previewFailure} calls `failed`.
+ */
+export function thrownStatus(thrown: unknown): number | undefined {
+  const status = (thrown as { status?: unknown } | null | undefined)?.status;
+  return typeof status === "number" ? status : undefined;
 }
