@@ -51,11 +51,19 @@
   **Shown to fire** (each restored afterwards):
   - M1, the file reverted to HEAD's markup: fails.
   - M1b, the note hint moved after `</fieldset>`: fails.
-- [ ] 1.3 Live check in the backoffice, with two or more closed periods. Each period's hints sit
+- [x] 1.3 Live check in the backoffice, with two or more closed periods. Each period's hints sit
   under its own fields. Read the shadow DOM: every `aria-describedby` id resolves within the same
   root, and all ids are unique after adding and removing a period. Verify: a screenshot plus the DOM
   readout, recorded here.
 
+  *Done 2026-10-13, on the main TestSite (Meeting Room A, nothing saved).*
+  - *Three periods added: each To hint renders under its period's From/To row, and each Note
+    hint inside the note's field. Screenshot taken.*
+  - *Shadow DOM readout: each input's `aria-describedby` names `cp-<i>-to-hint` or
+    `cp-<i>-note-hint`, and every id resolves inside the same fieldset.*
+  - *Middle period removed: the remaining two re-index as `cp-0` and `cp-1`, with every reference
+    still inside its own fieldset.*
+  - *No duplicate ids at any point, and no shared `cp-to-hint` or `cp-note-hint`.*
 ## 2. Holiday import wording (design D2, D3)
 
 - [x] 2.1 Make `importSummary` a function term in `en-us.ts`: "closure"/"closures"; the skipped
@@ -111,11 +119,44 @@
     `failed`, and `previewOutcome(_, "failed")` is `failed`.
   - *What the element actually shows is checked live only (2.4). No client test in this project
     renders a Lit element.*
-- [ ] 2.4 Live check: import 1 holiday with 0 skipped, and N with ≥ 2 skipped where the source
+- [x] 2.4 Live check: import 1 holiday with 0 skipped, and N with ≥ 2 skipped where the source
   allows; read the summary. Provoke a 403, for example by removing *Change site settings* from the
   test user's group while the screen is open, then preview. Verify: the refusal message, with the
   panel still present; recorded here.
 
+  *Done 2026-10-13, on the main TestSite (GOV.UK source). This check FOUND A DEFECT (below).*
+  - *Summary: the December 2026 window, with Boxing Day (substitute day) unticked, imported
+    Christmas Day only. The screen showed "Created 1 closure." in `role="status"`, with no
+    skipped sentence. It left a 2026-12-25 closure in the TestSite data.*
+  - *"Rows were skipped" is not reachable live: the GOV.UK source yields no rejected rows. It is
+    covered by the unit tests in 2.1 only.*
+  - *Refusal, first attempt: FAILED. Chris removed "Change site settings" with the screen open,
+    then I fetched. The screen read "The site's holiday source could not be reached". The server
+    had refused correctly: the log shows OpenIddict `insufficient_access` forbidden, and a direct
+    call with the backoffice token returns 403.*
+    - ***Cause:** the generated client THROWS on a non-2xx. Calling `previewHolidays` in the page
+      threw `{status: 403, title: "You do not have the necessary permissions…", type:
+      "Unauthorized"}`, so the code only reached `catch`, which always set "failed".*
+    - *The returned-response branch therefore never ran, so **the 404 → withdraw rule from
+      `public-holidays` "A source that goes away while the screen is open" was broken too**,
+      from the holiday import onward. Pre-existing, not introduced here. `find-fields.ts`
+      `isMiss` already records the same fact for bookings.*
+    - ***Fix:** `thrownStatus` (holiday-fields.ts). Both calls now decide a failure once, from
+      the returned response or the thrown value, and no bare `catch` remains. 3 vitest tests use
+      the measured thrown shape. `ClosureAccessibilityTests.Both_holiday_calls_classify_a_thrown_failure_by_its_status`
+      pins the seam.*
+  - *Refusal, second attempt, on the rebuilt bundle:*
+    1. *Chris restored the permission. I reloaded, opened the panel and set the window.*
+    2. *Chris removed the permission again, and I fetched.*
+    3. *HTTP 403. `_holidayFailure` = refused. The panel stays and the source is still offered.
+       The alert reads "The site refused this request. Your session may have ended, or you may
+       no longer have permission to change closures. This is not a problem with the holiday
+       source." Screenshot taken.*
+  - *Also observed: once the permission is removed, a reload correctly shows the screen read-only
+    with no import panel, and never asks the source.*
+  - *Not reproduced live: the 404 withdraw path, which needs the source deregistered while the
+    screen is open. It is covered by the same `thrownStatus` + `previewFailure(404)` decision and
+    the seam test.*
 ## 3. Documentation (design D4, D5; proposal items 4–6)
 
 - [x] 3.1 `docs/backoffice.md`: one sentence after *During a closure, the booking page looks past
@@ -254,6 +295,38 @@
 
 - [ ] 7.1 QA (`qa-review`) in one subagent, reused across rounds. Hand each round's fixes over as
   new code, with every claim to verify rather than trust. Verify: APPROVE.
+  *Round 1: REJECT* (on `b98ed99`). QA re-ran the build, all four suites, validation, M1, H1 and
+  the real vitest skip/todo probe, and all reproduced. Every fix below is new code.
+  - **1. CRITICAL: the audit's Release pass listed the Debug graph.** `dotnet list package` has
+    no configuration option and restores implicitly as Debug before it lists, overwriting the
+    `dotnet restore -p:Configuration=Release` that ran just before it. QA reproduced it with a
+    probe holding a Release-only `System.Text.Json 8.0.0`: exit 0, "No known advisories".
+    - **Why it got through:** the six new fixture tests and M4 prove what the script does WITH
+      two graphs, not how it GETS them. My "run for real" record was true, but its findings were
+      present in both graphs, so it showed nothing about a Release-only one.
+    - *Fix:* each pass sets `Configuration` in the ENVIRONMENT (saved and restored) and lets
+      `dotnet list` do its own restore. The separate restore is gone.
+    - **Checked against the real CLI**, on QA's probes:
+      - Release-only: fails, "(in Release only)";
+      - Debug-only: fails, "(in Debug only)";
+      - unconditional: fails once, unqualified;
+      - `Configuration` is empty in the environment afterwards.
+    - **New guard:**
+      `AuditScriptTests.A_package_only_the_Release_configuration_references_is_found_by_the_real_listing`
+      writes a Release-conditioned probe outside the repository and runs the real CLI. It needs
+      nuget.org, as every restore here does.
+    - Corrected the script header, the `audit.yml` comment and the `docs/publishing.md` wording.
+  - **2. MINOR: the raw-key guard could not see the refusal keys.** `ElementLocalizationKeyTests`
+    matches only literal `#term("key")` calls. *Fix:* each branch calls a literal `#term(...)`,
+    and the seam test's expected strings are updated.
+  - **3. NITs.** Design D7 promised a message naming vitest's version, which the report does not
+    carry; the design now says so. Two over-long lines re-wrapped (`README.md`,
+    `docs/publishing.md`).
+  - **Also found after round 1, in the live check 2.4 (see there):** both holiday calls had
+    classified only RETURNED failures, but the client THROWS them. So 401/403 never reached
+    "refused", and a 404 never withdrew the panel; the latter is pre-existing, from the holiday
+    import. *Fix:* `thrownStatus` and a single decision per call, with 3 vitest tests and a new
+    seam test. Re-verified live: 403 shows the refusal message.
 - [ ] 7.2 Port to `dev/v18` on `tidy-2026-10-v18`, from `origin/dev/v18`, by cherry-pick.
   **Drop the `packaging` delta** from the port's change folder: `dev/v18` already has that text, so
   archiving it there would be a no-op MODIFIED. Check that the v18 backoffice package's

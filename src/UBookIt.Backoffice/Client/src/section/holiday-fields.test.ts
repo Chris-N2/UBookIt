@@ -8,6 +8,7 @@ import {
   previewFailure,
   previewOutcome,
   shouldAskForSource,
+  thrownStatus,
   showsImport,
   toggleDate,
 } from "./holiday-fields.js";
@@ -233,6 +234,38 @@ describe("what a failed preview means", () => {
     // would send somebody to debug a feed that is fine (tidy-2026-10).
     expect(previewFailure(401)).toBe("refused");
     expect(previewFailure(403)).toBe("refused");
+  });
+});
+
+describe("a failure the client THROWS", () => {
+  // The holiday calls throw their failures rather than returning them (Umbraco's client
+  // configuration). This is the shape a 403 was measured arriving in, against the running
+  // backoffice — the status is on the thrown problem details, nowhere else.
+  const forbidden = {
+    status: 403,
+    title:
+      "You do not have the necessary permissions to complete the requested action. If you believe this is in error, please reach out to your administrator.",
+    type: "Unauthorized",
+  };
+
+  it("is classified by the status it carries", () => {
+    expect(previewFailure(thrownStatus(forbidden))).toBe("refused");
+    expect(previewFailure(thrownStatus({ ...forbidden, status: 401 }))).toBe("refused");
+    expect(previewFailure(thrownStatus({ status: 404, title: "Not Found" }))).toBe("absent");
+    expect(previewFailure(thrownStatus({ status: 503, title: "Service Unavailable" }))).toBe("failed");
+  });
+
+  it("is a failure of the source when it carries no status", () => {
+    // A network failure or a bug throws something with no HTTP status at all.
+    expect(thrownStatus(new TypeError("Failed to fetch"))).toBeUndefined();
+    expect(previewFailure(thrownStatus(new TypeError("Failed to fetch")))).toBe("failed");
+    expect(previewFailure(thrownStatus(undefined))).toBe("failed");
+    expect(previewFailure(thrownStatus(null))).toBe("failed");
+    expect(previewFailure(thrownStatus("boom"))).toBe("failed");
+  });
+
+  it("reads only a numeric status", () => {
+    expect(thrownStatus({ status: "403" })).toBeUndefined();
   });
 });
 

@@ -108,8 +108,9 @@ the lines do differ.
 - **`audit`** — Mondays 06:00 UTC, and on demand from the Actions tab. Audits the NuGet graph of
   **both** lines for known vulnerabilities, direct and transitive, and fails on any. Each line is
   restored and listed as Debug and again as Release, so an advisory reachable only from the graph
-  that ships is still found. There is one narrow exception: a project that is not packable can accept an advisory it suppresses
-  (`NuGetAuditSuppress`), for one no reachable version can fix yet. What a project suppresses,
+  that ships is still found. There is one narrow exception: a project that is not packable can
+  accept an advisory it suppresses (`NuGetAuditSuppress`), for one no reachable version can fix
+  yet. What a project suppresses,
   and whether it is packable, are taken from MSBuild's evaluation of it, as Debug and as Release,
   so imports count, and so does anything else MSBuild sees. The audit reports each accepted
   finding as a notice, and fails on a suppression that:

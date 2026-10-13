@@ -236,15 +236,61 @@ public class ClosureAccessibilityTests
         Assert.Contains("previewOutcome(this._holidayRows, this._holidayFailure)", source, StringComparison.Ordinal);
         Assert.Contains("if (outcome === \"failed\" || outcome === \"refused\") {", source, StringComparison.Ordinal);
         Assert.Contains(
-            "${this.#term(outcome === \"refused\" ? \"importRefused\" : \"importSourceFailed\")}",
+            "${outcome === \"refused\" ? this.#term(\"importRefused\") : this.#term(\"importSourceFailed\")}",
             source,
             StringComparison.Ordinal);
 
         // The import.
         Assert.Contains(
-            "this._error = this.#term(failure === \"refused\" ? \"importRefused\" : \"importFailed\");",
+            "this._error = failure === \"refused\" ? this.#term(\"importRefused\") : this.#term(\"importFailed\");",
             source,
             StringComparison.Ordinal);
+    }
+
+    /// <summary>
+    /// Both holiday calls classify a THROWN failure by its status, not only a returned one.
+    /// </summary>
+    /// <remarks>
+    /// <para>
+    /// <b>The failure this guards was live, and every test was green.</b> The generated client
+    /// throws on a non-2xx, so both calls' failures arrive in <c>catch</c> — and the catch blocks
+    /// said "the source failed" unconditionally. The returned-response branch that classified a
+    /// 404 as an absent source, and then a 401/403 as a refusal, never ran: a refused preview was
+    /// seen live reading "the site's holiday source could not be reached" (tidy-2026-10), and a
+    /// deregistered source would have done the same since the holiday import shipped.
+    /// </para>
+    /// <para>
+    /// <c>previewFailure</c> and <c>thrownStatus</c> are unit-tested on the measured thrown shape
+    /// in <c>holiday-fields.test.ts</c>; this pins that the view asks them about what was thrown,
+    /// in BOTH calls, and has no catch left that decides without them.
+    /// </para>
+    /// </remarks>
+    [Fact]
+    public void Both_holiday_calls_classify_a_thrown_failure_by_its_status()
+    {
+        var source = RepoFiles.Read(ClosuresView);
+
+        // Per method, not per file: the closure save has a `catch (thrown)` of its own, for its own
+        // reasons, and a file-wide count would be about it as much as about these.
+        foreach (var method in new[] { "async #preview() {", "async #import() {" })
+        {
+            var body = MethodBody(source, method);
+
+            Assert.Equal(1, Occurrences(body, "catch (thrown) {"));
+            Assert.Equal(1, Occurrences(body, "failure = previewFailure(thrownStatus(thrown));"));
+            Assert.DoesNotContain("catch {", body, StringComparison.Ordinal);
+            Assert.DoesNotContain("this._holidayFailure = \"failed\"", body, StringComparison.Ordinal);
+        }
+    }
+
+    /// <summary>From <paramref name="signature"/> to the next method's <c>async #</c>.</summary>
+    private static string MethodBody(string source, string signature)
+    {
+        var start = source.IndexOf(signature, StringComparison.Ordinal);
+        Assert.True(start >= 0, $"closures-view.element.ts no longer has {signature}");
+
+        var next = source.IndexOf("\n  async #", start + signature.Length, StringComparison.Ordinal);
+        return next < 0 ? source[start..] : source[start..next];
     }
 
     private static int Occurrences(string haystack, string needle)
