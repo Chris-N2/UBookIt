@@ -79,15 +79,19 @@
   - **NIT: the round 1 record understated `docs/backoffice.md`'s session sentence.** *Taken:* the
     record above now says what that sentence claims, and the sentence is recorded as debt.
   - No must-fix. Two rounds, one reviewer.
-- [ ] 3.2 Chris pushes this branch and opens the PR. Verify: the PR's CI is green at every step,
+- [x] 3.2 Chris pushes this branch and opens the PR. Verify: the PR's CI is green at every step,
   parity included. The release changes no CI file, so parity has no reason to fail.
-- [ ] 3.3 Chris merges with "Create a merge commit". Verify: `origin/dev/v18` is the merge commit, and
+  *Done:* PR **#25**. Its CI run `38453082350` (pull_request) was green at every step, parity included.
+- [x] 3.3 Chris merges with "Create a merge commit". Verify: `origin/dev/v18` is the merge commit, and
   its push run is green.
+  *Done:* merged as **`dd77c71`**, with the release branch head as its second parent. Its push run `38453139883` was green.
 
 ## 4. Release through the workflow
 
-- [ ] 4.1 Chris pushes tag `18.2.1` on the merge commit. Verify: `check` and `pack` are green.
-- [ ] 4.2 **Before approving**, check the run's `packages` artifact:
+- [x] 4.1 Chris pushes tag `18.2.1` on the merge commit. Verify: `check` and `pack` are green.
+  *Done:* tag `18.2.1` on `dd77c71` (checked on origin with `ls-remote`). Publish run **`38454092978`**:
+  `check` and `pack` were green, and `publish` was waiting.
+- [x] 4.2 **Before approving**, check the run's `packages` artifact:
   - the tagged `booking-flow.png` returns 200;
   - there are exactly 5 `.nupkg` and 4 `.snupkg`, all `18.2.1`, each `.snupkg` holding its `.pdb`;
   - all five nuspecs carry the authors, copyright, licence, readme, icon, project URL and the
@@ -97,12 +101,36 @@
     at the tag, not this list;
   - the packed README is identical to the tag's, all its addresses return 200, and every
     repository address is pinned to `18.2.1`.
-- [ ] 4.3 Chris approves. Record the summary table and the conclusion.
-- [ ] 4.4 Confirm `18.2.1` per package on the flat container, and that the package page renders.
+  *Done, nothing wrong.* Chris downloaded the artifact to `artifacts/packages-v18`. It was
+  extracted to a scratch folder and checked by script:
+  - exactly 5 `.nupkg` and 4 `.snupkg`, all `18.2.1`; each `.snupkg` holds its own `.pdb`;
+  - all five nuspecs: authors, copyright (`©` checked as bytes `C2 A9`), MIT, readme and icon
+    (present in each package), project URL, and commit `dd77c71`. `umbraco-marketplace` is on
+    `UBookIt` only;
+  - every `Umbraco.Cms.*` dependency is `[18.2.1, 19.0.0)`; EF Core SqlServer is `10.0.11`; the inter-package
+    dependencies are at `18.2.1`.
+  - `Microsoft.AspNetCore.OpenApi 10.0.11` (on Backoffice and Web) is the line's own dependency,
+    already in published `18.2.0`. `Directory.Packages.props` is unchanged between the tags.
+  - the packed README is identical in all five packages to `README.md` at the tag. All 19
+    addresses return 200, all 17 repository addresses are pinned to `18.2.1`, and the tagged
+    `booking-flow.png` returns 200.
+- [x] 4.3 Chris approves. Record the summary table and the conclusion.
+  *Done.* Chris approved, and the run concluded **success** at 19:27:48Z. Every `.nupkg` was
+  "published", every `.snupkg` "symbols submitted", and `UBookIt` came last (summary pasted by
+  Chris). There was no 409, so the pending-symbols wording is still unobserved.
+- [x] 4.4 Confirm `18.2.1` per package on the flat container, and that the package page renders.
+  *Done:* all five `18.2.1` packages were in the flat container by 19:56:24Z (polled every 30 s;
+  `UBookIt.Core` and `UBookIt.Web` had appeared by 19:44:53Z), about 29 minutes after the run concluded, which is
+  slower than last release. `nuget.org/packages/UBookIt/18.2.1` returns 200 and says "uBookIt is at
+  18.2.1".
 
 ## 5. Close out
 
-- [ ] 5.1 Stamp the entry's date.
-- [ ] 5.2 Sibling sweep for `18.2.0` and for sentences the release falsifies. Fix or record each.
+- [x] 5.1 Stamp the entry's date.
+  *Done:* `## 18.2.1 — 2026-10-13`.
+- [x] 5.2 Sibling sweep for `18.2.0` and for sentences the release falsifies. Fix or record each.
+  *Done:* `git grep 18.2.0` over `docs/`, README, `openspec/specs` and CLAUDE.md finds nothing
+  that names this package's version. The only hits are `packaging/spec.md:1010-1011`, an example of an *Umbraco* dependency version, not uBookIt's. The runbook's *Status* section names only the
+  `17.0.0` history anchor. Nothing is falsified.
 - [ ] 5.3 Commit and run the unit suite. Chris pushes. Verify: `dev/v18`'s CI is green.
 - [ ] 5.4 Archive last, running the unit suite before the push.
