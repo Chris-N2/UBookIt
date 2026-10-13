@@ -354,6 +354,31 @@
   - the records match `main`'s;
   - `git diff origin/dev/v18 -- .github scripts/ci` equals `main`'s CI diff;
   - the 7.1 reviewer has checked the port.
+
+  *Port done 2026-10-13, awaiting the reviewer.* Cherry-picked `main`'s four commits (`a4374b9`,
+  `8274ea8`, `358d0f3`, `5e0808a`), then `bd21166` dropped the packaging delta.
+  - *Conflicts:* the README keeps v18's `blob/18.2.0` link. `VersionTruthTests` had v18's own
+    version text around the guards, so the `RepositoryAddress` change was re-applied by script
+    rather than merged.
+  - *`UmbLocalizationEntry` on 18:* the runtime calls a function term with its arguments
+    (`typeof t == "function" ? t(...e)`), and the live summary below confirms it.
+  - *Suites:* client 355; clean Release build 0 warnings; unit 2141 (2120 + 21); rendering 1178;
+    integration 210; `openspec validate --all --strict` 27/27. The real audit exits 0.
+  - *CI parity:* `.github/workflows/ci.yml`, `audit.yml`, `scripts/ci/Assert-ClientTestResults.ps1`
+    and `Assert-NoVulnerablePackages.ps1` are byte-identical to `main`'s.
+  - *1.3 live (v18 TestSite):* three periods added. Every `aria-describedby` resolves inside its
+    own fieldset, and there are no duplicate ids. After the middle period was removed, the rest
+    re-index cleanly. Screenshot taken.
+  - *2.4 live, summary:* the January 2027 window offered "2027-01-01 New Year's Day". Importing it
+    showed "Created 1 closure." in `role="status"`, with no skipped sentence. It left a
+    2027-01-01 closure in the TestSite data.
+  - *2.4 live, refusal:* Chris removed "Change site settings" with the screen open (panel open,
+    January 2027 window), then I fetched. `_holidayFailure` = refused. The alert reads "The site
+    refused this request. …"; the panel and the source are kept. Screenshot taken.
+    - A reload with the permission removed shows the screen read-only: only "Show past closures",
+      and no import panel. This matches `main`.
+    - An earlier reload, during Chris's re-login, showed editing controls without the panel.
+      That was before the backoffice had picked up the change; it is not a defect.
 - [ ] 7.3 PRs into `main` and `dev/v18`. Both are expected red on parity until the first merges.
   Merge `main`'s first, then re-run the v18 PR. Verify: both green after the second run.
 - [ ] 7.4 Archive on each line, syncing `public-holidays` on both and `packaging` on `main` only.
