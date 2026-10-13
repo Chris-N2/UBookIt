@@ -1,6 +1,6 @@
 ## 1. The version and the entry
 
-- [ ] 1.1 Branch `release-18-2-1` from local `dev/v18` at `a541c78` (the `tidy-2026-10` archive).
+- [x] 1.1 Branch `release-18-2-1` from local `dev/v18` at `a541c78` (the `tidy-2026-10` archive).
   - Bump `<Version>` to `18.2.1`, and move every row of the table in `docs/publishing.md`
     *Before any push*, step 2.
   - Re-read the *Tag the release* literals by eye, because no guard sees them.
@@ -8,21 +8,37 @@
 
   Verify: `git grep 18.2.0` over `Directory.Build.props`, README and the runbook is empty. Before
   the bump the counts were 1, 21 and 5.
-- [ ] 1.2 Write the `18.2.1` entry, undated. **Check every claim against the code and the archived
+  *Done:* 1 in `Directory.Build.props`, 21 in README and 5 in the runbook, all current-version
+  sentences or tag-pinned URLs. All moved to `18.2.1`, and none remain. The *Tag the release*
+  literals were re-read by eye.
+- [x] 1.2 Write the `18.2.1` entry, undated. **Check every claim against the code and the archived
   `tidy-2026-10`, not against the proposal.** In particular:
   - quote the new summary and refusal wording from `en-us.ts`;
   - say what the 404 repair restores and since when (`18.1.0` on this line);
   - make no claim about CI.
 
   Verify: `ChangelogTests` passes.
+  *Done.* `17.3.1`'s entry, checked claim by claim in `release-17-3-1` 1.2. The two entries are
+  identical except for the heading and "Since 18.1.0": the `18.1.0` entry is where the holiday
+  import shipped on this line.
+  - This line's `en-us.ts` and `closures-view.element.ts` are byte-identical to `main`'s after the
+    tidy port (QA, port round), so the quoted wording and the override paragraph hold here too.
+  - The unproven "appears in English" fallback claim was dropped on both lines (see
+    `release-17-3-1` 1.2).
 
 ## 2. Clean build and suites
 
-- [ ] 2.1 Stop the TestSite. Clean the outputs, build the client, then
+- [x] 2.1 Stop the TestSite. Clean the outputs, build the client, then
   `CI=true dotnet build UBookIt.slnx -c Release --no-incremental`. Verify: 0 warnings.
-- [ ] 2.2 Run the suites per project, one after another. Verify, each with 0 skipped:
+  *Done:* no TestSite was running. Client built, then the clean CI-mode Release build: 0 warnings,
+  0 errors.
+- [x] 2.2 Run the suites per project, one after another. Verify, each with 0 skipped:
   - unit **2141**, integration **210**, rendering **1178**, client **355**;
   - `openspec validate --all --strict` passes (26 specs, plus this change).
+
+  *Done, 0 skipped, each project on its own and in turn:* client **355**, unit **2141**,
+  rendering **1178**, integration **210**; openspec 27/27. They ran against the final changelog
+  text.
 
 ## 3. Review and merge
 
