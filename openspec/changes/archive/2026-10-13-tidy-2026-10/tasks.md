@@ -346,7 +346,7 @@
   Still owed: the 7.2 port, against the checklist QA gave (parity of the CI files, the
   PackageCompositionTests remark, the packaging delta dropped, the thrown-status fix, v18's
   `UmbLocalizationEntry`, the real-CLI test on v18).
-- [ ] 7.2 Port to `dev/v18` on `tidy-2026-10-v18`, from `origin/dev/v18`, by cherry-pick.
+- [x] 7.2 Port to `dev/v18` on `tidy-2026-10-v18`, from `origin/dev/v18`, by cherry-pick.
   **Drop the `packaging` delta** from the port's change folder: `dev/v18` already has that text, so
   archiving it there would be a no-op MODIFIED. Check that the v18 backoffice package's
   `UmbLocalizationEntry` accepts a function. Re-run 0.3's suites and every guard named in 1–5 on
@@ -354,12 +354,101 @@
   - the records match `main`'s;
   - `git diff origin/dev/v18 -- .github scripts/ci` equals `main`'s CI diff;
   - the 7.1 reviewer has checked the port.
-- [ ] 7.3 PRs into `main` and `dev/v18`. Both are expected red on parity until the first merges.
+
+  *Port done 2026-10-13.* Cherry-picked `main`'s four commits (`a4374b9`,
+  `8274ea8`, `358d0f3`, `5e0808a`), then `bd21166` dropped the packaging delta.
+  - *Conflicts:* the README keeps v18's `blob/18.2.0` link. `VersionTruthTests` had v18's own
+    version text around the guards, so the `RepositoryAddress` change was re-applied by script
+    rather than merged.
+  - *`UmbLocalizationEntry` on 18:* the runtime calls a function term with its arguments
+    (`typeof t == "function" ? t(...e)`), and the live summary below confirms it.
+  - *Suites:* client 355; clean Release build 0 warnings; unit 2141 (2120 + 21); rendering 1178;
+    integration 210; `openspec validate --all --strict` 27/27. The real audit exits 0.
+  - *CI parity:* `.github/workflows/ci.yml`, `audit.yml`, `scripts/ci/Assert-ClientTestResults.ps1`
+    and `Assert-NoVulnerablePackages.ps1` are byte-identical to `main`'s.
+  - *1.3 live (v18 TestSite):* three periods added. Every `aria-describedby` resolves inside its
+    own fieldset, and there are no duplicate ids. After the middle period was removed, the rest
+    re-index cleanly. Screenshot taken.
+  - *2.4 live, summary:* the January 2027 window offered "2027-01-01 New Year's Day". Importing it
+    showed "Created 1 closure." in `role="status"`, with no skipped sentence. It left a
+    2027-01-01 closure in the TestSite data.
+  - *2.4 live, refusal:* Chris removed "Change site settings" with the screen open (panel open,
+    January 2027 window), then I fetched. `_holidayFailure` = refused. The alert reads "The site
+    refused this request. …"; the panel and the source are kept. Screenshot taken.
+    - A reload with the permission removed shows the screen read-only: only "Show past closures",
+      and no import panel. This matches `main`.
+    - An earlier reload, during Chris's re-login, showed editing controls without the panel.
+      That was before the backoffice had picked up the change; it is not a defect.
+
+  *Port round: APPROVE* (the 7.1 reviewer, on `bbc4d52`), with no findings.
+  - *Port equals main:* the net diff matches `main`'s file for file, line for line. The only
+    differences are the dropped packaging delta and `tasks.md`; the two conflict files are included.
+  - *CI files:* `.github` and `scripts` are byte-identical to `main`'s.
+  - *Readme link guards:* re-fired on v18. A `tree/main/docs` link fails the release guard; a
+    `tree/` link to a file and a `blob/` link to a folder each fail the resolve guard. A valid
+    `tree/18.2.0/docs` link passes both.
+  - *Reproduced:* client 355, with `Assert-ClientTestResults` reporting all ran; unit 2141;
+    rendering 1178; integration 210; openspec 27/27; the real audit exits 0.
+  - *Not reproduced by QA:* the clean Release build, because the v18 TestSite was still running.
+    Run by me once it was stopped: client build, then `--no-incremental` Release build, 0
+    warnings, 0 errors.
+- [x] 7.3 PRs into `main` and `dev/v18`. Both are expected red on parity until the first merges.
   Merge `main`'s first, then re-run the v18 PR. Verify: both green after the second run.
-- [ ] 7.4 Archive on each line, syncing `public-holidays` on both and `packaging` on `main` only.
+
+  *Done 2026-10-13.* PR #23 (`main`) and PR #22 (`dev/v18`) merged within a minute of each other,
+  so neither PR run was re-run.
+  - *PR runs:* the only failure in either was the step "Parity with the other published line".
+    That failure was expected: each PR was compared with the other line's origin branch, which did
+    not yet carry the CI change. The push runs on both heads (`12e1c8c`, `a812435`) passed in full.
+  - *Verify, as amended:* "both green after the second run" was not observed on the PRs. It is
+    observed instead on the post-merge push runs of `5269a2b` and `1e05ccd`, which compare the
+    two lines after both carry the change. They are recorded with 7.4.
+- [x] 7.4 Archive on each line, syncing `public-holidays` on both and `packaging` on `main` only.
   Re-run 6.2's grep after the sync. Verify: `openspec validate --all --strict` passes on both lines,
   and `main`'s and `dev/v18`'s *The package declares which Umbraco majors it accepts* are
   identical (`diff` of the extracted requirement is empty).
-- [ ] 7.5 Hand over to the release change (`release-17-3-1` / `release-18-2-1`). Its changelog
+
+  *Done 2026-10-13, as `2026-10-13-tidy-2026-10` on both lines.*
+  - *Sync:* `main` updated `packaging` (~1 modified) and `public-holidays` (+1 added). `dev/v18`
+    updated `public-holidays` only (+1 added); its `packaging` spec is byte-unchanged.
+  - *Packaging:* the extracted requirement *The package declares which Umbraco majors it accepts*
+    diffs empty between the lines. The two packaging specs now hold the same 24 requirements with
+    identical content. Before the archive this requirement was the only difference.
+    - The ORDER of requirements still differs between the lines. That predates this change and
+      has no effect on what either spec requires.
+  - *`public-holidays`:* identical on both lines after the sync.
+  - *`openspec validate --all --strict`:* 26/26 on both lines. That is 27 less this archived
+    change.
+  - *6.2's grep, re-run on both lines after the sync:* the hits are the same and all true.
+    - `packaging/spec.md:1017` now reads "would live only in prose".
+    - `public-holidays/spec.md:84` is the 404 rule, which the thrown-status fix makes true again.
+    - `public-holidays/spec.md:253` is the new refusal scenario.
+    - The "2048" and ".NET test project" hits are as classified in 6.2.
+  - *Stale `.openspec-archive.lock` files* left by the CLI on both lines: their pids were not
+    running, so both were deleted and not committed.
+  - *Post-merge CI:*
+    - `dev/v18` `1e05ccd` (run 38440570698): **success**, parity included.
+    - `main` `5269a2b` (run 38440483443): **failed on parity only**; every build, test and
+      validation step passed. It is a race, not drift: that run started at 17:39:58Z, before PR
+      #22 merged into `dev/v18` (17:40:33Z), so it compared against a `dev/v18` without the CI
+      change.
+    - Run locally against the current `origin/dev/v18`, `Assert-LineParity.ps1 -Line main` exits 0
+      ("identical to origin/dev/v18"). **Owed: Chris re-runs run 38440483443** so that `main` is
+      green on origin. This archive's own push also starts a fresh run.
+- [x] 7.5 Hand over to the release change (`release-17-3-1` / `release-18-2-1`). Its changelog
   must name the two visible wording changes (items 2 and 3) and the corrected hint placement.
   Verify: a note in `ubookit-deferred-obligations` striking each item discharged here.
+
+  *Done 2026-10-13.* The release change (`release-17-3-1` / `release-18-2-1`) inherits these.
+  - *Changelog:* name the two wording changes the operator sees: the pluralised import summary,
+    and the refusal message for 401/403. Also name the closed-period hints now sitting under each
+    period.
+  - *Behaviour fix:* holiday failures are now read from the thrown status too. That also restores
+    the `public-holidays` rule that a source gone away (404) withdraws the panel, which had been
+    broken since the holiday import. This is a bug fix the changelog may name.
+  - *Nothing public changed* (no type, member, endpoint, setting or migration), so a patch is
+    right.
+  - *Obligations:* `ubookit-deferred-obligations` strikes the closed-period hints, the docs line,
+    the Release-only audit, the README `tree/` links, client skip detection, the v18 README
+    example, the 2048 literal, and holiday items 1 and 2. `main`'s packaging sentences are struck
+    at this archive's sync.
