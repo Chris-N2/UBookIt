@@ -346,7 +346,7 @@
   Still owed: the 7.2 port, against the checklist QA gave (parity of the CI files, the
   PackageCompositionTests remark, the packaging delta dropped, the thrown-status fix, v18's
   `UmbLocalizationEntry`, the real-CLI test on v18).
-- [ ] 7.2 Port to `dev/v18` on `tidy-2026-10-v18`, from `origin/dev/v18`, by cherry-pick.
+- [x] 7.2 Port to `dev/v18` on `tidy-2026-10-v18`, from `origin/dev/v18`, by cherry-pick.
   **Drop the `packaging` delta** from the port's change folder: `dev/v18` already has that text, so
   archiving it there would be a no-op MODIFIED. Check that the v18 backoffice package's
   `UmbLocalizationEntry` accepts a function. Re-run 0.3's suites and every guard named in 1–5 on
@@ -379,6 +379,19 @@
       and no import panel. This matches `main`.
     - An earlier reload, during Chris's re-login, showed editing controls without the panel.
       That was before the backoffice had picked up the change; it is not a defect.
+
+  *Port round: APPROVE* (the 7.1 reviewer, on `bbc4d52`), with no findings.
+  - *Port equals main:* the net diff matches `main`'s file for file, line for line. The only
+    differences are the dropped packaging delta and `tasks.md`; the two conflict files are included.
+  - *CI files:* `.github` and `scripts` are byte-identical to `main`'s.
+  - *Readme link guards:* re-fired on v18. A `tree/main/docs` link fails the release guard; a
+    `tree/` link to a file and a `blob/` link to a folder each fail the resolve guard. A valid
+    `tree/18.2.0/docs` link passes both.
+  - *Reproduced:* client 355, with `Assert-ClientTestResults` reporting all ran; unit 2141;
+    rendering 1178; integration 210; openspec 27/27; the real audit exits 0.
+  - *Not reproduced by QA:* the clean Release build, because the v18 TestSite was still running.
+    Run by me once it was stopped: client build, then `--no-incremental` Release build, 0
+    warnings, 0 errors.
 - [ ] 7.3 PRs into `main` and `dev/v18`. Both are expected red on parity until the first merges.
   Merge `main`'s first, then re-run the v18 PR. Verify: both green after the second run.
 - [ ] 7.4 Archive on each line, syncing `public-holidays` on both and `packaging` on `main` only.
