@@ -54,7 +54,7 @@
 
 ## 3. Review and merge
 
-- [ ] 3.1 QA (`qa-review`) in one subagent, reused across rounds, covering this change and
+- [x] 3.1 QA (`qa-review`) in one subagent, reused across rounds, covering this change and
   `release-18-2-1`. Verify: APPROVE.
   *Round 1: REJECT on both changes.* QA reproduced both clean builds (0 warnings) and every
   suite, with the counts in 2.2. It confirmed the version moves, the anchors, patch eligibility
@@ -72,12 +72,25 @@
     - *Fix:* the paragraph now leads with the observed cause, a permission removed while the
       Closures view is open. "Session may have ended" stays only inside the quoted message, which
       is what the screen says.
-    - `docs/backoffice.md`'s refusal sentence is left as tidy shipped it. It describes the message,
-      and changing shipped docs is not this release's job.
+    - `docs/backoffice.md`'s refusal sentence is left as tidy shipped it. That sentence does make a
+      behaviour claim: an ended session shows the refusal. For a preview (a GET), Umbraco's auth
+      interceptor most likely re-prompts instead, so the claim goes further than was observed.
+      It is tidy's approved, merged text, and QA judged leaving it acceptable for a patch. It is
+      recorded in `ubookit-deferred-obligations` for the next tidy (QA round 2 NIT).
   - **4 (NIT): the changelog preamble named `17.x` only.** It now reads "uBookIt `17.x` is for
     Umbraco 17 and `18.x` for Umbraco 18", matching the README, on both lines. The preamble is not
     a release entry, so the never-edit rule does not apply, and no test pins it.
   - No published entry was edited. `ChangelogTests` and `VersionTruthTests` re-ran: 20 passed.
+  *Round 2: APPROVE WITH NITS on both changes.* QA confirmed both MAJORs fixed on both lines. It
+  checked that "used to" holds for every release since the holiday import shipped: the
+  `closures-view.element.ts` blob is identical from `17.2.0`/`18.1.0` through `17.2.3`/`18.1.3`, and
+  `#preview`/`#import` hash the same at `17.3.0`/`18.2.0`. It re-ran `ChangelogTests` and
+  `VersionTruthTests` with a build: 20 passed on each line.
+  - **NIT: the re-wrapped preamble line was 126 characters.** *Taken:* re-wrapped to the file's
+    width, on both lines.
+  - **NIT: the round 1 record understated `docs/backoffice.md`'s session sentence.** *Taken:* the
+    record above now says what that sentence claims, and the sentence is recorded as debt.
+  - No must-fix. Two rounds, one reviewer.
 - [ ] 3.2 Chris pushes this branch and opens the PR. Verify: the PR's CI is green at every step,
   parity included. The release changes no CI file, so parity has no reason to fail.
 - [ ] 3.3 Chris merges with "Create a merge commit". Verify: `origin/main` is the merge commit, and
