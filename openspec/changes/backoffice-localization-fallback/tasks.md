@@ -279,7 +279,7 @@ such.
   and clearing/rebuilding the client): unit 2143 (2141 + 2), rendering 1178, integration 210,
   client 355, openspec 27; Release 0 errors, NU1902 x36 and NU1903 x72 only. `git diff` between the
   branches on the manifest, the test and the change folder: empty.*
-- [ ] 8.6 Return to the same QA reviewer with each claim to verify, naming the fixes as new code.
+- [x] 8.6 Return to the same QA reviewer with each claim to verify, naming the fixes as new code.
 
 ## 9. QA round 2 (REJECT): remediation
 
