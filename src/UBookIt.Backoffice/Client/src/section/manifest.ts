@@ -217,11 +217,20 @@ export const manifests: Array<UmbExtensionManifest> = [
     js: () => import("./place-on-behalf-modal.element.js"),
   },
   {
+    // Registered under Umbraco's FALLBACK culture, `en`, not `en-us`. Umbraco loads only the
+    // dictionaries for the user's region, the user's language and `en`, so under `en-us` the
+    // terms were never loaded for anyone else — a Spanish or a British English user saw every
+    // term as its raw key. Under `en` an `en-US` user still finds them, one step later.
+    //
+    // The alias still says EnUS: it is how a site would unregister or replace this extension,
+    // so it is kept for compatibility although the culture has moved. The wording itself is US
+    // English, which is why the file is still `en-us.ts`. LocalizationCultureTests holds the
+    // culture equal to Umbraco's own UMB_DEFAULT_LOCALIZATION_CULTURE.
     type: "localization",
     alias: "UBookIt.Localization.EnUS",
-    name: "uBookIt English (United States)",
+    name: "uBookIt English",
     meta: {
-      culture: "en-us",
+      culture: "en",
     },
     js: () => import("../localization/en-us.js"),
   },

@@ -11,8 +11,9 @@ fallback culture `en` (`UMB_DEFAULT_LOCALIZATION_CULTURE`). It then looks a term
 order. `en-us` is none of those three for anyone except an `en-US` user, so for everyone else
 the dictionary is never loaded and every lookup misses.
 
-That includes **British English**. An `en-GB` user loads `en-gb`, `en` and the fallback `en`.
-It does not load `en-us`. So this is not only a defect for non-English sites; it is a defect for
+That includes **British English**. Umbraco's "English (United Kingdom)" option *is* the culture
+`en` (`Umb.Localization.EN`), so a UK user loads `en` and nothing else English. It does not
+load `en-us`. So this is not only a defect for non-English sites; it is a defect for
 most UK ones.
 
 It is fixed in a patch because it is a defect with no change to any public surface.

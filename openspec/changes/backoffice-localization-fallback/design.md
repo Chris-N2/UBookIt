@@ -21,11 +21,14 @@ What changes for each kind of user:
 | User language | Dictionaries loaded today       | uBookIt terms today | Under `en` |
 |---------------|---------------------------------|---------------------|------------|
 | `en-US`       | `en-us`, `en`                   | `en-us` ✓           | `en` ✓ (second step) |
-| `en-GB`       | `en-gb`, `en`                   | **keys**            | `en` ✓     |
-| `es-ES`       | `es-es`, `es`, `en`             | **keys**            | `en` ✓ (fallback) |
+| UK (`en`)     | `en`                            | **keys**            | `en` ✓     |
+| Spanish (`es`)| `es`, `en`                      | **keys**            | `en` ✓ (fallback) |
 
 Umbraco itself registers both `en` and `en-US` (`core/localization/manifests.js:78,85`), so `en`
-is a culture Umbraco expects packages to use.
+is a culture Umbraco expects packages to use. Its `en` **is** the "English (United Kingdom)"
+option a user picks (`Umb.Localization.EN`, :76-78); there is no `en-GB` in Umbraco's list. A
+site whose default UI language is set to `en-GB` in configuration would load `en-gb` and `en`,
+which the fix also covers.
 
 ## Goals / Non-Goals
 
@@ -98,7 +101,7 @@ recorded as an observation, not settled here.
 ## Risks / Trade-offs
 
 - [Umbraco 18's lookup differs from 17.5.3's] → The v18 live check runs on the 18 TestSite with
-  `es-ES` and `en-GB` users, not inferred from the 17 reading.
+  Spanish and UK English (`en`) users, not inferred from the 17 reading.
 - [A key of ours collides with an Umbraco `en` key] → D3; and the live check looks at Umbraco's
   own Users section and a content screen as an `en-US` user, where a collision would show.
 - [The alias is now misleading] → Accepted (D2); a comment beside it says why it was kept.
