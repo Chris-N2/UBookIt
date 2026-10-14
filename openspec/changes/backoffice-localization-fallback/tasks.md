@@ -46,17 +46,23 @@
   so every backoffice language resolves, and that the alias is kept for compatibility (design D2).
   Verify: 2.1's test passes.
   *Done: `LocalizationCultureTests` passes within the full unit run (2130).*
-- [ ] 3.2 Build the client first (`npm run build` in `src/UBookIt.Backoffice/Client`), then the
+- [x] 3.2 Build the client first (`npm run build` in `src/UBookIt.Backoffice/Client`), then the
   solution. Verify: 0 warnings; the client suite, unit suite, rendering suite and openspec
   validation all pass. Report each count against the baselines (unit 2129 + the new test, client
   355, rendering 1178, integration 210, openspec 26 specs).
   *Suites done 2026-10-14 (Debug, per project, the TestSite running): unit 2130 (2129 + 1), rendering
   1178, integration 210, client 355; `openspec validate --all --strict` 27 passed (26 specs + this
   change). NOT yet done: the 0-warning Release build, which a running TestSite locks; it runs once
-  the main TestSite is stopped, before 6.x. Restore printed NU1902/NU1903 advisories
+  the main TestSite is stopped, before 6.x. *Then done: `dotnet build UBookIt.slnx -c Release --no-incremental`,
+  0 errors; every warning is NU1902 (20) or NU1903 (32), i.e. NuGet advisories, no compiler or
+  analyser warning.* Restore printed NU1902/NU1903 advisories
   (`System.Security.Cryptography.Xml` 10.0.10, `…Pkcs` 10.0.0), which CLAUDE.md excludes from
   warnings-as-errors and leaves to the `audit` workflow; whether they are new since 2026-10-13 is
-  checked separately, not in this change.*
+  checked separately, not in this change.* *Checked: all five (GHSA-7hqp-7c5m-4vq6,
+  GHSA-c399-9853-6jmj, GHSA-r955-8q5j-3h83, GHSA-846f-f764-76mx, GHSA-2fmv-rv2c-59x7) were
+  PUBLISHED 2026-10-13, fixed in 10.0.13, reached through Umbraco 17.7.1's DataProtection
+  dependency; no patched Umbraco 17.x or 18.x yet. Out of scope here; raised with Chris and
+  recorded in the deferred obligations.*
 
 ## 4. Live check on main (Umbraco 17)
 
