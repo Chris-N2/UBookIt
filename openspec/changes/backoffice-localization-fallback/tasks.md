@@ -232,7 +232,7 @@ such.
   `en`), with a regional culture named as such for the example.
   NITs: the culture test's failure message no longer says "not exactly the registered culture"
   (it states the lookup chain instead); 3.2's miscounted tally is corrected above.
-- [ ] 8.4 Live, with a REAL package file, as QA asked (registration order is the point, so an
+- [x] 8.4 Live, with a REAL package file, as QA asked (registration order is the point, so an
   in-page registration cannot prove it). Add a temporary `App_Plugins/LiveCheckEnOverride/
   umbraco-package.json` to the TestSite declaring a `localization` extension, `culture: "en"`, no
   weight, with an inline dictionary supplying ONE uBookIt term (the Resources heading). Restart the
@@ -259,8 +259,19 @@ such.
   and its "Resources" overwrote the site's wording on tab, heading and title. So the check can
   fail, and the weight is what decides it. Manifest restored with `git checkout`, client rebuilt
   (bundle `weight: 200`), `git status` showing only the untracked override folder.*
-- [ ] 8.5 Full suites, Release build, `openspec validate --all --strict`, on both lines, with the
+  *dev/v18 (Umbraco 18), same file and method after the round's commits were cherry-picked and the
+  client rebuilt from cleared assets. Registry: `UBookIt:200`, `Umb:100`, `LiveCheck:100` (`en`).
+  UK user (`en`): "Rooms and people" on tab, heading and title, "Create resource" uBookIt's. US
+  user (`en-us`, no uBookIt label in `en-us`): the same. Contrast at weight 50: "Resources"
+  (uBookIt's) won, as on 17. Manifest restored with `git checkout`, client rebuilt to
+  `weight: 200`. The override folder was then deleted and `git status` was clean.*
+- [x] 8.5 Full suites, Release build, `openspec validate --all --strict`, on both lines, with the
   client assets cleared and rebuilt first on each line. Then port the round's commits to the v18
   branch and check the two branches are identical on the manifest, the test and the artifacts.
+  *main: unit 2131 (2129 + 2), rendering 1178, integration 210, client 355, openspec 27; Release 0
+  errors, warnings NU1902 x36 and NU1903 x72 only. v18 (after cherry-picking the round's commits
+  and clearing/rebuilding the client): unit 2143 (2141 + 2), rendering 1178, integration 210,
+  client 355, openspec 27; Release 0 errors, NU1902 x36 and NU1903 x72 only. `git diff` between the
+  branches on the manifest, the test and the change folder: empty.*
 - [ ] 8.6 Return to the same QA reviewer with each claim to verify, naming the fixes as new code.
 
