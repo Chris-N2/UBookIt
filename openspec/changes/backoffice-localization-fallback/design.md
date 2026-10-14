@@ -80,14 +80,20 @@ which was false.)*
 
 Sharing `en` means sharing a dictionary with any `en` wording a site registers, typically to
 reword uBookIt (or, before this fix, to work around it for UK users). Within one culture the
-LAST dictionary registered wins a shared key. Umbraco registers in descending weight, and ties
-keep registry order. uBookIt's manifests arrive from a bundle, imported asynchronously, so at
-the default weight they register after a site's directly declared localization, and **uBookIt's
-terms would overwrite the site's**. Under `en-us` that collision did not exist for a site using
-`en`. *(Found by QA round 1, derived from Umbraco's source.)*
+LAST dictionary registered wins a shared key. Umbraco orders localizations by weight **twice**:
+the extension registry's `byType` sorts by `weight || 0` (`extension.registry.js:85`, an ABSENT
+weight counting as 0), and the localization registry then sorts by `weight ?? 100` (`:86`,
+`:141`, stable on ties). So without a weight of its own, uBookIt and a site's weightless
+dictionary tie under both sorts, and **which one registers last, and wins, is decided by the
+order the extensions arrived in**, which neither uBookIt nor Umbraco promises. A site's override
+might win on one load and lose on another. Under `en-us` that collision did not exist for a site
+using `en`. *(Found by QA round 1, derived from Umbraco's source. QA round 2 corrected the
+mechanism: round 1 asserted that uBookIt's bundle always registers after a site's and so always
+overwrites it. That was never observed; see 8.4.)*
 
-So the extension sets `weight: 200`, above Umbraco's default of 100. It then registers before
-every default-weight `en` dictionary, the site's and Umbraco's own, and any of them overrides
+So the extension sets `weight: 200`, above Umbraco's default of 100. It then sorts first under
+BOTH orderings (200 beats an absent weight's 0, and beats `?? 100`), so it registers before every
+default-weight `en` dictionary, the site's and Umbraco's own, and any of them overrides
 uBookIt's terms on a shared key. That is the right priority for a package's defaults, and it
 also means uBookIt can never overwrite an Umbraco key (strengthening D3).
 
