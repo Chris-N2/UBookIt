@@ -143,21 +143,49 @@ Each step uses a normal reload, not a hard refresh (design, Risks).
 
 ## 6. Port to dev/v18 (same sitting)
 
-- [ ] 6.1 Cherry-pick the change's commits onto a branch from `dev/v18`. Verify: the manifest and
+- [x] 6.1 Cherry-pick the change's commits onto a branch from `dev/v18`. Verify: the manifest and
   the new test are identical on both lines (`git diff main dev/v18-branch -- <both files>` is
   empty), and the full v18 build and suites pass against the v18 baselines (unit 2141 + the new
   test).
-- [ ] 6.2 On the v18 TestSite (Umbraco 18), repeat 1.1 against the **old** v18 build first, then
+  *Done 2026-10-14 on `backoffice-localization-fallback-v18` (from `dev/v18` 1474856): the three
+  commits cherry-picked cleanly; `git diff` between the two branches on `manifest.ts`,
+  `LocalizationCultureTests.cs` and `en-us.ts` is empty. Stale hashed client assets deleted,
+  client rebuilt (bundle `culture: "en"`). Unit 2142 (2141 + 1; v18's own total, so not stale
+  binaries), rendering 1178, integration 210, client 355, openspec 27; Release build 0 errors,
+  warnings only NU1902 (36) and NU1903 (72), the same advisories as main.*
+- [x] 6.2 On the v18 TestSite (Umbraco 18), repeat 1.1 against the **old** v18 build first, then
   4.1, 4.2 and 4.3 against the new one. Verify with screenshots. This is the only proof for v18:
   its guard reads the 17.5.3 npm package (design D4), not the Umbraco 18 code that runs.
+  *Done 2026-10-14 on the v18 TestSite (Umbraco 18, which adds the Library section).
+  BEFORE (client rebuilt from `dev/v18`'s manifest, bundle `culture: "en-us"`), Spanish user:
+  section label, tabs, heading, column headings and every row button rendered as keys. Read from
+  the running Umbraco 18: `UMB_DEFAULT_LOCALIZATION_CULTURE` is `en` (so the v18 guard's answer,
+  read from 17.5.3, matches the runtime), and the 381 `ubookit…` keys WERE loaded, in `en-us`
+  (the server's default UI language boots the page in `en-US` first), but a Spanish lookup
+  checks only `es` then `en`.
+  AFTER (committed manifest restored, `git status` clean apart from this file; bundle
+  `culture: "en"`), each language checked with the same scanner and render proof as 4.x, zero keys
+  on every screen: Spanish (`documentLanguage` `es`; 382 uBookIt keys in `en`, 0 in `en-us`),
+  UK (`en`) and US (`en-us`). Screens per language: Resources (1451-1452 text nodes), resource
+  editor (1012), Services (1329), service editor (896), Bookings (845), Move (908), Cancel (884;
+  dismissed with its own Cancel, booking 2SMJ-2MJC still Confirmed), Record a booking (992),
+  Closures with the holiday import (562, content confirmed by its own sentences), Settings (683),
+  the Perm Test group's permissions (2489-2490: "uBookIt", "See bookings", "Act on bookings").
+  US also: Umbraco's own Users and Content sections showed wording, no key-shaped text.
+  D3 on Umbraco 18, checked against the dictionary Umbraco actually registers
+  (`Umb.Localization.EN`, 2727 keys): our 382 keys share NO key with it, and 0 of its keys
+  differ in the merged `en`. (A first comparison against `assets/lang/en.js` showed one
+  difference, `contentTypeEditor_elementDoesNotSupport`; that file and the registered extension
+  differ by a full stop, and our dictionary has no such key. Not ours.)*
 
 ## 7. Hand over
 
-- [ ] 7.1 Record in the deferred obligations: `dev/v18`'s client builds against
+- [x] 7.1 Record in the deferred obligations: `dev/v18`'s client builds against
   `@umbraco-cms/backoffice` `^17.5.3`, unchanged since the scaffold, so its type checks and this
   change's guard see Umbraco 17's backoffice, not 18's. An observation, not a decision. Verify:
   the entry exists.
-- [ ] 7.2 Write the handover for the release change (`release-17-3-2` / `release-18-2-2`). Its
+  *Done: `ubookit-deferred-obligations` memory, with the 2026-10-13 advisories beside it.*
+- [x] 7.2 Write the handover for the release change (`release-17-3-2` / `release-18-2-2`). Its
   changelog entry names the defect as an operator sees it: a backoffice user whose language is
   not US English, British English included, saw term keys instead of wording on every uBookIt
   screen; it now shows English. It tells an operator who still sees keys after upgrading to
@@ -165,7 +193,8 @@ Each step uses a normal reload, not a hard refresh (design, Risks).
   translated or reworded uBookIt by registering its own dictionary under `en-us` that the override
   still applies to US English users, but a British English user (Umbraco's `en`), who used to see
   keys, now sees the package's wording; to reach them too, register the same dictionary under `en`
-  as well (found by the 5.1 sweep). Verify: the handover is
+  as well (found by the 5.1 sweep).
+  *Done: the paragraph above is the handover.* Verify: the handover is
   in this file under 7.2.
 - [ ] 7.3 QA: one `qa-review` subagent for this change, reused across rounds. The handover states
   each claim (counts, guard red-then-green, screenshots per line) for it to verify, not trust.
