@@ -73,7 +73,8 @@ public class LocalizationCultureTests
             + $"{defaultWeight}. Umbraco registers in descending weight and the LAST dictionary "
             + "registered in a culture wins, so at or below the default a site's own wording in "
             + "the same culture is no longer guaranteed to override uBookIt's: below it, uBookIt's "
-            + "wins; at it, the winner depends on the order the extensions arrived in.");
+            + "wins; at it, the outcome depends on the site's own weight and on the order the "
+            + "extensions arrived in.");
     }
 
     private static string LocalizationEntry(string manifest)
