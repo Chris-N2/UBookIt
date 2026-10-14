@@ -241,6 +241,24 @@ such.
   check can fail, set uBookIt's weight to 100 in the built output only, reload, and observe the
   package's wording win; restore. Finally delete the temporary folder and confirm `git status`.
   Both lines.
+  *main (Umbraco 17), 2026-10-14. The override file at
+  `src/UBookIt.TestSite/wwwroot/App_Plugins/LiveCheckEnOverride/umbraco-package.json` (culture
+  `en`, no weight, supplying only `ubookitResources.label` = "Rooms and people") was read at
+  TestSite start: the registry listed `LiveCheck.EnOverride` (`en`, default 100) beside
+  `UBookIt.Localization.EnUS` (`en`, 200) and Umbraco's `en`. UK user (`en`): merged `en` resolved
+  `ubookitResources_label` to "Rooms and people" and `ubookitResources_create` to uBookIt's
+  "Create resource"; the tab, heading and page title read "Rooms and people", everything else was
+  uBookIt's wording. US user (`en-us`): `en-us` holds no uBookIt label, so the lookup reached `en`
+  and showed "Rooms and people" on the tab, heading and title, the rest uBookIt's.
+  CONTRAST, and a correction to QA round 1's prediction. At `weight: 100` (client rebuilt) the
+  SITE still won: on this load the registry held uBookIt's extension BEFORE the site's, so in a tie
+  the site's registered last. QA predicted the opposite order (bundle after site); that was not
+  observed. The order in a tie is not something uBookIt controls or Umbraco promises, which is the
+  real defect, and weight 200 removes the dependence on it. To prove the weight decides, uBookIt's
+  weight was set BELOW the site's (`50`, client rebuilt): the registry then registered uBookIt last
+  and its "Resources" overwrote the site's wording on tab, heading and title. So the check can
+  fail, and the weight is what decides it. Manifest restored with `git checkout`, client rebuilt
+  (bundle `weight: 200`), `git status` showing only the untracked override folder.*
 - [ ] 8.5 Full suites, Release build, `openspec validate --all --strict`, on both lines, with the
   client assets cleared and rebuilt first on each line. Then port the round's commits to the v18
   branch and check the two branches are identical on the manifest, the test and the artifacts.
