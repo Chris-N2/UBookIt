@@ -54,8 +54,10 @@
   1178, integration 210, client 355; `openspec validate --all --strict` 27 passed (26 specs + this
   change). NOT yet done: the 0-warning Release build, which a running TestSite locks; it runs once
   the main TestSite is stopped, before 6.x. *Then done: `dotnet build UBookIt.slnx -c Release --no-incremental`,
-  0 errors; every warning is NU1902 (20) or NU1903 (32), i.e. NuGet advisories, no compiler or
-  analyser warning.* Restore printed NU1902/NU1903 advisories
+  0 errors; every warning is NU1902 or NU1903, i.e. NuGet advisories, no compiler or
+  analyser warning. *(Corrected, QA round 1: the per-code tally first recorded here, 20 and 32,
+  was miscounted; QA counted 36 and 72 on main, the same as v18. Only the claim that every warning
+  is an NU advisory is relied on.)* Restore printed NU1902/NU1903 advisories
   (`System.Security.Cryptography.Xml` 10.0.10, `…Pkcs` 10.0.0), which CLAUDE.md excludes from
   warnings-as-errors and leaves to the `audit` workflow; whether they are new since 2026-10-13 is
   checked separately, not in this change.* *Checked: all five (GHSA-7hqp-7c5m-4vq6,
@@ -193,8 +195,54 @@ Each step uses a normal reload, not a hard refresh (design, Risks).
   translated or reworded uBookIt by registering its own dictionary under `en-us` that the override
   still applies to US English users, but a British English user (Umbraco's `en`), who used to see
   keys, now sees the package's wording; to reach them too, register the same dictionary under `en`
-  as well (found by the 5.1 sweep).
+  as well (found by the 5.1 sweep). It says that an `en` override needs nothing special: uBookIt
+  registers its own wording below the default priority, so a site's ordinary `en` dictionary
+  overrides it, and a site that already registered uBookIt wording under `en` keeps it.
+  *(Corrected, QA round 1: the advice as first written would not have worked, because at the
+  default weight uBookIt's `en` terms overwrote the site's. 8.1 fixes that; 8.4 proves the advice
+  live.)*
   *Done: the paragraph above is the handover.* Verify: the handover is
   in this file under 7.2.
 - [ ] 7.3 QA: one `qa-review` subagent for this change, reused across rounds. The handover states
   each claim (counts, guard red-then-green, screenshots per line) for it to verify, not trust.
+
+## 8. QA round 1 (REJECT): remediation
+
+QA round 1 found one MAJOR, two MINORs and two NITs. Each fix below is new code and is reviewed as
+such.
+
+- [x] 8.1 MAJOR — a site's own `en` wording was overwritten by uBookIt's (design D6). The manifest
+  entry now declares `weight: 200`, above Umbraco's default of 100, so uBookIt registers first in
+  `en` and any default-weight `en` dictionary overrides it. Chris chose this over telling sites to
+  lower their own weight (2026-10-14). Spec: the requirement now says the precedence includes
+  English, and gains two scenarios (a site's own English wording takes precedence; the priority
+  cannot drop unnoticed). Design: D3's false sentence corrected, D6 added, D4 extended. Proposal:
+  the weight added to What Changes. 7.2's advice corrected.
+  *Verify:* `LocalizationCultureTests` gains a weight test that reads Umbraco's default from
+  `localization.registry.js` (`extension.weight ?? N`). Proved at its boundary after a clean client
+  rebuild (the first attempt ran stale binaries, visible as 1 test instead of 2, and was
+  discarded): weight removed → FAIL "declares no weight"; `100` → FAIL "weight is 100, but
+  Umbraco's default weight is 100"; `101` → pass; `200` → pass. The culture test was re-proved
+  after the entry-extraction rewrite: `en-us` → FAIL naming `en-us` and `en`. Manifest restored
+  each time (`git diff --stat` shows only the intended edit).
+- [x] 8.2 MINOR — "never loaded" was false (the v18 evidence showed `en-us` loaded for a Spanish
+  user). Reworded to "never looked up" / "never consulted" in `manifest.ts`, the test's XML doc and
+  proposal.md; design's table now says "consulted" and explains why loaded is not the question.
+- [x] 8.3 MINOR — design.md's lookup block still said `es-es`. Now generic (base name, language,
+  `en`), with a regional culture named as such for the example.
+  NITs: the culture test's failure message no longer says "not exactly the registered culture"
+  (it states the lookup chain instead); 3.2's miscounted tally is corrected above.
+- [ ] 8.4 Live, with a REAL package file, as QA asked (registration order is the point, so an
+  in-page registration cannot prove it). Add a temporary `App_Plugins/LiveCheckEnOverride/
+  umbraco-package.json` to the TestSite declaring a `localization` extension, `culture: "en"`, no
+  weight, with an inline dictionary supplying ONE uBookIt term (the Resources heading). Restart the
+  TestSite so the manifest is read. As a UK (`en`) user and as a US (`en-us`) user: that one term
+  shows the site's wording and every other term the package's. Then, as a contrast that proves the
+  check can fail, set uBookIt's weight to 100 in the built output only, reload, and observe the
+  package's wording win; restore. Finally delete the temporary folder and confirm `git status`.
+  Both lines.
+- [ ] 8.5 Full suites, Release build, `openspec validate --all --strict`, on both lines, with the
+  client assets cleared and rebuilt first on each line. Then port the round's commits to the v18
+  branch and check the two branches are identical on the manifest, the test and the artifacts.
+- [ ] 8.6 Return to the same QA reviewer with each claim to verify, naming the fixes as new code.
+
