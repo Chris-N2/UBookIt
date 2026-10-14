@@ -18,10 +18,12 @@ namespace UBookIt.Tests;
 /// </para>
 /// <para>
 /// Sharing the fallback culture means sharing a dictionary with any wording a site registers in
-/// it, and within one culture the dictionary registered LAST wins. Umbraco registers in
-/// descending weight, so uBookIt's weight must be above Umbraco's default for a site's
-/// default-weight dictionary to override it. At the default, uBookIt's terms overwrite the site's
-/// (QA round 1).
+/// it, and within one culture the dictionary registered LAST wins. Umbraco orders localizations
+/// by weight twice: the extension registry by <c>weight || 0</c>, then the localization registry
+/// by <c>weight ?? 100</c>, keeping ties in order. Without a weight of its own, whether uBookIt or a
+/// site registers last is decided by the order the extensions arrived in, which nobody controls
+/// (QA rounds 1-2). Above Umbraco's default, uBookIt sorts first under both orderings, so a site's
+/// default-weight dictionary always overrides it.
 /// </para>
 /// <para>
 /// Both values are compared against Umbraco's own source, read from the backoffice package the
@@ -69,8 +71,9 @@ public class LocalizationCultureTests
             weight > defaultWeight,
             $"The client's localization weight is {weight}, but Umbraco's default weight is "
             + $"{defaultWeight}. Umbraco registers in descending weight and the LAST dictionary "
-            + "registered in a culture wins, so at or below the default uBookIt's terms would "
-            + "overwrite a site's own wording in the same culture.");
+            + "registered in a culture wins, so at or below the default a site's own wording in "
+            + "the same culture is no longer guaranteed to override uBookIt's: below it, uBookIt's "
+            + "wins; at it, the winner depends on the order the extensions arrived in.");
     }
 
     private static string LocalizationEntry(string manifest)
@@ -81,19 +84,30 @@ public class LocalizationCultureTests
             entries.Count == 1,
             $"Expected exactly one localization extension in {ManifestFile}; found {entries.Count}.");
 
-        // The entry is the object containing that `type:`: from the `{` that opens it to the
-        // `type:` of the next extension, or the end of the file.
+        // The entry is the object containing that `type:`: from the `{` that opens it (so a field
+        // written before `type:` is still seen) to the `type:` of the next extension, or the end
+        // of the file.
         var start = manifest.LastIndexOf('{', entries[0].Index);
         var rest = manifest[(entries[0].Index + entries[0].Length)..];
         var next = Regex.Match(rest, @"\btype:\s*""");
         var end = next.Success ? entries[0].Index + entries[0].Length + next.Index : manifest.Length;
 
-        return manifest[start..end];
+        // Comments are removed before any field is read. The comment above this entry discusses
+        // `culture:` and `weight:` by name, and a field read out of a comment would let a wrong or
+        // missing real field pass (QA round 2: both guards went green with the real culture set
+        // to `en-us`, or the real weight deleted, because a comment line still matched).
+        var entry = manifest[start..end];
+        entry = Regex.Replace(entry, @"/\*.*?\*/", "", RegexOptions.Singleline);
+        entry = Regex.Replace(entry, @"//[^\r\n]*", "");
+
+        return entry;
     }
 
     private static string Field(string entry, string name, string valuePattern)
     {
-        var field = Regex.Match(entry, $@"\b{name}:\s*{valuePattern}");
+        // A field counts only as the first thing on its line, so text that merely mentions it
+        // (a string, or anything a comment filter missed) cannot satisfy it.
+        var field = Regex.Match(entry, $@"^\s*{name}:\s*{valuePattern}", RegexOptions.Multiline);
 
         Assert.True(field.Success, $"The localization extension in {ManifestFile} declares no {name}.");
 

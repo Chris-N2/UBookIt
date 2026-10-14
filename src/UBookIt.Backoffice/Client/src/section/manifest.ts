@@ -223,10 +223,11 @@ export const manifests: Array<UmbExtensionManifest> = [
     // its raw key. Under `en` an `en-US` user still finds them, one step later.
     //
     // Sharing `en` means sharing a dictionary with any `en` wording a site supplies, and within
-    // one culture the dictionary registered LAST wins the merge. Umbraco registers in descending
-    // weight, default 100, so the weight above the default makes ours register first: a site's
-    // own `en` wording, at the default weight, then overrides ours rather than being overwritten
-    // by it, and so does Umbraco's.
+    // one culture the dictionary registered LAST wins the merge. Umbraco orders by weight (an
+    // absent weight sorts as 0, then as 100), so without one, whether ours or a site's lands last
+    // would depend on the order they arrived in. A weight above the default makes ours register
+    // first, so a site's own `en` wording at the default weight always overrides ours, and so
+    // does Umbraco's.
     //
     // The alias still says EnUS: it is how a site would unregister or replace this extension,
     // so it is kept for compatibility although the culture has moved. The wording itself is US

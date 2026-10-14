@@ -195,12 +195,15 @@ Each step uses a normal reload, not a hard refresh (design, Risks).
   translated or reworded uBookIt by registering its own dictionary under `en-us` that the override
   still applies to US English users, but a British English user (Umbraco's `en`), who used to see
   keys, now sees the package's wording; to reach them too, register the same dictionary under `en`
-  as well (found by the 5.1 sweep). It says that an `en` override needs nothing special: uBookIt
-  registers its own wording below the default priority, so a site's ordinary `en` dictionary
-  overrides it, and a site that already registered uBookIt wording under `en` keeps it.
-  *(Corrected, QA round 1: the advice as first written would not have worked, because at the
-  default weight uBookIt's `en` terms overwrote the site's. 8.1 fixes that; 8.4 proves the advice
-  live.)*
+  as well (found by the 5.1 sweep). It says that an `en` override needs nothing special, in Umbraco's own
+  terms: uBookIt's localization has `weight: 200`, and Umbraco registers higher weights first, so
+  a site's ordinary `en` dictionary (no weight, or any weight up to the default of 100) is
+  registered after it and overrides it; a site that already registered uBookIt wording under `en`
+  keeps it.
+  *(Corrected, QA round 1: the advice as first written could not be relied on, because at the
+  default weight whether uBookIt's `en` terms or the site's won depended on registration order.
+  8.1 fixes that; 8.4 proves the advice live. Reworded, QA round 2: it first said "below the
+  default priority", while the manifest says weight 200, i.e. above.)*
   *Done: the paragraph above is the handover.* Verify: the handover is
   in this file under 7.2.
 - [ ] 7.3 QA: one `qa-review` subagent for this change, reused across rounds. The handover states
@@ -238,8 +241,9 @@ such.
   weight, with an inline dictionary supplying ONE uBookIt term (the Resources heading). Restart the
   TestSite so the manifest is read. As a UK (`en`) user and as a US (`en-us`) user: that one term
   shows the site's wording and every other term the package's. Then, as a contrast that proves the
-  check can fail, set uBookIt's weight to 100 in the built output only, reload, and observe the
-  package's wording win; restore. Finally delete the temporary folder and confirm `git status`.
+  check can fail, set uBookIt's weight BELOW the site's (the plan first said 100; see the
+  correction below for why 100 proves nothing), rebuild, reload, and observe the package's wording
+  win; restore. Finally delete the temporary folder and confirm `git status`.
   Both lines.
   *main (Umbraco 17), 2026-10-14. The override file at
   `src/UBookIt.TestSite/wwwroot/App_Plugins/LiveCheckEnOverride/umbraco-package.json` (culture
@@ -250,11 +254,13 @@ such.
   "Create resource"; the tab, heading and page title read "Rooms and people", everything else was
   uBookIt's wording. US user (`en-us`): `en-us` holds no uBookIt label, so the lookup reached `en`
   and showed "Rooms and people" on the tab, heading and title, the rest uBookIt's.
-  CONTRAST, and a correction to QA round 1's prediction. At `weight: 100` (client rebuilt) the
-  SITE still won: on this load the registry held uBookIt's extension BEFORE the site's, so in a tie
-  the site's registered last. QA predicted the opposite order (bundle after site); that was not
-  observed. The order in a tie is not something uBookIt controls or Umbraco promises, which is the
-  real defect, and weight 200 removes the dependence on it. To prove the weight decides, uBookIt's
+  CONTRAST. At `weight: 100` (client rebuilt) the SITE still won, with uBookIt's extension listed
+  BEFORE the site's. *(Corrected, QA round 2: that run says nothing about the state before the
+  fix. Umbraco's `byType` sorts by `weight || 0`, so an EXPLICIT 100 beats the site's ABSENT
+  weight (0) and sorts first; the state before the fix had no weight, 0 against 0, which falls back
+  to arrival order, and was never observed. QA round 1's prediction is therefore neither confirmed
+  nor refuted, and this record no longer calls it a correction. Weight 200 makes the question
+  moot, since it sorts first under both orderings.)* To prove the weight decides, uBookIt's
   weight was set BELOW the site's (`50`, client rebuilt): the registry then registered uBookIt last
   and its "Resources" overwrote the site's wording on tab, heading and title. So the check can
   fail, and the weight is what decides it. Manifest restored with `git checkout`, client rebuilt
@@ -274,4 +280,35 @@ such.
   client 355, openspec 27; Release 0 errors, NU1902 x36 and NU1903 x72 only. `git diff` between the
   branches on the manifest, the test and the change folder: empty.*
 - [ ] 8.6 Return to the same QA reviewer with each claim to verify, naming the fixes as new code.
+
+## 9. QA round 2 (REJECT): remediation
+
+- [x] 9.1 MAJOR — both guards could be satisfied by COMMENT text, a false-green this round's own
+  fix introduced (8.1 widened the entry slice to start at the `{`, which took in the comment above
+  `type:` that names both fields). `LocalizationEntry` now strips `/* */` and `//` comments from
+  the slice before reading, and `Field` accepts a field only as the first thing on its line.
+  *Verify,* after clearing and rebuilding the client (`dotnet test --no-build`, the manifest
+  mutated and restored each time; expected result in brackets):
+  - as written [pass] → pass;
+  - culture `en-us` [FAIL] → FAIL;
+  - weight `100` [FAIL] → FAIL;
+  - M1, comment line `// Was culture: "en" before X.` above the entry, real culture `en-us`
+    [FAIL] → FAIL (QA's first false-green);
+  - M2, comment `// Keep weight: 200 here.`, real weight deleted [FAIL] → FAIL (QA's second);
+  - M3, the real weight commented out as `// weight: 300,` [FAIL] → FAIL (QA's third);
+  - M4, block comment `/* weight: 300, */`, real weight deleted [FAIL] → FAIL;
+  - M5, `weight: 200` moved before `type:` [pass] → pass;
+  - M6, `weight: 50` moved before `type:` [FAIL] → FAIL. M6 proves M5's move applied, because the
+    unmutated file would also pass.
+  Manifest restored; `git status` shows only the intended edits.
+- [x] 9.2 MINOR — the record asserted an overwrite at the default weight that was never observed,
+  and missed Umbraco's first sort (`byType`, `weight || 0`, `extension.registry.js:85`, checked).
+  D6 now describes both orderings and calls the default-weight outcome order-dependent. The test's
+  XML doc and weight failure message say the same. The 7.2 parenthetical says "could not be
+  relied on". 8.4's plan text and conclusion are corrected (the 100 contrast proves nothing about
+  the pre-fix state; the 50 contrast stands).
+- [x] 9.3 NIT — 7.2 now says it in Umbraco's terms (`weight: 200`, higher registers first), not
+  "below the default priority".
+- [ ] 9.4 Suites on both lines (assets cleared and rebuilt), branches identical, back to the same
+  QA reviewer.
 
