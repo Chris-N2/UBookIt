@@ -217,18 +217,26 @@ export const manifests: Array<UmbExtensionManifest> = [
     js: () => import("./place-on-behalf-modal.element.js"),
   },
   {
-    // Registered under Umbraco's FALLBACK culture, `en`, not `en-us`. Umbraco loads only the
-    // dictionaries for the user's region, the user's language and `en`, so under `en-us` the
-    // terms were never loaded for anyone else — a Spanish or a British English user saw every
-    // term as its raw key. Under `en` an `en-US` user still finds them, one step later.
+    // Registered under Umbraco's FALLBACK culture, `en`, not `en-us`. Umbraco looks a term up in
+    // the user's region, then the user's language, then `en`, so under `en-us` the terms were
+    // never looked up for anyone else — a Spanish or a British English user saw every term as
+    // its raw key. Under `en` an `en-US` user still finds them, one step later.
+    //
+    // Sharing `en` means sharing a dictionary with any `en` wording a site supplies, and within
+    // one culture the dictionary registered LAST wins the merge. Umbraco registers in descending
+    // weight, default 100, so the weight above the default makes ours register first: a site's
+    // own `en` wording, at the default weight, then overrides ours rather than being overwritten
+    // by it, and so does Umbraco's.
     //
     // The alias still says EnUS: it is how a site would unregister or replace this extension,
     // so it is kept for compatibility although the culture has moved. The wording itself is US
     // English, which is why the file is still `en-us.ts`. LocalizationCultureTests holds the
-    // culture equal to Umbraco's own UMB_DEFAULT_LOCALIZATION_CULTURE.
+    // culture equal to Umbraco's UMB_DEFAULT_LOCALIZATION_CULTURE, and the weight above its
+    // default.
     type: "localization",
     alias: "UBookIt.Localization.EnUS",
     name: "uBookIt English",
+    weight: 200,
     meta: {
       culture: "en",
     },

@@ -6,19 +6,24 @@ See proposal.md — Why. Umbraco's lookup code, read in the installed
 ```
 packages/core/localization/registry/localization.registry.js
   loads the localization extensions whose culture (lower-cased) is one of:
-    the user's base name ('es-es')  ·  the user's language ('es')  ·  'en' (always)
+    the user's base name  ·  the user's language  ·  'en' (always)
+  e.g. a user on a regional culture such as 'es-mx': 'es-mx', 'es', 'en'
+  registers them in DESCENDING weight (:141), default weight 100 (:86)
 
 libs/localization-api/localization.controller.js:81-100
-  term(key):  primary ('es-es')  →  secondary ('es')  →  fallback ('en')
+  term(key):  primary (base name)  →  secondary (language)  →  fallback ('en')
 
 libs/localization-api/localization.manager.js
   UMB_DEFAULT_LOCALIZATION_CULTURE = 'en'
-  registerLocalization: a second dictionary with the same code is MERGED key by key (:44-46)
+  registerLocalization: a second dictionary with the same code is MERGED key by key (:44-46),
+  so within one culture the dictionary registered LAST wins any key both define
 ```
 
-What changes for each kind of user:
+What changes for each kind of user. "Consulted" is the lookup chain. Loaded dictionaries also
+persist across a language change, so `en-us` is often loaded for everyone (the page boots in the
+server's default UI language, `en-US` here). Loaded is not the question; consulted is.
 
-| User language | Dictionaries loaded today       | uBookIt terms today | Under `en` |
+| User language | Dictionaries consulted          | uBookIt terms today | Under `en` |
 |---------------|---------------------------------|---------------------|------------|
 | `en-US`       | `en-us`, `en`                   | `en-us` ✓           | `en` ✓ (second step) |
 | UK (`en`)     | `en`                            | **keys**            | `en` ✓     |
@@ -66,8 +71,32 @@ same exposure the `en-us` registration already had against Umbraco's `en-US` dic
 Umbraco key is overwritten. The guard in D4 does not check this; the live check does, by
 looking at Umbraco's own screens as well as ours.
 
-`$dir` and `$weight` are also merged: ours sets `ltr` (as Umbraco's `en` does) and the default
-weight. Weight orders registration only, before the merge, so it has no effect on lookup.
+`$dir` and `$weight` are also merged: ours sets `ltr`, as Umbraco's `en` does. Weight is not
+inert: within one culture it decides which dictionary registers last and so wins a shared key.
+See D6. *(Corrected, QA round 1: this paragraph first said weight "has no effect on lookup",
+which was false.)*
+
+### D6 — Weigh above the default, so a site's own `en` wording wins
+
+Sharing `en` means sharing a dictionary with any `en` wording a site registers, typically to
+reword uBookIt (or, before this fix, to work around it for UK users). Within one culture the
+LAST dictionary registered wins a shared key. Umbraco registers in descending weight, and ties
+keep registry order. uBookIt's manifests arrive from a bundle, imported asynchronously, so at
+the default weight they register after a site's directly declared localization, and **uBookIt's
+terms would overwrite the site's**. Under `en-us` that collision did not exist for a site using
+`en`. *(Found by QA round 1, derived from Umbraco's source.)*
+
+So the extension sets `weight: 200`, above Umbraco's default of 100. It then registers before
+every default-weight `en` dictionary, the site's and Umbraco's own, and any of them overrides
+uBookIt's terms on a shared key. That is the right priority for a package's defaults, and it
+also means uBookIt can never overwrite an Umbraco key (strengthening D3).
+
+Rejected alternative: keep the default and tell sites to give their override a weight below
+100. Every site would carry that burden, and getting it wrong fails silently. Chris chose the
+weight, 2026-10-14.
+
+The guard (D4) holds the weight above Umbraco's default, read from Umbraco's source
+(`extension.weight ?? N` in the registry), for the same reason it reads the culture from there.
 
 ### D4 — The guard compares two source files, in the C# test project
 
@@ -90,6 +119,10 @@ non-`en-US` user.
 
 It is proved able to fire before it is trusted: with the culture set back to `"en-us"` it
 fails, and with the manifest's localization entry removed it fails.
+
+A second test in the same class holds the weight (D6) above Umbraco's default, read from the
+registry's `extension.weight ?? N`. Proved at its boundary: weight removed fails, `100` fails,
+`101` passes.
 
 **On dev/v18 the guard reads 17.5.3's constant.** That line's client still depends on
 `@umbraco-cms/backoffice` `^17.5.3` (unchanged since the scaffold), while an 18 site runs

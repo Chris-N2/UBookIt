@@ -9,7 +9,8 @@ localization extension with `culture: "en-us"`. Umbraco loads, for the current u
 extensions whose culture is the user's regional culture, the user's language, or Umbraco's
 fallback culture `en` (`UMB_DEFAULT_LOCALIZATION_CULTURE`). It then looks a term up in that
 order. `en-us` is none of those three for anyone except an `en-US` user, so for everyone else
-the dictionary is never loaded and every lookup misses.
+the dictionary is never consulted and every lookup misses. (It may well be loaded: the page boots
+in the server's default UI language. Loaded is not consulted.)
 
 That includes **British English**. Umbraco's "English (United Kingdom)" option *is* the culture
 `en` (`Umb.Localization.EN`), so a UK user loads `en` and nothing else English. It does not
@@ -31,6 +32,11 @@ It is fixed in a patch because it is a defect with no change to any public surfa
   under. That is a deliberate cost, accepted to keep the alias stable.
 - The terms file keeps its name, `localization/en-us.ts`. The wording is US English, and the
   file name says so; only the culture it is registered under moves.
+- The extension declares `weight: 200`, above Umbraco's default of 100. Sharing `en` means
+  sharing a dictionary with any `en` wording a site supplies. Within one culture the dictionary
+  registered last wins, and Umbraco registers in descending weight, so the higher weight makes a
+  site's own `en` wording override uBookIt's rather than be overwritten by it (design D6; found
+  by QA round 1).
 - A new test fails if the manifest's localization culture ever differs from Umbraco's own
   fallback constant. It reads both from source, so a future Umbraco that changes the constant
   fails the test rather than silently re-breaking every non-`en-US` user.
