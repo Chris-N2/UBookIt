@@ -206,7 +206,7 @@ Each step uses a normal reload, not a hard refresh (design, Risks).
   default priority", while the manifest says weight 200, i.e. above.)*
   *Done: the paragraph above is the handover.* Verify: the handover is
   in this file under 7.2.
-- [ ] 7.3 QA: one `qa-review` subagent for this change, reused across rounds. The handover states
+- [x] 7.3 QA: one `qa-review` subagent for this change, reused across rounds. The handover states
   each claim (counts, guard red-then-green, screenshots per line) for it to verify, not trust.
 
 ## 8. QA round 1 (REJECT): remediation
@@ -309,6 +309,21 @@ such.
   the pre-fix state; the 50 contrast stands).
 - [x] 9.3 NIT — 7.2 now says it in Umbraco's terms (`weight: 200`, higher registers first), not
   "below the default priority".
-- [ ] 9.4 Suites on both lines (assets cleared and rebuilt), branches identical, back to the same
+- [x] 9.4 Suites on both lines (assets cleared and rebuilt), branches identical, back to the same
   QA reviewer.
+  *main 2131 / v18 2143 unit, 1178, 210, client 355, openspec 27 on each; branches identical.*
+
+## 10. QA round 3: APPROVE WITH NITS
+
+- [x] 10.1 QA verified the round-2 MAJOR fix and probed it beyond the claimed matrix (trailing
+  comments, a `weight: 300` inside a string, `//` in a `js:` URL, multi-line block comments, a
+  weight on the `name` line, a `/*` inside a string): every case either failed loudly or passed
+  when it should. MINOR and NIT verified; counts and parity re-verified on both lines. QA: "Further
+  QA rounds are not warranted. The NIT can be fixed at apply's discretion without another review."
+- [x] 10.2 NIT taken: the weight failure message said that at exactly the default "the winner
+  depends on the order the extensions arrived in". An explicit `100` beats a weightless site in
+  `byType`, so it now says "the outcome depends on the site's own weight and on the order the
+  extensions arrived in". Message text only; the guard's threshold is unchanged. Both guard tests
+  pass.
+- [x] 7.3 (see sections 8-10: three rounds, REJECT, REJECT, APPROVE WITH NITS).
 
