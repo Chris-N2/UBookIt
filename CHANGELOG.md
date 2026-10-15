@@ -18,6 +18,88 @@ See [the versioning note](README.md#versions-and-the-api-promise).
 
 ---
 
+## 18.2.2
+
+### What you have to do
+
+**Run the .NET 10.0.13 runtime or later on your server.** Microsoft released it on 13 October
+2026 (ASP.NET Core Runtime 10.0.13) as a security update. Its
+[release notes](https://github.com/dotnet/core/blob/main/release-notes/10.0/10.0.13/10.0.13.md)
+list 44 vulnerabilities it fixes in .NET and ASP.NET Core. GitHub rates three of them critical,
+two of those in Kestrel, ASP.NET Core's web server. Those are not uBookIt's, but they are in the
+runtime your site runs on, so take the update whatever you do about uBookIt. It is also the only
+fix for three of the five advisories below, which concern packages uBookIt depends on. No uBookIt
+release can supply it, because your site takes that code from the runtime, not from a package.
+- On a server that runs your site with an installed runtime, install it there:
+  `dotnet --list-runtimes` should list `Microsoft.AspNetCore.App 10.0.13` or later. On a hosting
+  platform that provides the runtime for you, check that it has moved to 10.0.13.
+- In a container, rebuild on an ASP.NET Core 10.0.13 base image, or a later one.
+- A self-contained deployment carries its own runtime, so rebuild it with an SDK that ships
+  10.0.13: 10.0.113 or 10.0.402, or later.
+
+**Your own NuGet audit will not tell you about those three.** With the .NET 10 SDK's default
+settings, a site that runs on ASP.NET Core does not restore `System.Security.Cryptography.Xml` as
+a package: the SDK removes it from the dependency graph, because the runtime provides it. So
+`dotnet list package --vulnerable` and restore's own audit stay quiet about it, whichever runtime
+the server has. Check the runtime instead.
+
+**If your site rewords uBookIt's backoffice under `en-us`, and has British English users**,
+register the same wording under `en` as well (see *What changed*).
+
+Otherwise, **nothing.** No API signature, schema, migration or setting changes. If your site
+references `System.Security.Cryptography.Pkcs` directly at a version below 10.0.13, restore reports
+a downgrade: raise that reference to 10.0.13.
+
+### What changed
+
+**Five of the advisories Microsoft published on 13 October 2026 are against packages uBookIt
+depends on.** All five are denial-of-service, all are fixed in 10.0.13, and they reach
+every site that runs uBookIt. No Umbraco release fixes them yet.
+
+Three are against `System.Security.Cryptography.Xml`, which your site takes from the ASP.NET Core
+runtime. Only updating the runtime fixes them (see *What you have to do*):
+
+- [GHSA-7hqp-7c5m-4vq6](https://github.com/advisories/GHSA-7hqp-7c5m-4vq6) (high)
+- [GHSA-c399-9853-6jmj](https://github.com/advisories/GHSA-c399-9853-6jmj) (high)
+- [GHSA-r955-8q5j-3h83](https://github.com/advisories/GHSA-r955-8q5j-3h83) (high)
+
+Two are against `System.Security.Cryptography.Pkcs`, which reaches your site as a package, through
+Entity Framework Core's SQL Server provider and through MailKit:
+
+- [GHSA-846f-f764-76mx](https://github.com/advisories/GHSA-846f-f764-76mx) (high)
+- [GHSA-2fmv-rv2c-59x7](https://github.com/advisories/GHSA-2fmv-rv2c-59x7) (medium)
+
+**uBookIt now requires `System.Security.Cryptography.Pkcs` 10.0.13 or later.** `UBookIt.Persistence`
+and `UBookIt.Web` declare it, so a site that installs or updates uBookIt resolves the fixed
+package. It was already in every site's graph; only its minimum rises. That package's copy is
+newer than the one in any .NET 10 runtime before 10.0.13, and .NET uses the newer of the two, so
+it fixes these two advisories even on a server not yet updated. We confirmed that on Windows: a
+site on the 10.0.9 runtime loaded the package's copy. The runtime update still matters for the
+other three.
+
+**`UBookIt` and `UBookIt.Backoffice` now declare the ASP.NET Core framework**
+(`Microsoft.AspNetCore.App`), as `UBookIt.Web` always has. Every Umbraco site already runs on it,
+so this asks nothing new of your site.
+
+**uBookIt's backoffice shows its wording in every backoffice language.** Every earlier release
+registered uBookIt's wording for US English only. A backoffice user with any other language saw
+raw term keys, such as `ubookitResources_create` where the button should say "Create resource",
+on every uBookIt screen, and on uBookIt's permissions in Umbraco's user group editor. That
+included British English, which Umbraco calls `en`. uBookIt now registers its wording as
+Umbraco's fallback English, so every backoffice user sees it in English unless your site supplies
+a translation. If you still see keys after upgrading, reload the backoffice once with a hard
+refresh.
+
+**If your site supplies its own uBookIt wording**, as an Umbraco localization:
+- Wording you registered under `en-us` still reaches your US English users. British English users
+  now see uBookIt's own wording rather than keys. To give them yours as well, register the same
+  wording under `en`.
+- Wording you register under `en` needs nothing special. uBookIt's registration has a weight of
+  200, and Umbraco registers higher weights first, so yours, at the default weight or any weight up
+  to 100, is registered after it and wins.
+
+---
+
 ## 18.2.1 — 2026-10-13
 
 ### What you have to do
