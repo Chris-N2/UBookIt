@@ -124,16 +124,54 @@
 
 ## 5. Sweep and hand over
 
-- [ ] 5.1 Search docs, README, CHANGELOG, CLAUDE.md, `openspec/specs/**` and the CI scripts for
+- [x] 5.1 Search docs, README, CHANGELOG, CLAUDE.md, `openspec/specs/**` and the CI scripts for
   sentences this falsifies (for example, "0 warnings" claims, statements about which advisories
   the audit accepts, or "the packages depend only on Umbraco"). Verify: each hit listed with its
   decision.
-- [ ] 5.2 Record in the deferred-obligations memory: the pins, their exit condition (design D5),
+  *Done 2026-10-15 (main line; dev/v18 carries the same files for these hits). Searched for
+  Cryptography, FrameworkReference / AspNetCore.App, "depend(s) only on", NU190x, "0 warnings",
+  transitive, shared framework, .NET runtime / .NET 10, advisor. Hits and decisions:
+  `openspec/specs/packaging` "Nothing is declared that is not published" constrains only
+  dependencies on uBookIt packages (lockstep versions), not Microsoft ones: not falsified. Its
+  Umbraco upper-bound requirement exempts nothing new (Pkcs is not `Umbraco.Cms.*`): not falsified.
+  `docs/theming.md`'s example already declares the same framework reference: consistent.
+  `docs/publishing.md` "the only accepted advisories are `UBookIt.TestSite`'s, for ImageSharp":
+  still true (no suppression added). `openspec/specs/continuous-integration` (the audit fails on
+  any advisory in the graph, transitive included): still true; the graph no longer contains Xml as a
+  package, which is the point of D6. The "depend only on ports" hits are about code, not packages.
+  CHANGELOG hits are history and are not edited. No README or CLAUDE.md hit. Nothing to change.*
+- [x] 5.2 Record in the deferred-obligations memory: the pins, their exit condition (design D5),
   and that the release changelog owes the .NET runtime advice (D4). Verify: the entry exists.
-- [ ] 5.3 Handover for the release change (`17.3.2` / `18.2.2`, shared with
+  *Done 2026-10-15: the advisories section records (B), the Pkcs-only exit (the framework
+  references stay), and the changelog's runtime sentence including that a site's own audit will
+  not report the Xml advisories.*
+- [x] 5.3 Handover for the release change (`17.3.2` / `18.2.2`, shared with
   `backoffice-localization-fallback`): the changelog names the five advisories, says the update
   raises the minimum of two Microsoft packages already in the site's graph, states 3.3's observed
   result honestly, and advises taking the October .NET servicing update. Verify: written here.
+  *Written 2026-10-15. Under (B) it is ONE package's minimum, not two, so the task's own wording
+  is superseded. The changelog entry must say:*
+  1. *The five advisories published 2026-10-13, linked by GHSA id: `System.Security.Cryptography.
+     Xml` GHSA-7hqp-7c5m-4vq6, GHSA-c399-9853-6jmj, GHSA-r955-8q5j-3h83 (high);
+     `System.Security.Cryptography.Pkcs` GHSA-846f-f764-76mx (high), GHSA-2fmv-rv2c-59x7
+     (moderate). They reach every site through Umbraco, EF Core's SqlClient and MailKit, and no
+     Umbraco release fixes them yet.*
+  2. *What this release does: `UBookIt.Persistence` and `UBookIt.Web` now depend on
+     `System.Security.Cryptography.Pkcs` 10.0.13 or later. That package was already in every
+     site's graph; only its minimum rises. Observed: on an unpatched .NET 10.0.9 runtime, the site
+     then loads the patched Pkcs (10.0.1326) instead of the framework's copy (3.3, 3.4).*
+  3. *What it cannot do, said plainly: the three `Xml` advisories are fixed only by the site's
+     .NET runtime. Every Umbraco site gets `Xml` from the ASP.NET Core shared framework, and the
+     .NET SDK removes the NuGet package from such projects, so no package can replace it.
+     **A site's own NuGet audit will not report these three advisories**, for the same reason.
+     The action: run the **ASP.NET Core Runtime 10.0.13** (released 2026-10-13) or later on the
+     server. A self-contained deployment carries its own runtime, so it must be rebuilt with an
+     SDK that ships 10.0.13 (SDK 10.0.113 or 10.0.402, or later), per Microsoft's release notes:
+     https://github.com/dotnet/core/blob/main/release-notes/10.0/10.0.13/10.0.13.md*
+  4. *`UBookIt` and `UBookIt.Backoffice` now declare the `Microsoft.AspNetCore.App` framework,
+     as `UBookIt.Web` always has. Nothing to do: every Umbraco site already uses it, and
+     Umbraco's own web packages declare it.*
+  5. *No API, schema or configuration change.*
 - [ ] 5.4 QA: one `qa-review` subagent for this change, reused across rounds, handed the claims to
   verify (audit before and after, nuspec diff, counts, publish observation).
 
