@@ -8,7 +8,7 @@
 
 - [x] 2.1 Add the `SettingCatalogue.All` entry (Editable, Boolean, operator block) and the `SettingText` mapping. Verify: `SettingCatalogueTests` and `SettingsControllerTests` cover the key as editable and not restart-bound; a write by a verb holder is accepted and stored; a non-boolean value is refused by the existing validator.
 - [x] 2.2 Add the `skipSingleChoiceCatalogueLabel` and `skipSingleChoiceCatalogueDescription` terms to `en-us.ts` (copy in design D5). Verify: `npm run build` and `npm test` pass (baseline 355 + new). The existing term-key and manifest guards pass, and are confirmed to cover the new key.
-- [ ] 2.3 Live check on the TestSite (v17): the settings tab shows the setting as an editable checkbox with its configured and effective values. Toggling it, then reloading the booking page, changes what renders without a restart. Record this by screenshot or description in the handover.
+- [x] 2.3 Live check on the TestSite (v17): the settings tab shows the setting as an editable checkbox with its configured and effective values. Toggling it, then reloading the booking page, changes what renders without a restart. Record this by screenshot or description in the handover. **Done 2026-10-15**, on a fresh database `UBookIt_SingleResourceTest` (unattended install). The setting appears after *Privacy policy link* with its label and description, ticked by default, and not marked as needing a restart. Unticking it stored the value and showed "Overriding — the site's configuration sets no value for this" with *Reset to configured value*; the next request rendered the catalogue of one. Reset ticked it again.
 
 ## 3. The front end
 
@@ -28,7 +28,12 @@
   - a sole entry with no availability: its flow's own explanation.
 
   Verify: all pass. **Mutate the dispatcher** (always skip; never skip; skip on `>= 1`; drop the token) and confirm that each mutation fails at least one test. Revert after. **Done:** six mutations, each caught. The failure counts were: no `[ActivatorUtilitiesConstructor]` 16 (activation throws on the ambiguous constructors); always skip 2; never skip 11; `>= 1` 3; drop the token 4; dispatcher ignores the setting 9. All were reverted, and the diff stat was unchanged afterwards.
-- [ ] 3.5 Live check on the TestSite (v17) with the settings store and catalogue arranged for each case: one entry (skips), two entries (catalogue), setting off (catalogue). Complete a booking through the skipped flow and confirm the confirmation page and its URL.
+- [x] 3.5 Live check on the TestSite (v17) with the settings store and catalogue arranged for each case: one entry (skips), two entries (catalogue), setting off (catalogue). Complete a booking through the skipped flow and confirm the confirmation page and its URL. **Done 2026-10-15** on the fresh database. Setup: one service "Massage" (1 × room, 60 min) and "Treatment Room" (service only), with a published Booking Page.
+  - **One entry, setting on:** the bare `/book/` rendered "Book Massage" with no catalogue. The date form carried `ubBook=s:…` as a hidden field; the next step was `/book/?ubBook=s%3A…&ubDate=2026-10-16`, and the POST carried the same `Subject`.
+  - **Booking:** "Booking confirmed", reference SKZT-CJJM (Massage, Treatment Room, Fri 16 Oct 09:00–10:00). The redirect target was `/?ubBook=s%3A…&ubDate=2026-10-16&ubMins=60`; the page is the only root node, so Umbraco serves it at `/`.
+  - **Setting off (stored):** "Choose what to book" offering Massage alone, with no restart. This is also live proof that Umbraco activates the settings constructor, because the published four-argument one would have skipped.
+  - **Two entries** (Treatment Room made bookable on its own), **setting on:** the catalogue offered Massage and Treatment Room.
+  - The one-resource case was not run live. It is covered by `SingleChoiceDispatchTests`, and it will be the v18 port's live case on Chris's own site's database.
 
 ## 4. Docs
 
@@ -37,6 +42,7 @@
 - [x] 4.3 `docs/theming.md`: one sentence saying that a themed `Catalogue` view is not rendered for a catalogue of one while the setting is on. Delivery API docs (`docs/delivery-api.md`): one sentence saying the skip is a front-end behaviour, and that a headless client decides for itself. Verify by rereading.
 - [x] 4.4 Falsified-sentence sweep: grep `openspec/specs`, `docs`, `README.md` and the XML comments in `src/UBookIt.Web` for sentences that assume the bare booking page always shows the catalogue (`catalogue`, `list of one`, `nothing else specified`), including `BookingFlowViewComponent`'s own class remarks. Fix each one, or record why it still holds. List the results in the handover.
 
+- [x] 4.4a **Sweep result, recorded.** Fixed: `FlowEntry.NamedByAuthor`'s remarks; `BookingFlowViewComponent`'s class remarks; the `/book` line in `booking-page.md`. **Found during the live check, missed by the sweep** (which did not search `package.xml`): the Booking Page document type's description said only "or a single service or resource when the URL names one". Corrected in `src/UBookIt.Web/Packaging/package.xml`. This is safe because `BookingPagePackageMigrationPlan` is a custom plan with a fixed state id, so the manifest never re-imports on an existing site. New installs get the new text, and existing installs keep the old description, which is now incomplete but not false about anything they can do. Everything else the grep found is either inside the requirement being modified or still true (the catalogue's accessibility, its GET form, `README.md`'s "the whole catalogue, one service, or one resource").
 - [x] 4.5 Guarantee diff for every MODIFIED requirement, checked against `openspec/specs/` as it stands:
 
   **default-frontend — "A site may enter the flow at any point"**
@@ -56,7 +62,7 @@
 
 ## 5. Validate and QA (v17)
 
-- [ ] 5.1 Full verification on `main`'s branch: client build, then `dotnet build` (Release, 0 warnings), unit (baseline 2131), integration (210), rendering (1178), client (355). Report the new counts. Run `openspec validate single-choice-shortcut --strict` and CI's exact openspec command after the last commit.
+- [x] 5.1 Full verification on `main`'s branch: client build, then `dotnet build` (Release, 0 warnings), unit (baseline 2131), integration (210), rendering (1178), client (355). Report the new counts. Run `openspec validate single-choice-shortcut --strict` and CI's exact openspec command after the last commit.
 - [ ] 5.2 QA review (`qa-review`) in a fresh subagent, reused across rounds. Hand it the claims (build state, counts, live checks) to verify, not to trust. Treat each round's fixes as new code.
 
 ## 6. Port to dev/v18
