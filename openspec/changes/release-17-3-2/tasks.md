@@ -12,8 +12,8 @@
   *Done:* before, 1 in `Directory.Build.props`, 21 in README (16 tag-pinned documentation links,
   4 tag-pinned screenshot URLs and the "uBookIt is at" sentence; corrected in QA round 1, which
   found the first record's 17/4 split wrong) and 5 in the runbook (the "uBookIt is at" sentence
-  and the
-  four *Tag the release* literals). Each was read in context first; none was a history anchor.
+  and the four *Tag the release* literals). Each was read in context first; none was a history
+  anchor.
   After: 0 of `17.3.1`, and 1, 21 and 5 of `17.3.2`; the diff is those 27 lines. The *Tag the
   release* literals were re-read by eye.
 - [x] 1.2 Write the `17.3.2` entry, undated. **Check every claim against the code and the two
@@ -72,8 +72,15 @@
 
 ## 3. Review and merge
 
-- [ ] 3.1 QA (`qa-review`) in one subagent, reused across rounds, covering this change and
+- [x] 3.1 QA (`qa-review`) in one subagent, reused across rounds, covering this change and
   `release-18-2-2`. Verify: APPROVE.
+  *Round 2: APPROVE WITH NITS on both changes.* QA re-checked every number in the rewritten
+  paragraphs against the sources: 44 unique CVEs in both the release notes and `releases.json`;
+  exactly three critical advisories that day, all in 10.0.13's list; two naming Kestrel. The
+  other round-1 fixes held; ChangelogTests and VersionTruthTests 20/20 on each line. Both nits
+  taken: this record's short rewrapped line, and "in uBookIt's own dependency graph" became
+  "packages uBookIt depends on" (with the framework reference, the SDK prunes `Xml` from
+  uBookIt's restore graph, so "graph" was not exact). Two rounds, one reviewer.
   *Round 1: REJECT on both changes.* QA reproduced both clean builds, every suite, the audit and
   validation, the bump counts and every entry claim against its primary source.
   - **MAJOR: "Microsoft published five .NET advisories on 13 October 2026" was false.** GitHub
