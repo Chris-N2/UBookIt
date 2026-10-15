@@ -124,4 +124,6 @@
   *Done:* recorded in `release-17-3-2` 5.4.
 - [x] 5.5 Commit and run the unit suite. Chris pushes. Verify: `dev/v18`'s CI is green.
   *Done:* unit **2143**, 0 skipped. `dev/v18`'s CI runs on Chris's push.
-- [ ] 5.6 Archive last, running the unit suite before the push.
+- [x] 5.6 Archive last, running the unit suite before the push.
+  *Done:* archived after the close-out commit; unit **2143** passed on that commit, and the
+  archive moves files only.
