@@ -1,6 +1,6 @@
 ## 1. The version and the entry
 
-- [ ] 1.1 Branch `release-18-2-2` from local `dev/v18` at `c783455` (the
+- [x] 1.1 Branch `release-18-2-2` from local `dev/v18` at `c783455` (the
   `crypto-advisories-2026-10` archive).
   - Bump `<Version>` to `18.2.2`, and move every row of the table in `docs/publishing.md`
     *Before any push*, step 2.
@@ -9,7 +9,15 @@
 
   Verify: `git grep 18.2.1` over `Directory.Build.props`, README and the runbook is empty, apart
   from history anchors (record the counts before and after).
-- [ ] 1.2 Write the `18.2.2` entry, undated. **Check every claim against the code and the two
+  *Done:* before, 1 in `Directory.Build.props`, 23 in README and 5 in the runbook. **Two of the
+  README's are not uBookIt's version but the Umbraco floor** (line 16, "Umbraco 18.2.1 or later",
+  and the requirements table at line 175), so the README was changed by pattern: the 16
+  tag-pinned documentation links, the 4 tag-pinned screenshot URLs and the "uBookIt is at"
+  sentence. The props file and the runbook (the "uBookIt is at" sentence and the four *Tag the
+  release* literals) were changed throughout. After: `18.2.1` remains only at those two Umbraco
+  lines; `18.2.2` appears 1, 21 and 5 times; the diff is 27 lines, as on main. The *Tag the
+  release* literals were re-read by eye. No history anchor named `18.2.1`.
+- [x] 1.2 Write the `18.2.2` entry, undated. **Check every claim against the code and the two
   archived changes, not against the proposal.** In particular:
   - the five advisories by GHSA id, each linked, with severity as GitHub records it;
   - the runtime version and SDKs from Microsoft's `releases.json`, not from memory;
@@ -21,18 +29,29 @@
   - no claim about CI.
 
   Verify: `ChangelogTests` and `VersionTruthTests` pass.
+  *Done:* the entry is `17.3.2`'s, byte-identical below the heading (compared with `diff`); it
+  names no line-specific version. Its claims were checked as recorded in `release-17-3-2` task
+  1.2, and the one that differs by line was checked here: every v18 tag from `18.0.0` to
+  `18.2.1` registered `culture: "en-us"`, so "every earlier release" holds on this line.
+  `ChangelogTests` and `VersionTruthTests` ran in the unit suite (2.2): passed.
 
 ## 2. Clean build and suites
 
-- [ ] 2.1 Stop the TestSite. Clean the outputs (including the stale hashed client assets), build
+- [x] 2.1 Stop the TestSite. Clean the outputs (including the stale hashed client assets), build
   the client, then `CI=true dotnet build UBookIt.slnx -c Release --no-incremental`. Verify:
   0 warnings, 0 errors.
-- [ ] 2.2 Run the suites per project, one after another. Verify, each with 0 skipped:
+  *Done:* no TestSite was running. `App_Plugins/UBookItBackoffice` deleted, client built (the
+  bundle registers `culture: "en"`), then the clean CI-mode Release build: 0 warnings, 0 errors.
+- [x] 2.2 Run the suites per project, one after another. Verify, each with 0 skipped:
   - unit **2143**, integration **210**, rendering **1178**, client **355**;
   - `openspec validate --all --strict` passes (26 specs, plus this change), run as CI runs it,
     after the last commit.
-- [ ] 2.3 Run the audit as `audit.yml` does. Verify: exit 0, the ImageSharp TestSite exception
+  *Done, 0 skipped:* client **355**, unit **2143**, rendering **1178**, integration **210**. The
+  openspec result is recorded with the commit.
+- [x] 2.3 Run the audit as `audit.yml` does. Verify: exit 0, the ImageSharp TestSite exception
   reported as accepted, not stale.
+  *Done:* "audited 10 project(s) (Debug, Release); 5 finding(s) accepted by a suppression"; "No
+  unaccepted advisories in the graph".
 
 ## 3. Review and merge
 
