@@ -35,6 +35,7 @@ public sealed class UBookItPersistenceComposer : IComposer
     public const string PrivacyPolicyUrlSettingKey = "UBookIt:PrivacyPolicyUrl";
     public const string SendBookerEmailsSettingKey = "UBookIt:Notifications:SendBookerEmails";
     public const string InternalRecipientsSettingKey = "UBookIt:Notifications:InternalRecipients";
+    public const string SkipSingleChoiceCatalogueSettingKey = "UBookIt:SkipSingleChoiceCatalogue";
 
     public void Compose(IUmbracoBuilder builder)
     {
@@ -209,6 +210,7 @@ public sealed class UBookItPersistenceComposer : IComposer
         MaxQueryRangeDays = ResolveMaxQueryRangeDays(configuration),
         RetentionDays = ResolveRetentionDays(configuration),
         AutoConfirm = ResolveAutoConfirm(configuration),
+        SkipSingleChoiceCatalogue = ResolveSkipSingleChoiceCatalogue(configuration),
         PrivacyPolicyUrl = ResolvePrivacyPolicyUrl(configuration),
         Notifications = ResolveNotifications(configuration).Settings,
     };
@@ -273,6 +275,23 @@ public sealed class UBookItPersistenceComposer : IComposer
     /// </remarks>
     internal static bool ResolveAutoConfirm(IConfiguration configuration)
         => !bool.TryParse(configuration[AutoConfirmSettingKey], out var autoConfirm) || autoConfirm;
+
+    /// <summary>
+    /// Whether the site wrote anything at all for <c>UBookIt:SkipSingleChoiceCatalogue</c>,
+    /// readable or not. Split from <see cref="ResolveSkipSingleChoiceCatalogue"/> on the
+    /// <see cref="IsAutoConfirmConfigured"/> precedent: the startup report complains only about a
+    /// value that was written and could not be read, never about an ordinary absence.
+    /// </summary>
+    internal static bool IsSkipSingleChoiceCatalogueConfigured(IConfiguration configuration)
+        => configuration[SkipSingleChoiceCatalogueSettingKey] is not null;
+
+    /// <summary>
+    /// A missing or unreadable <c>UBookIt:SkipSingleChoiceCatalogue</c> resolves to <c>true</c>,
+    /// the default. Shaped exactly like <see cref="ResolveAutoConfirm"/>; the fallback direction
+    /// is explained on <see cref="SiteBookingSettings.SkipSingleChoiceCatalogue"/>.
+    /// </summary>
+    internal static bool ResolveSkipSingleChoiceCatalogue(IConfiguration configuration)
+        => !bool.TryParse(configuration[SkipSingleChoiceCatalogueSettingKey], out var skip) || skip;
 
     /// <summary>
     /// The configured retention period in days, or <c>null</c> for no retention.

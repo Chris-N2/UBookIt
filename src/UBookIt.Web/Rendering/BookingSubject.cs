@@ -211,8 +211,9 @@ public static class BookingFlowLink
 /// <param name="Subject">What is being booked, or null for the catalogue.</param>
 /// <param name="NamedByAuthor">
 /// True when a site author supplied the id on the component. The author's id
-/// wins over the query — that is what makes "a site with one service" work, since
-/// no catalogue then exists to be traversed.
+/// wins over the query. It is one of the two ways "a site with one service" avoids a
+/// catalogue to traverse; the other is the single-choice skip, which enters the sole
+/// entry with this <c>false</c> — as if chosen — so that its token is carried.
 /// </param>
 public readonly record struct FlowEntry(BookingSubject? Subject, bool NamedByAuthor)
 {
@@ -238,4 +239,37 @@ public readonly record struct FlowEntry(BookingSubject? Subject, bool NamedByAut
             ? new FlowEntry(BookingSubject.Resource(resource), NamedByAuthor: true)
             : new FlowEntry(fromQuery, NamedByAuthor: false);
     }
+}
+
+/// <summary>
+/// Whether a catalogue is skipped: the one rule behind "a site offering one thing does not make a
+/// visitor choose it from a list of one".
+/// </summary>
+/// <remarks>
+/// <para>
+/// A pure function rather than a branch inside the dispatcher, for the reason
+/// <see cref="FlowEntry"/> is a value: a ViewComponent needs a host to exercise, and this rule's
+/// whole matrix — none, one service, one resource, two, the setting on and off — should not.
+/// </para>
+/// <para>
+/// <b>It counts the catalogue as composed and nothing else.</b> Whether the sole entry has any
+/// availability is deliberately not asked: that would be a second notion of what is bookable, and
+/// a page whose shape followed the calendar. A sole entry with none leads to its flow's own
+/// explanation, exactly as choosing it would.
+/// </para>
+/// <para>
+/// Internal, beside <see cref="FlowEntry"/> rather than on it, so it does not read as part of a
+/// published surface it is not.
+/// </para>
+/// </remarks>
+internal static class SingleChoice
+{
+    /// <summary>
+    /// The subject to enter as if the visitor had chosen it, or <c>null</c> to render the
+    /// catalogue.
+    /// </summary>
+    public static BookingSubject? Sole(CatalogueModel catalogue, bool skipSingleChoice)
+        => skipSingleChoice && catalogue.Entries.Count == 1
+            ? catalogue.Entries[0].Subject
+            : null;
 }
