@@ -65,15 +65,18 @@
   (byte-identical below the heading); 3.3 now checks `origin/dev/v18`, not `origin/main`
   (MINOR); 4.2 checks the inter-package dependencies again (MINOR); the proposal no longer reads
   as if `18.2.2` lands on `main` (NIT); 5.1 rechecks the "no Umbraco release" sentence (NIT).
-- [ ] 3.2 Chris pushes this branch and opens the PR. Verify: the PR's CI is green at every step,
+- [x] 3.2 Chris pushes this branch and opens the PR. Verify: the PR's CI is green at every step,
   parity included.
-- [ ] 3.3 Chris merges with "Create a merge commit". Verify: `origin/dev/v18` is the merge commit,
+  *Done:* PR #31, green at every step.
+- [x] 3.3 Chris merges with "Create a merge commit". Verify: `origin/dev/v18` is the merge commit,
   and its push run is green.
+  *Done:* `origin/dev/v18` is `f49e9d8` (merge of PR #31); its push run is green.
 
 ## 4. Release through the workflow
 
-- [ ] 4.1 Chris pushes tag `18.2.2` on the merge commit. Verify: `check` and `pack` are green.
-- [ ] 4.2 **Before approving**, check the run's `packages` artifact:
+- [x] 4.1 Chris pushes tag `18.2.2` on the merge commit. Verify: `check` and `pack` are green.
+  *Done:* the tag resolves to `f49e9d8`; publish run 38749733869, `check` and `pack` green.
+- [x] 4.2 **Before approving**, check the run's `packages` artifact:
   - the tagged `booking-flow.png` returns 200;
   - there are exactly 5 `.nupkg` and 4 `.snupkg`, all `18.2.2`, each `.snupkg` holding its `.pdb`;
   - all five nuspecs carry the authors, copyright, licence, readme, icon, project URL and the
@@ -88,18 +91,37 @@
   - the packed backoffice bundle registers its localization under `culture: "en"`;
   - the packed README is identical to the tag's, all its addresses return 200, and every
     repository address is pinned to `18.2.2`.
-- [ ] 4.3 Chris approves. Record the summary table and the conclusion.
-- [ ] 4.4 Confirm `18.2.2` per package on the flat container, and that the package page renders.
+
+  *Done:* Chris downloaded the artifact to `artifacts\packages-v18`; it was extracted to a fresh
+  scratch folder and checked by the same 79-check script as `release-17-3-2` 4.2, with this
+  line's expectations. All 79 pass. The negative control (this artifact against `17.3.2`'s
+  expectations) reports 29 failures.
+- [x] 4.3 Chris approves. Record the summary table and the conclusion.
+  *Done:* the run's summary: all five `.nupkg` "published", all four `.snupkg` "symbols
+  submitted". Conclusion: success.
+- [x] 4.4 Confirm `18.2.2` per package on the flat container, and that the package page renders.
+  *Done:* all five ids list `18.2.2` (each id's newest) on the flat container. The `UBookIt`
+  18.2.2 page returns 200, titled "UBookIt 18.2.2", with the README rendered.
 
 ## 5. Close out
 
-- [ ] 5.1 Stamp the entry's date. Before stamping, recheck "No Umbraco release fixes them yet":
+- [x] 5.1 Stamp the entry's date. Before stamping, recheck "No Umbraco release fixes them yet":
   Umbraco published `17.8.0-rc` and `18.3.0-rc` on 2026-10-15. If a stable release that resolves
   `Pkcs` 10.0.13 is out by then, correct the sentence (the entry is not yet published).
-- [ ] 5.2 Sibling sweep for `18.2.1` and for sentences the release falsifies. Fix or record each.
-- [ ] 5.3 The `audit` run is shared with `release-17-3-2` (one run audits both lines). Verify:
+  *Done:* stamped `2026-10-15`; the sentence sharpened as recorded in `release-17-3-2` 5.1 (no
+  stable release; both release candidates declare `Pkcs` 10.0.13). Byte-identical to main's
+  entry below the heading.
+- [x] 5.2 Sibling sweep for `18.2.1` and for sentences the release falsifies. Fix or record each.
+  *Done:* outside `CHANGELOG.md`, the archive and this change, `18.2.1` remains only as the
+  Umbraco floor (`Directory.Packages.props`, README lines 16 and 175) and in a TestSite comment
+  about `Umbraco.Cms.Imaging.ImageSharp` 18.2.1; all correct. Both "uBookIt is at" sentences say
+  `18.2.2`. Nothing to fix.
+- [x] 5.3 The `audit` run is shared with `release-17-3-2` (one run audits both lines). Verify:
   recorded there; nothing to run here.
-- [ ] 5.4 The deferred-obligations update is shared with `release-17-3-2`. Verify: done there,
+  *Done:* recorded in `release-17-3-2` 5.3 (green).
+- [x] 5.4 The deferred-obligations update is shared with `release-17-3-2`. Verify: done there,
   after both lines are live.
-- [ ] 5.5 Commit and run the unit suite. Chris pushes. Verify: `dev/v18`'s CI is green.
+  *Done:* recorded in `release-17-3-2` 5.4.
+- [x] 5.5 Commit and run the unit suite. Chris pushes. Verify: `dev/v18`'s CI is green.
+  *Done:* unit **2143**, 0 skipped. `dev/v18`'s CI runs on Chris's push.
 - [ ] 5.6 Archive last, running the unit suite before the push.
