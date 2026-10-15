@@ -183,8 +183,9 @@
      as `UBookIt.Web` always has. Nothing to do: every Umbraco site already uses it, and
      Umbraco's own web packages declare it.*
   5. *No API, schema or configuration change.*
-- [ ] 5.4 QA: one `qa-review` subagent for this change, reused across rounds, handed the claims to
+- [x] 5.4 QA: one `qa-review` subagent for this change, reused across rounds, handed the claims to
   verify (audit before and after, nuspec diff, counts, publish observation).
+  *Done: three rounds with one reviewer (REJECT, REJECT, APPROVE WITH NITS); see section 7.*
 
 ## 6. Design correction (2026-10-14, late): Xml is the runtime's, not the package's — option (B)
 
@@ -278,4 +279,13 @@
   - NIT: "the host loads the newer copy" now cites Microsoft's documented rule (SDK and host both
     prefer the newer version, and the framework's copy when equal) rather than resting on the 3.4
     trace.
-- [ ] 7.3 QA round 3.
+- [x] 7.3 QA round 3 (2026-10-15): **APPROVE WITH NITS**. Every SHALL and THEN of the body and
+  the changed scenarios was checked against all four packed nuspecs and held; the Microsoft Learn
+  citation was confirmed; the reviewer re-ran the unit suite (four unit-test files read
+  `Directory.Packages.props` or `openspec/changes`): 2131 / 2143 passed. Both nits taken:
+  - "the fewest packages that achieve this" admitted a single declaration in `UBookIt.Core`, which
+    only the narrowness clause excluded. The body now keeps the checkable rule ("SHALL NOT be
+    repeated along a dependency path"); the same "fewest" wording in proposal What Changes and
+    Capabilities and in the `Directory.Packages.props` comment was replaced to match.
+  - The scenario "A fix is declared once, where it is reached" (Pkcs is declared in two packages)
+    is now "A fix is not declared again where a dependency already brings it".
