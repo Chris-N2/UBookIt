@@ -14,7 +14,7 @@
   four *Tag the release* literals). Each was read in context first; none was a history anchor.
   After: 0 of `17.3.1`, and 1, 21 and 5 of `17.3.2`; the diff is those 27 lines. The *Tag the
   release* literals were re-read by eye.
-- [ ] 1.2 Write the `17.3.2` entry, undated. **Check every claim against the code and the two
+- [x] 1.2 Write the `17.3.2` entry, undated. **Check every claim against the code and the two
   archived changes, not against the proposal.** In particular:
   - the five advisories by GHSA id, each linked, with severity as GitHub records it;
   - the runtime version and SDKs from Microsoft's `releases.json`, not from memory;
