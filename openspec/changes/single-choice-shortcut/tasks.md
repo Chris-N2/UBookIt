@@ -63,12 +63,12 @@
 ## 5. Validate and QA (v17)
 
 - [x] 5.1 Full verification on `main`'s branch: client build, then `dotnet build` (Release, 0 warnings), unit (baseline 2131), integration (210), rendering (1178), client (355). Report the new counts. Run `openspec validate single-choice-shortcut --strict` and CI's exact openspec command after the last commit.
-- [ ] 5.2 QA review (`qa-review`) in a fresh subagent, reused across rounds. Hand it the claims (build state, counts, live checks) to verify, not to trust. Treat each round's fixes as new code.
+- [x] 5.2 QA review (`qa-review`) in a fresh subagent, reused across rounds. Hand it the claims (build state, counts, live checks) to verify, not to trust. Treat each round's fixes as new code. **Round 1 REJECT (1 MAJOR); round 2 APPROVE WITH NITS, both taken** (see the remediation sections below).
 
 ## 6. Port to dev/v18
 
-- [ ] 6.1 After v17 QA approval, cherry-pick onto a branch from `dev/v18` in worktree `..\uBookIt-v18`. Resolve any line differences, and run the generators (client build) against a running v18 TestSite. Verify: the same suites at the v18 baselines (unit 2143, integration 210, rendering 1178, client 355) plus new tests, 0 warnings, and the live checks 2.3 and 3.5 repeated on v18.
-- [ ] 6.2 QA review of the v18 branch: the same reviewer if it is still in this session, otherwise a fresh one told it is a port.
+- [x] 6.1 After v17 QA approval, cherry-pick onto a branch from `dev/v18` in worktree `..\uBookIt-v18`. Resolve any line differences, and run the generators (client build) against a running v18 TestSite. Verify: the same suites at the v18 baselines (unit 2143, integration 210, rendering 1178, client 355) plus new tests, 0 warnings, and the live checks 2.3 and 3.5 repeated on v18. **Done on branch `single-choice-shortcut-v18`**; the full record is in that branch's copy of this file. In brief: the cherry-picks applied clean; unit 2197; checked live on Chris's own site's database, including a booking through the skipped resource flow (SHTH-RDZ2).
+- [x] 6.2 QA review of the v18 branch: the same reviewer if it is still in this session, otherwise a fresh one told it is a port. **APPROVE (2026-10-15)**: the change's files are byte-identical to this branch's.
 
 ## 7. Release obligations (recorded for the release change, not done here)
 
