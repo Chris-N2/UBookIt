@@ -9,8 +9,10 @@
 
   Verify: `git grep 17.3.1` over `Directory.Build.props`, README and the runbook is empty, apart
   from history anchors (record the counts before and after).
-  *Done:* before, 1 in `Directory.Build.props`, 21 in README (17 tag-pinned documentation links
-  and 4 tag-pinned screenshot URLs) and 5 in the runbook (the "uBookIt is at" sentence and the
+  *Done:* before, 1 in `Directory.Build.props`, 21 in README (16 tag-pinned documentation links,
+  4 tag-pinned screenshot URLs and the "uBookIt is at" sentence; corrected in QA round 1, which
+  found the first record's 17/4 split wrong) and 5 in the runbook (the "uBookIt is at" sentence
+  and the
   four *Tag the release* literals). Each was read in context first; none was a history anchor.
   After: 0 of `17.3.1`, and 1, 21 and 5 of `17.3.2`; the diff is those 27 lines. The *Tag the
   release* literals were re-read by eye.
@@ -72,6 +74,25 @@
 
 - [ ] 3.1 QA (`qa-review`) in one subagent, reused across rounds, covering this change and
   `release-18-2-2`. Verify: APPROVE.
+  *Round 1: REJECT on both changes.* QA reproduced both clean builds, every suite, the audit and
+  validation, the bump counts and every entry claim against its primary source.
+  - **MAJOR: "Microsoft published five .NET advisories on 13 October 2026" was false.** GitHub
+    lists 40 NuGet advisories published that day, and `releases.json` lists 44 CVEs for 10.0.13,
+    three of them critical by GitHub's rating (two in Kestrel, on every platform; one in MsQuic).
+    The entry made the runtime update look like a fix for three DoS advisories only, which
+    understates it. *Fix (new text, verified first):* *What you have to do* now says the update
+    fixes 44 vulnerabilities, links the release notes, names the critical Kestrel ones as not
+    uBookIt's but in the runtime the site runs on, and tells the reader to take it regardless.
+    *What changed* now says five of that day's advisories are against packages in uBookIt's graph.
+    Same text on both lines (byte-identical below the heading).
+  - MINOR (v18): task 3.3 checked `origin/main`; now `origin/dev/v18`.
+  - MINOR: 4.2 had dropped the check that the uBookIt packages depend on each other at the new
+    version; restored on both lines.
+  - NITs taken: main 1.1's README split corrected; v18's proposal no longer reads as if `18.2.2`
+    lands on `main`; a hosting platform that provides the runtime is covered; 5.1 rechecks the
+    "no Umbraco release" sentence before stamping, because Umbraco published release candidates
+    today. NIT declined: "(medium)" for GHSA-2fmv-rv2c-59x7 stays, GitHub's API value and the
+    `17.2.3` entry's convention.
 - [ ] 3.2 Chris pushes this branch and opens the PR. Verify: the PR's CI is green at every step,
   parity included.
 - [ ] 3.3 Chris merges with "Create a merge commit". Verify: `origin/main` is the merge commit, and
@@ -86,7 +107,8 @@
   - all five nuspecs carry the authors, copyright, licence, readme, icon, project URL and the
     merge commit, with `umbraco-marketplace` on `UBookIt` only;
   - every `Umbraco.Cms.*` dependency is `[17.7.1, 18.0.0)`, and EF Core SqlServer is `10.0.11`,
-    confirmed against `Directory.Packages.props` at the tag;
+    confirmed against `Directory.Packages.props` at the tag, and the dependencies between the
+    uBookIt packages are at `17.3.2`;
   - **new this release:** `UBookIt.Persistence` and `UBookIt.Web` declare
     `System.Security.Cryptography.Pkcs` `10.0.13`; `UBookIt` and `UBookIt.Backoffice` declare the
     `Microsoft.AspNetCore.App` framework reference (as `UBookIt.Web` already does); no package
@@ -99,7 +121,9 @@
 
 ## 5. Close out
 
-- [ ] 5.1 Stamp the entry's date.
+- [ ] 5.1 Stamp the entry's date. Before stamping, recheck "No Umbraco release fixes them yet":
+  Umbraco published `17.8.0-rc` and `18.3.0-rc` on 2026-10-15. If a stable release that resolves
+  `Pkcs` 10.0.13 is out by then, correct the sentence (the entry is not yet published).
 - [ ] 5.2 Sibling sweep for `17.3.1` and for sentences the release falsifies. Fix or record each.
 - [ ] 5.3 Run the `audit` workflow by hand (Actions → *audit* → *Run workflow*). Verify: green for
   both lines. Chris runs it and reports the result.

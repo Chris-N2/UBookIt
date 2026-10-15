@@ -23,11 +23,16 @@ See [the versioning note](README.md#versions-and-the-api-promise).
 ### What you have to do
 
 **Run the .NET 10.0.13 runtime or later on your server.** Microsoft released it on 13 October
-2026 (ASP.NET Core Runtime 10.0.13). It is the only fix for three of the five advisories below,
-and no uBookIt release can supply it, because your site takes that code from the runtime, not
-from a package.
+2026 (ASP.NET Core Runtime 10.0.13) as a security update. Its
+[release notes](https://github.com/dotnet/core/blob/main/release-notes/10.0/10.0.13/10.0.13.md)
+list 44 vulnerabilities it fixes in .NET and ASP.NET Core. GitHub rates three of them critical,
+two of those in Kestrel, ASP.NET Core's web server. Those are not uBookIt's, but they are in the
+runtime your site runs on, so take the update whatever you do about uBookIt. It is also the only
+fix for three of the five advisories below, which concern packages uBookIt depends on. No uBookIt
+release can supply it, because your site takes that code from the runtime, not from a package.
 - On a server that runs your site with an installed runtime, install it there:
-  `dotnet --list-runtimes` should list `Microsoft.AspNetCore.App 10.0.13` or later.
+  `dotnet --list-runtimes` should list `Microsoft.AspNetCore.App 10.0.13` or later. On a hosting
+  platform that provides the runtime for you, check that it has moved to 10.0.13.
 - In a container, rebuild on an ASP.NET Core 10.0.13 base image, or a later one.
 - A self-contained deployment carries its own runtime, so rebuild it with an SDK that ships
   10.0.13: 10.0.113 or 10.0.402, or later.
@@ -47,8 +52,9 @@ a downgrade: raise that reference to 10.0.13.
 
 ### What changed
 
-**Microsoft published five .NET advisories on 13 October 2026**, all denial-of-service, all fixed
-in 10.0.13. They reach every site that runs uBookIt, and no Umbraco release fixes them yet.
+**Five of the advisories Microsoft published on 13 October 2026 are against packages in uBookIt's
+own dependency graph.** All five are denial-of-service, all are fixed in 10.0.13, and they reach
+every site that runs uBookIt. No Umbraco release fixes them yet.
 
 Three are against `System.Security.Cryptography.Xml`, which your site takes from the ASP.NET Core
 runtime. Only updating the runtime fixes them (see *What you have to do*):
