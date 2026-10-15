@@ -57,10 +57,15 @@
 
 - [ ] 3.1 QA (`qa-review`) in one subagent, reused across rounds, covering this change and
   `release-17-3-2`. Verify: APPROVE.
+  *Round 1: REJECT on both changes;* recorded in full in `release-17-3-2` task 3.1. On this line:
+  the entry's "five .NET advisories" paragraph (MAJOR) corrected with the same text as main
+  (byte-identical below the heading); 3.3 now checks `origin/dev/v18`, not `origin/main`
+  (MINOR); 4.2 checks the inter-package dependencies again (MINOR); the proposal no longer reads
+  as if `18.2.2` lands on `main` (NIT); 5.1 rechecks the "no Umbraco release" sentence (NIT).
 - [ ] 3.2 Chris pushes this branch and opens the PR. Verify: the PR's CI is green at every step,
   parity included.
-- [ ] 3.3 Chris merges with "Create a merge commit". Verify: `origin/main` is the merge commit, and
-  its push run is green.
+- [ ] 3.3 Chris merges with "Create a merge commit". Verify: `origin/dev/v18` is the merge commit,
+  and its push run is green.
 
 ## 4. Release through the workflow
 
@@ -71,7 +76,8 @@
   - all five nuspecs carry the authors, copyright, licence, readme, icon, project URL and the
     merge commit, with `umbraco-marketplace` on `UBookIt` only;
   - every `Umbraco.Cms.*` dependency is `[18.2.1, 19.0.0)`, and EF Core SqlServer is `10.0.11`,
-    confirmed against `Directory.Packages.props` at the tag;
+    confirmed against `Directory.Packages.props` at the tag, and the dependencies between the
+    uBookIt packages are at `18.2.2`;
   - **new this release:** `UBookIt.Persistence` and `UBookIt.Web` declare
     `System.Security.Cryptography.Pkcs` `10.0.13`; `UBookIt` and `UBookIt.Backoffice` declare the
     `Microsoft.AspNetCore.App` framework reference (as `UBookIt.Web` already does); no package
@@ -84,7 +90,9 @@
 
 ## 5. Close out
 
-- [ ] 5.1 Stamp the entry's date.
+- [ ] 5.1 Stamp the entry's date. Before stamping, recheck "No Umbraco release fixes them yet":
+  Umbraco published `17.8.0-rc` and `18.3.0-rc` on 2026-10-15. If a stable release that resolves
+  `Pkcs` 10.0.13 is out by then, correct the sentence (the entry is not yet published).
 - [ ] 5.2 Sibling sweep for `18.2.1` and for sentences the release falsifies. Fix or record each.
 - [ ] 5.3 The `audit` run is shared with `release-17-3-2` (one run audits both lines). Verify:
   recorded there; nothing to run here.

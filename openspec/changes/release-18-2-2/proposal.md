@@ -14,8 +14,8 @@ Two fixes are merged and archived on `dev/v18`, and neither reaches a site until
   repository, so the merge already made it pass; sites still resolve the old minimum until this
   release is published.
 
-`18.2.2` is the 18 line's half of the release, and follows `release-17-3-2` on `main`. The
-maintainer's own site runs the 18 line.
+`18.2.2` is the 18 line's half of the release. It follows `release-17-3-2`, which runs on
+`main`. The maintainer's own site runs the 18 line.
 
 ## What Changes
 
