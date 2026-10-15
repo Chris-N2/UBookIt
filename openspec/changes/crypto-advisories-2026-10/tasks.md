@@ -59,14 +59,18 @@
   `dotnet build UBookIt.slnx -c Release --no-incremental` **0 Warning(s), 0 Error(s)**; unit
   2129, rendering 1178, integration 210; `openspec validate --all --strict` 27. No packaging guard
   failed.*
-- [ ] 3.3 Which copy loads (design D4): `dotnet publish src/UBookIt.TestSite -c Release` to a scratch
+- [x] 3.3 Which copy loads (design D4): `dotnet publish src/UBookIt.TestSite -c Release` to a scratch
   folder, and record the file version of `System.Security.Cryptography.Xml.dll` and `…Pkcs.dll` in
   the output. Verify: recorded here, with what it implies for the changelog sentence, without
   claiming more than was observed.
+  *Done 2026-10-14, and it overturned D4 for `Xml`: see 6.1 (Xml.dll absent, pruned; Pkcs.dll
+  10.0.1326) and 6.2 (the same after (B)). The run-time half of D4 is in 3.4.*
 - [ ] 3.4 Live: start the TestSite and confirm the backoffice section loads, a booking can be placed
-  from the booking page, and it appears in the backoffice. (DataProtection signs the anti-forgery
-  token the booking form relies on, so this exercises the pinned `Xml` package's neighbourhood.)
-  Verify: screenshots or recorded observations.
+  from the booking page, and it appears in the backoffice. (DataProtection protects the anti-forgery
+  token the booking form relies on, so this exercises the neighbourhood of the framework references.)
+  Also, per design D4, start it with host tracing (`COREHOST_TRACE=1`) on this machine's unpatched
+  10.0.9 runtime, and record the path the host resolves for `System.Security.Cryptography.Pkcs.dll`
+  and `…Xml.dll`. Verify: screenshots or recorded observations, and the two resolved paths.
 
 ## 4. Port to dev/v18 (same sitting)
 
@@ -111,7 +115,7 @@
   `UBookIt.Web` + Pkcs 10.0.13. Release `--no-incremental`: 0 warnings, 0 errors. Unit 2129,
   rendering 1178, integration 210, client 355, openspec 27. Re-published TestSite: Xml.dll absent
   (framework's), Pkcs.dll file 10.0.1326.
-- [ ] 6.3 NEXT (tomorrow): update the artifacts to (B) BEFORE anything else. Proposal What Changes
+- [x] 6.3 Update the artifacts to (B) BEFORE anything else. Proposal What Changes
   and Impact; design D1/D2 (no Xml pin), D4 corrected with 6.1's observation, new D7 (framework
   reference; Xml is fixed only by the site's .NET runtime); spec: the scenario "An installing site
   resolves the fixed version" needs the case of a package the site's shared framework provides
@@ -120,4 +124,15 @@
   and handover. The release changelog must say: update the site's .NET 10 runtime to the October
   servicing release, which is the ONLY fix for the three Xml advisories (find the exact runtime
   version from Microsoft's release notes first, don't guess).
-
+  *Done 2026-10-15, after rebasing onto main `87c1f49` (the localization change merged and
+  archived). Proposal: a paragraph saying the two packages differ, What Changes, Not breaking,
+  Capabilities and Impact rewritten for (B). Design: Context gains the pruning and the 10.0.13
+  runtime facts; D2 records the measured set; D3 diffs framework references too; D4 corrected; D5
+  narrowed to `Pkcs`; the new decision is **D6**, not D7 (the code comments cited D7 with no D6, so
+  they were renumbered). Spec: a paragraph and a scenario, "An assembly the shared framework
+  supplies is left to the site's runtime". The runtime version was looked up, not guessed:
+  Microsoft's `release-metadata/10.0/releases.json` lists 10.0.13 (2026-10-13, security) as
+  fixing CVE-2026-96960, -96959, -96958 (Xml) and CVE-2026-84008, -70162 (Pkcs), which are the CVE
+  ids of the five GHSAs according to GitHub's advisory API. The proposal's claim that Umbraco's web
+  packages declare `Microsoft.AspNetCore.App` was checked: `Umbraco.Cms.Web.Common` and
+  `Umbraco.Cms.Api.Common` 17.7.1 nuspecs both do.*

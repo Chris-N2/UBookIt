@@ -30,7 +30,7 @@
        System.Security.Cryptography.Xml advisories correctly NOT this package's to fix: the
        framework provides that assembly, the SDK prunes the NuGet package from any project that
        references the framework, and so every Umbraco site runs the framework's copy, fixed only
-       by updating the site's .NET runtime (crypto-advisories-2026-10, design D7). -->
+       by updating the site's .NET runtime (crypto-advisories-2026-10, design D6). -->
   <ItemGroup>
     <FrameworkReference Include="Microsoft.AspNetCore.App" />
   </ItemGroup>
