@@ -65,12 +65,27 @@
   claiming more than was observed.
   *Done 2026-10-14, and it overturned D4 for `Xml`: see 6.1 (Xml.dll absent, pruned; Pkcs.dll
   10.0.1326) and 6.2 (the same after (B)). The run-time half of D4 is in 3.4.*
-- [ ] 3.4 Live: start the TestSite and confirm the backoffice section loads, a booking can be placed
+- [x] 3.4 Live: start the TestSite and confirm the backoffice section loads, a booking can be placed
   from the booking page, and it appears in the backoffice. (DataProtection protects the anti-forgery
   token the booking form relies on, so this exercises the neighbourhood of the framework references.)
   Also, per design D4, start it with host tracing (`COREHOST_TRACE=1`) on this machine's unpatched
   10.0.9 runtime, and record the path the host resolves for `System.Security.Cryptography.Pkcs.dll`
   and `…Xml.dll`. Verify: screenshots or recorded observations, and the two resolved paths.
+  *Done 2026-10-15, after the rebase, from this worktree's Release build (`UBookIt.TestSite.exe`
+  with `COREHOST_TRACE=1`). Frameworks resolved: Microsoft.AspNetCore.App **10.0.9** (unpatched),
+  Microsoft.NETCore.App 10.0.11. Final TRUSTED_PLATFORM_ASSEMBLIES:
+  `Pkcs` = the app's own `bin\Release
+et10.0untimes\win\lib
+et10.0\System.Security.Cryptography.Pkcs.dll`,
+  file **10.0.1326.50504** (the framework's 10.0.926 entry was processed at fx level 1 and not
+  added); `Xml` = `C:\Program Files\dotnet\shared\Microsoft.AspNetCore.App.0.9\System.Security.Cryptography.Xml.dll`,
+  file **10.0.926.27113** (the deps.json has no asset for `Xml`, pruned). So on an unpatched
+  runtime a site runs the patched `Pkcs` and the vulnerable `Xml`, exactly as D4/D6 state.
+  Booking page: booked Closure Live Room, Thursday 15 October 2026 16:00-17:00, as "Crypto Check"
+  (`crypto-check@example.test`); "Booking confirmed", reference **7VXV-F3ZR** (anti-forgery token
+  accepted). Backoffice over HTTPS (Chris signed in): the uBookIt section loads (Resources list in
+  English), and Bookings lists 7VXV-F3ZR, Oct 15 2026 4:00-5:00 PM, Closure Live Room, Booked
+  directly, Confirmed. TestSite stopped afterwards.*
 
 ## 4. Port to dev/v18 (same sitting)
 
