@@ -100,15 +100,18 @@
     "no Umbraco release" sentence before stamping, because Umbraco published release candidates
     today. NIT declined: "(medium)" for GHSA-2fmv-rv2c-59x7 stays, GitHub's API value and the
     `17.2.3` entry's convention.
-- [ ] 3.2 Chris pushes this branch and opens the PR. Verify: the PR's CI is green at every step,
+- [x] 3.2 Chris pushes this branch and opens the PR. Verify: the PR's CI is green at every step,
   parity included.
-- [ ] 3.3 Chris merges with "Create a merge commit". Verify: `origin/main` is the merge commit, and
+  *Done:* PR #30, green at every step.
+- [x] 3.3 Chris merges with "Create a merge commit". Verify: `origin/main` is the merge commit, and
   its push run is green.
+  *Done:* `origin/main` is `a1cd378` (merge of PR #30); its push run is green.
 
 ## 4. Release through the workflow
 
-- [ ] 4.1 Chris pushes tag `17.3.2` on the merge commit. Verify: `check` and `pack` are green.
-- [ ] 4.2 **Before approving**, check the run's `packages` artifact:
+- [x] 4.1 Chris pushes tag `17.3.2` on the merge commit. Verify: `check` and `pack` are green.
+  *Done:* the tag resolves to `a1cd378`; publish run 38749674186, `check` and `pack` green.
+- [x] 4.2 **Before approving**, check the run's `packages` artifact:
   - the tagged `booking-flow.png` returns 200;
   - there are exactly 5 `.nupkg` and 4 `.snupkg`, all `17.3.2`, each `.snupkg` holding its `.pdb`;
   - all five nuspecs carry the authors, copyright, licence, readme, icon, project URL and the
@@ -123,18 +126,42 @@
   - the packed backoffice bundle registers its localization under `culture: "en"`;
   - the packed README is identical to the tag's, all its addresses return 200, and every
     repository address is pinned to `17.3.2`.
-- [ ] 4.3 Chris approves. Record the summary table and the conclusion.
-- [ ] 4.4 Confirm `17.3.2` per package on the flat container, and that the package page renders.
+
+  *Done:* Chris downloaded the artifact to `artifacts\packages-v17`; it was extracted to a fresh
+  scratch folder and checked by a script that parses each nuspec as XML (79 checks). All 79 pass:
+  every item above, with `Pkcs` declared by exactly Persistence and Web, the framework reference
+  on `UBookIt`, Backoffice and Web, no `Xml` dependency, the bundle's only culture `en`, all 19
+  README addresses 200 and the 17 repository addresses pinned. The script can fail: run against
+  the `18.2.2` artifact with this release's expectations, it reports 29 failures.
+- [x] 4.3 Chris approves. Record the summary table and the conclusion.
+  *Done:* the run's summary: all five `.nupkg` "published", all four `.snupkg` "symbols
+  submitted". Conclusion: success.
+- [x] 4.4 Confirm `17.3.2` per package on the flat container, and that the package page renders.
+  *Done:* all five ids list `17.3.2` on `api.nuget.org/v3-flatcontainer/<id>/index.json`. The
+  `UBookIt` 17.3.2 page returns 200, titled "UBookIt 17.3.2", with the README rendered (its
+  tagged `booking-flow.png` is on the page).
 
 ## 5. Close out
 
-- [ ] 5.1 Stamp the entry's date. Before stamping, recheck "No Umbraco release fixes them yet":
+- [x] 5.1 Stamp the entry's date. Before stamping, recheck "No Umbraco release fixes them yet":
   Umbraco published `17.8.0-rc` and `18.3.0-rc` on 2026-10-15. If a stable release that resolves
   `Pkcs` 10.0.13 is out by then, correct the sentence (the entry is not yet published).
-- [ ] 5.2 Sibling sweep for `17.3.1` and for sentences the release falsifies. Fix or record each.
-- [ ] 5.3 Run the `audit` workflow by hand (Actions → *audit* → *Run workflow*). Verify: green for
+  *Done:* stamped `2026-10-15`. No stable release is out (the feed's newest are `17.7.1` and
+  `18.2.1`), but both release candidates' nuspecs declare `Pkcs` 10.0.13 (Infrastructure,
+  Persistence.EFCore, Api.Common). The bare sentence was literally true and misleading, so it
+  now says no *stable* release fixes them and that the candidates raise `Pkcs`, covering two of
+  the five. Same text on both lines (byte-identical below the heading).
+- [x] 5.2 Sibling sweep for `17.3.1` and for sentences the release falsifies. Fix or record each.
+  *Done:* outside `CHANGELOG.md`, the archive and this change, `17.3.1` appears nowhere. Both
+  "uBookIt is at" sentences say `17.3.2`. The only "undated" is the runbook's rule. Nothing to fix.
+- [x] 5.3 Run the `audit` workflow by hand (Actions → *audit* → *Run workflow*). Verify: green for
   both lines. Chris runs it and reports the result.
-- [ ] 5.4 Update the deferred-obligations memory: the advisory section closes (the `Pkcs` exit
+  *Done:* Chris ran it by hand on 2026-10-15: green.
+- [x] 5.4 Update the deferred-obligations memory: the advisory section closes (the `Pkcs` exit
   obligation stays open); the localization section closes.
-- [ ] 5.5 Commit and run the unit suite. Chris pushes. Verify: `main`'s CI is green.
+  *Done:* both sections closed, and the changelog obligation marked paid. The `Pkcs` exit
+  obligation stays open and now records where it lands: the floor raise to stable `17.8.0` /
+  `18.3.0`, whose release candidates declare `Pkcs` 10.0.13.
+- [x] 5.5 Commit and run the unit suite. Chris pushes. Verify: `main`'s CI is green.
+  *Done:* unit **2131**, 0 skipped. `main`'s CI runs on Chris's push.
 - [ ] 5.6 Archive last, running the unit suite before the push.

@@ -18,7 +18,7 @@ See [the versioning note](README.md#versions-and-the-api-promise).
 
 ---
 
-## 17.3.2
+## 17.3.2 — 2026-10-15
 
 ### What you have to do
 
@@ -54,7 +54,9 @@ a downgrade: raise that reference to 10.0.13.
 
 **Five of the advisories Microsoft published on 13 October 2026 are against packages uBookIt
 depends on.** All five are denial-of-service, all are fixed in 10.0.13, and they reach
-every site that runs uBookIt. No Umbraco release fixes them yet.
+every site that runs uBookIt. No stable Umbraco release fixes them yet; Umbraco's `17.8.0` and
+`18.3.0` release candidates (15 October 2026) raise `Pkcs` to 10.0.13, which covers two of the
+five.
 
 Three are against `System.Security.Cryptography.Xml`, which your site takes from the ASP.NET Core
 runtime. Only updating the runtime fixes them (see *What you have to do*):
