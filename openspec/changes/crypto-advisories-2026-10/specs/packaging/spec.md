@@ -7,8 +7,8 @@ known security advisory when a fixed version of that package exists. Where the v
 arrives transitively, and no Umbraco release within the line's supported range depends on a fixed
 version, the fixed version SHALL be declared as a direct dependency, either by that package or by a
 uBookIt package it depends on, so that its resolved graph reaches the fixed version. The
-declaration SHALL be made in the fewest packages that achieve this: a package whose uBookIt
-dependencies already bring the fixed version SHALL NOT declare it again. The declaration SHALL
+declaration SHALL NOT be repeated along a dependency path: a package whose uBookIt dependencies
+already bring the fixed version SHALL NOT declare it again. The declaration SHALL
 appear in the **packed** nuspec, because that is what a site's resolver reads.
 
 The declaration SHALL be narrow:
@@ -70,7 +70,7 @@ as to any other.
   other package
 - **AND** that declaration is not replaced by a framework reference
 
-#### Scenario: A fix is declared once, where it is reached
+#### Scenario: A fix is not declared again where a dependency already brings it
 
 - **WHEN** a shipped package reaches the fixed version through a uBookIt package it depends on
 - **THEN** it does not declare the fixed version itself

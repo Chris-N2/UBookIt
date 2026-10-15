@@ -42,8 +42,8 @@ pin of `Xml` would be inert at every real site. Both are fixed in the **.NET 10.
 
 ## What Changes
 
-- **The fewest packable projects that reach every affected one reference the patched `Pkcs`
-  directly**, at 10.0.13, through `Directory.Packages.props`. A project gets a direct reference
+- **Packable projects reference the patched `Pkcs` directly, but not where a uBookIt dependency
+  already brings it**, at 10.0.13, through `Directory.Packages.props`. A project gets a direct reference
   only to a package already in its resolved graph at a vulnerable version, and only if no uBookIt
   project it references already brings the fix. The exact set is measured at apply, per line, not
   assumed from the table above. On both lines it is `UBookIt.Persistence` and `UBookIt.Web`;
@@ -102,8 +102,8 @@ _None._
 
 - `packaging`: ADDS one requirement. When a package uBookIt ships would resolve a dependency with a
   known advisory, and no supported Umbraco release fixes it, the patched version is declared
-  directly, by that package or by a uBookIt package it depends on, in the fewest packages that
-  reach every affected one. The declaration is read from the packed nuspec, adds no package that
+  directly, by that package or by a uBookIt package it depends on, and is not repeated where a
+  dependency already brings it. The declaration is read from the packed nuspec, adds no package that
   was not already in the graph, and is removed once Umbraco carries the fix. Where the vulnerable
   package is one the .NET SDK prunes from every project that references the ASP.NET Core shared
   framework (every Umbraco site), a package declaration cannot reach the site, so the package
