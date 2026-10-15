@@ -24,6 +24,8 @@
   `System.Security.Cryptography.Pkcs` at `10.0.13` in `Directory.Packages.props`, with a comment
   naming the five advisories and the exit condition (design D5). Add `PackageReference`s to the
   expected set (design D2). Verify: restore succeeds.
+  *Superseded in part by 6.2 (option B): the `Xml` `PackageVersion` and Backoffice's `Xml`
+  reference were removed, and framework references declared instead. As done on 2026-10-14:*
   *Done: `PackageVersion` Xml and Pkcs 10.0.13 with the advisories/exit comment;
   `PackageReference` Pkcs in Persistence and Web, Xml in Backoffice. Audit: exit 0, "No
   unaccepted advisories in the graph", 10 projects, Debug and Release, ImageSharp x5 still
@@ -32,6 +34,8 @@
   Release). Keep it only if its removal brings an advisory back. Verify: the final set and the
   reason each reference stays are recorded here, and the audit reports no vulnerable package in
   ANY project, test projects and TestSite included.
+  *Superseded by 6.2 and 4.1: under option B the final set is two `Pkcs` references and three
+  framework references, each re-minimised on both lines in 4.1. As done on 2026-10-14:*
   *Done. Each reference removed in turn and the audit re-run (Debug and Release), then restored:
   without Persistence's Pkcs -> Persistence and Tests.Integration vulnerable (Pkcs 10.0.0);
   without Web's Pkcs -> Web, Tests.Rendering, Tests.ThemeFixture (Pkcs 10.0.0); without
@@ -46,6 +50,8 @@
 - [x] 3.1 Pack again and diff each package's nuspec dependency groups against 1.2 (design D3).
   Verify: the only differences are the added `System.Security.Cryptography.*` `10.0.13`
   dependencies, and each of them was in that project's graph in 1.1.
+  *Superseded by 6.2 (the final diff, framework references included) and 4.1 (v18). As done on
+  2026-10-14:*
   *Done: `pack-after` (5 nupkgs) diffed against `deps-before.txt`. The ONLY differences:
   `UBookIt.Backoffice` + System.Security.Cryptography.Xml 10.0.13; `UBookIt.Persistence` +
   System.Security.Cryptography.Pkcs 10.0.13; `UBookIt.Web` + System.Security.Cryptography.Pkcs
@@ -154,12 +160,15 @@
   1. *The five advisories published 2026-10-13, linked by GHSA id: `System.Security.Cryptography.
      Xml` GHSA-7hqp-7c5m-4vq6, GHSA-c399-9853-6jmj, GHSA-r955-8q5j-3h83 (high);
      `System.Security.Cryptography.Pkcs` GHSA-846f-f764-76mx (high), GHSA-2fmv-rv2c-59x7
-     (moderate). They reach every site through Umbraco, EF Core's SqlClient and MailKit, and no
-     Umbraco release fixes them yet.*
+     (moderate). They reach every site by two routes. `Pkcs` arrives as a package, through
+     Umbraco, EF Core's SqlClient and MailKit, and no Umbraco release raises it yet. `Xml` comes
+     from the ASP.NET Core shared framework that every site runs on, whatever packages the site
+     has (item 3).*
   2. *What this release does: `UBookIt.Persistence` and `UBookIt.Web` now depend on
      `System.Security.Cryptography.Pkcs` 10.0.13 or later. That package was already in every
-     site's graph; only its minimum rises. Observed: on an unpatched .NET 10.0.9 runtime, the site
-     then loads the patched Pkcs (10.0.1326) instead of the framework's copy (3.3, 3.4).*
+     site's graph; only its minimum rises. Observed on Windows (the TestSite's build output, where
+     Pkcs is the `runtimes/win` asset), on an unpatched .NET 10.0.9 runtime: the site then loads
+     the patched Pkcs (10.0.1326) instead of the framework's copy (3.3, 3.4).*
   3. *What it cannot do, said plainly: the three `Xml` advisories are fixed only by the site's
      .NET runtime. Every Umbraco site gets `Xml` from the ASP.NET Core shared framework, and the
      .NET SDK removes the NuGet package from such projects, so no package can replace it.
@@ -167,7 +176,9 @@
      The action: run the **ASP.NET Core Runtime 10.0.13** (released 2026-10-13) or later on the
      server. A self-contained deployment carries its own runtime, so it must be rebuilt with an
      SDK that ships 10.0.13 (SDK 10.0.113 or 10.0.402, or later), per Microsoft's release notes:
-     https://github.com/dotnet/core/blob/main/release-notes/10.0/10.0.13/10.0.13.md*
+     https://github.com/dotnet/core/blob/main/release-notes/10.0/10.0.13/10.0.13.md. A site
+     deployed as a container gets its runtime from the image, so it needs a rebuild on (or a
+     re-pull of) an `aspnet` 10.0.13 base image.*
   4. *`UBookIt` and `UBookIt.Backoffice` now declare the `Microsoft.AspNetCore.App` framework,
      as `UBookIt.Web` always has. Nothing to do: every Umbraco site already uses it, and
      Umbraco's own web packages declare it.*
@@ -180,7 +191,11 @@
 - [x] 6.1 FINDING while doing 3.3 (`dotnet publish` of the TestSite): a published site has no
   loadable `System.Security.Cryptography.Xml.dll` of its own; only the shared framework's copy runs
   (installed runtime 10.0.9, file 10.0.926, vulnerable). *Corrected 2026-10-15: this first said the
-  file was "ABSENT" from the publish output, which is not literally true.* (The publish folder does hold a `refs/System.Security.Cryptography.Xml.dll`, file 10.0.926: `refs/` is the set of framework reference assemblies kept for Umbraco's run-time Razor compilation, 307 files on both lines. The host does not load from it; the 3.4 traces show 0 of the 473-474 trusted platform assemblies come from `refs/`.) Cause, read from `obj/project.assets.json`: the .NET 10 SDK
+  file was "ABSENT" from the publish output, which is not literally true.* (The publish folder does
+  hold a `refs/System.Security.Cryptography.Xml.dll`, file 10.0.926: `refs/` is the set of framework
+  reference assemblies kept for Umbraco's run-time Razor compilation, 307 files on both lines. The
+  host does not load from it; the 3.4 traces show 0 of the 473-474 trusted platform assemblies come
+  from `refs/`.) Cause, read from `obj/project.assets.json`: the .NET 10 SDK
   prunes `System.Security.Cryptography.Xml` `(,10.0.32767]` from every project that references
   `Microsoft.AspNetCore.App` (UBookIt.Web, the TestSite, every Umbraco site). `Pkcs` is NOT pruned:
   10.0.13 (file 10.0.1326) ships in the site and is newer than the framework's (10.0.926). So the
@@ -219,3 +234,24 @@
   ids of the five GHSAs according to GitHub's advisory API. The proposal's claim that Umbraco's web
   packages declare `Microsoft.AspNetCore.App` was checked: `Umbraco.Cms.Web.Common` and
   `Umbraco.Cms.Api.Common` 17.7.1 nuspecs both do.*
+
+## 7. QA
+
+- [x] 7.1 QA round 1 (2026-10-15): **REJECT**. Every measured claim was verified independently
+  (audits before and after, minimality on both lines, nuspec diff by XML parse, builds and suites,
+  host traces, the 10.0.13 CVE list, line parity, encoding hygiene). Findings:
+  - MAJOR: the spec keyed the framework-reference rule on "an assembly the shared framework
+    supplies"; the real condition is the SDK's prune list (`Pkcs` is in the framework but not
+    pruned, and its pin works). Read literally, the paragraph forbade this change's own `Pkcs` pin.
+    Fixed in the spec paragraph (plus a sentence that framework membership is not the condition),
+    the scenario title (now matching its WHEN), a new scenario "A framework assembly that is not
+    pruned is declared like any other", proposal Capabilities, design D6 (heading and a paragraph),
+    and the comments in `Directory.Packages.props` and `UBookIt.Backoffice.csproj`.
+  - MINOR: handover item 1 said all five reach sites through Umbraco/SqlClient/MailKit; `Xml`
+    comes from the shared framework. Fixed.
+  - MINOR: the audit cannot see pruned packages, and nothing said so. A paragraph in
+    `docs/publishing.md`'s audit description, and a design risk.
+  - NITs: 2.1/2.2/3.1 and design D2 marked superseded; the two long inserted lines rewrapped;
+    handover item 2 says "on Windows", item 3 covers container images. The `global.json` SDK
+    observation is recorded in the deferred-obligations memory, not changed here.
+- [ ] 7.2 QA round 2.

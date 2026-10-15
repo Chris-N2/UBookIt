@@ -57,15 +57,17 @@ From the table in proposal.md, the expected set on `main` was:
 - `UBookIt.Web` → `Pkcs`. Web does not reference Persistence.
 - `UBookIt.Backoffice` → `Xml`, which its Umbraco dependencies bring at 10.0.10.
 
-That was an expectation, not the decision. Measured, the `Pkcs` pair held. The `Xml` reference
-was replaced by D6. The apply measures it: add the references, re-run
+That was an expectation, not the decision. The apply measures it: add the references, re-run
 `dotnet list package --vulnerable --include-transitive` for **Debug and Release**, then remove any
 reference whose removal leaves the audit clean. `dev/v18` is measured on its own, because Umbraco
 18.2.1's graph may differ (for example, `UBookIt.Web` may reach `Xml`).
 
-Whether `System.Security.Cryptography.Xml` 10.0.13 itself depends on `Pkcs` 10.0.13 is read from
-its nuspec at apply. If it does, `UBookIt.Backoffice`'s `Xml` reference also raises its Pkcs, and
-the set may shrink.
+Measured, the `Pkcs` pair held on both lines. The `Xml` reference was replaced by D6.
+
+*Superseded by D6:* whether `System.Security.Cryptography.Xml` 10.0.13 itself depends on `Pkcs`
+10.0.13 was to be read from its nuspec at apply (it does), because an `Xml` reference in
+`UBookIt.Backoffice` would then also have raised its Pkcs. No `Xml` reference remains, so this no
+longer bears on the set.
 
 ### D3 — The nuspec diff is the proof, read from the packed packages
 
@@ -91,7 +93,10 @@ packages even on an unpatched runtime. **For `Xml` that was wrong**, and the app
 doing what this decision asked. A published TestSite has **no** `System.Security.Cryptography.Xml`
 asset in its `deps.json` and no copy that the host can load, because the SDK pruned the package
 (Context). So the framework's copy (file 10.0.926 on the installed 10.0.9 runtime) is the one that
-runs. That led to D6. (The publish folder does hold a `refs/System.Security.Cryptography.Xml.dll`, file 10.0.926: `refs/` is the set of framework reference assemblies kept for Umbraco's run-time Razor compilation, 307 files on both lines. The host does not load from it; the 3.4 traces show 0 of the 473-474 trusted platform assemblies come from `refs/`.)
+runs. That led to D6. (The publish folder does hold a `refs/System.Security.Cryptography.Xml.dll`,
+file 10.0.926: `refs/` is the set of framework reference assemblies kept for Umbraco's run-time
+Razor compilation, 307 files on both lines. The host does not load from it; the 3.4 traces show 0 of
+the 473-474 trusted platform assemblies come from `refs/`.)
 
 For `Pkcs` the expectation stands, and is checked at two levels:
 
@@ -112,7 +117,7 @@ declaration whose reason has gone is removed"). The deferred-obligations memory 
 the `PackageVersion` entry carries a comment naming the advisories and the exit condition. The
 framework references of D6 have no exit: they are not a security measure.
 
-### D6 — `Xml` belongs to the shared framework: declare the framework, do not pin
+### D6 — The SDK prunes `Xml` from every site: declare the framework, do not pin
 
 Options, once the pruning was found (Chris chose B, 2026-10-14):
 
@@ -125,6 +130,11 @@ Options, once the pruning was found (Chris chose B, 2026-10-14):
   application, as `UBookIt.Web` already declares. The repository's restore then prunes `Xml` as a
   site's does, so the audit reports what a site runs. Chosen. `UBookIt.Tests` takes the same
   reference, because it runs ASP.NET Core code and should resolve as a site does.
+
+The condition that decides this is the SDK's prune list (`packagesToPrune` in a project's
+`obj/project.assets.json`), not whether the shared framework contains the assembly. `Pkcs` is in
+the framework too, but it is not pruned, and its pin works (D4). Choosing by "is it in the
+framework?" would have given up a fix that reaches every site.
 
 The consequence is stated plainly in the release changelog: uBookIt cannot fix the three `Xml`
 advisories, and a site fixes them by running .NET 10.0.13 or later. The audit cannot see a site's
@@ -139,6 +149,11 @@ advisories and stay.
 - [The pins outlive their reason] → D5.
 - [A guard enumerating packed dependencies fails] → D3: update the expectation, with the reason.
 - [`dev/v18` differs] → measured separately (D2), with its own nuspec diff (D3).
+- [The audit cannot see pruned packages] → with the framework reference, NuGet audit never
+  reports an advisory against a package the SDK prunes (Backoffice's prune list has 412 entries),
+  although such an advisory still affects every site, through its runtime. So nothing in this
+  repository will detect the next one. `docs/publishing.md` says so in the audit's description,
+  and names the trigger: a .NET security release, checked for packages on the prune list.
 - [A green audit read as "the site is safe"] → the audit sees uBookIt's graph, not a site's
   runtime. The changelog's runtime sentence (D6) is the only thing that reaches the `Xml`
   advisories, so it names the version.

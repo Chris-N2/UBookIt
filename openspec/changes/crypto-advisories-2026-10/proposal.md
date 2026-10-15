@@ -101,10 +101,12 @@ _None._
 - `packaging`: ADDS one requirement. When a package uBookIt ships would resolve a dependency with a
   known advisory, and no supported Umbraco release fixes it, the package declares the patched
   version directly. The declaration is read from the packed nuspec, adds no package that was not
-  already in the graph, and is removed once Umbraco carries the fix. Where the vulnerable assembly
-  is one the ASP.NET Core shared framework supplies to every site, a package declaration cannot
-  reach the site, so the package declares the framework instead, and the release notes name the
-  runtime that fixes it. No existing requirement is modified or removed.
+  already in the graph, and is removed once Umbraco carries the fix. Where the vulnerable package
+  is one the .NET SDK prunes from every project that references the ASP.NET Core shared framework
+  (every Umbraco site), a package declaration cannot reach the site, so the package declares the
+  framework instead, and the release notes name the runtime that fixes it. Being in the framework
+  is not the condition: an assembly the framework contains but the SDK does not prune (`Pkcs`) is
+  declared like any other. No existing requirement is modified or removed.
 
 ## Impact
 
