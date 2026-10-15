@@ -72,4 +72,14 @@
 
 ## 7. Release obligations (recorded for the release change, not done here)
 
-- [ ] 7.1 Record in the deferred-obligations memory what the `17.4.0` / `18.3.0` changelog entry must say. Under *What you have to do*: "a site whose booking page offers exactly one service or resource now goes straight to it; to keep showing the catalogue, untick *Skip the catalogue when there is only one choice* on the settings tab, or set `UBookIt:SkipSingleChoiceCatalogue` to `false`". Also note that Chris's own site needs it off before or at upgrade. Verify: the memory entry exists.
+- [x] 7.1 Record in the deferred-obligations memory what the `17.4.0` / `18.3.0` changelog entry must say. Under *What you have to do*: "a site whose booking page offers exactly one service or resource now goes straight to it; to keep showing the catalogue, untick *Skip the catalogue when there is only one choice* on the settings tab, or set `UBookIt:SkipSingleChoiceCatalogue` to `false`". Also note that Chris's own site needs it off before or at upgrade. Verify: the memory entry exists.
+
+## QA round 1 remediation (REJECT: 1 MAJOR, 5 MINOR, 3 NIT)
+
+- [x] R1.1 MAJOR: no test pinned "a named subject wins" on a catalogue of ONE. Added `An_author_named_subject_beats_the_skip_on_a_catalogue_of_one` and `A_subject_in_the_url_beats_the_skip_on_a_catalogue_of_one` (each run with the setting on and off), naming the service-only room on a one-service site. QA's ordering mutation (compute the sole entry before checking the subject) now fails 2 tests. The mutation set was rerun at seven mutations, all caught, and the files were restored.
+- [x] R1.2 MINOR: `BookingFlowViewComponent` class `<code>` block qualified for a catalogue of one.
+- [x] R1.3 MINOR: `package.xml`'s "with nothing named it renders the catalogue" comment qualified.
+- [x] R1.4 MINOR: comments citing a non-existent rendering test now name `SingleChoiceDispatchTests` (`BookingFlowViewComponent` constructor remarks, `SingleChoiceTests` class remarks).
+- [x] R1.5 MINOR: `booking-page.md`'s opening sentence qualified.
+- [x] R1.6 NITs: `theming.md` names the unavailable and confirmation views too; the TestSite harness comment is qualified; the test's activator comment says what it does and does not show.
+- [x] R1.7 Task 7.1 recorded in the deferred-obligations memory.

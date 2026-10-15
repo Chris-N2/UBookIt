@@ -137,7 +137,10 @@ public class SingleChoiceDispatchTests
                 },
             };
 
-            // MVC's own activator: the same path a site's request takes to construct the component.
+            // MVC's own activator, in an AddMvcCore container rather than Umbraco's host: the same
+            // component-activation code a site runs, not the site's whole container. That the
+            // site's container reaches the settings constructor was seen live (task 3.5: stored
+            // off rendered a catalogue of one).
             var component = (BookingFlowViewComponent)provider
                 .GetRequiredService<IViewComponentActivator>()
                 .Create(context);
@@ -358,6 +361,45 @@ public class SingleChoiceDispatchTests
         var form = Assert.IsType<BookingFormModel>(model);
         Assert.Equal(room.Id, form.ResourceId);
         Assert.Null(form.FlowToken);
+    }
+
+    // ---- a named subject wins ON A CATALOGUE OF ONE -------------------------------------------
+    //
+    // FOUND BY QA (round 1): the two tests above use a site with TWO entries, where the skip can
+    // never fire, so neither could tell "the named subject wins" from "the skip overrides it". A
+    // dispatcher that computed the sole entry BEFORE looking at the subject passed every suite.
+    // These name a DIFFERENT thing from the sole entry, on a site where the skip WOULD fire.
+    // The thing named is the service-only room: the only other bookable thing a one-entry site
+    // can have. Its flow reports it as not offered on its own — a resource-branch outcome, which
+    // is precisely what the skip, choosing the service, could never produce.
+
+    [Theory]
+    [InlineData(true)]
+    [InlineData(false)]
+    public async Task An_author_named_subject_beats_the_skip_on_a_catalogue_of_one(bool skip)
+    {
+        var room = TreatmentRoom(directlyBookable: false);
+        var site = new Site().With(Massage()).With(room);
+
+        var (view, model) = Rendered(await site.InvokeAsync(skip, resourceId: room.Id));
+
+        Assert.Equal("Unavailable", view);
+        Assert.IsType<BookingUnavailableModel>(model);
+    }
+
+    [Theory]
+    [InlineData(true)]
+    [InlineData(false)]
+    public async Task A_subject_in_the_url_beats_the_skip_on_a_catalogue_of_one(bool skip)
+    {
+        var room = TreatmentRoom(directlyBookable: false);
+        var site = new Site().With(Massage()).With(room);
+        var token = BookingSubject.Resource(room.Id).Token;
+
+        var (view, model) = Rendered(await site.InvokeAsync(skip, query: $"?{BookingKeys.SubjectQuery}={token}"));
+
+        Assert.Equal("Unavailable", view);
+        Assert.IsType<BookingUnavailableModel>(model);
     }
 
     [Theory]
