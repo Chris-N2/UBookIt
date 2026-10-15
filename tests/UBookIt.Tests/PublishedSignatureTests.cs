@@ -35,6 +35,17 @@ public class PublishedSignatureTests
     }
 
     [Fact]
+    public void BookingFlowViewComponent_keeps_its_published_constructor()
+    {
+        // single-choice-shortcut added a constructor taking the site settings; the published one
+        // stays, by exact parameter types, so an assembly built against it still binds.
+        var constructor = typeof(BookingFlowViewComponent).GetConstructor(
+            [typeof(ResourceBookingFlow), typeof(ServiceBookingFlow), typeof(BookingCatalogue), typeof(UBookIt.Web.FrontendSettings)]);
+
+        Assert.True(constructor is { IsPublic: true }, "BookingFlowViewComponent's four-argument constructor is published and must stay.");
+    }
+
+    [Fact]
     public void SiteClosure_Create_keeps_its_published_signature()
         => AssertHas(typeof(SiteClosure), nameof(SiteClosure.Create), typeof(DateOnly), typeof(string), typeof(Guid?));
 

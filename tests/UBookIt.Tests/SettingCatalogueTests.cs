@@ -213,6 +213,19 @@ public class SettingCatalogueTests
     }
 
     [Fact]
+    public void The_single_choice_skip_is_an_editable_boolean_that_needs_no_restart()
+    {
+        // Communication, so the operator's: whether a visitor to a site offering one bookable
+        // thing is shown a list of it. Read per request through the scoped settings, so a stored
+        // value takes effect on the next booking page request — no restart.
+        Assert.True(SettingCatalogue.TryGet(
+            UBookItPersistenceComposer.SkipSingleChoiceCatalogueSettingKey, out var skip));
+        Assert.Equal(SettingTier.Editable, skip.Tier);
+        Assert.Equal(SettingValueKind.Boolean, skip.ValueKind);
+        Assert.False(skip.RequiresRestart);
+    }
+
+    [Fact]
     public void Restart_bound_is_recorded_separately_from_read_only()
     {
         // Two different facts. RetentionDays is read-only but would take effect immediately;

@@ -87,4 +87,16 @@ public class PublishedCallShapeTests
 
         Assert.Null(form.ShiftedWindowFrom);
     }
+
+    [Fact]
+    public void BookingFlowViewComponent_keeps_its_published_four_argument_constructor()
+    {
+        // single-choice-shortcut added a five-argument constructor for the site settings. The
+        // published four-argument shape must still compile and bind; the flows are never invoked
+        // here, so nulls stand in for them.
+        var component = new BookingFlowViewComponent(
+            null!, null!, null!, new UBookIt.Web.FrontendSettings());
+
+        Assert.NotNull(component);
+    }
 }

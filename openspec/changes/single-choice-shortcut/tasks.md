@@ -1,21 +1,21 @@
 ## 1. The setting (Core + Persistence)
 
-- [ ] 1.1 Add `SkipSingleChoiceCatalogue` (`bool`, `init`, default `true`) to `SiteBookingSettings`, with remarks on its meaning and fallback direction. Verify: builds with 0 warnings, and no existing constructor or `with` usage changes.
-- [ ] 1.2 Add `SkipSingleChoiceCatalogueSettingKey = "UBookIt:SkipSingleChoiceCatalogue"`, plus `IsSkipSingleChoiceCatalogueConfigured` (presence) and `ResolveSkipSingleChoiceCatalogue` (absent or unreadable → true), to `UBookItPersistenceComposer`, and set the property in `ResolveSettings`. Verify: unit tests for absent → on, `"false"` → off, `"true"` → on, `"banana"` → on, each from configuration AND from the store via `EffectiveConfiguration`.
-- [ ] 1.3 Add `ErrorIfSkipSingleChoiceCatalogueUnreadable` to `RunUBookItMigrations.Report`. Verify: tests that an unreadable value logs one error naming the key, and that an absent or readable value logs nothing (persistence delta scenarios).
+- [x] 1.1 Add `SkipSingleChoiceCatalogue` (`bool`, `init`, default `true`) to `SiteBookingSettings`, with remarks on its meaning and fallback direction. Verify: builds with 0 warnings, and no existing constructor or `with` usage changes.
+- [x] 1.2 Add `SkipSingleChoiceCatalogueSettingKey = "UBookIt:SkipSingleChoiceCatalogue"`, plus `IsSkipSingleChoiceCatalogueConfigured` (presence) and `ResolveSkipSingleChoiceCatalogue` (absent or unreadable → true), to `UBookItPersistenceComposer`, and set the property in `ResolveSettings`. Verify: unit tests for absent → on, `"false"` → off, `"true"` → on, `"banana"` → on, each from configuration AND from the store via `EffectiveConfiguration`.
+- [x] 1.3 Add `ErrorIfSkipSingleChoiceCatalogueUnreadable` to `RunUBookItMigrations.Report`. Verify: tests that an unreadable value logs one error naming the key, and that an absent or readable value logs nothing (persistence delta scenarios).
 
 ## 2. The backoffice
 
-- [ ] 2.1 Add the `SettingCatalogue.All` entry (Editable, Boolean, operator block) and the `SettingText` mapping. Verify: `SettingCatalogueTests` and `SettingsControllerTests` cover the key as editable and not restart-bound; a write by a verb holder is accepted and stored; a non-boolean value is refused by the existing validator.
-- [ ] 2.2 Add the `skipSingleChoiceCatalogueLabel` and `skipSingleChoiceCatalogueDescription` terms to `en-us.ts` (copy in design D5). Verify: `npm run build` and `npm test` pass (baseline 355 + new). The existing term-key and manifest guards pass, and are confirmed to cover the new key.
+- [x] 2.1 Add the `SettingCatalogue.All` entry (Editable, Boolean, operator block) and the `SettingText` mapping. Verify: `SettingCatalogueTests` and `SettingsControllerTests` cover the key as editable and not restart-bound; a write by a verb holder is accepted and stored; a non-boolean value is refused by the existing validator.
+- [x] 2.2 Add the `skipSingleChoiceCatalogueLabel` and `skipSingleChoiceCatalogueDescription` terms to `en-us.ts` (copy in design D5). Verify: `npm run build` and `npm test` pass (baseline 355 + new). The existing term-key and manifest guards pass, and are confirmed to cover the new key.
 - [ ] 2.3 Live check on the TestSite (v17): the settings tab shows the setting as an editable checkbox with its configured and effective values. Toggling it, then reloading the booking page, changes what renders without a restart. Record this by screenshot or description in the handover.
 
 ## 3. The front end
 
-- [ ] 3.1 Add the internal pure rule (design D1, e.g. `SoleChoice(CatalogueModel, bool)`) beside `FlowEntry`. Verify: unit tests for 0, 1 service, 1 resource and 2 entries, each with the setting on and off. Only "1 entry + on" yields a subject.
-- [ ] 3.2 Add the second public constructor taking `SiteBookingSettings`, marked `[ActivatorUtilitiesConstructor]`, keeping the existing one (it behaves as on). Add the existing constructor's shape to `PublishedCallShapeTests`. Verify: build, and the call-shape test passes.
-- [ ] 3.3 In `InvokeAsync`'s no-subject branch, after `BuildAsync`, dispatch to the sole entry's flow with its token via `ServiceAsync` / `ResourceAsync` when the rule yields a subject. Change nothing else. Verify: 3.4.
-- [ ] 3.4 Rendering tests through the real component and host (`UBookIt.Tests.Rendering`). Each scenario in the `default-frontend` delta needs at least one test:
+- [x] 3.1 Add the internal pure rule (design D1, e.g. `SoleChoice(CatalogueModel, bool)`) beside `FlowEntry`. Verify: unit tests for 0, 1 service, 1 resource and 2 entries, each with the setting on and off. Only "1 entry + on" yields a subject.
+- [x] 3.2 Add the second public constructor taking `SiteBookingSettings`, marked `[ActivatorUtilitiesConstructor]`, keeping the existing one (it behaves as on). Add the existing constructor's shape to `PublishedCallShapeTests`. Verify: build, and the call-shape test passes.
+- [x] 3.3 In `InvokeAsync`'s no-subject branch, after `BuildAsync`, dispatch to the sole entry's flow with its token via `ServiceAsync` / `ResourceAsync` when the rule yields a subject. Change nothing else. Verify: 3.4.
+- [x] 3.4 Component tests through the real component (`UBookIt.Tests/SingleChoiceDispatchTests.cs`). **Changed during apply:** the rendering rig renders views, never a component, and its project cannot reach the in-memory stores. So these drive `BookingFlow`, activated by MVC's own `IViewComponentActivator` over the real flows and catalogue, and assert the view chosen and its model. That the views render `<h2>Book …</h2>` and the hidden `Subject` field is already the rendering suite's to prove, and it does. The PRG step is followed through `BookingFlowLink.AfterSubmission` with the token from the model. Each scenario in the `default-frontend` delta needs at least one test:
   - one service, setting on: service date step, `<h2>` names the service, no catalogue markup;
   - one resource, setting on: resource step;
   - one service plus one non-direct resource: service flow;
@@ -27,15 +27,32 @@
   - a skipped flow's confirmation is reached through the real PRG round trip;
   - a sole entry with no availability: its flow's own explanation.
 
-  Verify: all pass. **Mutate the dispatcher** (always skip; never skip; skip on `>= 1`; drop the token) and confirm that each mutation fails at least one test. Revert after.
+  Verify: all pass. **Mutate the dispatcher** (always skip; never skip; skip on `>= 1`; drop the token) and confirm that each mutation fails at least one test. Revert after. **Done:** six mutations, each caught. The failure counts were: no `[ActivatorUtilitiesConstructor]` 16 (activation throws on the ambiguous constructors); always skip 2; never skip 11; `>= 1` 3; drop the token 4; dispatcher ignores the setting 9. All were reverted, and the diff stat was unchanged afterwards.
 - [ ] 3.5 Live check on the TestSite (v17) with the settings store and catalogue arranged for each case: one entry (skips), two entries (catalogue), setting off (catalogue). Complete a booking through the skipped flow and confirm the confirmation page and its URL.
 
 ## 4. Docs
 
-- [ ] 4.1 `docs/booking-page.md`: the "With nothing else specified the page shows the catalogue" paragraph and its URL table state the single-choice skip and the setting that turns it off. Verify by rereading against the delta.
-- [ ] 4.2 `docs/configuration.md`: add the key to the *Editable in the backoffice* table and the fallback table ("on", "error, if something was written"). Reread line 26 ("behaves exactly as it did before") and qualify it if this release makes it misleading. Verify: any doc/README guard tests (pinned sentences, link guards) pass.
-- [ ] 4.3 `docs/theming.md`: one sentence saying that a themed `Catalogue` view is not rendered for a catalogue of one while the setting is on. Delivery API docs (`docs/delivery-api.md`): one sentence saying the skip is a front-end behaviour, and that a headless client decides for itself. Verify by rereading.
-- [ ] 4.4 Falsified-sentence sweep: grep `openspec/specs`, `docs`, `README.md` and the XML comments in `src/UBookIt.Web` for sentences that assume the bare booking page always shows the catalogue (`catalogue`, `list of one`, `nothing else specified`), including `BookingFlowViewComponent`'s own class remarks. Fix each one, or record why it still holds. List the results in the handover.
+- [x] 4.1 `docs/booking-page.md`: the "With nothing else specified the page shows the catalogue" paragraph and its URL table state the single-choice skip and the setting that turns it off. Verify by rereading against the delta.
+- [x] 4.2 `docs/configuration.md`: add the key to the *Editable in the backoffice* table and the fallback table ("on", "error, if something was written"). Reread line 26 ("behaves exactly as it did before") and qualify it if this release makes it misleading. Verify: any doc/README guard tests (pinned sentences, link guards) pass.
+- [x] 4.3 `docs/theming.md`: one sentence saying that a themed `Catalogue` view is not rendered for a catalogue of one while the setting is on. Delivery API docs (`docs/delivery-api.md`): one sentence saying the skip is a front-end behaviour, and that a headless client decides for itself. Verify by rereading.
+- [x] 4.4 Falsified-sentence sweep: grep `openspec/specs`, `docs`, `README.md` and the XML comments in `src/UBookIt.Web` for sentences that assume the bare booking page always shows the catalogue (`catalogue`, `list of one`, `nothing else specified`), including `BookingFlowViewComponent`'s own class remarks. Fix each one, or record why it still holds. List the results in the handover.
+
+- [x] 4.5 Guarantee diff for every MODIFIED requirement, checked against `openspec/specs/` as it stands:
+
+  **default-frontend — "A site may enter the flow at any point"**
+  - SHALL let an author start at the catalogue, a service or a resource: carried forward word for word.
+  - SHALL NOT require the catalogue to be traversed first: carried forward word for word.
+  - Each entry point independently renderable, and the same flow from that point on: carried forward word for word.
+  - Scenario *A site starts at one service*: carried forward word for word.
+  - Scenario *A site starts at the catalogue*: **deliberately narrowed** to "two or more choices, or the skip setting off". The proposal states this narrowing; with one choice and the setting on, the visitor is taken to that choice, which is the point of the change.
+  - Scenario *The entry point does not change what follows*: carried forward word for word. It is strengthened for the skip by *A skipped catalogue is the same flow as a chosen one*.
+  - Nothing is dropped.
+
+  **site-settings — "Settings are tiered, and the tier is enforced by the server"**
+  - The tier list: carried forward, with `UBookIt:SkipSingleChoiceCatalogue` added to Editable. Every other key keeps its tier.
+  - The deliberate omissions (`PreservedQueryParameters`, the theme), the tier-boundary rule, read-only refusal, the self-service cancellation reasoning, "no editable setting destroys data", restart-bound marking, and the dependency statement: all carried forward word for word.
+  - All six scenarios are carried forward word for word, and one is added.
+  - Nothing is dropped.
 
 ## 5. Validate and QA (v17)
 
