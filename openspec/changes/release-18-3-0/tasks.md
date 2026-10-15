@@ -1,3 +1,15 @@
+> **ON HOLD (2026-10-15, Chris's decision after QA round 1).** QA found that shipping with
+> MessagePack 3.1.8 breaks the packaging requirement *A shipped package declares the fix for an
+> advisory its host cannot yet supply*. Rather than ship, pin and ship again, this release WAITS
+> for stable Umbraco `17.8.0` / `18.3.0`. Their release candidates carry MessagePack 3.1.11 and
+> `Pkcs` 10.0.13; confirm that in the stable nuspecs.
+> - A separate change then raises the floor and removes the `Pkcs` pin, as that requirement
+>   demands.
+> - This change is then re-scoped on top of it: the floor raise goes first in *What you have to
+>   do*, and the bump, entry, builds and QA are redone.
+> - Round 1's other findings (the re-import overclaim and the project list) are fixed below.
+> - The branch is local and was never pushed.
+
 ## 1. The version and the entry
 
 - [x] 1.1 Branch `release-18-3-0` from local `dev/v18` at `3357f94` (the `single-choice-shortcut`
@@ -58,7 +70,7 @@
 - [x] 2.3 Run the audit as `audit.yml` does. Verify: exit 0, the ImageSharp TestSite exception
   reported as accepted, not stale.
   *NOT met, by Chris's decision (2026-10-15):* exit 1. The only finding is a NEW advisory, [GHSA-qhrr-8q5h-9q3h](https://github.com/advisories/GHSA-qhrr-8q5h-9q3h) (CVE-2026-92707, medium, published 2026-10-15 18:35 UTC). It is in MessagePack 3.1.8 and fixed in 3.1.9.
-  - It reaches Backoffice, Web, the TestSite and the three test projects **only through Umbraco**: `Umbraco.Cms.Web.Common` and `Umbraco.Cms.PublishedCache.HybridCache` 18.2.1 depend on 3.1.8. uBookIt does not reference MessagePack.
+  - It reaches seven projects **only through Umbraco**: the shipped `UBookIt`, `UBookIt.Backoffice` and `UBookIt.Web`, plus the TestSite and the three test projects (corrected in QA round 1, which found `UBookIt` missing from the first list): `Umbraco.Cms.Web.Common` and `Umbraco.Cms.PublishedCache.HybridCache` 18.2.1 depend on 3.1.8. uBookIt does not reference MessagePack.
   - Umbraco's `17.8.0-rc` / `18.3.0-rc` already move to 3.1.11.
   - Nothing else was found. The ImageSharp TestSite exception is still accepted.
   - **Chris chose to ship this release as it is and fix MessagePack in its own change straight after**: a minimum-version pin like `Pkcs`, or stable Umbraco. That is recorded in the deferred-obligations memory.

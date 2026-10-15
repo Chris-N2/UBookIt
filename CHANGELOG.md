@@ -62,9 +62,9 @@ configured value. A configured value that cannot be read as `true` or `false` is
 and the site logs an error naming the setting when it starts.
 
 **New installs get an updated description for the Booking Page document type**, mentioning the
-skip. An existing site keeps the description it was installed with: uBookIt never re-imports its
-document type into a site that already has it, so that your edits to the page template are never
-overwritten.
+skip. An existing site keeps the description it was installed with: this release adds no migration
+step, and an ordinary upgrade does not re-import uBookIt's schema (see *What an upgrade does* in
+the booking page docs).
 
 ### For developers
 
