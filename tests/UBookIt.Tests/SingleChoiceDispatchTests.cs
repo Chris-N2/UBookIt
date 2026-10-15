@@ -384,7 +384,9 @@ public class SingleChoiceDispatchTests
         var (view, model) = Rendered(await site.InvokeAsync(skip, resourceId: room.Id));
 
         Assert.Equal("Unavailable", view);
-        Assert.IsType<BookingUnavailableModel>(model);
+        Assert.Equal(
+            BookingUnavailableReason.NotOfferedIndividually,
+            Assert.IsType<BookingUnavailableModel>(model).Reason);
     }
 
     [Theory]
@@ -399,7 +401,9 @@ public class SingleChoiceDispatchTests
         var (view, model) = Rendered(await site.InvokeAsync(skip, query: $"?{BookingKeys.SubjectQuery}={token}"));
 
         Assert.Equal("Unavailable", view);
-        Assert.IsType<BookingUnavailableModel>(model);
+        Assert.Equal(
+            BookingUnavailableReason.NotOfferedIndividually,
+            Assert.IsType<BookingUnavailableModel>(model).Reason);
     }
 
     [Theory]

@@ -83,3 +83,8 @@
 - [x] R1.5 MINOR: `booking-page.md`'s opening sentence qualified.
 - [x] R1.6 NITs: `theming.md` names the unavailable and confirmation views too; the TestSite harness comment is qualified; the test's activator comment says what it does and does not show.
 - [x] R1.7 Task 7.1 recorded in the deferred-obligations memory.
+
+## QA round 2: APPROVE WITH NITS (both taken)
+
+- [x] R2.1 NIT: the two catalogue-of-one named-subject tests now assert `Reason == NotOfferedIndividually`, which is what their comment says, rather than only the model type.
+- [x] R2.2 NIT: `theming.md`'s edited paragraph rewrapped.
