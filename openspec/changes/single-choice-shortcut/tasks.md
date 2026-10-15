@@ -63,11 +63,22 @@
 ## 5. Validate and QA (v17)
 
 - [x] 5.1 Full verification on `main`'s branch: client build, then `dotnet build` (Release, 0 warnings), unit (baseline 2131), integration (210), rendering (1178), client (355). Report the new counts. Run `openspec validate single-choice-shortcut --strict` and CI's exact openspec command after the last commit.
-- [ ] 5.2 QA review (`qa-review`) in a fresh subagent, reused across rounds. Hand it the claims (build state, counts, live checks) to verify, not to trust. Treat each round's fixes as new code.
+- [x] 5.2 QA review (`qa-review`) in a fresh subagent, reused across rounds. Hand it the claims (build state, counts, live checks) to verify, not to trust. Treat each round's fixes as new code. **Round 1 REJECT (1 MAJOR); round 2 APPROVE WITH NITS, both taken** (see the remediation sections below).
 
 ## 6. Port to dev/v18
 
-- [ ] 6.1 After v17 QA approval, cherry-pick onto a branch from `dev/v18` in worktree `..\uBookIt-v18`. Resolve any line differences, and run the generators (client build) against a running v18 TestSite. Verify: the same suites at the v18 baselines (unit 2143, integration 210, rendering 1178, client 355) plus new tests, 0 warnings, and the live checks 2.3 and 3.5 repeated on v18.
+- [ ] 6.1 After v17 QA approval, cherry-pick onto a branch from `dev/v18` in worktree `..\uBookIt-v18`. Resolve any line differences, and run the generators (client build) against a running v18 TestSite. Verify: the same suites at the v18 baselines (unit 2143, integration 210, rendering 1178, client 355) plus new tests, 0 warnings, and the live checks 2.3 and 3.5 repeated on v18. **Progress 2026-10-15:**
+  - **Port:** branch `single-choice-shortcut-v18` from `dev/v18` `284203a`. The five commits (`063dc5c`, `fada253`, `d28799b`, `c7c3312`, `5c9393d`) applied with **no conflicts**.
+  - **Builds and suites:** client build and 356 client tests pass; Release build 0 warnings first time; unit **2197** (2143 + 54, the same growth as main), rendering 1178, integration 210; `openspec validate --strict` passes.
+  - **Mutations:** all seven caught on v18, with the same failure counts as main; the tree was clean afterwards.
+  - **Generator:** `npm run generate-client` against the running v18 TestSite gave output identical to the committed client apart from line endings (`git diff --ignore-cr-at-eol` empty), so the committed files were restored.
+  - **Live, on Chris's own site's database** (`NDD-Umbraco18-DB-UBOOKIT-TEST`, Umbraco 18.2.1, one directly bookable resource):
+    - The bare `/book-a-consultation/` renders "Book Consultancy Appointment" (the resource flow) with no catalogue, and the form carries `ubBook=r:…`.
+    - Configured `false` (environment variable, nothing stored) renders "Choose what to book" offering "Consultancy Appointment" alone.
+    - Configured `no` logs the startup ERR naming the key and skips.
+    - With nothing set, the page skips and nothing is logged about the setting.
+  - **Two local-only steps:** the git-ignored `Views/uBookItBookingPage.cshtml` was copied into the v18 TestSite, because the restored database's template had no file there (404). There were no pending uBookIt migrations.
+  - **Still owed (needs Chris's backoffice login):** the setting on the v18 settings screen, a stored toggle with no restart, a booking completed through the skipped resource flow, and Chris's own catalogue copy with the setting off.
 - [ ] 6.2 QA review of the v18 branch: the same reviewer if it is still in this session, otherwise a fresh one told it is a port.
 
 ## 7. Release obligations (recorded for the release change, not done here)
