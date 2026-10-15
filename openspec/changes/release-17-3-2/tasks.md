@@ -1,6 +1,6 @@
 ## 1. The version and the entry
 
-- [ ] 1.1 Branch `release-17-3-2` from local `main` at `4170e0b` (the `crypto-advisories-2026-10`
+- [x] 1.1 Branch `release-17-3-2` from local `main` at `4170e0b` (the `crypto-advisories-2026-10`
   archive).
   - Bump `<Version>` to `17.3.2`, and move every row of the table in `docs/publishing.md`
     *Before any push*, step 2.
@@ -9,6 +9,11 @@
 
   Verify: `git grep 17.3.1` over `Directory.Build.props`, README and the runbook is empty, apart
   from history anchors (record the counts before and after).
+  *Done:* before, 1 in `Directory.Build.props`, 21 in README (17 tag-pinned documentation links
+  and 4 tag-pinned screenshot URLs) and 5 in the runbook (the "uBookIt is at" sentence and the
+  four *Tag the release* literals). Each was read in context first; none was a history anchor.
+  After: 0 of `17.3.1`, and 1, 21 and 5 of `17.3.2`; the diff is those 27 lines. The *Tag the
+  release* literals were re-read by eye.
 - [ ] 1.2 Write the `17.3.2` entry, undated. **Check every claim against the code and the two
   archived changes, not against the proposal.** In particular:
   - the five advisories by GHSA id, each linked, with severity as GitHub records it;
@@ -21,18 +26,47 @@
   - no claim about CI.
 
   Verify: `ChangelogTests` and `VersionTruthTests` pass.
+  *Done.* Each claim was checked against a source, not the proposal:
+  - **Advisories:** all five `github.com/advisories/<id>` addresses return 200. Package, CVE and
+    severity come from GitHub's advisory API: the three `Xml` ones are high; `Pkcs`
+    GHSA-846f-f764-76mx is high and GHSA-2fmv-rv2c-59x7 medium (GitHub's word, as `17.2.3`'s entry
+    used). All five are denial-of-service ("Denial of Service Vulnerability" in each summary).
+  - **Runtime and SDKs:** `releases.json` lists 10.0.13 (2026-10-13, security), ASP.NET Core
+    Runtime 10.0.13, SDKs 10.0.113 and 10.0.402. The release-notes address returns 200.
+  - **"Your own NuGet audit will not tell you":** the archived advisory design (Context, D6) and
+    Microsoft Learn's compatibility-rules page (pruning is on by default for .NET 10 projects).
+    Worded as "with the .NET 10 SDK's default settings".
+  - **"Newer than any runtime before 10.0.13, and .NET uses the newer":** Microsoft's documented
+    rule (archived design D4), plus the Windows observation, which the entry labels as Windows.
+  - **Pkcs routes and downgrade:** EF Core's SQL Server provider and MailKit (the archived
+    proposal's measured table). The downgrade sentence follows `17.2.3`'s.
+  - **Localization:** `culture: "en"`, `weight: 200` (`manifest.ts:239-243`). "Every earlier
+    release" was checked: `en-us` at the commit that declared `17.0.0` (`b9ce573`, before tags
+    existed) and at every tag from `17.1.1` to `17.3.1`. The example key was checked:
+    `ubookitResources_create` is "Create resource" (`en-us.ts`); a first draft named
+    `ubookitResources_heading`, which does not exist, and was corrected. The permissions are the
+    four `entityUserPermission` toggles in the user group editor (`manifest.ts`). The override
+    paragraph follows the archived localization handover (task 7.2).
+  - No claim about CI.
+  `ChangelogTests` and `VersionTruthTests` ran in the unit suite (2.2): passed.
 
 ## 2. Clean build and suites
 
-- [ ] 2.1 Stop the TestSite. Clean the outputs (including the stale hashed client assets), build
+- [x] 2.1 Stop the TestSite. Clean the outputs (including the stale hashed client assets), build
   the client, then `CI=true dotnet build UBookIt.slnx -c Release --no-incremental`. Verify:
   0 warnings, 0 errors.
-- [ ] 2.2 Run the suites per project, one after another. Verify, each with 0 skipped:
+  *Done:* no TestSite was running. `App_Plugins/UBookItBackoffice` deleted, client built (the
+  bundle registers `culture: "en"`), then the clean CI-mode Release build: 0 warnings, 0 errors.
+- [x] 2.2 Run the suites per project, one after another. Verify, each with 0 skipped:
   - unit **2131**, integration **210**, rendering **1178**, client **355**;
   - `openspec validate --all --strict` passes (26 specs, plus this change), run as CI runs it,
     after the last commit.
-- [ ] 2.3 Run the audit as `audit.yml` does. Verify: exit 0, the ImageSharp TestSite exception
+  *Done, 0 skipped:* client **355**, unit **2131**, rendering **1178**, integration **210**. The
+  openspec result is recorded with the commit below.
+- [x] 2.3 Run the audit as `audit.yml` does. Verify: exit 0, the ImageSharp TestSite exception
   reported as accepted, not stale.
+  *Done:* exit 0; "audited 10 project(s) (Debug, Release); 5 finding(s) accepted by a
+  suppression"; "No unaccepted advisories in the graph".
 
 ## 3. Review and merge
 
