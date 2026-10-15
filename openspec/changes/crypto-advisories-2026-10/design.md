@@ -88,9 +88,10 @@ package resolves an advisory", is already enforced by the scheduled audit. A tes
 As proposed, this decision expected the host to reconcile the app's copy and the framework's copy
 of each assembly, with the higher version winning, so that uBookIt's update would fix both
 packages even on an unpatched runtime. **For `Xml` that was wrong**, and the apply found it by
-doing what this decision asked. A published TestSite contains **no**
-`System.Security.Cryptography.Xml.dll`, because the SDK pruned the package (Context), so the
-framework's copy (file 10.0.926 on the installed 10.0.9 runtime) is the only one. That led to D6.
+doing what this decision asked. A published TestSite has **no** `System.Security.Cryptography.Xml`
+asset in its `deps.json` and no copy that the host can load, because the SDK pruned the package
+(Context). So the framework's copy (file 10.0.926 on the installed 10.0.9 runtime) is the one that
+runs. That led to D6. (The publish folder does hold a `refs/System.Security.Cryptography.Xml.dll`, file 10.0.926: `refs/` is the set of framework reference assemblies kept for Umbraco's run-time Razor compilation, 307 files on both lines. The host does not load from it; the 3.4 traces show 0 of the 473-474 trusted platform assemblies come from `refs/`.)
 
 For `Pkcs` the expectation stands, and is checked at two levels:
 

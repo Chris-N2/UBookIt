@@ -63,7 +63,7 @@
   folder, and record the file version of `System.Security.Cryptography.Xml.dll` and `…Pkcs.dll` in
   the output. Verify: recorded here, with what it implies for the changelog sentence, without
   claiming more than was observed.
-  *Done 2026-10-14, and it overturned D4 for `Xml`: see 6.1 (Xml.dll absent, pruned; Pkcs.dll
+  *Done 2026-10-14, and it overturned D4 for `Xml`: see 6.1 (no loadable Xml.dll, pruned; Pkcs.dll
   10.0.1326) and 6.2 (the same after (B)). The run-time half of D4 is in 3.4.*
 - [x] 3.4 Live: start the TestSite and confirm the backoffice section loads, a booking can be placed
   from the booking page, and it appears in the backoffice. (DataProtection protects the anti-forgery
@@ -89,9 +89,38 @@
 
 ## 4. Port to dev/v18 (same sitting)
 
-- [ ] 4.1 Branch from `dev/v18`, cherry-pick, then repeat 1.1–1.3 and 2.2–3.4 there, because Umbraco
+- [x] 4.1 Branch from `dev/v18`, cherry-pick, then repeat 1.1–1.3 and 2.2–3.4 there, because Umbraco
   18.2.1's graph is measured separately (design D2). Verify: v18's own minimal set, its nuspec
   diff, 0 warnings, and suites at v18's baselines (unit 2141, or 2142 with the localization change).
+  *Done 2026-10-15 on branch `crypto-advisories-2026-10-v18` from dev/v18 `5170f77` (the
+  localization change merged and archived); the five main-line commits cherry-picked cleanly.
+  The baseline was wrong: the localization change added TWO unit tests, so the baselines are 2131
+  (main) and 2143 (v18), not 2130/2142.
+  1.1 before: audit exit 1, the same projects and versions as main (`UBookIt`, `Backoffice`,
+  `Tests`: Xml + Pkcs 10.0.10; `Persistence`, `Web`, `Tests.Integration`, `.Rendering`,
+  `.ThemeFixture`, `TestSite`: Pkcs 10.0.0). 1.2: packed before (17 dependency lines; the only
+  framework reference was Web's). 1.3 needs no repeat (the same 10.0.13 nuspecs).
+  2.2 minimised with a scratch script (each added reference removed in turn, the audit run as CI
+  runs it with every output stream captured, then restored from git): without Persistence's Pkcs
+  -> Backoffice, Persistence, Tests.Integration at Pkcs 10.0.0; without Web's Pkcs -> Web,
+  Tests.Rendering, Tests.ThemeFixture at Pkcs 10.0.0; without the framework reference in
+  `UBookIt`, `Backoffice` or `Tests` -> that project at Xml 10.0.10. All five stay. The same script
+  on the main line (whose framework references had not been through 2.2, since (B) came after it)
+  gave the identical result.
+  2.3: audit exit 0, "No unaccepted advisories", 10 projects, Debug and Release, ImageSharp x5
+  accepted, not stale. 3.1: pack diff exactly `UBookIt` + frameworkReference
+  Microsoft.AspNetCore.App, `UBookIt.Backoffice` + the same, `UBookIt.Persistence` + Pkcs 10.0.13,
+  `UBookIt.Web` + Pkcs 10.0.13; nothing removed; no pack warnings. 3.2: client 355; Release
+  `--no-incremental` 0 warnings, 0 errors; unit 2143, rendering 1178, integration 210.
+  3.3: published TestSite has `Pkcs.dll` 10.0.1326.50504 (root and `runtimes/win/...`) and no
+  loadable Xml (`refs/` as on main, see 6.1).
+  3.4: the build output's `UBookIt.TestSite.exe` with `COREHOST_TRACE=1` on AspNetCore 10.0.9:
+  TPA `Pkcs` = the app's `runtimes/win/lib/net10.0` copy, `Xml` = the 10.0.9 framework's; 0 TPA
+  entries from `refs/` (on both lines). Booking page: "DBO Granted", Monday 19 October 2026
+  09:00-09:30, "Crypto Check v18" (`crypto-check-v18@example.test`), confirmed, reference
+  **RD2C-M6PX**. Backoffice over HTTPS (Chris signed in; Umbraco 18, Library section present):
+  the uBookIt Bookings view loads; found by reference: RD2C-M6PX, Oct 19 2026 9:00-9:30 AM, DBO
+  Granted, Booked directly, Confirmed. TestSite stopped.*
 
 ## 5. Sweep and hand over
 
@@ -110,9 +139,10 @@
 
 ## 6. Design correction (2026-10-14, late): Xml is the runtime's, not the package's — option (B)
 
-- [x] 6.1 FINDING while doing 3.3 (`dotnet publish` of the TestSite): `System.Security.Cryptography.
-  Xml.dll` is ABSENT from a published site; only the shared framework's copy runs (installed runtime
-  10.0.9, file 10.0.926, vulnerable). Cause, read from `obj/project.assets.json`: the .NET 10 SDK
+- [x] 6.1 FINDING while doing 3.3 (`dotnet publish` of the TestSite): a published site has no
+  loadable `System.Security.Cryptography.Xml.dll` of its own; only the shared framework's copy runs
+  (installed runtime 10.0.9, file 10.0.926, vulnerable). *Corrected 2026-10-15: this first said the
+  file was "ABSENT" from the publish output, which is not literally true.* (The publish folder does hold a `refs/System.Security.Cryptography.Xml.dll`, file 10.0.926: `refs/` is the set of framework reference assemblies kept for Umbraco's run-time Razor compilation, 307 files on both lines. The host does not load from it; the 3.4 traces show 0 of the 473-474 trusted platform assemblies come from `refs/`.) Cause, read from `obj/project.assets.json`: the .NET 10 SDK
   prunes `System.Security.Cryptography.Xml` `(,10.0.32767]` from every project that references
   `Microsoft.AspNetCore.App` (UBookIt.Web, the TestSite, every Umbraco site). `Pkcs` is NOT pruned:
   10.0.13 (file 10.0.1326) ships in the site and is newer than the framework's (10.0.926). So the
@@ -128,8 +158,8 @@
   (dependencies AND framework references): exactly `UBookIt` + frameworkReference
   Microsoft.AspNetCore.App, `UBookIt.Backoffice` + the same, `UBookIt.Persistence` + Pkcs 10.0.13,
   `UBookIt.Web` + Pkcs 10.0.13. Release `--no-incremental`: 0 warnings, 0 errors. Unit 2129,
-  rendering 1178, integration 210, client 355, openspec 27. Re-published TestSite: Xml.dll absent
-  (framework's), Pkcs.dll file 10.0.1326.
+  rendering 1178, integration 210, client 355, openspec 27. Re-published TestSite: no loadable
+  Xml.dll (framework's; see 6.1 on `refs/`), Pkcs.dll file 10.0.1326.
 - [x] 6.3 Update the artifacts to (B) BEFORE anything else. Proposal What Changes
   and Impact; design D1/D2 (no Xml pin), D4 corrected with 6.1's observation, new D7 (framework
   reference; Xml is fixed only by the site's .NET runtime); spec: the scenario "An installing site
