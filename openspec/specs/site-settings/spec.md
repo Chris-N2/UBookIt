@@ -72,7 +72,8 @@ shows through when nothing is stored.
 Each setting SHALL belong to exactly one tier, declared once by the server:
 
 - **Editable** — `UBookIt:AutoConfirm`, `UBookIt:Notifications:SendBookerEmails`,
-  `UBookIt:Notifications:InternalRecipients`, `UBookIt:PrivacyPolicyUrl`.
+  `UBookIt:Notifications:InternalRecipients`, `UBookIt:PrivacyPolicyUrl`,
+  `UBookIt:SkipSingleChoiceCatalogue`.
 - **Editable with a stated consequence** — `UBookIt:TimeZoneId`.
 - **Read-only** — `UBookIt:RetentionDays`, `UBookIt:MaxQueryRangeDays`,
   `UBookIt:DeliveryApi:EnableReads`, `UBookIt:DeliveryApi:EnablePlacement`,
@@ -91,6 +92,11 @@ assembly to the rendering assembly in order to tell a developer something they w
 The tier boundary divides settings by **who is competent to judge them**: policy and communication
 belong to whoever runs the bookings; cost, safety and data lifetime belong to whoever deploys the
 site.
+
+**`UBookIt:SkipSingleChoiceCatalogue` is editable because it is communication.** It decides whether
+a visitor to a site offering one bookable thing is shown a list of that one thing, which is a
+question about what the site says to its visitors — the person who writes the booking page's copy
+is the person competent to answer it. It exposes nothing, costs nothing and destroys nothing.
 
 **A write to a read-only setting SHALL be refused by the server**, whatever the client rendered. The
 boundary exists to keep irreversible erasure and the package's anonymous exposure out of an
@@ -141,6 +147,10 @@ which is the failure this screen exists to avoid.
 #### Scenario: An unmet dependency is stated
 - **WHEN** the settings are presented on a site where self-service cancellation is enabled and booker emails are off
 - **THEN** the screen states that the feature cannot run, and that it needs booker emails
+
+#### Scenario: The single-choice skip is editable and takes effect without a restart
+- **WHEN** a user holding the settings verb stores a value for `UBookIt:SkipSingleChoiceCatalogue`
+- **THEN** the write is accepted, the setting is shown as editable and not as requiring a restart, and the next booking page request renders according to the stored value
 
 ### Requirement: The screen shows what a stored value is overriding, and can restore it
 
