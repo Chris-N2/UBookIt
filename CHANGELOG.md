@@ -52,8 +52,8 @@ a downgrade: raise that reference to 10.0.13.
 
 ### What changed
 
-**Five of the advisories Microsoft published on 13 October 2026 are against packages in uBookIt's
-own dependency graph.** All five are denial-of-service, all are fixed in 10.0.13, and they reach
+**Five of the advisories Microsoft published on 13 October 2026 are against packages uBookIt
+depends on.** All five are denial-of-service, all are fixed in 10.0.13, and they reach
 every site that runs uBookIt. No Umbraco release fixes them yet.
 
 Three are against `System.Security.Cryptography.Xml`, which your site takes from the ASP.NET Core

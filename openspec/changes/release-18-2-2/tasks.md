@@ -55,8 +55,11 @@
 
 ## 3. Review and merge
 
-- [ ] 3.1 QA (`qa-review`) in one subagent, reused across rounds, covering this change and
+- [x] 3.1 QA (`qa-review`) in one subagent, reused across rounds, covering this change and
   `release-17-3-2`. Verify: APPROVE.
+  *Round 2: APPROVE WITH NITS on both changes;* recorded in `release-17-3-2` task 3.1. The entry
+  nit ("packages uBookIt depends on") was taken on this line too; the entry stays byte-identical
+  to main's below the heading.
   *Round 1: REJECT on both changes;* recorded in full in `release-17-3-2` task 3.1. On this line:
   the entry's "five .NET advisories" paragraph (MAJOR) corrected with the same text as main
   (byte-identical below the heading); 3.3 now checks `origin/dev/v18`, not `origin/main`
