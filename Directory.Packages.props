@@ -38,7 +38,7 @@
          fixed DLL (newer than the framework's copy).
          The same day's System.Security.Cryptography.Xml advisories are NOT pinned: the ASP.NET
          Core shared framework provides that assembly, so the SDK prunes the package from every
-         site and only a .NET runtime update fixes it (design D7).
+         site and only a .NET runtime update fixes it (design D6).
          Direct references, NOT CentralPackageTransitivePinningEnabled: that would also pin every
          other entry in this file wherever it is reached transitively and declare it in the nuspec.
          EXIT: remove this, and the references to it, in the change that raises the Umbraco floor

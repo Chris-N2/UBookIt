@@ -24,7 +24,7 @@
 
   <!-- The suite exercises ASP.NET Core code (the Management API controllers), so it runs on the
        shared framework as a site does, and resolves System.Security.Cryptography.Xml from it rather
-       than from a package (crypto-advisories-2026-10, design D7). -->
+       than from a package (crypto-advisories-2026-10, design D6). -->
   <ItemGroup>
     <FrameworkReference Include="Microsoft.AspNetCore.App" />
   </ItemGroup>
