@@ -1,6 +1,6 @@
 ## 1. The version and the entry
 
-- [ ] 1.1 Branch `release-17-4-0` from local `main` at `47ea410` (the `single-choice-shortcut`
+- [x] 1.1 Branch `release-17-4-0` from local `main` at `47ea410` (the `single-choice-shortcut`
   archive).
   - Bump `<Version>` to `17.4.0`, and move every row of the table in `docs/publishing.md`
     *Before any push*, step 2.
@@ -9,7 +9,8 @@
 
   Verify: `git grep 17.3.2` over `Directory.Build.props`, README and the runbook is empty, apart
   from history anchors. Record the counts before and after; at `17.3.2` they were 1, 21 and 5.
-- [ ] 1.2 Write the `17.4.0` entry, undated. **Check every claim against the code and the archived
+  *Done:* before, 1 in `Directory.Build.props`, 21 in README (16 tag-pinned documentation links, 4 tag-pinned screenshot URLs and the "uBookIt is at" sentence) and 5 in the runbook (its "uBookIt is at" sentence and the four *Tag the release* literals). Each was read in context first; none is a history anchor. After: 0 of `17.3.2`, and 1, 21 and 5 of `17.4.0`; the diff is those 27 lines. The *Tag the release* literals were re-read by eye.
+- [x] 1.2 Write the `17.4.0` entry, undated. **Check every claim against the code and the archived
   change (`2026-10-15-single-choice-shortcut`), not against the proposal.** In particular:
   - the setting's key, label and default, from `UBookItPersistenceComposer`, `SiteBookingSettings`
     and `en-us.ts`;
@@ -27,18 +28,41 @@
   - no claim about CI.
 
   Verify: `ChangelogTests` and `VersionTruthTests` pass.
+  *Done.* Each claim was checked against a source:
+  - **The key, label and default:** `UBookItPersistenceComposer.SkipSingleChoiceCatalogueSettingKey`, `en-us.ts` ("Skip the catalogue when there is only one choice") and `SiteBookingSettings` (`= true`).
+  - **What counts as one, and that a named subject wins:** `BookingCatalogue.BuildAsync` and `BookingFlowViewComponent.InvokeAsync`.
+  - **No restart, and Reset to configured value:** seen live in the feature's checks 2.3 and 6.1.
+  - **The unreadable value:** `ResolveSkipSingleChoiceCatalogue` and `ErrorIfSkipSingleChoiceCatalogueUnreadable`, and seen live in 6.1.
+  - **The downgrade, against `17.3.2`'s code:**
+    - `SettingsController.GetSettings` lists `SettingCatalogue.All` only, so a stored row for an unknown key is not shown.
+    - `PutSetting` and `ResetSetting` answer 404 `setting-unknown` for it, so the screen cannot remove it.
+    - `RunUBookItMigrations.Report` has no check that reads it, and nothing else does.
+    - The row persists, so it applies again after an upgrade.
+  - **The description reaching new installs only:** `BookingPagePackageMigrationPlan` is a custom plan with one fixed state.
+  - **The public additions, by name**, from the archived feature (QA-verified there).
+  - The entry does not mention Umbraco `18.3.0`, so the two cannot be confused. There is no CI claim.
+  - This line's entry is the reference text; `release-18-3-0`'s matches it below the heading apart from the version names.
+  `ChangelogTests` and `VersionTruthTests`: 20 of 20 passed.
 
 ## 2. Clean build and suites
 
-- [ ] 2.1 Stop the TestSite. Clean the outputs (including the stale hashed client assets), build
+- [x] 2.1 Stop the TestSite. Clean the outputs (including the stale hashed client assets), build
   the client, then `CI=true dotnet build UBookIt.slnx -c Release --no-incremental`. Verify:
   0 warnings, 0 errors.
-- [ ] 2.2 Run the suites per project, one after another. Verify, each with 0 skipped:
+  *Done:* no TestSite was running. The hashed client assets in `App_Plugins/UBookItBackoffice` were deleted, the client was built, then the clean CI-mode Release build: 0 warnings, 0 errors.
+- [x] 2.2 Run the suites per project, one after another. Verify, each with 0 skipped:
   - unit **2185**, integration **210**, rendering **1178**, client **356**;
   - `openspec validate --all --strict` passes (26 specs, plus this change), run as CI runs it,
     after the last commit.
-- [ ] 2.3 Run the audit as `audit.yml` does. Verify: exit 0, the ImageSharp TestSite exception
+  *Done, 0 skipped:* client **356**, unit **2185**, integration **210**, rendering **1178**. The openspec result is recorded with the commit.
+- [x] 2.3 Run the audit as `audit.yml` does. Verify: exit 0, the ImageSharp TestSite exception
   reported as accepted, not stale.
+  *NOT met, by Chris's decision (2026-10-15):* exit 1. The only finding is a NEW advisory, [GHSA-qhrr-8q5h-9q3h](https://github.com/advisories/GHSA-qhrr-8q5h-9q3h) (CVE-2026-92707, medium, published 2026-10-15 18:35 UTC). It is in MessagePack 3.1.8 and fixed in 3.1.9.
+  - It reaches Backoffice, Web, the TestSite and the three test projects **only through Umbraco**: `Umbraco.Cms.Web.Common` and `Umbraco.Cms.PublishedCache.HybridCache` 17.7.1 depend on 3.1.8. uBookIt does not reference MessagePack.
+  - Umbraco's `17.8.0-rc` / `18.3.0-rc` already move to 3.1.11.
+  - Nothing else was found. The ImageSharp TestSite exception is still accepted.
+  - **Chris chose to ship this release as it is and fix MessagePack in its own change straight after**: a minimum-version pin like `Pkcs`, or stable Umbraco. That is recorded in the deferred-obligations memory.
+  - PR CI and `publish.yml` are unaffected, because advisories are warnings there. The scheduled `audit` workflow will be red until that change lands.
 
 ## 3. Review and merge
 
