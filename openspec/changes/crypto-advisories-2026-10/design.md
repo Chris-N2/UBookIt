@@ -105,6 +105,12 @@ For `Pkcs` the expectation stands, and is checked at two levels:
 - **Run time:** start the TestSite on the unpatched 10.0.9 runtime with host tracing and record
   which path the host resolves `System.Security.Cryptography.Pkcs.dll` to. The release changelog
   states only what was observed.
+- **The general rule** (added in QA round 2, so that the spec does not rest on one trace): the
+  SDK at build time and the host at run time both prefer the newer version, and the framework's
+  copy when the versions are equal. Source: Microsoft Learn, "NuGet package compatibility rules",
+  https://learn.microsoft.com/dotnet/standard/library-guidance/nuget-package-compatibility-rules
+  (section "Assembly versioning for .NET libraries that overlap with shared frameworks"), which
+  links the runtime's assembly-conflict-resolution design document.
 
 Whatever is observed, the changelog tells a site to update its .NET 10 runtime to 10.0.13 or
 later. For `Xml` that is the only fix, and uBookIt cannot speak for the rest of a site's graph.

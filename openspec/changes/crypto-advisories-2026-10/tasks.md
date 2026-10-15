@@ -254,4 +254,28 @@
   - NITs: 2.1/2.2/3.1 and design D2 marked superseded; the two long inserted lines rewrapped;
     handover item 2 says "on Windows", item 3 covers container images. The `global.json` SDK
     observation is recorded in the deferred-obligations memory, not changed here.
-- [ ] 7.2 QA round 2.
+- [x] 7.2 QA round 2 (2026-10-15): **REJECT**. The round-1 fixes held (the prune-list condition,
+  proposal, design D6, comments, handover, the `docs/publishing.md` paragraph). The reviewer re-ran
+  the unit suites because five unit-test files read `docs/publishing.md`: 2131 / 2143 passed.
+  Findings:
+  - MAJOR: the new scenario, and the requirement body since round 0, said the shipped package
+    "SHALL declare a direct dependency on the fixed version". `UBookIt` and `UBookIt.Backoffice`
+    both reached vulnerable `Pkcs` and declare it nowhere: they reach 10.0.13 through
+    `UBookIt.Persistence` / `UBookIt.Web`, which is design D2's rule. Fixed: the body now says the
+    fixed version is declared by the package or by a uBookIt package it depends on, in the fewest
+    packages; the scenario says the same, and "no framework reference is offered in its place"
+    became "that declaration is not replaced by a framework reference"; a new scenario, "A fix is
+    declared once, where it is reached", states the minimality that 2.2/4.1 measured. Proposal
+    Capabilities said "declares the patched version directly" too, and now matches. A grep for
+    siblings found two more the reviewer had not listed, both fixed: proposal What Changes ("Each
+    affected packable project references the patched `Pkcs` directly") and the
+    `Directory.Packages.props` comment ("the packable projects that resolve a vulnerable version
+    reference the fix directly"). Checked against
+    all four packed nuspecs: Persistence and Web declare Pkcs 10.0.13; `UBookIt` and Backoffice
+    declare no Pkcs and reach it through them (their framework references are for `Xml`).
+  - NIT: "never restored into a site" now says "with the SDK's default pruning (on by default for
+    .NET 10 projects)".
+  - NIT: "the host loads the newer copy" now cites Microsoft's documented rule (SDK and host both
+    prefer the newer version, and the framework's copy when equal) rather than resting on the 3.4
+    trace.
+- [ ] 7.3 QA round 3.
