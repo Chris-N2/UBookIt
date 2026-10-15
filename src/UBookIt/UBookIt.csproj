@@ -64,4 +64,13 @@
     <ProjectReference Include="..\UBookIt.Web\UBookIt.Web.csproj" />
   </ItemGroup>
 
+  <!-- Installed only into Umbraco sites, which are ASP.NET Core applications, so it declares the
+       shared framework as its libraries do. A framework reference is not inherited through a
+       project reference for package pruning, so without this the October 2026
+       System.Security.Cryptography.Xml advisories appear here although every site runs the
+       framework's copy (crypto-advisories-2026-10, design D6). -->
+  <ItemGroup>
+    <FrameworkReference Include="Microsoft.AspNetCore.App" />
+  </ItemGroup>
+
 </Project>

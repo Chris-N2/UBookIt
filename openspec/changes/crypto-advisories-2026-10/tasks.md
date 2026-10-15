@@ -1,0 +1,291 @@
+## 1. Baseline (main)
+
+- [x] 1.1 Record the audit before any change: `dotnet list UBookIt.slnx package --vulnerable
+  --include-transitive`, as Debug and as Release (`-p:Configuration=Release` on restore). Verify:
+  the findings match proposal.md's table, or the table is corrected first.
+  *Done 2026-10-14 with `scripts/ci/Assert-NoVulnerablePackages.ps1 -Target UBookIt.slnx` (Debug
+  and Release, as `audit.yml` runs it): exit 1. Vulnerable: `UBookIt`, `UBookIt.Backoffice`,
+  `UBookIt.Tests` (Xml 10.0.10 + Pkcs 10.0.10); `UBookIt.Persistence`, `UBookIt.Web`,
+  `UBookIt.Tests.Integration`, `.Rendering`, `.ThemeFixture`, `UBookIt.TestSite` (Pkcs 10.0.0).
+  `UBookIt.Core` clean. ImageSharp x5 accepted in the TestSite. Matches the proposal's table.*
+- [x] 1.2 Pack every packable project (Release) into a scratch folder and extract each nuspec's
+  dependency groups as the "before" set (design D3). Verify: one dependency list per package is
+  saved, outside the repository.
+  *Done: `dotnet pack UBookIt.slnx -c Release` (as `publish.yml`) into the session scratchpad
+  (`pack-before`, 5 nupkgs); dependency groups extracted by a scratch script to
+  `deps-before.txt`. 14 dependencies; `UBookIt.Core` declares none.*
+- [x] 1.3 Read `System.Security.Cryptography.Xml` 10.0.13's nuspec (NuGet flat container). Record
+  whether it depends on `…Pkcs` and at what version (design D2). Verify: recorded in this task.
+  *Done: Xml 10.0.13's nuspec (net10.0 group) depends on Pkcs 10.0.13; Pkcs 10.0.13 (net10.0)
+  has no dependencies. Both MIT.*
+## 2. Pin (main)
+
+- [x] 2.1 Add `PackageVersion` entries for `System.Security.Cryptography.Xml` and
+  `System.Security.Cryptography.Pkcs` at `10.0.13` in `Directory.Packages.props`, with a comment
+  naming the five advisories and the exit condition (design D5). Add `PackageReference`s to the
+  expected set (design D2). Verify: restore succeeds.
+  *Superseded in part by 6.2 (option B): the `Xml` `PackageVersion` and Backoffice's `Xml`
+  reference were removed, and framework references declared instead. As done on 2026-10-14:*
+  *Done: `PackageVersion` Xml and Pkcs 10.0.13 with the advisories/exit comment;
+  `PackageReference` Pkcs in Persistence and Web, Xml in Backoffice. Audit: exit 0, "No
+  unaccepted advisories in the graph", 10 projects, Debug and Release, ImageSharp x5 still
+  accepted.*
+- [x] 2.2 Minimise: for each added `PackageReference`, remove it and re-run the audit (Debug and
+  Release). Keep it only if its removal brings an advisory back. Verify: the final set and the
+  reason each reference stays are recorded here, and the audit reports no vulnerable package in
+  ANY project, test projects and TestSite included.
+  *Superseded by 6.2 and 4.1: under option B the final set is two `Pkcs` references and three
+  framework references, each re-minimised on both lines in 4.1. As done on 2026-10-14:*
+  *Done. Each reference removed in turn and the audit re-run (Debug and Release), then restored:
+  without Persistence's Pkcs -> Persistence and Tests.Integration vulnerable (Pkcs 10.0.0);
+  without Web's Pkcs -> Web, Tests.Rendering, Tests.ThemeFixture (Pkcs 10.0.0); without
+  Backoffice's Xml -> UBookIt, Backoffice, Tests (Xml 10.0.10). All three stay. (The script's
+  own summary counter printed 0 each time because the audit writes its errors to a stream the
+  capture missed; the `::error` lines printed directly are the evidence.)*
+- [x] 2.3 Run `scripts/ci/Assert-NoVulnerablePackages.ps1` the way `audit.yml` runs it. Verify: it
+  passes, and the ImageSharp TestSite exception is still reported as accepted, not stale.
+  *Done: as 2.1, the ImageSharp exception reported as accepted, not stale.*
+## 3. Prove what ships
+
+- [x] 3.1 Pack again and diff each package's nuspec dependency groups against 1.2 (design D3).
+  Verify: the only differences are the added `System.Security.Cryptography.*` `10.0.13`
+  dependencies, and each of them was in that project's graph in 1.1.
+  *Superseded by 6.2 (the final diff, framework references included) and 4.1 (v18). As done on
+  2026-10-14:*
+  *Done: `pack-after` (5 nupkgs) diffed against `deps-before.txt`. The ONLY differences:
+  `UBookIt.Backoffice` + System.Security.Cryptography.Xml 10.0.13; `UBookIt.Persistence` +
+  System.Security.Cryptography.Pkcs 10.0.13; `UBookIt.Web` + System.Security.Cryptography.Pkcs
+  10.0.13. Each package was in that project's graph in 1.1.*
+- [x] 3.2 Build and test: client first (`npm run build`), then `dotnet build UBookIt.slnx -c Release`
+  and the suites. Verify: 0 errors and **0 warnings** (the NU1902/NU1903 advisories are gone); unit,
+  rendering, integration and client counts equal the baselines (unit 2129 on main, or 2130 if
+  `backoffice-localization-fallback` has merged first; rendering 1178; integration 210; client 355).
+  Any packaging guard that fails is handled per design D3 and recorded here.
+  *Done (before `backoffice-localization-fallback` merges, so main's baselines): client 355;
+  `dotnet build UBookIt.slnx -c Release --no-incremental` **0 Warning(s), 0 Error(s)**; unit
+  2129, rendering 1178, integration 210; `openspec validate --all --strict` 27. No packaging guard
+  failed.*
+- [x] 3.3 Which copy loads (design D4): `dotnet publish src/UBookIt.TestSite -c Release` to a scratch
+  folder, and record the file version of `System.Security.Cryptography.Xml.dll` and `…Pkcs.dll` in
+  the output. Verify: recorded here, with what it implies for the changelog sentence, without
+  claiming more than was observed.
+  *Done 2026-10-14, and it overturned D4 for `Xml`: see 6.1 (no loadable Xml.dll, pruned; Pkcs.dll
+  10.0.1326) and 6.2 (the same after (B)). The run-time half of D4 is in 3.4.*
+- [x] 3.4 Live: start the TestSite and confirm the backoffice section loads, a booking can be placed
+  from the booking page, and it appears in the backoffice. (DataProtection protects the anti-forgery
+  token the booking form relies on, so this exercises the neighbourhood of the framework references.)
+  Also, per design D4, start it with host tracing (`COREHOST_TRACE=1`) on this machine's unpatched
+  10.0.9 runtime, and record the path the host resolves for `System.Security.Cryptography.Pkcs.dll`
+  and `…Xml.dll`. Verify: screenshots or recorded observations, and the two resolved paths.
+  *Done 2026-10-15, after the rebase, from this worktree's Release build (`UBookIt.TestSite.exe`
+  with `COREHOST_TRACE=1`). Frameworks resolved: Microsoft.AspNetCore.App **10.0.9** (unpatched),
+  Microsoft.NETCore.App 10.0.11. Final TRUSTED_PLATFORM_ASSEMBLIES:
+  `Pkcs` = the app's own
+  `bin/Release/net10.0/runtimes/win/lib/net10.0/System.Security.Cryptography.Pkcs.dll`,
+  file **10.0.1326.50504** (the framework's 10.0.926 entry was processed at fx level 1 and not
+  added); `Xml` = the shared framework's
+  `C:/Program Files/dotnet/shared/Microsoft.AspNetCore.App/10.0.9/System.Security.Cryptography.Xml.dll`,
+  file **10.0.926.27113** (the deps.json has no asset for `Xml`, pruned). So on an unpatched
+  runtime a site runs the patched `Pkcs` and the vulnerable `Xml`, exactly as D4/D6 state.
+  Booking page: booked Closure Live Room, Thursday 15 October 2026 16:00-17:00, as "Crypto Check"
+  (`crypto-check@example.test`); "Booking confirmed", reference **7VXV-F3ZR** (anti-forgery token
+  accepted). Backoffice over HTTPS (Chris signed in): the uBookIt section loads (Resources list in
+  English), and Bookings lists 7VXV-F3ZR, Oct 15 2026 4:00-5:00 PM, Closure Live Room, Booked
+  directly, Confirmed. TestSite stopped afterwards.*
+
+## 4. Port to dev/v18 (same sitting)
+
+- [x] 4.1 Branch from `dev/v18`, cherry-pick, then repeat 1.1–1.3 and 2.2–3.4 there, because Umbraco
+  18.2.1's graph is measured separately (design D2). Verify: v18's own minimal set, its nuspec
+  diff, 0 warnings, and suites at v18's baselines (unit 2141, or 2142 with the localization change).
+  *Done 2026-10-15 on branch `crypto-advisories-2026-10-v18` from dev/v18 `5170f77` (the
+  localization change merged and archived); the five main-line commits cherry-picked cleanly.
+  The baseline was wrong: the localization change added TWO unit tests, so the baselines are 2131
+  (main) and 2143 (v18), not 2130/2142.
+  1.1 before: audit exit 1, the same projects and versions as main (`UBookIt`, `Backoffice`,
+  `Tests`: Xml + Pkcs 10.0.10; `Persistence`, `Web`, `Tests.Integration`, `.Rendering`,
+  `.ThemeFixture`, `TestSite`: Pkcs 10.0.0). 1.2: packed before (17 dependency lines; the only
+  framework reference was Web's). 1.3 needs no repeat (the same 10.0.13 nuspecs).
+  2.2 minimised with a scratch script (each added reference removed in turn, the audit run as CI
+  runs it with every output stream captured, then restored from git): without Persistence's Pkcs
+  -> Backoffice, Persistence, Tests.Integration at Pkcs 10.0.0; without Web's Pkcs -> Web,
+  Tests.Rendering, Tests.ThemeFixture at Pkcs 10.0.0; without the framework reference in
+  `UBookIt`, `Backoffice` or `Tests` -> that project at Xml 10.0.10. All five stay. The same script
+  on the main line (whose framework references had not been through 2.2, since (B) came after it)
+  gave the identical result.
+  2.3: audit exit 0, "No unaccepted advisories", 10 projects, Debug and Release, ImageSharp x5
+  accepted, not stale. 3.1: pack diff exactly `UBookIt` + frameworkReference
+  Microsoft.AspNetCore.App, `UBookIt.Backoffice` + the same, `UBookIt.Persistence` + Pkcs 10.0.13,
+  `UBookIt.Web` + Pkcs 10.0.13; nothing removed; no pack warnings. 3.2: client 355; Release
+  `--no-incremental` 0 warnings, 0 errors; unit 2143, rendering 1178, integration 210.
+  3.3: published TestSite has `Pkcs.dll` 10.0.1326.50504 (root and `runtimes/win/...`) and no
+  loadable Xml (`refs/` as on main, see 6.1).
+  3.4: the build output's `UBookIt.TestSite.exe` with `COREHOST_TRACE=1` on AspNetCore 10.0.9:
+  TPA `Pkcs` = the app's `runtimes/win/lib/net10.0` copy, `Xml` = the 10.0.9 framework's; 0 TPA
+  entries from `refs/` (on both lines). Booking page: "DBO Granted", Monday 19 October 2026
+  09:00-09:30, "Crypto Check v18" (`crypto-check-v18@example.test`), confirmed, reference
+  **RD2C-M6PX**. Backoffice over HTTPS (Chris signed in; Umbraco 18, Library section present):
+  the uBookIt Bookings view loads; found by reference: RD2C-M6PX, Oct 19 2026 9:00-9:30 AM, DBO
+  Granted, Booked directly, Confirmed. TestSite stopped.*
+
+## 5. Sweep and hand over
+
+- [x] 5.1 Search docs, README, CHANGELOG, CLAUDE.md, `openspec/specs/**` and the CI scripts for
+  sentences this falsifies (for example, "0 warnings" claims, statements about which advisories
+  the audit accepts, or "the packages depend only on Umbraco"). Verify: each hit listed with its
+  decision.
+  *Done 2026-10-15 (main line; dev/v18 carries the same files for these hits). Searched for
+  Cryptography, FrameworkReference / AspNetCore.App, "depend(s) only on", NU190x, "0 warnings",
+  transitive, shared framework, .NET runtime / .NET 10, advisor. Hits and decisions:
+  `openspec/specs/packaging` "Nothing is declared that is not published" constrains only
+  dependencies on uBookIt packages (lockstep versions), not Microsoft ones: not falsified. Its
+  Umbraco upper-bound requirement exempts nothing new (Pkcs is not `Umbraco.Cms.*`): not falsified.
+  `docs/theming.md`'s example already declares the same framework reference: consistent.
+  `docs/publishing.md` "the only accepted advisories are `UBookIt.TestSite`'s, for ImageSharp":
+  still true (no suppression added). `openspec/specs/continuous-integration` (the audit fails on
+  any advisory in the graph, transitive included): still true; the graph no longer contains Xml as a
+  package, which is the point of D6. The "depend only on ports" hits are about code, not packages.
+  CHANGELOG hits are history and are not edited. No README or CLAUDE.md hit. Nothing to change.*
+- [x] 5.2 Record in the deferred-obligations memory: the pins, their exit condition (design D5),
+  and that the release changelog owes the .NET runtime advice (D4). Verify: the entry exists.
+  *Done 2026-10-15: the advisories section records (B), the Pkcs-only exit (the framework
+  references stay), and the changelog's runtime sentence including that a site's own audit will
+  not report the Xml advisories.*
+- [x] 5.3 Handover for the release change (`17.3.2` / `18.2.2`, shared with
+  `backoffice-localization-fallback`): the changelog names the five advisories, says the update
+  raises the minimum of two Microsoft packages already in the site's graph, states 3.3's observed
+  result honestly, and advises taking the October .NET servicing update. Verify: written here.
+  *Written 2026-10-15. Under (B) it is ONE package's minimum, not two, so the task's own wording
+  is superseded. The changelog entry must say:*
+  1. *The five advisories published 2026-10-13, linked by GHSA id: `System.Security.Cryptography.
+     Xml` GHSA-7hqp-7c5m-4vq6, GHSA-c399-9853-6jmj, GHSA-r955-8q5j-3h83 (high);
+     `System.Security.Cryptography.Pkcs` GHSA-846f-f764-76mx (high), GHSA-2fmv-rv2c-59x7
+     (moderate). They reach every site by two routes. `Pkcs` arrives as a package, through
+     Umbraco, EF Core's SqlClient and MailKit, and no Umbraco release raises it yet. `Xml` comes
+     from the ASP.NET Core shared framework that every site runs on, whatever packages the site
+     has (item 3).*
+  2. *What this release does: `UBookIt.Persistence` and `UBookIt.Web` now depend on
+     `System.Security.Cryptography.Pkcs` 10.0.13 or later. That package was already in every
+     site's graph; only its minimum rises. Observed on Windows (the TestSite's build output, where
+     Pkcs is the `runtimes/win` asset), on an unpatched .NET 10.0.9 runtime: the site then loads
+     the patched Pkcs (10.0.1326) instead of the framework's copy (3.3, 3.4).*
+  3. *What it cannot do, said plainly: the three `Xml` advisories are fixed only by the site's
+     .NET runtime. Every Umbraco site gets `Xml` from the ASP.NET Core shared framework, and the
+     .NET SDK removes the NuGet package from such projects, so no package can replace it.
+     **A site's own NuGet audit will not report these three advisories**, for the same reason.
+     The action: run the **ASP.NET Core Runtime 10.0.13** (released 2026-10-13) or later on the
+     server. A self-contained deployment carries its own runtime, so it must be rebuilt with an
+     SDK that ships 10.0.13 (SDK 10.0.113 or 10.0.402, or later), per Microsoft's release notes:
+     https://github.com/dotnet/core/blob/main/release-notes/10.0/10.0.13/10.0.13.md. A site
+     deployed as a container gets its runtime from the image, so it needs a rebuild on (or a
+     re-pull of) an `aspnet` 10.0.13 base image.*
+  4. *`UBookIt` and `UBookIt.Backoffice` now declare the `Microsoft.AspNetCore.App` framework,
+     as `UBookIt.Web` always has. Nothing to do: every Umbraco site already uses it, and
+     Umbraco's own web packages declare it.*
+  5. *No API, schema or configuration change.*
+- [x] 5.4 QA: one `qa-review` subagent for this change, reused across rounds, handed the claims to
+  verify (audit before and after, nuspec diff, counts, publish observation).
+  *Done: three rounds with one reviewer (REJECT, REJECT, APPROVE WITH NITS); see section 7.*
+
+## 6. Design correction (2026-10-14, late): Xml is the runtime's, not the package's — option (B)
+
+- [x] 6.1 FINDING while doing 3.3 (`dotnet publish` of the TestSite): a published site has no
+  loadable `System.Security.Cryptography.Xml.dll` of its own; only the shared framework's copy runs
+  (installed runtime 10.0.9, file 10.0.926, vulnerable). *Corrected 2026-10-15: this first said the
+  file was "ABSENT" from the publish output, which is not literally true.* (The publish folder does
+  hold a `refs/System.Security.Cryptography.Xml.dll`, file 10.0.926: `refs/` is the set of framework
+  reference assemblies kept for Umbraco's run-time Razor compilation, 307 files on both lines. The
+  host does not load from it; the 3.4 traces show 0 of the 473-474 trusted platform assemblies come
+  from `refs/`.) Cause, read from `obj/project.assets.json`: the .NET 10 SDK
+  prunes `System.Security.Cryptography.Xml` `(,10.0.32767]` from every project that references
+  `Microsoft.AspNetCore.App` (UBookIt.Web, the TestSite, every Umbraco site). `Pkcs` is NOT pruned:
+  10.0.13 (file 10.0.1326) ships in the site and is newer than the framework's (10.0.926). So the
+  original `Xml` pin in Backoffice would have been inert at every real site, and design D4's
+  expectation was wrong for `Xml`.
+- [x] 6.2 Chris chose (B), 2026-10-14: no `Xml` pin; `UBookIt.Backoffice` and `UBookIt` declare
+  `<FrameworkReference Include="Microsoft.AspNetCore.App" />` (as `UBookIt.Web` already does), and
+  `UBookIt.Tests` too (non-packable). The `Xml` `PackageVersion` is removed; `Pkcs` stays pinned in
+  Persistence and Web.
+  *Verify:* audit exit 0, "No unaccepted advisories", 10 projects, Debug and Release. (Before
+  adding it to UBookIt and UBookIt.Tests, those two still showed Xml 10.0.10: a framework reference
+  is not inherited through a project reference for pruning.) Pack diff against `pack-before`
+  (dependencies AND framework references): exactly `UBookIt` + frameworkReference
+  Microsoft.AspNetCore.App, `UBookIt.Backoffice` + the same, `UBookIt.Persistence` + Pkcs 10.0.13,
+  `UBookIt.Web` + Pkcs 10.0.13. Release `--no-incremental`: 0 warnings, 0 errors. Unit 2129,
+  rendering 1178, integration 210, client 355, openspec 27. Re-published TestSite: no loadable
+  Xml.dll (framework's; see 6.1 on `refs/`), Pkcs.dll file 10.0.1326.
+- [x] 6.3 Update the artifacts to (B) BEFORE anything else. Proposal What Changes
+  and Impact; design D1/D2 (no Xml pin), D4 corrected with 6.1's observation, new D7 (framework
+  reference; Xml is fixed only by the site's .NET runtime); spec: the scenario "An installing site
+  resolves the fixed version" needs the case of a package the site's shared framework provides
+  (then the site's runtime supplies it, and the requirement asks the package to declare the
+  framework rather than pin). Then 3.4 live (TestSite from THIS worktree), 4.1 v18 port, 5.x sweep
+  and handover. The release changelog must say: update the site's .NET 10 runtime to the October
+  servicing release, which is the ONLY fix for the three Xml advisories (find the exact runtime
+  version from Microsoft's release notes first, don't guess).
+  *Done 2026-10-15, after rebasing onto main `87c1f49` (the localization change merged and
+  archived). Proposal: a paragraph saying the two packages differ, What Changes, Not breaking,
+  Capabilities and Impact rewritten for (B). Design: Context gains the pruning and the 10.0.13
+  runtime facts; D2 records the measured set; D3 diffs framework references too; D4 corrected; D5
+  narrowed to `Pkcs`; the new decision is **D6**, not D7 (the code comments cited D7 with no D6, so
+  they were renumbered). Spec: a paragraph and a scenario, "An assembly the shared framework
+  supplies is left to the site's runtime". The runtime version was looked up, not guessed:
+  Microsoft's `release-metadata/10.0/releases.json` lists 10.0.13 (2026-10-13, security) as
+  fixing CVE-2026-96960, -96959, -96958 (Xml) and CVE-2026-84008, -70162 (Pkcs), which are the CVE
+  ids of the five GHSAs according to GitHub's advisory API. The proposal's claim that Umbraco's web
+  packages declare `Microsoft.AspNetCore.App` was checked: `Umbraco.Cms.Web.Common` and
+  `Umbraco.Cms.Api.Common` 17.7.1 nuspecs both do.*
+
+## 7. QA
+
+- [x] 7.1 QA round 1 (2026-10-15): **REJECT**. Every measured claim was verified independently
+  (audits before and after, minimality on both lines, nuspec diff by XML parse, builds and suites,
+  host traces, the 10.0.13 CVE list, line parity, encoding hygiene). Findings:
+  - MAJOR: the spec keyed the framework-reference rule on "an assembly the shared framework
+    supplies"; the real condition is the SDK's prune list (`Pkcs` is in the framework but not
+    pruned, and its pin works). Read literally, the paragraph forbade this change's own `Pkcs` pin.
+    Fixed in the spec paragraph (plus a sentence that framework membership is not the condition),
+    the scenario title (now matching its WHEN), a new scenario "A framework assembly that is not
+    pruned is declared like any other", proposal Capabilities, design D6 (heading and a paragraph),
+    and the comments in `Directory.Packages.props` and `UBookIt.Backoffice.csproj`.
+  - MINOR: handover item 1 said all five reach sites through Umbraco/SqlClient/MailKit; `Xml`
+    comes from the shared framework. Fixed.
+  - MINOR: the audit cannot see pruned packages, and nothing said so. A paragraph in
+    `docs/publishing.md`'s audit description, and a design risk.
+  - NITs: 2.1/2.2/3.1 and design D2 marked superseded; the two long inserted lines rewrapped;
+    handover item 2 says "on Windows", item 3 covers container images. The `global.json` SDK
+    observation is recorded in the deferred-obligations memory, not changed here.
+- [x] 7.2 QA round 2 (2026-10-15): **REJECT**. The round-1 fixes held (the prune-list condition,
+  proposal, design D6, comments, handover, the `docs/publishing.md` paragraph). The reviewer re-ran
+  the unit suites because five unit-test files read `docs/publishing.md`: 2131 / 2143 passed.
+  Findings:
+  - MAJOR: the new scenario, and the requirement body since round 0, said the shipped package
+    "SHALL declare a direct dependency on the fixed version". `UBookIt` and `UBookIt.Backoffice`
+    both reached vulnerable `Pkcs` and declare it nowhere: they reach 10.0.13 through
+    `UBookIt.Persistence` / `UBookIt.Web`, which is design D2's rule. Fixed: the body now says the
+    fixed version is declared by the package or by a uBookIt package it depends on, in the fewest
+    packages; the scenario says the same, and "no framework reference is offered in its place"
+    became "that declaration is not replaced by a framework reference"; a new scenario, "A fix is
+    declared once, where it is reached", states the minimality that 2.2/4.1 measured. Proposal
+    Capabilities said "declares the patched version directly" too, and now matches. A grep for
+    siblings found two more the reviewer had not listed, both fixed: proposal What Changes ("Each
+    affected packable project references the patched `Pkcs` directly") and the
+    `Directory.Packages.props` comment ("the packable projects that resolve a vulnerable version
+    reference the fix directly"). Checked against
+    all four packed nuspecs: Persistence and Web declare Pkcs 10.0.13; `UBookIt` and Backoffice
+    declare no Pkcs and reach it through them (their framework references are for `Xml`).
+  - NIT: "never restored into a site" now says "with the SDK's default pruning (on by default for
+    .NET 10 projects)".
+  - NIT: "the host loads the newer copy" now cites Microsoft's documented rule (SDK and host both
+    prefer the newer version, and the framework's copy when equal) rather than resting on the 3.4
+    trace.
+- [x] 7.3 QA round 3 (2026-10-15): **APPROVE WITH NITS**. Every SHALL and THEN of the body and
+  the changed scenarios was checked against all four packed nuspecs and held; the Microsoft Learn
+  citation was confirmed; the reviewer re-ran the unit suite (four unit-test files read
+  `Directory.Packages.props` or `openspec/changes`): 2131 / 2143 passed. Both nits taken:
+  - "the fewest packages that achieve this" admitted a single declaration in `UBookIt.Core`, which
+    only the narrowness clause excluded. The body now keeps the checkable rule ("SHALL NOT be
+    repeated along a dependency path"); the same "fewest" wording in proposal What Changes and
+    Capabilities and in the `Directory.Packages.props` comment was replaced to match.
+  - The scenario "A fix is declared once, where it is reached" (Pkcs is declared in two packages)
+    is now "A fix is not declared again where a dependency already brings it".
