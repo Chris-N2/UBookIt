@@ -7,8 +7,8 @@ namespace UBookIt.Tests;
 /// site's setting, which subject (if any) is entered as if the visitor had chosen it.
 /// </summary>
 /// <remarks>
-/// The whole matrix lives here because it needs no host. The rendering suite proves the
-/// dispatcher actually consults it, through the real component.
+/// The whole matrix lives here because it needs no host. <see cref="SingleChoiceDispatchTests"/>
+/// proves the dispatcher actually consults it, through the real component.
 /// </remarks>
 public class SingleChoiceTests
 {

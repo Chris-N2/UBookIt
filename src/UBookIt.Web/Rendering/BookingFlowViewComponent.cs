@@ -9,6 +9,9 @@ namespace UBookIt.Web.Rendering;
 /// in and renders it:
 /// <code>
 ///   Component.InvokeAsync("BookingFlow")                     → catalogue, then either flow
+///                                                              (a catalogue of one: straight
+///                                                              into its flow, unless the skip
+///                                                              setting is off)
 ///   Component.InvokeAsync("BookingFlow", new { serviceId })  → straight into the service flow
 ///   Component.InvokeAsync("BookingFlow", new { resourceId }) → straight into the resource flow
 /// </code>
@@ -66,8 +69,9 @@ public sealed class BookingFlowViewComponent : ViewComponent
     /// <remarks>
     /// A second constructor rather than a changed one: the four-argument shape above is published,
     /// and the public surface is frozen. <see cref="ActivatorUtilitiesConstructorAttribute"/> is
-    /// what makes the ViewComponent activator choose this one; a rendering test with the setting
-    /// off and a catalogue of one fails if it does not.
+    /// what makes the ViewComponent activator choose this one; a component test
+    /// (<c>SingleChoiceDispatchTests</c>) with the setting off and a catalogue of one fails if it
+    /// does not.
     /// </remarks>
     [ActivatorUtilitiesConstructor]
     public BookingFlowViewComponent(

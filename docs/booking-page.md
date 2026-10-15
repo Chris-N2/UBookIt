@@ -11,8 +11,9 @@ anything.
 
 
 With nothing else specified the page shows the **catalogue** — everything the site
-offers, services and directly bookable resources together. To send a visitor straight
-to one thing, name it in the URL:
+offers, services and directly bookable resources together — unless there is only one
+such thing, in which case it goes straight to it (see *A catalogue of one is skipped*,
+below). To send a visitor straight to one thing, name it in the URL:
 
 ```
 /book                      the catalogue (or its only entry, see below)

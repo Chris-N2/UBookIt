@@ -100,7 +100,8 @@
       <Structure />
       <!--
         No properties in v1. The page needs no configuration: the flow reads its
-        state from the URL, and with nothing named it renders the catalogue.
+        state from the URL, and with nothing named it renders the catalogue, or
+        that catalogue's only entry when it has one and the skip setting is on.
 
         Deferring is safe rather than merely tolerable, and this is the measured
         part: a property added in a later release DOES reach sites that installed
