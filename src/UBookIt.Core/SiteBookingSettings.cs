@@ -87,6 +87,27 @@ public sealed record SiteBookingSettings
     public bool AutoConfirm { get; init; } = true;
 
     /// <summary>
+    /// Whether a booking page entered with nothing chosen goes straight to the only thing the
+    /// site offers, rather than showing a catalogue of one. Defaults to <c>true</c>.
+    /// </summary>
+    /// <remarks>
+    /// <para>
+    /// <b>A question about what the site says to its visitors</b>, which is why it is here and
+    /// editable rather than on the front end's configuration-only settings: the person who writes
+    /// the booking page's copy is the person competent to decide whether a list of one belongs on
+    /// it. It lives in Core only because this is the one settings type the store is composed
+    /// over; it says nothing about what a booking is.
+    /// </para>
+    /// <para>
+    /// <b>The fallback is on, and neither direction is harmful</b> — both misreadings are visible
+    /// on the booking page to anyone who looks. A written value that cannot be read still resolves
+    /// to on with an error logged naming the setting, because a site that wrote "off" and still
+    /// sees its catalogue skipped has no other way to learn why.
+    /// </para>
+    /// </remarks>
+    public bool SkipSingleChoiceCatalogue { get; init; } = true;
+
+    /// <summary>
     /// What the package sends when a booking is placed, confirmed, declined or cancelled.
     /// Nothing, unless the site has said otherwise.
     /// </summary>

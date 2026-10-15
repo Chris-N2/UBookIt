@@ -143,6 +143,11 @@ public static class SettingCatalogue
         new(UBookItPersistenceComposer.PrivacyPolicyUrlSettingKey,
             SettingTier.Editable, SettingValueKind.Url),
 
+        // Communication: whether a visitor to a site offering one bookable thing is shown a list
+        // of that one thing. The person writing the booking page's copy decides that.
+        new(UBookItPersistenceComposer.SkipSingleChoiceCatalogueSettingKey,
+            SettingTier.Editable, SettingValueKind.Boolean),
+
         // --- Editable, but it reinterprets what the site already holds. ---------------------
         // Availability rules are wall-clock in this zone and carry no zone of their own, so
         // changing it changes what every existing rule MEANS. Nothing is rewritten and it is

@@ -164,6 +164,47 @@ public class SettingsControllerTests
         Assert.Equal((UBookItPersistenceComposer.AutoConfirmSettingKey, "false"), Assert.Single(store.Written));
     }
 
+    [Fact]
+    public async Task The_single_choice_skip_can_be_stored_by_a_verb_holder()
+    {
+        var store = new FakeSettingsStore();
+        var controller = Controller(store, Config());
+
+        var result = await controller.PutSetting(
+            UBookItPersistenceComposer.SkipSingleChoiceCatalogueSettingKey, new SettingWriteModel { Value = "false" });
+
+        Assert.IsType<OkResult>(result);
+        Assert.Equal(
+            (UBookItPersistenceComposer.SkipSingleChoiceCatalogueSettingKey, "false"), Assert.Single(store.Written));
+    }
+
+    [Theory]
+    [InlineData("no")]
+    [InlineData("0")]
+    [InlineData("")]
+    public async Task A_non_boolean_single_choice_skip_is_refused(string value)
+    {
+        var store = new FakeSettingsStore();
+        var controller = Controller(store, Config());
+
+        var result = await controller.PutSetting(
+            UBookItPersistenceComposer.SkipSingleChoiceCatalogueSettingKey, new SettingWriteModel { Value = value });
+
+        Assert.IsType<BadRequestObjectResult>(result);
+        Assert.Empty(store.Written);
+    }
+
+    [Fact]
+    public void The_single_choice_skip_reads_as_on_when_nothing_is_configured()
+    {
+        // The read model's effective value carries the record's default, so a site that has never
+        // mentioned the key sees a ticked box — the AutoConfirm lesson, applied up front.
+        var model = Read(Controller(new FakeSettingsStore(), Config()));
+
+        Assert.Equal(
+            "true", Setting(model, UBookItPersistenceComposer.SkipSingleChoiceCatalogueSettingKey).EffectiveValue);
+    }
+
     // ---- the policy link: the screen and the site answer "usable?" the same way --------------
 
     /// <summary>

@@ -75,6 +75,7 @@ public class EffectiveConfigurationTests
         settings.RetentionDays,
         settings.PrivacyPolicyUrl,
         settings.AutoConfirm,
+        settings.SkipSingleChoiceCatalogue,
         settings.Notifications.SendBookerEmails,
         InternalRecipients = string.Join("|", settings.Notifications.InternalRecipients),
     };
@@ -102,6 +103,16 @@ public class EffectiveConfigurationTests
 
         Assert.Equal("Europe/London", settings.TimeZoneId);
         Assert.False(settings.AutoConfirm);
+    }
+
+    [Fact]
+    public void A_stored_off_for_the_skip_overrides_a_configured_on()
+    {
+        var settings = Resolve(
+            SiteConfig((UBookItPersistenceComposer.SkipSingleChoiceCatalogueSettingKey, "true")),
+            (UBookItPersistenceComposer.SkipSingleChoiceCatalogueSettingKey, "false"));
+
+        Assert.False(settings.SkipSingleChoiceCatalogue);
     }
 
     [Fact]
@@ -143,6 +154,7 @@ public class EffectiveConfigurationTests
         { UBookItPersistenceComposer.RetentionDaysSettingKey, "-5" },
         { UBookItPersistenceComposer.RetentionDaysSettingKey, "0" },
         { UBookItPersistenceComposer.AutoConfirmSettingKey, "banana" },
+        { UBookItPersistenceComposer.SkipSingleChoiceCatalogueSettingKey, "banana" },
         { UBookItPersistenceComposer.MaxQueryRangeDaysSettingKey, "not-a-number" },
         { UBookItPersistenceComposer.MaxQueryRangeDaysSettingKey, "-1" },
         { UBookItPersistenceComposer.PrivacyPolicyUrlSettingKey, "javascript:alert(1)" },

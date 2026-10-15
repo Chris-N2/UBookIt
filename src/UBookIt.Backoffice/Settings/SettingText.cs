@@ -51,6 +51,9 @@ internal static class SettingText
         {
             UBookItPersistenceComposer.AutoConfirmSettingKey => Bool(settings.AutoConfirm),
 
+            UBookItPersistenceComposer.SkipSingleChoiceCatalogueSettingKey
+                => Bool(settings.SkipSingleChoiceCatalogue),
+
             UBookItPersistenceComposer.SendBookerEmailsSettingKey
                 => Bool(settings.Notifications.SendBookerEmails),
 

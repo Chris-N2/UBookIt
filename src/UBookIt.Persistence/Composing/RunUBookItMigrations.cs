@@ -89,6 +89,7 @@ internal sealed class RunUBookItMigrations(
         ErrorIfRetentionUnreadable(configuration, logger);
         ErrorIfPrivacyPolicyUrlUnusable(configuration, logger);
         ErrorIfAutoConfirmUnreadable(configuration, logger);
+        ErrorIfSkipSingleChoiceCatalogueUnreadable(configuration, logger);
     }
 
     internal static void WarnIfTimeZoneNotConfigured(IConfiguration configuration, ILogger logger)
@@ -160,6 +161,29 @@ internal sealed class RunUBookItMigrations(
                 + "placed booking is confirmed immediately, today's default behaviour. If this "
                 + "site meant to require approval, set the value to false.",
                 UBookItPersistenceComposer.AutoConfirmSettingKey);
+        }
+    }
+
+    /// <summary>
+    /// Reports a single-choice skip value that was written and could not be read as a boolean.
+    /// Says nothing when none was written.
+    /// </summary>
+    /// <remarks>
+    /// An error on the <see cref="ErrorIfAutoConfirmUnreadable"/> precedent, though the stakes are
+    /// lower: either misreading is visible on the booking page. The line exists because a site
+    /// that wrote an unreadable "false" sees its catalogue skipped anyway and has nowhere else to
+    /// learn why.
+    /// </remarks>
+    internal static void ErrorIfSkipSingleChoiceCatalogueUnreadable(IConfiguration configuration, ILogger logger)
+    {
+        if (UBookItPersistenceComposer.IsSkipSingleChoiceCatalogueConfigured(configuration)
+            && !bool.TryParse(configuration[UBookItPersistenceComposer.SkipSingleChoiceCatalogueSettingKey], out _))
+        {
+            logger.LogError(
+                "uBookIt could not read '{SettingKey}' as a boolean. The skip is ON — a booking page "
+                + "offering exactly one service or resource goes straight to it. If this site meant "
+                + "to show its catalogue regardless, set the value to false.",
+                UBookItPersistenceComposer.SkipSingleChoiceCatalogueSettingKey);
         }
     }
 

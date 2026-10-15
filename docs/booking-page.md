@@ -11,14 +11,28 @@ anything.
 
 
 With nothing else specified the page shows the **catalogue** — everything the site
-offers, services and directly bookable resources together. To send a visitor straight
-to one thing, name it in the URL:
+offers, services and directly bookable resources together — unless there is only one
+such thing, in which case it goes straight to it (see *A catalogue of one is skipped*,
+below). To send a visitor straight to one thing, name it in the URL:
 
 ```
-/book                      the catalogue
+/book                      the catalogue (or its only entry, see below)
 /book?ubBook=s:<serviceId>    that service
 /book?ubBook=r:<resourceId>   that resource
 ```
+
+**A catalogue of one is skipped.** If the catalogue would offer exactly one thing, the
+page goes straight to booking it, exactly as if the visitor had chosen it: the heading
+names what they are booking, and every step after the first carries `ubBook=` in its
+URL. One means one entry in the catalogue as listed above. A thing that has no free
+dates at the moment still counts, and still leads to its own page explaining that. An
+empty catalogue, or one with two or more entries (one service and one resource included),
+is shown as normal.
+
+To show the catalogue anyway — say your page's own text explains why there is only one
+choice — untick **Skip the catalogue when there is only one choice** on uBookIt's
+settings tab, or set `UBookIt:SkipSingleChoiceCatalogue` to `false`. See
+[Configuration](configuration.md).
 
 The Booking Page is allowed at the root of the content tree so it can be created
 immediately on a fresh install. You are free to allow it under your own page types

@@ -91,6 +91,12 @@ describe("turning a configuration key into a slug", () => {
     expect(settingSlug("UBookIt:TimeZoneId")).toBe("timeZoneId");
   });
 
+  it("gives the single-choice skip the slug its localization terms are keyed by", () => {
+    // en-us.ts declares skipSingleChoiceCatalogueLabel / …Description; a different slug would
+    // render the raw term key on the settings screen.
+    expect(settingSlug("UBookIt:SkipSingleChoiceCatalogue")).toBe("skipSingleChoiceCatalogue");
+  });
+
   it("keeps nested sections distinct", () => {
     // Two keys under the same section must not collapse to one slug, or two settings would share
     // a control id and the label of one would point at the other.

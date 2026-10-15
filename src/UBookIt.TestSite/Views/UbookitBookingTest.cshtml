@@ -30,7 +30,8 @@
         : (await ResourceStore.ListAsync(0, 1)).Items.FirstOrDefault();
 
     // Dev harness for change ⑩. `?flow` renders the dispatcher, which reads
-    // `ubBook` from the query and shows the catalogue when it says nothing;
+    // `ubBook` from the query and shows the catalogue when it says nothing (or
+    // the catalogue's only entry, when it has one and the skip setting is on);
     // `?flow=<serviceId>` renders that service directly, which is the "entry at
     // any point" case a site author with one service would use.
     // ALSO WHEN `ubBook` IS PRESENT, and this is a fix rather than a convenience.
