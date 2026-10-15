@@ -74,11 +74,11 @@
   *Done 2026-10-15, after the rebase, from this worktree's Release build (`UBookIt.TestSite.exe`
   with `COREHOST_TRACE=1`). Frameworks resolved: Microsoft.AspNetCore.App **10.0.9** (unpatched),
   Microsoft.NETCore.App 10.0.11. Final TRUSTED_PLATFORM_ASSEMBLIES:
-  `Pkcs` = the app's own `bin\Release
-et10.0untimes\win\lib
-et10.0\System.Security.Cryptography.Pkcs.dll`,
+  `Pkcs` = the app's own
+  `bin/Release/net10.0/runtimes/win/lib/net10.0/System.Security.Cryptography.Pkcs.dll`,
   file **10.0.1326.50504** (the framework's 10.0.926 entry was processed at fx level 1 and not
-  added); `Xml` = `C:\Program Files\dotnet\shared\Microsoft.AspNetCore.App.0.9\System.Security.Cryptography.Xml.dll`,
+  added); `Xml` = the shared framework's
+  `C:/Program Files/dotnet/shared/Microsoft.AspNetCore.App/10.0.9/System.Security.Cryptography.Xml.dll`,
   file **10.0.926.27113** (the deps.json has no asset for `Xml`, pruned). So on an unpatched
   runtime a site runs the patched `Pkcs` and the vulnerable `Xml`, exactly as D4/D6 state.
   Booking page: booked Closure Live Room, Thursday 15 October 2026 16:00-17:00, as "Crypto Check"
