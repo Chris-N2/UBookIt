@@ -164,4 +164,6 @@
   `18.3.0`, whose release candidates declare `Pkcs` 10.0.13.
 - [x] 5.5 Commit and run the unit suite. Chris pushes. Verify: `main`'s CI is green.
   *Done:* unit **2131**, 0 skipped. `main`'s CI runs on Chris's push.
-- [ ] 5.6 Archive last, running the unit suite before the push.
+- [x] 5.6 Archive last, running the unit suite before the push.
+  *Done:* archived after the close-out commit; unit **2131** passed on that commit, and the
+  archive moves files only.
