@@ -432,6 +432,76 @@ public class SiteSettingsTests
         Assert.Empty(logger.Entries);
     }
 
+    // ---- UBookIt:SkipSingleChoiceCatalogue --------------------------------------------------
+    // The persistence delta's three scenarios, shaped exactly like the AutoConfirm set above.
+
+    private static IConfiguration SkipConfig(string? value)
+    {
+        var values = new Dictionary<string, string?>();
+        if (value is not null)
+        {
+            values[UBookItPersistenceComposer.SkipSingleChoiceCatalogueSettingKey] = value;
+        }
+
+        return new ConfigurationBuilder().AddInMemoryCollection(values).Build();
+    }
+
+    [Fact]
+    public void An_absent_skip_setting_is_on()
+        => Assert.True(UBookItPersistenceComposer.ResolveSettings(SkipConfig(null)).SkipSingleChoiceCatalogue);
+
+    [Fact]
+    public void The_record_defaults_the_skip_on()
+        => Assert.True(new UBookIt.Core.SiteBookingSettings { TimeZoneId = "UTC" }.SkipSingleChoiceCatalogue);
+
+    [Fact]
+    public void An_explicit_off_for_the_skip_is_honoured()
+        => Assert.False(UBookItPersistenceComposer.ResolveSettings(SkipConfig("false")).SkipSingleChoiceCatalogue);
+
+    [Fact]
+    public void An_explicit_on_for_the_skip_is_honoured()
+        => Assert.True(UBookItPersistenceComposer.ResolveSettings(SkipConfig("True")).SkipSingleChoiceCatalogue);
+
+    [Theory]
+    [InlineData("")]
+    [InlineData("   ")]
+    [InlineData("no")]
+    [InlineData("0")]
+    public void An_unreadable_skip_value_resolves_to_on(string configured)
+        => Assert.True(UBookItPersistenceComposer.ResolveSettings(SkipConfig(configured)).SkipSingleChoiceCatalogue);
+
+    [Theory]
+    [InlineData("")]
+    [InlineData("   ")]
+    [InlineData("no")]
+    [InlineData("0")]
+    public void A_skip_value_that_was_written_and_cannot_be_read_is_reported_at_startup(string configured)
+    {
+        var logger = new CapturingLogger();
+
+        // Through Report, the entry point production calls, so this also proves the check is
+        // wired in rather than merely written.
+        RunUBookItMigrations.Report(SkipConfig(configured), logger);
+
+        var entry = Assert.Single(
+            logger.Entries,
+            e => e.Message.Contains(UBookItPersistenceComposer.SkipSingleChoiceCatalogueSettingKey));
+        Assert.Equal(LogLevel.Error, entry.Level);
+    }
+
+    [Theory]
+    [InlineData(null)]
+    [InlineData("false")]
+    [InlineData("true")]
+    public void An_absent_or_readable_skip_setting_logs_nothing(string? configured)
+    {
+        var logger = new CapturingLogger();
+
+        RunUBookItMigrations.ErrorIfSkipSingleChoiceCatalogueUnreadable(SkipConfig(configured), logger);
+
+        Assert.Empty(logger.Entries);
+    }
+
     private sealed class CapturingLogger : ILogger
     {
         public List<(LogLevel Level, string Message)> Entries { get; } = [];

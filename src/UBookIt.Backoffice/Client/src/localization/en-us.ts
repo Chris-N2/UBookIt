@@ -625,6 +625,9 @@ export default {
     notificationsInternalRecipientsLabel: "Internal recipients",
     notificationsInternalRecipientsDescription:
       "Your own addresses to tell about bookings, separated by commas. Supplying addresses is what turns internal messages on.",
+    skipSingleChoiceCatalogueLabel: "Skip the catalogue when there is only one choice",
+    skipSingleChoiceCatalogueDescription:
+      "On, a visitor to the booking page goes straight to the only service or resource on offer. Off, they choose it from a list of one, which suits a page whose own text explains the choice.",
     privacyPolicyUrlLabel: "Privacy policy link",
     privacyPolicyUrlDescription:
       "Linked from the booking form's privacy notice. With none, the notice renders without a link rather than with a broken one.",

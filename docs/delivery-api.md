@@ -112,6 +112,11 @@ Nothing. The Razor booking flow renders on the server from the package's own ser
 that is a stated guarantee, not an implementation detail — so leaving both settings off
 costs it nothing, and turning them on changes nothing about it.
 
+The reverse holds too: what the shipped page does is not something this API does. The
+page skips a catalogue that would offer exactly one thing (`UBookIt:SkipSingleChoiceCatalogue`),
+but the API has no catalogue. A headless client builds its own list from the services and
+resources it reads, and decides for itself whether a list of one is worth showing.
+
 ## Closed dates look like any other unavailable date
 
 A site can mark dates on which the whole organisation is shut. This API says nothing about

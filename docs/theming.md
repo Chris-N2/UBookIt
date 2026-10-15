@@ -62,6 +62,13 @@ All types are in `UBookIt.Web.Rendering`. The authoritative list is
 `UBookItThemeContract.RequiredViews` — read it from code rather than copying this
 table, and the completeness check below reads the same list.
 
+**Your `Catalogue` view is not rendered for a catalogue of one** while the site's
+`UBookIt:SkipSingleChoiceCatalogue` setting is on, which is the default. The component goes
+straight to that one thing's flow instead, so the view a visitor sees is your `Service` or
+`Default` view. The contract and its models are unchanged, and with the setting off your
+`Catalogue` view renders however many entries there are. See
+[the booking page](booking-page.md).
+
 You may declare a base type or an interface the model implements — `@model
 IBookingFormView` for a view handed a `BookingFormModel` is correct and renders.
 

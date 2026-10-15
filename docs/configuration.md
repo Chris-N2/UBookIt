@@ -23,8 +23,10 @@ whichever place it came from: the same fallback, the same message in the log.
 > value** removes the stored value so the file takes over again — it does not copy the file's value
 > into the store.
 
-A fresh install and an upgrade both start with nothing stored, so uBookIt behaves exactly as it did
-before this feature existed until somebody saves something.
+A fresh install and an upgrade both start with nothing stored, so the store changes nothing until
+somebody saves something: every setting resolves from your configuration, or its default, exactly
+as it would with no store at all. (A setting new in a release still takes its default on upgrade —
+see the release's changelog entry for any whose default changes what a site shows.)
 
 ## Who decides what
 
@@ -46,6 +48,7 @@ Requires the **`UBookIt.Settings`** permission — see [Permissions](#permission
 | `UBookIt:Notifications:SendBookerEmails` | bool | `false` | Whether the person who booked is emailed when their booking is placed, confirmed, declined or cancelled. |
 | `UBookIt:Notifications:InternalRecipients` | string[] | empty | Your own addresses to tell about bookings. **Supplying addresses is what turns internal messages on** — there is no separate switch. |
 | `UBookIt:PrivacyPolicyUrl` | string | none | Linked from the booking form's privacy notice. With none, the notice renders without a link rather than with a broken one. |
+| `UBookIt:SkipSingleChoiceCatalogue` | bool | `true` | `true`, a booking page whose catalogue would offer exactly one service or resource goes straight to it. `false`, the catalogue is shown even with one entry. See [the booking page](booking-page.md). |
 | `UBookIt:TimeZoneId` | IANA id | `UTC` | The zone the site's availability rules are written in, e.g. `Europe/London`. |
 
 **`UBookIt:TimeZoneId` carries a consequence, and the screen states it before you change it.**
@@ -144,6 +147,7 @@ which is convenient. They apply identically to stored and configured values.
 | `UBookIt:RetentionDays` | **no retention** — never a default period | error, if something was written |
 | `UBookIt:AutoConfirm` | `true` (on) | error, if something was written |
 | `UBookIt:PrivacyPolicyUrl` | **no link** | error, if something unusable was written |
+| `UBookIt:SkipSingleChoiceCatalogue` | `true` (on) | error, if something was written |
 
 `UBookIt:RetentionDays` and `UBookIt:MaxQueryRangeDays` are both numbers and are resolved on
 opposite terms on purpose: the cost of misreading a query range is a rejected query, and the cost of
