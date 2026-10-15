@@ -67,7 +67,7 @@
 
 ## 6. Port to dev/v18
 
-- [ ] 6.1 After v17 QA approval, cherry-pick onto a branch from `dev/v18` in worktree `..\uBookIt-v18`. Resolve any line differences, and run the generators (client build) against a running v18 TestSite. Verify: the same suites at the v18 baselines (unit 2143, integration 210, rendering 1178, client 355) plus new tests, 0 warnings, and the live checks 2.3 and 3.5 repeated on v18. **Progress 2026-10-15:**
+- [x] 6.1 After v17 QA approval, cherry-pick onto a branch from `dev/v18` in worktree `..\uBookIt-v18`. Resolve any line differences, and run the generators (client build) against a running v18 TestSite. Verify: the same suites at the v18 baselines (unit 2143, integration 210, rendering 1178, client 355) plus new tests, 0 warnings, and the live checks 2.3 and 3.5 repeated on v18. **Progress 2026-10-15:**
   - **Port:** branch `single-choice-shortcut-v18` from `dev/v18` `284203a`. The five commits (`063dc5c`, `fada253`, `d28799b`, `c7c3312`, `5c9393d`) applied with **no conflicts**.
   - **Builds and suites:** client build and 356 client tests pass; Release build 0 warnings first time; unit **2197** (2143 + 54, the same growth as main), rendering 1178, integration 210; `openspec validate --strict` passes.
   - **Mutations:** all seven caught on v18, with the same failure counts as main; the tree was clean afterwards.
@@ -79,6 +79,7 @@
     - With nothing set, the page skips and nothing is logged about the setting.
   - **Two local-only steps:** the git-ignored `Views/uBookItBookingPage.cshtml` was copied into the v18 TestSite, because the restored database's template had no file there (404). There were no pending uBookIt migrations.
   - **Still owed (needs Chris's backoffice login):** the setting on the v18 settings screen, a stored toggle with no restart, a booking completed through the skipped resource flow, and Chris's own catalogue copy with the setting off.
+  - **Completed 2026-10-15 with Chris logged in:** the setting shows on the v18 Settings tab, ticked by default. Unticking it (stored) gave the catalogue of one with no restart, and Reset restored the skip. **A booking went through the skipped resource flow: SHTH-RDZ2** (Consultancy Appointment, Fri 16 Oct 09:00–09:30). The second step was `/book-a-consultation/?ubBook=r%3A…&ubDate=2026-10-16&ubMins=30`, and the redirect after booking kept the token. This closes QA's MINOR: the resource case has now been completed live. Chris's own catalogue copy needs no setting change. His page just re-renders the component, so after upgrading he removes the copy that explained the list of one.
 - [x] 6.2 QA review of the v18 branch: the same reviewer if it is still in this session, otherwise a fresh one told it is a port. **APPROVE (2026-10-15, same reviewer)**, with no findings against the port. The change's files are byte-identical to main's `5c9393d`. One MINOR: the skipped resource flow has never been completed live on either line. It is owed under 6.1 before archive.
 
 ## 7. Release obligations (recorded for the release change, not done here)
