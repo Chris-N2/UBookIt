@@ -325,5 +325,6 @@ such.
   `byType`, so it now says "the outcome depends on the site's own weight and on the order the
   extensions arrived in". Message text only; the guard's threshold is unchanged. Both guard tests
   pass.
-- [x] 7.3 (see sections 8-10: three rounds, REJECT, REJECT, APPROVE WITH NITS).
+Task 7.3 is therefore complete: sections 8-10 record its three rounds (REJECT, REJECT, APPROVE
+WITH NITS).
 
