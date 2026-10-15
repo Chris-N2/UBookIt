@@ -118,6 +118,14 @@ the lines do differ.
   - is declared by a project that is packable in either configuration; or
   - is declared by a project that targets more than one framework.
 
+  **What the audit cannot see:** a package the .NET SDK prunes because the project references the
+  ASP.NET Core shared framework (for example `System.Security.Cryptography.Xml`; the full list is
+  `packagesToPrune` in a project's `obj/project.assets.json`) is not in the graph, so an advisory
+  against it is never reported here. Every site runs the framework's copy of such an assembly, so
+  only the site's .NET runtime fixes it. The trigger to check is a .NET security release: if it
+  names a package on that list, the next release's changelog tells sites which runtime they need
+  (the `packaging` spec's requirement on advisories).
+
   Today the only accepted advisories are `UBookIt.TestSite`'s, for ImageSharp 3.1.12, which it
   reaches through Umbraco; see the comment there. Advisories are deliberately *not* errors in the `ci` build (see `Directory.Build.props`): an advisory is
   published against a package, not introduced by a commit, and would otherwise fail unrelated

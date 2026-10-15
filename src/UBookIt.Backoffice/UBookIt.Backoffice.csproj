@@ -26,6 +26,16 @@
     <PackageReference Include="Umbraco.Cms.Web.Website" />
   </ItemGroup>
 
+  <!-- This is an ASP.NET Core library (Management API controllers), so it declares the shared
+       framework as UBookIt.Web does. That is also what makes the October 2026
+       System.Security.Cryptography.Xml advisories correctly NOT this package's to fix: that
+       package is on the framework's prune list, so the SDK prunes it from any project that
+       references the framework, and every Umbraco site runs the framework's copy, fixed only by
+       updating the site's .NET runtime (crypto-advisories-2026-10, design D6). -->
+  <ItemGroup>
+    <FrameworkReference Include="Microsoft.AspNetCore.App" />
+  </ItemGroup>
+
 
   <ItemGroup>
     <!-- Don't include the client folder as part of packaging nuget build -->
