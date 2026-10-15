@@ -23,8 +23,8 @@ service or resource goes straight to it, behind a new editable setting that is o
      configured `false` works without the backoffice, and what an unreadable value does.
    - *For developers:* the new members; that a theme's `Catalogue` view is not rendered for a
      catalogue of one while the setting is on; that the delivery API is unchanged; and that the
-     Booking Page document type's description changed for **new installs only**, because the
-     package's schema import never re-runs on an existing site.
+     Booking Page document type's description changed for **new installs only**, because this release adds no
+     migration step and an ordinary upgrade does not re-import the schema.
    - What a downgrade does. A stored value for the setting is a row an older version never reads,
      so nothing breaks. This must be checked against `17.3.2`'s code, not assumed.
 3. **Pack from the merged, pushed commit, tag it, verify the artifact, and publish through
