@@ -30,7 +30,8 @@
          MailKit), the SDK does not prune it, and no Umbraco release yet depends on a
          fixed version. So the packable projects that resolve a vulnerable version reference the
          fix directly, except where a uBookIt dependency already brings it (Persistence and Web
-         do; Backoffice and UBookIt reach it through them), which raises the minimum in their packed nuspecs, and a site then runs the
+         do; Backoffice and UBookIt reach it through them), which raises the minimum in their
+         packed nuspecs, and a site then runs the
          fixed DLL (newer than the framework's copy).
          The same day's System.Security.Cryptography.Xml advisories are NOT pinned: the SDK prunes
          that package from every project referencing the ASP.NET Core shared framework (it is on

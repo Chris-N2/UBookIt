@@ -43,11 +43,11 @@ pin of `Xml` would be inert at every real site. Both are fixed in the **.NET 10.
 ## What Changes
 
 - **Packable projects reference the patched `Pkcs` directly, but not where a uBookIt dependency
-  already brings it**, at 10.0.13, through `Directory.Packages.props`. A project gets a direct reference
-  only to a package already in its resolved graph at a vulnerable version, and only if no uBookIt
-  project it references already brings the fix. The exact set is measured at apply, per line, not
-  assumed from the table above. On both lines it is `UBookIt.Persistence` and `UBookIt.Web`;
-  `UBookIt.Backoffice` and `UBookIt` reach 10.0.13 through them.
+  already brings it**, at 10.0.13, through `Directory.Packages.props`. A project gets a direct
+  reference only to a package already in its resolved graph at a vulnerable version, and only if
+  no uBookIt project it references already brings the fix. The exact set is measured at apply, per
+  line, not assumed from the table above. On both lines it is `UBookIt.Persistence` and
+  `UBookIt.Web`; `UBookIt.Backoffice` and `UBookIt` reach 10.0.13 through them.
 - **`Xml` is not pinned. Instead, the packages that still saw it declare the shared framework.**
   `UBookIt.Web` already declares `<FrameworkReference Include="Microsoft.AspNetCore.App" />`.
   `UBookIt.Backoffice` and `UBookIt` now declare it too (and the non-packable `UBookIt.Tests`).
