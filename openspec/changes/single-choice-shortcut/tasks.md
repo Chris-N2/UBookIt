@@ -79,7 +79,7 @@
     - With nothing set, the page skips and nothing is logged about the setting.
   - **Two local-only steps:** the git-ignored `Views/uBookItBookingPage.cshtml` was copied into the v18 TestSite, because the restored database's template had no file there (404). There were no pending uBookIt migrations.
   - **Still owed (needs Chris's backoffice login):** the setting on the v18 settings screen, a stored toggle with no restart, a booking completed through the skipped resource flow, and Chris's own catalogue copy with the setting off.
-- [ ] 6.2 QA review of the v18 branch: the same reviewer if it is still in this session, otherwise a fresh one told it is a port.
+- [x] 6.2 QA review of the v18 branch: the same reviewer if it is still in this session, otherwise a fresh one told it is a port. **APPROVE (2026-10-15, same reviewer)**, with no findings against the port. The change's files are byte-identical to main's `5c9393d`. One MINOR: the skipped resource flow has never been completed live on either line. It is owed under 6.1 before archive.
 
 ## 7. Release obligations (recorded for the release change, not done here)
 
