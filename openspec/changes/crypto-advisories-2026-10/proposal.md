@@ -104,12 +104,12 @@ _None._
   known advisory, and no supported Umbraco release fixes it, the patched version is declared
   directly, by that package or by a uBookIt package it depends on, in the fewest packages that
   reach every affected one. The declaration is read from the packed nuspec, adds no package that
-  was not already in the graph, and is removed once Umbraco carries the fix. Where the vulnerable package
-  is one the .NET SDK prunes from every project that references the ASP.NET Core shared framework
-  (every Umbraco site), a package declaration cannot reach the site, so the package declares the
-  framework instead, and the release notes name the runtime that fixes it. Being in the framework
-  is not the condition: an assembly the framework contains but the SDK does not prune (`Pkcs`) is
-  declared like any other. No existing requirement is modified or removed.
+  was not already in the graph, and is removed once Umbraco carries the fix. Where the vulnerable
+  package is one the .NET SDK prunes from every project that references the ASP.NET Core shared
+  framework (every Umbraco site), a package declaration cannot reach the site, so the package
+  declares the framework instead, and the release notes name the runtime that fixes it. Being in
+  the framework is not the condition: an assembly the framework contains but the SDK does not
+  prune (`Pkcs`) is declared like any other. No existing requirement is modified or removed.
 
 ## Impact
 
