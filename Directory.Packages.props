@@ -49,7 +49,8 @@
     <!-- SECURITY PIN, not a feature. GHSA-qhrr-8q5h-9q3h (CVE-2026-92707, medium, published
          2026-10-15): MessagePack before 3.1.9 can allocate excessive memory deserializing nested
          arrays into System.Object. MessagePack reaches the shipped packages only through Umbraco
-         (Umbraco.Cms.Web.Common and its HybridCache, 17.7.1, depend on 3.1.8), and no stable
+         (Umbraco's 17.7.1 packages, Web.Common, PublishedCache.HybridCache and others, depend on
+         3.1.8), and no stable
          Umbraco release yet depends on a fixed version. So the packable projects that resolve it
          reference the fix directly: Backoffice and Web, which are siblings; UBookIt reaches it
          through them, and Persistence and Core do not have MessagePack at all. 3.1.9 is the first
