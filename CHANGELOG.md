@@ -42,7 +42,9 @@ changed, so code built against 17.3.x keeps working.
 **Going back to 17.3.x afterwards is safe.** The older version always shows the catalogue. If you
 have saved the new setting on the settings tab, the older version ignores the saved value and does
 not show it, and it cannot remove it either. Coming forward again, the saved value applies once
-more.
+more. Going back also gives up the MessagePack fix below: the older version does not require
+3.1.9, so your site resolves the 3.1.8 that Umbraco brings, unless it requires a fixed version some
+other way, such as its own direct reference.
 
 ### What changed
 

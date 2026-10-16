@@ -26,11 +26,11 @@ its host cannot yet supply*. That is why QA round 1 put the release on hold.
      `UBookIt:SkipSingleChoiceCatalogue` to `false`. A site with page copy written around a list
      of one should either do that or remove the copy.
    - *What changed:* the feature as a visitor and an operator meet it, including that a
-     configured `false` works without the backoffice, and what an unreadable value does.
+     configured `false` works without the backoffice, and what an unreadable value does; and that
+     the Booking Page document type's description changed for **new installs only**, because this
+     release adds no migration step and an ordinary upgrade does not re-import the schema.
    - *For developers:* the new members; that a theme's `Catalogue` view is not rendered for a
-     catalogue of one while the setting is on; that the delivery API is unchanged; and that the
-     Booking Page document type's description changed for **new installs only**, because this release adds no
-     migration step and an ordinary upgrade does not re-import the schema.
+     catalogue of one while the setting is on; and that the delivery API is unchanged.
    - What a downgrade does. A stored value for the setting is a row an older version never reads,
      so nothing breaks. This must be checked against `17.3.2`'s code, not assumed.
    - **The MessagePack advisory:** in *What changed*, what it is, that it reaches every site through
