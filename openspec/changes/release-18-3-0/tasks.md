@@ -51,8 +51,25 @@
 - [x] 0.4 Task 4.2's artifact check gains: `UBookIt.Backoffice` and `UBookIt.Web` declare
   `MessagePack` `3.1.9`; no other package does.
   *Done:* added to 4.2's list, with the "no other dependency differs" check that 0.2 defers to it.
-- [ ] 0.5 QA round 2 for both release changes: round 1's reviewer if it can still be reached,
+- [x] 0.5 QA round 2 for both release changes: round 1's reviewer if it can still be reached,
   otherwise a fresh one told round 1's findings and how each was resolved.
+  *Round 2 (the same reviewer as round 1): APPROVE WITH NITS on both changes.* Both round-1
+  MAJORs resolved: the re-import sentence, and MessagePack, fixed at its cause by
+  `messagepack-advisory`. The MINOR was resolved too.
+  - The reviewer reproduced the clean builds, every suite, the audit (exit 0) and openspec 27/27 on
+    both lines.
+  - It confirmed the rebase left the 27-mention bump byte-identical. It checked every new entry claim
+    against GitHub's API and the Umbraco nuspecs.
+  - It verified "no other dependency changes" now, by packing both lines and comparing them with the
+    published `18.2.2` nuspecs from nuget.org, parsed as XML: the only difference is MessagePack 3.1.9 in
+    Backoffice and Web.
+
+  Nits taken:
+  - the downgrade paragraph now says going back gives up the MessagePack fix;
+  - 5.3 names both exits;
+  - main's proposal places the Booking Page description under *What changed*, where the entry has it.
+
+  Not taken: "code built against 17.3.x / 18.2.x" keeps the precedent's phrasing, as round 1 allowed.
 
 ## 1. The version and the entry
 
@@ -161,6 +178,6 @@
 - [ ] 5.1 Stamp the entry's date.
 - [ ] 5.2 Sibling sweep for `18.2.2` and for sentences the release falsifies. Fix or record each.
 - [ ] 5.3 Update the deferred-obligations memory: the `17.4.0` / `18.3.0` changelog obligation is
-  paid. The `Pkcs` exit obligation stays open.
+  paid. The exit obligation stays open for both declarations, `Pkcs` and MessagePack: the floor raise to stable Umbraco removes them together (QA round 2 NIT).
 - [ ] 5.4 Commit and run the unit suite. Chris pushes. Verify: `dev/v18`'s CI is green.
 - [ ] 5.5 Archive last, running the unit suite before the push.
