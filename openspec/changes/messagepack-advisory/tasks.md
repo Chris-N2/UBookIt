@@ -67,8 +67,10 @@
   warnings, 0 errors.
 - [x] 2.2 Run the suites per project. Verify, 0 skipped: unit **2185**, integration **210**,
   rendering **1178**, client **356**; CI's exact openspec command passes after the last commit.
-  *Done, 0 skipped:* client **356**, unit **2185**, integration **210**, rendering **1178**. The
-  openspec result is recorded with the commit.
+  *Done, 0 skipped:* client **356**, unit **2185**, integration **210**, rendering **1178**. CI's
+  `npx @fission-ai/openspec@1.13.0 validate --all --strict`, run after commit `c5fcb50`: 27 passed,
+  0 failed. (Corrected in QA round 1: this line first said the result was "recorded with the
+  commit", and the commit message does not record it.)
 - [x] 2.3 Smoke test (design D5): start the TestSite on its usual dev database. Check that
   `bin/Debug/net10.0/MessagePack.dll` is version 3.1.9. Fetch the home page and the booking page
   (HTTP 200, expected heading), and open one backoffice uBookIt view. Record the result.
@@ -90,13 +92,31 @@
   (>= 3.1.8)`. The SDK treats NU1605 as an error by default, so the changelog's advice holds: a
   site that references MessagePack directly below 3.1.9 must raise that reference.
 
+- [x] 2.5 QA round 1 (main): **APPROVE WITH NITS**, all seven claims verified independently,
+  nothing to fix before merge. The reviewer also:
+  - compared MessagePack 3.1.8's and 3.1.9's public members by reflection: 1361 each, differing
+    only in how 4 nested type names print, so no binding break is possible;
+  - confirmed the analyzer set for Backoffice and Web is unchanged;
+  - confirmed MessagePack is not in Web's `packagesToPrune`;
+  - found that a parallel pack into a fresh folder succeeded, so 1.1's collision was probably local
+    to that folder.
+
+  All three nits were taken:
+  - the `Directory.Packages.props` comment now says Umbraco's packages (Web.Common, HybridCache and
+    others) bring 3.1.8, rather than Web.Common alone;
+  - 2.2 now records the openspec result;
+  - the v18 port's smoke test publishes one content node and fetches it, so MessagePack's
+    serialize path is exercised too (3.1).
+
 ## 3. Port to dev/v18
 
 - [ ] 3.1 After main's QA approval, cherry-pick onto a branch from `dev/v18`
   (`messagepack-advisory-v18`, worktree `..\uBookIt-v18`). Re-measure 1.1 and 1.3 on Umbraco
   18.2.1's graph, rather than assuming main's set. Verify: the same checks as 1.3 and 1.4; the
   v18 baselines (unit 2197, integration 210, rendering 1178, client 356); 0 warnings; the 2.3
-  smoke test on the v18 TestSite.
+  smoke test on the v18 TestSite, **plus publishing one content node and fetching it** (QA round 1
+  NIT). The `Directory.Packages.props` comment's versions must be v18's: Umbraco 18.2.1, and an
+  exit naming 18.3.0.
 
 ## 4. Review
 
