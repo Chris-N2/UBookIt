@@ -110,7 +110,7 @@
 
 ## 3. Port to dev/v18
 
-- [ ] 3.1 After main's QA approval, cherry-pick onto a branch from `dev/v18`
+- [x] 3.1 After main's QA approval, cherry-pick onto a branch from `dev/v18`
   (`messagepack-advisory-v18`, worktree `..\uBookIt-v18`). Re-measure 1.1 and 1.3 on Umbraco
   18.2.1's graph, rather than assuming main's set. Verify: the same checks as 1.3 and 1.4; the
   v18 baselines (unit 2197, integration 210, rendering 1178, client 356); 0 warnings; the 2.3
@@ -132,8 +132,12 @@
     rendering **1178**, 0 skipped.
   - **Smoke test:** the v18 TestSite's `MessagePack.dll` is `3.1.9+aa16e71…`. `/` returned 200
     ("Book DBO Granted"); `/book/` returned 200 ("Choose what to book").
-  - **Still owed:** publishing one content node and fetching it. The browser extension is not
-    connected, so this needs Chris to publish, or a reconnected browser.
+  - **Publish and fetch (QA round 1 NIT), done:** once the browser was reconnected and Chris had
+    logged in, the Book node was saved and published unchanged at 08:00:13. Umbraco showed
+    "Document published" and logged "Content … has been published". `/book/` then returned 200
+    ("Choose what to book"). There were no Error or Fatal entries in the console or in that day's
+    trace log. That exercised MessagePack 3.1.9's serialize and deserialize paths in the
+    HybridCache. The TestSite was stopped afterwards.
 
 ## 4. Review
 
