@@ -160,9 +160,12 @@
   *Done (2026-10-16):* the deferred-obligations memory records this fix, and a single exit that
   removes the MessagePack and `Pkcs` declarations together when the floor rises to stable
   `17.8.0` / `18.3.0`.
-- [ ] 5.2 After merge on both lines, archive on both. Then re-scope `release-17-4-0` /
+- [x] 5.2 After merge on both lines, archive on both. Then re-scope `release-17-4-0` /
   `release-18-3-0`:
   - remove their "on hold" notes;
   - add the advisory to the changelog entry: what it is, that updating uBookIt fixes it with no
     Umbraco upgrade, and the NU1605 advice from 2.4;
   - redo their audit task (now expected to pass) and their QA.
+  *Done:* merged as PR #34 (main, `cb23fd6`) and PR #36 (dev/v18, `09402a3`), CI green on both,
+  and archived with this box ticked. The re-scope of `release-17-4-0` / `release-18-3-0` follows in
+  those changes.
