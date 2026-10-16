@@ -18,6 +18,89 @@ See [the versioning note](README.md#versions-and-the-api-promise).
 
 ---
 
+## 18.3.0
+
+### What you have to do
+
+**If your booking page offers exactly one thing, check that you want what it now does.** A booking
+page whose catalogue would list a single service or resource now goes straight to booking it,
+rather than showing a list of one. That is on by default, so an upgraded site with one bookable
+thing changes the moment it starts. A site offering two or more things, or none, sees no change.
+- To keep showing the catalogue, untick **Skip the catalogue when there is only one choice** on
+  uBookIt's settings tab, or set `UBookIt:SkipSingleChoiceCatalogue` to `false` in your
+  configuration.
+- If your page has text explaining why there is only one thing to choose, either turn the setting
+  off or remove that text.
+
+**If your site references MessagePack directly, at a version below 3.1.9, raise that reference to
+3.1.9 or later.** uBookIt now requires 3.1.9 (see *What changed*), so a lower direct reference makes
+restore fail with a package-downgrade error (NU1605).
+
+Otherwise, **nothing.** There is no migration, no schema change, and no published API removed or
+changed, so code built against 18.2.x keeps working.
+
+**Going back to 18.2.x afterwards is safe.** The older version always shows the catalogue. If you
+have saved the new setting on the settings tab, the older version ignores the saved value and does
+not show it, and it cannot remove it either. Coming forward again, the saved value applies once
+more. Going back also gives up the MessagePack fix below: the older version does not require
+3.1.9, so your site resolves the 3.1.8 that Umbraco brings, unless it requires a fixed version some
+other way, such as its own direct reference.
+
+### What changed
+
+**A catalogue of one is skipped.** When the booking page is opened with nothing chosen, and its
+catalogue would list exactly one thing, the page goes straight to booking that thing, exactly as
+if the visitor had chosen it:
+- the heading names what they are booking;
+- every step after the first carries `ubBook=` in its URL, as after a real choice, so a step stays
+  linkable if you later add a second thing.
+
+"One" means one entry in the catalogue as it is listed: every service, plus every resource that
+can be booked on its own. Whether that one thing has free dates at the moment does not matter; if
+it has none, its own page says so. A link or a page that names what to book, by `ubBook=` or by the
+service or resource the site's code passes to the component, still decides, whatever the setting
+says.
+
+**The setting is on uBookIt's settings tab**, as **Skip the catalogue when there is only one
+choice**, and is on by default. Like the other editable settings, a value saved there overrides
+configuration, takes effect on the next page request without a restart, and can be reset to the
+configured value. A configured value that cannot be read as `true` or `false` is treated as on,
+and the site logs an error naming the setting when it starts.
+
+**uBookIt now requires MessagePack 3.1.9 or later.**
+[GHSA-qhrr-8q5h-9q3h](https://github.com/advisories/GHSA-qhrr-8q5h-9q3h) (medium), published on
+15 October 2026, is a denial-of-service vulnerability in MessagePack before 3.1.9: deserializing
+attacker-controlled data into `System.Object` can allocate excessive memory. MessagePack reaches
+every site that runs uBookIt through Umbraco, whose 18.2.1 packages depend on 3.1.8, and no stable
+Umbraco release yet depends on a fixed version. `UBookIt.Backoffice` and `UBookIt.Web` now declare
+MessagePack 3.1.9, so a site that installs or updates uBookIt resolves the fixed package without
+upgrading Umbraco. It was already in every site's graph; only its minimum rises.
+
+**New installs get an updated description for the Booking Page document type**, mentioning the
+skip. An existing site keeps the description it was installed with: this release adds no migration
+step, and an ordinary upgrade does not re-import uBookIt's schema (see *What an upgrade does* in
+the booking page docs).
+
+### For developers
+
+- **New members.** Every existing signature is unchanged:
+  - `SiteBookingSettings.SkipSingleChoiceCatalogue`, defaulting to `true`;
+  - `UBookItPersistenceComposer.SkipSingleChoiceCatalogueSettingKey`;
+  - a second `BookingFlowViewComponent` constructor, taking the `SiteBookingSettings` as well. It is
+    the one dependency injection uses. The published constructor remains, and a component built
+    with it skips a catalogue of one, the setting's default.
+- `SettingCatalogue.All` lists the new setting, as editable.
+- **`UBookIt.Backoffice` and `UBookIt.Web` gain a dependency on `MessagePack` `3.1.9`** (a minimum).
+  `UBookIt` reaches it through them. No other dependency changes.
+- **A theme's `Catalogue` view is not rendered for a catalogue of one** while the setting is on:
+  the visitor sees that one thing's flow, in your theme's views for it. With the setting off, your
+  `Catalogue` view renders as before, however many entries there are.
+- **The delivery API is unchanged.** It has no catalogue; a headless client builds its own list
+  from the services and resources it reads and decides for itself whether a list of one is worth
+  showing.
+
+---
+
 ## 18.2.2 — 2026-10-15
 
 ### What you have to do
