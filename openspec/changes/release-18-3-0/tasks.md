@@ -139,17 +139,24 @@
 
 ## 3. Review and merge
 
-- [ ] 3.1 QA (`qa-review`) in one subagent, reused across rounds, covering this change and
+- [x] 3.1 QA (`qa-review`) in one subagent, reused across rounds, covering this change and
   `release-17-4-0`. Verify: APPROVE.
-- [ ] 3.2 Chris pushes `dev/v18` (the `single-choice-shortcut` archive, `3357f94`), then this branch,
+  *Done:* APPROVE WITH NITS at round 2, the same reviewer as round 1; see 0.5.
+- [x] 3.2 Chris pushes `dev/v18` (the `single-choice-shortcut` archive, `3357f94`), then this branch,
   and opens the PR. Verify: the PR's CI is green at every step, parity included.
-- [ ] 3.3 Chris merges with "Create a merge commit". Verify: `origin/dev/v18` is the merge commit, and
+  *Done (2026-10-16):* after the re-scope, Chris pushed `dev/v18` at `10d8617` (the `messagepack-advisory`
+  archive, which has `3357f94` as an ancestor), then this branch at `fe9724d`, and
+  opened PR #38. CI was green on the branch push and on the PR (run 38884387100), parity included.
+- [x] 3.3 Chris merges with "Create a merge commit". Verify: `origin/dev/v18` is the merge commit, and
   its push run is green.
+  *Done:* merged with a merge commit. `origin/dev/v18` is `a7ce661`, whose push run (run 38885100779) is green.
 
 ## 4. Release through the workflow
 
-- [ ] 4.1 Chris pushes tag `18.3.0` on the merge commit. Verify: `check` and `pack` are green.
-- [ ] 4.2 **Before approving**, check the run's `packages` artifact, parsing each nuspec as XML:
+- [x] 4.1 Chris pushes tag `18.3.0` on the merge commit. Verify: `check` and `pack` are green.
+  *Done:* Chris pushed tag `18.3.0` on the merge commit `a7ce661` on 2026-10-16. The publish run
+  (run 38889220447) ran `check`, `pack` and `publish`, all green.
+- [x] 4.2 **Before approving**, check the run's `packages` artifact, parsing each nuspec as XML:
   - the tagged `booking-flow.png` returns 200;
   - there are exactly 5 `.nupkg` and 4 `.snupkg`, all `18.3.0`, each `.snupkg` holding its `.pdb`;
   - all five nuspecs carry the authors, copyright, licence, readme, icon, project URL and the
@@ -170,14 +177,47 @@
 
   Show the check script can fail (for example, against the `18.2.2` artifact with this release's
   expectations).
-- [ ] 4.3 Chris approves. Record the summary table and the conclusion.
-- [ ] 4.4 Confirm `18.3.0` per package on the flat container, and that the package page renders.
+  *Done:* Chris downloaded the artifact to `artifacts\packages-v18`; it was extracted to a fresh
+  scratch folder and checked by a script that parses each nuspec as XML: **90 of 90 pass**.
+  - Every item above. `Pkcs` 10.0.13 is declared by exactly Persistence and Web, the framework
+    reference is on `UBookIt`, Backoffice and Web, there is no `Xml` dependency, and the bundle's
+    only culture is `en`.
+  - MessagePack 3.1.9 is declared by exactly Backoffice and Web. Compared with the published
+    `18.2.2` packages downloaded from nuget.org, that is the only dependency difference: the other
+    three packages' dependencies and framework references are identical.
+  - `skipSingleChoiceCatalogueLabel` is in the backoffice bundle's `en-us` chunk. `UBookIt.Web.dll`
+    embeds the tag's `package.xml` byte-for-byte, carrying the new Booking Page description.
+  - The packed README is identical to the tag's, all 19 addresses return 200, and the 17
+    repository addresses are pinned to `18.3.0`.
+
+  The script can fail. Against the published `18.2.2` packages with this release's expectations,
+  it reports 14 failures, every new check among them. And with the `17.4.0` artifact compared
+  against an older baseline (`17.2.1`), the dependency comparison fails on four packages, listing
+  each extra difference rather than only MessagePack.
+- [x] 4.3 Chris approves. Record the summary table and the conclusion.
+  *Done:* Chris approved after the check. The run concluded **success**, with `check`, `pack` and
+  `publish` all green.
+- [x] 4.4 Confirm `18.3.0` per package on the flat container, and that the package page renders.
+  *Done:* all five ids list `18.3.0` on `api.nuget.org/v3-flatcontainer/<id>/index.json`. The
+  `UBookIt` 18.3.0 page returns 200, titled "UBookIt 18.3.0", with the README's tagged
+  `booking-flow.png` on the page.
 
 ## 5. Close out
 
-- [ ] 5.1 Stamp the entry's date.
-- [ ] 5.2 Sibling sweep for `18.2.2` and for sentences the release falsifies. Fix or record each.
-- [ ] 5.3 Update the deferred-obligations memory: the `17.4.0` / `18.3.0` changelog obligation is
+- [x] 5.1 Stamp the entry's date.
+  *Done:* stamped `2026-10-16`. Rechecked first: the entry's "no stable Umbraco release yet depends
+  on a fixed version" still holds. The feed's newest are `17.7.1` / `18.2.1` stable and
+  `17.8.0-rc` / `18.3.0-rc`.
+- [x] 5.2 Sibling sweep for `18.2.2` and for sentences the release falsifies. Fix or record each.
+  *Done:* outside `CHANGELOG.md`, the archive and this change, `18.2.2` appears nowhere. Both
+  "uBookIt is at" sentences say `18.3.0`. The only "undated" is the runbook's rule and
+  `ChangelogTests`. MessagePack is mentioned only by the declarations and their comments, which
+  are still true. Nothing to fix.
+- [x] 5.3 Update the deferred-obligations memory: the `17.4.0` / `18.3.0` changelog obligation is
   paid. The exit obligation stays open for both declarations, `Pkcs` and MessagePack: the floor raise to stable Umbraco removes them together (QA round 2 NIT).
-- [ ] 5.4 Commit and run the unit suite. Chris pushes. Verify: `dev/v18`'s CI is green.
-- [ ] 5.5 Archive last, running the unit suite before the push.
+  *Done:* the changelog obligation is marked paid. The exit stays open for both declarations.
+- [x] 5.4 Commit and run the unit suite. Chris pushes. Verify: `dev/v18`'s CI is green.
+  *Done:* unit **2197**, 0 skipped; openspec `validate --all --strict` (1.13.0) 27/27. `dev/v18`'s CI runs on Chris's push.
+- [x] 5.5 Archive last, running the unit suite before the push.
+  *Done:* archived after the close-out commit; unit **2197** passed on that commit, and the
+  archive moves files only.
