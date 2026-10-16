@@ -1,3 +1,11 @@
+> **ON HOLD, then RE-SCOPED (2026-10-16).** The hold below was lifted the next morning: stable
+> Umbraco is not due until 2026-10-29, which Chris judged too long. `messagepack-advisory` declared
+> MessagePack 3.1.9 instead. It is merged (PR #34, `cb23fd6`) and archived (`6aa4d8c`). This branch
+> was rebased onto `main` (it had never been pushed). Section 0 below redoes what the base change
+> affects. Sections 1 and 2 keep their 2026-10-15 records, as history.
+>
+> *The original hold:*
+>
 > **ON HOLD (2026-10-15, Chris's decision after QA round 1).** QA found that shipping with
 > MessagePack 3.1.8 breaks the packaging requirement *A shipped package declares the fix for an
 > advisory its host cannot yet supply*. Rather than ship, pin and ship again, this release WAITS
@@ -9,6 +17,51 @@
 >   do*, and the bump, entry, builds and QA are redone.
 > - Round 1's other findings (the re-import overclaim and the project list) are fixed below.
 > - The branch is local and was never pushed.
+
+## 0. Re-scope onto `messagepack-advisory` (2026-10-16)
+
+- [x] 0.1 Rebase this branch onto `main` at `6aa4d8c`. Verify: the branch contains it; the
+  MessagePack declaration is present in `Directory.Packages.props`.
+  *Done:* all three commits rebased without conflicts; `git merge-base --is-ancestor main HEAD`
+  holds; `<PackageVersion Include="MessagePack" Version="3.1.9" />` is present.
+- [x] 0.2 Extend the changelog entry with the advisory, and check every new claim against the
+  archived `messagepack-advisory` (its proposal, and tasks 1.1, 1.4 and 2.4):
+  - the GHSA id, severity and date, and its effect (from GitHub's advisory API);
+  - the route (Umbraco 17.7.1's packages bring 3.1.8), and that no stable Umbraco carries the fix;
+  - that `UBookIt.Backoffice` and `UBookIt.Web` declare 3.1.9, and `UBookIt` reaches it through
+    them;
+  - the NU1605 advice, which is an error, measured with SDK 10.0.301;
+  - "no other dependency changes" against `17.3.2`, checked from the packed artifact at 4.2;
+  - no claim about how Umbraco uses MessagePack.
+
+  Verify: `ChangelogTests` and `VersionTruthTests` pass.
+  *Done:* three additions to the entry: a *What you have to do* paragraph (raise a direct
+  MessagePack reference below 3.1.9, or restore fails with NU1605), a *What changed* paragraph
+  (the advisory), and a *For developers* bullet (the new dependency).
+  - **Id, severity, date and effect:** GitHub's advisory API, checked 2026-10-15/16 — medium,
+    published 2026-10-15, "nested arrays can blow past buffer length limits", allocating memory
+    when deserializing into `System.Object`.
+  - **The route:** Umbraco 17.7.1's packages bring 3.1.8 (`messagepack-advisory` 1.1, and its
+    reviewer, from the nuspecs). No stable Umbraco carries the fix: the newest on nuget.org is
+    `18.3.0-rc`.
+  - **Which packages declare it:** `messagepack-advisory` 1.3 and 1.4.
+  - **NU1605:** an error, measured in `messagepack-advisory` 2.4 with SDK 10.0.301.
+  - **"No other dependency changes":** left for 4.2 to confirm from the artifact, as 0.2 requires.
+  - The entry says nothing about how Umbraco uses MessagePack.
+  - `ChangelogTests` and `VersionTruthTests`: 20 of 20.
+- [x] 0.3 Redo 2.1 to 2.3 on the rebased branch: a clean CI-mode build, the suites (unit
+  **2185**, integration **210**, rendering **1178**, client **356**), and the audit, which is now
+  expected to **exit 0**. Verify: all green; the audit has no unaccepted advisory.
+  *Done (2026-10-16):* the client assets were cleaned and rebuilt, then the clean CI-mode Release
+  build: 0 warnings, 0 errors. 0 skipped: client **356**, unit **2185**, integration **210**,
+  rendering **1178**. **The audit exits 0:** "5 finding(s) accepted by a suppression … No
+  unaccepted advisories in the graph". The MessagePack advisory is gone, and the ImageSharp
+  TestSite exception is unchanged. This supersedes 2.3's "NOT met" record.
+- [x] 0.4 Task 4.2's artifact check gains: `UBookIt.Backoffice` and `UBookIt.Web` declare
+  `MessagePack` `3.1.9`; no other package does.
+  *Done:* added to 4.2's list, with the "no other dependency differs" check that 0.2 defers to it.
+- [ ] 0.5 QA round 2 for both release changes: round 1's reviewer if it can still be reached,
+  otherwise a fresh one told round 1's findings and how each was resolved.
 
 ## 1. The version and the entry
 
@@ -101,6 +154,7 @@
     declare the `Microsoft.AspNetCore.App` framework reference; no package declares
     `System.Security.Cryptography.Xml`; the backoffice bundle registers its localization under
     `culture: "en"`;
+  - **new this release (from `messagepack-advisory`):** `UBookIt.Backoffice` and `UBookIt.Web` declare `MessagePack` `3.1.9`; no other package declares MessagePack; and no other dependency differs from the previous release's artifact;
   - **new this release:** the packed backoffice bundle carries `skipSingleChoiceCatalogueLabel`;
     `UBookIt.Web.dll`'s embedded `package.xml` carries the new Booking Page description;
   - the packed README is identical to the tag's, all its addresses return 200, and every
