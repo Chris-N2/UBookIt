@@ -110,25 +110,39 @@
 
 ## 3. Port to dev/v18
 
-- [ ] 3.1 After main's QA approval, cherry-pick onto a branch from `dev/v18`
+- [x] 3.1 After main's QA approval, cherry-pick onto a branch from `dev/v18`
   (`messagepack-advisory-v18`, worktree `..\uBookIt-v18`). Re-measure 1.1 and 1.3 on Umbraco
   18.2.1's graph, rather than assuming main's set. Verify: the same checks as 1.3 and 1.4; the
   v18 baselines (unit 2197, integration 210, rendering 1178, client 356); 0 warnings; the 2.3
   smoke test on the v18 TestSite, **plus publishing one content node and fetching it** (QA round 1
   NIT). The `Directory.Packages.props` comment's versions must be v18's: Umbraco 18.2.1, and an
   exit naming 18.3.0.
+  *Done on `dev/v18`* (branch `messagepack-advisory-v18`). The full record is in that branch's
+  copy of this file. In brief: measured before and after on Umbraco 18.2.1, the same as main;
+  the cherry-picks applied clean; the comment uses v18's versions; the nuspec diff is the same
+  two additions; unit 2197; published and fetched a content node on the v18 TestSite.
 
 ## 4. Review
 
-- [ ] 4.1 QA (`qa-review`) in one subagent, reused across rounds and across both lines. Hand it the
+- [x] 4.1 QA (`qa-review`) in one subagent, reused across rounds and across both lines. Hand it the
   claims (the measurements, the nuspec diff, counts, smoke tests) to verify, not trust. Treat each
   round's fixes as new code.
+  *Round 1 (main): APPROVE WITH NITS, all three taken (2.5). Round 2 (main's nits and the v18
+  port): APPROVE on both lines, no findings.* The reviewer reproduced every measurement, the
+  audit, both nuspec diffs (with its own XML parser, file lists included), the suites and the
+  openspec command on each line. It also compared the change across the lines: the only
+  differences are the two version mentions in the comment and the task records. Two rounds, one
+  reviewer. (In round 2 it briefly detached HEAD in the main repo by mistake, at the branch tip,
+  and restored it. The branch was verified afterwards at `eaa9fa1`, clean.)
 
 ## 5. Close out
 
-- [ ] 5.1 Update the deferred-obligations memory. The MessagePack section records the declaration
+- [x] 5.1 Update the deferred-obligations memory. The MessagePack section records the declaration
   and its exit, merged with the `Pkcs` exit: the floor raise to stable `17.8.0` / `18.3.0` removes
   both.
+  *Done (2026-10-16):* the deferred-obligations memory records this fix, and a single exit that
+  removes the MessagePack and `Pkcs` declarations together when the floor rises to stable
+  `17.8.0` / `18.3.0`.
 - [ ] 5.2 After merge on both lines, archive on both. Then re-scope `release-17-4-0` /
   `release-18-3-0`:
   - remove their "on hold" notes;
