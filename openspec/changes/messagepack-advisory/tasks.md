@@ -117,6 +117,23 @@
   smoke test on the v18 TestSite, **plus publishing one content node and fetching it** (QA round 1
   NIT). The `Directory.Packages.props` comment's versions must be v18's: Umbraco 18.2.1, and an
   exit naming 18.3.0.
+  **Progress (2026-10-16, branch `messagepack-advisory-v18` from `dev/v18` `3357f94`):**
+  - Measured **before** the cherry-pick, Debug and Release: the same as main. `UBookIt`, Backoffice
+    and Web resolve 3.1.8 with the advisory, through Umbraco 18.2.1; Persistence and Core have no
+    MessagePack.
+  - The three commits applied with no conflicts. The props comment was changed to v18's versions:
+    Umbraco's 18.2.1 packages, and an exit at 18.3.0 (whose release candidate brings 3.1.11).
+  - **After:** the three resolve 3.1.9 with no advisory; Persistence and Core still have none. The
+    audit exits 0, with 5 ImageSharp findings accepted. The set is minimal: removing either
+    reference brings the advisory back for that project only. Files restored.
+  - **Nuspec diff** against v18's own before set: the only differences are MessagePack 3.1.9
+    ADDED to Backoffice and Web. The reverse comparison reports the same two.
+  - Clean CI-mode Release build 0 warnings. Client **356**, unit **2197**, integration **210**,
+    rendering **1178**, 0 skipped.
+  - **Smoke test:** the v18 TestSite's `MessagePack.dll` is `3.1.9+aa16e71…`. `/` returned 200
+    ("Book DBO Granted"); `/book/` returned 200 ("Choose what to book").
+  - **Still owed:** publishing one content node and fetching it. The browser extension is not
+    connected, so this needs Chris to publish, or a reconnected browser.
 
 ## 4. Review
 

@@ -54,7 +54,7 @@
     <!-- SECURITY PIN, not a feature. GHSA-qhrr-8q5h-9q3h (CVE-2026-92707, medium, published
          2026-10-15): MessagePack before 3.1.9 can allocate excessive memory deserializing nested
          arrays into System.Object. MessagePack reaches the shipped packages only through Umbraco
-         (Umbraco's 17.7.1 packages, Web.Common, PublishedCache.HybridCache and others, depend on
+         (Umbraco's 18.2.1 packages, Web.Common, PublishedCache.HybridCache and others, depend on
          3.1.8), and no stable
          Umbraco release yet depends on a fixed version. So the packable projects that resolve it
          reference the fix directly: Backoffice and Web, which are siblings; UBookIt reaches it
@@ -64,7 +64,7 @@
          Direct references, NOT CentralPackageTransitivePinningEnabled, for the reason given above.
          EXIT: remove this, and the references to it, together with the Pkcs pin, in the change
          that raises the Umbraco floor to a release whose own graph resolves MessagePack 3.1.9 or
-         later (expected: 17.8.0, whose release candidate brings 3.1.11; messagepack-advisory,
+         later (expected: 18.3.0, whose release candidate brings 3.1.11; messagepack-advisory,
          design D4). -->
     <PackageVersion Include="MessagePack" Version="3.1.9" />
   </ItemGroup>
