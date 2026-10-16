@@ -6,6 +6,12 @@ catalogue would offer exactly one service or resource goes straight to it, behin
 setting that is on by default. The maintainer's own site runs the 18 line and has exactly one
 bookable resource, so it is the first site this changes.
 
+**It also publishes `messagepack-advisory`** (re-scoped 2026-10-16), which is merged into `dev/v18`
+(PR #36, `09402a3`) and archived there (`10d8617`). `UBookIt.Backoffice` and `UBookIt.Web` declare
+MessagePack 3.1.9, fixing GHSA-qhrr-8q5h-9q3h, which reaches every site through Umbraco 18.2.1.
+Without it, this release would break the packaging requirement *A shipped package declares the
+fix for an advisory its host cannot yet supply*. That is why QA round 1 put the release on hold.
+
 ## What Changes
 
 1. **Version `18.2.2` → `18.3.0`**, in every place `docs/publishing.md`'s *Before any push* table
@@ -22,7 +28,9 @@ bookable resource, so it is the first site this changes.
      exactly one service or resource now goes straight to it.** To keep showing the catalogue,
      untick *Skip the catalogue when there is only one choice*, or set
      `UBookIt:SkipSingleChoiceCatalogue` to `false`.
-   - *What changed*, *For developers*, and what a downgrade does, as in `17.4.0`.
+   - *What changed*, *For developers*, what a downgrade does, and the MessagePack advisory, as in
+     `17.4.0`. The advisory names this line's Umbraco (18.2.1), which is one more line difference
+     after `17.3.x` → `18.2.x`.
 3. **Pack from the merged, pushed commit, tag it, verify the artifact, and publish through
    `publish.yml`.** Then date the entry and archive.
 
@@ -33,8 +41,9 @@ bookable resource, so it is the first site this changes.
   release does not move uBookIt's Umbraco floor (still `[18.2.1, 19.0.0)`). uBookIt's major tracks
   Umbraco's and its minor does not. The entry must not let a reader think uBookIt `18.3.0`
   requires or follows Umbraco `18.3.0`.
-- **Removing the `System.Security.Cryptography.Pkcs` pin** waits for stable Umbraco `18.3.0`.
-  It is not on nuget.org (checked 2026-10-15: the newest is `18.3.0-rc`).
+- **Removing the `System.Security.Cryptography.Pkcs` and MessagePack declarations** waits for
+  stable Umbraco `18.3.0`, scheduled for 2026-10-29. It is not on nuget.org (checked 2026-10-16:
+  the newest is `18.3.0-rc`).
 
 ## Capabilities
 

@@ -32,6 +32,10 @@ thing changes the moment it starts. A site offering two or more things, or none,
 - If your page has text explaining why there is only one thing to choose, either turn the setting
   off or remove that text.
 
+**If your site references MessagePack directly, at a version below 3.1.9, raise that reference to
+3.1.9 or later.** uBookIt now requires 3.1.9 (see *What changed*), so a lower direct reference makes
+restore fail with a package-downgrade error (NU1605).
+
 Otherwise, **nothing.** There is no migration, no schema change, and no published API removed or
 changed, so code built against 18.2.x keeps working.
 
@@ -61,6 +65,15 @@ configuration, takes effect on the next page request without a restart, and can 
 configured value. A configured value that cannot be read as `true` or `false` is treated as on,
 and the site logs an error naming the setting when it starts.
 
+**uBookIt now requires MessagePack 3.1.9 or later.**
+[GHSA-qhrr-8q5h-9q3h](https://github.com/advisories/GHSA-qhrr-8q5h-9q3h) (medium), published on
+15 October 2026, is a denial-of-service vulnerability in MessagePack before 3.1.9: deserializing
+attacker-controlled data into `System.Object` can allocate excessive memory. MessagePack reaches
+every site that runs uBookIt through Umbraco, whose 18.2.1 packages depend on 3.1.8, and no stable
+Umbraco release yet depends on a fixed version. `UBookIt.Backoffice` and `UBookIt.Web` now declare
+MessagePack 3.1.9, so a site that installs or updates uBookIt resolves the fixed package without
+upgrading Umbraco. It was already in every site's graph; only its minimum rises.
+
 **New installs get an updated description for the Booking Page document type**, mentioning the
 skip. An existing site keeps the description it was installed with: this release adds no migration
 step, and an ordinary upgrade does not re-import uBookIt's schema (see *What an upgrade does* in
@@ -75,6 +88,8 @@ the booking page docs).
     the one dependency injection uses. The published constructor remains, and a component built
     with it skips a catalogue of one, the setting's default.
 - `SettingCatalogue.All` lists the new setting, as editable.
+- **`UBookIt.Backoffice` and `UBookIt.Web` gain a dependency on `MessagePack` `3.1.9`** (a minimum).
+  `UBookIt` reaches it through them. No other dependency changes.
 - **A theme's `Catalogue` view is not rendered for a catalogue of one** while the setting is on:
   the visitor sees that one thing's flow, in your theme's views for it. With the setting off, your
   `Catalogue` view renders as before, however many entries there are.
