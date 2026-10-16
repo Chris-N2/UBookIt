@@ -141,15 +141,25 @@
 
 ## 4. Review
 
-- [ ] 4.1 QA (`qa-review`) in one subagent, reused across rounds and across both lines. Hand it the
+- [x] 4.1 QA (`qa-review`) in one subagent, reused across rounds and across both lines. Hand it the
   claims (the measurements, the nuspec diff, counts, smoke tests) to verify, not trust. Treat each
   round's fixes as new code.
+  *Round 1 (main): APPROVE WITH NITS, all three taken (2.5). Round 2 (main's nits and the v18
+  port): APPROVE on both lines, no findings.* The reviewer reproduced every measurement, the
+  audit, both nuspec diffs (with its own XML parser, file lists included), the suites and the
+  openspec command on each line. It also compared the change across the lines: the only
+  differences are the two version mentions in the comment and the task records. Two rounds, one
+  reviewer. (In round 2 it briefly detached HEAD in the main repo by mistake, at the branch tip,
+  and restored it. The branch was verified afterwards at `eaa9fa1`, clean.)
 
 ## 5. Close out
 
-- [ ] 5.1 Update the deferred-obligations memory. The MessagePack section records the declaration
+- [x] 5.1 Update the deferred-obligations memory. The MessagePack section records the declaration
   and its exit, merged with the `Pkcs` exit: the floor raise to stable `17.8.0` / `18.3.0` removes
   both.
+  *Done (2026-10-16):* the deferred-obligations memory records this fix, and a single exit that
+  removes the MessagePack and `Pkcs` declarations together when the floor rises to stable
+  `17.8.0` / `18.3.0`.
 - [ ] 5.2 After merge on both lines, archive on both. Then re-scope `release-17-4-0` /
   `release-18-3-0`:
   - remove their "on hold" notes;
