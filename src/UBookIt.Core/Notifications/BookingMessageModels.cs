@@ -171,7 +171,7 @@ public sealed record BookerMessageModel : BookingMessageModel
     /// <b><c>null</c> means "this message does not carry instructions"</b>: the booking is not
     /// confirmed as the message is composed, it was placed directly against a resource, or its
     /// service has none. Only a confirmed booking's message carries them, so a site that requires
-    /// approval never gives them to somebody it has not accepted. Added in 17.5.0; a view written
+    /// approval never gives them to somebody it has not accepted. Added in 17.5.0 and 18.4.0; a view written
     /// before it existed renders unchanged.
     /// </para>
     /// <para>
