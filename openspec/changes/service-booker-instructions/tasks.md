@@ -126,6 +126,28 @@ member → reflection test red; instructions in the site body → site test red;
 delivery tests red; migration gains an `UPDATE` → shape test and upgrade test red; docs label ≠
 `en-us.ts` → docs test red.
 
+**QA round 1 (fresh subagent): APPROVE.** No critical or major finding; 31/33 spec criteria
+verified (the two editor scenarios rest on the live shadow-DOM check, which QA could not repeat
+without a login). Follow-ups:
+- *MINOR, fixed:* the line-ending test fed CRLF only, so on Windows removing `ReplaceLineEndings()`
+  stayed green (and real textarea input is LF). Now a theory over CRLF, LF and mixed input, which
+  also asserts every line ending in the body is `Environment.NewLine` and that the model carries
+  the text unnormalised. Mutation re-run on Windows: removing the normalisation turns the LF and
+  mixed cases red. Unit main **2263**, v18 **2257**.
+- *MINOR, accepted:* the null-not-omitted and delivery tests serialise with
+  `JsonSerializerOptions.Web`, not the host's pipeline; the live checks (9.3, 8.1) read the real
+  wire bodies.
+- *For the sync:* `email-templates` "a site that supplies nothing SHALL be unaffected … exactly what
+  it sent before" is false as written for a site that writes instructions but supplies no views —
+  restate it as "unaffected by this capability" (the cancellation link set the same precedent).
+- *For the release notes:* a PUT that omits `bookerInstructions` clears them, so a backoffice tab
+  left open across the upgrade, or a script on the old generated types, wipes a service's
+  instructions when it saves.
+- *Left, on precedent:* "Added in 17.5.0" on the v18 line (v18 already says "Added in 17.1.0"
+  for `CancellationUrl`); the exemption matches the bare identifier `BookerInstructions` under the
+  two named actions only; the generated response type marks the member optional (the wire always
+  carries it).
+
 **Outward grep:** the composer's own remark ("the one exception is…") was falsified and is
 corrected. `email-templates` "a site that supplies nothing SHALL be unaffected … exactly what it
 sent before" compares a site with and without supplied content and is still true (a site that

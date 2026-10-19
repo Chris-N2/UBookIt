@@ -321,15 +321,27 @@ public class ServiceBookerInstructionsMessageTests
         Assert.True(when >= 0 && closing > when && heading > closing && cancel > heading, body);
     }
 
-    [Fact]
-    public async Task They_are_reproduced_as_written_without_doubled_line_breaks()
+    /// <remarks>
+    /// <b>Every ending, not just CRLF.</b> With CRLF input alone this test cannot fail on Windows,
+    /// where CRLF already is the body's own ending — QA removed the normalisation and it stayed
+    /// green. LF is what the editor's textarea actually sends, and a mixed text is what an API
+    /// caller can send; on any host, one of the three differs from <c>Environment.NewLine</c>.
+    /// </remarks>
+    [Theory]
+    [InlineData("\r\n")]
+    [InlineData("\n")]
+    [InlineData("mixed")]
+    public async Task They_are_reproduced_as_written_in_the_bodys_own_line_endings(string ending)
     {
-        var service = Consultation();
+        var text = ending == "mixed"
+            ? $"Join on Teams:\n{Marker}\r\n\nPlease test your microphone."
+            : $"Join on Teams:{ending}{Marker}{ending}{ending}Please test your microphone.";
+        var service = Consultation(text);
 
-        var (message, _) = await ComposeAsync(Booking(BookingStatus.Confirmed, service), BookingEvent.Confirmed, service);
+        var (message, model) = await ComposeAsync(Booking(BookingStatus.Confirmed, service), BookingEvent.Confirmed, service);
 
-        // The CRLFs the textarea gave are the body's own line endings now: one blank line where the
-        // site wrote one, and no \r\r\n or stray \r where a CRLF met AppendLine.
+        // One blank line where the site wrote one, every line ended the way the body's own lines
+        // are, and no \r\r\n, stray \r or bare \n where the site's ending met AppendLine.
         var nl = Environment.NewLine;
         Assert.Contains(
             $"Instructions for your booking:{nl}Join on Teams:{nl}{Marker}{nl}{nl}Please test your microphone.{nl}",
@@ -337,6 +349,12 @@ public class ServiceBookerInstructionsMessageTests
             StringComparison.Ordinal);
         Assert.DoesNotContain("\r\r", message.Body, StringComparison.Ordinal);
         Assert.DoesNotContain($"{nl}{nl}{nl}", message.Body, StringComparison.Ordinal);
+        Assert.Equal(
+            message.Body.Length - message.Body.Replace(nl, "", StringComparison.Ordinal).Length,
+            nl.Length * (message.Body.Length - message.Body.Replace("\n", "", StringComparison.Ordinal).Length));
+
+        // The model is the text as the site wrote it — normalising is the wording's, not the view's.
+        Assert.Equal(text, model.BookerInstructions);
     }
 
     [Fact]
