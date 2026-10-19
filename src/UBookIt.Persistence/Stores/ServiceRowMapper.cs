@@ -26,7 +26,9 @@ internal static class ServiceRowMapper
                     .Value,
                 VisitorSelectable = r.VisitorSelectable,
             }),
-            row.Id).Value;
+            row.Id).Value
+            // Through the domain rule, so stored text is normalised exactly as saved text is.
+            .WithBookerInstructions(row.BookerInstructions).Value;
 
     internal static ServiceRow ToRow(Service service)
     {
@@ -35,7 +37,7 @@ internal static class ServiceRowMapper
             Id = service.Id,
             Name = service.Name,
         };
-        ApplyDuration(service.Duration, row);
+        ApplyScalars(service, row);
         row.Roles = ToRoleRows(service);
         return row;
     }
@@ -43,6 +45,7 @@ internal static class ServiceRowMapper
     internal static void ApplyScalars(Service service, ServiceRow row)
     {
         row.Name = service.Name;
+        row.BookerInstructions = service.BookerInstructions;
         ApplyDuration(service.Duration, row);
     }
 

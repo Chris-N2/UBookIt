@@ -133,6 +133,9 @@ export default {
     requirementEntry: "%0% × %1%",
     requirementNone: "—",
     details: "Details",
+    bookerInstructions: "Instructions for the booker",
+    bookerInstructionsHint:
+      "Sent to the booker once their booking is confirmed — for example a link to join an online session, or directions and parking. Not shown on the public site. Plain text, up to 2000 characters.",
     duration: "Duration",
     durationVariable: "Variable length",
     durationVariableHint:

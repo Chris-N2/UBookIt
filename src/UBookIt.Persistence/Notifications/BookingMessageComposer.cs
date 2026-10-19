@@ -73,11 +73,13 @@ public sealed record BookingMessage(string Subject, string Body, bool IsHtml = f
 /// throwaway one now buys nothing that a later templating feature would keep.
 /// </para>
 /// <para>
-/// <b>Almost everything comes from the booking itself.</b> The one exception is the name of a
-/// directly-booked resource, because a claim carries an id and nothing else. That read reports the
-/// resource's name as it stands NOW, which is knowingly weaker than the snapshot a service booking
-/// carries — acceptable in a message sent within seconds of the event, and the alternative is a
-/// domain and schema change.
+/// <b>Almost everything comes from the booking itself.</b> There are two exceptions. One is the
+/// name of a directly-booked resource, because a claim carries an id and nothing else. That read
+/// reports the resource's name as it stands NOW, which is knowingly weaker than the snapshot a
+/// service booking carries — acceptable in a message sent within seconds of the event, and the
+/// alternative is a domain and schema change. The other is a confirmed booker's instructions,
+/// read from the service as it stands now on purpose: they exist to be acted on, so the current
+/// text is the useful one.
 /// </para>
 /// <para>
 /// <b>A message is never withheld because an enrichment could not be resolved.</b> The reference
@@ -90,6 +92,39 @@ public sealed class BookingMessageComposer(
     ILogger<BookingMessageComposer> logger,
     IBookingTemplateRenderer? templates = null)
 {
+    /// <summary>
+    /// Where a confirmed booker's instructions are read from, or <c>null</c> for a composer built
+    /// through the constructor published at 17.0.0, which never carries instructions.
+    /// </summary>
+    private readonly IServiceStore? _services;
+
+    /// <summary>
+    /// A composer that also gives a confirmed booker their service's instructions.
+    /// </summary>
+    /// <remarks>
+    /// <para>
+    /// <b>A new constructor, not a widened one.</b> The three-parameter constructor is published,
+    /// and adding a parameter to it would break every assembly compiled against it. The service
+    /// store comes LAST and is required, so no call written against the published constructor —
+    /// <c>(r, l)</c>, <c>(r, l, t)</c>, or <c>(r, null, null)</c> — can bind to this one or
+    /// become ambiguous with it.
+    /// </para>
+    /// <para>
+    /// The package registers the composer through this constructor explicitly, rather than
+    /// leaving the container to choose: with no renderer registered, the container would
+    /// otherwise prefer the published constructor and the instructions would silently go missing.
+    /// </para>
+    /// </remarks>
+    public BookingMessageComposer(
+        IResourceStore resources,
+        ILogger<BookingMessageComposer> logger,
+        IBookingTemplateRenderer? templates,
+        IServiceStore services)
+        : this(resources, logger, templates)
+    {
+        _services = services;
+    }
+
     /// <summary>
     /// Whether this site supplies any content of its own.
     /// </summary>
@@ -170,6 +205,9 @@ public sealed class BookingMessageComposer(
         var what = await DescribeAsync(booking, SupportsTemplates, cancellationToken).ConfigureAwait(false);
         var subject = SubjectFor(booking, bookingEvent);
 
+        // ONE READ FEEDS BOTH the package's wording and the model, so the two cannot disagree.
+        var instructions = await BookerInstructionsAsync(booking, cancellationToken).ConfigureAwait(false);
+
         var body = new StringBuilder()
             .AppendLine(subject)
             .AppendLine();
@@ -187,6 +225,17 @@ public sealed class BookingMessageComposer(
         body.Append(Details(booking, what.Text))
             .AppendLine()
             .AppendLine(ClosingLineFor(booking, bookingEvent));
+
+        // AFTER WHAT WAS BOOKED AND WHEN, BEFORE THE CANCELLATION LINK: the instructions are about
+        // attending the booking the details describe, and the link is the last thing a reader
+        // needs. Omitted entirely when there are none — never a heading over a blank. Line endings
+        // are made the body's own, so a CRLF from the editor's textarea cannot double-space it.
+        if (instructions is not null)
+        {
+            body.AppendLine()
+                .AppendLine("Instructions for your booking:")
+                .AppendLine(instructions.ReplaceLineEndings());
+        }
 
         // NAMED AS THE MEANS OF CANCELLING, not left as a bare address. The secret is issued once
         // and travels in this message alone, so a reader who discards it as decoration has no
@@ -240,9 +289,59 @@ public sealed class BookingMessageComposer(
             PreviousLocalStart = previousLocal?.Start,
             PreviousLocalEnd = previousLocal?.End,
             CancellationUrl = cancellationUrl,
+            BookerInstructions = instructions,
         };
 
         return await ApplyTemplateAsync(model, fallback, booking, cancellationToken).ConfigureAwait(false);
+    }
+
+    /// <summary>
+    /// The instructions this booker is given, or <c>null</c> where they are given none.
+    /// </summary>
+    /// <remarks>
+    /// <para>
+    /// <b>Only for a booking that is <c>Confirmed</c> as the message is composed</b>, and decided by
+    /// that status alone — never by which message this is, nor by the site's <c>AutoConfirm</c>
+    /// setting. That settles every case: a placement is confirmed under auto-confirm and requested
+    /// otherwise; a confirmation always is; a move is whatever the booking was; a decline and a
+    /// cancellation never are. A site that requires approval does not hand a join link to somebody
+    /// it has not accepted.
+    /// </para>
+    /// <para>
+    /// <b>Read now, not recorded at placement</b>, so a changed link reaches a booker in the next
+    /// message. Unlike the service's name, which stays the one recorded when it was sold. A deleted
+    /// service and a service with none both give none, and a booking placed directly against a
+    /// resource has no service to read.
+    /// </para>
+    /// <para>
+    /// Caught on the terms of <see cref="ResourceNamesAsync"/>: cancellation escapes, and any other
+    /// failure costs the instructions and nothing else, logged with the booking id only.
+    /// </para>
+    /// </remarks>
+    private async Task<string?> BookerInstructionsAsync(Booking booking, CancellationToken cancellationToken)
+    {
+        if (_services is null
+            || booking.Status != BookingStatus.Confirmed
+            || booking.Service is not { } attribution)
+        {
+            return null;
+        }
+
+        try
+        {
+            var service = await _services.GetAsync(attribution.ServiceId, cancellationToken).ConfigureAwait(false);
+            return service?.BookerInstructions;
+        }
+        catch (Exception exception) when (exception is not OperationCanceledException)
+        {
+            logger.LogWarning(
+                exception,
+                "uBookIt could not read a service while composing a message for booking "
+                + "{BookingId}. The message is sent without the service's instructions.",
+                booking.Id);
+
+            return null;
+        }
     }
 
     /// <summary>

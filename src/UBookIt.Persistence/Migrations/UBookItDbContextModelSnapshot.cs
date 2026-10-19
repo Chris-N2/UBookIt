@@ -388,6 +388,10 @@ namespace UBookIt.Persistence.Migrations
                     b.Property<Guid>("Id")
                         .HasColumnType("uniqueidentifier");
 
+                    b.Property<string>("BookerInstructions")
+                        .HasMaxLength(2000)
+                        .HasColumnType("nvarchar(2000)");
+
                     b.Property<string>("DurationKind")
                         .IsRequired()
                         .HasMaxLength(16)
