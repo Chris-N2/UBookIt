@@ -322,6 +322,13 @@ public class MultiClaimConcurrencyTests(SqlServerFixture fixture)
                 // Neither uBookItResourceClaim nor uBookItBooking is referenced: closed periods,
                 // like closures, change which times are OFFERED, never how a claim is written.
                 "20261011182653_ClosureDateRanges",
+
+                // service-booker-instructions: adds uBookItService.BookerInstructions, one nullable
+                // nvarchar(2000). Confirmed against the rule above — a single AddColumn on the
+                // service table, altering and dropping nothing. Neither uBookItResourceClaim nor
+                // uBookItBooking is referenced: the instructions are read when a message is
+                // composed, never when a claim is written.
+                "20261019195550_AddServiceBookerInstructions",
             ],
             applied.OrderBy(name => name, StringComparer.Ordinal));
 

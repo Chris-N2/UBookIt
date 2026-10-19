@@ -161,6 +161,30 @@ public sealed record BookerMessageModel : BookingMessageModel
     /// </para>
     /// </remarks>
     public Uri? CancellationUrl { get; init; }
+
+    /// <summary>
+    /// The instructions the site wrote for the booked service — joining details, directions — or
+    /// <c>null</c> where this message does not carry them.
+    /// </summary>
+    /// <remarks>
+    /// <para>
+    /// <b><c>null</c> means "this message does not carry instructions"</b>: the booking is not
+    /// confirmed as the message is composed, it was placed directly against a resource, or its
+    /// service has none. Only a confirmed booking's message carries them, so a site that requires
+    /// approval never gives them to somebody it has not accepted. Added in 17.5.0 and 18.4.0; a view written
+    /// before it existed renders unchanged.
+    /// </para>
+    /// <para>
+    /// <b>The text as the site wrote it</b>, trimmed, line breaks kept, read from the service when
+    /// the message is composed. Plain text, never formatted for a medium: Razor encodes it in an
+    /// HTML view like any other value, and how its lines are presented is the view's.
+    /// </para>
+    /// <para>
+    /// The model for the site's own recipients has no such member: they are written for the
+    /// booker.
+    /// </para>
+    /// </remarks>
+    public string? BookerInstructions { get; init; }
 }
 
 /// <summary>

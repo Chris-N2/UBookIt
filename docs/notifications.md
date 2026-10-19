@@ -97,6 +97,46 @@ applies rather than carrying the details past it.
 A booking whose booker has been erased (see [the backoffice guide](backoffice.md)) has no address, so nothing is
 sent to them. Your own recipients are still told.
 
+### Instructions for the booker
+
+A service can carry **Instructions for the booker** — plain text you write once in the service
+editor, such as a link to join an online consultation, or directions and parking for an in-person
+one. uBookIt includes them in the booker's message **only once the booking is confirmed**, judged
+by the booking's status at the moment the message is composed:
+
+| Message to the booker | Carries the instructions |
+|---|---|
+| Placed, on a site that confirms on placement | yes |
+| Placed, on a site that requires approval | no — the booking is only requested |
+| Confirmed by an operator | yes |
+| Moved, while the booking is confirmed | yes |
+| Moved, while the booking is still awaiting approval | no |
+| Declined or cancelled | no |
+
+So a site that requires approval never hands a join link to somebody it has not accepted.
+
+In uBookIt's own wording they appear under **Instructions for your booking:**, as you wrote them,
+line breaks included — after what was booked and when, and before the cancellation link. A service
+with no instructions gets no such section at all.
+
+They are **read from the service when each message is composed**, not recorded when the booking
+was placed. Change a meeting link and the next message a confirmed booker receives — a move, say —
+carries the new one. That is deliberately unlike the service's *name* in the same message, which
+stays the name the booking was sold under. A booking whose service has since been deleted carries
+none, and so does a booking placed directly against a resource, which has no service.
+
+If the service cannot be read while a message is being composed, the message is still sent with
+everything else it carries, without the instructions, and the failure is logged with the booking
+id only.
+
+**Messages to `InternalRecipients` never carry them** — they are written for the booker. Neither
+does the delivery API: `GET /services` and `GET /services/{id}` do not publish them, so they are
+not on the public site unless your own template or front end puts them there.
+
+**Do not put secrets in them.** They travel by email, so they are as private as the booker's inbox —
+the same as the cancellation link. A standing meeting link is the case they were made for; a
+password that unlocks something more is not.
+
 ### When bookings need approval
 
 By default every placement is confirmed on the spot. Setting `UBookIt:AutoConfirm` to `false`
@@ -217,7 +257,8 @@ several resources can list them:
 branch on: a `BookerPlaced` message describes a **confirmed** booking on a site that confirms on
 placement, and a **requested** one on a site that requires approval.
 
-`BookerMessageModel` adds `BookerName`, `BookerEmail` and `BookerPhone`.
+`BookerMessageModel` adds `BookerName`, `BookerEmail` and `BookerPhone`, and the
+`CancellationUrl` and `BookerInstructions` described below.
 `InternalMessageModel` adds `AwaitsApproval` and `BackofficeUrl` — and **carries no booker name,
 address or telephone number at all**, deliberately. See below.
 
@@ -248,6 +289,33 @@ live.
 will not compensate by sending a second message: that would be overriding a choice you made. This is
 the same narrowing that applies to everything else a supplied view says — the words are yours, and
 so is their completeness.
+
+#### `BookerInstructions` — the service's instructions for a confirmed booker
+
+`BookerMessageModel.BookerInstructions` carries the service's
+[instructions for the booker](#instructions-for-the-booker), on exactly the terms uBookIt's own
+wording follows: present when the booking is confirmed as the message is composed and its service
+has instructions.
+
+```razor
+@if (Model.BookerInstructions is not null)
+{
+    <h2>Before your appointment</h2>
+    <p style="white-space: pre-line">@Model.BookerInstructions</p>
+}
+```
+
+**`null` means this message does not carry instructions** — the booking is awaiting approval,
+declined or cancelled, it was placed directly against a resource, or its service has none. A view
+written before the member existed renders unchanged.
+
+The value is the text as it was written, trimmed, with its line breaks, and nothing else: no
+markup is interpreted, and Razor encodes it in an HTML view like any other value. How its lines are
+presented is your view's choice.
+
+**If you supply your own view and omit it, your bookers are not given the instructions.** uBookIt
+does not add them to your content or send them separately — the same narrowing as for
+`CancellationUrl`: the words are yours. `InternalMessageModel` has no such member.
 
 #### HTML means no plain-text alternative
 

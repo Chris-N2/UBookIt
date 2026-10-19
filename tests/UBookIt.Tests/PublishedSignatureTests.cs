@@ -100,4 +100,31 @@ public class PublishedSignatureTests
             typeof(string),
             typeof(ServiceBookingFormBuilder.ResourceChoiceState),
             typeof(IReadOnlyList<PreservedQueryPair>));
+
+    [Fact]
+    public void BookingMessageComposer_keeps_its_published_constructor()
+    {
+        // service-booker-instructions gave the composer a service store through a NEW constructor;
+        // the published one stays, by exact parameter types.
+        var constructor = typeof(UBookIt.Persistence.Notifications.BookingMessageComposer).GetConstructor(
+        [
+            typeof(UBookIt.Core.Stores.IResourceStore),
+            typeof(Microsoft.Extensions.Logging.ILogger<UBookIt.Persistence.Notifications.BookingMessageComposer>),
+            typeof(UBookIt.Core.Notifications.IBookingTemplateRenderer),
+        ]);
+
+        Assert.True(constructor is { IsPublic: true }, "BookingMessageComposer's three-parameter constructor is published and must stay.");
+    }
+
+    [Fact]
+    public void Service_Create_keeps_its_published_signature()
+        // service-booker-instructions added the instructions through `WithBookerInstructions`
+        // precisely so that this signature did not widen (design 1).
+        => AssertHas(
+            typeof(Service),
+            nameof(Service.Create),
+            typeof(string),
+            typeof(ServiceDuration),
+            typeof(IEnumerable<ServiceRole>),
+            typeof(Guid?));
 }
