@@ -26,12 +26,13 @@ See [the versioning note](README.md#versions-and-the-api-promise).
 to hold the new instructions. The column is empty for every existing service, so nothing changes
 until somebody writes some.
 
-**After upgrading, reload any backoffice tab that was open before.** Saving a service sends its
-instructions with it, and a save that sends none clears them. An editor tab still running the
-previous version's backoffice code knows nothing about the field, so saving a service from it
-after somebody has added instructions would remove them. The same applies to your own scripts or
-tools that update services through the Management API: send `bookerInstructions` with the service,
-or it is cleared.
+**After upgrading, reload any backoffice tab that was open before**, with a hard reload
+(Ctrl+Shift+R, or Cmd+Shift+R on a Mac) so the browser cannot keep the old backoffice code. Saving a
+service sends its instructions with it, and a save that sends none clears them. An editor tab still
+running the previous version's backoffice code knows nothing about the field, so saving a service
+from it after somebody has added instructions would remove them. The same applies to your own
+scripts or tools that update services through the Management API: send `bookerInstructions` with the
+service, or it is cleared.
 
 **If you supply your own email views, add the instructions to them if you want bookers to get
 them.** uBookIt passes them to your view as `Model.BookerInstructions` and does not add them to
