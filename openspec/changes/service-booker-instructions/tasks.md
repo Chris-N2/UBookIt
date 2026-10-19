@@ -71,7 +71,9 @@
   *Done:* `--no-incremental` solution build 0 warnings 0 errors. Unit **2261** (+58), integration
   **214** (+4), rendering **1178** (+0, nothing rendered changed), client **370** (+14); no skips.
   The first unit run had three deliberate decision guards fail — see *Apply record* below.
-- [ ] 9.2 Run `openspec validate service-booker-instructions --strict` after the last commit. Verify: it passes.
+- [x] 9.2 Run `openspec validate service-booker-instructions --strict` after the last commit. Verify: it passes.
+  *Done:* CI's own command, `npx @fission-ai/openspec@1.13.0 validate --all --strict`, on both
+  lines after their last commits: 27 passed, 0 failed (26 specs + this change).
 - [x] 9.3 Live check on the TestSite. Give a service instructions with a URL, book it with auto-confirm on, and read the captured email. Then turn approval on, book again, confirm, and read both emails. Verify: the instructions appear only in the confirmed-booking messages, and the service's public read does not contain them.
   *Done (dev site, `.eml` pickup directory, new files only).* Service `SBI Online consultation`
   (`4e527609-…`, type `room`) with a marker `SBI-LIVE-4c2e`. **The TestSite references
