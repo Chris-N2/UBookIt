@@ -40,7 +40,8 @@ user, so an administrator you create later sees those details hidden until you a
 - Build services from roles. For example, "a haircut" can mean one stylist and one chair, and
   uBookIt works out which combinations are free.
 - Give a service instructions for the booker, such as a link to join an online session or
-  directions. If you send booker emails, uBookIt includes them once the booking is confirmed.
+  directions. If you send booker emails, uBookIt includes them in its own emails once the
+  booking is confirmed.
 - Close the whole organisation for a day or a run of dates, from one list, and open individual
   resources anyway; close a single resource for a period of its own.
 - Import public holidays from a source your own code supplies. uBookIt ships no holiday data.

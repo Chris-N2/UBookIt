@@ -79,8 +79,19 @@
 
 ## 3. Review and merge
 
-- [ ] 3.1 QA (`qa-review`) in one subagent, reused across rounds, covering this change and
-  `release-18-4-0`. Verify: APPROVE.
+- [x] 3.1 QA (`qa-review`) in one subagent, reused across rounds, covering this change and
+  `release-17-5-0`. Verify: APPROVE.
+  *Done (2026-10-19): APPROVE WITH NITS at round 1*, one fresh reviewer for both changes. It
+  re-ran every claim (clean Release builds, all suites on both lines, the audit, openspec
+  27/27, `ChangelogTests` + `VersionTruthTests` 20/20) and checked every entry sentence against
+  the code, the downgrade paragraph against the code at the previous tag. Nits taken, without
+  re-review: 4.2 restores the EF Core SqlServer `10.0.11` check and the "exactly / no other
+  package declares MessagePack" form; v18's 3.1 named itself instead of `release-17-5-0`; the
+  README bullet says "in its own emails" (a site's own views must render the member); the
+  reload advice is now a hard reload, since the reviewer could not confirm the backoffice
+  entry bundle is cache-busted. Not taken: a cross-line note in `18.4.0` for a 17.5.0 site
+  moving to Umbraco 18 on 18.3.x — earlier v18 entries do not cross-reference the 17 line.
+  Unverified by anyone: the downgrade by measurement (reasoned from the tag code only).
 - [ ] 3.2 Chris pushes this branch and opens the PR. Verify: the PR's CI is green, parity included.
 - [ ] 3.3 Chris merges with "Create a merge commit". Verify: `origin/dev/v18` is the merge commit, and
   its push run is green.
@@ -94,11 +105,11 @@
   - all five nuspecs carry the authors, copyright, licence, readme, icon, project URL and the
     merge commit, with `umbraco-marketplace` on `UBookIt` only;
   - every `Umbraco.Cms.*` dependency is `[18.2.1, 19.0.0)`, confirmed against
-    `Directory.Packages.props` at the tag; the dependencies between the uBookIt packages are at
-    `18.4.0`;
-  - carried from `18.3.0`: `Pkcs` `10.0.13` on Persistence and Web; MessagePack `3.1.9` on
-    Backoffice and Web; the `Microsoft.AspNetCore.App` framework reference on `UBookIt`,
-    Backoffice and Web; no `System.Security.Cryptography.Xml`; the backoffice bundle's only
+    `Directory.Packages.props` at the tag, and EF Core SqlServer is `10.0.11`; the dependencies
+    between the uBookIt packages are at `18.4.0`;
+  - carried from `18.3.0`: `Pkcs` `10.0.13` on exactly Persistence and Web; MessagePack `3.1.9`
+    on exactly Backoffice and Web, and no other package declares MessagePack; the
+    `Microsoft.AspNetCore.App` framework reference on `UBookIt`, Backoffice and Web; no `System.Security.Cryptography.Xml`; the backoffice bundle's only
     localization culture is `en`;
   - **no dependency differs from the published `18.3.0` packages**, downloaded from nuget.org;
   - **new this release:** `UBookIt.Persistence.dll` contains the migration
