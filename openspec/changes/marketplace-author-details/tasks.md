@@ -19,9 +19,17 @@
 ## 5. Verification and handover
 
 - [x] 5.1 Run the full unit suite. Verify: green, and the count equals the `main` baseline (2185) plus the new tests, with no skips.
-- [ ] 5.2 Run `openspec validate marketplace-author-details --strict` after the last commit. Verify: it passes.
+- [x] 5.2 Run `openspec validate marketplace-author-details --strict` after the last commit. Verify: it passes.
 - [x] 5.3 Record in the deferred obligations: the Trusted Publishing owner documentation (`docs/publishing.md:224`, `publish.yml:185` `NUGET_USER`) must be corrected and observed at the next release, the floor raise. Also: personal ownership of the packages should not be removed until that release has proven the organisation policy. Verify: the entry exists.
-- [ ] 5.4 Hand over to a fresh QA subagent (`qa-review`), with build state, test counts and the mutation results stated as claims to verify, not facts.
+- [x] 5.4 Hand over to a fresh QA subagent (`qa-review`), with build state, test counts and the mutation results stated as claims to verify, not facts. Round 1: REJECT (1 MAJOR, 3 MINOR, 2 NIT).
+
+## 7. QA round 1 fixes (new code, not corrections)
+
+- [x] 7.1 MAJOR: any `ImageUrl` reaching this repository through a GitHub host must be the canonical raw `main` form exactly. That means the owner and repository as packed, with no query, fragment or dot segments. Any other form is refused. The canonical path must be tracked by `git ls-files`, compared ordinally (design 4a). This also closes both NITs: case-insensitive file system and untracked files, and the unnormalised path. Verify: mutations for `refs/heads` form, `github.com/…/raw/…`, lower-case owner and repository, another branch, dot segments, and a wrong-case file name each fail for the stated reason.
+- [x] 7.2 MINOR: every text value in `AuthorDetails` is checked against `Umbraco\s+\d+`. The spec names that vocabulary and its limit (design 4a). Verify: an "Umbraco 17" description mutation fails naming the text.
+- [x] 7.3 MINOR: correct the `docs/publishing.md` sentence that overstated the logo check, so that it says exactly what is refused. Verify: each clause of the sentence corresponds to a check in the test.
+- [x] 7.4 MINOR: put the `docs/publishing.md` paragraph on `dev/v18` (design Decision 3). Do it as a documentation-only commit on branch `marketplace-author-details-v18` from `dev/v18`, in the worktree `..\uBookIt-v18`, without the JSON file or the test. Verify: the v18 unit suite is green at its baseline (2197), and `git diff dev/v18 -- docs/publishing.md` shows only the paragraph.
+- [x] 7.5 Re-run the full unit suite on `main`, then `openspec validate --strict` after the last commit. Return to the same QA reviewer for round 2.
 
 ## 6. After merge (outside the repo, not claimed before it happens)
 

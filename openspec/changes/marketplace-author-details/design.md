@@ -57,12 +57,20 @@ schema has others, such as `VersionSpecificPackageIds` and fields added later. A
 becomes a deliberate spec change. The cost is a test edit whenever the listing is enriched, and
 that is the point.
 
-### 3. The file is not copied to `dev/v18`
+### 3. The file is not copied to `dev/v18`. The documentation is.
 
 The Marketplace reads only the default branch. A copy on `dev/v18` would do nothing, and an inert
 copy drifts unnoticed. The test therefore runs on `main` only. Usually a test cherry-picked to one
 line and not the other is the "fix reaching one line" defect. Here it is the intended shape, and
 this paragraph is where that is recorded. If the default branch ever changes, the file follows it.
+
+**The `docs/publishing.md` paragraph goes to both lines** (QA round 1). It is true on `dev/v18`
+too: it describes a listing both lines share, and it already says the file and its test are on
+`main`. Whoever releases either line reads `publishing.md`, and that document otherwise differs
+between the lines only by version-specific text. Leaving the paragraph off one line would make it
+the one-line fix this project keeps paying for, and would make the next nearby cherry-pick
+conflict. It lands on `dev/v18` as a documentation-only commit on its own branch from `dev/v18`.
+The JSON file and the test do not go with it.
 
 ### 4. The logo is committed and referenced by its raw `main` URL
 
@@ -82,6 +90,28 @@ description of the company. Apply stops at that task until the values are given:
 - the logo (square PNG; around 500 px works for the Marketplace's avatar slot);
 - the one- or two-sentence description;
 - the website URL.
+
+### 4a. One accepted form for a URL into this repository, checked against tracked files (QA round 1)
+
+Round 1 found the existence check scoped to one exact string prefix. Any other URL that reaches
+this repository skipped the check and passed on scheme and extension alone. That included the
+`refs/heads/main` form GitHub's own Raw button produces, `github.com/…/raw/…`, and a different
+letter case. The fix does not try to recognise and normalise every form, which is a list that is
+never finished. Instead:
+- Any URL on a GitHub host whose first two path segments are this owner and repository,
+  compared case-insensitively as GitHub does, **must be the canonical form exactly**. Anything
+  else is refused, whether the file exists or not.
+- The canonical form's path is looked up in `git ls-files`, compared ordinally. GitHub serves only
+  committed files and is case-sensitive. A file-system check on Windows is neither, so a local
+  green run would have been weaker than CI's.
+- The canonical-form check rejects dot segments and query strings, because `Uri.AbsoluteUri` must
+  equal the text as written.
+
+**Free text naming an Umbraco major** (QA round 1, MINOR). The top-level allow-list checks the
+mechanism. The guarantee is that the file states nothing that differs between lines, and a
+description saying "for Umbraco 17" would break it inside an allowed field. So every string value
+in `AuthorDetails` is checked against the package-description guard's vocabulary (`Umbraco`,
+whitespace, digits). The spec now names that vocabulary and its limit, and does not claim more.
 
 ### 5. The guard can fire
 

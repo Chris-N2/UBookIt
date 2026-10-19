@@ -532,8 +532,14 @@ the file needs no release**. The logo it names is `docs/images/ndd-logo.png`, se
   `dev/v18` would be read by nothing and free to drift, and so would its test.
 - **It may carry only `$schema` and `AuthorDetails`.** One listing serves both lines, so a `Title`
   or `Description` there would override every line's description with one sentence.
-  `MarketplaceListingFileTests` refuses any other top-level field. It also refuses an author name
-  that differs from the packed `<authors>`, and a logo the repository does not contain.
+  `MarketplaceListingFileTests`, on `main`, refuses:
+  - any other top-level field;
+  - author text that names an Umbraco major in the form "Umbraco 17";
+  - an author name that differs from the packed `<authors>`.
+
+  A logo URL into this repository must be the raw `main` form already in the file, naming a file
+  git tracks. Other forms, such as GitHub's `refs/heads/main` link, are refused. A logo hosted
+  anywhere else is checked only for being an `https` `.png` or `.jpg`.
 - **If the listing has not changed after a reasonable wait,** ask the Marketplace to resync the
   package through its single-package sync endpoint, described in Umbraco's
   [listing documentation](https://docs.umbraco.com/umbraco-dxp/marketplace/listing-your-package).
