@@ -94,7 +94,7 @@
   save, `aria-invalid="true"`, describedby grows to `…-hint err-booker-instructions`, both
   resolve, summary names the failure, no Details group error, value and name kept; a two-line
   save round-trips (read back over the API, LF line break).
-- [ ] 9.4 Hand over to a fresh QA subagent (`qa-review`), with build state, test counts, the mutation results and the live check stated as claims to verify.
+- [x] 9.4 Hand over to a fresh QA subagent (`qa-review`), with build state, test counts, the mutation results and the live check stated as claims to verify.
 
 ## Apply record
 
@@ -131,7 +131,8 @@ verified (the two editor scenarios rest on the live shadow-DOM check, which QA c
 without a login). Follow-ups:
 - *MINOR, fixed:* the line-ending test fed CRLF only, so on Windows removing `ReplaceLineEndings()`
   stayed green (and real textarea input is LF). Now a theory over CRLF, LF and mixed input, which
-  also asserts every line ending in the body is `Environment.NewLine` and that the model carries
+  also asserts every `\n` in the body belongs to an `Environment.NewLine` (meaningful only where the
+  newline is CRLF; on Linux the `Contains` and `\r\r` checks carry it) and that the model carries
   the text unnormalised. Mutation re-run on Windows: removing the normalisation turns the LF and
   mixed cases red. Unit main **2263**, v18 **2257**.
 - *MINOR, accepted:* the null-not-omitted and delivery tests serialise with
@@ -143,12 +144,18 @@ without a login). Follow-ups:
 - *For the release notes:* a PUT that omits `bookerInstructions` clears them, so a backoffice tab
   left open across the upgrade, or a script on the old generated types, wipes a service's
   instructions when it saves.
-- *Left, on precedent:* "Added in 17.5.0" on the v18 line (v18 already says "Added in 17.1.0"
-  for `CancellationUrl`); the exemption matches the bare identifier `BookerInstructions` under the
+- *Fixed after round 2:* "Added in 17.5.0" read on the v18 line as though 18.0–18.3 had the member;
+  it now says "Added in 17.5.0 and 18.4.0" (17.1.0 for `CancellationUrl` predates 18.0, so that
+  precedent did not carry over).
+- *Left:* the exemption matches the bare identifier `BookerInstructions` under the
   two named actions only; the generated response type marks the member optional (the wire always
   carries it).
 
-**Outward grep:** the composer's own remark ("the one exception is…") was falsified and is
+**QA round 2: APPROVE** — the line-ending fix verified (the length check proven to fire on
+Windows independently of `Contains`); the three items above were tidied without re-review.
+
+**Outward grep** *(the email-templates half is superseded by the QA record above: the sentence is
+false as written and is restated at sync)*: the composer's own remark ("the one exception is…") was falsified and is
 corrected. `email-templates` "a site that supplies nothing SHALL be unaffected … exactly what it
 sent before" compares a site with and without supplied content and is still true (a site that
 writes no instructions sends what it sent) — left, to be re-checked at sync.
