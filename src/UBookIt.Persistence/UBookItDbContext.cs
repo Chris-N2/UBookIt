@@ -1,6 +1,7 @@
 using Microsoft.EntityFrameworkCore;
 using UBookIt.Core.Availability;
 using UBookIt.Core.Bookings;
+using UBookIt.Core.Services;
 using UBookIt.Persistence.Entities;
 
 namespace UBookIt.Persistence;
@@ -193,6 +194,10 @@ public sealed class UBookItDbContext(DbContextOptions<UBookItDbContext> options)
             service.HasKey(s => s.Id);
             service.Property(s => s.Id).ValueGeneratedNever();
             service.Property(s => s.Name).HasMaxLength(512);
+
+            // Sized to the domain's limit, which rejects anything longer first — so the column
+            // is never where an over-long value fails.
+            service.Property(s => s.BookerInstructions).HasMaxLength(Service.BookerInstructionsMaxLength);
 
             // Stored as its name so the column is readable in the database and
             // does not silently shift meaning if the enum is ever reordered.

@@ -314,7 +314,7 @@ theming guide. Nothing about it will look broken if a theme leaves it out.
 | | |
 |---|---|
 | **Resources** | The bookable things themselves: opening hours, exceptions, duration limits, capabilities, and whether each may be booked directly |
-| **Services** | What a visitor books by name, and the resource roles each service resolves to |
+| **Services** | What a visitor books by name, the resource roles each service resolves to, and the [instructions a confirmed booker is sent](#instructions-for-the-booker) |
 | **Bookings** | What the site has taken: a window you choose, filtered by status, showing the reference, when, who booked *(if you may see it — below)*, which resources, which service, and status |
 | **Closures** | The dates the whole organisation is shut, one day or a run of them. Every resource inherits them; any resource can be opened anyway from its own editor |
 
@@ -502,6 +502,26 @@ nothing. Saving replaces the whole set with what the pickers hold, so changing a
 selection and saving drops that picker's stale entries with the change — which is the natural
 moment for them to go. A stale entry in the picker you did not touch stays, still marked. Users the mail path skips — disabled accounts, invitations never accepted — are marked
 with their state in the same box.
+
+## Instructions for the booker
+
+The service editor's **Details** box has an optional **Instructions for the booker** field, below
+the name. Write anything a person who has booked this service needs in order to turn up — a link
+to join an online consultation, say, or directions and parking for an in-person one. Line breaks
+are kept; spaces and blank lines at either end are trimmed, and a field left blank (or holding
+only spaces) means the service has none. It takes up to 2000 characters, and a longer text is
+refused against the field when you save, with everything else you entered still in the form.
+
+The text is **sent to the booker once their booking is confirmed** — on placement when your site
+confirms bookings on the spot, otherwise when you confirm it, and again if a confirmed booking is
+moved. It is never sent with a booking still awaiting approval, a decline or a cancellation, and
+never to your own recipients. [Notifications](notifications.md#instructions-for-the-booker) has
+the full table.
+
+**It is not shown on the public site.** The delivery API does not publish it, and the package's
+own booking pages do not display it. Because it is read when each message is composed, changing it
+changes what the *next* message to a confirmed booker says — not anything already sent. It travels
+by email, so keep secrets out of it.
 
 ## The service shown against a booking
 

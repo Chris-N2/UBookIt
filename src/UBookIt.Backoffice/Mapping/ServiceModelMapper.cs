@@ -48,13 +48,18 @@ internal static class ServiceModelMapper
             }),
             id);
 
+        // Validated on their own, through the rule `WithBookerInstructions` also uses, rather than
+        // by calling that method on the service — which does not exist when `Create` failed. A
+        // blank name and over-long instructions are then both reported by one save.
+        var instructions = Service.NormalizeBookerInstructions(model.BookerInstructions);
+
         var valueObjectFailures = duration.Failures
             .Concat(capabilities.Where(c => !c.Succeeded).SelectMany(c => c.Failures))
             .ToList();
 
-        if (valueObjectFailures.Count == 0)
+        if (valueObjectFailures.Count == 0 && instructions.Succeeded)
         {
-            return service;
+            return service.Succeeded ? service.Value.WithBookerInstructions(instructions.Value) : service;
         }
 
         // Report value-object problems alongside any name or role problems, so
@@ -65,6 +70,8 @@ internal static class ServiceModelMapper
         {
             failures.AddRange(service.Failures);
         }
+
+        failures.AddRange(instructions.Failures);
 
         return DomainResult<Service>.Failure(failures);
     }
@@ -241,6 +248,7 @@ internal static class ServiceModelMapper
                     VisitorSelectable = r.VisitorSelectable,
                 })
                 .ToList(),
+            BookerInstructions = service.BookerInstructions,
         };
 
     /// <summary>

@@ -12,6 +12,14 @@ public class ServiceRequestModel
     public ServiceDurationModel? Duration { get; set; }
 
     public List<ServiceRoleModel> Roles { get; set; } = [];
+
+    /// <summary>
+    /// Plain text sent to a booker once their booking for this service is confirmed. Omitted,
+    /// null, empty or whitespace-only means none — and on an update, removes any the service had.
+    /// Trimmed, line breaks kept; at most 2000 characters, or
+    /// <c>service-booker-instructions-too-long</c>.
+    /// </summary>
+    public string? BookerInstructions { get; set; }
 }
 
 public class ServiceResponseModel
@@ -23,6 +31,13 @@ public class ServiceResponseModel
     public ServiceDurationModel Duration { get; set; } = new();
 
     public List<ServiceRoleModel> Roles { get; set; } = [];
+
+    /// <summary>
+    /// The service's instructions for the booker, as stored. Always present, carrying
+    /// <c>null</c> where the service has none, so a client never has to treat an absent member
+    /// as a default.
+    /// </summary>
+    public string? BookerInstructions { get; set; }
 }
 
 /// <summary>
