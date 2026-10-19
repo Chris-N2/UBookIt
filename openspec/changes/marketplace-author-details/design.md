@@ -98,9 +98,19 @@ this repository skipped the check and passed on scheme and extension alone. That
 `refs/heads/main` form GitHub's own Raw button produces, `github.com/…/raw/…`, and a different
 letter case. The fix does not try to recognise and normalise every form, which is a list that is
 never finished. Instead:
-- Any URL on a GitHub host whose first two path segments are this owner and repository,
-  compared case-insensitively as GitHub does, **must be the canonical form exactly**. Anything
-  else is refused, whether the file exists or not.
+- Any URL on a GitHub host whose path names this owner and repository, compared
+  case-insensitively as GitHub does, **must be the canonical form exactly**. Anything else is
+  refused, whether the file exists or not.
+- **Round 2 found the same fault one level up.** "GitHub host" had been a list (`github.com`,
+  `www.github.com`, `*.githubusercontent.com`), and `raw.github.com` serves this repository's files
+  outside that list. A host list is a sample. So a host now counts when it is either domain or any
+  subdomain of one. The owner and repository may start at the first or the second path segment,
+  which covers `media.githubusercontent.com/media/<owner>/<repo>/…`. Mirrors on other domains,
+  such as jsDelivr's `cdn.jsdelivr.net/gh/…`, are outside the definition by name: the spec says so,
+  and treats them as hosted elsewhere.
+- Each mutation's expected message now names **the check that should fire**, such as "does not
+  track" or ".png or .jpg", not just the field or path. The form check quotes the whole URL, so a
+  path-only expectation could not tell which check had refused it.
 - The canonical form's path is looked up in `git ls-files`, compared ordinally. GitHub serves only
   committed files and is case-sensitive. A file-system check on Windows is neither, so a local
   green run would have been weaker than CI's.

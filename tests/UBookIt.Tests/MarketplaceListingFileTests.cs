@@ -54,8 +54,12 @@ public class MarketplaceListingFileTests(PackedSolutionFixture fixture)
 
     private static readonly string[] AllowedTopLevelFields = ["$schema", "AuthorDetails"];
 
-    /// <summary>Hosts through which a URL can reach a GitHub repository's files.</summary>
-    private static readonly string[] GitHubHosts = ["github.com", "www.github.com"];
+    /// <summary>
+    /// The GitHub domains. Every host on them counts, not a list of known ones: round 2 found
+    /// <c>raw.github.com</c> serving this repository's files past a list that named only
+    /// <c>github.com</c> and <c>www.github.com</c>.
+    /// </summary>
+    private static readonly string[] GitHubDomains = ["github.com", "githubusercontent.com"];
 
     private static readonly Regex UmbracoMajor = new(@"Umbraco\s+\d+", RegexOptions.CultureInvariant);
 
@@ -79,11 +83,13 @@ public class MarketplaceListingFileTests(PackedSolutionFixture fixture)
     [Theory]
     [InlineData("name", "AuthorDetails.Name")]
     [InlineData("http-url", "AuthorDetails.Url")]
-    [InlineData("gif-image", "AuthorDetails.ImageUrl")]
-    [InlineData("missing-image", "docs/images/no-such-logo.png")]
-    [InlineData("wrong-case-image", "docs/images/NDD-logo.png")]
+    [InlineData("gif-image", "is not an absolute https URL to a .png or .jpg")]
+    [InlineData("missing-image", "points at docs/images/no-such-logo.png on main, which this repository does not track")]
+    [InlineData("wrong-case-image", "points at docs/images/NDD-logo.png on main, which this repository does not track")]
     [InlineData("refs-heads-form", "not the accepted form")]
     [InlineData("github-raw-form", "not the accepted form")]
+    [InlineData("raw-github-host", "not the accepted form")]
+    [InlineData("media-host", "not the accepted form")]
     [InlineData("lower-case-repository", "not the accepted form")]
     [InlineData("other-branch", "not the accepted form")]
     [InlineData("dot-segments", "not the accepted form")]
@@ -121,6 +127,12 @@ public class MarketplaceListingFileTests(PackedSolutionFixture fixture)
                 break;
             case "github-raw-form":
                 author["ImageUrl"] = $"https://github.com/{owner}/{repository}/raw/{DefaultBranch}/docs/images/no-such-logo.png";
+                break;
+            case "raw-github-host":
+                author["ImageUrl"] = $"https://raw.github.com/{owner}/{repository}/{DefaultBranch}/docs/images/no-such-logo.png";
+                break;
+            case "media-host":
+                author["ImageUrl"] = $"https://media.githubusercontent.com/media/{owner}/{repository}/{DefaultBranch}/docs/images/no-such-logo.png";
                 break;
             case "lower-case-repository":
                 author["ImageUrl"] = $"https://raw.githubusercontent.com/{owner.ToLowerInvariant()}/{repository.ToLowerInvariant()}/{DefaultBranch}/docs/images/no-such-logo.png";
@@ -269,24 +281,36 @@ public class MarketplaceListingFileTests(PackedSolutionFixture fixture)
     }
 
     /// <summary>
-    /// Whether a URL reaches this repository's files through any GitHub host, compared without
-    /// regard to case, because GitHub resolves owner and repository names that way.
+    /// Whether a URL reaches this repository's files through any host on a GitHub domain, with the
+    /// owner and repository as consecutive path segments starting at the first or second segment
+    /// (the second is the <c>media.githubusercontent.com/media/&lt;owner&gt;/&lt;repo&gt;/…</c> shape).
+    /// Compared without regard to case, because GitHub resolves owner and repository names that way.
     /// </summary>
     private static bool PointsIntoRepository(Uri url, (string Owner, string Repository) own)
     {
         var host = url.Host;
 
-        if (!GitHubHosts.Contains(host, StringComparer.OrdinalIgnoreCase)
-            && !host.EndsWith(".githubusercontent.com", StringComparison.OrdinalIgnoreCase))
+        var onGitHub = GitHubDomains.Any(domain =>
+            host.Equals(domain, StringComparison.OrdinalIgnoreCase)
+            || host.EndsWith("." + domain, StringComparison.OrdinalIgnoreCase));
+
+        if (!onGitHub)
         {
             return false;
         }
 
         var segments = url.AbsolutePath.Split('/', StringSplitOptions.RemoveEmptyEntries);
 
-        return segments.Length >= 2
-            && segments[0].Equals(own.Owner, StringComparison.OrdinalIgnoreCase)
-            && segments[1].Equals(own.Repository, StringComparison.OrdinalIgnoreCase);
+        for (var start = 0; start <= 1 && start + 1 < segments.Length; start++)
+        {
+            if (segments[start].Equals(own.Owner, StringComparison.OrdinalIgnoreCase)
+                && segments[start + 1].Equals(own.Repository, StringComparison.OrdinalIgnoreCase))
+            {
+                return true;
+            }
+        }
+
+        return false;
     }
 
     private static string CanonicalPrefix(string owner, string repository) =>

@@ -13,7 +13,11 @@ that name the publisher cannot disagree. Its `Description`, `Url` and `ImageUrl`
 `Url` SHALL be an absolute `https` URL. `ImageUrl` SHALL be an absolute `https` URL to a `.png` or
 `.jpg` image.
 
-A logo URL that reaches this repository through any GitHub host SHALL use one accepted form: the
+A URL **reaches this repository** when its host is `github.com`, `githubusercontent.com` or any
+subdomain of either, and the owner and repository appear as consecutive path segments, starting
+at the first or second segment. Owner and repository are compared without regard to case. A host
+outside those two domains that also serves the repository's files, such as a CDN mirror, counts
+as hosted elsewhere. A logo URL that reaches this repository SHALL use one accepted form: the
 raw URL of the default branch, with the owner and repository spelled as in the package's project
 URL, and no query, fragment or dot segments. In that form the image SHALL be a file the repository
 **tracks**, matched case-sensitively, because GitHub serves only committed files and is
@@ -61,8 +65,9 @@ is read from the default branch and not from any package, and that changing it n
 #### Scenario: A logo URL into this repository in another form fails
 
 - **WHEN** `ImageUrl` reaches this repository in a form other than the accepted one. Examples: the
-  `refs/heads/` form, the `github.com/…/raw/…` form, another branch, a different letter case for
-  the owner or repository, or dot segments
+  `refs/heads/` form, the `github.com/…/raw/…` form, the `raw.github.com` host, the
+  `media.githubusercontent.com/media/…` form, another branch, a different letter case for the owner
+  or repository, or dot segments
 - **THEN** the check fails and says the URL is not the accepted form, whether or not the file
   exists
 

@@ -29,6 +29,12 @@
 - [x] 7.2 MINOR: every text value in `AuthorDetails` is checked against `Umbraco\s+\d+`. The spec names that vocabulary and its limit (design 4a). Verify: an "Umbraco 17" description mutation fails naming the text.
 - [x] 7.3 MINOR: correct the `docs/publishing.md` sentence that overstated the logo check, so that it says exactly what is refused. Verify: each clause of the sentence corresponds to a check in the test.
 - [x] 7.4 MINOR: put the `docs/publishing.md` paragraph on `dev/v18` (design Decision 3). Do it as a documentation-only commit on branch `marketplace-author-details-v18` from `dev/v18`, in the worktree `..\uBookIt-v18`, without the JSON file or the test. Verify: the v18 unit suite is green at its baseline (2197), and `git diff dev/v18 -- docs/publishing.md` shows only the paragraph.
+## 8. QA round 2 fixes (new code, not corrections)
+
+- [x] 8.1 MAJOR: a host counts as GitHub when it is `github.com`, `githubusercontent.com` or any subdomain of either, and the owner and repository may start at path segment 1 or 2. Spec and design 4a state that definition. Verify: `raw-github-host` and `media-host` mutations fail as "not the accepted form".
+- [x] 8.2 MINOR: the expected messages of `gif-image`, `missing-image` and `wrong-case-image` name the check that should fire (".png or .jpg", "… on main, which this repository does not track"). Verify: the theory passes with those substrings.
+- [x] 8.3 Re-run the full unit suite on `main` and `openspec validate --strict` after the last commit; return to the same QA reviewer for round 3.
+
 - [x] 7.5 Re-run the full unit suite on `main`, then `openspec validate --strict` after the last commit. Return to the same QA reviewer for round 2.
 
 ## 6. After merge (outside the repo, not claimed before it happens)
