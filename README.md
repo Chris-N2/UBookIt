@@ -4,7 +4,7 @@ Bookings for Umbraco 17: rooms, desks, studios, equipment, and appointments that
 and a place at the same time. You set up what can be booked in the backoffice, and visitors book
 on a page of your own site, in your own layout. Every step works with JavaScript turned off.
 
-![A booking page on a site called Fairfield Studios: the site's own header and navigation across the top, then a heading reading Book Studio session and a grouped list of radio buttons headed "Dates with availability for 30 minutes in the next 30 days", one per day from Monday 21 September 2026 onward, the first already selected. The list continues below the visible area.](https://raw.githubusercontent.com/Chris-N2/UBookIt/17.4.0/docs/images/booking-flow.png)
+![A booking page on a site called Fairfield Studios: the site's own header and navigation across the top, then a heading reading Book Studio session and a grouped list of radio buttons headed "Dates with availability for 30 minutes in the next 30 days", one per day from Monday 21 September 2026 onward, the first already selected. The list continues below the visible area.](https://raw.githubusercontent.com/Chris-N2/UBookIt/17.5.0/docs/images/booking-flow.png)
 
 ## Get started
 
@@ -22,7 +22,7 @@ decides who can see the bookings your site has taken.
 The booker's **name and email address** are a second question, and Umbraco's built-in
 **Sensitive data** group answers it. At first that group holds only the site's original super
 user, so an administrator you create later sees those details hidden until you add them. See
-[the backoffice docs](https://github.com/Chris-N2/UBookIt/blob/17.4.0/docs/backoffice.md).
+[the backoffice docs](https://github.com/Chris-N2/UBookIt/blob/17.5.0/docs/backoffice.md).
 
 ## What it does
 
@@ -39,6 +39,8 @@ user, so an administrator you create later sees those details hidden until you a
   capabilities that describe what each one can do.
 - Build services from roles. For example, "a haircut" can mean one stylist and one chair, and
   uBookIt works out which combinations are free.
+- Give a service instructions for the booker, such as a link to join an online session or
+  directions. If you send booker emails, uBookIt includes them once the booking is confirmed.
 - Close the whole organisation for a day or a run of dates, from one list, and open individual
   resources anyway; close a single resource for a period of its own.
 - Import public holidays from a source your own code supplies. uBookIt ships no holiday data.
@@ -64,12 +66,12 @@ A new install starts with all four of these off, or granted to nobody:
 - **The delivery API.** The API is off by default, and reads and booking placement are turned on
   separately. Once on, the API is anonymous by design, and uBookIt makes no DDoS-protection
   claim: volume protection belongs to your host. See
-  [the delivery API](https://github.com/Chris-N2/UBookIt/blob/17.4.0/docs/delivery-api.md).
+  [the delivery API](https://github.com/Chris-N2/UBookIt/blob/17.5.0/docs/delivery-api.md).
 - **Emails**, to the booker and to your own people. That means a site-wide list, plus the users
   and groups made responsible for each resource or service. A mail server is not permission to
   write to your customers.
 - **Self-service cancellation.** It rides the booker's confirmation email, so it needs those
-  emails on too. Read [the configuration notes](https://github.com/Chris-N2/UBookIt/blob/17.4.0/docs/configuration.md)
+  emails on too. Read [the configuration notes](https://github.com/Chris-N2/UBookIt/blob/17.5.0/docs/configuration.md)
   first, because the link is the credential.
 - **The settings screen.** It needs the *Change site settings* permission, which nobody has,
   administrators included, until you grant it.
@@ -80,17 +82,17 @@ A new install starts with all four of these off, or granted to nobody:
 the page rather than running down it. Every field is labelled, and the notice explaining what
 the site does with the details sits where the details are asked for.
 
-![The lower half of the booking page shown at the top of this readme: a How long do you need? selector reading 30 minutes, a Show times button, and a fieldset headed "Available start times on Monday 21 September 2026 for 30 minutes" whose nine radio options from 12:30 to 16:30 wrap across two rows. Below it a Your details fieldset holds labelled Name, Email and optional Phone fields, a note saying the site will email you about your booking, two paragraphs explaining what the details are used for and how long they are kept, and a Book button.](https://raw.githubusercontent.com/Chris-N2/UBookIt/17.4.0/docs/images/booking-form.png)
+![The lower half of the booking page shown at the top of this readme: a How long do you need? selector reading 30 minutes, a Show times button, and a fieldset headed "Available start times on Monday 21 September 2026 for 30 minutes" whose nine radio options from 12:30 to 16:30 wrap across two rows. Below it a Your details fieldset holds labelled Name, Email and optional Phone fields, a note saying the site will email you about your booking, two paragraphs explaining what the details are used for and how long they are kept, and a Book button.](https://raw.githubusercontent.com/Chris-N2/UBookIt/17.5.0/docs/images/booking-form.png)
 
 **The Bookings screen in the backoffice.** Find a booking by reference or email address, choose a
 date window, filter by status, and act on a row.
 
-![The uBookIt Bookings screen inside the Umbraco backoffice: a Find box for a reference or email address, From and To date fields both set to 5 October 2026, status checkboxes for Requested, Confirmed, Cancelled and Declined, and a New booking button for recording one taken by telephone. Below them a table of four bookings shows reference, date and time, booker name and email, resources, service and status, each row offering Move and Cancel actions.](https://raw.githubusercontent.com/Chris-N2/UBookIt/17.4.0/docs/images/bookings-screen.png)
+![The uBookIt Bookings screen inside the Umbraco backoffice: a Find box for a reference or email address, From and To date fields both set to 5 October 2026, status checkboxes for Requested, Confirmed, Cancelled and Declined, and a New booking button for recording one taken by telephone. Below them a table of four bookings shows reference, date and time, booker name and email, resources, service and status, each row offering Move and Cancel actions.](https://raw.githubusercontent.com/Chris-N2/UBookIt/17.5.0/docs/images/bookings-screen.png)
 
 **Availability, per resource.** Opening hours are windows on each weekday. Add as many as a day
 needs, for a lunch break or a split shift.
 
-![The Opening hours panel of a resource in the uBookIt backoffice, with one section per day of the week. Monday through Friday are shown and the remaining days continue below the picture; each day holds a From and a To time field reading 09:00 and 17:00, a Remove window link beside them, and an Add window link for that day underneath.](https://raw.githubusercontent.com/Chris-N2/UBookIt/17.4.0/docs/images/availability.png)
+![The Opening hours panel of a resource in the uBookIt backoffice, with one section per day of the week. Monday through Friday are shown and the remaining days continue below the picture; each day holds a From and a To time field reading 09:00 and 17:00, a Remove window link beside them, and an Add window link for that day underneath.](https://raw.githubusercontent.com/Chris-N2/UBookIt/17.5.0/docs/images/availability.png)
 
 ## Accessibility is a feature here, not a checkbox
 
@@ -104,7 +106,7 @@ conformance is a property of a page. Text contrast, focus appearance and target 
 by CSS. The shipped stylesheet sets no text colour of its own, and non-text contrast for
 decorative borders is explicitly **not** claimed. The full account, including what becomes yours
 the moment you override a token or supply a theme, is in
-[the booking page docs](https://github.com/Chris-N2/UBookIt/blob/17.4.0/docs/booking-page.md#accessibility-what-we-hold-and-what-becomes-yours).
+[the booking page docs](https://github.com/Chris-N2/UBookIt/blob/17.5.0/docs/booking-page.md#accessibility-what-we-hold-and-what-becomes-yours).
 
 ## What it does not do yet
 
@@ -127,12 +129,12 @@ anyone to read:
 - **Specs first.** Every change starts as a written proposal and task list, with a design where one
   is needed, in [OpenSpec](https://github.com/Fission-AI/OpenSpec). No code is written until the
   change is approved. The requirements agreed so far live in the repository, for example
-  [the site settings spec](https://github.com/Chris-N2/UBookIt/blob/17.4.0/openspec/specs/site-settings/spec.md).
+  [the site settings spec](https://github.com/Chris-N2/UBookIt/blob/17.5.0/openspec/specs/site-settings/spec.md).
 - **Independent review.** A separate agent that did not write the change reviews it
   adversarially against its spec. It can reject the change, and when it does, the findings go
   back through implementation. The reviewer never fixes code itself.
 - **CI that can't pass by skipping.** Every push to a release line is built and tested on Linux
-  against SQL Server, by [the CI workflow](https://github.com/Chris-N2/UBookIt/blob/17.4.0/.github/workflows/ci.yml).
+  against SQL Server, by [the CI workflow](https://github.com/Chris-N2/UBookIt/blob/17.5.0/.github/workflows/ci.yml).
   The run fails if any .NET test project didn't report, or any test, .NET or backoffice client,
   was skipped.
 - **Documentation under test.** The test suite checks key claims in this readme: the version it
@@ -141,13 +143,13 @@ anyone to read:
   CI runner, verifies the packages there, and publishes nothing until the maintainer approves.
   There is no manual route around it.
 
-The project's rules are in [`CLAUDE.md`](https://github.com/Chris-N2/UBookIt/blob/17.4.0/CLAUDE.md),
+The project's rules are in [`CLAUDE.md`](https://github.com/Chris-N2/UBookIt/blob/17.5.0/CLAUDE.md),
 the same file the AI agents working on it read. The release procedure is in
-[the publishing runbook](https://github.com/Chris-N2/UBookIt/blob/17.4.0/docs/publishing.md).
+[the publishing runbook](https://github.com/Chris-N2/UBookIt/blob/17.5.0/docs/publishing.md).
 
 ## Versions and the API promise
 
-> **uBookIt is at `17.4.0`, and the public API is a promise.** That doesn't mean nothing will ever
+> **uBookIt is at `17.5.0`, and the public API is a promise.** That doesn't mean nothing will ever
 > change. It means a change to a published contract is deliberate, is named before you meet it,
 > and never arrives in a patch.
 
@@ -163,7 +165,7 @@ signal, and this is where uBookIt departs from Semantic Versioning**:
 
 Breaking changes are avoided: the public interface is kept as consistent as possible, and
 additions are preferred to changes. Where a break is genuinely unavoidable, it lands in a minor release. It
-is called out in [the changelog](https://github.com/Chris-N2/UBookIt/blob/17.4.0/CHANGELOG.md),
+is called out in [the changelog](https://github.com/Chris-N2/UBookIt/blob/17.5.0/CHANGELOG.md),
 where each release opens with what upgrading asks of you, and it ships with sensible defaults or a
 documented upgrade path so a site that already works keeps working. A patch release never carries
 a breaking change.
@@ -182,18 +184,18 @@ rather than quietly misbehaving.
 
 ## Documentation
 
-- [The booking page](https://github.com/Chris-N2/UBookIt/blob/17.4.0/docs/booking-page.md): creating it, URL parameters,
+- [The booking page](https://github.com/Chris-N2/UBookIt/blob/17.5.0/docs/booking-page.md): creating it, URL parameters,
   styling, the deployment note about committing the installed template, and the accessibility
   statement
-- [The backoffice](https://github.com/Chris-N2/UBookIt/blob/17.4.0/docs/backoffice.md): resources, availability,
+- [The backoffice](https://github.com/Chris-N2/UBookIt/blob/17.5.0/docs/backoffice.md): resources, availability,
   services, closures, bookings and permissions
-- [Configuration](https://github.com/Chris-N2/UBookIt/blob/17.4.0/docs/configuration.md): every setting, and what
+- [Configuration](https://github.com/Chris-N2/UBookIt/blob/17.5.0/docs/configuration.md): every setting, and what
   turning each one on means
-- [The delivery API](https://github.com/Chris-N2/UBookIt/blob/17.4.0/docs/delivery-api.md): turning it on, what
+- [The delivery API](https://github.com/Chris-N2/UBookIt/blob/17.5.0/docs/delivery-api.md): turning it on, what
   anonymous means, and where volume protection belongs
-- [Reacting to bookings](https://github.com/Chris-N2/UBookIt/blob/17.4.0/docs/notifications.md): the notifications
+- [Reacting to bookings](https://github.com/Chris-N2/UBookIt/blob/17.5.0/docs/notifications.md): the notifications
   and how to handle them
-- [Writing a theme](https://github.com/Chris-N2/UBookIt/blob/17.4.0/docs/theming.md): replacing the rendering with
+- [Writing a theme](https://github.com/Chris-N2/UBookIt/blob/17.5.0/docs/theming.md): replacing the rendering with
   your own views
 
 ## The packages
@@ -215,6 +217,6 @@ Install `UBookIt`.
 
 ## Licence
 
-[MIT](https://github.com/Chris-N2/UBookIt/blob/17.4.0/LICENSE). Copyright © Norwood Design & Development Ltd.
+[MIT](https://github.com/Chris-N2/UBookIt/blob/17.5.0/LICENSE). Copyright © Norwood Design & Development Ltd.
 
 Built by [Norwood Design & Development Ltd.](https://www.norwood-development.co.uk).
