@@ -53,15 +53,23 @@
 
 ## 2. Clean build and suites
 
-- [ ] 2.1 Stop the TestSite. Clean the outputs (including the stale hashed client assets), build
+- [x] 2.1 Stop the TestSite. Clean the outputs (including the stale hashed client assets), build
   the client, then `CI=true dotnet build UBookIt.slnx -c Release --no-incremental`. Verify:
   0 warnings, 0 errors.
-- [ ] 2.2 Run the suites per project, one after another. Verify, each with 0 skipped:
+  *Done (2026-10-19, at `1966e06`):* no TestSite running. The hashed client assets and both
+  `obj` configurations of `UBookIt.Backoffice` were deleted, the client built, then
+  `CI=true dotnet build UBookIt.slnx -c Release --no-incremental`: 0 warnings, 0 errors.
+- [x] 2.2 Run the suites per project, one after another. Verify, each with 0 skipped:
   - unit **2263**, integration **214**, rendering **1178**, client **370**;
   - `openspec validate --all --strict` passes (26 specs, plus this change), run as CI runs it,
     after the last commit.
-- [ ] 2.3 Run the audit as `audit.yml` does. Verify: exit 0, the ImageSharp TestSite exception
+  *Done, Release, 0 skipped:* unit **2263**, integration **214**, rendering **1178**, client
+  **370**. `openspec@1.13.0 validate --all --strict`: 27 passed (re-run after the last commit).
+- [x] 2.3 Run the audit as `audit.yml` does. Verify: exit 0, the ImageSharp TestSite exception
   reported as accepted, not stale.
+  *Done:* `Assert-NoVulnerablePackages.ps1 -Target UBookIt.slnx` exits **0**: 10 projects,
+  Debug and Release, "5 finding(s) accepted by a suppression", all the ImageSharp TestSite
+  exception, none stale. "No unaccepted advisories in the graph."
 
 ## 3. Review and merge
 
