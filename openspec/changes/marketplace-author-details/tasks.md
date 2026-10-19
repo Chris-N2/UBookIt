@@ -37,6 +37,10 @@
 - [x] 8.2 MINOR: the expected messages of `gif-image`, `missing-image` and `wrong-case-image` name the check that should fire (".png or .jpg", "… on main, which this repository does not track"). Verify: the theory passes with those substrings.
 - [x] 8.3 Re-run the full unit suite on `main` and `openspec validate --strict` after the last commit; return to the same QA reviewer for round 3.
 
+## 9. QA round 3 (APPROVE WITH NITS): the optional NIT, taken
+
+- [x] 9.1 A trailing-dot host (`raw.githubusercontent.com.`) is resolved by GitHub, but it escaped the domain rule because `Uri.Host` keeps the dot. Trim the trailing dot before matching. Verify: the `trailing-dot-host` mutation fails as "not the accepted form", and the full suite and `openspec validate --strict` pass after the last commit.
+
 ## 6. After merge (outside the repo, not claimed before it happens)
 
 - [ ] 6.1 After the PR merges to `main` and the Marketplace has synced, check `https://marketplace.umbraco.com/package/ubookit`. Verify by observation: the logo replaces the placeholder avatar, and the description and website appear. Record what was seen in `docs/publishing.md`. Do not expect the "Explore more packages by CNorwood69" link to change; it follows NuGet ownership (design, Risks). Record its state as observed.

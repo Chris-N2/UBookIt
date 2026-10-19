@@ -90,6 +90,7 @@ public class MarketplaceListingFileTests(PackedSolutionFixture fixture)
     [InlineData("github-raw-form", "not the accepted form")]
     [InlineData("raw-github-host", "not the accepted form")]
     [InlineData("media-host", "not the accepted form")]
+    [InlineData("trailing-dot-host", "not the accepted form")]
     [InlineData("lower-case-repository", "not the accepted form")]
     [InlineData("other-branch", "not the accepted form")]
     [InlineData("dot-segments", "not the accepted form")]
@@ -133,6 +134,9 @@ public class MarketplaceListingFileTests(PackedSolutionFixture fixture)
                 break;
             case "media-host":
                 author["ImageUrl"] = $"https://media.githubusercontent.com/media/{owner}/{repository}/{DefaultBranch}/docs/images/no-such-logo.png";
+                break;
+            case "trailing-dot-host":
+                author["ImageUrl"] = $"https://raw.githubusercontent.com./{owner}/{repository}/{DefaultBranch}/docs/images/no-such-logo.png";
                 break;
             case "lower-case-repository":
                 author["ImageUrl"] = $"https://raw.githubusercontent.com/{owner.ToLowerInvariant()}/{repository.ToLowerInvariant()}/{DefaultBranch}/docs/images/no-such-logo.png";
@@ -288,7 +292,8 @@ public class MarketplaceListingFileTests(PackedSolutionFixture fixture)
     /// </summary>
     private static bool PointsIntoRepository(Uri url, (string Owner, string Repository) own)
     {
-        var host = url.Host;
+        // A fully qualified host keeps its trailing dot in Uri.Host, and GitHub serves it (QA round 3).
+        var host = url.Host.TrimEnd('.');
 
         var onGitHub = GitHubDomains.Any(domain =>
             host.Equals(domain, StringComparison.OrdinalIgnoreCase)
