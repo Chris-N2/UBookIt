@@ -151,6 +151,15 @@ without a login). Follow-ups:
   two named actions only; the generated response type marks the member optional (the wire always
   carries it).
 
+**At sync — guarantee diff for "A site can supply the content of a message without owning its
+delivery" (email-templates), replaced wholesale by a MODIFIED delta added for QA's finding.**
+Carried verbatim: the SHALL to replace the body while the package decides whether, to whom and
+under what configuration; the SHALL that content and delivery be separable; the scenario "Content is
+replaced without delivery being replaced". Deliberately narrowed (stated in the proposal): "a site
+that supplies nothing SHALL be unaffected … exactly what it sent before this capability existed"
+becomes "unaffected *by this capability* … exactly the package's own message for that event", and
+the scenario "A site that supplies nothing is unchanged" is reworded to match. Nothing dropped.
+
 **QA round 2: APPROVE** — the line-ending fix verified (the length check proven to fire on
 Windows independently of `Contains`); the three items above were tidied without re-review.
 

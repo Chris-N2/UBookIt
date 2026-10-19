@@ -68,6 +68,12 @@ None.
 - `booking-emails`: **adds** a requirement stating when the booker's message carries the
   instructions, and the narrowing for supplied content.
 - `email-templates`: **adds** a requirement for `BookerInstructions` on the booker's model.
+  **Modifies** "A site can supply the content of a message without owning its delivery" (added at
+  sync, after QA): its sentence "a site that supplies nothing SHALL be unaffected … exactly what it
+  sent before this capability existed" became false as written for a site that writes instructions
+  and supplies no views. It is narrowed to "unaffected *by this capability*" — the package's own
+  wording may grow with the capabilities that define each message. A deliberate narrowing of a
+  sentence that was over-broad, not a removal of a guarantee.
 - `delivery-api`: **adds** a requirement that the service read model never carries the
   instructions.
 - `persistence`: **adds** a requirement for the additive nullable column.
