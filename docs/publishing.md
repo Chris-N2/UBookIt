@@ -548,7 +548,7 @@ the file needs no release**. The logo it names is `docs/images/ndd-logo.png`, se
   the package.
 - **Seen on the listing on 2026-10-19,** within hours of the file merging. The author card showed
   the logo, the description and a "Read more about the developer" link. The
-  link read "explore more packages by CNorwood69 or Norwood-Design-and-Development", one name per
+  line beneath it read "explore more packages by CNorwood69 or Norwood-Design-and-Development", one name per
   NuGet owner. The listing's own icon is the package icon (`assets/icon.png`), not this file's logo.
   That is one observation, not a rule the Marketplace promises.
 
