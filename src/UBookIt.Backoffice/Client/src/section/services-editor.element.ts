@@ -16,6 +16,15 @@ import { alignmentReport, type AlignmentSnapshot } from "./alignment-report.js";
 import { sufficiencyReport, type ShortfallSnapshot } from "./sufficiency-report.js";
 import { carriedRows, rowNumbers } from "./preview-rows.js";
 import { attributedFields, errorsForRole, selectableHintKey, summaryLines } from "./role-fields.js";
+import {
+  BOOKER_INSTRUCTIONS_ERROR_ID,
+  BOOKER_INSTRUCTIONS_HINT_ID,
+  BOOKER_INSTRUCTIONS_ID,
+  instructionsDescribedBy,
+  instructionsErrors,
+  instructionsForRequest,
+  instructionsFromResponse,
+} from "./booker-instructions-fields.js";
 import "./capability-input.element.js";
 
 /**
@@ -105,6 +114,13 @@ export class UBookItServiceEditorElement extends UmbLitElement {
 
   @state()
   private _name = "";
+
+  /**
+   * The service's instructions for the booker, exactly as typed. Empty means none; trimming and
+   * the length rule are the server's.
+   */
+  @state()
+  private _bookerInstructions = "";
 
   /**
    * The service's roles, one per requirement row. Always at least one: a service
@@ -233,6 +249,7 @@ export class UBookItServiceEditorElement extends UmbLitElement {
     }
 
     this._name = data.name;
+    this._bookerInstructions = instructionsFromResponse(data.bookerInstructions);
     this._roles =
       data.roles.length > 0
         ? data.roles.map((role) => ({
@@ -488,6 +505,8 @@ export class UBookItServiceEditorElement extends UmbLitElement {
         // second one switched on: the at-most-one rule is the server's.
         visitorSelectable: role.visitorSelectable,
       })),
+      // Always sent, so an emptied field removes the instructions.
+      bookerInstructions: instructionsForRequest(this._bookerInstructions),
     };
   }
 
@@ -646,8 +665,42 @@ export class UBookItServiceEditorElement extends UmbLitElement {
               @input=${(e: InputEvent) => (this._name = (e.target as HTMLInputElement).value)}
             ></uui-input>
           </div>
+          ${this.#renderBookerInstructions()}
         </fieldset>
       </uui-box>
+    `;
+  }
+
+  /**
+   * The instructions for the booker.
+   *
+   * A native textarea rather than uui-textarea, for the reason the resource editor gives for its
+   * native checkbox: the hint has to be ASSOCIATED with the control, and a uui component's inner
+   * control is not reliably reachable by an aria-describedby set on its host. Labelled by
+   * label[for] in this shadow root. Its one failure renders here, against the field, and not on
+   * the Details group.
+   */
+  #renderBookerInstructions() {
+    const errors = instructionsErrors(this._errors);
+
+    return html`
+      <div class="field">
+        <label for=${BOOKER_INSTRUCTIONS_ID}>${this.#term("bookerInstructions")}</label>
+        <textarea
+          id=${BOOKER_INSTRUCTIONS_ID}
+          rows="5"
+          .value=${this._bookerInstructions}
+          aria-invalid=${errors.length > 0 ? "true" : nothing}
+          aria-describedby=${instructionsDescribedBy(this._errors)}
+          @input=${(e: InputEvent) => (this._bookerInstructions = (e.target as HTMLTextAreaElement).value)}
+        ></textarea>
+        <p id=${BOOKER_INSTRUCTIONS_HINT_ID} class="hint">${this.#term("bookerInstructionsHint")}</p>
+        ${errors.length === 0
+          ? nothing
+          : html`<p class="group-error" id=${BOOKER_INSTRUCTIONS_ERROR_ID}>
+              ${errors.map((e) => e.message).join(" ")}
+            </p>`}
+      </div>
     `;
   }
 
@@ -1221,6 +1274,13 @@ export class UBookItServiceEditorElement extends UmbLitElement {
       border-radius: var(--uui-border-radius, 3px);
       margin-bottom: var(--uui-size-space-3);
       padding: var(--uui-size-space-4);
+    }
+    textarea {
+      font: inherit;
+      padding: var(--uui-size-space-2);
+      border: 1px solid var(--uui-color-border-standalone, #c2c2c2);
+      border-radius: var(--uui-border-radius, 3px);
+      resize: vertical;
     }
     .hint {
       color: var(--uui-color-text-alt, #515054);

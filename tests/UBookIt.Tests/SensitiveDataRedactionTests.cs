@@ -491,7 +491,15 @@ public class SensitiveDataRedactionTests
             "ResponsibilityRow: PartyKey,PartyType,SubjectId,SubjectType",
             "ServiceRoleCapabilityRow: Key,ServiceRoleId",
             "ServiceRoleRow: Capabilities,Count,Id,ResourceType,ServiceId,VisitorSelectable",
-            "ServiceRow: DurationKind,Id,MaxDurationMinutes,MinDurationMinutes,Name,Roles",
+
+            // Decision, service-booker-instructions (roadmap 17.5.0): BookerInstructions is the
+            // SITE's own text about a service — a meeting link, directions — written through the
+            // service editor under the configure verb. Despite its name it holds nothing a booker
+            // supplied: no booker's detail can reach it by any route, so it is no second home for
+            // their data and erasure has no business with it. Like a closed period's note it is
+            // free text, so an operator could type anything; it is about the service, and the
+            // docs tell them it travels by email and is no place for secrets.
+            "ServiceRow: BookerInstructions,DurationKind,Id,MaxDurationMinutes,MinDurationMinutes,Name,Roles",
 
             // Decision, admin-settings-screen (roadmap 17.1.0): one row per setting a site has
             // overridden through the backoffice — the CONFIGURATION KEY, its value as text, and
@@ -936,7 +944,38 @@ public class SensitiveDataRedactionTests
             "BookingsController.PlaceBookingOnBehalf: BookerPhone",
         ];
 
+        // NAMED FOR THE BOOKER, AND NOT A CONTACT DETAIL — an exemption from the name filter,
+        // recorded exactly, never a pattern.
+        //
+        // service-booker-instructions: a service's "instructions for the booker" are the SITE's own
+        // text about the service — a meeting link, directions — written by a holder of the
+        // configure verb, stored on the service, and sent to a confirmed booker. Nothing a booker
+        // supplies reaches them, they are never matched against anything, and the endpoints only
+        // persist and echo them. The name filter below sees "booker" and would demand the
+        // sensitive-data gate on saving a SERVICE, which protects nobody and would lock service
+        // configuration away from everyone without that grant.
+        //
+        // The exemption is held to three things, so it cannot become the way a hurried reader
+        // quiets this guard: each entry must exist (a stale one fails), each must be on an action
+        // recorded as a WRITE (a read answering questions can never be exempted), and it names an
+        // endpoint and an identifier exactly, so a new parameter on the same action is still seen.
+        string[] notContactDetails =
+        [
+            "ServicesController.CreateService: BookerInstructions",
+            "ServicesController.UpdateService: BookerInstructions",
+        ];
+
+        foreach (var exemption in notContactDetails)
+        {
+            Assert.Contains(allIdentifiers, entry => $"{entry.Where}: {entry.Identifier}" == exemption);
+            Assert.Contains(exemption.Split(':')[0], KnownWrites);
+        }
+
+        bool IsExempt(string where, string identifier)
+            => notContactDetails.Contains($"{where}: {identifier}", StringComparer.Ordinal);
+
         var contactParameters = allIdentifiers
+            .Where(entry => !IsExempt(entry.Where, entry.Identifier))
             .Where(entry =>
                 entry.Identifier.Contains("booker", StringComparison.OrdinalIgnoreCase)
                 || entry.Identifier.Contains("email", StringComparison.OrdinalIgnoreCase))
@@ -971,8 +1010,9 @@ public class SensitiveDataRedactionTests
         foreach (var (identifier, where, gated) in allIdentifiers)
         {
             var isContactDetail =
-                identifier.Contains("booker", StringComparison.OrdinalIgnoreCase)
-                || identifier.Contains("email", StringComparison.OrdinalIgnoreCase);
+                !IsExempt(where, identifier)
+                && (identifier.Contains("booker", StringComparison.OrdinalIgnoreCase)
+                    || identifier.Contains("email", StringComparison.OrdinalIgnoreCase));
 
             Assert.False(
                 isContactDetail && !gated,

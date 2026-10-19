@@ -1,6 +1,7 @@
 using UBookIt.Core.Availability;
 using UBookIt.Core.Bookings;
 using UBookIt.Core.Resources;
+using UBookIt.Core.Services;
 using UBookIt.Tests.Support;
 using UBookIt.Web.Rendering;
 
@@ -86,6 +87,50 @@ public class PublishedCallShapeTests
             new PrivacyNoticeView(null, null, false), 30, default);
 
         Assert.Null(form.ShiftedWindowFrom);
+    }
+
+    [Fact]
+    public void Service_Create_accepts_every_published_call_shape()
+    {
+        // service-booker-instructions gave the service a new member without touching this factory
+        // (design 1). Every shape a host could write against 17.4.x still binds, and still yields a
+        // service with no instructions.
+        ServiceRole[] roles = [new("room", 1)];
+
+        var shapes = new[]
+        {
+            Service.Create("Massage", null, roles),
+            Service.Create("Massage", null, roles, null),
+            Service.Create("Massage", null, roles, Guid.NewGuid()),
+            Service.Create("Massage", ServiceDuration.Unbounded, [new ServiceRole("room", 1)]),
+            Service.Create(name: "Massage", duration: null, roles: roles, id: null),
+        };
+
+        Assert.All(shapes, result =>
+        {
+            Assert.True(result.Succeeded);
+            Assert.Null(result.Value.BookerInstructions);
+        });
+    }
+
+    [Fact]
+    public void BookingMessageComposer_accepts_every_published_constructor_shape()
+    {
+        // service-booker-instructions added a four-parameter constructor taking a service store.
+        // Every shape written against the published one must still bind to it — `(r, null, null)`
+        // above all, which a constructor taking the store SECOND would have made ambiguous.
+        var resources = new InMemoryResourceStore();
+        var logger = Microsoft.Extensions.Logging.Abstractions.NullLogger<
+            UBookIt.Persistence.Notifications.BookingMessageComposer>.Instance;
+
+        var shapes = new[]
+        {
+            new UBookIt.Persistence.Notifications.BookingMessageComposer(resources, logger),
+            new UBookIt.Persistence.Notifications.BookingMessageComposer(resources, logger, null),
+            new UBookIt.Persistence.Notifications.BookingMessageComposer(resources, null!, null),
+        };
+
+        Assert.All(shapes, Assert.NotNull);
     }
 
     [Fact]

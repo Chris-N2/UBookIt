@@ -228,6 +228,13 @@ internal sealed class ServiceRow
 
     public int? MaxDurationMinutes { get; set; }
 
+    /// <summary>
+    /// The service's instructions for the booker. Nullable, and <c>NULL</c> rather than an empty
+    /// string for none, so storage and the domain have one representation of "none" — and every
+    /// service stored before the column existed reads back with none.
+    /// </summary>
+    public string? BookerInstructions { get; set; }
+
     public List<ServiceRoleRow> Roles { get; set; } = [];
 }
 

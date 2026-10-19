@@ -179,17 +179,89 @@ public sealed class Service
 {
     private readonly List<ServiceRole> _roles;
 
-    private Service(Guid id, string name, ServiceDuration duration, List<ServiceRole> roles)
+    /// <summary>
+    /// The longest <see cref="BookerInstructions"/> may be, in characters, after
+    /// normalisation. Bounded here rather than left to the column, so an over-long
+    /// value is a validation failure with a stable code and never a database error.
+    /// </summary>
+    public const int BookerInstructionsMaxLength = 2000;
+
+    /// <summary>The failure field for <see cref="BookerInstructions"/>, as the Management API names it.</summary>
+    public const string BookerInstructionsField = "bookerInstructions";
+
+    private Service(Guid id, string name, ServiceDuration duration, List<ServiceRole> roles, string? bookerInstructions = null)
     {
         Id = id;
         Name = name;
         Duration = duration;
         _roles = roles;
+        BookerInstructions = bookerInstructions;
     }
 
     public Guid Id { get; }
 
     public string Name { get; }
+
+    /// <summary>
+    /// Plain text a site writes once for this service, which a <b>confirmed</b> booker is given in
+    /// their message — joining details for an online session, or directions for an in-person one.
+    /// <c>null</c> when the service has none; never an empty string.
+    /// <para>
+    /// Not set by <see cref="Create"/>, whose published shape is unchanged: a caller that knows about
+    /// instructions chains <see cref="WithBookerInstructions"/>, and every other caller gets a
+    /// service with none. Not published by the delivery API — it is written for people the site has
+    /// accepted, and may hold a standing link to join a meeting.
+    /// </para>
+    /// </summary>
+    public string? BookerInstructions { get; }
+
+    /// <summary>
+    /// This service with the given instructions for the booker, equal to it in every other member.
+    /// The service is immutable, so this returns a new one.
+    /// <para>
+    /// The text is normalised and validated by <see cref="NormalizeBookerInstructions"/>: trimmed,
+    /// empty or whitespace-only meaning none, line breaks kept, and at most
+    /// <see cref="BookerInstructionsMaxLength"/> characters.
+    /// </para>
+    /// </summary>
+    public DomainResult<Service> WithBookerInstructions(string? instructions)
+    {
+        var normalized = NormalizeBookerInstructions(instructions);
+
+        return normalized.Succeeded
+            ? DomainResult<Service>.Success(new Service(Id, Name, Duration, _roles, normalized.Value))
+            : DomainResult<Service>.Failure(normalized.Failures);
+    }
+
+    /// <summary>
+    /// The one rule for instructions for the booker, shared by <see cref="WithBookerInstructions"/>
+    /// and by a caller that must report the instructions' failure alongside those of
+    /// <see cref="Create"/> — which it cannot do through the instance method when there is no
+    /// service to call it on.
+    /// <para>
+    /// Leading and trailing whitespace is removed; an empty or whitespace-only value becomes
+    /// <c>null</c>; line breaks within the text are kept as written. More than
+    /// <see cref="BookerInstructionsMaxLength"/> characters after that is
+    /// <see cref="FailureCodes.ServiceBookerInstructionsTooLong"/> against
+    /// <see cref="BookerInstructionsField"/>.
+    /// </para>
+    /// </summary>
+    public static DomainResult<string?> NormalizeBookerInstructions(string? instructions)
+    {
+        if (string.IsNullOrWhiteSpace(instructions))
+        {
+            return DomainResult<string?>.Success(null);
+        }
+
+        var trimmed = instructions.Trim();
+
+        return trimmed.Length > BookerInstructionsMaxLength
+            ? DomainResult<string?>.Failure(
+                FailureCodes.ServiceBookerInstructionsTooLong,
+                $"Instructions for the booker may be at most {BookerInstructionsMaxLength} characters.",
+                BookerInstructionsField)
+            : DomainResult<string?>.Success(trimmed);
+    }
 
     /// <summary>
     /// How long this service takes: a fixed length, or a booker-chosen length

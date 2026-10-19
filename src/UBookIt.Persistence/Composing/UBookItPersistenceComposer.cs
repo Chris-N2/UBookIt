@@ -1,9 +1,11 @@
 using System.Net.Mail;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Logging;
 using UBookIt.Core;
 using UBookIt.Core.Availability;
 using UBookIt.Core.Bookings;
+using UBookIt.Core.Notifications;
 using UBookIt.Core.Services;
 using UBookIt.Core.Stores;
 using UBookIt.Persistence.Jobs;
@@ -122,7 +124,15 @@ public sealed class UBookItPersistenceComposer : IComposer
         // the handler reads the settings itself and returns immediately when a site has asked for
         // nothing. Registering it only when sending is configured would make the setting's effect
         // depend on the state of configuration at startup in a second, invisible way.
-        builder.Services.AddScoped<BookingMessageComposer>();
+        // Through the constructor that reads services, named rather than left to the container:
+        // with no renderer registered it would otherwise prefer the published three-parameter
+        // constructor, and confirmed bookers would silently lose their instructions. The renderer
+        // stays optional, read at resolution time, so composer order still cannot matter.
+        builder.Services.AddScoped(provider => new BookingMessageComposer(
+            provider.GetRequiredService<IResourceStore>(),
+            provider.GetRequiredService<ILogger<BookingMessageComposer>>(),
+            provider.GetService<IBookingTemplateRenderer>(),
+            provider.GetRequiredService<IServiceStore>()));
         builder.Services.AddScoped<IResponsibilityStore, SqlResponsibilityStore>();
         builder.Services.AddScoped<IFlagStore, SqlFlagStore>();
         builder.Services.AddScoped<ISettingsStore, SqlSettingsStore>();

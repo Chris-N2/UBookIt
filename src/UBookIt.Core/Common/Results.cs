@@ -161,6 +161,13 @@ public static class FailureCodes
     /// </summary>
     public const string ServiceRoleMultipleSelectable = "service-role-multiple-selectable";
     public const string ServiceDurationInvalid = "service-duration-invalid";
+
+    /// <summary>
+    /// A service's instructions for the booker are longer than
+    /// <c>Service.BookerInstructionsMaxLength</c> after trimming. A validation failure so that an
+    /// over-long value never reaches the column and fails there as a 500.
+    /// </summary>
+    public const string ServiceBookerInstructionsTooLong = "service-booker-instructions-too-long";
     public const string ServiceNotFound = "service-not-found";
 
     /// <summary>
