@@ -51,7 +51,64 @@
 
 ## 9. Verification and handover
 
-- [ ] 9.1 Run the full suites on `main`: unit (2203 baseline), integration (210), rendering (1178), client (356). Verify: green, no skips, counts equal the baselines plus the new tests.
+- [x] 9.1 Run the full suites on `main`: unit (2203 baseline), integration (210), rendering (1178), client (356). Verify: green, no skips, counts equal the baselines plus the new tests.
+  *Done:* `--no-incremental` solution build 0 warnings 0 errors. Unit **2261** (+58), integration
+  **214** (+4), rendering **1178** (+0, nothing rendered changed), client **370** (+14); no skips.
+  The first unit run had three deliberate decision guards fail — see *Apply record* below.
 - [ ] 9.2 Run `openspec validate service-booker-instructions --strict` after the last commit. Verify: it passes.
-- [ ] 9.3 Live check on the TestSite. Give a service instructions with a URL, book it with auto-confirm on, and read the captured email. Then turn approval on, book again, confirm, and read both emails. Verify: the instructions appear only in the confirmed-booking messages, and the service's public read does not contain them.
+- [x] 9.3 Live check on the TestSite. Give a service instructions with a URL, book it with auto-confirm on, and read the captured email. Then turn approval on, book again, confirm, and read both emails. Verify: the instructions appear only in the confirmed-booking messages, and the service's public read does not contain them.
+  *Done (dev site, `.eml` pickup directory, new files only).* Service `SBI Online consultation`
+  (`4e527609-…`, type `room`) with a marker `SBI-LIVE-4c2e`. **The TestSite references
+  `UBookIt.Tests.ThemeFixture`, which supplies `BookerPlaced`/`Confirmed`/`Moved` views**, so the
+  first run proved only the narrowing (no supplied view rendered the member). For the second run
+  the fixture was changed locally and restored from git afterwards: `BookerPlaced`/`BookerMoved`
+  moved aside so the package's own wording rendered, `BookerConfirmed` given a line printing
+  `Model.BookerInstructions`. Results: placed with auto-confirm (`K6ZB-XQSK`) — package wording
+  carries "Instructions for your booking:" after the closing line, lines intact; approval on
+  (`NHGC-6ZKT`) — placement and a move while Requested carry none; confirm — the supplied view
+  received the text; move while Confirmed — package wording carries it. Internal messages: none.
+  No cancellation link appeared (the dev site cannot resolve its own address), so ordering
+  against the link is evidenced by the unit test only. Delivery `GET /services/{id}` and the list:
+  marker absent. Management API: `bookerInstructions: null` present for a service without;
+  blank name + 2001 characters → one 400 carrying both codes. `AutoConfirm` overridden for the run
+  and reset (effective `true`, not overridden). **Editor, live shadow DOM:** native textarea in
+  Details, `label[for]` in the same root, `aria-describedby` → hint (resolves); after a 2001-char
+  save, `aria-invalid="true"`, describedby grows to `…-hint err-booker-instructions`, both
+  resolve, summary names the failure, no Details group error, value and name kept; a two-line
+  save round-trips (read back over the API, LF line break).
 - [ ] 9.4 Hand over to a fresh QA subagent (`qa-review`), with build state, test counts, the mutation results and the live check stated as claims to verify.
+
+## Apply record
+
+**Decisions the artifacts did not settle (for QA and Chris):**
+
+1. **`BookingMessageComposer` gained a constructor rather than a widened one.** Design 2 says the
+   composer reads the service; it does not say how it gets a store, and the class's three-parameter
+   constructor is published. The new one is `(IResourceStore, ILogger, IBookingTemplateRenderer?,
+   IServiceStore)` — store LAST and required, so `(r, l)`, `(r, l, t)` and `(r, null, null)` bind
+   only to the published one. The persistence composer registers it through an explicit factory:
+   left to the container, a site with no renderer registered would get the published constructor
+   and lose the instructions silently. A composer built through the published constructor carries
+   none. Pinned by `PublishedSignatureTests`, `PublishedCallShapeTests` and
+   `ServiceBookerInstructionsMessageTests.The_package_registers_…`.
+2. **`SensitiveDataRedactionTests` was narrowed by an exact exemption.** Its name filter treats any
+   endpoint parameter containing "booker" as a contact detail and demands the sensitive-data gate;
+   `bookerInstructions` is the spec's own wire name and is site configuration. The exemption names
+   the two service writes exactly, fails if an entry goes stale, and refuses any action not
+   recorded as a write. Mutation: a `BookerNote` property on the same request model still turns
+   the guard red. Its storage-surface twin records the new column with its decision.
+3. **Native `<textarea>`, not `uui-textarea`** — see 4.1.
+4. **The column is `BookerInstructions`** (PascalCase like the table's other columns; design 5
+   left the casing to apply).
+
+**Mutations (each reverted, revert confirmed):** `Service.Create` gains an optional parameter →
+signature guard red; status check removed from the composer → 6 red; `InternalMessageModel`
+member → reflection test red; instructions in the site body → site test red; DI back to
+`AddScoped<BookingMessageComposer>()` → seam test red; delivery `Name` += instructions → both
+delivery tests red; migration gains an `UPDATE` → shape test and upgrade test red; docs label ≠
+`en-us.ts` → docs test red.
+
+**Outward grep:** the composer's own remark ("the one exception is…") was falsified and is
+corrected. `email-templates` "a site that supplies nothing SHALL be unaffected … exactly what it
+sent before" compares a site with and without supplied content and is still true (a site that
+writes no instructions sends what it sent) — left, to be re-checked at sync.
