@@ -46,8 +46,24 @@
 
 ## 8. The other line
 
-- [ ] 8.1 Port the change to `dev/v18` on branch `service-booker-instructions-v18` (worktree `..\uBookIt-v18`). Regenerate the v18 client with its own generator, and confirm the migration is equivalent on both lines (design 8). Verify: the v18 unit, integration, rendering and client suites are green at their baselines plus the new tests.
-- [ ] 8.2 Run the upgrade path on real SQL Server: create a database with the 17.x build including this change, then start the 18.x build against it. Verify: the column exists once, existing services read back unchanged, and no migration fails or repeats.
+- [x] 8.1 Port the change to `dev/v18` on branch `service-booker-instructions-v18` (worktree `..\uBookIt-v18`). Regenerate the v18 client with its own generator, and confirm the migration is equivalent on both lines (design 8). Verify: the v18 unit, integration, rendering and client suites are green at their baselines plus the new tests.
+  *Done:* the three main commits cherry-picked cleanly onto `dev/v18` (`a3d59f9`). The migration is
+  the same file under the same id on both lines, and `dotnet ef migrations
+  has-pending-model-changes` on v18 reports no change. The v18 generator (reading
+  `/umbraco/openapi/ubookitbackoffice.json`) differs only in union order (`null | string`),
+  committed separately. `--no-incremental` v18 build 0 warnings. v18 unit **2255** (2197 + 58),
+  integration **214**, rendering **1178**, client **370**. Live on the v18 dev site over the wire:
+  create round-trips with CRLF, delivery GET and list free of the marker, blank name + 2001
+  characters → one 400 with both codes, blank clears to `null`. **v18 dev-site residue:** services
+  `SBI v18 check` and `SBI v18 check (2)`. The v18 editor was not driven live; its client source is
+  identical to main's apart from the generated union order.
+- [x] 8.2 Run the upgrade path on real SQL Server: create a database with the 17.x build including this change, then start the 18.x build against it. Verify: the column exists once, existing services read back unchanged, and no migration fails or repeats.
+  *Done on LocalDB, through the package's own startup path (`Database.MigrateAsync`, as `dotnet ef
+  database update --connection`):* main's build created the database (18 history rows, including
+  `AddServiceBookerInstructions`); two services seeded by SQL, one with CRLF instructions; v18's
+  build then reported "No migrations were applied". History 18 → 18, the migration recorded once,
+  the column present once (`YES`, 2000), every service row byte-identical before and after, the
+  CRLF intact. The scratch database was dropped.
 
 ## 9. Verification and handover
 
