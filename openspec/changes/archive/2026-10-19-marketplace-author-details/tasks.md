@@ -43,4 +43,4 @@
 
 ## 6. After merge (outside the repo, not claimed before it happens)
 
-- [ ] 6.1 After the PR merges to `main` and the Marketplace has synced, check `https://marketplace.umbraco.com/package/ubookit`. Verify by observation: the logo replaces the placeholder avatar, and the description and website appear. Record what was seen in `docs/publishing.md`. Do not expect the "Explore more packages by CNorwood69" link to change; it follows NuGet ownership (design, Risks). Record its state as observed.
+- [x] 6.1 After the PR merges to `main` and the Marketplace has synced, check `https://marketplace.umbraco.com/package/ubookit`. Verify by observation: the logo replaces the placeholder avatar, and the description and website appear. Record what was seen in `docs/publishing.md`. Do not expect the "Explore more packages by CNorwood69" link to change; it follows NuGet ownership (design, Risks). Record its state as observed.
