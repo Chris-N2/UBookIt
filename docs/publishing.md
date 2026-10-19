@@ -522,6 +522,31 @@ It names the Umbraco major derived from `<Version>`, because `UBookIt.csproj` is
 lines. `18.0.0` and `18.1.0` shipped describing themselves as for Umbraco 17 when the major was
 written by hand.
 
+**The listing's author details come from `umbraco-marketplace.json` at the repository root.** That
+covers the publisher's description, website and logo. The Marketplace looks for the file in the
+folder the package's project URL points to. That URL is this GitHub repository, so it reads the
+file from the root of `main`, at its own sync. It does not read it from any package, so **changing
+the file needs no release**. The logo it names is `docs/images/ndd-logo.png`, served from `main`.
+
+- **The file is on `main` only.** The Marketplace reads only the default branch. A copy on
+  `dev/v18` would be read by nothing and free to drift, and so would its test.
+- **It may carry only `$schema` and `AuthorDetails`.** One listing serves both lines, so a `Title`
+  or `Description` there would override every line's description with one sentence.
+  `MarketplaceListingFileTests`, on `main`, refuses:
+  - any other top-level field;
+  - author text that names an Umbraco major in the form "Umbraco 17";
+  - an author name that differs from the packed `<authors>`.
+
+  A logo URL into this repository must be the raw `main` form already in the file, naming a file
+  git tracks. Other forms, such as GitHub's `refs/heads/main` link, are refused. A logo hosted
+  anywhere else is checked only for being an `https` `.png` or `.jpg`.
+- **If the listing has not changed after a reasonable wait,** ask the Marketplace to resync the
+  package through its single-package sync endpoint, described in Umbraco's
+  [listing documentation](https://docs.umbraco.com/umbraco-dxp/marketplace/listing-your-package).
+  Do not keep editing the file.
+- **The "Explore more packages by …" link is not set by this file.** It follows the NuGet owners of
+  the package.
+
 ## The guard that failed when we published — and what it guards now
 
 `VersionTruthTests.Every_mention_of_the_feed_is_accounted_for` scans the documents it walks for a

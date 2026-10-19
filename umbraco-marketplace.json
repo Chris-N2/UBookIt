@@ -1,0 +1,9 @@
+{
+  "$schema": "https://marketplace.umbraco.com/umbraco-marketplace-schema.json",
+  "AuthorDetails": {
+    "Name": "Norwood Design & Development Ltd.",
+    "Description": "Norwood Design & Development Ltd. builds software on the .NET platform and specialises in Umbraco: websites, migrations and packages.",
+    "Url": "https://www.norwood-development.co.uk",
+    "ImageUrl": "https://raw.githubusercontent.com/Chris-N2/UBookIt/main/docs/images/ndd-logo.png"
+  }
+}
