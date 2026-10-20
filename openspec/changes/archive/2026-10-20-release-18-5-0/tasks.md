@@ -114,5 +114,7 @@
   obligation (a save without `templateSet` clears it) is paid by the entry.
   *Done:* recorded paid in the feature's handover memory (`ubookit-service-email-templates-handover`): the entry says a save without `templateSet` clears it, under *What you have to do*.
 
-- [ ] 5.4 Commit and run the unit suite. Chris pushes. Verify: `dev/v18`'s CI is green.
-- [ ] 5.5 Archive last, running the unit suite before the push.
+- [x] 5.4 Commit and run the unit suite. Chris pushes. Verify: `dev/v18`'s CI is green.
+  *Done:* committed on `release-18-5-0-closeout`; unit **2414**, 0 skipped. Chris pushes; `dev/v18`'s CI is his to confirm.
+- [x] 5.5 Archive last, running the unit suite before the push.
+  *Done (2026-10-20):* archived after the records above. The unit suite and `openspec validate --all --strict` were run after the archive commit.
