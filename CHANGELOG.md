@@ -18,6 +18,112 @@ See [the versioning note](README.md#versions-and-the-api-promise).
 
 ---
 
+## 18.5.0
+
+### What you have to do
+
+**Nothing to make it work.** When the site starts, uBookIt adds one column to its own service table
+to hold the new email template set. The column is empty for every existing service, so no set
+applies until somebody names one. (A site that supplies its own email content has one change even
+without a set, described below.)
+
+**After upgrading, reload any backoffice tab that was open before**, with a hard reload
+(Ctrl+Shift+R, or Cmd+Shift+R on a Mac) so the browser cannot keep the old backoffice code. Saving a
+service sends its template set with it, and a save that sends none clears it. An editor tab still
+running the previous version's backoffice code knows nothing about the field, so saving a service
+from it after somebody has named a set would remove the set. The same applies to your own scripts or
+tools that update services through the Management API: send `templateSet` with the service, or it is
+cleared.
+
+**If you supply your own email content, one thing behaves differently**, whether that content is
+Razor views or a renderer of your own. When uBookIt cannot read a booking's service while it writes a
+message (a database fault, say), that message is now sent in uBookIt's own wording, and your views
+or your renderer are not asked for it. Without the service, uBookIt cannot tell which template set
+applies, and content written for every service may have been written for a different kind of
+service. The message is still sent, without the service's instructions, and the failure is logged
+with the booking id only. On a site that supplies no content of its own, nothing changes.
+
+**If you have replaced uBookIt's renderer with your own `IBookingTemplateRenderer`,** it is given
+the set as `Model.TemplateSet` and ignores sets until it reads it. It is not called when the
+service cannot be read, as above (see *For developers*).
+
+Otherwise there is no published API removed or changed, so code built against 18.4.x keeps
+working.
+
+**Going back to 18.4.x afterwards is safe.** The older version ignores the new column: it applies
+no migration, does not read the set, and saving a service there leaves the set as it was. While you
+are on 18.4.x every message uses the views for every service, as before, and set folders are simply
+not consulted. The sets apply again when you come forward.
+
+### What changed
+
+**A service can name an email template set**, so an online consultation's emails can read
+differently from an in-person one without your views branching on names or ids. In the service
+editor's Details box there is a new, optional **Email template set** field, below the instructions
+for the booker. Name a set, say `remote`, and put that service's views in a folder of the same name:
+`Views/Partials/UBookIt/Emails/remote/`. Several services can name the same set.
+
+**For each message, uBookIt looks in the set first**, then at the view for every service, then uses
+its own wording. A set does not have to supply every message: a message the set has no view for
+uses the view for every service. Every message is eligible, including those to your own recipients,
+and a set's view for your recipients is given the same model, with no booker contact details on it,
+as any other.
+
+**Two failures send uBookIt's own wording, never the view for every service:** a view in the set
+that fails to render, and a service that cannot be read. The view for every service may have been
+written for another kind of service, and neutral wording is the safer thing to send. Both are
+logged; neither costs the message.
+
+**Set names are lower case.** The name becomes a folder name, and folder names are case-sensitive
+on Linux hosts and not on Windows, so uBookIt lowers the name when the service is saved: type
+`Remote` and the field shows `remote` afterwards. A name may use only the letters a–z, the digits
+0–9 and single hyphens between them, up to 64 characters; anything else is refused against the field
+when you save, with everything you entered kept.
+
+**The set is read from the service each time a message is written**, like the instructions, so
+changing a service's set changes the next message about any of its bookings. Messages already sent
+are not changed.
+
+**The startup log reports each set a service names**: which messages it supplies, and which fall
+back. **A set that supplies nothing is a warning** naming the folder its views were expected in,
+which is how a mistyped name or a folder in the wrong case is caught. The report reflects your
+services when the site starts, so a set named later is reported at the next start.
+
+**The set is not shown on the public site.** The delivery API does not publish it.
+
+### For developers
+
+- **New members.** Every existing signature is unchanged:
+  - `Service.TemplateSet`, with `Service.WithTemplateSet(string?)` to set it, the static
+    `Service.NormalizeTemplateSet(string?)` holding the rule, and the static
+    `Service.IsValidTemplateSetName(string?)` that the renderer checks again before using a name as
+    a path. `Service.Create` is unchanged and gives a service with none;
+  - `Service.TemplateSetMaxLength` (64) and `Service.TemplateSetField`;
+  - `FailureCodes.ServiceTemplateSetInvalid`, the stable code `service-template-set-invalid`;
+  - `BookingMessageModel.ServiceId` and `BookingMessageModel.TemplateSet`, on both the booker's and
+    the internal model. `ServiceId` is the id the booking recorded, `null` for a booking placed
+    directly against a resource and kept when the service is deleted. `TemplateSet` is `null` where
+    no set applies. **To tell services apart in a view, use `TemplateSet`**: a service's id differs
+    between your development, staging and live sites, and a set name does not;
+  - the static `RazorBookingTemplateRenderer.SetPathFor(string, BookingMessageKind)` and
+    `RazorBookingTemplateRenderer.IsSuppliedInSet(string, BookingMessageKind)`, new names rather
+    than overloads of `PathFor` and `IsSupplied`.
+- **`IBookingTemplateRenderer` is unchanged.** The set travels on the model, so a renderer of your
+  own keeps working and ignores sets until it reads `Model.TemplateSet`. It is no longer called for
+  a message whose service cannot be read; uBookIt's own wording is sent instead.
+- **The Management API** carries `templateSet` on a service's request and response. The response
+  always includes it, as `null` when there is none, and in lower case.
+- **The delivery API is unchanged**, and a test checks its responses never contain the set.
+- **One service read per message**, at most, where a renderer is registered, which is every site
+  with the UBookIt package installed: every message about a service booking now reads the service,
+  for its set, where before only a confirmed booker's message did. The instructions come from the
+  same read.
+- **The database** gains one nullable column, `uBookItService.TemplateSet`, through the additive
+  migration `AddServiceTemplateSet`.
+- No dependency changes.
+
+---
+
 ## 18.4.0 — 2026-10-20
 
 ### What you have to do
