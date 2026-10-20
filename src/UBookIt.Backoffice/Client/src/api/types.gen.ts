@@ -319,6 +319,7 @@ export type ServiceRequestModel = {
     duration?: ServiceDurationModel | null;
     roles: Array<ServiceRoleModel>;
     bookerInstructions?: string | null;
+    templateSet?: string | null;
 };
 
 export type ServiceResponseModel = {
@@ -327,6 +328,7 @@ export type ServiceResponseModel = {
     duration: ServiceDurationModel;
     roles: Array<ServiceRoleModel>;
     bookerInstructions?: string | null;
+    templateSet?: string | null;
 };
 
 export type ServiceRoleChainModel = {

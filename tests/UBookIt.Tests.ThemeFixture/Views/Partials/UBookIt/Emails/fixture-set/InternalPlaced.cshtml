@@ -1,0 +1,4 @@
+@inherits UBookIt.Web.Emails.UBookItEmailPage<UBookIt.Core.Notifications.InternalMessageModel>
+@* The site's own placement message in template set "fixture-set". Typed to the model with no
+   booker on it, so content in a set is held to the same guarantee as any other. *@
+SET-VIEW fixture-set InternalPlaced for @Model.Reference

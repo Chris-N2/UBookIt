@@ -117,6 +117,27 @@ public class PublishedSignatureTests
     }
 
     [Fact]
+    public void The_renderer_seam_keeps_its_published_signatures()
+    {
+        // service-email-templates carried the set on the MODEL, so none of these widened (design 1).
+        var kind = typeof(UBookIt.Core.Notifications.BookingMessageKind);
+        var model = typeof(UBookIt.Core.Notifications.BookingMessageModel);
+        var renderer = typeof(UBookIt.Web.Emails.RazorBookingTemplateRenderer);
+        var instance = BindingFlags.Public | BindingFlags.Instance;
+
+        var port = typeof(UBookIt.Core.Notifications.IBookingTemplateRenderer)
+            .GetMethod("RenderAsync", instance, [kind, model, typeof(CancellationToken)]);
+        Assert.Equal(typeof(Task<UBookIt.Core.Notifications.BookingTemplateResult>), port?.ReturnType);
+
+        AssertHas(renderer, "PathFor", kind);
+        Assert.Equal(typeof(string), renderer.GetMethod("PathFor", [kind])!.ReturnType);
+        Assert.Equal(typeof(bool), renderer.GetMethod("IsSupplied", instance, [kind])?.ReturnType);
+
+        var run = typeof(UBookIt.Web.Emails.UBookItEmailTemplateBootCheck).GetMethod("Run", instance, Type.EmptyTypes);
+        Assert.Equal(typeof(IReadOnlyList<(UBookIt.Core.Notifications.BookingMessageKind, bool)>), run?.ReturnType);
+    }
+
+    [Fact]
     public void Service_Create_keeps_its_published_signature()
         // service-booker-instructions added the instructions through `WithBookerInstructions`
         // precisely so that this signature did not widen (design 1).

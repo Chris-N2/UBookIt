@@ -53,13 +53,18 @@ internal static class ServiceModelMapper
         // blank name and over-long instructions are then both reported by one save.
         var instructions = Service.NormalizeBookerInstructions(model.BookerInstructions);
 
+        // The template set likewise, so a blank name and `../x` arrive in one 400.
+        var templateSet = Service.NormalizeTemplateSet(model.TemplateSet);
+
         var valueObjectFailures = duration.Failures
             .Concat(capabilities.Where(c => !c.Succeeded).SelectMany(c => c.Failures))
             .ToList();
 
-        if (valueObjectFailures.Count == 0 && instructions.Succeeded)
+        if (valueObjectFailures.Count == 0 && instructions.Succeeded && templateSet.Succeeded)
         {
-            return service.Succeeded ? service.Value.WithBookerInstructions(instructions.Value) : service;
+            return service.Succeeded
+                ? service.Value.WithBookerInstructions(instructions.Value).Value.WithTemplateSet(templateSet.Value)
+                : service;
         }
 
         // Report value-object problems alongside any name or role problems, so
@@ -72,6 +77,7 @@ internal static class ServiceModelMapper
         }
 
         failures.AddRange(instructions.Failures);
+        failures.AddRange(templateSet.Failures);
 
         return DomainResult<Service>.Failure(failures);
     }
@@ -249,6 +255,7 @@ internal static class ServiceModelMapper
                 })
                 .ToList(),
             BookerInstructions = service.BookerInstructions,
+            TemplateSet = service.TemplateSet,
         };
 
     /// <summary>

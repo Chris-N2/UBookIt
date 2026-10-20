@@ -20,6 +20,15 @@ public class ServiceRequestModel
     /// <c>service-booker-instructions-too-long</c>.
     /// </summary>
     public string? BookerInstructions { get; set; }
+
+    /// <summary>
+    /// The email template set this service's messages are looked up in first, as a folder of that
+    /// name under <c>Views/Partials/UBookIt/Emails/</c>. Omitted, null, empty or whitespace-only
+    /// means none — and on an update, removes any the service had. Trimmed and lowered; then only
+    /// <c>a</c>–<c>z</c>, <c>0</c>–<c>9</c> and single inner hyphens, at most 64 characters, or
+    /// <c>service-template-set-invalid</c>.
+    /// </summary>
+    public string? TemplateSet { get; set; }
 }
 
 public class ServiceResponseModel
@@ -38,6 +47,12 @@ public class ServiceResponseModel
     /// as a default.
     /// </summary>
     public string? BookerInstructions { get; set; }
+
+    /// <summary>
+    /// The service's email template set, as stored — always lower case. Always present, carrying
+    /// <c>null</c> where the service has none.
+    /// </summary>
+    public string? TemplateSet { get; set; }
 }
 
 /// <summary>

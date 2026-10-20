@@ -189,13 +189,30 @@ public sealed class Service
     /// <summary>The failure field for <see cref="BookerInstructions"/>, as the Management API names it.</summary>
     public const string BookerInstructionsField = "bookerInstructions";
 
-    private Service(Guid id, string name, ServiceDuration duration, List<ServiceRole> roles, string? bookerInstructions = null)
+    /// <summary>
+    /// The longest <see cref="TemplateSet"/> may be, in characters, after normalisation. Bounded here
+    /// rather than left to the column, so an over-long name is a validation failure with a stable
+    /// code and never a database error.
+    /// </summary>
+    public const int TemplateSetMaxLength = 64;
+
+    /// <summary>The failure field for <see cref="TemplateSet"/>, as the Management API names it.</summary>
+    public const string TemplateSetField = "templateSet";
+
+    private Service(
+        Guid id,
+        string name,
+        ServiceDuration duration,
+        List<ServiceRole> roles,
+        string? bookerInstructions = null,
+        string? templateSet = null)
     {
         Id = id;
         Name = name;
         Duration = duration;
         _roles = roles;
         BookerInstructions = bookerInstructions;
+        TemplateSet = templateSet;
     }
 
     public Guid Id { get; }
@@ -229,7 +246,7 @@ public sealed class Service
         var normalized = NormalizeBookerInstructions(instructions);
 
         return normalized.Succeeded
-            ? DomainResult<Service>.Success(new Service(Id, Name, Duration, _roles, normalized.Value))
+            ? DomainResult<Service>.Success(new Service(Id, Name, Duration, _roles, normalized.Value, TemplateSet))
             : DomainResult<Service>.Failure(normalized.Failures);
     }
 
@@ -261,6 +278,108 @@ public sealed class Service
                 $"Instructions for the booker may be at most {BookerInstructionsMaxLength} characters.",
                 BookerInstructionsField)
             : DomainResult<string?>.Success(trimmed);
+    }
+
+    /// <summary>
+    /// The name of the email template set this service's messages are looked up in first, before
+    /// the views written for every service — such as <c>remote</c> for an online consultation.
+    /// <c>null</c> when the service names none; never an empty string. Several services may name the
+    /// same set.
+    /// <para>
+    /// Not set by <see cref="Create"/>, whose published shape is unchanged: a caller that knows about
+    /// sets chains <see cref="WithTemplateSet"/>, and every other caller gets a service with none.
+    /// Always lower case, because the name is a folder name and folder names are case-sensitive on
+    /// some hosts. Not published by the delivery API — it is site configuration that chooses email
+    /// content.
+    /// </para>
+    /// </summary>
+    public string? TemplateSet { get; }
+
+    /// <summary>
+    /// This service with the given email template set, equal to it in every other member. The
+    /// service is immutable, so this returns a new one.
+    /// <para>
+    /// The name is normalised and validated by <see cref="NormalizeTemplateSet"/>.
+    /// </para>
+    /// </summary>
+    public DomainResult<Service> WithTemplateSet(string? templateSet)
+    {
+        var normalized = NormalizeTemplateSet(templateSet);
+
+        return normalized.Succeeded
+            ? DomainResult<Service>.Success(new Service(Id, Name, Duration, _roles, BookerInstructions, normalized.Value))
+            : DomainResult<Service>.Failure(normalized.Failures);
+    }
+
+    /// <summary>
+    /// The one rule for an email template set, shared by <see cref="WithTemplateSet"/>, by a caller
+    /// that must report the set's failure alongside those of <see cref="Create"/>, and by the store
+    /// when it reads a value back.
+    /// <para>
+    /// In this order: leading and trailing whitespace is removed; an empty or whitespace-only value
+    /// becomes <c>null</c>; the value is lowered with culture-invariant rules; and the result must
+    /// then satisfy <see cref="IsValidTemplateSetName"/>, or the outcome is
+    /// <see cref="FailureCodes.ServiceTemplateSetInvalid"/> against <see cref="TemplateSetField"/>.
+    /// Lowering comes before validation, so <c>Remote</c> is accepted as <c>remote</c> while
+    /// <c>Café</c> is still rejected.
+    /// </para>
+    /// </summary>
+    public static DomainResult<string?> NormalizeTemplateSet(string? templateSet)
+    {
+        if (string.IsNullOrWhiteSpace(templateSet))
+        {
+            return DomainResult<string?>.Success(null);
+        }
+
+        var lowered = templateSet.Trim().ToLowerInvariant();
+
+        return IsValidTemplateSetName(lowered)
+            ? DomainResult<string?>.Success(lowered)
+            : DomainResult<string?>.Failure(
+                FailureCodes.ServiceTemplateSetInvalid,
+                "An email template set may use only lower-case letters a-z, digits and single hyphens between them, "
+                + $"and may be at most {TemplateSetMaxLength} characters.",
+                TemplateSetField);
+    }
+
+    /// <summary>
+    /// Whether <paramref name="name"/> is, exactly as given, a valid email template set name: one to
+    /// <see cref="TemplateSetMaxLength"/> characters of ASCII <c>a</c>–<c>z</c> and <c>0</c>–<c>9</c>,
+    /// with single hyphens allowed between them but not at either end.
+    /// <para>
+    /// No normalisation is applied: upper case or surrounding whitespace makes a name invalid here.
+    /// Every value <see cref="NormalizeTemplateSet"/> accepts satisfies this, and this is what the
+    /// renderer checks again before using a name as a path segment, since a message model can be
+    /// constructed by anything. Written as a character test rather than a regular expression, so no
+    /// end-of-line anchor can admit a trailing line break.
+    /// </para>
+    /// </summary>
+    public static bool IsValidTemplateSetName(string? name)
+    {
+        if (string.IsNullOrEmpty(name) || name.Length > TemplateSetMaxLength)
+        {
+            return false;
+        }
+
+        for (var index = 0; index < name.Length; index++)
+        {
+            var character = name[index];
+
+            if (character is (>= 'a' and <= 'z') or (>= '0' and <= '9'))
+            {
+                continue;
+            }
+
+            // A hyphen only between two letters or digits: not first, not last, never doubled.
+            if (character == '-' && index > 0 && index < name.Length - 1 && name[index - 1] != '-')
+            {
+                continue;
+            }
+
+            return false;
+        }
+
+        return true;
     }
 
     /// <summary>

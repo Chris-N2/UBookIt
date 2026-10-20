@@ -25,6 +25,15 @@ import {
   instructionsForRequest,
   instructionsFromResponse,
 } from "./booker-instructions-fields.js";
+import {
+  TEMPLATE_SET_ERROR_ID,
+  TEMPLATE_SET_HINT_ID,
+  TEMPLATE_SET_ID,
+  templateSetDescribedBy,
+  templateSetErrors,
+  templateSetForRequest,
+  templateSetFromResponse,
+} from "./template-set-fields.js";
 import "./capability-input.element.js";
 
 /**
@@ -121,6 +130,13 @@ export class UBookItServiceEditorElement extends UmbLitElement {
    */
   @state()
   private _bookerInstructions = "";
+
+  /**
+   * The service's email template set, exactly as typed until a save returns the stored name.
+   * Empty means none; trimming, lowering and the character rule are the server's.
+   */
+  @state()
+  private _templateSet = "";
 
   /**
    * The service's roles, one per requirement row. Always at least one: a service
@@ -250,6 +266,7 @@ export class UBookItServiceEditorElement extends UmbLitElement {
 
     this._name = data.name;
     this._bookerInstructions = instructionsFromResponse(data.bookerInstructions);
+    this._templateSet = templateSetFromResponse(data.templateSet);
     this._roles =
       data.roles.length > 0
         ? data.roles.map((role) => ({
@@ -507,6 +524,8 @@ export class UBookItServiceEditorElement extends UmbLitElement {
       })),
       // Always sent, so an emptied field removes the instructions.
       bookerInstructions: instructionsForRequest(this._bookerInstructions),
+      // Always sent, so an emptied field removes the set.
+      templateSet: templateSetForRequest(this._templateSet),
     };
   }
 
@@ -537,6 +556,13 @@ export class UBookItServiceEditorElement extends UmbLitElement {
       if (result.error) {
         this._errors = toApiErrors(result.error, this.#term("serviceSaveFailed"));
         return;
+      }
+
+      // The service is saved, so the field shows the name as STORED from here on — `Remote` as
+      // `remote`, the folder that will actually be used. That matters most where the editor stays
+      // open below, because the responsibility panel failed with the service already saved.
+      if (result.data) {
+        this._templateSet = templateSetFromResponse(result.data.templateSet);
       }
 
       // The responsibility panel saves through its own endpoint, and only once the
@@ -665,7 +691,7 @@ export class UBookItServiceEditorElement extends UmbLitElement {
               @input=${(e: InputEvent) => (this._name = (e.target as HTMLInputElement).value)}
             ></uui-input>
           </div>
-          ${this.#renderBookerInstructions()}
+          ${this.#renderBookerInstructions()} ${this.#renderTemplateSet()}
         </fieldset>
       </uui-box>
     `;
@@ -700,6 +726,38 @@ export class UBookItServiceEditorElement extends UmbLitElement {
           : html`<p class="group-error" id=${BOOKER_INSTRUCTIONS_ERROR_ID}>
               ${errors.map((e) => e.message).join(" ")}
             </p>`}
+      </div>
+    `;
+  }
+
+  /**
+   * The email template set.
+   *
+   * A native input rather than uui-input, for the reason the instructions field gives: the hint
+   * has to be ASSOCIATED with the control, and aria-describedby set on a uui host does not reach
+   * its inner control. Labelled by label[for] in this shadow root. Its one failure renders here,
+   * against the field, and not on the Details group.
+   */
+  #renderTemplateSet() {
+    const errors = templateSetErrors(this._errors);
+
+    return html`
+      <div class="field">
+        <label for=${TEMPLATE_SET_ID}>${this.#term("templateSet")}</label>
+        <input
+          type="text"
+          id=${TEMPLATE_SET_ID}
+          autocomplete="off"
+          spellcheck="false"
+          .value=${this._templateSet}
+          aria-invalid=${errors.length > 0 ? "true" : nothing}
+          aria-describedby=${templateSetDescribedBy(this._errors)}
+          @input=${(e: InputEvent) => (this._templateSet = (e.target as HTMLInputElement).value)}
+        />
+        <p id=${TEMPLATE_SET_HINT_ID} class="hint">${this.#term("templateSetHint")}</p>
+        ${errors.length === 0
+          ? nothing
+          : html`<p class="group-error" id=${TEMPLATE_SET_ERROR_ID}>${errors.map((e) => e.message).join(" ")}</p>`}
       </div>
     `;
   }
@@ -1275,7 +1333,8 @@ export class UBookItServiceEditorElement extends UmbLitElement {
       margin-bottom: var(--uui-size-space-3);
       padding: var(--uui-size-space-4);
     }
-    textarea {
+    textarea,
+    #service-template-set {
       font: inherit;
       padding: var(--uui-size-space-2);
       border: 1px solid var(--uui-color-border-standalone, #c2c2c2);

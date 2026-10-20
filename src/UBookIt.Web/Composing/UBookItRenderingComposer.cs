@@ -58,5 +58,9 @@ public sealed class UBookItRenderingComposer : IComposer
             sp => sp.GetRequiredService<RazorBookingTemplateRenderer>());
 
         builder.AddNotificationHandler<UmbracoApplicationStartedNotification, UBookItEmailTemplateBootCheck>();
+
+        // The template-set report, beside the check above and separate from it: it reads services,
+        // and the check above has a published shape that reading them would change.
+        builder.AddNotificationAsyncHandler<UmbracoApplicationStartedNotification, UBookItEmailTemplateSetBootCheck>();
     }
 }
