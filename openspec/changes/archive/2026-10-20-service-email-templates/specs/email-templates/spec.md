@@ -181,3 +181,48 @@ package's migrations fail, the report SHALL NOT be taken.
 #### Scenario: Unreadable services do not fail startup
 - **WHEN** reading services fails during the startup report
 - **THEN** the site starts, the report says sets could not be checked, and the report for the views for every service is still given
+
+## MODIFIED Requirements
+
+### Requirement: Content is supplied as Razor views at a published path, one per message
+Site-supplied content SHALL be **Razor views**, discovered by convention at a **published
+path**, one view per message the package sends. Where a service names an email template set, a
+site MAY also supply one view per message **within that set**, at the published path for sets; the
+order in which the two are consulted is stated in "A service's template set is consulted before
+the content for every service". A view outside any set remains the content for every service.
+
+The package SHALL publish the **complete set of message names**, so an author discovers what may
+be supplied from the package rather than by reading its source. The set SHALL be exactly the
+messages the package can send: for the booker, placement, confirmation, decline, cancellation
+and a move; for the site's own recipients, placement and cancellation. Confirmation, decline
+and a move SHALL NOT appear for the site's own recipients, because no such message is sent.
+
+**The set grows additively.** A name, once published, is a file an author has on disk, and
+SHALL NOT be renamed or removed; a message the package newly sends is a new name, and an author
+who has supplied nothing for it gets the package's own content, exactly as for every other.
+
+**Each view SHALL be independently optional.** Supplying one SHALL NOT require supplying any
+other, and each message the site has not supplied SHALL use the package's own content.
+
+**A view SHALL be discoverable from an assembly as well as from the site's own files**, so that
+content can be distributed as a package rather than copied between sites.
+
+#### Scenario: The set of message names is published
+- **WHEN** an author asks what content may be supplied
+- **THEN** the package names every message, and the model each receives, without the author reading the package's source
+
+#### Scenario: The set names the booker's move
+- **WHEN** the published set of message names is inspected
+- **THEN** it contains an entry for a move addressed to the booker, and a site that has supplied nothing for it receives the package's own content for that message
+
+#### Scenario: One supplied view replaces one message
+- **WHEN** a site supplies a view for one message only
+- **THEN** that message uses it and every other message uses the package's own content
+
+#### Scenario: No view is offered for a message that is never sent
+- **WHEN** the published set of message names is inspected
+- **THEN** it contains no entry for a confirmation, a decline or a move addressed to the site's own recipients
+
+#### Scenario: Content can be distributed in an assembly
+- **WHEN** views are supplied by a referenced assembly rather than by files in the site
+- **THEN** they are discovered and used on the same terms as files in the site
