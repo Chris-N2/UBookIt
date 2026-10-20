@@ -55,15 +55,15 @@
 
 ## 3. Review and merge
 
-- [ ] 3.1 QA (`qa-review`) in one subagent, reused across rounds, covering this change and
+- [x] 3.1 QA (`qa-review`) in one subagent, reused across rounds, covering this change and
   `release-18-5-0`. Brief it that temporary source mutations are allowed if reverted. Verify:
   APPROVE.
+  *Done: APPROVE WITH NITS at round 2*, one reviewer for both changes, reused across rounds. Its brief allowed reverted mutations. In round 1 it independently confirmed the clean Release builds, every suite on both lines, the audit, openspec 27/27, the 27-line bump with no history anchor moved (and the version guard firing on a mutated README, reverted), the downgrade paragraph against the code at `17.5.0` and `18.4.0`, the dependency diff, and v18's entry as main's with version names only.
+  **QA round 1: REJECT (two MINOR wording defects, both lines).** (1) The unreadable-service paragraph was scoped to "if you supply your own email views" and ended "on a site that supplies no views, nothing changes". That is false for a site with its own `IBookingTemplateRenderer`, because the composer's `!SupportsTemplates || Failed` gate means any renderer is no longer called on a failed read. It is now scoped to "your own email content … Razor views or a renderer of your own", ends "no content of its own", and the renderer paragraph and the developers' `IBookingTemplateRenderer` bullet both say the renderer is not called when the service cannot be read. (2) "every message is looked up exactly as before until somebody names a set" contradicted that paragraph. It now reads "no set applies until somebody names one", with a pointer to the content-supplying change. NIT taken: `SetPathFor` is labelled static. NITs not taken, on the 17.5.0 precedent: naming the request/response model properties, and a cross-line note on moving to Umbraco 18. v18's entry was regenerated from main's (version names only). `ChangelogTests` + `VersionTruthTests`: 20/20 on both lines.
+  **QA round 2: APPROVE WITH NITS.** Every new sentence checked against the composer. The case "Razor renderer, no views" sends the same fallback as before; only the renderer call and the read's warning on a fault differ. No mutations needed; both trees clean. Remaining nit taken: this record moved here under 3.1. The two declined nits were accepted on the 17.5.0 precedent.
 - [ ] 3.2 Chris pushes this branch and opens the PR. Verify: the PR's CI is green, parity included.
 - [ ] 3.3 Chris merges with "Create a merge commit". Verify: `origin/main` is the merge commit, and
   its push run is green.
-
-
-  **QA round 1: REJECT (two MINOR wording defects, both lines).** (1) The unreadable-service paragraph was scoped to "if you supply your own email views" and ended "on a site that supplies no views, nothing changes". That is false for a site with its own `IBookingTemplateRenderer`, because the composer's `!SupportsTemplates || Failed` gate means any renderer is no longer called on a failed read. It is now scoped to "your own email content … Razor views or a renderer of your own", ends "no content of its own", and the renderer paragraph and the developers' `IBookingTemplateRenderer` bullet both say the renderer is not called when the service cannot be read. (2) "every message is looked up exactly as before until somebody names a set" contradicted that paragraph. It now reads "no set applies until somebody names one", with a pointer to the content-supplying change. NIT taken: `SetPathFor` is labelled static. NITs not taken, on the 17.5.0 precedent: naming the request/response model properties, and a cross-line note on moving to Umbraco 18. v18's entry was regenerated from main's (version names only). `ChangelogTests` + `VersionTruthTests`: 20/20 on both lines.
 
 ## 4. Release through the workflow
 
