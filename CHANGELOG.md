@@ -23,8 +23,9 @@ See [the versioning note](README.md#versions-and-the-api-promise).
 ### What you have to do
 
 **Nothing to make it work.** When the site starts, uBookIt adds one column to its own service table
-to hold the new email template set. The column is empty for every existing service, so every message
-is looked up exactly as before until somebody names a set.
+to hold the new email template set. The column is empty for every existing service, so no set
+applies until somebody names one. (A site that supplies its own email content has one change even
+without a set, described below.)
 
 **After upgrading, reload any backoffice tab that was open before**, with a hard reload
 (Ctrl+Shift+R, or Cmd+Shift+R on a Mac) so the browser cannot keep the old backoffice code. Saving a
@@ -34,15 +35,17 @@ from it after somebody has named a set would remove the set. The same applies to
 tools that update services through the Management API: send `templateSet` with the service, or it is
 cleared.
 
-**If you supply your own email views, one thing behaves differently.** When uBookIt cannot read a
-booking's service while it writes a message (a database fault, say), that message is now sent in
-uBookIt's own wording rather than with your view. Without the service, uBookIt cannot tell which
-template set applies, and your view for every service may have been written for a different kind of
+**If you supply your own email content, one thing behaves differently**, whether that content is
+Razor views or a renderer of your own. When uBookIt cannot read a booking's service while it writes a
+message (a database fault, say), that message is now sent in uBookIt's own wording, and your views
+or your renderer are not asked for it. Without the service, uBookIt cannot tell which template set
+applies, and content written for every service may have been written for a different kind of
 service. The message is still sent, without the service's instructions, and the failure is logged
-with the booking id only. On a site that supplies no views, nothing changes.
+with the booking id only. On a site that supplies no content of its own, nothing changes.
 
 **If you have replaced uBookIt's renderer with your own `IBookingTemplateRenderer`,** it is given
-the set as `Model.TemplateSet` and ignores sets until it reads it (see *For developers*).
+the set as `Model.TemplateSet` and ignores sets until it reads it. It is not called when the
+service cannot be read, as above (see *For developers*).
 
 Otherwise there is no published API removed or changed, so code built against 18.4.x keeps
 working.
@@ -102,11 +105,12 @@ services when the site starts, so a set named later is reported at the next star
     directly against a resource and kept when the service is deleted. `TemplateSet` is `null` where
     no set applies. **To tell services apart in a view, use `TemplateSet`**: a service's id differs
     between your development, staging and live sites, and a set name does not;
-  - `RazorBookingTemplateRenderer.SetPathFor(string, BookingMessageKind)` and
+  - the static `RazorBookingTemplateRenderer.SetPathFor(string, BookingMessageKind)` and
     `RazorBookingTemplateRenderer.IsSuppliedInSet(string, BookingMessageKind)`, new names rather
     than overloads of `PathFor` and `IsSupplied`.
 - **`IBookingTemplateRenderer` is unchanged.** The set travels on the model, so a renderer of your
-  own keeps working and ignores sets until it reads `Model.TemplateSet`.
+  own keeps working and ignores sets until it reads `Model.TemplateSet`. It is no longer called for
+  a message whose service cannot be read; uBookIt's own wording is sent instead.
 - **The Management API** carries `templateSet` on a service's request and response. The response
   always includes it, as `null` when there is none, and in lower case.
 - **The delivery API is unchanged**, and a test checks its responses never contain the set.
