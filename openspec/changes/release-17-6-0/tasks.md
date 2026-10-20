@@ -62,6 +62,9 @@
 - [ ] 3.3 Chris merges with "Create a merge commit". Verify: `origin/main` is the merge commit, and
   its push run is green.
 
+
+  **QA round 1: REJECT (two MINOR wording defects, both lines).** (1) The unreadable-service paragraph was scoped to "if you supply your own email views" and ended "on a site that supplies no views, nothing changes". That is false for a site with its own `IBookingTemplateRenderer`, because the composer's `!SupportsTemplates || Failed` gate means any renderer is no longer called on a failed read. It is now scoped to "your own email content … Razor views or a renderer of your own", ends "no content of its own", and the renderer paragraph and the developers' `IBookingTemplateRenderer` bullet both say the renderer is not called when the service cannot be read. (2) "every message is looked up exactly as before until somebody names a set" contradicted that paragraph. It now reads "no set applies until somebody names one", with a pointer to the content-supplying change. NIT taken: `SetPathFor` is labelled static. NITs not taken, on the 17.5.0 precedent: naming the request/response model properties, and a cross-line note on moving to Umbraco 18. v18's entry was regenerated from main's (version names only). `ChangelogTests` + `VersionTruthTests`: 20/20 on both lines.
+
 ## 4. Release through the workflow
 
 - [ ] 4.1 Chris pushes tag `17.6.0` on the merge commit. Verify: `check` and `pack` are green.
