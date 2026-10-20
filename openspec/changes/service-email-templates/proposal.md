@@ -95,7 +95,8 @@ None.
 - **Core:** `Service` gains `TemplateSet` and `WithTemplateSet(...)`, alongside the instructions
   and not through `Create`. The new failure code is `service-template-set-invalid`.
   `BookingMessageModel` gains `ServiceId` and `TemplateSet`. `IBookingTemplateRenderer` is
-  unchanged.
+  unchanged. *(Added at apply, 2026-10-20: `IUBookItStorageReadyHandler`, which the migration
+  runner calls after migrating, so the set report cannot race the migrations; design 5.)*
 - **Persistence:** one migration adding a nullable column, the row mapping, and the composer.
   The composer reads the service once per message where a renderer is registered or the booking is
   confirmed, and on a failed read uses its own wording. **The composer gets no new constructor.**

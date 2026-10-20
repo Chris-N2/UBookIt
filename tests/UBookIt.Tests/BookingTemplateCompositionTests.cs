@@ -864,11 +864,27 @@ public class BookingMessageModelContractTests
             d => d.ImplementationType == typeof(UBookItEmailTemplateBootCheck)
                 || d.ServiceType == typeof(UBookItEmailTemplateBootCheck));
 
-        // The template-set report (service-email-templates, design 5), registered beside it.
+        // The template-set report (service-email-templates, design 5), registered as a
+        // storage-ready handler — so it runs after uBookIt's migrations — and NOT for the started
+        // notification, where it raced them.
         Assert.Contains(
             registrations,
-            d => d.ImplementationType == typeof(UBookItEmailTemplateSetBootCheck)
-                || d.ServiceType == typeof(UBookItEmailTemplateSetBootCheck));
+            d => d.ServiceType == typeof(UBookIt.Core.Stores.IUBookItStorageReadyHandler)
+                && d.ImplementationType == typeof(UBookItEmailTemplateSetBootCheck));
+        Assert.DoesNotContain(
+            registrations,
+            d => d.ServiceType != typeof(UBookIt.Core.Stores.IUBookItStorageReadyHandler)
+                && (d.ImplementationType == typeof(UBookItEmailTemplateSetBootCheck)
+                    || d.ServiceType == typeof(UBookItEmailTemplateSetBootCheck)));
+
+        // The other half of the seam: the migration runner the persistence composer registers takes
+        // every storage-ready handler from the container. Without the parameter, the registration
+        // above would be a handler nothing ever calls.
+        var runner = typeof(UBookIt.Persistence.Composing.UBookItPersistenceComposer).Assembly
+            .GetType("UBookIt.Persistence.Composing.RunUBookItMigrations", throwOnError: true)!;
+        Assert.Contains(
+            runner.GetConstructors(BindingFlags.Public | BindingFlags.NonPublic | BindingFlags.Instance).Single().GetParameters(),
+            p => p.ParameterType == typeof(IEnumerable<UBookIt.Core.Stores.IUBookItStorageReadyHandler>));
     }
 
     [Fact]

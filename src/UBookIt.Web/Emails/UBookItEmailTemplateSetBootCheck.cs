@@ -2,8 +2,6 @@ using Microsoft.Extensions.Logging;
 using UBookIt.Core.Notifications;
 using UBookIt.Core.Stores;
 using Umbraco.Cms.Core;
-using Umbraco.Cms.Core.Events;
-using Umbraco.Cms.Core.Notifications;
 using Umbraco.Cms.Core.Services;
 
 namespace UBookIt.Web.Emails;
@@ -25,6 +23,13 @@ namespace UBookIt.Web.Emails;
 /// reading services. Its report is never touched by this one.
 /// </para>
 /// <para>
+/// <b>It runs after uBookIt's migrations, through <see cref="IUBookItStorageReadyHandler"/></b>,
+/// not as a handler for Umbraco's application-started notification. As such a handler it ran
+/// before the migrations on the first start after an upgrade, and its read of services met the
+/// column that upgrade had not yet added: two database errors and a misleading warning, on
+/// exactly the start where somebody is reading the log.
+/// </para>
+/// <para>
 /// <b>It never fails boot.</b> Where services cannot be read — the database not yet available, or
 /// any other fault — it says that sets could not be checked, and returns. It describes services as
 /// they stand at startup: a set typed in the editor later is reported at the next start.
@@ -35,17 +40,17 @@ public sealed class UBookItEmailTemplateSetBootCheck(
     IServiceStore services,
     IRuntimeState runtimeState,
     ILogger<UBookItEmailTemplateSetBootCheck> logger)
-    : INotificationAsyncHandler<UmbracoApplicationStartedNotification>
+    : IUBookItStorageReadyHandler
 {
     /// <summary>How many services are read per page while collecting the sets they name.</summary>
     private const int PageSize = 200;
 
-    public Task HandleAsync(UmbracoApplicationStartedNotification notification, CancellationToken cancellationToken)
-        => RunAsync(cancellationToken);
+    /// <summary>Called by uBookIt once its migrations have been applied at startup.</summary>
+    public Task OnStorageReadyAsync(CancellationToken cancellationToken) => RunAsync(cancellationToken);
 
     /// <summary>
     /// Collects the sets services name, looks for each message's view in each, and reports.
-    /// Separated from the notification so it can be exercised without booting Umbraco.
+    /// Separated from the hook so it can be exercised without booting Umbraco.
     /// </summary>
     /// <returns>
     /// Each distinct set, in ordinal order, with every message and whether the set supplies it.
