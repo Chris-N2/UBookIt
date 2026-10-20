@@ -136,6 +136,9 @@ export default {
     bookerInstructions: "Instructions for the booker",
     bookerInstructionsHint:
       "Sent to the booker once their booking is confirmed — for example a link to join an online session, or directions and parking. Not shown on the public site. Plain text, up to 2000 characters.",
+    templateSet: "Email template set",
+    templateSetHint:
+      "Optional. Emails for this service use the views in the folder Views/Partials/UBookIt/Emails/<set>/ where they exist. Saved in lower case; letters a–z, numbers and hyphens only.",
     duration: "Duration",
     durationVariable: "Variable length",
     durationVariableHint:

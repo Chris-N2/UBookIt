@@ -13,6 +13,14 @@
 
   <ItemGroup>
     <InternalsVisibleTo Include="UBookIt.Tests" />
+    <!-- service-email-templates: IUBookItStorageReadyHandler is internal on purpose (Chris, QA
+         round 1). Persistence calls it after migrating and Web implements it; no site needs it,
+         so it is not a public extension point. Exactly the two assemblies that use it, plus the
+         integration tests that drive it through the migration runner; the same released-together
+         assumption as Persistence's grant to Backoffice. -->
+    <InternalsVisibleTo Include="UBookIt.Persistence" />
+    <InternalsVisibleTo Include="UBookIt.Web" />
+    <InternalsVisibleTo Include="UBookIt.Tests.Integration" />
   </ItemGroup>
 
 </Project>

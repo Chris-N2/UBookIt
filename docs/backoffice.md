@@ -523,6 +523,25 @@ own booking pages do not display it. Because it is read when each message is com
 changes what the *next* message to a confirmed booker says — not anything already sent. It travels
 by email, so keep secrets out of it.
 
+## Email template set
+
+The same **Details** box has an optional **Email template set** field, below the instructions. It
+names a folder of email views written for this service — `remote`, say — so that this service's
+messages are taken from `Views/Partials/UBookIt/Emails/remote/` where a view exists there, and from
+the views for every service otherwise. Several services can name the same set. Leave it blank and
+the service uses the views for every service, as before.
+
+The name is **saved in lower case**: type `Remote` and the field shows `remote` once the service is
+saved, which is the folder name to create. It may use only the letters `a`–`z`, the digits `0`–`9`
+and single hyphens between them, up to 64 characters. Anything else is refused against the field
+when you save, with everything else you entered still in the form.
+
+The field only names the set; the views themselves are files a developer adds to the site.
+[Notifications](notifications.md#template-sets) describes the folder layout and the order uBookIt
+looks in. A set whose folder holds no views is reported as a warning in the log when the site
+starts, so a mistyped name is caught at the next restart rather than by a customer. The set is not
+shown on the public site.
+
 ## The service shown against a booking
 
 A booking records the service it was placed for. Two things about that are worth knowing

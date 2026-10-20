@@ -4,6 +4,7 @@ using Microsoft.Extensions.Logging;
 using UBookIt.Core.Resources;
 using UBookIt.Core.Bookings;
 using UBookIt.Core.Notifications;
+using UBookIt.Core.Services;
 using UBookIt.Core.Stores;
 
 namespace UBookIt.Persistence.Notifications;
@@ -77,9 +78,10 @@ public sealed record BookingMessage(string Subject, string Body, bool IsHtml = f
 /// name of a directly-booked resource, because a claim carries an id and nothing else. That read
 /// reports the resource's name as it stands NOW, which is knowingly weaker than the snapshot a
 /// service booking carries — acceptable in a message sent within seconds of the event, and the
-/// alternative is a domain and schema change. The other is a confirmed booker's instructions,
-/// read from the service as it stands now on purpose: they exist to be acted on, so the current
-/// text is the useful one.
+/// alternative is a domain and schema change. The other is the service itself, read as it stands
+/// now on purpose, at most once per message: a confirmed booker's instructions exist to be acted
+/// on, so the current text is the useful one, and the service's email template set decides which
+/// of the site's content applies.
 /// </para>
 /// <para>
 /// <b>A message is never withheld because an enrichment could not be resolved.</b> The reference
@@ -205,8 +207,10 @@ public sealed class BookingMessageComposer(
         var what = await DescribeAsync(booking, SupportsTemplates, cancellationToken).ConfigureAwait(false);
         var subject = SubjectFor(booking, bookingEvent);
 
-        // ONE READ FEEDS BOTH the package's wording and the model, so the two cannot disagree.
-        var instructions = await BookerInstructionsAsync(booking, cancellationToken).ConfigureAwait(false);
+        // ONE READ FEEDS the package's wording, the model's instructions and its template set, so
+        // none of them can disagree with another.
+        var read = await ReadServiceAsync(booking, forBooker: true, cancellationToken).ConfigureAwait(false);
+        var instructions = InstructionsFrom(read, booking);
 
         var body = new StringBuilder()
             .AppendLine(subject)
@@ -249,7 +253,12 @@ public sealed class BookingMessageComposer(
 
         var fallback = new BookingMessage(subject, body.ToString());
 
-        if (!SupportsTemplates)
+        // A FAILED READ MEANS OUR OWN WORDING, without asking the renderer. Which template set
+        // applies cannot be established, and the view for every service may be written for a
+        // different kind of service — in-person directions sent to an online booker are worse than
+        // neutral wording. Where no content can be supplied this changes nothing: the fallback was
+        // going to be sent anyway.
+        if (!SupportsTemplates || read.Outcome == ServiceReadOutcome.Failed)
         {
             return fallback;
         }
@@ -290,59 +299,105 @@ public sealed class BookingMessageComposer(
             PreviousLocalEnd = previousLocal?.End,
             CancellationUrl = cancellationUrl,
             BookerInstructions = instructions,
+            ServiceId = booking.Service?.ServiceId,
+            TemplateSet = TemplateSetFrom(read),
         };
 
         return await ApplyTemplateAsync(model, fallback, booking, cancellationToken).ConfigureAwait(false);
     }
 
+    /// <summary>What reading the booking's service produced.</summary>
+    private enum ServiceReadOutcome
+    {
+        /// <summary>
+        /// No read was attempted: there is no store, no service, or nothing the read could feed.
+        /// Not a failure — a composer built through the 17.0.0 constructor has no store, and that
+        /// is an absent store rather than a read that failed.
+        /// </summary>
+        NotRead,
+
+        /// <summary>The read happened. The service is <c>null</c> where it has been deleted.</summary>
+        Read,
+
+        /// <summary>The read threw. It has been logged.</summary>
+        Failed,
+    }
+
+    private readonly record struct ServiceRead(ServiceReadOutcome Outcome, Service? Service = null);
+
     /// <summary>
-    /// The instructions this booker is given, or <c>null</c> where they are given none.
+    /// The one read of the booking's service a message makes — at most one, whatever it feeds.
     /// </summary>
     /// <remarks>
     /// <para>
-    /// <b>Only for a booking that is <c>Confirmed</c> as the message is composed</b>, and decided by
-    /// that status alone — never by which message this is, nor by the site's <c>AutoConfirm</c>
-    /// setting. That settles every case: a placement is confirmed under auto-confirm and requested
-    /// otherwise; a confirmation always is; a move is whatever the booking was; a decline and a
-    /// cancellation never are. A site that requires approval does not hand a join link to somebody
-    /// it has not accepted.
+    /// <b>Only where the read can feed something</b>: where the site can supply content, the set
+    /// decides which; and for the booker of a <c>Confirmed</c> booking, the instructions. A
+    /// composer with no store, a booking placed directly against a resource, and every other case
+    /// are <see cref="ServiceReadOutcome.NotRead"/>, so a host without a renderer pays nothing new
+    /// for the site's own message, nor for a booker's message that cannot carry instructions.
     /// </para>
     /// <para>
-    /// <b>Read now, not recorded at placement</b>, so a changed link reaches a booker in the next
-    /// message. Unlike the service's name, which stays the one recorded when it was sold. A deleted
-    /// service and a service with none both give none, and a booking placed directly against a
-    /// resource has no service to read.
+    /// <b>Read now, not recorded at placement</b>, so a changed link or a changed set reaches the
+    /// next message. Unlike the service's name, which stays the one recorded when it was sold.
     /// </para>
     /// <para>
     /// Caught on the terms of <see cref="ResourceNamesAsync"/>: cancellation escapes, and any other
-    /// failure costs the instructions and nothing else, logged with the booking id only.
+    /// failure is logged once, with the booking id only, and reported as
+    /// <see cref="ServiceReadOutcome.Failed"/> for the caller to fall back on.
     /// </para>
     /// </remarks>
-    private async Task<string?> BookerInstructionsAsync(Booking booking, CancellationToken cancellationToken)
+    private async Task<ServiceRead> ReadServiceAsync(
+        Booking booking, bool forBooker, CancellationToken cancellationToken)
     {
         if (_services is null
-            || booking.Status != BookingStatus.Confirmed
-            || booking.Service is not { } attribution)
+            || booking.Service is not { } attribution
+            || !(SupportsTemplates || (forBooker && booking.Status == BookingStatus.Confirmed)))
         {
-            return null;
+            return new ServiceRead(ServiceReadOutcome.NotRead);
         }
 
         try
         {
             var service = await _services.GetAsync(attribution.ServiceId, cancellationToken).ConfigureAwait(false);
-            return service?.BookerInstructions;
+            return new ServiceRead(ServiceReadOutcome.Read, service);
         }
         catch (Exception exception) when (exception is not OperationCanceledException)
         {
             logger.LogWarning(
                 exception,
                 "uBookIt could not read a service while composing a message for booking "
-                + "{BookingId}. The message is sent without the service's instructions.",
+                + "{BookingId}. The message is sent in uBookIt's own wording, without anything read "
+                + "from the service.",
                 booking.Id);
 
-            return null;
+            return new ServiceRead(ServiceReadOutcome.Failed);
         }
     }
+
+    /// <summary>
+    /// The instructions this booker is given, or <c>null</c> where they are given none.
+    /// </summary>
+    /// <remarks>
+    /// <b>Only for a booking that is <c>Confirmed</c> as the message is composed</b>, and decided by
+    /// that status alone — never by which message this is, nor by the site's <c>AutoConfirm</c>
+    /// setting. That settles every case: a placement is confirmed under auto-confirm and requested
+    /// otherwise; a confirmation always is; a move is whatever the booking was; a decline and a
+    /// cancellation never are. A site that requires approval does not hand a join link to somebody
+    /// it has not accepted — which is why the status is checked HERE, and not left to whether a
+    /// read happened: a site that supplies content reads the service for every message, for its set.
+    /// A deleted service and a service with none both give none.
+    /// </remarks>
+    private static string? InstructionsFrom(ServiceRead read, Booking booking)
+        => read.Outcome == ServiceReadOutcome.Read && booking.Status == BookingStatus.Confirmed
+            ? read.Service?.BookerInstructions
+            : null;
+
+    /// <summary>
+    /// The template set content is looked up in first, or <c>null</c> for none: the service names
+    /// none, has been deleted, could not be read, or was not read at all.
+    /// </summary>
+    private static string? TemplateSetFrom(ServiceRead read)
+        => read.Outcome == ServiceReadOutcome.Read ? read.Service?.TemplateSet : null;
 
     /// <summary>
     /// The message sent to the site's own recipients.
@@ -403,6 +458,16 @@ public sealed class BookingMessageComposer(
             return fallback;
         }
 
+        // Read only now, past the point where no content can be supplied: the site's own message
+        // never carries instructions, so the set is the only thing the read is for. A failed read
+        // means our own wording, on the terms the booker's message gives.
+        var read = await ReadServiceAsync(booking, forBooker: false, cancellationToken).ConfigureAwait(false);
+
+        if (read.Outcome == ServiceReadOutcome.Failed)
+        {
+            return fallback;
+        }
+
         var (localStart, localEnd) = LocalInterval(booking.Interval);
 
         // THE MODEL WITH NO BOOKER ON IT. Not a shared model with the contact details left out
@@ -422,6 +487,8 @@ public sealed class BookingMessageComposer(
             TimeZoneId = booking.Interval.TimeZoneId,
             AwaitsApproval = awaitsApproval,
             BackofficeUrl = backofficeUrl,
+            ServiceId = booking.Service?.ServiceId,
+            TemplateSet = TemplateSetFrom(read),
         };
 
         return await ApplyTemplateAsync(model, fallback, booking, cancellationToken).ConfigureAwait(false);

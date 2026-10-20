@@ -487,6 +487,47 @@ public class BookingTemplateCompositionTests
         Assert.Equal(expectedReads, store.Reads);
     }
 
+    /// <summary>
+    /// The same table through the constructor that takes a service store, which is the one the
+    /// package registers (service-email-templates, design 3). The theory above is built on the
+    /// three-parameter constructor and so sees no service read at all; this proves that adding one
+    /// did not move a resource read between cells.
+    /// </summary>
+    [Theory]
+    [InlineData("booker", false, false, 0)]
+    [InlineData("booker", false, true, 1)]
+    [InlineData("booker", true, false, 1)]
+    [InlineData("booker", true, true, 1)]
+    [InlineData("site", false, false, 0)]
+    [InlineData("site", false, true, 1)]
+    [InlineData("site", true, false, 1)]
+    [InlineData("site", true, true, 1)]
+    public async Task What_a_message_costs_in_resource_reads_with_a_service_store(
+        string audience, bool direct, bool withRenderer, int expectedReads)
+    {
+        var store = new CountingResourceStore();
+        var composer = new BookingMessageComposer(
+            store,
+            NullLogger<BookingMessageComposer>.Instance,
+            withRenderer ? new StubRenderer(BookingTemplateResult.NotSupplied) : null,
+            new InMemoryServiceStore());
+
+        var booking = Booking(direct: direct);
+
+        var message = audience switch
+        {
+            "booker" => await composer.ForBookerAsync(booking, BookingEvent.Placed),
+            "site" => await composer.ForSiteAsync(booking, BookingEvent.Placed, backofficeUrl: null),
+            _ => throw new ArgumentOutOfRangeException(nameof(audience), audience, "Unknown audience."),
+        };
+
+        Assert.Equal(
+            audience == "booker" ? "Your booking is confirmed" : $"New booking — {booking.Reference.Display}",
+            message.Subject);
+
+        Assert.Equal(expectedReads, store.Reads);
+    }
+
     [Fact]
     public async Task A_directly_booked_booking_is_not_read_twice()
     {
@@ -709,6 +750,13 @@ public class BookingMessageModelContractTests
         nameof(InternalMessageModel.TimeZoneId),
         nameof(InternalMessageModel.AwaitsApproval),
         nameof(InternalMessageModel.BackofficeUrl),
+
+        // service-email-templates, asked deliberately: the id of the service the booking recorded,
+        // and the name of the email template set that service names. Both identify the site's own
+        // configuration — which service, which folder of views — and neither says anything about
+        // the person who booked.
+        nameof(InternalMessageModel.ServiceId),
+        nameof(InternalMessageModel.TemplateSet),
     ];
 
     /// <summary>
@@ -815,6 +863,28 @@ public class BookingMessageModelContractTests
             registrations,
             d => d.ImplementationType == typeof(UBookItEmailTemplateBootCheck)
                 || d.ServiceType == typeof(UBookItEmailTemplateBootCheck));
+
+        // The template-set report (service-email-templates, design 5), registered as a
+        // storage-ready handler — so it runs after uBookIt's migrations — and NOT for the started
+        // notification, where it raced them.
+        Assert.Contains(
+            registrations,
+            d => d.ServiceType == typeof(UBookIt.Core.Stores.IUBookItStorageReadyHandler)
+                && d.ImplementationType == typeof(UBookItEmailTemplateSetBootCheck));
+        Assert.DoesNotContain(
+            registrations,
+            d => d.ServiceType != typeof(UBookIt.Core.Stores.IUBookItStorageReadyHandler)
+                && (d.ImplementationType == typeof(UBookItEmailTemplateSetBootCheck)
+                    || d.ServiceType == typeof(UBookItEmailTemplateSetBootCheck)));
+
+        // The other half of the seam: the migration runner the persistence composer registers takes
+        // every storage-ready handler from the container. Without the parameter, the registration
+        // above would be a handler nothing ever calls.
+        var runner = typeof(UBookIt.Persistence.Composing.UBookItPersistenceComposer).Assembly
+            .GetType("UBookIt.Persistence.Composing.RunUBookItMigrations", throwOnError: true)!;
+        Assert.Contains(
+            runner.GetConstructors(BindingFlags.Public | BindingFlags.NonPublic | BindingFlags.Instance).Single().GetParameters(),
+            p => p.ParameterType == typeof(IEnumerable<UBookIt.Core.Stores.IUBookItStorageReadyHandler>));
     }
 
     [Fact]

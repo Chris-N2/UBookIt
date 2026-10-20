@@ -93,6 +93,45 @@ public abstract record BookingMessageModel
     /// legitimately quote two different zones.
     /// </remarks>
     public required string TimeZoneId { get; init; }
+
+    /// <summary>
+    /// The id of the service the booking was placed for, as the booking recorded it at placement —
+    /// or <c>null</c> where the booking was placed directly against a resource.
+    /// </summary>
+    /// <remarks>
+    /// <para>
+    /// <b><c>null</c> means "not a service booking"</b>, and nothing else. A booking whose service
+    /// has since been deleted still carries the id it recorded. Added in 17.6.0 and 18.5.0; a view
+    /// written before it existed renders unchanged.
+    /// </para>
+    /// <para>
+    /// <b>To tell services apart in a view, prefer <see cref="TemplateSet"/>.</b> Services are held
+    /// in the package's own tables rather than in content, so the same service has a different id on
+    /// each of a site's environments, and a view that compares against one id works on one
+    /// environment only. A set name is whatever the site typed, and is the same everywhere.
+    /// </para>
+    /// </remarks>
+    public Guid? ServiceId { get; init; }
+
+    /// <summary>
+    /// The email template set the booking's service names, as read from the service when the
+    /// message was composed — or <c>null</c> where there is none.
+    /// </summary>
+    /// <remarks>
+    /// <para>
+    /// <b><c>null</c> means "no set applies"</b>: the service names none, it no longer exists, or
+    /// the booking was placed directly against a resource. Added in 17.6.0 and 18.5.0; a view
+    /// written before it existed renders unchanged.
+    /// </para>
+    /// <para>
+    /// Always lower case, and always a name the service rule accepts. The package's own renderer
+    /// has already looked for this message's view in the set's folder before it reached the view
+    /// for every service; a view for every service can still read this to vary a line or two
+    /// rather than supply a whole set. <b>This is the portable way to tell services apart</b> —
+    /// see <see cref="ServiceId"/> for why an id is not.
+    /// </para>
+    /// </remarks>
+    public string? TemplateSet { get; init; }
 }
 
 /// <summary>

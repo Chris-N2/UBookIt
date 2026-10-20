@@ -1,0 +1,4 @@
+@inherits UBookIt.Web.Emails.UBookItEmailPage<UBookIt.Core.Notifications.BookerMessageModel>
+@* Deliberately throws, while a working BookerMoved view exists for every service: a set view
+   that fails must be Failed, and must not fall through to the view written for every service. *@
+@{ throw new InvalidOperationException("This set template is broken on purpose."); }

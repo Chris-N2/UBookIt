@@ -35,7 +35,14 @@ namespace UBookIt.Tests.Rendering;
 public class EmailTemplateRenderingTests
 {
     /// <summary>A provider with the view engine and the fixture's compiled views, and nothing else.</summary>
-    private static (RazorBookingTemplateRenderer Renderer, IServiceProvider Services) Rig()
+    /// <param name="wrapEngine">
+    /// Optionally wraps the view engine the renderer is given — so a test can see which paths were
+    /// looked up — without changing the provider the views render from.
+    /// </param>
+    /// <param name="logger">Where the renderer logs, or nowhere.</param>
+    internal static (RazorBookingTemplateRenderer Renderer, IServiceProvider Services) Rig(
+        Func<IRazorViewEngine, IRazorViewEngine>? wrapEngine = null,
+        ILogger<RazorBookingTemplateRenderer>? logger = null)
     {
         var services = new ServiceCollection();
 
@@ -56,11 +63,13 @@ public class EmailTemplateRenderingTests
 
         var provider = services.BuildServiceProvider();
 
+        var engine = provider.GetRequiredService<IRazorViewEngine>();
+
         var renderer = new RazorBookingTemplateRenderer(
-            provider.GetRequiredService<IRazorViewEngine>(),
+            wrapEngine is null ? engine : wrapEngine(engine),
             provider.GetRequiredService<ITempDataProvider>(),
             provider,
-            NullLogger<RazorBookingTemplateRenderer>.Instance);
+            logger ?? NullLogger<RazorBookingTemplateRenderer>.Instance);
 
         return (renderer, provider);
     }
@@ -85,7 +94,7 @@ public class EmailTemplateRenderingTests
         public string EnvironmentName { get; set; } = "Test";
     }
 
-    private static BookerMessageModel Booker(BookingMessageKind kind) => new()
+    internal static BookerMessageModel Booker(BookingMessageKind kind) => new()
     {
         Kind = kind,
         Status = BookingStatus.Confirmed,
@@ -99,7 +108,7 @@ public class EmailTemplateRenderingTests
         BookerEmail = "ada@example.com",
     };
 
-    private static InternalMessageModel Internal(bool awaitsApproval = false) => new()
+    internal static InternalMessageModel Internal(bool awaitsApproval = false) => new()
     {
         Kind = BookingMessageKind.InternalPlaced,
         Status = awaitsApproval ? BookingStatus.Requested : BookingStatus.Confirmed,
