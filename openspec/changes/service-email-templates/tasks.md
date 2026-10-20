@@ -99,6 +99,8 @@
 - [x] R1.3 **MINOR, the cancellation link on the failed-read renderer path.** `An_unreadable_service_gives_the_packages_own_wording_without_asking_the_renderer` now composes the booker's message with a cancellation link and asserts it is in the body.
 - [x] R1.4 **NITs.** The composer's two statements on one line are split; my mutation-2 revert had removed the line break along with the line. The hint now reads "letters a–z, numbers and hyphens only", and its test asserts that. The handover's swapped heads are corrected.
 
+**QA round 2: APPROVE.** Every round-1 finding resolved, each fix reviewed as new code with no new defect. The reviewer independently confirmed builds, counts, validation and identical fixes on both lines. Mutations were judged statically in both rounds: the reviewer's one attempted edit in round 1 was refused by the session's permission check, most likely because the brief said "do not modify anything". The applying session executed every recorded mutation. Accepted residue: R1.2's editor call, invisible to a DOM-less suite. Left for archive: 11.3.
+
 ## 8. Delivery API
 
 - [x] 8.1 Add the wire-level exclusion test (design 8), with a marker set name absent from the `GET /services/{id}` and `GET /services` bodies, and the members and values identical to the same service without a set. Verify: green. A local mutation copying the set into a read-model member turns it red; revert the mutation.
