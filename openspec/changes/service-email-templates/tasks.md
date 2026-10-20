@@ -137,4 +137,6 @@
 
   **Addendum (after 7.2):** On a normal boot with the hook in place, the set report still fires, now called by the migration runner. With the views removed, it correctly warned about `remote`. The residue service's set was then cleared to `null`, so the dev site does not warn on every start; its instructions remain. The upgrade boot itself (column pending) is covered by `StorageReadyHandlerTests` and exercised live by 10.2. The dev database could not be rolled back without reading its secret connection string.
 - [ ] 11.3 At sync: run the outward grep of sibling specs for sentences this change falsifies. Candidates: "one per message", "one view per message", "published path", "PathFor", "cost the instructions and nothing else", "reads the service", "service read", and the `email-templates` Purpose's "one per message". Then re-run the guarantee diff for both MODIFIED requirements: `booking-emails`' "A confirmed booker is given the service's instructions" and `services`' "Workspace editor for a service". Verify: every hit is resolved or recorded, here, with its reason.
-- [ ] 11.4 Run CI's own command, `npx @fission-ai/openspec@1.13.0 validate --all --strict`, after the last commit on each line. Verify: it passes.
+- [x] 11.4 Run CI's own command, `npx @fission-ai/openspec@1.13.0 validate --all --strict`, after the last commit on each line. Verify: it passes.
+
+  **Apply record:** 27 passed, 0 failed on both lines, after the apply's last commit and again after the commit recording this. **Re-run at sync and archive**, which add commits of their own.
