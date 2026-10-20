@@ -34,8 +34,13 @@ namespace UBookIt.Web.Emails;
 /// any other fault — it says that sets could not be checked, and returns. It describes services as
 /// they stand at startup: a set typed in the editor later is reported at the next start.
 /// </para>
+/// <para>
+/// <b>Internal</b>, unlike the check for the views for every service, which was published at
+/// 17.0.0: nothing outside uBookIt constructs this, and its tests reach it through
+/// <c>InternalsVisibleTo</c> (QA round 1).
+/// </para>
 /// </remarks>
-public sealed class UBookItEmailTemplateSetBootCheck(
+internal sealed class UBookItEmailTemplateSetBootCheck(
     RazorBookingTemplateRenderer renderer,
     IServiceStore services,
     IRuntimeState runtimeState,

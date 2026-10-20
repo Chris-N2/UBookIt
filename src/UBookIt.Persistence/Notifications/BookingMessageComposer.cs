@@ -209,7 +209,8 @@ public sealed class BookingMessageComposer(
 
         // ONE READ FEEDS the package's wording, the model's instructions and its template set, so
         // none of them can disagree with another.
-        var read = await ReadServiceAsync(booking, forBooker: true, cancellationToken).ConfigureAwait(false);        var instructions = InstructionsFrom(read, booking);
+        var read = await ReadServiceAsync(booking, forBooker: true, cancellationToken).ConfigureAwait(false);
+        var instructions = InstructionsFrom(read, booking);
 
         var body = new StringBuilder()
             .AppendLine(subject)

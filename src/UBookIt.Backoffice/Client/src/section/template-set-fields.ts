@@ -32,6 +32,19 @@ export function templateSetFromResponse(value: string | null | undefined): strin
 }
 
 /**
+ * What the input shows once a save has answered. A successful save answers with the service as
+ * stored, so the field takes the stored name — `Remote` typed, `remote` shown, the folder that will
+ * actually be used. With no service in the answer (the save failed) the field keeps exactly what was
+ * typed, so nothing the editor entered is lost.
+ */
+export function templateSetAfterSave(
+  typed: string,
+  saved: { templateSet?: string | null } | undefined,
+): string {
+  return saved === undefined ? typed : templateSetFromResponse(saved.templateSet);
+}
+
+/**
  * What a save sends. The name goes exactly as entered: trimming, lowering and the character rule
  * are the server's, so they have one implementation. Blank is sent as `null`, which the server
  * reads the same way, so an emptied field removes the set rather than being mistaken for "leave it

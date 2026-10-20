@@ -230,8 +230,6 @@ public class PublishedCallShapeTests
     [InlineData(typeof(UBookIt.Web.Emails.RazorBookingTemplateRenderer), "RenderAsync")]
     [InlineData(typeof(UBookIt.Core.Notifications.IBookingTemplateRenderer), "RenderAsync")]
     [InlineData(typeof(UBookIt.Web.Emails.UBookItEmailTemplateBootCheck), "Run")]
-    [InlineData(typeof(UBookIt.Web.Emails.UBookItEmailTemplateSetBootCheck), "RunAsync")]
-    [InlineData(typeof(UBookIt.Core.Stores.IUBookItStorageReadyHandler), "OnStorageReadyAsync")]
     [InlineData(typeof(Service), "Create")]
     [InlineData(typeof(Service), "WithTemplateSet")]
     [InlineData(typeof(Service), "NormalizeTemplateSet")]
@@ -244,4 +242,16 @@ public class PublishedCallShapeTests
                 | System.Reflection.BindingFlags.Static
                 | System.Reflection.BindingFlags.DeclaredOnly),
             m => m.Name == name);
+
+    /// <summary>
+    /// <b>Not published, on purpose</b> (service-email-templates, QA round 1). The storage-ready hook
+    /// and the set report are uBookIt's own plumbing; making either public would freeze it as an
+    /// extension point no requirement describes. Publishing one later is additive — but it must be a
+    /// decision, so it turns this red first.
+    /// </summary>
+    [Theory]
+    [InlineData(typeof(UBookIt.Core.Stores.IUBookItStorageReadyHandler))]
+    [InlineData(typeof(UBookIt.Web.Emails.UBookItEmailTemplateSetBootCheck))]
+    public void The_storage_ready_plumbing_is_not_published(Type type)
+        => Assert.False(type.IsVisible, $"{type.Name} is public, which publishes it as frozen API.");
 }

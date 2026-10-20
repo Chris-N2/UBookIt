@@ -168,8 +168,16 @@ notification. So:
   `AddScoped<IUBookItStorageReadyHandler, UBookItEmailTemplateSetBootCheck>()`.
 
 *Rejected:* a notification type in Persistence, which would make `UBookIt.Web` reference
-Persistence and EF Core. *Rejected:* accepting and documenting the noise. The new interface is
-additive public API, frozen once shipped.
+Persistence and EF Core. *Rejected:* accepting and documenting the noise.
+
+**Amended again after QA round 1 (Chris's decision): the interface is `internal`**, and so is
+`UBookItEmailTemplateSetBootCheck`. As public types they were frozen extension points that no
+requirement described. Core gains `InternalsVisibleTo` for `UBookIt.Persistence`, `UBookIt.Web` and
+`UBookIt.Tests.Integration`. That relies on the packages being released together, the same
+assumption as Persistence's existing grant to Backoffice. Publishing the hook later would be
+additive. A guard pins both types as non-public, so publishing one has to be a decision. The
+guarantee the hook exists for is stated in `email-templates`' startup-report requirement: the
+report is taken only once storage is up to date, and not at all when the migrations fail.
 
 What it does:
 - skips entirely unless `IRuntimeState.Level == RuntimeLevel.Run`;
