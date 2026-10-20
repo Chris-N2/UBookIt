@@ -146,5 +146,7 @@
   obligation (a save without the field clears it) is paid by the entry.
   *Done:* recorded paid (the obligation lived in the feature's handover memory, and is marked
   there too).
-- [ ] 5.4 Commit and run the unit suite. Chris pushes. Verify: `main`'s CI is green.
-- [ ] 5.5 Archive last, running the unit suite before the push.
+- [x] 5.4 Commit and run the unit suite. Chris pushes. Verify: `main`'s CI is green.
+  *Done:* committed; unit **2263**, 0 skipped. Chris pushes; `main`'s CI is his to confirm.
+- [x] 5.5 Archive last, running the unit suite before the push.
+  *Done (2026-10-20):* archived after the records above; unit suite and `openspec validate --all --strict` run after the archive commit.
