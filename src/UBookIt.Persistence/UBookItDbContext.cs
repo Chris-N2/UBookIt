@@ -198,6 +198,7 @@ public sealed class UBookItDbContext(DbContextOptions<UBookItDbContext> options)
             // Sized to the domain's limit, which rejects anything longer first — so the column
             // is never where an over-long value fails.
             service.Property(s => s.BookerInstructions).HasMaxLength(Service.BookerInstructionsMaxLength);
+            service.Property(s => s.TemplateSet).HasMaxLength(Service.TemplateSetMaxLength);
 
             // Stored as its name so the column is readable in the database and
             // does not silently shift meaning if the enum is ever reordered.

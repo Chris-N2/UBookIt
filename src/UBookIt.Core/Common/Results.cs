@@ -168,6 +168,14 @@ public static class FailureCodes
     /// over-long value never reaches the column and fails there as a 500.
     /// </summary>
     public const string ServiceBookerInstructionsTooLong = "service-booker-instructions-too-long";
+
+    /// <summary>
+    /// A service's email template set is not a valid set name after normalisation: only
+    /// <c>a</c>–<c>z</c>, <c>0</c>–<c>9</c> and single inner hyphens, at most
+    /// <c>Service.TemplateSetMaxLength</c> characters. A validation failure, because the name becomes a
+    /// path segment and must never reach the view engine, or the column, unchecked.
+    /// </summary>
+    public const string ServiceTemplateSetInvalid = "service-template-set-invalid";
     public const string ServiceNotFound = "service-not-found";
 
     /// <summary>

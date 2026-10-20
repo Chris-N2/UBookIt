@@ -247,12 +247,22 @@ public class ServiceBookerInstructionsMessageTests
 
     // ── A failed read costs the instructions and nothing else ────────────────────────────────
 
+    /// <remarks>
+    /// <b>On a site that supplies no content</b>, which is the scenario's own condition since
+    /// service-email-templates: there, a failed read also costs the site's content, and
+    /// <c>ServiceTemplateSetMessageTests</c> holds that case. No renderer is wired, so the
+    /// package's wording is the whole message and the assertion on its body is the whole claim.
+    /// </remarks>
     [Fact]
     public async Task A_service_that_cannot_be_read_costs_the_instructions_alone_and_is_logged_without_the_booker()
     {
         var logs = new CapturingLoggerProvider();
         var factory = LoggerFactory.Create(builder => builder.AddProvider(logs).SetMinimumLevel(LogLevel.Trace));
-        var (composer, renderer) = Wire(new ThrowingServiceStore(), factory.CreateLogger<BookingMessageComposer>());
+        var composer = new BookingMessageComposer(
+            new InMemoryResourceStore().Add(Room),
+            factory.CreateLogger<BookingMessageComposer>(),
+            templates: null,
+            new ThrowingServiceStore());
         var booking = Booking(BookingStatus.Confirmed, Consultation());
 
         var message = await composer.ForBookerAsync(
@@ -265,7 +275,6 @@ public class ServiceBookerInstructionsMessageTests
         Assert.Contains("9:00 AM (Europe/London)", message.Body, StringComparison.Ordinal);
         Assert.Contains(CancelLink.AbsoluteUri, message.Body, StringComparison.Ordinal);
         Assert.DoesNotContain("Instructions for your booking", message.Body, StringComparison.Ordinal);
-        Assert.Null(Assert.IsType<BookerMessageModel>(Assert.Single(renderer.Models)).BookerInstructions);
 
         var entry = Assert.Single(logs.Entries, e => e.Message.Contains("could not read a service", StringComparison.Ordinal));
         Assert.Contains(booking.Id.ToString(), entry.Message, StringComparison.Ordinal);
@@ -292,9 +301,18 @@ public class ServiceBookerInstructionsMessageTests
     {
         // Design 2: reading only when needed keeps the extra read off every other message. A
         // store that throws proves it was never asked — a read would have been logged.
+        //
+        // With NO renderer: since service-email-templates a site that can supply content reads the
+        // service for every service booking's message, to find its template set, and
+        // `ServiceTemplateSetMessageTests`' read-count theory holds that table. What this test
+        // still guards is the host without a renderer, which pays nothing new.
         var logs = new CapturingLoggerProvider();
         var factory = LoggerFactory.Create(builder => builder.AddProvider(logs).SetMinimumLevel(LogLevel.Trace));
-        var (composer, _) = Wire(new ThrowingServiceStore(), factory.CreateLogger<BookingMessageComposer>());
+        var composer = new BookingMessageComposer(
+            new InMemoryResourceStore().Add(Room),
+            factory.CreateLogger<BookingMessageComposer>(),
+            templates: null,
+            new ThrowingServiceStore());
 
         await composer.ForBookerAsync(
             Booking(BookingStatus.Requested, Consultation()), BookingEvent.Placed, null, null,

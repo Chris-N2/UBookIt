@@ -59,6 +59,12 @@ public class ThemeFixtureTests
             new[] { "BookerPlaced", "BookerConfirmed", "BookerCancelled", "BookerMoved", "InternalPlaced" }
                 .Select(name => $"/Views/Partials/UBookIt/Emails/{name}.cshtml"));
 
+        // service-email-templates: template set "fixture-set" — two views that render and one that
+        // throws beside a working view for every service. No BookerConfirmed, deliberately.
+        expected.AddRange(
+            new[] { "BookerPlaced", "InternalPlaced", "BookerMoved" }
+                .Select(name => $"/Views/Partials/UBookIt/Emails/fixture-set/{name}.cshtml"));
+
         var actual = DescriptorsOf(Fixture).Select(d => d.RelativePath);
 
         Assert.Equal(

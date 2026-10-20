@@ -144,4 +144,103 @@ public class PublishedCallShapeTests
 
         Assert.NotNull(component);
     }
+
+    // ── service-email-templates: the new members, as a host would call them ─────────────────
+
+    [Fact]
+    public void Service_template_set_members_bind_as_a_host_would_write_them()
+    {
+        // `null` literals and bare strings, the arguments an added overload would make ambiguous.
+        var service = Service.Create("Massage", null, [new ServiceRole("room", 1)]).Value;
+
+        Assert.Null(service.TemplateSet);
+        Assert.Equal("remote", service.WithTemplateSet("Remote").Value.TemplateSet);
+        Assert.Null(service.WithTemplateSet(null).Value.TemplateSet);
+        Assert.Null(Service.NormalizeTemplateSet(null).Value);
+        Assert.Equal("remote", Service.NormalizeTemplateSet(" remote ").Value);
+        Assert.False(Service.IsValidTemplateSetName(null));
+        Assert.True(Service.IsValidTemplateSetName("remote"));
+
+        const int max = Service.TemplateSetMaxLength;
+        const string field = Service.TemplateSetField;
+        Assert.Equal(64, max);
+        Assert.Equal("templateSet", field);
+        Assert.Equal("service-template-set-invalid", UBookIt.Core.Common.FailureCodes.ServiceTemplateSetInvalid);
+
+        // The instructions member chained either side of the set, both orders.
+        Assert.Equal("remote", service.WithBookerInstructions(null).Value.WithTemplateSet("remote").Value.TemplateSet);
+    }
+
+    [Fact]
+    public void The_message_models_take_the_service_id_and_set_in_an_initializer_or_not_at_all()
+    {
+        // A view model built by a host for its own preview or test, before and after the members
+        // existed: both compile, and leaving them out means "absent".
+        var before = new UBookIt.Core.Notifications.InternalMessageModel
+        {
+            Kind = UBookIt.Core.Notifications.BookingMessageKind.InternalPlaced,
+            Status = BookingStatus.Confirmed,
+            Reference = "7QX4-M2NP",
+            ResourceNames = [],
+            LocalStart = DateTimeOffset.UnixEpoch,
+            LocalEnd = DateTimeOffset.UnixEpoch,
+            TimeZoneId = "Europe/London",
+            AwaitsApproval = false,
+        };
+        var after = before with { ServiceId = null, TemplateSet = null };
+        var withBoth = before with { ServiceId = Guid.Empty, TemplateSet = "remote" };
+
+        Assert.Null(before.ServiceId);
+        Assert.Null(before.TemplateSet);
+        Assert.Equal(before, after);
+        Assert.Equal("remote", withBoth.TemplateSet);
+    }
+
+    [Fact]
+    public void The_renderers_set_members_bind_as_a_host_would_write_them()
+    {
+        // Method groups, the shape an overload would make ambiguous for a delegate conversion,
+        // and the published members beside them, unchanged.
+        Func<string, UBookIt.Core.Notifications.BookingMessageKind, string> setPath =
+            UBookIt.Web.Emails.RazorBookingTemplateRenderer.SetPathFor;
+        Func<UBookIt.Core.Notifications.BookingMessageKind, string> path =
+            UBookIt.Web.Emails.RazorBookingTemplateRenderer.PathFor;
+
+        Assert.Equal(
+            "~/Views/Partials/UBookIt/Emails/remote/BookerPlaced.cshtml",
+            setPath("remote", UBookIt.Core.Notifications.BookingMessageKind.BookerPlaced));
+        Assert.Equal(
+            "~/Views/Partials/UBookIt/Emails/BookerPlaced.cshtml",
+            path(UBookIt.Core.Notifications.BookingMessageKind.BookerPlaced));
+    }
+
+    /// <summary>
+    /// <b>Exactly one member of each published name.</b> service-email-templates gave the renderer
+    /// <c>SetPathFor</c> and <c>IsSuppliedInSet</c> as NEW NAMES rather than overloads of
+    /// <c>PathFor</c> and <c>IsSupplied</c> (design 4), because an overload has broken source
+    /// compatibility here once already (2026-10-11). An overload that happens not to be ambiguous
+    /// for the shapes above is still a second meaning for one name; this turns it red at the moment
+    /// it is added, rather than at the first ambiguous call a host writes.
+    /// </summary>
+    [Theory]
+    [InlineData(typeof(UBookIt.Web.Emails.RazorBookingTemplateRenderer), "PathFor")]
+    [InlineData(typeof(UBookIt.Web.Emails.RazorBookingTemplateRenderer), "SetPathFor")]
+    [InlineData(typeof(UBookIt.Web.Emails.RazorBookingTemplateRenderer), "IsSupplied")]
+    [InlineData(typeof(UBookIt.Web.Emails.RazorBookingTemplateRenderer), "IsSuppliedInSet")]
+    [InlineData(typeof(UBookIt.Web.Emails.RazorBookingTemplateRenderer), "RenderAsync")]
+    [InlineData(typeof(UBookIt.Core.Notifications.IBookingTemplateRenderer), "RenderAsync")]
+    [InlineData(typeof(UBookIt.Web.Emails.UBookItEmailTemplateBootCheck), "Run")]
+    [InlineData(typeof(UBookIt.Web.Emails.UBookItEmailTemplateSetBootCheck), "RunAsync")]
+    [InlineData(typeof(Service), "Create")]
+    [InlineData(typeof(Service), "WithTemplateSet")]
+    [InlineData(typeof(Service), "NormalizeTemplateSet")]
+    [InlineData(typeof(Service), "IsValidTemplateSetName")]
+    [InlineData(typeof(Service), "WithBookerInstructions")]
+    public void Each_published_name_has_exactly_one_overload(Type type, string name)
+        => Assert.Single(
+            type.GetMethods(System.Reflection.BindingFlags.Public
+                | System.Reflection.BindingFlags.Instance
+                | System.Reflection.BindingFlags.Static
+                | System.Reflection.BindingFlags.DeclaredOnly),
+            m => m.Name == name);
 }
