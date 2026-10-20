@@ -231,6 +231,7 @@ public class PublishedCallShapeTests
     [InlineData(typeof(UBookIt.Core.Notifications.IBookingTemplateRenderer), "RenderAsync")]
     [InlineData(typeof(UBookIt.Web.Emails.UBookItEmailTemplateBootCheck), "Run")]
     [InlineData(typeof(UBookIt.Web.Emails.UBookItEmailTemplateSetBootCheck), "RunAsync")]
+    [InlineData(typeof(UBookIt.Core.Stores.IUBookItStorageReadyHandler), "OnStorageReadyAsync")]
     [InlineData(typeof(Service), "Create")]
     [InlineData(typeof(Service), "WithTemplateSet")]
     [InlineData(typeof(Service), "NormalizeTemplateSet")]

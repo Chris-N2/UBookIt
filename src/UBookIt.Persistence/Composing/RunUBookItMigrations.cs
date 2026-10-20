@@ -19,7 +19,8 @@ internal sealed class RunUBookItMigrations(
     IRuntimeState runtimeState,
     IConfiguration configuration,
     ISettingsStore settingsStore,
-    ILogger<RunUBookItMigrations> logger) : INotificationAsyncHandler<UmbracoApplicationStartedNotification>
+    ILogger<RunUBookItMigrations> logger,
+    IEnumerable<IUBookItStorageReadyHandler> readyHandlers) : INotificationAsyncHandler<UmbracoApplicationStartedNotification>
 {
     public async Task HandleAsync(UmbracoApplicationStartedNotification notification, CancellationToken cancellationToken)
     {
@@ -54,6 +55,36 @@ internal sealed class RunUBookItMigrations(
         }
 
         Report(EffectiveConfigurationOrRaw(), logger);
+
+        await NotifyStorageReadyAsync(cancellationToken).ConfigureAwait(false);
+    }
+
+    /// <summary>
+    /// Calls each <see cref="IUBookItStorageReadyHandler"/> — only here, after the migrations, which
+    /// is the point of the interface. Reached only when migrating succeeded: a failure above
+    /// rethrows, and then the storage is not ready for anything to read.
+    /// </summary>
+    /// <remarks>
+    /// Each handler is caught on its own, so one that fails cannot stop the site starting or keep
+    /// the next one from running. Cancellation escapes, as everywhere else in the package.
+    /// </remarks>
+    private async Task NotifyStorageReadyAsync(CancellationToken cancellationToken)
+    {
+        foreach (var handler in readyHandlers)
+        {
+            try
+            {
+                await handler.OnStorageReadyAsync(cancellationToken).ConfigureAwait(false);
+            }
+            catch (Exception exception) when (exception is not OperationCanceledException)
+            {
+                logger.LogError(
+                    exception,
+                    "uBookIt startup work {Handler} failed after the database was brought up to date. "
+                    + "The site has started regardless.",
+                    handler.GetType().Name);
+            }
+        }
     }
 
     /// <summary>

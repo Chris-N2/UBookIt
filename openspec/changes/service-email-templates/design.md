@@ -149,10 +149,27 @@ Because the composer already turns `Failed` into its own wording, decision 4 of 
 
 ### 5. The set report is a separate boot check
 
-A new `UBookItEmailTemplateSetBootCheck` is an
-`INotificationAsyncHandler<UmbracoApplicationStartedNotification>`. It is not folded into the
-existing class: changing that class's interface, constructor or `Run()` return type would change a
-published shape.
+A new `UBookItEmailTemplateSetBootCheck` is not folded into the existing class: changing that
+class's interface, constructor or `Run()` return type would change a published shape.
+
+**Amended at apply (2026-10-20, Chris's decision).** As first designed, it handled
+`UmbracoApplicationStartedNotification`. `RunUBookItMigrations` handles the same notification, and
+nothing controls the order. The live check saw the set check run first on the start after an
+upgrade: its service read failed on the not-yet-added column, logging two database errors and the
+"could not be checked" warning. `UBookIt.Web` references only Core, so it cannot order itself after
+the persistence composer, and Core references nothing, so it cannot declare an Umbraco
+notification. So:
+- Core gains `public interface IUBookItStorageReadyHandler { Task OnStorageReadyAsync(CancellationToken); }`
+  (`UBookIt.Core.Stores`), free of Umbraco types;
+- `RunUBookItMigrations` takes `IEnumerable<IUBookItStorageReadyHandler>` and calls each one after
+  migrating and reporting. A failed migration rethrows before reaching them. Each handler is caught
+  on its own, except for cancellation, and logged, so one cannot fail boot or stop the next;
+- the set check implements that interface and is registered with
+  `AddScoped<IUBookItStorageReadyHandler, UBookItEmailTemplateSetBootCheck>()`.
+
+*Rejected:* a notification type in Persistence, which would make `UBookIt.Web` reference
+Persistence and EF Core. *Rejected:* accepting and documenting the noise. The new interface is
+additive public API, frozen once shipped.
 
 What it does:
 - skips entirely unless `IRuntimeState.Level == RuntimeLevel.Run`;

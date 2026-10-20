@@ -351,7 +351,7 @@ public class EffectiveConfigurationTests
     }
 
     private static RunUBookItMigrations Handler(IConfiguration configuration, ISettingsStore store)
-        => new(null!, null!, configuration, store, NullLogger<RunUBookItMigrations>.Instance);
+        => new(null!, null!, configuration, store, NullLogger<RunUBookItMigrations>.Instance, []);
 
     [Fact]
     public void The_startup_handler_reports_against_the_EFFECTIVE_configuration_not_the_raw_one()

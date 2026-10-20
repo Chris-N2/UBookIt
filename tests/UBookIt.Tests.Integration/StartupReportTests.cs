@@ -95,7 +95,7 @@ public class StartupReportTests(SqlServerFixture fixture)
         var logger = new CapturingLogger();
 
         await new RunUBookItMigrations(
-                context, new RunningRuntimeState(), siteConfiguration, store, logger)
+                context, new RunningRuntimeState(), siteConfiguration, store, logger, [])
             .HandleAsync(new UmbracoApplicationStartedNotification(false), Ct);
 
         foreach (var (key, _) in stored)
