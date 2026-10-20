@@ -499,7 +499,12 @@ public class SensitiveDataRedactionTests
             // their data and erasure has no business with it. Like a closed period's note it is
             // free text, so an operator could type anything; it is about the service, and the
             // docs tell them it travels by email and is no place for secrets.
-            "ServiceRow: BookerInstructions,DurationKind,Id,MaxDurationMinutes,MinDurationMinutes,Name,Roles",
+            //
+            // Decision, service-email-templates (roadmap 17.6.0): TemplateSet is the name of a
+            // folder of the site's own email views, typed in the service editor under the configure
+            // verb and constrained to a-z, 0-9 and hyphens. It is site configuration; no booker's
+            // detail can reach it by any route, and erasure has no business with it.
+            "ServiceRow: BookerInstructions,DurationKind,Id,MaxDurationMinutes,MinDurationMinutes,Name,Roles,TemplateSet",
 
             // Decision, admin-settings-screen (roadmap 17.1.0): one row per setting a site has
             // overridden through the backoffice — the CONFIGURATION KEY, its value as text, and

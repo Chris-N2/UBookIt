@@ -235,6 +235,13 @@ internal sealed class ServiceRow
     /// </summary>
     public string? BookerInstructions { get; set; }
 
+    /// <summary>
+    /// The service's email template set. Nullable, and <c>NULL</c> rather than an empty string for
+    /// none, so every service stored before the column existed reads back with none. Neither indexed
+    /// nor unique: several services may share a set.
+    /// </summary>
+    public string? TemplateSet { get; set; }
+
     public List<ServiceRoleRow> Roles { get; set; } = [];
 }
 

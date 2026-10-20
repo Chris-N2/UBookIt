@@ -1,0 +1,4 @@
+@inherits UBookIt.Web.Emails.UBookItEmailPage<UBookIt.Core.Notifications.BookerMessageModel>
+@* The placement message in template set "fixture-set": used instead of the view for every
+   service. Prints the set the model carries, so a test can see which view rendered and why. *@
+SET-VIEW fixture-set BookerPlaced for @Model.Reference (set @Model.TemplateSet)

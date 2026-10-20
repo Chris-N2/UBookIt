@@ -127,7 +127,9 @@ none, and so does a booking placed directly against a resource, which has no ser
 
 If the service cannot be read while a message is being composed, the message is still sent with
 everything else it carries, without the instructions, and the failure is logged with the booking
-id only.
+id only. On a site that [writes its own message content](#writing-your-own-message-content), that
+message is sent in **uBookIt's own wording** rather than yours, because without the service uBookIt
+cannot tell which [template set](#template-sets) applies.
 
 **Messages to `InternalRecipients` never carry them** — they are written for the booker. Neither
 does the delivery API: `GET /services` and `GET /services/{id}` do not publish them, so they are
@@ -257,6 +259,28 @@ several resources can list them:
 branch on: a `BookerPlaced` message describes a **confirmed** booking on a site that confirms on
 placement, and a **requested** one on a site that requires approval.
 
+Both models also carry `ServiceId` and `TemplateSet`. `ServiceId` is the id of the service the
+booking was placed for, as the booking recorded it — `null` for a booking placed directly against a
+resource, and still present when the service has since been deleted. `TemplateSet` is the service's
+[template set](#template-sets) as read when the message is composed — `null` where the service names
+none, no longer exists, or the booking was placed directly against a resource. A view written before
+either existed renders unchanged.
+
+**To tell services apart in a view, use `Model.TemplateSet`, not `Model.ServiceId`.** Services live
+in uBookIt's own tables rather than in your content, so the same service has a different id on your
+development, staging and live sites, and a view that compares against one id works on one of them
+only. A set name is whatever you typed, and is the same everywhere you deploy:
+
+```cshtml
+@if (Model.TemplateSet == "remote")
+{
+    @:Join from a quiet room with a working microphone.
+}
+```
+
+Branching on `ServiceName` is worse still: it is the name the booking was sold under, and a rename
+in the backoffice changes what new bookings carry without telling your view.
+
 `BookerMessageModel` adds `BookerName`, `BookerEmail` and `BookerPhone`, and the
 `CancellationUrl` and `BookerInstructions` described below.
 `InternalMessageModel` adds `AwaitsApproval` and `BackofficeUrl` — and **carries no booker name,
@@ -317,6 +341,60 @@ presented is your view's choice.
 does not add them to your content or send them separately — the same narrowing as for
 `CancellationUrl`: the words are yours. `InternalMessageModel` has no such member.
 
+#### Template sets
+
+An online consultation's confirmation is often a different email from an in-person one, not the same
+email with a paragraph added. A **template set** gives a service — or a group of services — its own
+views, without your views branching on names or ids.
+
+**Name the set on the service**, in the **Email template set** field of the service editor (or as
+`templateSet` through the Management API) — say `remote`. Then put that service's views in a folder
+of the same name beneath the email folder:
+
+```
+Views/Partials/UBookIt/Emails/
+  BookerPlaced.cshtml            ← for every service
+  BookerConfirmed.cshtml
+  remote/
+    BookerConfirmed.cshtml       ← for services whose set is "remote"
+    InternalPlaced.cshtml
+```
+
+**For each message, uBookIt looks in this order:**
+
+1. the view for that message in the service's set — `remote/BookerConfirmed.cshtml`;
+2. where the set has no view for it, the view for every service — `BookerConfirmed.cshtml`;
+3. where neither exists, uBookIt's own wording.
+
+A set does not have to supply every message. In the layout above, a `remote` booking's confirmation
+comes from the set, its placement message from the view for every service, and its cancellation in
+uBookIt's own wording. Several services can name the same set. Every message is eligible, including
+those to your own recipients, and a set's `InternalPlaced.cshtml` is given the same
+`InternalMessageModel`, with no booker contact details on it, as any other.
+
+**Set names are lower case.** The name becomes a folder name, and folder names are case-sensitive on
+Linux hosts and not on Windows — a site developed on Windows and deployed to a Linux container would
+otherwise find `Remote` working on one and silently falling back on the other. So uBookIt lowers the
+name when the service is saved: type `Remote` and the editor shows `remote` afterwards, which is the
+folder to create. A name may use only the letters `a`–`z`, the digits `0`–`9` and single hyphens
+between them, up to 64 characters. Anything else is refused when the service is saved, so no set
+name can point outside the email folder.
+
+The set is **read from the service when each message is composed**, like the instructions. Change a
+service's set, and the next message about any of its bookings is looked up in the new one. A booking
+whose service has been deleted, and a booking placed directly against a resource, use no set.
+
+**Two failures send uBookIt's own wording, never the view for every service:**
+
+- **A view in the set that fails to render.** Your view for every service may have been written for
+  a different kind of service, and in-person directions sent to an online booker are worse than
+  neutral wording. The failure is logged, naming the set's file.
+- **A service that cannot be read** while the message is composed, because uBookIt cannot then tell
+  which set applies. The message is still sent and the failure is logged with the booking id only.
+
+**If you replace uBookIt's renderer** with your own `IBookingTemplateRenderer`, it is given
+`Model.TemplateSet` and must read it itself to support sets; until it does, it ignores them.
+
 #### HTML means no plain-text alternative
 
 If you set `IsHtml = true`, the message is sent as HTML **and nothing else**. There is no
@@ -348,6 +426,7 @@ says which time zone it is quoting. What it gives you is everything needed to be
 
 A referenced assembly can supply templates too — a Razor class library with the same
 `Views/Partials/UBookIt/Emails/` folder, precompiled, works without the site copying anything.
+[Template set](#template-sets) folders inside it work the same way.
 
 **One caveat worth knowing before you rely on it:** if both a referenced assembly and your own
 site supply the same file name, the assembly's currently wins. Your own file is used wherever the
@@ -360,9 +439,16 @@ At startup uBookIt logs which messages have content supplied and which are using
 so a misspelled file name shows up when you start the site rather than when a customer does not
 get what you intended.
 
+It does the same for each [template set](#template-sets) a service names: which messages the set
+supplies, and which fall back. **A set that supplies nothing is logged as a warning** naming the
+folder its views were expected in — the usual cause is a misspelt set name, or a folder whose case
+differs from it. The report describes your services **as they stand at startup**, so a set typed into
+the editor afterwards is reported the next time the site starts. If services cannot be read at
+startup, the report says sets could not be checked, and the site starts regardless.
+
 If a template throws while rendering, uBookIt logs the failure and **sends its own wording
 instead** — the message still goes out. A broken template is never silently treated as an absent
-one.
+one — including one in a template set, which does not fall back to the view for every service.
 
 ### Replacing the whole message, delivery included
 

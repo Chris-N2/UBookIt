@@ -329,6 +329,13 @@ public class MultiClaimConcurrencyTests(SqlServerFixture fixture)
                 // uBookItBooking is referenced: the instructions are read when a message is
                 // composed, never when a claim is written.
                 "20261019195550_AddServiceBookerInstructions",
+
+                // service-email-templates: adds uBookItService.TemplateSet, one nullable
+                // nvarchar(64) with no index. Confirmed against the rule above — a single AddColumn
+                // on the service table, altering and dropping nothing. Neither uBookItResourceClaim
+                // nor uBookItBooking is referenced: the set is read when a message is composed,
+                // never when a claim is written.
+                "20261020171452_AddServiceTemplateSet",
             ],
             applied.OrderBy(name => name, StringComparer.Ordinal));
 

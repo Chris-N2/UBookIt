@@ -1,6 +1,7 @@
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using UBookIt.Core.Notifications;
+using UBookIt.Core.Stores;
 using UBookIt.Web.Emails;
 using UBookIt.Web.Rendering;
 using Umbraco.Cms.Core.Composing;
@@ -58,5 +59,12 @@ public sealed class UBookItRenderingComposer : IComposer
             sp => sp.GetRequiredService<RazorBookingTemplateRenderer>());
 
         builder.AddNotificationHandler<UmbracoApplicationStartedNotification, UBookItEmailTemplateBootCheck>();
+
+        // The template-set report, beside the check above and separate from it: it reads services,
+        // and the check above has a published shape that reading them would change. Registered as
+        // a storage-ready handler rather than for the started notification, so uBookIt calls it
+        // after applying its migrations instead of racing them. Scoped, like the renderer and the
+        // service store it uses.
+        builder.Services.AddScoped<IUBookItStorageReadyHandler, UBookItEmailTemplateSetBootCheck>();
     }
 }

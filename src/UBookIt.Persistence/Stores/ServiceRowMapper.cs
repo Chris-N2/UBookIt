@@ -13,6 +13,25 @@ namespace UBookIt.Persistence.Stores;
 internal static class ServiceRowMapper
 {
     internal static Service ToDomain(ServiceRow row)
+        => WithStoredTemplateSet(ToDomainWithoutTemplateSet(row), row.TemplateSet);
+
+    /// <summary>
+    /// Applies a stored template set through the domain rule, so a value written outside the package
+    /// reads back normalised. A value the rule rejects reads back as <b>no set</b>, deliberately
+    /// unlike the instructions above, whose <c>.Value</c> throws on a failed result: one bad row must
+    /// not stop the service loading, or stop the messages for its bookings being sent, and "no set"
+    /// is the safe reading because every message then falls back to the views for every service
+    /// (service-email-templates, design 6). <c>WithTemplateSet</c> cannot fail on a value the rule
+    /// has already accepted, nor on <c>null</c>.
+    /// </summary>
+    private static Service WithStoredTemplateSet(Service service, string? stored)
+    {
+        var normalized = Service.NormalizeTemplateSet(stored);
+
+        return service.WithTemplateSet(normalized.Succeeded ? normalized.Value : null).Value;
+    }
+
+    private static Service ToDomainWithoutTemplateSet(ServiceRow row)
         => Service.Create(
             row.Name,
             ToDuration(row),
@@ -46,6 +65,7 @@ internal static class ServiceRowMapper
     {
         row.Name = service.Name;
         row.BookerInstructions = service.BookerInstructions;
+        row.TemplateSet = service.TemplateSet;
         ApplyDuration(service.Duration, row);
     }
 
