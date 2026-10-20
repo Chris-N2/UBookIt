@@ -18,6 +18,82 @@ See [the versioning note](README.md#versions-and-the-api-promise).
 
 ---
 
+## 17.5.0
+
+### What you have to do
+
+**Nothing to make it work.** When the site starts, uBookIt adds one column to its own service table
+to hold the new instructions. The column is empty for every existing service, so nothing changes
+until somebody writes some.
+
+**After upgrading, reload any backoffice tab that was open before**, with a hard reload
+(Ctrl+Shift+R, or Cmd+Shift+R on a Mac) so the browser cannot keep the old backoffice code. Saving a
+service sends its instructions with it, and a save that sends none clears them. An editor tab still
+running the previous version's backoffice code knows nothing about the field, so saving a service
+from it after somebody has added instructions would remove them. The same applies to your own
+scripts or tools that update services through the Management API: send `bookerInstructions` with the
+service, or it is cleared.
+
+**If you supply your own email views, add the instructions to them if you want bookers to get
+them.** uBookIt passes them to your view as `Model.BookerInstructions` and does not add them to
+your content (see *For developers*).
+
+Otherwise there is no published API removed or changed, so code built against 17.4.x keeps
+working.
+
+**Going back to 17.4.x afterwards is safe.** The older version ignores the new column: it applies
+no migration, does not read the instructions, and saving a service there leaves them as they were.
+No message carries them while you are on 17.4.x, and they apply again when you come forward.
+
+### What changed
+
+**A service can carry instructions for the booker.** In the service editor's Details box there is
+a new, optional **Instructions for the booker** field: plain text, up to 2000 characters, with line
+breaks kept and spaces or blank lines at either end trimmed. Use it for anything a person who has
+booked needs in order to turn up, such as a link to join an online consultation, or directions and
+parking for an in-person one.
+
+**They are sent only once a booking is confirmed**, judged by the booking's status when the message
+is written:
+- the booker's message on placement carries them on a site that confirms bookings on the spot, and
+  not on a site that requires approval. A booking your own people record for somebody is always
+  confirmed, so its message carries them either way;
+- the confirmation message carries them;
+- a move message carries them while the booking is confirmed, and not while it still awaits
+  approval;
+- a decline or a cancellation never carries them, and neither does any message to your own
+  recipients.
+
+In uBookIt's own wording they appear under *Instructions for your booking:*, after what was booked
+and when, and before the cancellation link. They are read from the service each time a message is
+written, so a changed link reaches the booker's next message. Messages already sent are not changed.
+
+**They are not shown on the public site.** The delivery API does not publish them, and uBookIt's
+booking pages do not display them. They travel by email, so they are as private as the booker's
+inbox: the field is not a place for passwords or other secrets.
+
+### For developers
+
+- **New members.** Every existing signature is unchanged:
+  - `Service.BookerInstructions`, with `Service.WithBookerInstructions(string?)` to set it and the
+    static `Service.NormalizeBookerInstructions(string?)` holding the rule. `Service.Create` is
+    unchanged and gives a service with none;
+  - `Service.BookerInstructionsMaxLength` (2000) and `Service.BookerInstructionsField`;
+  - `FailureCodes.ServiceBookerInstructionsTooLong`, the stable code
+    `service-booker-instructions-too-long`;
+  - `BookerMessageModel.BookerInstructions`, `null` wherever the message does not carry them;
+  - a second `BookingMessageComposer` constructor, taking an `IServiceStore` as well. It is the one
+    the package registers. A composer built with the published constructor sends no instructions.
+- **The Management API** carries `bookerInstructions` on a service's request and response. The
+  response always includes it, as `null` when there are none.
+- **The delivery API is unchanged**, and a test checks its responses never contain the
+  instructions.
+- **The database** gains one nullable column, `uBookItService.BookerInstructions`, through the
+  additive migration `AddServiceBookerInstructions`.
+- No dependency changes.
+
+---
+
 ## 17.4.0 — 2026-10-16
 
 ### What you have to do
