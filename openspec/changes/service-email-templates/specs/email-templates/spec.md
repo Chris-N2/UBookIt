@@ -156,6 +156,12 @@ continue. The report for the views for every service SHALL be unaffected.
 The report describes the services **as they stand at startup**. A set typed in the editor later is
 reported at the next start, and the documentation SHALL say so.
 
+**The report SHALL be taken only once the package's own storage is up to date for that start.** On
+the first start after an upgrade that changes what is stored about services, a report taken before
+the package's own migrations would read the old schema, fail, and say that sets could not be
+checked, which is untrue and lands on exactly the start where somebody is reading the log. Where the
+package's migrations fail, the report SHALL NOT be taken.
+
 #### Scenario: A set's supplied messages are reported
 - **WHEN** a service names set `remote` and the set supplies the placement and confirmation messages
 - **THEN** the startup report names set `remote` with those two messages as supplied and the rest as not
@@ -167,6 +173,10 @@ reported at the next start, and the documentation SHALL say so.
 #### Scenario: A shared set is reported once
 - **WHEN** two services name set `remote`
 - **THEN** the startup report lists set `remote` once
+
+#### Scenario: The report is taken after the package's storage is brought up to date
+- **WHEN** a site starts with one of the package's migrations pending, and that migration adds what the report reads about services
+- **THEN** the migration is applied first, the report is then taken against the migrated storage, and it reports no failure to read services
 
 #### Scenario: Unreadable services do not fail startup
 - **WHEN** reading services fails during the startup report

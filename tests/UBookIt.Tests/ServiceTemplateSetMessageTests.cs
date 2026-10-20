@@ -33,6 +33,8 @@ public class ServiceTemplateSetMessageTests
 
     private static readonly Uri BackofficeLink = new("https://site.example/umbraco");
 
+    private static readonly Uri CancelLink = new("https://site.example/cancel?secret=abc");
+
     /// <summary>Supplies content for every message, and records what it was asked for.</summary>
     private sealed class SupplyingRenderer : IBookingTemplateRenderer
     {
@@ -252,7 +254,16 @@ public class ServiceTemplateSetMessageTests
         var composer = Composer(new ThrowingServiceStore(), renderer, factory.CreateLogger<BookingMessageComposer>());
         var booking = Booking(status, Consultation("remote"));
 
-        var message = await ComposeAsync(composer, audience, booking);
+        // The booker's message is given a cancellation link, because "everything else the package's
+        // own message carries" includes it and the site's message has no such member to lose.
+        var message = audience == "booker"
+            ? await composer.ForBookerAsync(booking, BookingEvent.Placed, null, CancelLink, CancellationToken.None)
+            : await ComposeAsync(composer, audience, booking);
+
+        if (audience == "booker")
+        {
+            Assert.Contains(CancelLink.AbsoluteUri, message.Body, StringComparison.Ordinal);
+        }
 
         // The package's own message, whole: its subject, the reference, what and when.
         Assert.Empty(renderer.Models);

@@ -163,6 +163,64 @@ public class StorageReadyHandlerTests(SqlServerFixture fixture)
         }
     }
 
+    /// <summary>
+    /// A migration that FAILS: the column the pending migration adds is already there, so its
+    /// <c>AddColumn</c> is refused by SQL Server. The runner rethrows, as it always has, and no
+    /// handler is called — the storage is not ready, so nothing may read it as though it were.
+    /// </summary>
+    [Fact]
+    public async Task No_handler_is_called_when_the_migration_fails()
+    {
+        fixture.EnsureAvailable();
+
+        const string previous = "20261019195550_AddServiceBookerInstructions";
+
+        await using var probe = fixture.CreateContext();
+        var database = $"uBookItReadyFail_{Guid.NewGuid():N}";
+        var baseConnection = probe.Database.GetConnectionString()!;
+        var master = new SqlConnectionStringBuilder(baseConnection) { InitialCatalog = "master" }.ConnectionString;
+        var builder = new SqlConnectionStringBuilder(baseConnection) { InitialCatalog = database };
+
+        await ExecuteAsync(master, $"CREATE DATABASE [{database}]");
+
+        try
+        {
+            var optionsBuilder = new DbContextOptionsBuilder<UBookItDbContext>();
+            UBookItDbContext.ConfigureSqlServer(optionsBuilder, builder.ConnectionString);
+            var options = optionsBuilder.Options;
+
+            await using (var old = new UBookItDbContext(options))
+            {
+                await old.GetService<IMigrator>().MigrateAsync(previous, Ct);
+            }
+
+            await ExecuteAsync(builder.ConnectionString, "ALTER TABLE uBookItService ADD TemplateSet int NULL");
+
+            await using var context = new UBookItDbContext(options);
+            var events = new List<string>();
+            var logger = new CapturingLogger();
+
+            await Assert.ThrowsAnyAsync<Exception>(() => new RunUBookItMigrations(
+                    context,
+                    new RunningRuntimeState(),
+                    new ConfigurationBuilder().Build(),
+                    new SqlSettingsStore(context, TimeProvider.System),
+                    logger,
+                    [new ReadingHandler(context, events, "only"), new ThrowingHandler(events)])
+                .HandleAsync(new UmbracoApplicationStartedNotification(false), Ct));
+
+            Assert.Empty(events);
+            Assert.Contains(logger.Entries, e => e.Level == LogLevel.Error && e.Message.Contains("migration failed", StringComparison.Ordinal));
+        }
+        finally
+        {
+            SqlConnection.ClearAllPools();
+            await ExecuteAsync(
+                master,
+                $"ALTER DATABASE [{database}] SET SINGLE_USER WITH ROLLBACK IMMEDIATE; DROP DATABASE [{database}]");
+        }
+    }
+
     private static async Task ExecuteAsync(string connectionString, string sql)
     {
         await using var connection = new SqlConnection(connectionString);

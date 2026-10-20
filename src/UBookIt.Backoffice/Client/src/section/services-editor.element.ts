@@ -29,6 +29,7 @@ import {
   TEMPLATE_SET_ERROR_ID,
   TEMPLATE_SET_HINT_ID,
   TEMPLATE_SET_ID,
+  templateSetAfterSave,
   templateSetDescribedBy,
   templateSetErrors,
   templateSetForRequest,
@@ -561,9 +562,7 @@ export class UBookItServiceEditorElement extends UmbLitElement {
       // The service is saved, so the field shows the name as STORED from here on — `Remote` as
       // `remote`, the folder that will actually be used. That matters most where the editor stays
       // open below, because the responsibility panel failed with the service already saved.
-      if (result.data) {
-        this._templateSet = templateSetFromResponse(result.data.templateSet);
-      }
+      this._templateSet = templateSetAfterSave(this._templateSet, result.data);
 
       // The responsibility panel saves through its own endpoint, and only once the
       // service save has succeeded — on create, the id exists only now. A failed

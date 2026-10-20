@@ -3,6 +3,7 @@ import {
   TEMPLATE_SET_ERROR_ID,
   TEMPLATE_SET_HINT_ID,
   TEMPLATE_SET_INVALID,
+  templateSetAfterSave,
   templateSetDescribedBy,
   templateSetErrors,
   templateSetForRequest,
@@ -41,13 +42,18 @@ describe("loading and saving the template set", () => {
   });
 
   it("shows what the server stored after a save, so Remote is seen as remote", () => {
-    // The editor sends what was typed and then shows the response's value: the stored name,
-    // which is the folder the editor must create.
-    const typed = "Remote";
-    const sent = templateSetForRequest(typed);
-    const stored = { templateSet: sent!.trim().toLowerCase() };
+    // The stored value comes from the server's answer, never from the field: a function that kept
+    // the typed value would leave "Remote" on screen and fail here.
+    expect(templateSetAfterSave("Remote", { templateSet: "remote" })).toBe("remote");
+  });
 
-    expect(templateSetFromResponse(stored.templateSet)).toBe("remote");
+  it("shows no set after a save that removed it", () => {
+    expect(templateSetAfterSave("   ", { templateSet: null })).toBe("");
+    expect(templateSetAfterSave("   ", {})).toBe("");
+  });
+
+  it("keeps exactly what was typed when the save answered with no service", () => {
+    expect(templateSetAfterSave("../x", undefined)).toBe("../x");
   });
 
   it.each(["", "   ", "\t"])("sends a blank field as null, removing the set", (value) => {
@@ -91,6 +97,7 @@ describe("the field's wording", () => {
     const hint = en.ubookitServices.templateSetHint;
     expect(hint).toContain("Views/Partials/UBookIt/Emails/");
     expect(hint).toContain("lower case");
-    expect(hint).toContain("letters, numbers and hyphens");
+    // a–z named, because accented letters are refused and "letters" alone would not say so.
+    expect(hint).toContain("letters a–z, numbers and hyphens");
   });
 });

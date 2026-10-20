@@ -19,13 +19,18 @@ namespace UBookIt.Core.Stores;
 /// assembly without one referencing another.
 /// </para>
 /// <para>
+/// <b>Internal, not an extension point</b> (QA round 1, Chris's decision): uBookIt's own assemblies
+/// use it, through <c>InternalsVisibleTo</c>, and nothing promises a site anything about it.
+/// Making it public later would be additive; making a public one internal would be a break.
+/// </para>
+/// <para>
 /// <b>A handler cannot stop a site starting.</b> A failure other than cancellation is logged and
 /// the next handler runs. Handlers are not called when the migrations themselves fail, because
-/// then the storage is not ready. Register an implementation with the service collection; each is
-/// resolved in the same scope as the migrations.
+/// then the storage is not ready. Each is registered with the service collection and resolved in
+/// the same scope as the migrations.
 /// </para>
 /// </remarks>
-public interface IUBookItStorageReadyHandler
+internal interface IUBookItStorageReadyHandler
 {
     /// <summary>Does the work, now that uBookIt's storage is up to date.</summary>
     Task OnStorageReadyAsync(CancellationToken cancellationToken);
