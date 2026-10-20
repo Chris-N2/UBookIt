@@ -92,14 +92,18 @@
   entry bundle is cache-busted. Not taken: a cross-line note in `18.4.0` for a 17.5.0 site
   moving to Umbraco 18 on 18.3.x — earlier v18 entries do not cross-reference the 17 line.
   Unverified by anyone: the downgrade by measurement (reasoned from the tag code only).
-- [ ] 3.2 Chris pushes this branch and opens the PR. Verify: the PR's CI is green, parity included.
-- [ ] 3.3 Chris merges with "Create a merge commit". Verify: `origin/dev/v18` is the merge commit, and
+- [x] 3.2 Chris pushes this branch and opens the PR. Verify: the PR's CI is green, parity included.
+  *Done (2026-10-20):* PR #47, CI green (Chris).
+- [x] 3.3 Chris merges with "Create a merge commit". Verify: `origin/dev/v18` is the merge commit, and
   its push run is green.
+  *Done:* `origin/dev/v18` is `3c48056`, parents `2478474` and `b17ea14`.
 
 ## 4. Release through the workflow
 
-- [ ] 4.1 Chris pushes tag `18.4.0` on the merge commit. Verify: `check` and `pack` are green.
-- [ ] 4.2 **Before approving**, check the run's `packages` artifact, parsing each nuspec as XML:
+- [x] 4.1 Chris pushes tag `18.4.0` on the merge commit. Verify: `check` and `pack` are green.
+  *Done:* `18.4.0` resolves to `3c48056`; the run reached the approval, so `check` and `pack`
+  were green.
+- [x] 4.2 **Before approving**, check the run's `packages` artifact, parsing each nuspec as XML:
   - the tagged `booking-flow.png` returns 200;
   - there are exactly 5 `.nupkg` and 4 `.snupkg`, all `18.4.0`, each `.snupkg` holding its `.pdb`;
   - all five nuspecs carry the authors, copyright, licence, readme, icon, project URL and the
@@ -120,14 +124,35 @@
     repository address is pinned to `18.4.0`.
 
   Show the check script can fail (against the `18.3.0` artifact with this release's expectations).
-- [ ] 4.3 Chris approves. Record the summary table and the conclusion.
-- [ ] 4.4 Confirm `18.4.0` per package on the flat container, and that the package page renders.
+  *Done:* the same script as `release-17-5-0`'s 4.2. Against the run's artifact, with merge commit
+  `3c48056…` and `[18.2.1, 19.0.0)` confirmed against `Directory.Packages.props` at the tag:
+  **91 of 91 PASS, exit 0**. The 5 dependency comparisons were against the published `18.3.0`
+  packages downloaded from the flat container; all 19 README addresses returned 200. The
+  negative control was run on `main` (published `17.4.0` packages with `17.5.0` expectations:
+  26 FAIL, exit 1, the migration and label checks among them); the checks are line-independent
+  apart from the version, commit and range, which are arguments.
+- [x] 4.3 Chris approves. Record the summary table and the conclusion.
+  *Done (2026-10-20):* approved after 4.2; the publish run completed (Chris). The packages'
+  required signer stays "Any": no owner has a certificate registered, so unsigned submissions
+  are accepted, as before.
+- [x] 4.4 Confirm `18.4.0` per package on the flat container, and that the package page renders.
+  *Done:* `18.4.0` is in the flat container index of all five ids; `nuget.org/packages/UBookIt/18.4.0`
+  returns 200.
 
 ## 5. Close out
 
-- [ ] 5.1 Stamp the entry's date.
-- [ ] 5.2 Sibling sweep for `18.3.0` and for sentences the release falsifies. Fix or record each.
-- [ ] 5.3 Update the deferred-obligations memory: the `service-booker-instructions` release-notes
+- [x] 5.1 Stamp the entry's date.
+  *Done:* `## 18.4.0 — 2026-10-20`.
+- [x] 5.2 Sibling sweep for `18.3.0` and for sentences the release falsifies. Fix or record each.
+  *Done:* outside `CHANGELOG.md` and `openspec`, `18.3.0` appears once, in a
+  `Directory.Packages.props` comment about **Umbraco** `18.3.0` (the MessagePack exit
+  condition), which is not a uBookIt version and stays. A sweep of `docs`, README and `src` for
+  `18.3` finds nothing else.
+- [x] 5.3 Update the deferred-obligations memory: the `service-booker-instructions` release-notes
   obligation (a save without the field clears it) is paid by the entry.
-- [ ] 5.4 Commit and run the unit suite. Chris pushes. Verify: `dev/v18`'s CI is green.
-- [ ] 5.5 Archive last, running the unit suite before the push.
+  *Done:* recorded paid (the obligation lived in the feature's handover memory, and is marked
+  there too).
+- [x] 5.4 Commit and run the unit suite. Chris pushes. Verify: `dev/v18`'s CI is green.
+  *Done:* committed; unit **2257**, 0 skipped. Chris pushes; `dev/v18`'s CI is his to confirm.
+- [x] 5.5 Archive last, running the unit suite before the push.
+  *Done (2026-10-20):* archived after the records above; unit suite and `openspec validate --all --strict` run after the archive commit.
