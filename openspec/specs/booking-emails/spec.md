@@ -591,9 +591,14 @@ to join a meeting, to a person it has not accepted.
 when the booking was placed. Instructions exist to be acted on, so the current text is the useful
 one. A booking whose service no longer exists, or has no instructions, SHALL carry none. This is
 unlike the service's **name** in the same message, which remains the name recorded at placement.
-A failure to read the service SHALL cost the instructions and nothing else: the message SHALL
-still be sent with everything else it is due, and the failure SHALL be logged without any booker
-detail.
+
+**A failure to read the service SHALL cost the instructions, and SHALL NOT cost the message.** The
+message SHALL still be sent, carrying everything else the package's own message for that event
+carries, and the failure SHALL be logged without any booker detail. Where the site supplies its own
+content, the same failure also means the package's own content is used for that message instead
+of the site's: the service's email template set cannot be established without the read, and the
+`email-templates` capability decides that case. That is the one further thing a failed read
+costs.
 
 **A message to the site's own recipients SHALL NOT carry the instructions.** They are written for
 the booker.
@@ -644,8 +649,12 @@ to the view (see the `email-templates` capability) on exactly the terms above.
 - **THEN** it carries no instructions
 
 #### Scenario: The service cannot be read
-- **WHEN** reading the service fails while a confirmed booking's message is being composed
-- **THEN** the message is sent without the instructions, carrying everything else it is due, and the failure is logged without any booker detail
+- **WHEN** reading the service fails while a confirmed booking's message is being composed, on a site that supplies no content
+- **THEN** the message is sent without the instructions, carrying everything else the package's own message for that event carries, and the failure is logged without any booker detail
+
+#### Scenario: The service cannot be read on a site that supplies content
+- **WHEN** reading the service fails while a confirmed booking's message is being composed, and the site supplies a view for that message
+- **THEN** the message is sent carrying the package's own content without the instructions, rather than the site's content, and the failure is logged once without any booker detail
 
 #### Scenario: The instructions sit between the booking and the cancellation link
 - **WHEN** the package's own wording is composed for a confirmed booking that carries instructions and a cancellation link
