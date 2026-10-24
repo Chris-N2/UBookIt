@@ -120,13 +120,13 @@ public static class DocsMarkdown
 
         return slug.ToString();
 
-        // GitHub's filter removes [^\p{Word}\- ], and Onigmo's \p{Word} is letters, every mark,
-        // DECIMAL digits and connector punctuation. So a superscript or a Roman numeral (other or
-        // letter numbers) is removed. Keeping a character GitHub removes is the dangerous direction:
-        // the guard would pass a fragment GitHub does not resolve.
+        // Observed on GitHub (DocsMarkdownTests): letter numbers such as Ⅳ are KEPT, because
+        // GitHub's letters are Unicode Alphabetic, which includes them; other numbers such as ² are
+        // REMOVED. Both directions are dangerous when wrong: keeping what GitHub removes, or removing
+        // what it keeps, each lets the guard pass a fragment GitHub does not resolve.
         static bool IsKept(UnicodeCategory category) => category is
             UnicodeCategory.NonSpacingMark or UnicodeCategory.SpacingCombiningMark or UnicodeCategory.EnclosingMark
-            or UnicodeCategory.DecimalDigitNumber
+            or UnicodeCategory.DecimalDigitNumber or UnicodeCategory.LetterNumber
             or UnicodeCategory.ConnectorPunctuation;
     }
 

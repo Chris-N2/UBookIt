@@ -225,7 +225,7 @@ of your own people just recorded it on the screen that already lists it. See
 ## Permissions
 
 The settings screen and its endpoints require the **`UBookIt.Settings`** verb, granted in
-**Users → User Groups → Default permissions** as *"Change site settings"*.
+**Users → User Groups → *(a group)***, in the box headed **uBookIt**, as *"Change site settings"*.
 
 > **It is not granted automatically, including on upgrade.** A group holding `UBookIt.Configure`
 > does not get it: configuring a bookable resource and configuring the site are different

@@ -6,9 +6,10 @@ configured, and where the bookings it has taken are read.
 
 ## Who can use it
 
-Access has two steps, both in **Users → User Groups → *(a group)***: tick **uBookIt
-Section** under *Sections*, then tick what the group may do under *Default permissions* —
-**tick the section, then tick what they may do**. The section grant is the outer gate: it
+Access has two steps, both in **Users → User Groups → *(a group)***: add **uBookIt** under
+*Sections* (with **Choose**), then switch on what the group may do in the box headed
+**uBookIt** further down the page — **add the section, then switch on what they may do**.
+The section grant is the outer gate: it
 decides whether the section appears and whether uBookIt's management API may be called at
 all. The permissions decide what within it:
 

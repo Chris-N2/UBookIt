@@ -217,8 +217,34 @@ public static class RetiredClaims
     ];
 
     /// <summary>
+    /// Instructions that were never true of the Umbraco 17 backoffice, found by following Getting
+    /// started on a new Umbraco 17.7.1 site (docs-single-source, task 6.3). The user group editor's
+    /// Sections field is a picker listing "uBookIt", not a tickbox labelled "uBookIt Section", and the
+    /// package's permissions are switches in a box headed "uBookIt", not under "Default permissions".
+    /// </summary>
+    private static readonly RetiredClaim[] WrongAboutTheUserGroupEditor =
+    [
+        new(
+            "tick uBookIt Section",
+            """
+            Access has two steps, both in **Users → User Groups → *(a group)***: tick **uBookIt
+            Section** under *Sections*, then tick what the group may do under *Default permissions* —
+            """,
+            "docs/backoffice.md @ 1754ebf",
+            "docs-single-source"),
+        new(
+            "under Default permissions",
+            """
+            Access has two steps, both in **Users → User Groups → *(a group)***: tick **uBookIt
+            Section** under *Sections*, then tick what the group may do under *Default permissions* —
+            """,
+            "docs/backoffice.md @ 1754ebf",
+            "docs-single-source"),
+    ];
+
+    /// <summary>
     /// Every retired claim. The sweep holds all of these out of every shipped document.
     /// </summary>
     public static IReadOnlyList<RetiredClaim> All { get; } =
-        [.. BeforeThisRelease, .. FalsifiedBy171];
+        [.. BeforeThisRelease, .. FalsifiedBy171, .. WrongAboutTheUserGroupEditor];
 }

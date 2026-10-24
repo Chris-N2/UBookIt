@@ -52,7 +52,9 @@ public class PermissionsDocumentationTests
     [Fact]
     public void The_new_group_shell_behaviour_is_stated()
     {
-        DocumentationAssert.Says(Backoffice(), "tick the section, then tick what they may do");
+        // Worded for Umbraco 17's user group editor, as walked on 2026-10-24: Sections is a picker
+        // ("uBookIt"), and the permissions are switches in a box headed "uBookIt".
+        DocumentationAssert.Says(Backoffice(), "add the section, then switch on what they may do");
         DocumentationAssert.Says(
             Backoffice(),
             "A group with the section and no uBookIt permissions sees the section shell and nothing in it");
