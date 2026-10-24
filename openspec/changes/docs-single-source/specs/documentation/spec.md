@@ -116,9 +116,15 @@ documentation never sees it. The README may state it as well.
 **There are exactly two exceptions, and each is a requirement that names a different home for its
 statement:**
 
-- **The publishing documentation.** A requirement obliging *the publishing documentation* to state
-  something is about how the maintainer releases the package. It is satisfied by `docs/publishing.md`,
-  which is deliberately unlisted because a site using uBookIt has no use for it.
+- **How the maintainer builds and publishes the package.** A statement about how the package is
+  built, packed, verified, tagged or pushed to a feed is satisfied by `docs/publishing.md`, which is
+  deliberately unlisted because a site using uBookIt has no use for it. The exception is decided by
+  the statement's **subject**, not by the requirement's wording: it covers a requirement that says
+  "the publishing documentation" and one that says only "the documentation" alike, such as the
+  order in which a package's declared URLs, its repository remote and its build must be corrected.
+  It does **not** cover anything a site owner needs in order to install, upgrade or choose a
+  version: which version to install, what a version number means, what an upgrade changes, and
+  what the package requires are never publishing statements, whoever else needs them too.
 - **The per-release callouts.** A requirement obliging the package to name a release's contract
   changes per release is satisfied by `CHANGELOG.md`, which a consumer reaches from the package
   page. A published page may point readers to it, but it is not a documentation page and the
@@ -130,7 +136,15 @@ carries it.
 
 #### Scenario: The two exceptions are the only ones
 - **WHEN** a requirement obliges the documentation to state something
-- **THEN** the statement is on a listed page, unless the requirement names the publishing documentation or the per-release changelog as its home, in which case it is in `docs/publishing.md` or `CHANGELOG.md` respectively
+- **THEN** the statement is on a listed page, unless its subject is how the maintainer builds and publishes the package, in which case it is in `docs/publishing.md`, or the requirement names the per-release changelog as its home, in which case it is in `CHANGELOG.md`
+
+#### Scenario: A publishing statement is exempt by subject, whatever its requirement calls it
+- **WHEN** a requirement says "the documentation SHALL state" the order in which a package's declared URLs, its remote and its build are corrected
+- **THEN** that statement is satisfied by `docs/publishing.md`, because its subject is how the package is built and published
+
+#### Scenario: What a site owner needs is never a publishing statement
+- **WHEN** a statement concerns which version to install, what a version number means, what an upgrade changes, or what the package requires
+- **THEN** it is on a listed page, even where `docs/publishing.md` also states it
 
 #### Scenario: A statement the README carries is published too
 - **WHEN** a requirement's statement about installing or versioning is in the README, such as the database the package requires or what its version numbers mean

@@ -80,9 +80,9 @@ public class DocsMarkdownTests
     [Fact]
     public void A_code_span_that_wraps_neither_swallows_a_link_nor_exposes_one()
     {
-        // Read line by line, the backticks on lines 1 and 2 pair with the wrong partners: line 1's
-        // span runs to its end and hides the real link, and line 2's opening backtick is taken for
-        // a closing one, exposing the link-shaped text inside the span.
+        // Read line by line, each line holds one unpaired backtick, so neither line's span is
+        // removed: line 2's link-shaped text inside the wrapped span is read as a link to
+        // not-a-link.md. Read as a paragraph, the two backticks pair and the span is removed.
         const string page = "A span `that wraps\nacross [lines](not-a-link.md)` and then [a link](real.md).\n\nNext paragraph [here](next.md).\n";
 
         Assert.Equal(
@@ -95,16 +95,21 @@ public class DocsMarkdownTests
     {
         Assert.Single(DocsMarkdown.UnsupportedSyntax("See <a href=\"mvp.md\">v1</a>.\n"));
         Assert.Single(DocsMarkdown.UnsupportedSyntax("<img src=\"images/x.png\" alt=\"x\">\n"));
+        Assert.Single(DocsMarkdown.UnsupportedSyntax("See the old plan <a\nhref=\"mvp.md\">here</a>.\n"));
+        Assert.Empty(DocsMarkdown.UnsupportedSyntax("An <abbr title=\"x\">abbr</abbr> and an <aside> are not links.\n"));
         Assert.Empty(DocsMarkdown.UnsupportedSyntax("Write `<a href=\"…\">` in your view.\n"));
         Assert.Empty(DocsMarkdown.UnsupportedSyntax("```html\n<a href=\"x\">x</a>\n```\n"));
     }
 
-    // NOT observed on GitHub, unlike the theory above: these follow GitHub's stated rule (every
-    // \p{M}, \p{N} and \p{Pc} is kept), and no current heading uses them.
+    // NOT observed on GitHub, unlike the theory above. These follow GitHub's filter as written,
+    // [^\p{Word}\- ] under Onigmo, where \p{Word} is letters, marks, decimal digits and connector
+    // punctuation. No current heading uses them; the next one that does is checked by hand.
     [Theory]
-    [InlineData("Step 2 — the 3rd ²", "step-2--the-3rd-²")]
+    [InlineData("Step 2 — the 3rd ²", "step-2--the-3rd-")]
+    [InlineData("Part Ⅳ", "part-")]
     [InlineData("snake_case and ‿", "snake_case-and-‿")]
-    public void Every_number_mark_and_connector_is_kept(string heading, string expected)
+    [InlineData("Café crème", "café-crème")]
+    public void Only_word_characters_hyphens_and_spaces_survive(string heading, string expected)
         => Assert.Equal(expected, DocsMarkdown.Slug(heading));
 
     [Fact]
