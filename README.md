@@ -9,8 +9,11 @@ on a page of your own site, in your own layout. Every step works with JavaScript
 ## Get started
 
 ```
-dotnet add package UBookIt
+dotnet add package UBookIt --version "17.*"
 ```
+
+The version keeps uBookIt on the line for your Umbraco major. Without it the newest uBookIt is
+chosen, which is for a later Umbraco, and the restore fails.
 
 Run the site, and uBookIt installs its schema on first boot. It needs **SQL Server** (not SQLite)
 and Umbraco 18.2.1 or later. The full requirements are further down, and
