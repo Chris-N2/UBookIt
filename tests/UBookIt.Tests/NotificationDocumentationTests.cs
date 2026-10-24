@@ -34,6 +34,10 @@ public class NotificationDocumentationTests
 {
     private static string Docs() => RepoFiles.Read("docs/notifications.md");
 
+    /// <summary>The email authoring content, moved here from <c>notifications.md</c> by
+    /// <c>docs-single-source</c>. The guards below follow the content, not the file name.</summary>
+    private static string EmailTemplates() => RepoFiles.Read("docs/email-templates.md");
+
     [Fact]
     public void The_documented_notification_types_are_the_ones_the_package_raises()
     {
@@ -266,7 +270,7 @@ public class NotificationDocumentationTests
     [Fact]
     public void An_author_can_supply_content_from_the_documentation_alone()
     {
-        var docs = Docs();
+        var docs = EmailTemplates();
 
         // The path, and every message name — asserted against the enum, so a name added or
         // renamed in code fails here rather than leaving the documentation quietly incomplete.
@@ -292,7 +296,7 @@ public class NotificationDocumentationTests
     [Fact]
     public void The_single_body_limit_is_stated_with_its_reason()
     {
-        var docs = Docs();
+        var docs = EmailTemplates();
 
         // Wrap-safe through DocumentationAssert, so the fragment is written on one line here
         // regardless of how the sentence wraps in the document.
@@ -304,7 +308,7 @@ public class NotificationDocumentationTests
     [Fact]
     public void What_becomes_the_authors_and_what_does_not_is_stated()
     {
-        var docs = Docs();
+        var docs = EmailTemplates();
 
         DocumentationAssert.Says(docs, "The words become yours, including whether they are accurate");
 
@@ -328,7 +332,7 @@ public class NotificationDocumentationTests
     /// </remarks>
     [Fact]
     public void The_documented_example_does_not_claim_to_be_what_the_package_sends()
-        => DocumentationAssert.Says(Docs(), "This example is not what uBookIt sends");
+        => DocumentationAssert.Says(EmailTemplates(), "This example is not what uBookIt sends");
 
     /// <summary>
     /// No document tells an author that content they supply is still subject to the package's
@@ -446,6 +450,14 @@ public class NotificationDocumentationTests
         Assert.Contains("docs/backoffice.md", swept);
         Assert.Contains("docs/mvp.md", swept);
         Assert.True(swept.Count >= 5, $"Only {swept.Count} markdown files found; the sweep is not reading the repository.");
+
+        // And every page the documentation manifest publishes, plus the pages it deliberately does
+        // not: a published page outside the sweep would be the one place a retired claim could
+        // come back unseen, and docs-single-source added two.
+        foreach (var file in DocumentationManifestTests.Listed().Select(p => p.File).Concat(DocumentationManifestTests.Unlisted.Keys))
+        {
+            Assert.Contains($"docs/{file}", swept);
+        }
     }
 
     /// <summary>

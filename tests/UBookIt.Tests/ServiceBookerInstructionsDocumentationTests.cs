@@ -20,6 +20,10 @@ public class ServiceBookerInstructionsDocumentationTests
 {
     private static string Notifications() => RepoFiles.Read("docs/notifications.md");
 
+    /// <summary>The email authoring content, moved here from <c>notifications.md</c> by
+    /// <c>docs-single-source</c>. The guards below follow the content, not the file name.</summary>
+    private static string EmailTemplates() => RepoFiles.Read("docs/email-templates.md");
+
     private static string Backoffice() => RepoFiles.Read("docs/backoffice.md");
 
     [Fact]
@@ -36,9 +40,9 @@ public class ServiceBookerInstructionsDocumentationTests
     }
 
     [Fact]
-    public void The_notifications_page_tells_a_template_author_about_the_member()
+    public void The_email_templates_page_tells_a_template_author_about_the_member()
     {
-        var docs = Notifications();
+        var docs = EmailTemplates();
 
         Assert.Contains($"Model.{nameof(BookerMessageModel.BookerInstructions)}", docs, StringComparison.Ordinal);
         DocumentationAssert.Says(docs, "`null` means this message does not carry instructions");
