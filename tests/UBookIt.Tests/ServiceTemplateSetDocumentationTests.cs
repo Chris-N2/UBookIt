@@ -18,14 +18,16 @@ namespace UBookIt.Tests;
 /// </remarks>
 public class ServiceTemplateSetDocumentationTests
 {
-    private static string Notifications() => RepoFiles.Read("docs/notifications.md");
+    /// <summary>The email authoring content, moved here from <c>notifications.md</c> by
+    /// <c>docs-single-source</c>. The guards below follow the content, not the file name.</summary>
+    private static string EmailTemplates() => RepoFiles.Read("docs/email-templates.md");
 
     private static string Backoffice() => RepoFiles.Read("docs/backoffice.md");
 
     [Fact]
-    public void The_notifications_page_states_the_order_and_the_failure_rules()
+    public void The_email_templates_page_states_the_order_and_the_failure_rules()
     {
-        var docs = Notifications();
+        var docs = EmailTemplates();
 
         Assert.Contains(RazorBookingTemplateRenderer.TemplateFolder.TrimStart('~', '/'), docs, StringComparison.Ordinal);
         DocumentationAssert.Says(docs, "For each message, uBookIt looks in this order:");
@@ -38,9 +40,9 @@ public class ServiceTemplateSetDocumentationTests
     }
 
     [Fact]
-    public void The_notifications_page_states_the_name_rule_against_the_real_limit()
+    public void The_email_templates_page_states_the_name_rule_against_the_real_limit()
     {
-        var docs = Notifications();
+        var docs = EmailTemplates();
 
         DocumentationAssert.Says(docs, "Set names are lower case.");
         DocumentationAssert.Says(docs, $"up to {Service.TemplateSetMaxLength} characters");
@@ -48,9 +50,9 @@ public class ServiceTemplateSetDocumentationTests
     }
 
     [Fact]
-    public void The_notifications_page_recommends_the_set_over_the_id_for_branching()
+    public void The_email_templates_page_recommends_the_set_over_the_id_for_branching()
     {
-        var docs = Notifications();
+        var docs = EmailTemplates();
 
         Assert.Contains($"Model.{nameof(BookingMessageModel.TemplateSet)}", docs, StringComparison.Ordinal);
         Assert.Contains($"Model.{nameof(BookingMessageModel.ServiceId)}", docs, StringComparison.Ordinal);
@@ -59,9 +61,9 @@ public class ServiceTemplateSetDocumentationTests
     }
 
     [Fact]
-    public void The_notifications_page_describes_the_startup_report_and_when_it_is_taken()
+    public void The_email_templates_page_describes_the_startup_report_and_when_it_is_taken()
     {
-        var docs = Notifications();
+        var docs = EmailTemplates();
 
         DocumentationAssert.Says(docs, "A set that supplies nothing is logged as a warning");
         DocumentationAssert.Says(docs, "as they stand at startup");
@@ -69,10 +71,10 @@ public class ServiceTemplateSetDocumentationTests
     }
 
     [Fact]
-    public void The_notifications_page_tells_a_custom_renderer_to_read_the_set()
+    public void The_email_templates_page_tells_a_custom_renderer_to_read_the_set()
     {
-        DocumentationAssert.Says(Notifications(), $"must read it itself to support sets");
-        Assert.Contains(nameof(IBookingTemplateRenderer), Notifications(), StringComparison.Ordinal);
+        DocumentationAssert.Says(EmailTemplates(), $"must read it itself to support sets");
+        Assert.Contains(nameof(IBookingTemplateRenderer), EmailTemplates(), StringComparison.Ordinal);
     }
 
     [Fact]

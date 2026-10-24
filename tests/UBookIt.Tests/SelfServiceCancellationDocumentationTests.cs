@@ -21,7 +21,9 @@ public class SelfServiceCancellationDocumentationTests
 {
     private static string Configuration() => RepoFiles.Read("docs/configuration.md");
 
-    private static string Notifications() => RepoFiles.Read("docs/notifications.md");
+    /// <summary>The email authoring content, moved here from <c>notifications.md</c> by
+    /// <c>docs-single-source</c>. The guards below follow the content, not the file name.</summary>
+    private static string EmailTemplates() => RepoFiles.Read("docs/email-templates.md");
 
     [Fact]
     public void The_setting_is_documented_with_its_key_and_its_tier()
@@ -103,7 +105,7 @@ public class SelfServiceCancellationDocumentationTests
         // `email-templates` makes the booker model public API. A site supplying its own view needs
         // the member's name, what its absence means, and what happens if they omit it — the last
         // being the narrowing this package applies to everything a supplied view says.
-        var docs = Notifications();
+        var docs = EmailTemplates();
 
         Assert.Contains("CancellationUrl", docs, StringComparison.Ordinal);
         DocumentationAssert.Says(docs, "there is no self-service cancellation for this booking");
