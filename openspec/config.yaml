@@ -30,5 +30,6 @@ rules:
   proposal:
     - Always include a "Non-goals" section
     - Any breaking change to public API surface or destructive schema change must be called out explicitly
+    - Name the documentation pages this change updates (docs/*.md); if it changes setup, include docs/getting-started.md; if it adds a page, add it to docs/docs.json
   specs:
     - New third-party dependencies must be named explicitly with their license
