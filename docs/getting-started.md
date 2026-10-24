@@ -23,8 +23,13 @@ one version.
 ## 2. Install the package
 
 ```
-dotnet add package UBookIt
+dotnet add package UBookIt --version "17.*"
 ```
+
+**The version is not optional.** uBookIt's major follows Umbraco's, so without it your package
+manager picks the newest uBookIt, which is for a later Umbraco, and the restore fails with a
+version conflict. `17.*` takes the newest uBookIt for Umbraco 17; give an exact version instead if
+you prefer to choose when to move.
 
 Start the site. uBookIt installs its schema, its **Booking Page** document type and that page's
 template on the first start. Nothing is sent to anybody and nothing is published until you do the

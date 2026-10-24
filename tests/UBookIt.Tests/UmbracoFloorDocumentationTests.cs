@@ -65,6 +65,37 @@ public class UmbracoFloorDocumentationTests
             $"{page} states Umbraco {string.Join(", ", wrong)}, but Directory.Packages.props declares {declared} as the floor.");
     }
 
+    /// <summary>
+    /// The install command names the line for the declared Umbraco major, on every page that
+    /// gives it.
+    /// </summary>
+    /// <remarks>
+    /// Found by following Getting started on a new Umbraco 17.7.1 site: a bare
+    /// <c>dotnet add package UBookIt</c> chose UBookIt 18.5.0, the newest, and the restore failed
+    /// with NU1107. Every page that gave the command had given that one since 18.0.0 was
+    /// published. The major comes from the declared floor, so the 18 line's pages are checked for
+    /// <c>18.*</c> by the same test.
+    /// </remarks>
+    [Theory]
+    [InlineData("README.md")]
+    [InlineData("docs/getting-started.md")]
+    public void The_install_command_names_the_line_for_the_umbraco_major(string page)
+    {
+        var major = DeclaredFloor().Split('.')[0];
+        var commands = Regex.Matches(RepoFiles.Read(page), @"dotnet add package UBookIt\b[^\r\n]*")
+            .Select(m => m.Value)
+            .ToList();
+
+        Assert.NotEmpty(commands);
+
+        foreach (var command in commands)
+        {
+            Assert.True(
+                command.Contains($"--version \"{major}.*\"", StringComparison.Ordinal),
+                $"{page} gives '{command}', which does not keep uBookIt on the {major}.x line: without it the newest uBookIt is chosen, and on an Umbraco {major} site that restore fails.");
+        }
+    }
+
     [Fact]
     public void A_stale_floor_is_found_in_every_phrasing()
         => Assert.Equal(
