@@ -225,7 +225,7 @@ public static class RetiredClaims
     private static readonly RetiredClaim[] WrongAboutTheUserGroupEditor =
     [
         new(
-            "tick uBookIt Section",
+            "uBookIt Section",
             """
             Access has two steps, both in **Users → User Groups → *(a group)***: tick **uBookIt
             Section** under *Sections*, then tick what the group may do under *Default permissions* —
@@ -233,7 +233,7 @@ public static class RetiredClaims
             "docs/backoffice.md @ 1754ebf",
             "docs-single-source"),
         new(
-            "under Default permissions",
+            "Default permissions",
             """
             Access has two steps, both in **Users → User Groups → *(a group)***: tick **uBookIt
             Section** under *Sections*, then tick what the group may do under *Default permissions* —

@@ -80,7 +80,7 @@ public class PermissionsDocumentationTests
     public void The_implication_is_stated()
         => DocumentationAssert.Says(
             Backoffice(),
-            "Includes seeing them: acting on what you cannot see makes no sense, so this needs no second tick");
+            "Includes seeing them: acting on what you cannot see makes no sense, so this needs no second switch");
 
     /// <summary>Client hiding is convenience; the server is the truth on every request.</summary>
     [Fact]
