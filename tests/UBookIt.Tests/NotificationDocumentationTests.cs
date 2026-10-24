@@ -450,6 +450,14 @@ public class NotificationDocumentationTests
         Assert.Contains("docs/backoffice.md", swept);
         Assert.Contains("docs/mvp.md", swept);
         Assert.True(swept.Count >= 5, $"Only {swept.Count} markdown files found; the sweep is not reading the repository.");
+
+        // And every page the documentation manifest publishes, plus the pages it deliberately does
+        // not: a published page outside the sweep would be the one place a retired claim could
+        // come back unseen, and docs-single-source added two.
+        foreach (var file in DocumentationManifestTests.Listed().Select(p => p.File).Concat(DocumentationManifestTests.Unlisted.Keys))
+        {
+            Assert.Contains($"docs/{file}", swept);
+        }
     }
 
     /// <summary>

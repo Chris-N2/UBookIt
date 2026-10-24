@@ -127,8 +127,8 @@ The documentation SHALL include a Getting started page, listed first in the `sit
 takes a site owner from installing the package to a visitor's booking arriving by email, through
 the default booking page only. In order, it SHALL cover:
 
-1. installing the package;
-2. the requirements, including the database and the lowest supported Umbraco version;
+1. the requirements, including the database and the lowest supported Umbraco version;
+2. installing the package;
 3. granting the uBookIt section, and the separate question of who sees bookers' details;
 4. creating a resource and its opening hours;
 5. creating a service;

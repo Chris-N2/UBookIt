@@ -537,7 +537,7 @@ and single hyphens between them, up to 64 characters. Anything else is refused a
 when you save, with everything else you entered still in the form.
 
 The field only names the set; the views themselves are files a developer adds to the site.
-[Notifications](notifications.md#template-sets) describes the folder layout and the order uBookIt
+[Email templates](email-templates.md#template-sets) describes the folder layout and the order uBookIt
 looks in. A set whose folder holds no views is reported as a warning in the log when the site
 starts, so a mistyped name is caught at the next restart rather than by a customer. The set is not
 shown on the public site.

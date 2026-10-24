@@ -127,9 +127,9 @@ none, and so does a booking placed directly against a resource, which has no ser
 
 If the service cannot be read while a message is being composed, the message is still sent with
 everything else it carries, without the instructions, and the failure is logged with the booking
-id only. On a site that [writes its own message content](#writing-your-own-message-content), that
+id only. On a site that [writes its own message content](email-templates.md#writing-your-own-message-content), that
 message is sent in **uBookIt's own wording** rather than yours, because without the service uBookIt
-cannot tell which [template set](#template-sets) applies.
+cannot tell which [template set](email-templates.md#template-sets) applies.
 
 **Messages to `InternalRecipients` never carry them** — they are written for the booker. Neither
 does the delivery API: `GET /services` and `GET /services/{id}` do not publish them, so they are
