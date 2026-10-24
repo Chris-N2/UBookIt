@@ -97,14 +97,14 @@ requirement is replaced, so no guarantee can be dropped by rewriting one.
   - `docs/docs.json`;
   - `docs/getting-started.md`;
   - `docs/email-templates.md`;
-  - a manifest/link test class and an email-reference test class in `tests/UBookIt.Tests`.
+  - test classes for the manifest, links, the email reference, the Umbraco floor and Getting
+    started, and a Markdown structure reader, in `tests/UBookIt.Tests`.
 - **Edited:**
   - `docs/notifications.md` (the content moves out; a pointer stays);
   - `docs/backoffice.md` (links);
   - `README.md` (*Documentation* list, the email bullet, a floor guard);
   - `CLAUDE.md`;
   - `openspec/config.yaml`;
-  - `docs/publishing.md` (the version-bump table gains Getting started's floor);
   - the `*DocumentationTests.cs` files that read the moved content.
 - **Unchanged:**
   - every package's code and compiled output;

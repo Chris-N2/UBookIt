@@ -17,7 +17,7 @@ wording:
 | File | Sent to | When |
 |---|---|---|
 | `BookerPlaced.cshtml` | the booker | their booking has been placed — on every site, whether it is confirmed at once or awaits approval, and when your own people record it for them |
-| `BookerConfirmed.cshtml` | the booker | you confirmed a booking that was awaiting approval — never sent on a site that confirms bookings as they are placed |
+| `BookerConfirmed.cshtml` | the booker | you confirmed a booking that was awaiting approval. A booking confirmed as it was placed gets `BookerPlaced` instead, and no `BookerConfirmed` |
 | `BookerDeclined.cshtml` | the booker | you declined their requested booking |
 | `BookerCancelled.cshtml` | the booker | their booking has been cancelled |
 | `BookerMoved.cshtml` | the booker | you moved their booking to a new time |

@@ -185,7 +185,7 @@ a breaking change.
 |---|---|
 | **Umbraco** | **18.2.1 or later**, and not 19. Not 13, not the 14–16 STS line, and not 17 — uBookIt `17.x` is the release for Umbraco 17. On a site below 18.2.1, installing uBookIt raises the Umbraco packages it depends on and leaves the rest where they are; **upgrade `Umbraco.Cms` itself to 18.2.1 first** so every Umbraco package stays on one version. |
 | **.NET** | 10.0 |
-| **Database** | **SQL Server.** SQLite is not supported, including the SQLite database a `dotnet new umbraco` site gives you by default. |
+| **Database** | **SQL Server 2019 or later**, including LocalDB and Azure SQL. SQLite is not supported, including the SQLite database a `dotnet new umbraco` site gives you by default. |
 
 SQLite is excluded for a real reason, not because it's untested: uBookIt's schema and
 availability queries are written for SQL Server, and a site on SQLite fails at migration time

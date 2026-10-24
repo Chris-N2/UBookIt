@@ -50,6 +50,8 @@ public static class DocsMarkdown
 
     private static readonly Regex Setext = new(@"^\s{0,3}(=+|-+)\s*$", RegexOptions.CultureInvariant);
 
+    private static readonly Regex RawHtmlLink = new(@"<(a|img)\s", RegexOptions.CultureInvariant | RegexOptions.IgnoreCase);
+
     private static readonly Regex ReferenceDefinition = new(@"^\s{0,3}\[[^\]]+\]:\s", RegexOptions.CultureInvariant);
 
     /// <summary>The page's lines outside fenced code blocks, with their 1-based numbers.</summary>
@@ -108,14 +110,20 @@ public static class DocsMarkdown
             {
                 slug.Append('-');
             }
-            else if (c is '-' or '_' || char.IsLetterOrDigit(c)
-                || CharUnicodeInfo.GetUnicodeCategory(c) == UnicodeCategory.NonSpacingMark)
+            else if (c == '-' || char.IsLetter(c) || IsKept(CharUnicodeInfo.GetUnicodeCategory(c)))
             {
                 slug.Append(c);
             }
         }
 
         return slug.ToString();
+
+        // GitHub keeps every mark, every number and every connector punctuation (`_` among them),
+        // not only the decimal digits and non-spacing marks.
+        static bool IsKept(UnicodeCategory category) => category is
+            UnicodeCategory.NonSpacingMark or UnicodeCategory.SpacingCombiningMark or UnicodeCategory.EnclosingMark
+            or UnicodeCategory.DecimalDigitNumber or UnicodeCategory.LetterNumber or UnicodeCategory.OtherNumber
+            or UnicodeCategory.ConnectorPunctuation;
     }
 
     /// <summary>
@@ -146,17 +154,67 @@ public static class DocsMarkdown
         return ids;
     }
 
+    /// <summary>
+    /// The page's prose as paragraphs: runs of non-blank lines, broken by a blank line or by a
+    /// fenced block between them, each with the 1-based line it starts on.
+    /// </summary>
+    private static IEnumerable<(string Text, int FirstLine)> Paragraphs(string markdown)
+    {
+        var lines = new List<string>();
+        var first = 0;
+        var last = 0;
+
+        foreach (var (text, line) in ProseLines(markdown))
+        {
+            var breaks = string.IsNullOrWhiteSpace(text) || (lines.Count > 0 && line != last + 1);
+
+            if (breaks && lines.Count > 0)
+            {
+                yield return (string.Join('\n', lines), first);
+                lines.Clear();
+            }
+
+            if (!string.IsNullOrWhiteSpace(text))
+            {
+                if (lines.Count == 0)
+                {
+                    first = line;
+                }
+
+                lines.Add(text);
+            }
+
+            last = line;
+        }
+
+        if (lines.Count > 0)
+        {
+            yield return (string.Join('\n', lines), first);
+        }
+    }
+
     /// <summary>Every inline link and image target on the page, outside code.</summary>
+    /// <remarks>
+    /// Code spans are removed a paragraph at a time, not a line at a time, because a span can wrap:
+    /// read line by line, the wrapped span's backticks pair with the wrong partners and can swallow a
+    /// link or expose one. A span is replaced by the line breaks it contained, so every link keeps
+    /// its line number.
+    /// </remarks>
     public static IReadOnlyList<Link> Links(string markdown)
-        => ProseLines(markdown)
-            .SelectMany(line => InlineLink
-                .Matches(InlineCode.Replace(line.Text, string.Empty))
-                .Select(m => new Link(m.Groups[1].Value, line.Line)))
+        => Paragraphs(markdown)
+            .SelectMany(paragraph =>
+            {
+                var prose = InlineCode.Replace(paragraph.Text, span => new string('\n', span.Value.Count(c => c == '\n')));
+
+                return InlineLink.Matches(prose)
+                    .Select(m => new Link(m.Groups[1].Value, paragraph.FirstLine + prose[..m.Index].Count(c => c == '\n')));
+            })
             .ToList();
 
     /// <summary>
     /// Lines using syntax this reader does not understand and that would change what a heading
-    /// or a link is: setext heading underlines and reference-style link definitions.
+    /// or a link is: setext heading underlines, reference-style link definitions, and raw HTML
+    /// links and images.
     /// </summary>
     public static IReadOnlyList<string> UnsupportedSyntax(string markdown)
     {
@@ -175,6 +233,13 @@ public static class DocsMarkdown
             if (ReferenceDefinition.IsMatch(text))
             {
                 found.Add($"line {line}: a reference-style link definition");
+            }
+
+            // Raw HTML links and images are invisible to Links, so a page using them would have
+            // links nothing checks.
+            if (RawHtmlLink.IsMatch(InlineCode.Replace(text, string.Empty)))
+            {
+                found.Add($"line {line}: a raw HTML link or image");
             }
 
             previous = text;
