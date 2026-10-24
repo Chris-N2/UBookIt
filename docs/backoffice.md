@@ -6,16 +6,17 @@ configured, and where the bookings it has taken are read.
 
 ## Who can use it
 
-Access has two steps, both in **Users → User Groups → *(a group)***: tick **uBookIt
-Section** under *Sections*, then tick what the group may do under *Default permissions* —
-**tick the section, then tick what they may do**. The section grant is the outer gate: it
+Access has two steps, both in **Users → User Groups → *(a group)***: add **uBookIt** under
+*Sections* (with **Choose**), then switch on what the group may do in the box headed
+**uBookIt** further down the page — **add the section, then switch on what they may do**.
+The section grant is the outer gate: it
 decides whether the section appears and whether uBookIt's management API may be called at
 all. The permissions decide what within it:
 
 | Permission | What it allows |
 |---|---|
 | **See bookings** | The Bookings list and its reads. Contact details still need the Sensitive data group on top — see below. |
-| **Act on bookings** | Cancel, confirm, decline and move. Includes seeing them: acting on what you cannot see makes no sense, so this needs no second tick. |
+| **Act on bookings** | Cancel, confirm, decline and move. Includes seeing them: acting on what you cannot see makes no sense, so this needs no second switch. |
 | **Configure resources and services** | Create, edit and delete resources and services, and assign who is responsible for them. |
 | **Change site settings** | The Settings screen — how bookings behave and who is told about them. See [Configuration](configuration.md). **Not granted automatically, including on upgrade.** |
 
@@ -26,11 +27,11 @@ section grant — a group holding every permission but not the section reaches n
 **Upgrading from a version before these permissions existed?** Every group that already
 held the uBookIt section is granted the first three automatically, once, at the first start
 — so nobody loses access by upgrading. Groups you create afterwards start with nothing
-ticked, and a group whose permissions you later empty stays emptied.
+switched on, and a group whose permissions you later empty stays emptied.
 
 > **"Change site settings" is never granted automatically — on upgrade or otherwise, and
 > not even to Umbraco administrators.** After upgrading you will find the Settings tab
-> present and explaining that it needs a grant; tick the permission for the people who
+> present and explaining that it needs a grant; switch the permission on for the people who
 > should decide these things, and it appears.
 >
 > This is deliberate rather than an oversight. Those settings reach the site's retention
@@ -537,7 +538,7 @@ and single hyphens between them, up to 64 characters. Anything else is refused a
 when you save, with everything else you entered still in the form.
 
 The field only names the set; the views themselves are files a developer adds to the site.
-[Notifications](notifications.md#template-sets) describes the folder layout and the order uBookIt
+[Email templates](email-templates.md#template-sets) describes the folder layout and the order uBookIt
 looks in. A set whose folder holds no views is reported as a warning in the log when the site
 starts, so a mistyped name is caught at the next restart rather than by a customer. The set is not
 shown on the public site.
@@ -616,8 +617,8 @@ without the decision it exists to serve.
 
 The split is deliberate. Exempting one resource is a resource decision; one closure entry shuts
 every resource the site has, so it sits with the same grant as the site's other settings — and
-that grant is **never given automatically**, including on upgrade. Until an administrator ticks
-it, the Closures view is visible to anyone who configures resources and says so, rather than
+that grant is **never given automatically**, including on upgrade. Until an administrator switches
+it on, the Closures view is visible to anyone who configures resources and says so, rather than
 appearing to work and refusing the save.
 
 ### Bringing in public holidays

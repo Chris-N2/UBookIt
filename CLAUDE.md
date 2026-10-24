@@ -139,6 +139,20 @@ flow against the delivery API without referencing `UBookIt.Web`.
 - No secrets, connection strings, or personal data in logs or test
   fixtures.
 
+## Documentation
+
+`docs/` is the single source for the published documentation. The maintainer's site renders it
+at each release tag from `docs/docs.json`, which lists the published pages and is a versioned
+contract (the `documentation` spec): fields are added, never renamed or removed without bumping
+`schema`. The site shows only what the manifest lists, so:
+
+- **A change names the documentation pages it updates**, in its proposal's *Impact*. A
+  user-visible feature with no page named is not finished.
+- **A change to setup updates `docs/getting-started.md`** as well as the reference page.
+- **A new page goes into `docs/docs.json`** in the same change, or into the test's
+  deliberately-unlisted set with a reason. Links between pages are relative and must resolve to a
+  listed page and an existing heading; `DocumentationLinkTests` checks every one.
+
 ## Workflow
 
 OpenSpec is installed via `@fission-ai/openspec` (CLI: `openspec`); skills

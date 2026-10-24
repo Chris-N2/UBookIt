@@ -9,11 +9,16 @@ on a page of your own site, in your own layout. Every step works with JavaScript
 ## Get started
 
 ```
-dotnet add package UBookIt
+dotnet add package UBookIt --version "18.*"
 ```
 
+The version keeps uBookIt on the line for your Umbraco major. Without it the newest uBookIt is
+chosen, which is for a later Umbraco, and the restore fails.
+
 Run the site, and uBookIt installs its schema on first boot. It needs **SQL Server** (not SQLite)
-and Umbraco 18.2.1 or later. The full requirements are further down.
+and Umbraco 18.2.1 or later. The full requirements are further down, and
+[Getting started](https://github.com/Chris-N2/UBookIt/blob/18.5.0/docs/getting-started.md) walks through the rest of the setup, from your first
+resource to a booking arriving by email.
 
 **Then grant the section.** Like any Umbraco section, **uBookIt** stays hidden until you grant it
 to a user group: *Users → User Groups → (a group) → Sections*. Grant it deliberately, because it
@@ -61,7 +66,7 @@ user, so an administrator you create later sees those details hidden until you a
   Razor class library.
 - Write your own email wording as Razor views, and give a service or a group of services its own
   set of them: name an email template set on the service, and uBookIt looks in that set's folder
-  first.
+  first. See [email templates](https://github.com/Chris-N2/UBookIt/blob/18.5.0/docs/email-templates.md).
 
 ### Off until you turn it on
 
@@ -180,7 +185,7 @@ a breaking change.
 |---|---|
 | **Umbraco** | **18.2.1 or later**, and not 19. Not 13, not the 14–16 STS line, and not 17 — uBookIt `17.x` is the release for Umbraco 17. On a site below 18.2.1, installing uBookIt raises the Umbraco packages it depends on and leaves the rest where they are; **upgrade `Umbraco.Cms` itself to 18.2.1 first** so every Umbraco package stays on one version. |
 | **.NET** | 10.0 |
-| **Database** | **SQL Server.** SQLite is not supported, including the SQLite database a `dotnet new umbraco` site gives you by default. |
+| **Database** | **SQL Server 2019 or later**, including LocalDB and Azure SQL. SQLite is not supported, including the SQLite database a `dotnet new umbraco` site gives you by default. |
 
 SQLite is excluded for a real reason, not because it's untested: uBookIt's schema and
 availability queries are written for SQL Server, and a site on SQLite fails at migration time
@@ -188,6 +193,8 @@ rather than quietly misbehaving.
 
 ## Documentation
 
+- [Getting started](https://github.com/Chris-N2/UBookIt/blob/18.5.0/docs/getting-started.md): from installing the package to a visitor's
+  booking arriving by email, step by step
 - [The booking page](https://github.com/Chris-N2/UBookIt/blob/18.5.0/docs/booking-page.md): creating it, URL parameters,
   styling, the deployment note about committing the installed template, and the accessibility
   statement
@@ -197,8 +204,10 @@ rather than quietly misbehaving.
   turning each one on means
 - [The delivery API](https://github.com/Chris-N2/UBookIt/blob/18.5.0/docs/delivery-api.md): turning it on, what
   anonymous means, and where volume protection belongs
-- [Reacting to bookings](https://github.com/Chris-N2/UBookIt/blob/18.5.0/docs/notifications.md): the notifications
-  and how to handle them
+- [Email templates](https://github.com/Chris-N2/UBookIt/blob/18.5.0/docs/email-templates.md): writing the emails as Razor
+  views, the models they are given, and template sets for a service
+- [Reacting to bookings](https://github.com/Chris-N2/UBookIt/blob/18.5.0/docs/notifications.md): whether and to whom
+  uBookIt sends emails, and the notifications your own code can handle
 - [Writing a theme](https://github.com/Chris-N2/UBookIt/blob/18.5.0/docs/theming.md): replacing the rendering with
   your own views
 

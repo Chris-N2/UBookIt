@@ -1,0 +1,58 @@
+{
+  "schema": 1,
+  "headingIds": "github",
+  "sections": [
+    {
+      "title": "Using uBookIt",
+      "audience": "site",
+      "pages": [
+        {
+          "file": "getting-started.md",
+          "title": "Getting started",
+          "summary": "From installing the package to a visitor's booking arriving by email, using the booking page uBookIt ships."
+        },
+        {
+          "file": "booking-page.md",
+          "title": "The Booking Page",
+          "summary": "The page visitors book on: creating it, sending visitors straight to one thing, styling it, deploying it, and what it holds for accessibility."
+        },
+        {
+          "file": "backoffice.md",
+          "title": "The uBookIt backoffice section",
+          "summary": "Resources, availability, services, closures and bookings, and who may see and act on each."
+        },
+        {
+          "file": "configuration.md",
+          "title": "Configuration",
+          "summary": "Every setting, which can be changed in the backoffice and which only in configuration, and what turning each one on means."
+        }
+      ]
+    },
+    {
+      "title": "Developers",
+      "audience": "developer",
+      "pages": [
+        {
+          "file": "email-templates.md",
+          "title": "Email templates",
+          "summary": "Writing uBookIt's emails as Razor views: the files, the models they are given, template sets for a service, and what happens when a view fails."
+        },
+        {
+          "file": "notifications.md",
+          "title": "Reacting to bookings",
+          "summary": "Whether and to whom uBookIt sends emails, and the notifications your own code can handle when a booking is placed, confirmed, declined, moved or cancelled."
+        },
+        {
+          "file": "theming.md",
+          "title": "Writing a uBookIt theme",
+          "summary": "Replacing the booking flow's markup with your own views in a Razor class library, and what a theme takes on when it does."
+        },
+        {
+          "file": "delivery-api.md",
+          "title": "The delivery API",
+          "summary": "The anonymous JSON API for building your own front end: turning it on, what anonymous means, and where volume protection belongs."
+        }
+      ]
+    }
+  ]
+}

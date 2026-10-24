@@ -225,7 +225,7 @@ of your own people just recorded it on the screen that already lists it. See
 ## Permissions
 
 The settings screen and its endpoints require the **`UBookIt.Settings`** verb, granted in
-**Users → User Groups → Default permissions** as *"Change site settings"*.
+**Users → User Groups → *(a group)***, in the box headed **uBookIt**, as *"Change site settings"*.
 
 > **It is not granted automatically, including on upgrade.** A group holding `UBookIt.Configure`
 > does not get it: configuring a bookable resource and configuring the site are different
@@ -233,7 +233,7 @@ The settings screen and its endpoints require the **`UBookIt.Settings`** verb, g
 > addresses your bookers' details are sent to. Granting it on upgrade would widen privilege
 > silently.
 >
-> **Umbraco administrators are not exempt.** Until the box is ticked, nobody has it — the settings
+> **Umbraco administrators are not exempt.** Until it is switched on, nobody has it — the settings
 > tab explains this rather than disappearing.
 
 See [Permissions in the backoffice](backoffice.md) for the other three verbs.
