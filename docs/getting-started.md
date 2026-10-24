@@ -13,7 +13,7 @@ start with [the delivery API](delivery-api.md).
 |---|---|
 | **Umbraco** | 17.7.1 or later, and below 18. For Umbraco 18, install uBookIt `18.x`. |
 | **.NET** | 10.0 |
-| **Database** | **SQL Server.** SQLite is not supported, and that includes the SQLite database a new `dotnet new umbraco` site uses by default. |
+| **Database** | **SQL Server 2019 or later**, including LocalDB and Azure SQL. SQLite is not supported, and that includes the SQLite database a new `dotnet new umbraco` site uses by default. |
 
 A site on SQLite fails when uBookIt installs its schema, rather than quietly misbehaving.
 
@@ -33,11 +33,20 @@ you prefer to choose when to move.
 
 Start the site. uBookIt installs its schema, its **Booking Page** document type and that page's
 template on the first start. Nothing is sent to anybody and nothing is published until you do the
-steps below.
+steps below. What an install and each later upgrade change on your site is in
+[what an upgrade does](booking-page.md#what-an-upgrade-does-and-what-it-never-touches).
+
+**How uBookIt's versions work.** The major follows the Umbraco major it is built for, so `17.x` is
+for Umbraco 17 and `18.x` for Umbraco 18, and a new major is not a sign of a breaking change. In
+that respect uBookIt departs from Semantic Versioning. The public interface is kept as consistent
+as possible; where a breaking change is genuinely needed it lands in a minor version, never a
+patch, and ships with defaults or an upgrade path that keep an existing site working. Each
+release's entry in the changelog says what upgrading to it asks of you.
 
 ## 3. Give people the uBookIt section
 
-In the backoffice, open **Users → User Groups**, choose a group, and:
+In the backoffice, open **Users → User Groups**, choose a group you belong to, such as
+*Administrators*, and:
 
 1. under **Sections**, tick **uBookIt Section**;
 2. under **Default permissions**, tick what the group may do: **See bookings**, **Act on
@@ -59,7 +68,8 @@ A **resource** is something that can be booked: a room, a desk, a piece of equip
 In the **uBookIt** section, open **Resources** and choose **Create resource**.
 
 1. Give it a **Name**, such as *Studio 1*.
-2. Give it a **Type**, such as *studio*. Services find resources by type, in step 5.
+2. Set its **Type key**, which starts as *room*, to a word for what kind of thing it is, such as
+   *studio*. Services find resources by this key, in step 5.
 3. Tick **Can be booked on its own**, so that visitors can book it directly as well as through a
    service.
 4. Under **Opening hours**, use **Add window** on each day it is open, and set **From** and **To**.
@@ -83,14 +93,19 @@ In **Services**, choose **Create service**.
    step 4. Leave **How many at once** at `1`.
 4. **Save**. The editor's summary says how many resources can provide the service. It should be 1.
 
+Services can also need several resources at once, such as a room and a person, and resources can
+carry capabilities a service requires. See
+[what is in the section](backoffice.md#what-is-in-the-section).
+
 ## 6. Create the booking page
 
 In **Content**, create a page of the **Booking Page** type at the root of the content tree, call
 it *Book*, and **Save and publish**. Visit it: it lists your service and your resource, and either
 can be booked.
 
-The page uses your site's layout through your `_ViewStart.cshtml`, and it needs nothing else from
-you.
+The page uses your site's layout through your `_ViewStart.cshtml`. A new site may have none, and
+then the page renders without your site's header and navigation, which is Umbraco's normal
+behaviour. See [the Booking Page](booking-page.md).
 
 **Before you deploy, commit `Views/uBookItBookingPage.cshtml`.** uBookIt writes it into your
 project when it installs. A site that precompiles its views will not pick it up on the server.
@@ -118,7 +133,8 @@ your own people about every booking placed or cancelled. Both can also be change
 until you grant it, administrators included.
 
 uBookIt sends through your site's mail configuration, so Umbraco needs a `From` address and a way
-to send. **To check that messages are being sent without a mail server**, write them to a folder:
+to send. **To check that messages are being sent without a mail server**, have Umbraco write them
+to a folder. Create the folder first, because Umbraco does not create it:
 
 ```json
 {
@@ -127,7 +143,6 @@ to send. **To check that messages are being sent without a mail server**, write 
       "Global": {
         "Smtp": {
           "From": "bookings@example.com",
-          "DeliveryMethod": "SpecifiedPickupDirectory",
           "PickupDirectoryLocation": "C:\\temp\\mail"
         }
       }
@@ -136,7 +151,8 @@ to send. **To check that messages are being sent without a mail server**, write 
 }
 ```
 
-That folder is a way to check, not a way to run a site. When the check has passed, replace it with
+On Linux or macOS, use a path such as `/tmp/mail`. That folder is a way to check, not a way to run
+a site. When the check has passed, replace it with
 your real SMTP settings (`Host`, `Port`, `Username`, `Password`), as for Umbraco's own emails.
 
 Restart the site, then make a booking on your booking page with your own address. A message to you

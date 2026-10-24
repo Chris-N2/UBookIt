@@ -109,6 +109,31 @@
 - [x] 7.5 `CHANGELOG.md`: add an undated entry under the next release saying the documentation is restructured, with a Getting started and an Email templates page and a manifest at `docs/docs.json` for sites that render it. Verify: the changelog guards pass.
   - *Not done here, deliberately; handed to release prep.* Changelog entries are written per release with the version bump, and this change does not know its version: it rides the next release, 17.6.1 or 17.7.0 depending on the Umbraco patch. Release prep must cover: the restructure and the two new pages; `docs/docs.json` for sites that render the docs; and **the install-command fix**, because the README on nuget.org has told Umbraco 17 users to run a command that fails since 18.0.0 shipped.
 
+## QA round 1 (REJECT): remediation
+
+Two MAJOR, five MINOR, four NIT. Every fix is new code, and each new guard was shown able to fail.
+
+- [x] Q1.1 **MAJOR 1.** The "every statement is published" requirement was broader than the 3.5 audit, which checked email statements only. **Re-audited against every "documentation SHALL" in `openspec/specs`** (48 grep hits; each mapped to a page). Unmet:
+  - the `packaging` versioning policy (README only);
+  - the `persistence` "SQL Server 2019 or later (including LocalDB and Azure SQL)" (stated nowhere).
+
+  Both are now on Getting started (the database row; a *How uBookIt's versions work* paragraph in step 2), the database on the README too, and `GettingStartedDocumentationTests` asserts each. The spec now names its two exceptions explicitly, with scenarios:
+  - the *publishing documentation* (`packaging` ~526–537, 1089, 1280), satisfied by `docs/publishing.md`;
+  - the per-release callouts (`packaging` ~784), satisfied by `CHANGELOG.md`.
+
+  Everything else in the 48 is on a listed page: booking-management (bookings default, no picker ×2) and sensitive-data, booker-erasure and retention in `backoffice.md`/`configuration.md`; packaging schema/theme/ownership/notifications/content in `booking-page.md`, `theming.md`, `notifications.md`, `email-templates.md`; default-frontend's partial in `booking-page.md`; privacy-notice in `booking-page.md`/`theming.md`/`backoffice.md`. Hits that are not documentation obligations: `bookings` 456, `booking-management` 1705, `services` 396, `theming` 86. Mutations: the README database version removed; a versioning sentence removed; each fails.
+- [x] Q1.2 **MAJOR 2.** The pointer guarantee had no test. `EmailTemplateReferenceTests.The_notifications_page_keeps_its_pointer_to_this_page` asserts the heading, its identifier and a link to `email-templates.md` beneath it; the spec gains the scenario *Removing the pointer fails*. Mutations: QA's own rename (`### Email content`) fails it; the link removed fails it.
+- [x] Q1.3 **MINOR 3.** Step 4 now says **Type key**, which starts as *room* (`resource-editor.element.ts:94`, `:440`).
+- [x] Q1.4 **MINOR 4.** Step 2 links *what an upgrade does* and step 5 links *what is in the section*. The spec now says each step a reference page covers in more depth links it, the requirements step excepted, since it states them in full. `Each_step_after_the_requirements_links_a_reference_page` holds it; with step 5's link removed, it fails.
+- [x] Q1.5 **MINOR 5.** Confirmed in `ref/Umbraco-CMS-17-dev/.../Mail/EmailSender.cs:110-115`: `File.Open(<folder>/<guid>.eml, FileMode.CreateNew)` with no directory creation, so the folder must exist. The page now says to create it and gives a Linux/macOS path. `DeliveryMethod` is removed: `IsPickupDirectoryLocationConfigured` reads only the location (`GlobalSettings.cs:292`), so the setting was unnecessary.
+- [x] Q1.6 **MINOR 6.** The `BookerConfirmed` row no longer says "never sent on a site that confirms bookings as they are placed". `ConfirmAsync` ignores `AutoConfirm`, so a request still waiting when the setting is turned on can be confirmed. The row now reads: "you confirmed a booking that was awaiting approval. A booking confirmed as it was placed gets `BookerPlaced` instead, and no `BookerConfirmed`."
+- [x] Q1.7 **MINOR 7.** `DocsMarkdown.Links` strips code spans a paragraph at a time, so a wrapped span neither swallows nor exposes a link; links keep their line numbers. `UnsupportedSyntax` reports raw `<a`/`<img` outside code. Tests: `A_code_span_that_wraps_neither_swallows_a_link_nor_exposes_one`, `A_raw_html_link_or_image_is_reported_and_one_in_code_is_not`. Mutation: a raw `<a href="mvp.md">` on Getting started fails `No_listed_page_uses_syntax_the_structure_reader_cannot_see`.
+- [x] Q1.8 **NIT 8.** The proposal's *Impact* no longer lists the `publishing.md` edit, and names the test classes. The changelog handover (7.5) is recorded in memory's deferred obligations, which release prep reads.
+- [x] Q1.9 **NIT 9.** `Slug` keeps every `\p{M}`, `\p{N}` and `\p{Pc}`, with rows marked as following GitHub's stated rule rather than observed. `_emphasis_` and a suffix colliding with a heading already ending `-1` are left: neither occurs, and the class remarks already say the next unusual heading is checked by hand.
+- [x] Q1.10 **NIT 10.** Step 3 says to choose a group you belong to; step 6 says what happens with no `_ViewStart.cshtml` and links the Booking Page.
+- [x] Q1.11 **NIT 11.** Noted for 9.2: the README's pinned links to the two new pages 404 until the next release's tag exists. That is inherent to pinning, not a defect.
+- [ ] Q1.12 Walk step 3 in the browser and record whether the Sections picker shows "uBookIt Section" or "uBookIt" (`section/manifest.ts:72-75`); then make step 3 and `backoffice.md:10` say what it shows. Part of 6.3.
+
 ## 8. The other line
 
 - [ ] 8.1 Cherry-pick to `dev/v18` on branch `docs-single-source-v18`, adjusting version literals for the 18 line (the floor from that line's `Directory.Packages.props`, `blob/18.5.0/` links). Verify: the full unit suite is green on v18. `docs/docs.json` is byte-identical across the lines, or any difference is recorded here with its reason.

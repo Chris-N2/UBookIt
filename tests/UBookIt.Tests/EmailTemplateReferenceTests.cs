@@ -171,6 +171,35 @@ public class EmailTemplateReferenceTests
         Assert.Equal(expected.Order(StringComparer.Ordinal), documented.Order(StringComparer.Ordinal));
     }
 
+    /// <summary>
+    /// A link made to the notifications page's heading for writing message content, before the
+    /// content moved, still lands on that heading and finds the way to it.
+    /// </summary>
+    /// <remarks>
+    /// The link guard cannot see this: no published page links that fragment any more, so a
+    /// renamed or deleted heading broke no link it checks. QA round 1 renamed the heading and the
+    /// whole suite stayed green. Links from outside — a bookmark, a forum post, a page on
+    /// <c>main</c> — are what this keeps working.
+    /// </remarks>
+    [Fact]
+    public void The_notifications_page_keeps_its_pointer_to_this_page()
+    {
+        var notifications = RepoFiles.Read("docs/notifications.md");
+        var headings = DocsMarkdown.Headings(notifications);
+        var index = headings.ToList().FindIndex(h => h.Text == "Writing your own message content");
+
+        Assert.True(index >= 0, "docs/notifications.md no longer has the heading 'Writing your own message content'.");
+        Assert.Contains("writing-your-own-message-content", DocsMarkdown.HeadingIds(notifications));
+
+        var start = headings[index].Line;
+        var end = index + 1 < headings.Count ? headings[index + 1].Line : int.MaxValue;
+        var pointers = DocsMarkdown.Links(notifications)
+            .Where(l => l.Line > start && l.Line < end && l.Target.StartsWith("email-templates.md", StringComparison.Ordinal))
+            .ToList();
+
+        Assert.True(pointers.Count > 0, "The heading 'Writing your own message content' in docs/notifications.md no longer links to email-templates.md beneath it.");
+    }
+
     [Fact]
     public void The_folder_stated_is_the_folder_the_package_reads()
         => Assert.Contains($"`{RazorBookingTemplateRenderer.TemplateFolder}`", Page(), StringComparison.Ordinal);

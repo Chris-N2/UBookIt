@@ -111,7 +111,30 @@ Absolute links are not constrained by this requirement.
 Wherever a requirement in this repository obliges *the documentation* to state something, that
 statement SHALL appear on a page the manifest lists. A statement present only in an unlisted page,
 or only in the README, does not satisfy such a requirement, because a reader of the published
-documentation never sees it.
+documentation never sees it. The README may state it as well.
+
+**There are exactly two exceptions, and each is a requirement that names a different home for its
+statement:**
+
+- **The publishing documentation.** A requirement obliging *the publishing documentation* to state
+  something is about how the maintainer releases the package. It is satisfied by `docs/publishing.md`,
+  which is deliberately unlisted because a site using uBookIt has no use for it.
+- **The per-release callouts.** A requirement obliging the package to name a release's contract
+  changes per release is satisfied by `CHANGELOG.md`, which a consumer reaches from the package
+  page. A published page may point readers to it, but it is not a documentation page and the
+  manifest does not list it.
+
+No other statement is exempt. In particular, a statement a requirement places "where a consumer
+meets the version" or in "the package's own documentation" is not exempt because the README also
+carries it.
+
+#### Scenario: The two exceptions are the only ones
+- **WHEN** a requirement obliges the documentation to state something
+- **THEN** the statement is on a listed page, unless the requirement names the publishing documentation or the per-release changelog as its home, in which case it is in `docs/publishing.md` or `CHANGELOG.md` respectively
+
+#### Scenario: A statement the README carries is published too
+- **WHEN** a requirement's statement about installing or versioning is in the README, such as the database the package requires or what its version numbers mean
+- **THEN** a listed page states it as well, and a test reads that page
 
 #### Scenario: Moving a section keeps what it was required to say
 - **WHEN** content that a requirement obliges the documentation to state moves from one page to another
@@ -127,8 +150,10 @@ The documentation SHALL include a Getting started page, listed first in the `sit
 takes a site owner from installing the package to a visitor's booking arriving by email, through
 the default booking page only. In order, it SHALL cover:
 
-1. the requirements, including the database and the lowest supported Umbraco version;
-2. installing the package;
+1. the requirements, including the database with its lowest supported version and the lowest
+   supported Umbraco version;
+2. installing the package, with a version that keeps it on the line for the site's Umbraco major,
+   and what uBookIt's version numbers mean;
 3. granting the uBookIt section, and the separate question of who sees bookers' details;
 4. creating a resource and its opening hours;
 5. creating a service;
@@ -136,7 +161,8 @@ the default booking page only. In order, it SHALL cover:
 7. turning emails on and confirming one is delivered;
 8. where to go next.
 
-Each step SHALL link the reference page that covers it in full rather than restate that page. The
+Each step that a reference page covers in more depth SHALL link that page rather than restate it.
+The requirements step is the exception: it states the requirements in full itself. The
 page SHALL NOT describe building a front end on the delivery API, and it SHALL link the delivery API
 documentation for that.
 
@@ -202,3 +228,7 @@ a route to the content.
 #### Scenario: An old link to the notifications page still leads to the content
 - **WHEN** a reader follows a link to the notifications page's heading for writing message content
 - **THEN** they land on that heading and find a link to the Email templates page
+
+#### Scenario: Removing the pointer fails
+- **WHEN** the heading is renamed or removed from the notifications page, or the link beneath it is
+- **THEN** the test suite fails, even though no published page links that heading any more
