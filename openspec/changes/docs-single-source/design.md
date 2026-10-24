@@ -231,3 +231,21 @@ There is nothing to migrate on a site. The change ships with the next release on
 cherry-picked to `dev/v18` with that line's version literals. The maintainer's site starts reading
 `docs/docs.json` from the first tag that carries it. Earlier tags have no manifest, and the site
 should not offer them. Rollback is a revert: no shipped artefact depends on the new files.
+
+## Amendments at apply
+
+Each is recorded in full under its task in `tasks.md`.
+
+- **D6.** The last two paragraphs of *Replacing the whole message* stayed in `notifications.md`.
+  They are about sending, and one says "the settings above", which would have been false on the
+  new page (task 1.1).
+- **D7.** The sweeps were already discovering every `docs/*.md`, not naming files, so nothing
+  needed repointing there. No repointed test turned out to be an absence assertion. The three
+  sweeps were mutation-checked against the new page instead (tasks 3.1, 3.4).
+- **D8.** No row was added to `docs/publishing.md`. Its table lists what moves with the package
+  version, and the Umbraco floor is not that (task 7.3).
+- **D10.** The walkthrough used the published package from nuget.org, because this change alters
+  no package code. It also used the 17.7.1 template from an isolated template hive. It found that
+  a bare `dotnet add package UBookIt` installs the 18 line and fails, so both pages now give
+  `--version "17.*"`, guarded against the declared floor (task 6.3).
+- **Changelog (task 7.5)** is left to release prep, which knows the version.
