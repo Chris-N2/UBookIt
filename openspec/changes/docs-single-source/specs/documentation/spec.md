@@ -117,7 +117,7 @@ documentation never sees it. The README may state it as well.
 statement:**
 
 - **How the maintainer builds and publishes the package.** A statement about how the package is
-  built, packed, verified, tagged or pushed to a feed is satisfied by `docs/publishing.md`, which is
+  built, packed, tagged or pushed to a feed, or how its release artifacts are checked before they are, is satisfied by `docs/publishing.md`, which is
   deliberately unlisted because a site using uBookIt has no use for it. The exception is decided by
   the statement's **subject**, not by the requirement's wording: it covers a requirement that says
   "the publishing documentation" and one that says only "the documentation" alike, such as the

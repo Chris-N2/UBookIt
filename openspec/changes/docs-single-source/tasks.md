@@ -90,11 +90,31 @@
   - *Done, `dfb3f9b`.* **Spec amended at apply:** the requirements step now precedes the install step, since a reader needs them before installing.
 - [x] 6.2 Add the floor guard (design D8): parse the `Umbraco.Cms` lower bound from `Directory.Packages.props`, and compare it with the README's *Get started* sentence, the README's *Requirements* row and Getting started. Verify: green; then changing the props bound in a scratch edit fails it naming each page, and is reverted.
   - *Done, `dfb3f9b`.* Phrasings matched: "X or later", "below X", "to X first"; at least 3 on the README and 2 on Getting started. Mutation: props bound `17.8.0` → both pages fail, naming the stated and declared versions.
-- [ ] 6.3 Follow Getting started **literally** on a new site: the pinned Umbraco template, the locally built packages from a folder feed, and a LocalDB database (design D10). Verify: a published booking page, a booking placed through it, and its email in the pickup directory. Fix every step where the guide was wrong or assumed knowledge it did not give, and record each fix under 6.3. Delete the scratch site and database afterwards.
+- [x] 6.3 Follow Getting started **literally** on a new site: the pinned Umbraco template, the locally built packages from a folder feed, and a LocalDB database (design D10). Verify: a published booking page, a booking placed through it, and its email in the pickup directory. Fix every step where the guide was wrong or assumed knowledge it did not give, and record each fix under 6.3. Delete the scratch site and database afterwards.
   - *In progress.* A new site was made from `Umbraco.Templates::17.7.1`, installed into an isolated template hive (`--debug:custom-hive`), so the machine's global template (18.3.0-rc) is untouched. It uses LocalDB and resolves `Umbraco.Cms` to 17.7.1. The guide was followed with the **published** UBookIt from nuget.org rather than a local build, because this change alters no package code and that is what a reader installs. Findings so far:
     - **Step 2 was wrong.** A bare `dotnet add package UBookIt` chose UBookIt **18.5.0**, and the restore failed with NU1107 against Umbraco 17.7.1. With `--version "17.*"` it restored 17.6.0 and built. Both pages are fixed, and guarded (`a1dadbd`).
     - First start: the uBookIt package migration ran, `Views/uBookItBookingPage.cshtml` was written, and the site listens. LocalDB attach errors precede Umbraco's unattended install creating the database, which is Umbraco's own first-boot behaviour.
-    - **Steps 3–7 (backoffice and booking) need the browser**, which means Chris's Chrome. They are held until he is back rather than taking over his browser during his own release.
+    - **Steps 3–7 walked 2026-10-24 in Chris's Chrome, with his go-ahead, after his own local site was stopped.** The first two attempts to save the user group timed out inside Umbraco's own `UserGroupRepository.PersistPermissions` → `InsertBulk` (a SQL execution timeout). No session was blocking (`sys.dm_exec_requests` empty), and it went through in seconds once Chris's site was down. This is the same class of failure as the 17→18 LocalDB timeout in `service-email-templates`: load on the machine, not uBookIt.
+    - **Step 3 was wrong twice.**
+      - *Sections* is a picker (**Choose** → **uBookIt** → **Submit**), not a tickbox, and it lists **"uBookIt"**, not "uBookIt Section". **This answers Q1.12.**
+      - The permissions are switches in a box headed **uBookIt** near the bottom of the group, not under "Default permissions".
+      - The section appeared in the top bar on save, with no reload needed.
+      - Fixed in `getting-started.md`, `backoffice.md` (Who can use it) and `configuration.md` (Permissions). `PermissionsDocumentationTests` now pins "add the section, then switch on what they may do".
+      - Both wrong wordings are added to `RetiredClaims` as `WrongAboutTheUserGroupEditor` ("tick uBookIt Section", "under Default permissions"). **The first needles were whole phrases, and a mutation restoring the instruction in a different word order passed.** They were narrowed to the wrong core; then restoring either wording on Getting started or in configuration.md failed `The_claims_this_change_falsified_are_not_made_anywhere_in_the_docs`. Reverted.
+    - **Step 4** held: Type key starts at `room` and accepted `studio`; Can be booked on its own; Add window per day. Added to the page: a window starts at 09:00–17:00, and Save is at the bottom. The resource listed as "studio, 7 windows/week, On its own".
+    - **Step 5.**
+      - The form puts **Service Requirements before Duration**, and Duration starts as **Variable length**. The steps are reordered to match, and say so.
+      - The minutes for Fixed length start at 60.
+      - The summary sits under the service's name at the top of the editor ("studio / 1 resource can provide this service."). The page now says where to look.
+      - **Not changed, raised with Chris:** with Fixed length selected, the hint beneath still reads "The person booking chooses how long they need…". `services-editor.element.ts:1215` renders `durationVariableHint` unconditionally. That is product behaviour, outside this change.
+    - **Step 6** held: Booking Page offered at root; published; the page lists "A one-hour session" and "Studio 1" (a catalogue of two). On a site whose only page it is, it is served at `/`, so the page now says to use the link in Info. It renders unstyled with no `_ViewStart.cshtml`, as Q1.10's note says.
+    - **Step 7.**
+      - **The page now says to merge.** A new site's `appsettings.json` already has `Umbraco:CMS:Global` (with `Id`), so pasting the guide's `Umbraco` block as a second top-level key would replace it.
+      - With only `From` and `PickupDirectoryLocation` set, there was no "no usable mail configuration" line at startup.
+      - **Negative check, folder absent:** booking HWXG-G9PD (service) was confirmed. The log recorded "A handler for the booking-{What} notification threw. Booking … is unaffected and the notification was not retried" with `System.IO.DirectoryNotFoundException`, and no file was written. The page's "create the folder first" is right, and it now says what the missing folder looks like in the log.
+      - **Folder created:** booking 97PZ-7H82 (resource, directly) wrote two `.eml` files: To `booker@example.com`, Subject "Your booking is confirmed"; and To `bookings@example.com`, Subject "New booking — 97PZ-7H82". Both From `bookings@example.com`.
+    - Placing a booking through each catalogue entry worked: the service (16:00–17:00) and the resource directly (13:00–13:30).
+    - The scratch site, its LocalDB database, the template hive and the mail folder were deleted afterwards (9.x record).
 
 ## 7. Signposting and convention
 
@@ -132,7 +152,7 @@ Two MAJOR, five MINOR, four NIT. Every fix is new code, and each new guard was s
 - [x] Q1.9 **NIT 9.** `Slug` keeps every `\p{M}`, `\p{N}` and `\p{Pc}`, with rows marked as following GitHub's stated rule rather than observed. `_emphasis_` and a suffix colliding with a heading already ending `-1` are left: neither occurs, and the class remarks already say the next unusual heading is checked by hand.
 - [x] Q1.10 **NIT 10.** Step 3 says to choose a group you belong to; step 6 says what happens with no `_ViewStart.cshtml` and links the Booking Page.
 - [x] Q1.11 **NIT 11.** Noted for 9.2: the README's pinned links to the two new pages 404 until the next release's tag exists. That is inherent to pinning, not a defect.
-- [ ] Q1.12 Walk step 3 in the browser and record whether the Sections picker shows "uBookIt Section" or "uBookIt" (`section/manifest.ts:72-75`); then make step 3 and `backoffice.md:10` say what it shows. Part of 6.3.
+- [x] Q1.12 Walk step 3 in the browser and record whether the Sections picker shows "uBookIt Section" or "uBookIt" (`section/manifest.ts:72-75`); then make step 3 and `backoffice.md:10` say what it shows. Part of 6.3.
 
 ## QA round 2 (REJECT): remediation
 
@@ -142,6 +162,12 @@ Two MAJOR, five MINOR, four NIT. Every fix is new code, and each new guard was s
 - [x] Q2.2 **MINOR R2-2.** `RawHtmlLink` is now `<(a|img)(\s|>|/|$)`, so a tag wrapped straight after its name is seen. Tests added: the wrapped case is reported, and `<abbr>`/`<aside>` are not. Mutation: QA's own two-line `<a` / `href="mvp.md">` on Getting started fails `No_listed_page_uses_syntax_the_structure_reader_cannot_see`; reverted.
 - [x] Q2.3 **NIT R2-3.** `Slug` now keeps letters, every mark, **decimal** digits and connector punctuation, which is Onigmo's `\p{Word}` under GitHub's `[^\p{Word}\- ]`. Other and letter numbers (`²`, `Ⅳ`) are removed, which is the safe direction. The unobserved rows say so.
 - [x] Q2.4 **NIT R2-4.** The wrapped-span test's comment now describes the old failure correctly.
+
+## QA round 3 (APPROVE WITH NITS, conditional on the walk): remediation
+
+- [x] Q3.1 **NIT R3-1.** `Slug` also keeps letter numbers (`Ⅳ` → `ⅳ`, lower-cased), and still removes other numbers (`²`). **Both are now observed:** "Ⅳ. usage:" → `ⅳ-usage` (ying32/govcl README) and "² Player Roles support…" → `-player-roles-support-is-only-available-since-version-20` (Awakened-Redstone/AutoWhitelist README), each read through `gh api … contents` with `application/vnd.github.html+json` on 2026-10-24. QA's other two citations (ConfettiFX/The-Forge, GanchengZhu/GazeFollower) could not be reproduced and are not cited. The `IsKept` comment now says both directions are dangerous; Q2.3's "safe direction" was wrong.
+- [x] Q3.2 **NIT R3-2.** "verified" in the exception now reads "or how its release artifacts are checked before they are", so it cannot be read as "what has been measured to work".
+- [x] Q3.3 The walk (6.3), recorded above. Q1.12 is closed by it.
 
 ## 8. The other line
 

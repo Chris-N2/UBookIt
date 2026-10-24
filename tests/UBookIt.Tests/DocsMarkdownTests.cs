@@ -101,12 +101,16 @@ public class DocsMarkdownTests
         Assert.Empty(DocsMarkdown.UnsupportedSyntax("```html\n<a href=\"x\">x</a>\n```\n"));
     }
 
-    // NOT observed on GitHub, unlike the theory above. These follow GitHub's filter as written,
-    // [^\p{Word}\- ] under Onigmo, where \p{Word} is letters, marks, decimal digits and connector
-    // punctuation. No current heading uses them; the next one that does is checked by hand.
+    // The ² and Ⅳ rows were OBSERVED on GitHub on 2026-10-24, through the same contents endpoint
+    // (`gh api -H "Accept: application/vnd.github.html+json" repos/<repo>/readme`), on other
+    // repositories' READMEs:
+    // - ² is removed: "² Player Roles support…" →
+    //   "-player-roles-support-is-only-available-since-version-20" (Awakened-Redstone/AutoWhitelist);
+    // - Ⅳ is kept and lower-cased: "Ⅳ. usage:" → "ⅳ-usage" (ying32/govcl).
+    // The other two rows are NOT observed; no current heading uses those characters.
     [Theory]
     [InlineData("Step 2 — the 3rd ²", "step-2--the-3rd-")]
-    [InlineData("Part Ⅳ", "part-")]
+    [InlineData("Part Ⅳ", "part-ⅳ")]
     [InlineData("snake_case and ‿", "snake_case-and-‿")]
     [InlineData("Café crème", "café-crème")]
     public void Only_word_characters_hyphens_and_spaces_survive(string heading, string expected)
