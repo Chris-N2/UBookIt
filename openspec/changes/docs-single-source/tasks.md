@@ -134,6 +134,15 @@ Two MAJOR, five MINOR, four NIT. Every fix is new code, and each new guard was s
 - [x] Q1.11 **NIT 11.** Noted for 9.2: the README's pinned links to the two new pages 404 until the next release's tag exists. That is inherent to pinning, not a defect.
 - [ ] Q1.12 Walk step 3 in the browser and record whether the Sections picker shows "uBookIt Section" or "uBookIt" (`section/manifest.ts:72-75`); then make step 3 and `backoffice.md:10` say what it shows. Part of 6.3.
 
+## QA round 2 (REJECT): remediation
+
+- [x] Q2.1 **MAJOR R2-1.** The publishing exception was defined by the phrase "the publishing documentation". `packaging` 528–534 (the URLs → remote → rebuild order) says only "the documentation", lives only in `publishing.md`, and so was neither exempt nor published. The exception is now decided by **subject**: how the package is built, packed, verified, tagged or pushed. It explicitly does not cover anything a site owner needs in order to install, upgrade or choose a version. Two scenarios were added, one exempting by subject and one saying that what a site owner needs is never a publishing statement. Q1.1's publishing rows were re-read against the new wording:
+  - 520–526 (a person verifies the URL), 532–534 (the order), 537 (what a push makes permanent), 1089 (metadata editing) and 1280 (author details): all are about building or publishing, so all are exempt and in `publishing.md`.
+  - None of the install, version or requirements statements falls under it. They are on Getting started (Q1.1).
+- [x] Q2.2 **MINOR R2-2.** `RawHtmlLink` is now `<(a|img)(\s|>|/|$)`, so a tag wrapped straight after its name is seen. Tests added: the wrapped case is reported, and `<abbr>`/`<aside>` are not. Mutation: QA's own two-line `<a` / `href="mvp.md">` on Getting started fails `No_listed_page_uses_syntax_the_structure_reader_cannot_see`; reverted.
+- [x] Q2.3 **NIT R2-3.** `Slug` now keeps letters, every mark, **decimal** digits and connector punctuation, which is Onigmo's `\p{Word}` under GitHub's `[^\p{Word}\- ]`. Other and letter numbers (`²`, `Ⅳ`) are removed, which is the safe direction. The unobserved rows say so.
+- [x] Q2.4 **NIT R2-4.** The wrapped-span test's comment now describes the old failure correctly.
+
 ## 8. The other line
 
 - [ ] 8.1 Cherry-pick to `dev/v18` on branch `docs-single-source-v18`, adjusting version literals for the 18 line (the floor from that line's `Directory.Packages.props`, `blob/18.5.0/` links). Verify: the full unit suite is green on v18. `docs/docs.json` is byte-identical across the lines, or any difference is recorded here with its reason.

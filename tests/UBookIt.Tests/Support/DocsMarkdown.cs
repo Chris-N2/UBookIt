@@ -50,7 +50,9 @@ public static class DocsMarkdown
 
     private static readonly Regex Setext = new(@"^\s{0,3}(=+|-+)\s*$", RegexOptions.CultureInvariant);
 
-    private static readonly Regex RawHtmlLink = new(@"<(a|img)\s", RegexOptions.CultureInvariant | RegexOptions.IgnoreCase);
+    // The tag name may end the line: the check runs a line at a time, so a tag wrapped straight
+    // after its name has no whitespace after it here.
+    private static readonly Regex RawHtmlLink = new(@"<(a|img)(\s|>|/|$)", RegexOptions.CultureInvariant | RegexOptions.IgnoreCase);
 
     private static readonly Regex ReferenceDefinition = new(@"^\s{0,3}\[[^\]]+\]:\s", RegexOptions.CultureInvariant);
 
@@ -118,11 +120,13 @@ public static class DocsMarkdown
 
         return slug.ToString();
 
-        // GitHub keeps every mark, every number and every connector punctuation (`_` among them),
-        // not only the decimal digits and non-spacing marks.
+        // GitHub's filter removes [^\p{Word}\- ], and Onigmo's \p{Word} is letters, every mark,
+        // DECIMAL digits and connector punctuation. So a superscript or a Roman numeral (other or
+        // letter numbers) is removed. Keeping a character GitHub removes is the dangerous direction:
+        // the guard would pass a fragment GitHub does not resolve.
         static bool IsKept(UnicodeCategory category) => category is
             UnicodeCategory.NonSpacingMark or UnicodeCategory.SpacingCombiningMark or UnicodeCategory.EnclosingMark
-            or UnicodeCategory.DecimalDigitNumber or UnicodeCategory.LetterNumber or UnicodeCategory.OtherNumber
+            or UnicodeCategory.DecimalDigitNumber
             or UnicodeCategory.ConnectorPunctuation;
     }
 
