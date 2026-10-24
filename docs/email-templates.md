@@ -2,20 +2,22 @@
 
 uBookIt sends its emails in its own wording until you give it yours. This page covers writing
 that wording as Razor views: which files, what each view is given, giving a service its own set
-of views, and what happens when a view goes wrong. Whether a message is sent at all, and to whom,
-is decided by the settings in [Reacting to bookings](notifications.md), not by anything here.
+of views, and what happens when a view goes wrong.
+
+## Writing your own message content
 
 **Put a Razor view in `~/Views/Partials/UBookIt/Emails/`, named for the message.** uBookIt finds
 it and uses it in place of its own wording. Nothing else changes: whether a message is sent, who
-receives it, and under what configuration are still decided by the settings above.
+receives it, and under what configuration are still decided by the settings in
+[Reacting to bookings](notifications.md#turning-it-on).
 
 There are seven messages, and each file is optional — supply one and the other six keep uBookIt's
 wording:
 
 | File | Sent to | When |
 |---|---|---|
-| `BookerPlaced.cshtml` | the booker | their booking has been placed |
-| `BookerConfirmed.cshtml` | the booker | you confirmed their requested booking |
+| `BookerPlaced.cshtml` | the booker | their booking has been placed — on every site, whether it is confirmed at once or awaits approval, and when your own people record it for them |
+| `BookerConfirmed.cshtml` | the booker | you confirmed a booking that was awaiting approval — never sent on a site that confirms bookings as they are placed |
 | `BookerDeclined.cshtml` | the booker | you declined their requested booking |
 | `BookerCancelled.cshtml` | the booker | their booking has been cancelled |
 | `BookerMoved.cshtml` | the booker | you moved their booking to a new time |
@@ -57,7 +59,7 @@ never a second copy of them to drift out of step.
 `Subject` is optional: leave it unset and uBookIt's own subject is used, which is derived from
 the booking's state. `IsHtml` defaults to `false`; set it to `true` if your content is HTML.
 
-#### What your template is given
+## What your template is given
 
 Both models carry the booking's `Kind` (which message this is), `Status`, `Reference` in the form
 a person quotes, `ServiceName`, `ResourceNames`, `LocalStart`, `LocalEnd` and `TimeZoneId`. The
@@ -105,7 +107,7 @@ in the backoffice changes what new bookings carry without telling your view.
 `InternalMessageModel` adds `AwaitsApproval` and `BackofficeUrl` — and **carries no booker name,
 address or telephone number at all**, deliberately. See below.
 
-#### `CancellationUrl` — and what happens if your view leaves it out
+## `CancellationUrl` — and what happens if your view leaves it out
 
 Where self-service cancellation is on, `BookerMessageModel.CancellationUrl` carries the link that
 cancels the booking. It is a complete address, ready to render:
@@ -133,10 +135,10 @@ will not compensate by sending a second message: that would be overriding a choi
 the same narrowing that applies to everything else a supplied view says — the words are yours, and
 so is their completeness.
 
-#### `BookerInstructions` — the service's instructions for a confirmed booker
+## `BookerInstructions` — the service's instructions for a confirmed booker
 
 `BookerMessageModel.BookerInstructions` carries the service's
-[instructions for the booker](#instructions-for-the-booker), on exactly the terms uBookIt's own
+[instructions for the booker](notifications.md#instructions-for-the-booker), on exactly the terms uBookIt's own
 wording follows: present when the booking is confirmed as the message is composed and its service
 has instructions.
 
@@ -160,7 +162,7 @@ presented is your view's choice.
 does not add them to your content or send them separately — the same narrowing as for
 `CancellationUrl`: the words are yours. `InternalMessageModel` has no such member.
 
-#### Template sets
+## Template sets
 
 An online consultation's confirmation is often a different email from an in-person one, not the same
 email with a paragraph added. A **template set** gives a service — or a group of services — its own
@@ -214,7 +216,7 @@ whose service has been deleted, and a booking placed directly against a resource
 **If you replace uBookIt's renderer** with your own `IBookingTemplateRenderer`, it is given
 `Model.TemplateSet` and must read it itself to support sets; until it does, it ignores them.
 
-#### HTML means no plain-text alternative
+## HTML means no plain-text alternative
 
 If you set `IsHtml = true`, the message is sent as HTML **and nothing else**. There is no
 plain-text part alongside it.
@@ -225,7 +227,7 @@ bypassing your site's own mail configuration — costing you your transport and 
 intercept what the package sends. Worth knowing before you decide, because recipients who read
 mail as text would get nothing.
 
-#### What becomes yours, and what does not
+## What becomes yours, and what does not
 
 **The words become yours, including whether they are accurate.** uBookIt will not check that your
 content describes the booking's state correctly, presents the reference in the quotable form, or
@@ -239,9 +241,9 @@ says which time zone it is quoting. What it gives you is everything needed to be
 - A booking whose booker has been erased is still never written to.
 - **A message to your recipients still carries no booker contact details** — not by convention,
   but because `InternalMessageModel` has no member for them. If you want them there, send that
-  message yourself from the notifications below; uBookIt will not do it for you.
+  message yourself from [the notifications](notifications.md#the-notifications); uBookIt will not do it for you.
 
-#### Templates supplied by a package
+## Templates supplied by a package
 
 A referenced assembly can supply templates too — a Razor class library with the same
 `Views/Partials/UBookIt/Emails/` folder, precompiled, works without the site copying anything.
@@ -252,7 +254,7 @@ site supply the same file name, the assembly's currently wins. Your own file is 
 assembly supplies none. If you need to override one a package gave you, the reliable route today
 is to ask the package not to supply it rather than to shadow it.
 
-#### When something is wrong
+## When something is wrong
 
 At startup uBookIt logs which messages have content supplied and which are using its own wording,
 so a misspelled file name shows up when you start the site rather than when a customer does not
@@ -269,7 +271,7 @@ If a template throws while rendering, uBookIt logs the failure and **sends its o
 instead** — the message still goes out. A broken template is never silently treated as an absent
 one — including one in a template set, which does not fall back to the view for every service.
 
-### Replacing the whole message, delivery included
+## Replacing the whole message, delivery included
 
 uBookIt sends through Umbraco's own `IEmailSender` with notifications enabled, so you can
 intercept `SendEmailNotification` and check `EmailType` for `"UBookItBooking"`.
