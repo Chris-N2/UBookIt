@@ -9,7 +9,7 @@ on a page of your own site, in your own layout. Every step works with JavaScript
 ## Get started
 
 ```
-dotnet add package UBookIt --version "17.*"
+dotnet add package UBookIt --version "18.*"
 ```
 
 The version keeps uBookIt on the line for your Umbraco major. Without it the newest uBookIt is
