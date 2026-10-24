@@ -215,7 +215,11 @@ public sealed class RetiredClaimEvidenceTests
 
                 foreach (var claim in RetiredClaims.All)
                 {
-                    if (!pinned.Contains(claim.Needle, StringComparison.OrdinalIgnoreCase))
+                    // Ordinal, because that is how the sweep matches: DocumentationAssert is
+                    // case-sensitive, so a conflict is a pin the sweep would actually reject.
+                    // Case-insensitive here reported "the uBookIt section" as the retired label
+                    // "uBookIt Section", a pin the sweep never holds out (docs-single-source).
+                    if (!pinned.Contains(claim.Needle, StringComparison.Ordinal))
                     {
                         continue;
                     }
