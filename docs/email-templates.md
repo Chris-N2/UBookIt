@@ -61,9 +61,63 @@ the booking's state. `IsHtml` defaults to `false`; set it to `true` if your cont
 
 ## What your template is given
 
-Both models carry the booking's `Kind` (which message this is), `Status`, `Reference` in the form
-a person quotes, `ServiceName`, `ResourceNames`, `LocalStart`, `LocalEnd` and `TimeZoneId`. The
-times arrive **already converted to the zone the booking was placed against** — format them
+Which model a view is given depends on who the message is for. The booker's messages, the
+`Booker…` files, are given a `BookerMessageModel`; your recipients' messages, the `Internal…`
+files, are given an `InternalMessageModel`. So a view starts with one of these two lines:
+
+```cshtml
+@inherits UBookIt.Web.Emails.UBookItEmailPage<UBookIt.Core.Notifications.BookerMessageModel>
+```
+
+```cshtml
+@inherits UBookIt.Web.Emails.UBookItEmailPage<UBookIt.Core.Notifications.InternalMessageModel>
+```
+
+Both models share what `BookingMessageModel` carries, and each adds members of its own. A member
+marked `?` can be `null`, and the table says when.
+
+### Every message: `BookingMessageModel`
+
+| Member | Type | What it carries |
+|---|---|---|
+| `Kind` | `BookingMessageKind` | Which message this is, and so which file rendered it. |
+| `Status` | `BookingStatus` | The booking's status as the message is composed: `Requested`, `Confirmed`, `Declined` or `Cancelled`. |
+| `Reference` | `string` | The booking's reference in the form a person quotes, grouped as the confirmation screen shows it. |
+| `ServiceName` | `string?` | The name of the service the booking was placed for, as it was recorded at placement. `null` for a booking placed directly against a resource, or where what was booked could not be established. |
+| `ResourceNames` | `IReadOnlyList<string>` | Every resource the booking claimed, by name, in the booking's own order. Empty where none could be established. |
+| `LocalStart` | `DateTimeOffset` | When the booking starts, in the time zone it was placed against. |
+| `LocalEnd` | `DateTimeOffset` | When the booking ends, in the same zone. |
+| `TimeZoneId` | `string` | The IANA id of that zone, such as `Europe/London`. |
+| `ServiceId` | `Guid?` | The id of the service the booking was placed for, as the booking recorded it. `null` for a booking placed directly against a resource, and still present when the service has since been deleted. |
+| `TemplateSet` | `string?` | The service's [template set](#template-sets), read when the message is composed, always lower case. `null` where the service names none, no longer exists, or the booking was placed directly against a resource. |
+
+### Messages to the booker: what `BookerMessageModel` adds
+
+| Member | Type | What it carries |
+|---|---|---|
+| `BookerName` | `string` | The name the booker gave. |
+| `BookerEmail` | `string` | The address this message is being sent to. |
+| `BookerPhone` | `string?` | The telephone number the booker gave. `null` where they gave none. |
+| `PreviousLocalStart` | `DateTimeOffset?` | For `BookerMoved` only: when the booking started before the move, in the booking's zone. `null` for every other message. |
+| `PreviousLocalEnd` | `DateTimeOffset?` | For `BookerMoved` only: when the booking ended before the move. `null` for every other message. |
+| `CancellationUrl` | `Uri?` | The complete link the booker can cancel this booking with. `null` where there is no self-service cancellation for it, which includes every message except the one that issued the link. [See below.](#cancellationurl--and-what-happens-if-your-view-leaves-it-out) |
+| `BookerInstructions` | `string?` | The service's instructions for the booker, on a confirmed booking's message only. `null` where this message does not carry them. [See below.](#bookerinstructions--the-services-instructions-for-a-confirmed-booker) |
+
+### Messages to your recipients: what `InternalMessageModel` adds
+
+| Member | Type | What it carries |
+|---|---|---|
+| `AwaitsApproval` | `bool` | Whether the booking is waiting for somebody to confirm or decline it, taken from the booking's status rather than from the `AutoConfirm` setting. |
+| `BackofficeUrl` | `Uri?` | Where the booking can be seen in the backoffice. `null` where no such link can be built, as on a site with no configured application URL. |
+
+`InternalMessageModel` **carries no booker name, address or telephone number at all**,
+deliberately: it takes the reader to the backoffice, where the Sensitive data control still
+applies, rather than carrying the details past it. See
+[what becomes yours](#what-becomes-yours-and-what-does-not).
+
+### Using the members
+
+The times arrive **already converted to the zone the booking was placed against**: format them
 however you like, and use `TimeZoneId` to say which clock you are quoting.
 
 `ResourceNames` is a collection rather than a sentence, so a service booking that resolved to
@@ -80,12 +134,8 @@ several resources can list them:
 branch on: a `BookerPlaced` message describes a **confirmed** booking on a site that confirms on
 placement, and a **requested** one on a site that requires approval.
 
-Both models also carry `ServiceId` and `TemplateSet`. `ServiceId` is the id of the service the
-booking was placed for, as the booking recorded it — `null` for a booking placed directly against a
-resource, and still present when the service has since been deleted. `TemplateSet` is the service's
-[template set](#template-sets) as read when the message is composed — `null` where the service names
-none, no longer exists, or the booking was placed directly against a resource. A view written before
-either existed renders unchanged.
+`ServiceId` and `TemplateSet` were added after the other members. A view written before either
+existed renders unchanged.
 
 **To tell services apart in a view, use `Model.TemplateSet`, not `Model.ServiceId`.** Services live
 in uBookIt's own tables rather than in your content, so the same service has a different id on your
@@ -101,11 +151,6 @@ only. A set name is whatever you typed, and is the same everywhere you deploy:
 
 Branching on `ServiceName` is worse still: it is the name the booking was sold under, and a rename
 in the backoffice changes what new bookings carry without telling your view.
-
-`BookerMessageModel` adds `BookerName`, `BookerEmail` and `BookerPhone`, and the
-`CancellationUrl` and `BookerInstructions` described below.
-`InternalMessageModel` adds `AwaitsApproval` and `BackofficeUrl` — and **carries no booker name,
-address or telephone number at all**, deliberately. See below.
 
 ## `CancellationUrl` — and what happens if your view leaves it out
 
