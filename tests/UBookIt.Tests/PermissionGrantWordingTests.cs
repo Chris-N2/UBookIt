@@ -65,10 +65,46 @@ public class PermissionGrantWordingTests
     }
 
     /// <summary>
+    /// The permissions are switches in the group editor, so nothing describing them says to tick
+    /// one. Two descriptions did ("'See bookings' ticked as well", "tick it for the people who should
+    /// decide these"), the same mistake as the refusals' "by ticking". The whole section is swept
+    /// rather than those two terms, because it holds nothing but the switches' labels and
+    /// descriptions, so a description added later is held to the same word.
+    /// </summary>
+    [Theory]
+    [InlineData("tick")]
+    [InlineData("Tick")]
+    [InlineData("ticked")]
+    [InlineData("ticking")]
+    [InlineData("ticks")]
+    public void No_permission_description_says_to_tick_a_switch(string word)
+    {
+        var section = SectionBody(RepoFiles.Read($"{LocalizationDirectory}/en-us.ts"), "ubookitPermissions");
+
+        // Anti-vacuity: the section must still hold the descriptions this sweeps.
+        DocumentationAssert.Says(section, "switched on as well");
+        DocumentationAssert.Says(section, "switch it on for the people who should decide these");
+
+        DocumentationAssert.DoesNotSay(section, word, "en-us.ts ubookitPermissions");
+    }
+
+    /// <summary>
     /// The string value of <paramref name="section"/>.<paramref name="key"/>, which this file
     /// writes either on the key's line or on the line after it.
     /// </summary>
     private static string TermText(string localization, string section, string key)
+    {
+        var body = SectionBody(localization, section);
+
+        var entry = Regex.Match(
+            body, $@"^\s*{Regex.Escape(key)}:\s*""(?<text>[^""]*)""", RegexOptions.Multiline);
+        Assert.True(entry.Success, $"en-us.ts has no term {section}.{key}, or it is not a plain string.");
+
+        return entry.Groups["text"].Value;
+    }
+
+    /// <summary>The text of one top-level section of en-us.ts, up to the next one.</summary>
+    private static string SectionBody(string localization, string section)
     {
         var sectionStart = Regex.Match(
             localization, $@"^  {Regex.Escape(section)}:\s*{{", RegexOptions.Multiline);
@@ -76,12 +112,7 @@ public class PermissionGrantWordingTests
 
         var rest = localization[(sectionStart.Index + sectionStart.Length)..];
         var nextSection = Regex.Match(rest, @"^  [A-Za-z0-9]+:\s*{", RegexOptions.Multiline);
-        var body = nextSection.Success ? rest[..nextSection.Index] : rest;
 
-        var entry = Regex.Match(
-            body, $@"^\s*{Regex.Escape(key)}:\s*""(?<text>[^""]*)""", RegexOptions.Multiline);
-        Assert.True(entry.Success, $"en-us.ts has no term {section}.{key}, or it is not a plain string.");
-
-        return entry.Groups["text"].Value;
+        return nextSection.Success ? rest[..nextSection.Index] : rest;
     }
 }

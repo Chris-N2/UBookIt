@@ -126,14 +126,19 @@ the lines do differ.
     site's .NET runtime fixes it. The trigger to check is a .NET security release: if it names a
     package on that list, the next release's changelog tells sites which runtime they need (the
     `packaging` spec's requirement on advisories).
-  - **Umbraco's own advisories.** Umbraco publishes them on its GitHub repository's *Security* tab,
-    and they do not reach the global advisory database NuGet reads. They are also filed against
-    `Umbraco.Cms`, which no shipped package references. None of the seven published on
-    27 October 2026 (one high) was in that database two days later. The trigger to check is an Umbraco release: read its advisories,
-    and if the uBookIt floor admits a vulnerable version, raise the floor.
+  - **Umbraco's own advisories, until they reach the database.** Umbraco publishes them first on
+    its GitHub repository's *Security* tab. The audit sees one only once it is in the global
+    advisory database NuGet reads, and then through `UBookIt.TestSite`: they are filed against
+    `Umbraco.Cms`, which that project references and resolves at uBookIt's floor. Getting there can
+    take days. None of the seven published on 27 October 2026 (one high) was in the database two
+    days later. So a green audit cannot be relied on for them. The trigger to check is an Umbraco
+    release: read its advisories, and if the uBookIt floor admits a vulnerable version, raise the
+    floor.
 
   No advisory is accepted today. The last ones, `UBookIt.TestSite`'s for ImageSharp 3.1.12, went
-  when Umbraco 17.8.0 and 18.3.0 moved to ImageSharp 3.2.0, which fixes them. Advisories are deliberately *not* errors in the `ci` build (see `Directory.Build.props`): an advisory is
+  when Umbraco 17.8.0 and 18.3.0 moved to ImageSharp 3.2.0, which fixes them.
+
+  Advisories are deliberately *not* errors in the `ci` build (see `Directory.Build.props`): an advisory is
   published against a package, not introduced by a commit, and would otherwise fail unrelated
   work. **GitHub disables scheduled workflows after 60 days without repository activity** — if the
   project goes quiet, run it by hand.

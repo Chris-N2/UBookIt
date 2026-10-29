@@ -14,10 +14,13 @@ them necessary rather than optional:
   - GHSA-4vcm-wj6q-3pmg (low): website preview session did not expire.
 
   The fixes shipped in 17.7.2 / 18.2.2 and are carried by 17.8.0 / 18.3.0. Raising the floor is how a
-  site that installs or updates uBookIt gets pulled onto a fixed Umbraco. **Our audit cannot see these
-  advisories**, so this was found by reading Umbraco's advisories by hand. They are GitHub *repository*
-  advisories, not in the global advisory database NuGet audit reads (checked 2026-10-29: 404). They
-  are also filed against the `Umbraco.Cms` meta-package, which no shipped uBookIt package references.
+  site that installs or updates uBookIt gets pulled onto a fixed Umbraco. **Our audit did not see these
+  advisories**, so this was found by reading Umbraco's advisories by hand. They were published on
+  Umbraco's repository and had not yet reached the global advisory database NuGet audit reads
+  (checked 2026-10-29: 404). Earlier Umbraco advisories did reach it, filed against `Umbraco.Cms`,
+  which the audit sees through `UBookIt.TestSite`. So the gap is the delay, not a blind spot.
+  *(Corrected after QA round 1. This bullet first said these advisories never reach that database
+  and that no audited project references `Umbraco.Cms`. Both were false.)*
 - **The packaging requirement now demands that two declarations be removed.** *A shipped package
   declares the fix for an advisory its host cannot yet supply* says a declaration "SHALL be removed
   once a supported Umbraco release depends on the fixed version". The stable nuspecs (read
@@ -44,8 +47,8 @@ Chris also folded in three small items found earlier, so they ship in the same r
   is given.
 - **The duration hint shows in both modes.** The services editor shows "The person booking chooses how
   long they need…" with **Fixed length** selected as well, where it is false.
-- **`dev/v18`'s client still builds against `@umbraco-cms/backoffice` 17.5.3.** So v18's TypeScript
-  checks and client tests see Umbraco 17's API, and a break in 18 shows only at run time.
+- ~~**`dev/v18`'s client still builds against `@umbraco-cms/backoffice` 17.5.3.**~~ Split off at
+  apply; see *What Changes*. It is still true and is owed by its own change.
 
 ## What Changes
 
@@ -74,7 +77,8 @@ Chris also folded in three small items found earlier, so they ship in the same r
 - **Show the variable-length hint only when Variable length is selected.**
 - **State the new floor** in `README.md` and `docs/getting-started.md`, and correct `docs/publishing.md`:
   - it no longer says the TestSite accepts ImageSharp advisories;
-  - *What the audit cannot see* gains Umbraco's own repository advisories.
+  - *What the audit cannot see* gains Umbraco's own advisories until they reach the database
+    NuGet reads, which can take days.
 - **The upgrade checklist**, as for every floor raise:
   - regenerate the backoffice client against the running TestSite and read the diff;
   - confirm the migration list still holds;
@@ -108,8 +112,8 @@ carries:
 
 - **Umbraco 19.** `19.0.0-beta1` targets `net11.0` against .NET 11 release candidates. A spike comes
   later, and nothing ships against a beta.
-- **Making the audit see Umbraco's own advisories.** NuGet cannot, because the advisories are not in
-  the database it reads. This change documents that limit. A scripted check against Umbraco's advisory
+- **Making the audit see Umbraco's own advisories.** NuGet sees them only once they reach
+  the database it reads, which can be days late. This change documents that delay. A scripted check against Umbraco's advisory
   feed would be a CI change of its own.
 - **Moving `main`'s client off `@umbraco-cms/backoffice` 17.5.x.** That would be routine tidying, not
   a floor obligation, and `main`'s client already sees the right major.
@@ -153,13 +157,15 @@ The change sets `skip_specs: true`.
     see *What Changes*).
 - **Server:** the comment in `src/UBookIt.Backoffice/Composers/UBookItPermissionSeed.cs`.
 - **Tests:**
-  - the floor patterns in `UmbracoFloorDocumentationTests`;
+  - `UmbracoFloorDocumentationTests` must pass (it reads the floor from `Directory.Packages.props`,
+    so in the end it needed no edit);
   - a new guard over the localization terms;
   - a client test for the hint;
   - anything that counted the removed declarations.
 - **Documentation:**
   - `README.md` (the opening floor sentence and the *Requirements* row);
   - `docs/getting-started.md` (*Requirements* and the upgrade-first advice);
-  - `docs/publishing.md` (*Continuous integration*: accepted advisories, and what the audit cannot see).
+  - `docs/publishing.md` (*Continuous integration*: accepted advisories, and Umbraco's advisories
+    that have not yet reached the database).
 
   No page is added, so `docs/docs.json` is unchanged.
