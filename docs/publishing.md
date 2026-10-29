@@ -126,12 +126,13 @@ the lines do differ.
     site's .NET runtime fixes it. The trigger to check is a .NET security release: if it names a
     package on that list, the next release's changelog tells sites which runtime they need (the
     `packaging` spec's requirement on advisories).
-  - **Umbraco's own advisories, until they reach the database.** Umbraco publishes them first on
-    its GitHub repository's *Security* tab. The audit sees one only once it is in the global
-    advisory database NuGet reads, and then through `UBookIt.TestSite`: they are filed against
-    `Umbraco.Cms`, which that project references and resolves at uBookIt's floor. Getting there can
-    take days. None of the seven published on 27 October 2026 (one high) was in the database two
-    days later. So a green audit cannot be relied on for them. The trigger to check is an Umbraco
+  - **Umbraco's own advisories, unless they have reached the database.** Umbraco publishes them
+    first on its GitHub repository's *Security* tab. The audit sees one only once it is in the
+    global advisory database NuGet reads, and then through `UBookIt.TestSite`: they are filed
+    against `Umbraco.Cms`, which that project references and resolves at uBookIt's floor. Getting
+    there can take days, and nobody has checked that every one gets there. None of the seven
+    published on 27 October 2026 (one high) was in the database two days later. So a green audit
+    cannot be relied on for them. The trigger to check is an Umbraco
     release: read its advisories, and if the uBookIt floor admits a vulnerable version, raise the
     floor.
 

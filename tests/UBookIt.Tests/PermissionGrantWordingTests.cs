@@ -71,13 +71,13 @@ public class PermissionGrantWordingTests
     /// rather than those two terms, because it holds nothing but the switches' labels and
     /// descriptions, so a description added later is held to the same word.
     /// </summary>
-    [Theory]
-    [InlineData("tick")]
-    [InlineData("Tick")]
-    [InlineData("ticked")]
-    [InlineData("ticking")]
-    [InlineData("ticks")]
-    public void No_permission_description_says_to_tick_a_switch(string word)
+    /// <remarks>
+    /// A stem match, not <see cref="DocumentationAssert.DoesNotSay"/>: that matches whole words and is
+    /// case-sensitive, so a list of needles missed "Ticking", "Ticked" and "unticked" (QA round 2).
+    /// Any word beginning "tick" or "untick", in any case, is refused here.
+    /// </remarks>
+    [Fact]
+    public void No_permission_description_says_to_tick_a_switch()
     {
         var section = SectionBody(RepoFiles.Read($"{LocalizationDirectory}/en-us.ts"), "ubookitPermissions");
 
@@ -85,7 +85,14 @@ public class PermissionGrantWordingTests
         DocumentationAssert.Says(section, "switched on as well");
         DocumentationAssert.Says(section, "switch it on for the people who should decide these");
 
-        DocumentationAssert.DoesNotSay(section, word, "en-us.ts ubookitPermissions");
+        var ticks = Regex.Matches(section, @"(?<!\w)(?:un)?tick\w*", RegexOptions.IgnoreCase)
+            .Select(m => m.Value)
+            .ToList();
+
+        Assert.True(
+            ticks.Count == 0,
+            "en-us.ts ubookitPermissions describes its switches as something to tick: "
+            + string.Join(", ", ticks));
     }
 
     /// <summary>
