@@ -243,6 +243,15 @@ public static class RetiredClaims
     ];
 
     /// <summary>
+    /// The claims about Umbraco's user group editor alone. The backoffice's own terms describe
+    /// that same screen when they tell somebody where a permission is granted, so
+    /// <c>PermissionGrantWordingTests</c> holds these out of them too. The other sets are about
+    /// documentation pages and are not applied there.
+    /// </summary>
+    public static IReadOnlyList<RetiredClaim> AboutTheUserGroupEditor { get; } =
+        WrongAboutTheUserGroupEditor;
+
+    /// <summary>
     /// Every retired claim. The sweep holds all of these out of every shipped document.
     /// </summary>
     public static IReadOnlyList<RetiredClaim> All { get; } =

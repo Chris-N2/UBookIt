@@ -16,7 +16,7 @@ The version keeps uBookIt on the line for your Umbraco major. Without it the new
 chosen, which is for a later Umbraco, and the restore fails.
 
 Run the site, and uBookIt installs its schema on first boot. It needs **SQL Server** (not SQLite)
-and Umbraco 18.2.1 or later. The full requirements are further down, and
+and Umbraco 18.3.0 or later. The full requirements are further down, and
 [Getting started](https://github.com/Chris-N2/UBookIt/blob/18.5.0/docs/getting-started.md) walks through the rest of the setup, from your first
 resource to a booking arriving by email.
 
@@ -183,7 +183,7 @@ a breaking change.
 
 | | |
 |---|---|
-| **Umbraco** | **18.2.1 or later**, and not 19. Not 13, not the 14–16 STS line, and not 17 — uBookIt `17.x` is the release for Umbraco 17. On a site below 18.2.1, installing uBookIt raises the Umbraco packages it depends on and leaves the rest where they are; **upgrade `Umbraco.Cms` itself to 18.2.1 first** so every Umbraco package stays on one version. |
+| **Umbraco** | **18.3.0 or later**, and not 19. Not 13, not the 14–16 STS line, and not 17 — uBookIt `17.x` is the release for Umbraco 17. On a site below 18.3.0, installing uBookIt raises the Umbraco packages it depends on and leaves the rest where they are; **upgrade `Umbraco.Cms` itself to 18.3.0 first** so every Umbraco package stays on one version. |
 | **.NET** | 10.0 |
 | **Database** | **SQL Server 2019 or later**, including LocalDB and Azure SQL. SQLite is not supported, including the SQLite database a `dotnet new umbraco` site gives you by default. |
 

@@ -46,7 +46,7 @@ interface ClosureDraft {
  *
  * A user who may read but not write is TOLD SO, with where the grant is given, rather than
  * shown controls whose use would be refused. The settings verb is never seeded, so on an
- * upgraded site nobody holds it until an administrator ticks the box — a screen that merely
+ * upgraded site nobody holds it until an administrator switches it on — a screen that merely
  * rendered inert buttons would read as a feature that failed to ship.
  *
  * Accessibility notes follow the resources editor: native inputs are labelled with
