@@ -18,9 +18,12 @@ them necessary rather than optional:
   advisories**, so this was found by reading Umbraco's advisories by hand. They were published on
   Umbraco's repository and had not yet reached the global advisory database NuGet audit reads
   (checked 2026-10-29: 404). Earlier Umbraco advisories did reach it, filed against `Umbraco.Cms`,
-  which the audit sees through `UBookIt.TestSite`. So the gap is the delay, not a blind spot.
-  *(Corrected after QA round 1. This bullet first said these advisories never reach that database
-  and that no audited project references `Umbraco.Cms`. Both were false.)*
+  which the audit sees through `UBookIt.TestSite`. But reaching it can take days, and nothing
+  establishes that every one gets there, so a green audit cannot be relied on for them.
+  *(Corrected after QA rounds 1 and 2. This bullet first said these advisories "do not reach" that
+  database, which was false. It also gave "no shipped uBookIt package references `Umbraco.Cms`" as
+  a reason the audit could not see them. That is true, but misleading, because the audit also
+  covers `UBookIt.TestSite`, which does reference it.)*
 - **The packaging requirement now demands that two declarations be removed.** *A shipped package
   declares the fix for an advisory its host cannot yet supply* says a declaration "SHALL be removed
   once a supported Umbraco release depends on the fixed version". The stable nuspecs (read

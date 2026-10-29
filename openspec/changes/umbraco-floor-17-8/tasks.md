@@ -261,8 +261,11 @@
       *(Round 1 (same reviewer throughout): **REJECT**. Every mechanical claim was re-run and held:
       builds, all eight suite counts, both audits, the restore graphs, the nuspec diffs, validate, and
       the guard firing. Findings and what was done:
-      - **MAJOR:** `docs/publishing.md` said Umbraco's advisories do not reach the global database
-        NuGet reads, and that no audited project references `Umbraco.Cms`. Both were false.
+      - **MAJOR:** `docs/publishing.md` said Umbraco's advisories "do not reach" the global database
+        NuGet reads, which was false. It also gave "no shipped package references `Umbraco.Cms`" as a
+        reason the audit could not see them. That is literally true, but misleading, since the audit
+        also covers `UBookIt.TestSite`. *(This note first said "no audited project", misquoting the
+        original; QA round 2.)*
         `gh api "advisories?ecosystem=nuget&affects=Umbraco.Cms"` returns reviewed Umbraco advisories
         (e.g. GHSA-wr57-hqmp-fgvh, 2026-09-17), and `UBookIt.TestSite` references `Umbraco.Cms` at the
         floor. Rewritten: the audit sees them once they reach the database, through the TestSite, and
@@ -285,6 +288,16 @@
         - the *Impact* line about `UmbracoFloorDocumentationTests` is corrected;
         - `publishing.md`'s two long lines are rewrapped, and the CI-warnings sentence is now its own
           paragraph.)*
+      *(Round 2: **APPROVE WITH NITS**. Its three NITs, all taken:
+      - the tick sweep was case-sensitive and whole-word, so it missed "Ticking", "Ticked" and
+        "unticked". It is now one fact with a case-insensitive stem match, `(?<!\w)(?:un)?tick\w*`,
+        and the two positive pins stay. QA's own mutation ("Ticking it, or leaving it unticked, is up
+        to you." added to `configureDescription`) now fails it: `…describes its switches as something
+        to tick: Ticking, unticked`. Restored and confirmed;
+      - the correction notes misquoted the original claim. Fixed in the proposal and in 6.1 above;
+      - the new wording presumed every Umbraco advisory reaches the database. `publishing.md` is now
+        headed "unless they have reached the database" and says nobody has checked that every one gets
+        there, and the proposal says the same. The conclusion and the trigger are unchanged.)*
 - [ ] 6.2 Push both branches and open PRs; merge each once its CI is green and QA has approved.
       Verify: PR numbers, run IDs and merge SHAs recorded.
 - [ ] 6.3 Run the `audit` workflow on demand after both merge. Verify: green on both lines with no
