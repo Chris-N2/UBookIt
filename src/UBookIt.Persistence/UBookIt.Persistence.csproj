@@ -43,8 +43,6 @@
   <ItemGroup>
     <PackageReference Include="Umbraco.Cms.Persistence.EFCore" />
     <PackageReference Include="Microsoft.EntityFrameworkCore.SqlServer" />
-    <!-- Security pin, see Directory.Packages.props. -->
-    <PackageReference Include="System.Security.Cryptography.Pkcs" />
     <PackageReference Include="Microsoft.EntityFrameworkCore.Design">
       <PrivateAssets>all</PrivateAssets>
       <IncludeAssets>runtime; build; native; contentfiles; analyzers; buildtransitive</IncludeAssets>

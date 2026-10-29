@@ -46,8 +46,8 @@ public sealed class UBookItPermissionSeedComposer : IComposer
 /// <para>
 /// <b>The one-shot boundary, stated:</b> once the flag exists the seed never runs again,
 /// so a group emptied of its verbs by an administrator stays emptied, and a group granted
-/// the section AFTER this version starts from nothing until its verbs are ticked — "tick
-/// the section, then tick what they may do", per the docs.
+/// the section AFTER this version starts from nothing until its verbs are switched on — "add
+/// the section, then switch on what they may do", per the docs.
 /// </para>
 /// <para>
 /// Updates are performed as the super-user (the Umbraco super-user key):
@@ -83,9 +83,9 @@ internal sealed class UBookItPermissionSeed(
     /// </para>
     /// <para>
     /// So the settings verb is granted only by an administrator, deliberately, in Users → User
-    /// Groups → Default permissions. The section says so rather than merely rendering nothing,
+    /// Groups, in the box headed "uBookIt". The section says so rather than merely rendering nothing,
     /// because <c>UBookItVerbHandler</c> has no super-user bypass: an Umbraco administrator who has
-    /// not ticked it is refused like anyone else, and an unexplained empty section would read as a
+    /// not switched it on is refused like anyone else, and an unexplained empty section would read as a
     /// feature that failed to ship.
     /// </para>
     /// </remarks>
