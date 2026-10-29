@@ -14,8 +14,8 @@ export const manifests: Array<UmbExtensionManifest> = [
     js: () => import("./verb.condition.js"),
   },
 
-  // The four permission verbs, surfaced as toggles in the user group editor's
-  // Default permissions pane by Umbraco's own extension surface — no custom UI.
+  // The four permission verbs, surfaced as switches in the user group editor's
+  // box headed "uBookIt" by Umbraco's own extension surface — no custom UI.
   // The verbs are the server's constants verbatim; a server-side guard fails when
   // the two vocabularies disagree.
   {
@@ -199,7 +199,7 @@ export const manifests: Array<UmbExtensionManifest> = [
       //
       // The verb is never seeded, so on every upgraded site it starts out held by nobody — and
       // UBookItVerbHandler has no super-user bypass, so not even an Umbraco administrator has it
-      // until somebody ticks the box. A tab that simply did not appear would read as a feature
+      // until somebody switches it on. A tab that simply did not appear would read as a feature
       // that failed to ship. The view itself renders the explanation instead, and the server
       // refuses the data regardless, so nothing is exposed by showing the tab.
     ],
