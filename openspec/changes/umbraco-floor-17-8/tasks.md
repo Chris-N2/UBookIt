@@ -255,7 +255,7 @@
 
 ## 6. QA, merge, archive
 
-- [ ] 6.1 QA in a fresh subagent, one reviewer covering both branches and reused across rounds.
+- [x] 6.1 QA in a fresh subagent, one reviewer covering both branches and reused across rounds.
       Hand over the claims (build state, test counts, audit output, nuspec diffs, live observations)
       to be verified rather than trusted. Allow reverted mutations. Verify: APPROVE.
       *(Round 1 (same reviewer throughout): **REJECT**. Every mechanical claim was re-run and held:
@@ -298,6 +298,11 @@
       - the new wording presumed every Umbraco advisory reaches the database. `publishing.md` is now
         headed "unless they have reached the database" and says nobody has checked that every one gets
         there, and the proposal says the same. The conclusion and the trigger are unchanged.)*
+      *(Round 3: **APPROVE**, nothing owed. QA confirmed the same patch on both lines and re-ran the
+      clean Release builds (0 warnings, 0 errors on both), `UBookIt.Tests` (2496 / 2490) and validate
+      (28/28 both). Its own extra mutation, "UNTICKED by default.", failed the sweep as it should.
+      Final suites: client 391; unit 2496 (main) / 2490 (v18); integration 222; rendering 1211.
+      No `src` file changed after round 1.)*
 - [ ] 6.2 Push both branches and open PRs; merge each once its CI is green and QA has approved.
       Verify: PR numbers, run IDs and merge SHAs recorded.
 - [ ] 6.3 Run the `audit` workflow on demand after both merge. Verify: green on both lines with no
