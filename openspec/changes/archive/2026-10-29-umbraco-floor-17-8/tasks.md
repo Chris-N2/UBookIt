@@ -303,13 +303,31 @@
       (28/28 both). Its own extra mutation, "UNTICKED by default.", failed the sweep as it should.
       Final suites: client 391; unit 2496 (main) / 2490 (v18); integration 222; rendering 1211.
       No `src` file changed after round 1.)*
-- [ ] 6.2 Push both branches and open PRs; merge each once its CI is green and QA has approved.
+- [x] 6.2 Push both branches and open PRs; merge each once its CI is green and QA has approved.
       Verify: PR numbers, run IDs and merge SHAs recorded.
-- [ ] 6.3 Run the `audit` workflow on demand after both merge. Verify: green on both lines with no
+      *(2026-10-29. Git had no stored HTTPS credential, so each push passed `gh auth git-credential`
+      as the helper for that command only; the global git config is unchanged.
+      - **PR #63** (`main`): `verify` runs `40950302992` and `40950375739`, both pass; merged as
+        `e55ba79`.
+      - **PR #64** (`dev/v18`): `verify` runs `40950308775` and `40950382008`, both pass; merged as
+        `1a05632`.
+
+      No parity-checked path was touched, so the order did not matter.)*
+- [x] 6.3 Run the `audit` workflow on demand after both merge. Verify: green on both lines with no
       `Accepted advisory` notices; run ID recorded.
-- [ ] 6.4 Archive on each line, after an outward search of `openspec/specs` and `docs/` for any
+      *(Run `40951046428` on `main` at `e55ba79`: `audit (main)` success and `audit (dev/v18)` success.
+      Neither job has any annotations, so there are no `Accepted advisory` notices. That is the first
+      clean audit with no accepted findings since 2026-10-11.)*
+- [x] 6.4 Archive on each line, after an outward search of `openspec/specs` and `docs/` for any
       sentence the floor raise or the removals falsify. Verify: `openspec validate --all --strict`
       passes on both lines, and the search result is recorded.
+      *(Searched `openspec/specs`, `docs/` and README for `17.7.1|18.2.1|MessagePack|Pkcs|ImageSharp|
+      accepted advisor|Default permissions|ticking “`. Two hits, neither falsified:
+      - `packaging/spec.md:1184` uses Pkcs as a general example of an unpruned framework assembly;
+      - `docs/publishing.md:139-140` is this change's own "No advisory is accepted today".
+
+      QA's round-1 sweep found the same. `skip_specs`, so the archive syncs no spec. Each line is
+      archived on its own close-out branch.)*
 - [ ] 6.5 Then the release change (`17.7.0` / `18.6.0`). It carries the changelog: the Umbraco
       advisories and new floor, the removed declarations, the fixed messages and hint, and the
       `docs-single-source` debt. It also carries the Trusted Publishing org-policy observation, and
