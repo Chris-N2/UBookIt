@@ -84,9 +84,11 @@ Chris also folded in three small items found earlier, so they ship in the same r
 
 - Raise `Microsoft.AspNetCore.OpenApi` 10.0.11 → 10.0.12. `Umbraco.Cms.Api.Common` /
   `.Api.Management` 18.3.0 require it, so this is the same NU1605 constraint as EF Core.
-- Move the client's `@umbraco-cms/backoffice` from `^17.5.3` to Umbraco 18's package, matching the
-  floor. This is the one item whose size is unknown. If the TypeScript or client-test fallout turns
-  out to be more than small, apply stops and asks Chris before going further (design D5).
+- ~~Move the client's `@umbraco-cms/backoffice` from `^17.5.3` to Umbraco 18's package.~~ **Split
+  off at apply (Chris, 2026-10-29).** The 18.3.0 package requires `@hey-api/openapi-ts` 0.99 or
+  later, so the move also means upgrading the client's generator from 0.85 and regenerating the API
+  client. That hit design D6's stop condition. It becomes a change of its own on `dev/v18`, so this
+  change does not move v18's client.
 
 **Not breaking.** No public API changes and no schema changes. The higher floor makes NuGet raise a
 site's Umbraco packages to 17.8.0 / 18.3.0 when it installs or updates uBookIt. The advisories call
@@ -147,7 +149,8 @@ The change sets `skip_specs: true`.
   - `src/localization/en-us.ts` (three terms);
   - `src/section/services-editor.element.ts`;
   - the stale comment in `src/section/manifest.ts`;
-  - on v18, `package.json` / `package-lock.json` and whatever the 18 typings require.
+  - ~~on v18, `package.json` / `package-lock.json` and whatever the 18 typings require~~ (split off,
+    see *What Changes*).
 - **Server:** the comment in `src/UBookIt.Backoffice/Composers/UBookItPermissionSeed.cs`.
 - **Tests:**
   - the floor patterns in `UmbracoFloorDocumentationTests`;
