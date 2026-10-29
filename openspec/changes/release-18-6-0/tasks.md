@@ -68,7 +68,7 @@
 
 ## 3. Review and merge
 
-- [ ] 3.1 QA (`qa-review`) in one subagent, reused across rounds, covering this change and
+- [x] 3.1 QA (`qa-review`) in one subagent, reused across rounds, covering this change and
   `release-17-7-0`. Brief it that temporary source mutations are allowed if reverted. Verify:
   APPROVE.
   *(Round 1: **REJECT**. The reviewer independently confirmed the advisories, the downgrade minimums
@@ -86,6 +86,16 @@
     refusal names two switches.
   - **NIT, recorded:** nothing guards the entry's `--version` literal. It was checked by eye, and is
     left unguarded for a one-off entry.)*
+  *(Round 2: **APPROVE WITH NITS**, nothing owed before merge. The reviewer re-checked each fix as new code:
+  - the MessagePack paragraph, against the assets files, the 17.4.0 / 18.3.0 entries and the
+    versions that exist on nuget.org;
+  - the scoped quote, against `en-us.ts`;
+  - the deferral, against `publish.yml`'s `push_one`;
+  - the round-1 record on both lines, with no placeholder left.
+
+  Its 211/211 guard filter passed and validate was 28/28. Its one NIT, an over-long line in the
+  refusal paragraph, was re-wrapped on both lines. The word diff is empty and the guards still pass,
+  171/171 each.)*
 - [ ] 3.2 Push this branch and open the PR. Verify: the PR's CI is green, parity included.
 - [ ] 3.3 Merge with a merge commit, **without `--delete-branch`**. Verify: `origin/dev/v18` is the
   merge commit, and its push run is green.
