@@ -182,7 +182,9 @@
       - `UBookIt.Web`: two Umbraco ranges raised; `MessagePack 3.1.9` and `Pkcs 10.0.13` removed.
 
       Nothing else differs.)*
-- [ ] 4.4 `openspec validate --all --strict` after the last commit. Verify: all pass.
+- [x] 4.4 `openspec validate --all --strict` after the last commit. Verify: all pass.
+      *(28 passed, 0 failed, on both branches after the v18 record commit, with the change folders
+      identical across the two. Run again after any later commit.)*
 
 ## 5. Port to `dev/v18` (branch `umbraco-floor-17-8-v18`)
 
