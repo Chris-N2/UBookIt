@@ -50,12 +50,15 @@ A site installing uBookIt today gets `17.6.0`, which still admits a vulnerable U
      recorded from `docs-single-source`.
 3. **Pack from the merged, pushed commit, tag it, verify the artifact, and publish through
    `publish.yml`.** Then date the entry and archive.
-4. **The Trusted Publishing observation.** Before approving, Chris **disables** (does not delete) his
-   personal Trusted Publishing policy, so the publish must match the organisation-owned policy. That
-   settles the open question of which policy matches. `NuGet/login` runs before any push, so a
-   failure there costs no version: re-enable the policy and re-run the job. Whatever is seen goes
-   into `docs/publishing.md` (*Trusted Publishing setup* names `CNorwood69` as owner) in the
-   close-out, on both lines.
+4. **The Trusted Publishing observation is deferred (Chris, 2026-10-29, after QA round 1).** The plan
+   was to disable the personal policy so the publish had to match the organisation-owned one. QA
+   found that cannot work yet. nuget.org lists `Norwood-Design-and-Development` as an owner of
+   `UBookIt` only; `UBookIt.Core`, `.Persistence`, `.Backoffice` and `.Web` are owned by `CNorwood69`
+   alone. A policy applies only to the packages its owner owns, so with the personal policy disabled
+   the first library push would be refused (403), not the login. This release therefore publishes
+   with **both policies enabled**, as before. Chris adds the organisation as co-owner of the four
+   libraries afterwards, and the next release runs the observation. `docs/publishing.md` is not
+   changed by this release.
 
 ## Non-goals
 
