@@ -71,6 +71,21 @@
 - [ ] 3.1 QA (`qa-review`) in one subagent, reused across rounds, covering this change and
   `release-17-7-0`. Brief it that temporary source mutations are allowed if reverted. Verify:
   APPROVE.
+  *(Round 1: **REJECT**. The reviewer independently confirmed the advisories, the downgrade minimums
+  against the published nuspecs, the dependency claims from the assets files, the wording diff, the
+  docs claims (all 26 published READMEs carried the bare command), minor as the class, the 31-line
+  bump, the clean builds, every suite count, the audit and validate. Findings:
+  - **MAJOR:** the Trusted Publishing observation could not work. The organisation co-owns only
+    `UBookIt`, so with the personal policy disabled the libraries' push is refused, and 4.3's
+    recovery named the wrong step. I confirmed the owners from nuget.org's search API. **Chris
+    deferred the observation** (proposal item 4; 4.3, 5.2 and 5.4 rewritten).
+  - **MINOR:** the entry omitted that a site which followed the `18.3.0` advice (MessagePack 3.1.9) fails
+    restore with NU1605, because Umbraco now requires 3.1.11. Added under *What you have to do*. The
+    earlier entry's wording was re-read to confirm it said 3.1.9.
+  - **NIT, taken:** the refusal quote is now "The settings refusals now say", since the closures read
+    refusal names two switches.
+  - **NIT, recorded:** nothing guards the entry's `--version` literal. It was checked by eye, and is
+    left unguarded for a one-off entry.)*
 - [ ] 3.2 Push this branch and open the PR. Verify: the PR's CI is green, parity included.
 - [ ] 3.3 Merge with a merge commit, **without `--delete-branch`**. Verify: `origin/dev/v18` is the
   merge commit, and its push run is green.
@@ -100,19 +115,20 @@
     address is pinned to `18.6.0`.
 
   Show the check script can fail (against the `18.5.0` artifact with this release's expectations).
-- [ ] 4.3 **Chris disables his personal Trusted Publishing policy on nuget.org** (disable, not
-  delete), then approves. Record which policy the run authenticated through, the summary table and
-  the conclusion. If `NuGet/login` fails, re-enable the personal policy and re-run the job. No
-  version is spent.
+- [ ] 4.3 Chris approves, with **both Trusted Publishing policies left enabled** (the observation is
+  deferred, see the proposal's item 4). Record the summary table and the conclusion. If a push is
+  refused, the meta-package goes last and so stays unpushed. Fix the cause, then re-run the
+  publish job; already-published packages are reported as *already present*.
 - [ ] 4.4 Confirm `18.6.0` per package on the flat container, and that the package page renders.
 
 ## 5. Close out
 
 - [ ] 5.1 Stamp the entry's date.
-- [ ] 5.2 Record the Trusted Publishing outcome in `docs/publishing.md` (*Trusted Publishing setup*,
-  and the *Status* outstanding bullet on ownership), on both lines, in the same words.
+- [ ] 5.2 Record in the deferred-obligations memory that the Trusted Publishing observation is
+  deferred, and what it waits on: the organisation co-owning all five ids, with Chris's invitations
+  accepted. `docs/publishing.md` is unchanged.
 - [ ] 5.3 Sibling sweep for `18.5.0` and for sentences the release falsifies. Fix or record each.
 - [ ] 5.4 Update the deferred-obligations memory: the `docs-single-source` changelog obligation is
-  paid, and so is the Trusted Publishing observation, if seen.
+  paid.
 - [ ] 5.5 Archive last, running the unit suite and `openspec validate --all --strict` before the
   push.
