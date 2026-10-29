@@ -18,6 +18,71 @@ See [the versioning note](README.md#versions-and-the-api-promise).
 
 ---
 
+## 17.7.0
+
+### What you have to do
+
+**uBookIt now requires Umbraco 17.8.0 or later.** On 27 October 2026 Umbraco published seven
+security advisories, one of them rated high (GHSA-rpv9-qp4c-g469, a backoffice account takeover via
+sign-in redirect manipulation). They affect Umbraco 17.7.1 and every earlier 17 release, and
+Umbraco's fixes are in 17.7.2 and in 17.8.0. Umbraco lists them on the *Security* tab of its GitHub
+repository. uBookIt's floor was 17.7.1, so a site could install it on a vulnerable Umbraco; it can
+no longer.
+
+**Upgrade `Umbraco.Cms` itself to 17.8.0 first**, then update uBookIt. If you update uBookIt
+first, your package manager raises only the Umbraco packages uBookIt depends on and leaves the rest
+where they are. Umbraco's packages are meant to stay on one version.
+
+Nothing else is asked of you. No published API is added, removed or changed, there is no schema
+change, and no configuration changes.
+
+**Going back to 17.6.x afterwards is safe** on Umbraco 17.8.0. 17.6.0 accepts any Umbraco from
+17.7.1 below 18. The minimums it declares (Pkcs 10.0.13, MessagePack 3.1.9, EF Core 10.0.11) are
+all met by what Umbraco 17.8.0 already brings, so nothing is downgraded.
+
+### What changed
+
+**When you are refused a uBookIt permission, the message now says where it is granted.** The
+settings screen and the closures screen used to send an administrator to a place in the user group
+editor that does not exist in Umbraco 17, and to "tick" something. They now say: *An administrator
+can grant it in Users → User Groups: open a group and, in the box headed “uBookIt”, switch on
+“Change site settings”.* The permissions there are switches, so the descriptions of *Act on
+bookings* and *Change site settings* now say "switched on" and "switch it on" rather than "ticked"
+and "tick".
+
+**The services editor shows the variable-length hint only for a variable length.** The hint ("The
+person booking chooses how long they need…") was shown with **Fixed length** selected too, where it
+is not true.
+
+**The documentation is restructured**, and is now the single source for the documentation site:
+- **A new *Getting started* page** takes a site from install to a working booking: requirements,
+  granting access, a resource and its hours, a service, the booking page, and checking an email
+  arrives.
+- **A new *Email templates* page** holds what was spread through the notifications page: the view
+  file for each message, the `@inherits` line for each model, a table of each model's members,
+  template sets, and what falls back when. The notifications page points to it.
+- **`docs/docs.json`** lists the published pages in order. A site that renders uBookIt's
+  documentation reads it.
+- **The access instructions now match Umbraco 17's user group editor:** add **uBookIt** under
+  *Sections*, then switch on what the group may do in the box headed **uBookIt**.
+- **The install command now names the line**: `dotnet add package UBookIt --version "17.*"`. A bare
+  `dotnet add package UBookIt` on an Umbraco 17 site picks the newest uBookIt, an `18.x` built for
+  Umbraco 18, and restore then fails with NU1107. Every earlier README showed the bare command, which
+  has misled since `18.0.0` shipped.
+- **The README states SQL Server 2019 or later**, where it said only SQL Server.
+
+### For developers
+
+- **Dependencies.** Every Umbraco dependency is now `[17.8.0, 18.0.0)`. `UBookIt.Persistence`
+  requires EF Core SqlServer `10.0.12`, which Umbraco 17.8.0 itself requires.
+- **`UBookIt.Persistence` and `UBookIt.Web` no longer declare `System.Security.Cryptography.Pkcs`,
+  and `UBookIt.Backoffice` and `UBookIt.Web` no longer declare `MessagePack`.** 17.3.2 and 17.4.0
+  added them to raise the minimum past advisories that no Umbraco release fixed yet. Umbraco 17.8.0
+  now depends on Pkcs 10.0.13 and MessagePack 3.1.11 itself, so a site resolves the same or a later
+  version without them. Nothing is lowered.
+- **No public API change**, no migration, and no change to the delivery API, the Management API or
+  the booking flow's markup.
+
 ## 17.6.0 — 2026-10-20
 
 ### What you have to do
