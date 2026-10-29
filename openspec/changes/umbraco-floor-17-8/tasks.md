@@ -93,12 +93,15 @@
 
 ## 3. Documentation on `main`
 
-- [ ] 3.1 `README.md`: the opening floor sentence and the *Requirements* row say `17.8.0`, including
+- [x] 3.1 `README.md`: the opening floor sentence and the *Requirements* row say `17.8.0`, including
       "below 17.8.0" and "upgrade `Umbraco.Cms` itself to 17.8.0 first". `docs/getting-started.md`:
       *Requirements* and the upgrade-first sentence say the same. Verify:
       - `UmbracoFloorDocumentationTests` is green, with its patterns moved to 17.8.0;
       - no shipped page states 17.7.1 as the floor (grep README and `docs/`).
-- [ ] 3.2 `docs/publishing.md`, *Continuous integration*:
+      *(README ×4 and getting-started ×2 now say 17.8.0. `UmbracoFloorDocumentationTests` reads the floor
+      from `Directory.Packages.props`, so it needed no edit, and it is green. A grep of README and
+      `docs/` for `17.7.1|18.2.1` finds nothing.)*
+- [x] 3.2 `docs/publishing.md`, *Continuous integration*:
       - replace "Today the only accepted advisories are `UBookIt.TestSite`'s…" with the true state
         (none);
       - add Umbraco's own repository advisories to *What the audit cannot see*: not in the database
@@ -107,6 +110,9 @@
 
       Verify: the documentation suites (`DocumentationLinkTests`, the publishing-runbook guards) are
       green.
+      *(*What the audit cannot see* is now a two-item list: pruned packages, then Umbraco's own
+      advisories. The second gives the reasons, the 27 Oct example, and the trigger. The accepted-advisories
+      sentence now says none, and why the last went. Full unit run: **2495 passed** (2491 + 4), 0 failed.)*
 
 ## 4. Verify `main`
 
