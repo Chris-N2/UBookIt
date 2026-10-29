@@ -186,7 +186,7 @@
 
 ## 5. Port to `dev/v18` (branch `umbraco-floor-17-8-v18`)
 
-- [ ] 5.1 Branch from `dev/v18` and unset any upstream to `origin/dev/v18`. Cherry-pick the change
+- [x] 5.1 Branch from `dev/v18` and unset any upstream to `origin/dev/v18`. Cherry-pick the change
       folder, the text/guard/hint commits and the `docs/publishing.md` commit. Redo by hand:
       - the floor as `[18.3.0,19.0.0)`;
       - EF Core and `Microsoft.AspNetCore.OpenApi` at `10.0.12`;
@@ -195,6 +195,26 @@
       - the README and `getting-started.md` in v18's wording (18.3.0).
 
       Verify: as 1.1–1.3 and 3.1, at 18.3.0.
+      *(2026-10-29. The branch was made from `dev/v18` at `d456023` (= `origin/dev/v18`) in the
+      `uBookIt-v18` worktree. A local branch created that way has no upstream, which `git branch
+      --unset-upstream` confirmed ("has no upstream information"). All five commits were
+      cherry-picked. The conflicts were exactly the floors:
+      - `Directory.Packages.props`: v18's file was kept and redone by hand: the range, EF Core and
+        OpenApi at 10.0.12, and both declaration groups removed;
+      - `README.md` and `getting-started.md`: v18's text kept, with `18.2.1` → `18.3.0` (×4, ×2).
+
+      The csproj removals and the TestSite suppression removal applied cleanly.
+
+      **Commit subjects:** two of the cherry-picked subjects say "17.8.0" on v18; their contents are
+      v18's.
+
+      Results:
+      - restore is clean (no NU1605);
+      - every project resolves `Umbraco.Cms*` 18.3.0, Pkcs 10.0.13 and MessagePack 3.1.11 (where
+        reached), EF Core and OpenApi 10.0.12, and ImageSharp 3.2.0 (TestSite);
+      - there are no direct Pkcs or MessagePack references;
+      - the audit: `audited 10 project(s)… 0 finding(s) accepted` / `No known advisories`, exit 0;
+      - a grep of README and `docs/` finds no `18.2.1`.)*
 - [x] 5.2 ~~Move the client's~~ **Split off by Chris's decision (2026-10-29), at design D6's stop
       condition.** `@umbraco-cms/backoffice` 18.3.0 declares a peer `@hey-api/openapi-ts`
       `>=0.99.0 <1.0.0`, and the client's generator is `^0.85.2`, so `npm install` refuses with
@@ -205,8 +225,31 @@
       Move the client's `@umbraco-cms/backoffice` to `^18.3.0` and regenerate `package-lock.json`
       (design D6). Verify: `npm run build` and `npm test` are green. **If they need more than small,
       local edits, stop and report to Chris before going on.** Record every edit made for 18's typings.
-- [ ] 5.3 Run 4.1–4.4 on v18, at v18's baselines (unit 2485) plus the delta, against the published
+- [x] 5.3 Run 4.1–4.4 on v18, at v18's baselines (unit 2485) plus the delta, against the published
       `18.5.0` nuspecs. The live pass uses an 18.3.0 TestSite. Verify: each result recorded.
+      *(2026-10-29, `dev/v18` port:
+      - client built, then `--no-incremental` Release: **0 warnings, 0 errors**;
+      - suites, in order, nothing skipped: client **391**, unit **2489** (2485 + 4), integration
+        **222**, rendering **1211**;
+      - `has-pending-model-changes`: none;
+      - the TestSite started on 18.3.0. `generate-client` against `/umbraco/openapi/ubookitbackoffice.json`
+        changed only `types.gen.ts`, and the diff ignoring CR is empty. The working copy was restored;
+      - pack vs nuget.org's 18.5.0 nuspecs: `UBookIt` and `Core` identical. `Backoffice`: Umbraco ranges
+        `[18.2.1` → `[18.3.0`, OpenApi 10.0.11 → 10.0.12, MessagePack 3.1.9 removed. `Persistence`:
+        range raised, EF Core 10.0.11 → 10.0.12, Pkcs removed. `Web`: ranges raised, OpenApi →
+        10.0.12, MessagePack and Pkcs removed. Nothing else differs. **OpenApi 10.0.12 is a v18-only
+        addition to design D2's expected list**, forced by the same NU1605 constraint as EF Core;
+      - live, in Chrome. Chris signed in, because the browser's saved login did not submit by itself:
+        - the Hot desk editor hides the hint for Fixed length and shows it again for Variable (not saved);
+        - booking **DTJ3-7MQH**: DBO Granted, Mon 9 Nov 2026 10:00–11:00. Confirmed, and found by
+          reference on the Bookings screen;
+        - the group editor's box headed **uBookIt** shows the new switch descriptions;
+        - with **Change site settings** off on Administrators, Settings and Closures showed the
+          corrected `notPermitted` and `notPermittedWrite` wording. It was switched back on and saved,
+          and Settings rendered its data again;
+        - console: 12 errors, all 19:21:54–19:23:08. They are SignalR negotiation (1006, failed fetch,
+          401) and one `UmbAuthClient` token refresh 400, from swapping `main`'s site for v18's and
+          before Chris signed in. All are Umbraco core, before the pass, with none from uBookIt.)*
 
 ## 6. QA, merge, archive
 
