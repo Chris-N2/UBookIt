@@ -138,7 +138,7 @@
       - `dotnet ef migrations has-pending-model-changes`: "No changes have been made to the model
         since the last migration";
       - the audit: exit 0, 0 accepted (recorded at 1.3).)*
-- [ ] 4.2 Live pass on the TestSite, running 17.8.0, in Chrome:
+- [x] 4.2 Live pass on the TestSite, running 17.8.0, in Chrome:
       - the section and all its views load;
       - a booking is placed on the front end and found on the Bookings screen;
       - as a user without *Change site settings*, the Settings and Closures views show the corrected
@@ -148,6 +148,26 @@
       - no uBookIt console errors.
 
       Verify: each observation recorded, with the booking reference.
+      *(2026-10-29, TestSite on Umbraco 17.8.0, signed in as the site's admin:
+      - Resources, Services, Bookings, Closures and Settings all render their data;
+      - booking **94P4-D3S8**: placed on the harness for Closure Live Room, Mon 2 Nov 2026
+        11:00–12:00, shown as "Booking confirmed". Found by reference on the Bookings screen: Confirmed,
+        "Booked directly";
+      - the Hot desk editor: with Variable length the hint shows; with Fixed length it is gone; back to
+        Variable and it returns. Not saved;
+      - in the user group editor, the box headed **uBookIt** shows the new switch descriptions
+        ("'See bookings' switched on as well", "switch it on for the people who should decide these");
+      - **Change site settings** switched off on Administrators. Settings showed "…An administrator can
+        grant it in Users → User Groups: open a group and, in the box headed “uBookIt”, switch on
+        “Change site settings”. It is not granted automatically, including on upgrade." Closures listed
+        the closures and showed the `notPermittedWrite` wording instead of its controls;
+      - **Configure resources and services** switched off as well. The Closures tab is then not shown
+        at all, because its view is gated on the two grants (as the comment above the terms in
+        `en-us.ts` says), so **`notPermittedRead` cannot be reached in the UI** and is held only by
+        `PermissionGrantWordingTests`;
+      - both switches were turned back on, saved, and confirmed by reloading the group. Settings then
+        rendered its data again;
+      - no console errors across the section's views (read after the reload).)*
 - [x] 4.3 Pack Release and compare each nuspec with the published `17.6.0` one, parsed as XML (design
       D2). Verify: the only differences are the Umbraco minimum, the removed `Pkcs` / `MessagePack`
       dependencies, and EF Core `10.0.12` on Persistence (record the diff).
@@ -175,7 +195,14 @@
       - the README and `getting-started.md` in v18's wording (18.3.0).
 
       Verify: as 1.1–1.3 and 3.1, at 18.3.0.
-- [ ] 5.2 Move the client's `@umbraco-cms/backoffice` to `^18.3.0` and regenerate `package-lock.json`
+- [x] 5.2 ~~Move the client's~~ **Split off by Chris's decision (2026-10-29), at design D6's stop
+      condition.** `@umbraco-cms/backoffice` 18.3.0 declares a peer `@hey-api/openapi-ts`
+      `>=0.99.0 <1.0.0`, and the client's generator is `^0.85.2`, so `npm install` refuses with
+      ERESOLVE. Moving the package means moving a pre-1.0 generator across many minors and
+      regenerating the API client. Chris chose (a): a change of its own on v18. Not (b), doing it here;
+      not (c), `--legacy-peer-deps`, which would claim an unmet peer is met. Nothing was installed:
+      `package.json` and the lock file are unchanged. The original text of the task follows.
+      Move the client's `@umbraco-cms/backoffice` to `^18.3.0` and regenerate `package-lock.json`
       (design D6). Verify: `npm run build` and `npm test` are green. **If they need more than small,
       local edits, stop and report to Chris before going on.** Record every edit made for 18's typings.
 - [ ] 5.3 Run 4.1–4.4 on v18, at v18's baselines (unit 2485) plus the delta, against the published

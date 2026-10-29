@@ -137,6 +137,14 @@ own change, without holding up the floor raise.
 `LocalizationCultureTests` reads `UMB_DEFAULT_LOCALIZATION_CULTURE` from the installed package. After
 the move it reads 18's, which is the intent.
 
+**Outcome at apply (2026-10-29): the stop condition fired before any code changed.**
+`@umbraco-cms/backoffice` 18.3.0 declares a peer `@hey-api/openapi-ts` `>=0.99.0 <1.0.0`, and the
+client generates its API code with `^0.85.2`, so npm refused the install (ERESOLVE). The move is
+therefore also a generator upgrade across many pre-1.0 minors, with a regenerated client to review.
+Chris chose to **split it into its own change on `dev/v18`**. Forcing the install with
+`--legacy-peer-deps` was rejected, because it would claim an unmet peer is satisfied. This change
+leaves v18's client on `^17.5.3`, exactly as it was.
+
 ### D7. Order: `main` first, then a port branch for `dev/v18`
 
 Same procedure as `umbraco-security-2026-10`:
