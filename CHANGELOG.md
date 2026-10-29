@@ -33,6 +33,10 @@ no longer.
 first, your package manager raises only the Umbraco packages uBookIt depends on and leaves the rest
 where they are. Umbraco's packages are meant to stay on one version.
 
+**If your site references MessagePack directly, raise that reference to 3.1.11 or later before you
+upgrade.** The 18.3.0 notes asked such a site for 3.1.9 or later. Umbraco 18.3.0 itself requires
+3.1.11, so a reference left at 3.1.9 or 3.1.10 fails restore with NU1605.
+
 Nothing else is asked of you. No published API is added, removed or changed, there is no schema
 change, and no configuration changes.
 
@@ -45,7 +49,7 @@ is downgraded.
 
 **When you are refused a uBookIt permission, the message now says where it is granted.** The
 settings screen and the closures screen used to send an administrator to a place in the user group
-editor that does not exist in Umbraco 18, and to "tick" something. They now say: *An administrator
+editor that does not exist in Umbraco 18, and to "tick" something. The settings refusals now say: *An administrator
 can grant it in Users → User Groups: open a group and, in the box headed “uBookIt”, switch on
 “Change site settings”.* The permissions there are switches, so the descriptions of *Act on
 bookings* and *Change site settings* now say "switched on" and "switch it on" rather than "ticked"
