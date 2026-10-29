@@ -48,11 +48,11 @@ all met by what Umbraco 17.8.0 already brings, so nothing is downgraded.
 
 **When you are refused a uBookIt permission, the message now says where it is granted.** The
 settings screen and the closures screen used to send an administrator to a place in the user group
-editor that does not exist in Umbraco 17, and to "tick" something. The settings refusals now say: *An administrator
-can grant it in Users → User Groups: open a group and, in the box headed “uBookIt”, switch on
-“Change site settings”.* The permissions there are switches, so the descriptions of *Act on
-bookings* and *Change site settings* now say "switched on" and "switch it on" rather than "ticked"
-and "tick".
+editor that does not exist in Umbraco 17, and to "tick" something. The settings refusals now say:
+*An administrator can grant it in Users → User Groups: open a group and, in the box headed
+“uBookIt”, switch on “Change site settings”.* The permissions there are switches, so the
+descriptions of *Act on bookings* and *Change site settings* now say "switched on" and "switch it
+on" rather than "ticked" and "tick".
 
 **The services editor shows the variable-length hint only for a variable length.** The hint ("The
 person booking chooses how long they need…") was shown with **Fixed length** selected too, where it
