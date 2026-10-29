@@ -96,15 +96,15 @@
   Its 211/211 guard filter passed and validate was 28/28. Its one NIT, an over-long line in the
   refusal paragraph, was re-wrapped on both lines. The word diff is empty and the guards still pass,
   171/171 each.)*
-- [ ] 3.2 Push this branch and open the PR. Verify: the PR's CI is green, parity included.
-- [ ] 3.3 Merge with a merge commit, **without `--delete-branch`**. Verify: `origin/dev/v18` is the
+- [x] 3.2 Push this branch and open the PR. Verify: the PR's CI is green, parity included.
+- [x] 3.3 Merge with a merge commit, **without `--delete-branch`**. Verify: `origin/dev/v18` is the
   merge commit, and its push run is green.
 
 ## 4. Release through the workflow
 
-- [ ] 4.1 Chris pushes tag `18.6.0` on the merge commit, **by explicit SHA**. Verify: `check` and
+- [x] 4.1 Chris pushes tag `18.6.0` on the merge commit, **by explicit SHA**. Verify: `check` and
   `pack` are green.
-- [ ] 4.2 **Before approving**, check the run's `packages` artifact (Chris downloads it to
+- [x] 4.2 **Before approving**, check the run's `packages` artifact (Chris downloads it to
   `artifacts\packages-v18`), parsing each nuspec as XML:
   - the tagged `booking-flow.png` returns 200;
   - there are exactly 5 `.nupkg` and 4 `.snupkg`, all `18.6.0`, each `.snupkg` holding its `.pdb`;
@@ -125,20 +125,50 @@
     address is pinned to `18.6.0`.
 
   Show the check script can fail (against the `18.5.0` artifact with this release's expectations).
-- [ ] 4.3 Chris approves, with **both Trusted Publishing policies left enabled** (the observation is
+- [x] 4.3 Chris approves, with **both Trusted Publishing policies left enabled** (the observation is
   deferred, see the proposal's item 4). Record the summary table and the conclusion. If a push is
   refused, the meta-package goes last and so stays unpushed. Fix the cause, then re-run the
   publish job; already-published packages are reported as *already present*.
-- [ ] 4.4 Confirm `18.6.0` per package on the flat container, and that the package page renders.
+- [x] 4.4 Confirm `18.6.0` per package on the flat container, and that the package page renders.
 
 ## 5. Close out
 
-- [ ] 5.1 Stamp the entry's date.
-- [ ] 5.2 Record in the deferred-obligations memory that the Trusted Publishing observation is
+- [x] 5.1 Stamp the entry's date.
+- [x] 5.2 Record in the deferred-obligations memory that the Trusted Publishing observation is
   deferred, and what it waits on: the organisation co-owning all five ids, with Chris's invitations
   accepted. `docs/publishing.md` is unchanged.
-- [ ] 5.3 Sibling sweep for `18.5.0` and for sentences the release falsifies. Fix or record each.
-- [ ] 5.4 Update the deferred-obligations memory: the `docs-single-source` changelog obligation is
+- [x] 5.3 Sibling sweep for `18.5.0` and for sentences the release falsifies. Fix or record each.
+- [x] 5.4 Update the deferred-obligations memory: the `docs-single-source` changelog obligation is
   paid.
-- [ ] 5.5 Archive last, running the unit suite and `openspec validate --all --strict` before the
+- [x] 5.5 Archive last, running the unit suite and `openspec validate --all --strict` before the
   push.
+
+## Record (2026-10-29)
+
+- **3.2 / 3.3:** PR #68; both `verify` runs passed. Merged with a merge commit and no
+  `--delete-branch`, as `057c756`. The push run on `dev/v18`, `40962989894`, succeeded. The worktree was
+  unaffected.
+- **4.1:** Chris pushed tag `18.6.0` on `057c756` by explicit SHA; `git ls-remote` confirms it. Publish run
+  `40964958561`: `check` and `pack` succeeded on the first attempt.
+- **4.2:** the tagged `booking-flow.png` answered 200 before approval. Chris downloaded the artifact to
+  `artifacts\packages-v18`. The check script (every item in 4.2, nuspecs parsed as XML, dependencies compared
+  with nuget.org's `18.5.0`) gave **121 PASS, 0 FAIL, exit 0**.
+  - **Its first run failed one check on every package: the repository URL.** The packages carry
+    `https://github.com/Chris-N2/UBookIt.git`, the clone form, exactly as `18.5.0` did. The script
+    wrongly expected it without `.git`, so the expectation was fixed, not the packages.
+  - While writing it, a hint-gate pattern was found to match `18.5.0` too. It was replaced by one that
+    requires the conditional, and a crash now fails the run (exit 2) instead of passing.
+  - **Negative control:** nuget.org's published `18.5.0` packages, with this release's expectations,
+    gave **25 FAIL, exit 1**. The old artifact zip had been cleared, so the published packages were
+    used instead.
+- **4.3:** Chris approved, with both Trusted Publishing policies enabled (the observation is
+  deferred). Run `40964958561` concluded **success**: check, pack and publish.
+- **4.4:** `18.6.0` is in the flat-container index of all five ids. All ten packages across both lines
+  appeared about 7 minutes after publish. `nuget.org/packages/UBookIt/18.6.0` answers 200 to GET.
+- **5.1:** the entry is stamped `## 18.6.0 — 2026-10-29`.
+- **5.2 / 5.4:** recorded in the deferred-obligations memory: the `docs-single-source` changelog
+  obligation is paid; the Trusted Publishing observation is deferred until the organisation co-owns
+  all five ids, which Chris will arrange before the next release.
+- **5.3:** outside `CHANGELOG.md` and `openspec`, `18.5.0` appears only as history (the "Added in"
+  doc comments on `BookingMessageModel`, and test comments). Nothing to move.
+- **5.5:** archived on a close-out branch; unit suite and `openspec validate --all --strict` run before the push.
