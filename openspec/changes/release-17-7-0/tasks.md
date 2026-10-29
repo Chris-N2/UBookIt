@@ -1,6 +1,6 @@
 ## 1. The version and the entry
 
-- [ ] 1.1 Branch `release-17-7-0` from `origin/main` at `7382f61` (the `umbraco-floor-17-8`
+- [x] 1.1 Branch `release-17-7-0` from `origin/main` at `7382f61` (the `umbraco-floor-17-8`
   close-out merge), with no upstream.
   - Bump `<Version>` to `17.7.0`, and move every row of the table in `docs/publishing.md`
     *Before any push*, step 2.
@@ -9,7 +9,13 @@
 
   Verify: `git grep 17.6.0` over `Directory.Build.props`, README and the runbook is empty, apart
   from history anchors. Record the counts before and after.
-- [ ] 1.2 Write the `17.7.0` entry, undated. **Check every claim against the code, the archived
+  *Done (2026-10-29):* before, `17.6.0` appeared 1 / 25 / 5 times in `Directory.Build.props` /
+  README / the runbook. Each was read in context: the `<Version>`, 24 tag-pinned README links and
+  screenshots (three more than at the last release; `docs-single-source` added links), the two
+  *uBookIt is at* sentences, and the four *Tag the release* literals. None is a history anchor.
+  After: 0 of `17.6.0`, 1 / 25 / 5 of `17.7.0`, and the diff is exactly those 31 lines. The *Tag the
+  release* literals were re-read by eye. The branch has no upstream.
+- [x] 1.2 Write the `17.7.0` entry, undated. **Check every claim against the code, the archived
   changes (`2026-10-29-umbraco-floor-17-8`, `2026-10-24-docs-single-source`) and the published
   `17.6.0` nuspecs, not against the proposals.** In particular:
   - the advisories: their count, the high one, the versions that fix them, and where they are
@@ -26,17 +32,39 @@
     `--version "17.*"` named).
 
   Verify: `ChangelogTests`, `VersionTruthTests` and the documentation tests pass.
+  *Done.* Claims against their sources:
+  - **Advisories:** `gh api repos/umbraco/Umbraco-CMS/security-advisories`: seven published
+    2026-10-27, GHSA-rpv9-qp4c-g469 high, vulnerable `<=17.7.1, <=18.2.1`, patched 17.7.2 / 18.2.2.
+  - **Downgrade:** nuget.org's `17.6.0` nuspecs (diffed in `umbraco-floor-17-8`) declare the old
+    range and the minimums named, all below what the new Umbraco brings.
+  - **Wording:** quoted from `en-us.ts` at this commit.
+  - **Docs:** README and `getting-started.md` at this commit (`--version`, SQL Server 2019);
+    the 17.6.0 README said only SQL Server.
+  - **Every earlier README showed the bare command:** checked across all 23 tags.
+  - **Declarations' origin:** this line's own CHANGELOG entries.
+  - **The three constraints:** no "never/do not reach"; no retired literals (the sweep passes);
+    `--version` named.
+
+  The feed-accounting guard caught a first draft that named nuget.org ("The README on nuget.org has
+  shown…"); it was reworded rather than allow-listed. Guards: 171 of 171 on `main`.
+  *(v18's install-command paragraph is written for this line: on an Umbraco 18 site a bare
+  command works today, so the risk there is a later line, plus Umbraco 17 sites.)*
 
 ## 2. Clean build and suites
 
-- [ ] 2.1 Stop the TestSite. Clean the outputs, including the stale hashed client assets. Build the
+- [x] 2.1 Stop the TestSite. Clean the outputs, including the stale hashed client assets. Build the
   client, then `CI=true dotnet build UBookIt.slnx -c Release --no-incremental`. Verify: 0 warnings,
   0 errors.
-- [ ] 2.2 Run the suites per project, one after another. Verify, each with 0 skipped:
+  *Done (2026-10-29) at `4e4e64c`:* no TestSite running. The hashed assets and the backoffice `obj` were deleted, the client built, then `CI=true dotnet build … --no-incremental`: **0 warnings, 0 errors**.
+- [x] 2.2 Run the suites per project, one after another. Verify, each with 0 skipped:
   - unit **2496**, integration **222**, rendering **1211**, client **391**;
   - `openspec validate --all --strict` passes, run after the last commit.
-- [ ] 2.3 Run the audit as `audit.yml` does. Verify: exit 0, **0 accepted** (the first release
+  *Done,* Release with `UBOOKIT_TEST_DB_REQUIRED=true`, 0 skipped: unit **2496**, integration **222**,
+  rendering **1211**, client **391**. Validate 28/28, to be re-run after the last commit.
+- [x] 2.3 Run the audit as `audit.yml` does. Verify: exit 0, **0 accepted** (the first release
   with no accepted advisory since `17.2.3`).
+  *Done:* "audited 10 project(s)… (Debug, Release); 0 finding(s) accepted" / "No known advisories in
+  the graph.", exit **0**.
 
 ## 3. Review and merge
 
