@@ -18,6 +18,77 @@ See [the versioning note](README.md#versions-and-the-api-promise).
 
 ---
 
+## 18.6.0
+
+### What you have to do
+
+**uBookIt now requires Umbraco 18.3.0 or later.** On 27 October 2026 Umbraco published seven
+security advisories, one of them rated high (GHSA-rpv9-qp4c-g469, a backoffice account takeover via
+sign-in redirect manipulation). They affect Umbraco 18.2.1 and every earlier 18 release, and
+Umbraco's fixes are in 18.2.2 and in 18.3.0. Umbraco lists them on the *Security* tab of its GitHub
+repository. uBookIt's floor was 18.2.1, so a site could install it on a vulnerable Umbraco; it can
+no longer.
+
+**Upgrade `Umbraco.Cms` itself to 18.3.0 first**, then update uBookIt. If you update uBookIt
+first, your package manager raises only the Umbraco packages uBookIt depends on and leaves the rest
+where they are. Umbraco's packages are meant to stay on one version.
+
+**If your site references MessagePack directly, raise that reference to 3.1.11 or later before you
+upgrade.** The 18.3.0 notes asked such a site for 3.1.9 or later. Umbraco 18.3.0 itself requires
+3.1.11, so a reference left at 3.1.9 or 3.1.10 fails restore with NU1605.
+
+Nothing else is asked of you. No published API is added, removed or changed, there is no schema
+change, and no configuration changes.
+
+**Going back to 18.5.x afterwards is safe** on Umbraco 18.3.0. 18.5.0 accepts any Umbraco from
+18.2.1 below 19. The minimums it declares (Pkcs 10.0.13, MessagePack 3.1.9, EF Core 10.0.11,
+`Microsoft.AspNetCore.OpenApi` 10.0.11) are all met by what Umbraco 18.3.0 already brings, so nothing
+is downgraded.
+
+### What changed
+
+**When you are refused a uBookIt permission, the message now says where it is granted.** The
+settings screen and the closures screen used to send an administrator to a place in the user group
+editor that does not exist in Umbraco 18, and to "tick" something. The settings refusals now say:
+*An administrator can grant it in Users → User Groups: open a group and, in the box headed
+“uBookIt”, switch on “Change site settings”.* The permissions there are switches, so the
+descriptions of *Act on bookings* and *Change site settings* now say "switched on" and "switch it
+on" rather than "ticked" and "tick".
+
+**The services editor shows the variable-length hint only for a variable length.** The hint ("The
+person booking chooses how long they need…") was shown with **Fixed length** selected too, where it
+is not true.
+
+**The documentation is restructured**, and is now the single source for the documentation site:
+- **A new *Getting started* page** takes a site from install to a working booking: requirements,
+  granting access, a resource and its hours, a service, the booking page, and checking an email
+  arrives.
+- **A new *Email templates* page** holds what was spread through the notifications page: the view
+  file for each message, the `@inherits` line for each model, a table of each model's members,
+  template sets, and what falls back when. The notifications page points to it.
+- **`docs/docs.json`** lists the published pages in order. A site that renders uBookIt's
+  documentation reads it.
+- **The access instructions now match the user group editor:** add **uBookIt** under *Sections*,
+  then switch on what the group may do in the box headed **uBookIt**.
+- **The install command now names the line**: `dotnet add package UBookIt --version "18.*"`. A bare
+  `dotnet add package UBookIt` picks the newest uBookIt. That is an `18.x` today, but it stops being
+  one once a uBookIt for a later Umbraco ships, and on an Umbraco 17 site it already picks this line,
+  where restore fails with NU1107. Every earlier README showed the bare command.
+- **The README states SQL Server 2019 or later**, where it said only SQL Server.
+
+### For developers
+
+- **Dependencies.** Every Umbraco dependency is now `[18.3.0, 19.0.0)`. `UBookIt.Persistence`
+  requires EF Core SqlServer `10.0.12`, and `UBookIt.Backoffice` and `UBookIt.Web` require
+  `Microsoft.AspNetCore.OpenApi` `10.0.12`, both of which Umbraco 18.3.0 itself requires.
+- **`UBookIt.Persistence` and `UBookIt.Web` no longer declare `System.Security.Cryptography.Pkcs`,
+  and `UBookIt.Backoffice` and `UBookIt.Web` no longer declare `MessagePack`.** 18.2.2 and 18.3.0
+  added them to raise the minimum past advisories that no Umbraco release fixed yet. Umbraco 18.3.0
+  now depends on Pkcs 10.0.13 and MessagePack 3.1.11 itself, so a site resolves the same or a later
+  version without them. Nothing is lowered.
+- **No public API change**, no migration, and no change to the delivery API, the Management API or
+  the booking flow's markup.
+
 ## 18.5.0 — 2026-10-20
 
 ### What you have to do
