@@ -35,6 +35,7 @@ import {
   templateSetForRequest,
   templateSetFromResponse,
 } from "./template-set-fields.js";
+import { showsVariableLengthHint, type DurationMode } from "./duration-fields.js";
 import "./capability-input.element.js";
 
 /**
@@ -64,13 +65,6 @@ type RoleRow = {
    */
   visitorSelectable: boolean;
 };
-
-/**
- * The two duration kinds, matching the wire contract exactly. "variable" means
- * the person booking chooses the length, within whichever bounds are supplied
- * and always within what the booked resource itself allows.
- */
-type DurationMode = "variable" | "fixed";
 
 
 /** Client-only code for the empty fixed-duration guard; rendered in the Duration group. */
@@ -1212,7 +1206,9 @@ export class UBookItServiceEditorElement extends UmbLitElement {
             <uui-radio value="variable" label=${this.#term("durationVariable")}></uui-radio>
           </uui-radio-group>
 
-          <p class="hint">${this.#term("durationVariableHint")}</p>
+          ${showsVariableLengthHint(this._durationMode)
+            ? html`<p class="hint">${this.#term("durationVariableHint")}</p>`
+            : nothing}
 
           <div class="field">
             <label for="service-duration">${this.#term("durationMinutes")}</label>

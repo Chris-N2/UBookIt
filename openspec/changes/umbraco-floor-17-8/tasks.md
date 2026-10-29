@@ -1,10 +1,12 @@
 ## 1. Dependencies on `main` (branch `umbraco-floor-17-8`)
 
-- [ ] 1.1 Move every `Umbraco.Cms*` entry in `Directory.Packages.props` to `[17.8.0,18.0.0)`, and
+- [x] 1.1 Move every `Umbraco.Cms*` entry in `Directory.Packages.props` to `[17.8.0,18.0.0)`, and
       `Microsoft.EntityFrameworkCore.SqlServer` / `.Design` to `10.0.12`. Update the comments that
       name 17.7.1 / 17.7.x. Verify: restore succeeds with no NU1605; `dotnet list package
       --include-transitive` shows every `Umbraco.Cms*` reference at 17.8.0 and nothing at 18.x.
-- [ ] 1.2 Remove the `System.Security.Cryptography.Pkcs` and `MessagePack` `PackageVersion` entries and
+      *(2026-10-29: restore clean, no NU1605. Every project's `project.assets.json` holds exactly one
+      `Umbraco.Cms*` version, 17.8.0, and EF Core SqlServer 10.0.12 wherever it appears.)*
+- [x] 1.2 Remove the `System.Security.Cryptography.Pkcs` and `MessagePack` `PackageVersion` entries and
       their comment blocks. Remove `Pkcs` from `UBookIt.Persistence.csproj` and `UBookIt.Web.csproj`,
       and `MessagePack` from `UBookIt.Backoffice.csproj` and `UBookIt.Web.csproj`. Keep every
       `Microsoft.AspNetCore.App` framework reference. Verify, per design D2:
@@ -12,24 +14,48 @@
         MessagePack resolves `>= 3.1.9` wherever it appears (record the versions and the projects);
       - no source file still mentions the removed declarations as current (grep `Pkcs` and
         `MessagePack` outside `CHANGELOG.md` and `openspec/changes/archive`).
-- [ ] 1.3 Remove the five ImageSharp `NuGetAuditSuppress` entries and their comment from
+      *(2026-10-29, from each project's `project.assets.json`, with no direct reference left:
+      Pkcs 10.0.13 in UBookIt, Backoffice, Persistence, Web, the TestSite and all four test projects;
+      MessagePack 3.1.11 in UBookIt, Backoffice, Web, the TestSite, Tests, Rendering and ThemeFixture;
+      Core has neither. The grep finds only `openspec/specs/packaging/spec.md:1184`, which uses
+      Pkcs as a general example of an unpruned framework assembly and stays true.)*
+- [x] 1.3 Remove the five ImageSharp `NuGetAuditSuppress` entries and their comment from
       `src/UBookIt.TestSite/UBookIt.TestSite.csproj`. Verify:
       - the TestSite resolves `SixLabors.ImageSharp` 3.2.0;
       - `scripts/ci/Assert-NoVulnerablePackages.ps1` exits 0 against the solution with **0 accepted**
         findings (record its summary line).
-- [ ] 1.4 Run the tests that count or name the declarations (`AuditScriptTests` and any packaging or
+      *(TestSite resolves ImageSharp 3.2.0. Audit: `audited 10 project(s) in UBookIt.slnx (Debug,
+      Release); 0 finding(s) accepted by a suppression` / `No known advisories in the graph.`, exit 0.)*
+- [x] 1.4 Run the tests that count or name the declarations (`AuditScriptTests` and any packaging or
       composition test that fails after 1.2), and update only those whose subject was the removed
       declarations. Verify: each update is listed here with its reason. No assertion is weakened that
       guards something other than the removed declarations.
+      *(Full unit run after 1.1–1.3: 2489 passed, 2 failed. The two failures are
+      `UmbracoFloorDocumentationTests.Every_floor_a_page_states_is_the_declared_floor` for README and
+      getting-started, which is task 3.1's work. **No test counted or named the declarations**:
+      `AuditScriptTests` mentions advisories only in its own fixtures. The previous releases checked
+      the declarations by hand in their tasks, so nothing was updated here.)*
 
 ## 2. Text and hint (both lines' code; written on `main`)
 
-- [ ] 2.1 Rewrite `notPermitted`, `notPermittedWrite` and `notPermittedRead` in
+- [x] 2.1 Rewrite `notPermitted`, `notPermittedWrite` and `notPermittedRead` in
       `src/UBookIt.Backoffice/Client/src/localization/en-us.ts` per design D4. Correct the stale comments
       in `UBookItPermissionSeed.cs` and `section/manifest.ts`. Verify:
       - no client or server source says "Default permissions" as the place of a grant (grep);
       - the wording matches `docs/configuration.md` and `docs/backoffice.md`.
-- [ ] 2.2 Add the localization guard (design D4) to `UBookIt.Tests`:
+      *(Each now reads "An administrator can grant it in Users → User Groups: open a group and, in the
+      box headed “uBookIt”, switch on “…”". **The class was wider than the three terms**, and it was
+      fixed whole: the permissions are switches, and two of their own descriptions still said "tick".
+      `bookingsManageDescription` now says "'See bookings' switched on as well", and
+      `settingsDescription` says "switch it on for the people who should decide these". The comments
+      saying the same thing were also corrected:
+      - `UBookItPermissionSeed.cs` (×3);
+      - `manifest.ts` (×2: the pane comment, and "ticks the box" on the settings view);
+      - `closures-view.element.ts` ("ticks the box").
+
+      A grep of `src/` for `Default permissions|ticks? the box|ticked as well|tick it for` now finds only
+      the two comments about the *Directly bookable* checkbox, which really is a tick.)*
+- [x] 2.2 Add the localization guard (design D4) to `UBookIt.Tests`:
       - expose the user-group-editor retired claims from `RetiredClaims` (internal, not by copying them);
       - for every file under `Client/src/localization/`, apply `DocumentationAssert.DoesNotSay` with
         each of those claims;
@@ -40,11 +66,30 @@
       - restoring one old term turns it red (record the test and message), and the term is then
         reverted;
       - emptying one term's text turns the positive pin red, and is then reverted.
-- [ ] 2.3 Move the hint decision into a pure function in a `*-fields.ts` module (design D5). The
+      *(`PermissionGrantWordingTests`: 1 fact plus a 3-case theory, all 4 green. The claims are exposed
+      as `RetiredClaims.AboutTheUserGroupEditor`, the same array, not a copy. The theory pins
+      "Users → User Groups" and "in the box headed “uBookIt”, switch on". Mutations, each restored
+      afterwards (restore verified by comparing the file's contents):
+      - old `notPermittedRead` restored: 2 red. The sweep fails with
+        `…en-us.ts still says, or says again: "Default permissions"`, and the theory case for
+        `ubookitClosures.notPermittedRead` fails with `no longer says: "in the box headed “uBookIt”, switch on"`;
+      - `notPermitted` emptied: 1 red, the theory case for `ubookitSettings.notPermitted`
+        (`no longer says: "Users → User Groups"`).
+
+      **Instrument note:** the first run passed 24 tests against a stale DLL, because the .NET build
+      had failed on static web assets after the client source changed. The client must be built
+      before `dotnet build` (the known rule). The figures above are from the rebuilt DLL.)*
+- [x] 2.3 Move the hint decision into a pure function in a `*-fields.ts` module (design D5). The
       services editor renders `durationVariableHint` only when that function says so. Add vitest cases
       for `fixed` and `variable`. Verify:
       - the client suite is green (record the count against the 389 baseline);
       - forcing the function to always show the hint turns a test red, and is then reverted.
+      *(`section/duration-fields.ts` holds `showsVariableLengthHint` and the `DurationMode` type, which
+      moved there with its doc comment. The element keeps the literal `#term("durationVariableHint")`
+      and renders it only when the function says so. The client suite has **391** tests (389 + 2), 19
+      files. With the function forced to `return true`, the fixed-length case fails ("expected true to
+      be false"); the file was then restored and verified. That the element calls the function is
+      checked live (4.2), not by a test.)*
 
 ## 3. Documentation on `main`
 

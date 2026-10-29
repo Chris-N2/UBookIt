@@ -32,10 +32,6 @@
     <PackageReference Include="Microsoft.AspNetCore.OpenApi" />
     <PackageReference Include="Umbraco.Cms.Api.Common" />
     <PackageReference Include="Umbraco.Cms.Web.Website" />
-    <!-- Security pin, see Directory.Packages.props. -->
-    <PackageReference Include="System.Security.Cryptography.Pkcs" />
-    <!-- Security pin, see Directory.Packages.props (GHSA-qhrr-8q5h-9q3h). -->
-    <PackageReference Include="MessagePack" />
   </ItemGroup>
 
   <!--

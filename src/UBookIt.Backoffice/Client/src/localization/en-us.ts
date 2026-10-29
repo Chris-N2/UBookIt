@@ -592,20 +592,20 @@ export default {
       "View the Bookings list. Contact details still need the Sensitive data group on top.",
     bookingsManageLabel: "Act on bookings",
     bookingsManageDescription:
-      "Cancel, confirm, decline and move bookings. Includes seeing them — acting on what you cannot see makes no sense, so this does not need 'See bookings' ticked as well.",
+      "Cancel, confirm, decline and move bookings. Includes seeing them — acting on what you cannot see makes no sense, so this does not need 'See bookings' switched on as well.",
     configureLabel: "Configure resources and services",
     configureDescription:
       "Create, edit and delete resources and services, and assign who is responsible for them.",
     settingsLabel: "Change site settings",
     settingsDescription:
-      "Change how bookings behave and who is told about them. Separate from configuring resources on purpose, and not granted automatically — tick it for the people who should decide these.",
+      "Change how bookings behave and who is told about them. Separate from configuring resources on purpose, and not granted automatically — switch it on for the people who should decide these.",
   },
   ubookitSettings: {
     label: "Settings",
     intro:
       "How bookings behave and who is told about them. Some settings are shown here but changed in the site's configuration — those are the ones whose cost of being wrong falls to whoever deploys the site rather than whoever runs the bookings.",
     notPermitted:
-      "You do not have permission to change uBookIt settings. An administrator can grant it in Users → User Groups → Default permissions, by ticking “Change site settings”. It is not granted automatically, including on upgrade.",
+      "You do not have permission to change uBookIt settings. An administrator can grant it in Users → User Groups: open a group and, in the box headed “uBookIt”, switch on “Change site settings”. It is not granted automatically, including on upgrade.",
     loadFailed: "The settings could not be loaded.",
     saveFailed: "That change could not be saved.",
     resetFailed: "That setting could not be reset.",
@@ -671,9 +671,9 @@ export default {
     // list at all was told they could not CHANGE it — an answer to a question they had not
     // asked, on a branch that is unreachable anyway because the section view is gated.
     notPermittedWrite:
-      "You do not have permission to change closures. An administrator can grant it in Users → User Groups → Default permissions, by ticking “Change site settings”. It is not granted automatically, including on upgrade.",
+      "You do not have permission to change closures. An administrator can grant it in Users → User Groups: open a group and, in the box headed “uBookIt”, switch on “Change site settings”. It is not granted automatically, including on upgrade.",
     notPermittedRead:
-      "You do not have permission to see the site's closures. An administrator can grant it in Users → User Groups → Default permissions, by ticking “Configure resources and services” or “Change site settings”.",
+      "You do not have permission to see the site's closures. An administrator can grant it in Users → User Groups: open a group and, in the box headed “uBookIt”, switch on “Configure resources and services” or “Change site settings”.",
     loadFailed: "The closures could not be loaded.",
     saveFailed: "That closure could not be saved.",
     deleteFailed: "That closure could not be deleted.",
