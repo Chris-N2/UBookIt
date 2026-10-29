@@ -116,7 +116,7 @@
 
 ## 4. Verify `main`
 
-- [ ] 4.1 Run the floor-raise checklist on `main`:
+- [x] 4.1 Run the floor-raise checklist on `main`:
       - build the client first, then a clean `--no-incremental` Release build: 0 warnings, 0 errors;
       - regenerate the backoffice client against the running TestSite, read the diff, and record it
         (expected empty ignoring CR); restore the working copies;
@@ -126,6 +126,18 @@
       - the audit exits 0 with 0 accepted findings.
 
       Verify: each result recorded here.
+      *(2026-10-29, `main` at `fa53347`:
+      - client built, then `--no-incremental` Release: **0 warnings, 0 errors**;
+      - suites, separately and in order, nothing skipped: client **391** (389 + 2), unit **2495**
+        (2491 + 4), integration **222**, rendering **1211**;
+      - the TestSite started on 17.8.0 against its existing database: no upgrade step and no errors in
+        the Umbraco log; the home page and the swagger document answer 200;
+      - `npm run generate-client` against it: only `types.gen.ts` showed as modified, and
+        `git diff --ignore-cr-at-eol` is empty, so the management API surface is unchanged from 17.7.1
+        to 17.8.0. The working copy was restored;
+      - `dotnet ef migrations has-pending-model-changes`: "No changes have been made to the model
+        since the last migration";
+      - the audit: exit 0, 0 accepted (recorded at 1.3).)*
 - [ ] 4.2 Live pass on the TestSite, running 17.8.0, in Chrome:
       - the section and all its views load;
       - a booking is placed on the front end and found on the Bookings screen;
@@ -136,9 +148,20 @@
       - no uBookIt console errors.
 
       Verify: each observation recorded, with the booking reference.
-- [ ] 4.3 Pack Release and compare each nuspec with the published `17.6.0` one, parsed as XML (design
+- [x] 4.3 Pack Release and compare each nuspec with the published `17.6.0` one, parsed as XML (design
       D2). Verify: the only differences are the Umbraco minimum, the removed `Pkcs` / `MessagePack`
       dependencies, and EF Core `10.0.12` on Persistence (record the diff).
+      *(`dotnet pack -c Release` at `fa53347`, which still carries version 17.6.0; the bump belongs to
+      the release change. Each nuspec's dependencies were compared, as XML, with nuget.org's 17.6.0
+      nuspec:
+      - `UBookIt` and `UBookIt.Core`: no difference;
+      - `UBookIt.Backoffice`: four Umbraco ranges `[17.7.1, 18.0.0)` → `[17.8.0, 18.0.0)`, and
+        `MessagePack 3.1.9` removed;
+      - `UBookIt.Persistence`: `Umbraco.Cms.Persistence.EFCore` range raised, EF Core SqlServer
+        `10.0.11` → `10.0.12`, and `System.Security.Cryptography.Pkcs 10.0.13` removed;
+      - `UBookIt.Web`: two Umbraco ranges raised; `MessagePack 3.1.9` and `Pkcs 10.0.13` removed.
+
+      Nothing else differs.)*
 - [ ] 4.4 `openspec validate --all --strict` after the last commit. Verify: all pass.
 
 ## 5. Port to `dev/v18` (branch `umbraco-floor-17-8-v18`)
