@@ -18,7 +18,7 @@ See [the versioning note](README.md#versions-and-the-api-promise).
 
 ---
 
-## 17.7.0
+## 17.7.0 — 2026-10-29
 
 ### What you have to do
 

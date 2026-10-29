@@ -96,15 +96,15 @@
   Its 211/211 guard filter passed and validate was 28/28. Its one NIT, an over-long line in the
   refusal paragraph, was re-wrapped on both lines. The word diff is empty and the guards still pass,
   171/171 each.)*
-- [ ] 3.2 Push this branch and open the PR. Verify: the PR's CI is green, parity included.
-- [ ] 3.3 Merge with a merge commit, **without `--delete-branch`**. Verify: `origin/main` is the
+- [x] 3.2 Push this branch and open the PR. Verify: the PR's CI is green, parity included.
+- [x] 3.3 Merge with a merge commit, **without `--delete-branch`**. Verify: `origin/main` is the
   merge commit, and its push run is green.
 
 ## 4. Release through the workflow
 
-- [ ] 4.1 Chris pushes tag `17.7.0` on the merge commit, **by explicit SHA**. Verify: `check` and
+- [x] 4.1 Chris pushes tag `17.7.0` on the merge commit, **by explicit SHA**. Verify: `check` and
   `pack` are green.
-- [ ] 4.2 **Before approving**, check the run's `packages` artifact (Chris downloads it to
+- [x] 4.2 **Before approving**, check the run's `packages` artifact (Chris downloads it to
   `artifacts\packages-v17`), parsing each nuspec as XML:
   - the tagged `booking-flow.png` returns 200;
   - there are exactly 5 `.nupkg` and 4 `.snupkg`, all `17.7.0`, each `.snupkg` holding its `.pdb`;
@@ -124,20 +124,50 @@
     address is pinned to `17.7.0`.
 
   Show the check script can fail (against the `17.6.0` artifact with this release's expectations).
-- [ ] 4.3 Chris approves, with **both Trusted Publishing policies left enabled** (the observation is
+- [x] 4.3 Chris approves, with **both Trusted Publishing policies left enabled** (the observation is
   deferred, see the proposal's item 4). Record the summary table and the conclusion. If a push is
   refused, the meta-package goes last and so stays unpushed. Fix the cause, then re-run the
   publish job; already-published packages are reported as *already present*.
-- [ ] 4.4 Confirm `17.7.0` per package on the flat container, and that the package page renders.
+- [x] 4.4 Confirm `17.7.0` per package on the flat container, and that the package page renders.
 
 ## 5. Close out
 
-- [ ] 5.1 Stamp the entry's date.
-- [ ] 5.2 Record in the deferred-obligations memory that the Trusted Publishing observation is
+- [x] 5.1 Stamp the entry's date.
+- [x] 5.2 Record in the deferred-obligations memory that the Trusted Publishing observation is
   deferred, and what it waits on: the organisation co-owning all five ids, with Chris's invitations
   accepted. `docs/publishing.md` is unchanged.
-- [ ] 5.3 Sibling sweep for `17.6.0` and for sentences the release falsifies. Fix or record each.
-- [ ] 5.4 Update the deferred-obligations memory: the `docs-single-source` changelog obligation is
+- [x] 5.3 Sibling sweep for `17.6.0` and for sentences the release falsifies. Fix or record each.
+- [x] 5.4 Update the deferred-obligations memory: the `docs-single-source` changelog obligation is
   paid.
-- [ ] 5.5 Archive last, running the unit suite and `openspec validate --all --strict` before the
+- [x] 5.5 Archive last, running the unit suite and `openspec validate --all --strict` before the
   push.
+
+## Record (2026-10-29)
+
+- **3.2 / 3.3:** PR #67; both `verify` runs passed. Merged with a merge commit and no
+  `--delete-branch`, as `51d5d54`. The push run on `main`, `40962982430`, succeeded. The worktree was
+  unaffected.
+- **4.1:** Chris pushed tag `17.7.0` on `51d5d54` by explicit SHA; `git ls-remote` confirms it. Publish run
+  `40964958892`: `check` and `pack` succeeded on the first attempt.
+- **4.2:** the tagged `booking-flow.png` answered 200 before approval. Chris downloaded the artifact to
+  `artifacts\packages-v17`. The check script (every item in 4.2, nuspecs parsed as XML, dependencies compared
+  with nuget.org's `17.6.0`) gave **117 PASS, 0 FAIL, exit 0**.
+  - **Its first run failed one check on every package: the repository URL.** The packages carry
+    `https://github.com/Chris-N2/UBookIt.git`, the clone form, exactly as `17.6.0` did. The script
+    wrongly expected it without `.git`, so the expectation was fixed, not the packages.
+  - While writing it, a hint-gate pattern was found to match `17.6.0` too. It was replaced by one that
+    requires the conditional, and a crash now fails the run (exit 2) instead of passing.
+  - **Negative control:** nuget.org's published `17.6.0` packages, with this release's expectations,
+    gave **23 FAIL, exit 1**. The old artifact zip had been cleared, so the published packages were
+    used instead.
+- **4.3:** Chris approved, with both Trusted Publishing policies enabled (the observation is
+  deferred). Run `40964958892` concluded **success**: check, pack and publish.
+- **4.4:** `17.7.0` is in the flat-container index of all five ids. All ten packages across both lines
+  appeared about 7 minutes after publish. `nuget.org/packages/UBookIt/17.7.0` answers 200 to GET.
+- **5.1:** the entry is stamped `## 17.7.0 — 2026-10-29`.
+- **5.2 / 5.4:** recorded in the deferred-obligations memory: the `docs-single-source` changelog
+  obligation is paid; the Trusted Publishing observation is deferred until the organisation co-owns
+  all five ids, which Chris will arrange before the next release.
+- **5.3:** outside `CHANGELOG.md` and `openspec`, `17.6.0` appears only as history (the "Added in"
+  doc comments on `BookingMessageModel`, and test comments). Nothing to move.
+- **5.5:** archived on a close-out branch; unit suite and `openspec validate --all --strict` run before the push.
