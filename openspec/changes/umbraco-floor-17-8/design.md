@@ -66,7 +66,8 @@ Then the packed nuspecs are compared with the published `17.6.0` / `18.5.0` nusp
 in previous releases. The only expected differences are:
 - the Umbraco minimum;
 - the two removed dependencies;
-- EF Core 10.0.12 on Persistence.
+- EF Core 10.0.12 on Persistence;
+- on `dev/v18` only, `Microsoft.AspNetCore.OpenApi` 10.0.12 on Backoffice and Web (D3).
 
 *Alternative rejected:* keep the declarations until a later tidy. The requirement forbids it, and each
 declaration's EXIT comment names this change.
@@ -91,7 +92,7 @@ upgrade."
 
 **The guard:** a test in `UBookIt.Tests` reads every file under `Client/src/localization/` and applies
 `DocumentationAssert.DoesNotSay` with each **user-group-editor** retired claim
-(`RetiredClaims.WrongAboutTheUserGroupEditor`). This guarantee spans two languages, so the crossing
+(`RetiredClaims.AboutTheUserGroupEditor`, which exposes the private `WrongAboutTheUserGroupEditor` set). This guarantee spans two languages, so the crossing
 guard lives in the test project, which can read both sides. A positive pin goes with it:
 each of the three refusal terms says `box headed “uBookIt”`. A negative sweep alone passes over an
 emptied term.
@@ -151,7 +152,7 @@ Same procedure as `umbraco-security-2026-10`:
 - apply and verify on `main` (branch `umbraco-floor-17-8`);
 - branch `umbraco-floor-17-8-v18` from `dev/v18` and cherry-pick the change folder, the text, hint and
   guard commits;
-- redo the version ranges by hand (they differ per line), add OpenApi, and do the client move.
+- redo the version ranges by hand (they differ per line), and add OpenApi. (The client move was split off at apply; see D6.)
 
 One QA reviewer covers both branches. No parity-checked path is touched, so the two PRs do not need to
 merge in a particular order.
@@ -171,8 +172,9 @@ merge in a particular order.
 - **[The hint test covers the function, not the element]** → Stated in D5. The live pass confirms
   the element on both modes.
 - **[v18's client move grows]** → D6's stop condition.
-- **[The audit still cannot see Umbraco's own advisories after this change]** → Accepted, and
-  documented in `docs/publishing.md` so a green audit is not read as covering them.
+- **[The audit sees Umbraco's own advisories only once they reach the global database, which can be
+  days late]** → Accepted, and documented in `docs/publishing.md` so a green audit is not read as
+  covering them. *(Corrected after QA round 1. This first said the audit could not see them at all.)*
 
 ## Migration Plan
 

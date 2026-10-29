@@ -258,6 +258,33 @@
 - [ ] 6.1 QA in a fresh subagent, one reviewer covering both branches and reused across rounds.
       Hand over the claims (build state, test counts, audit output, nuspec diffs, live observations)
       to be verified rather than trusted. Allow reverted mutations. Verify: APPROVE.
+      *(Round 1 (same reviewer throughout): **REJECT**. Every mechanical claim was re-run and held:
+      builds, all eight suite counts, both audits, the restore graphs, the nuspec diffs, validate, and
+      the guard firing. Findings and what was done:
+      - **MAJOR:** `docs/publishing.md` said Umbraco's advisories do not reach the global database
+        NuGet reads, and that no audited project references `Umbraco.Cms`. Both were false.
+        `gh api "advisories?ecosystem=nuget&affects=Umbraco.Cms"` returns reviewed Umbraco advisories
+        (e.g. GHSA-wr57-hqmp-fgvh, 2026-09-17), and `UBookIt.TestSite` references `Umbraco.Cms` at the
+        floor. Rewritten: the audit sees them once they reach the database, through the TestSite, and
+        that can take days. The 27 Oct seven were still absent. The same wording was corrected in the
+        proposal (*Why*, *What Changes*, *Non-goals*) and the design (*Risks*). **The release changelog
+        must not repeat the old claim.**
+      - **MINOR:** nothing held the two switch descriptions' "tick" → "switch on" fix. Added the
+        theory `No_permission_description_says_to_tick_a_switch`. It sweeps the whole
+        `ubookitPermissions` section for tick/Tick/ticked/ticking/ticks and pins both corrected
+        phrases. Mutations, each restored and confirmed:
+        - restoring "ticked as well": 4 red (via the pin);
+        - restoring "tick it for": 4 red (via the pin);
+        - adding "Tick it to allow this." to `configureDescription`, pins intact: 1 red,
+          `…still says, or says again: "Tick"`.
+      - **NITs:**
+        - the proposal's v18-client bullet is struck as split off;
+        - D7 no longer says "do the client move";
+        - D4 names the public `AboutTheUserGroupEditor`;
+        - D2 lists v18's OpenApi;
+        - the *Impact* line about `UmbracoFloorDocumentationTests` is corrected;
+        - `publishing.md`'s two long lines are rewrapped, and the CI-warnings sentence is now its own
+          paragraph.)*
 - [ ] 6.2 Push both branches and open PRs; merge each once its CI is green and QA has approved.
       Verify: PR numbers, run IDs and merge SHAs recorded.
 - [ ] 6.3 Run the `audit` workflow on demand after both merge. Verify: green on both lines with no
