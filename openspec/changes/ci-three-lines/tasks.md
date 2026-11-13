@@ -1,8 +1,15 @@
 ## 1. The list and the parity check (design D1, D2, D3)
 
-- [ ] 1.1 Add `scripts/ci/published-lines.json`, `["main", "dev/v18", "dev/v19"]`. Verify: it parses
+- [x] 1.1 Add `scripts/ci/published-lines.json`, `["main", "dev/v18", "dev/v19"]`. Verify: it parses
       as a JSON array of three distinct strings.
-- [ ] 1.2 Rework `scripts/ci/Assert-LineParity.ps1`:
+
+      **Done.** `scripts/ci/published-lines.json` is `["main", "dev/v18", "dev/v19"]`. It is read
+      through a new dot-sourced helper, `scripts/ci/PublishedLines.ps1` (`Read-PublishedLines`). The
+      helper refuses a missing, non-JSON, non-array or empty list, a non-string or blank entry, or a
+      name listed twice, and keeps a one-element list an array (`-NoEnumerate`). One helper, so the
+      parity check, the tag check and the audit cannot validate the list differently.
+
+- [x] 1.2 Rework `scripts/ci/Assert-LineParity.ps1`:
       - a `-LinesFile` parameter (default beside the script), which refuses an empty, non-string or
         duplicated list;
       - `-Line` checked against the list. A listed line is compared with every OTHER listed line's
@@ -15,7 +22,21 @@
       - the description rewritten for N lines and push-only (no "two lines", no "the second push").
 
       Verify: task 1.3's tests.
-- [ ] 1.3 Add `LineParityScriptTests` (design D6): the real script through `pwsh`, against a throwaway
+
+      **Done** (`818ed63`).
+      - `-Line` is checked against the list, and `-LinesFile` defaults beside the script.
+      - An unlisted branch exits 0 with "… is not a published line (…)".
+      - Every OTHER listed line is compared, and each failure is collected, so one run names every
+        line that differs.
+      - A listed line missing from the remote fails, naming it, "must exist on origin".
+      - `global.json` is out of the whole-file `git diff` paths. It is compared as `ConvertFrom-Json
+        -AsHashtable`, with `sdk.version` removed, then key-sorted and serialised. An unreadable or
+        non-object file fails.
+      - `Directory.Build.props` keeps the first-`<Version>` rule unchanged.
+      - The description is rewritten for N lines, the two exempt values, and push-only with its
+        reason.
+
+- [x] 1.3 Add `LineParityScriptTests` (design D6): the real script through `pwsh`, against a throwaway
       git repository with `refs/remotes/origin/<line>` refs. Cases:
       - identical lines pass;
       - a workflow differing on one line fails, naming the file and that line;
@@ -33,6 +54,22 @@
       (a) skip one other line; (b) drop the `sdk.version` removal; (c) remove the whole of
       `global.json` from the comparison; (d) treat a missing line as a pass. Revert each one, and
       confirm `git status` is clean.
+
+      **Done.** New support: `Support/GitScratchRepository.cs` (a throwaway repo; whole-tree commits;
+      `refs/remotes/origin/<line>` set by `update-ref`; its own git identity, with autocrlf and signing
+      off) and `Support/PwshScript.cs`. `LineParityScriptTests`: **13/13**, the 11 planned cases plus
+      "a reformatted global.json with the same settings passes" and "differing on one line does not
+      name the other".
+
+      Mutations (scratchpad `mut_parity.py`; each reverted with `git checkout`, `git status` clean):
+
+      | Mutation | Fails |
+      |---|---|
+      | (a) compare only the first other line | `Identical_lines_pass`, `A_workflow_differing_on_one_line…`, `A_file_differing_on_two_lines…`, `A_listed_line_missing…` |
+      | (b) no `sdk.version` removal | `Only_the_sdk_version_differing_passes` |
+      | (c) `global.json` never compared | `A_different_roll_forward_fails` |
+      | (d) a missing line passes | `A_listed_line_missing_from_the_remote_fails_naming_it` |
+
 
 ## 2. The release tag (design D4)
 
