@@ -222,10 +222,21 @@
       - `ChangelogTests`, `VersionTruthTests` and `UmbracoFloorDocumentationTests` pass;
       - the floor guard **fails** when one page states a different floor (a reverted mutation);
       - `DocumentationLinkTests` passes.
-- [ ] 4.4 Add to `OpenApiTransformerTests` an assertion that the backoffice and delivery documents
+- [x] 4.4 Add to `OpenApiTransformerTests` an assertion that the backoffice and delivery documents
       each declare OpenAPI `3.1.x` (design D4). Verify: it passes, and it **fails** with 3.3's line
       removed (a mutation, reverted, with the revert confirmed by content comparison using absolute
       paths).
+
+      **Done.** `OpenApiTransformerTests.Each_document_declares_openapi_3_1(delivery|backoffice)`:
+      - it composes the real composer, as its sibling registration guards do;
+      - it reads `OpenApiOptions.OpenApiVersion` off the options the framework consumes;
+      - it asserts `OpenApi3_1`.
+
+      Both cases pass. **Can fire:** with 3.3's `options.OpenApiVersion = …OpenApi3_1;` replaced by a
+      comment, the delivery case **fails** (`Expected: OpenApi3_1, Actual: OpenApi3_2`, the .NET 11
+      default the explore saw), and the backoffice case stays green (Umbraco's pin). The file was
+      restored byte-for-byte with the hash equal, and `git status src` is clean.
+
 - [x] 4.5 The two storage guards skip EF Core 11's leading `SET NOCOUNT OFF;` and nothing else
       (design D11; Chris, 2026-11-13). Verify:
       - `BookerErasureStorageTests` and `MoveStorageTests` pass;
