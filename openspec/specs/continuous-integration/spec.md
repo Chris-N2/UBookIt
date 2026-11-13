@@ -8,13 +8,14 @@ was built and tested rather than that a maintainer remembered to.
 
 ## Requirements
 
-### Requirement: Verification runs unattended on both published lines
-Verification SHALL run without a maintainer's involvement on every push to `main` or `dev/v18`,
-and every such run SHALL complete: no run for a commit on a published line SHALL be cancelled or
-replaced by a run for a later commit. Verification SHALL also run on pushes to any other branch and
-on every pull request whose base is `main` or `dev/v18`. There, a run superseded by a newer push to
-the same branch or pull request MAY be cancelled, so that the latest push is the one verified.
-Each run SHALL start from a clean clone with full history and SHALL, in one job:
+### Requirement: Verification runs unattended on every published line
+Verification SHALL run without a maintainer's involvement on every push to a published line (see
+*The published lines are listed once*: today `main`, `dev/v18` and `dev/v19`), and every such run
+SHALL complete: no run for a commit on a published line SHALL be cancelled or replaced by a run for
+a later commit. Verification SHALL also run on pushes to any other branch and on every pull request
+whose base is a published line. There, a run superseded by a newer push to the same branch or pull
+request MAY be cancelled, so that the latest push is the one verified. Each run SHALL start from a
+clean clone with full history and SHALL, in one job:
 
 - build the solution in Release configuration, with the repository's CI warnings-as-errors rule in
   force;
@@ -24,11 +25,17 @@ Each run SHALL start from a clean clone with full history and SHALL, in one job:
 
 A failure of any of these SHALL fail the run. A run SHALL NOT be reported as passing when any of
 these four activities was skipped, cancelled or not reached. (Steps that exist only for particular
-events, such as the parity check under *Both published lines carry the same CI definitions*, are
-skipped where they do not apply, and that does not fail a run.)
+events, such as the parity check under *Every published line carries the same CI definitions*, which
+runs on pushes to a published line only, are skipped where they do not apply, and that does not
+fail a run.)
 
 #### Scenario: A push to either line is verified
 - **WHEN** a commit is pushed to `main` or to `dev/v18`
+- **THEN** a verification run starts for that commit without anyone triggering it, and its result is
+  shown against the commit
+
+#### Scenario: A push to any published line is verified
+- **WHEN** a commit is pushed to `main`, to `dev/v18` or to `dev/v19`
 - **THEN** a verification run starts for that commit without anyone triggering it, and its result is
   shown against the commit
 
@@ -43,7 +50,8 @@ skipped where they do not apply, and that does not fail a run.)
 - **THEN** the previous run may be cancelled, and the newest push is verified
 
 #### Scenario: A pull request is verified before merge
-- **WHEN** a pull request is opened or updated with base `main` or `dev/v18`
+- **WHEN** a pull request is opened or updated with a published line as its base, including
+  `dev/v19`
 - **THEN** a verification run reports its result on the pull request
 
 #### Scenario: A compiler warning fails the run
@@ -122,10 +130,13 @@ validation, SHALL be fixed in the CI definitions.
 A NuGet vulnerability advisory against a package in the dependency graph SHALL NOT fail the
 verification build; it SHALL remain a visible warning there, unless it falls under the exception
 below, in which case the audit reports it instead. A separate audit SHALL run on a
-schedule at least weekly, and on demand, and SHALL fail when any package in either published line's
+schedule at least weekly, and on demand, and SHALL fail when any package in any published line's
 graph — direct or transitive — has a known advisory, except as the exception below provides. Because scheduled runs execute only from the
-default branch, the audit SHALL check `dev/v18` explicitly rather than relying on that branch's own
-copy of the schedule.
+default branch, the audit SHALL check every published line explicitly, taking them from the list
+(*The published lines are listed once*), rather than relying on any other branch's own copy of the
+schedule. Each line SHALL be restored and audited with the .NET SDK that line itself pins, so a
+line on a different .NET major from the default branch is audited, rather than failed by a toolchain
+it was never built with.
 
 There is one exception, and it is deliberately narrow. When a project that is **not packable**
 declares a specific advisory as suppressed, the audit SHALL accept that advisory **in that project
@@ -160,9 +171,19 @@ than obey it:
 - **WHEN** the scheduled audit runs and a package in `dev/v18`'s graph has an advisory
 - **THEN** the audit fails, naming the line and the package
 
+#### Scenario: The audit reports an advisory on any line
+- **WHEN** the scheduled audit runs and a package in `dev/v18`'s or `dev/v19`'s graph has an
+  advisory
+- **THEN** the audit fails, naming the line and the package
+
 #### Scenario: The audit can be run on demand
 - **WHEN** a maintainer triggers the audit manually
-- **THEN** it runs against both lines immediately, without waiting for the schedule
+- **THEN** it runs against every published line immediately, without waiting for the schedule
+
+#### Scenario: A line on another .NET major is audited with its own SDK
+- **WHEN** the default branch pins a .NET 10 SDK and `dev/v19` pins a .NET 11 SDK
+- **THEN** `dev/v19` is restored and audited with its .NET 11 SDK, and its result is about its
+  packages, not about the default branch's toolchain
 
 #### Scenario: An advisory suppressed by a non-packable project is accepted there and reported
 - **WHEN** the development site declares an advisory as suppressed and that advisory is found in
@@ -196,17 +217,72 @@ than obey it:
 - **WHEN** a project that targets more than one framework declares any advisory as suppressed
 - **THEN** the audit fails, naming the project, and accepts none of that project's findings
 
-### Requirement: Both published lines carry the same CI definitions
+### Requirement: Every published line carries the same CI definitions
 The CI definitions — the workflow files, the pinned SDK file, the scripts the workflows run, and
-the shared build properties that carry the warnings rules (every part except the package version,
-which legitimately differs between the lines) — SHALL be identical on `main` and `dev/v18`. A verification run for a push to either line SHALL fail
-when those definitions differ from the other line's current tip, naming the differing files, so
-that a CI change landed on one line only cannot pass unnoticed.
+the shared build properties that carry the warnings rules — SHALL be identical on every published
+line, with exactly two values exempt because they legitimately differ between lines: the package
+version, and the SDK version the pinned SDK file names (a line pins the SDK its Umbraco major
+needs). Everything else in those two files, including the SDK roll-forward policy, SHALL still be
+identical. A verification run for a push to any published line SHALL fail when those definitions
+differ from any other published line's current tip, naming the differing files and the line they
+differ from, so that a CI change landed on one line only cannot pass unnoticed. A published line
+that is listed but cannot be found SHALL fail the check rather than pass it, because a comparison
+that could not be made has not shown the lines agree.
+
+The check SHALL run on pushes to published lines only, not on pull requests. A CI change reaches
+every line through one pull request per line, and a pull request's run compared against the other
+lines' tips would fail on every one of them until all had merged. The push run is where the check
+counts: it stays red, truly, until the change has reached every line, and a release tag requires a
+successful push run.
 
 #### Scenario: A CI change landed on one line is flagged
-- **WHEN** a workflow file is changed on `main` and the same change has not reached `dev/v18`
-- **THEN** the verification run for the push to `main` fails its parity check, naming the file
+- **WHEN** a workflow file is changed on `main` and the same change has not reached `dev/v18` and
+  `dev/v19`
+- **THEN** the verification run for the push to `main` fails its parity check, naming the file and
+  each line it differs from
 
 #### Scenario: Parity is restored by landing the change on the other line
-- **WHEN** the same change is then pushed to `dev/v18`
-- **THEN** the parity check passes on runs for both lines' tips
+- **WHEN** the same change is then pushed to each other line, `dev/v18` and `dev/v19`
+- **THEN** the parity check passes on runs for every line's tip, once the earlier red runs are
+  re-run
+
+#### Scenario: A line's own SDK version is not a difference
+- **WHEN** `dev/v19`'s pinned SDK file names a .NET 11 SDK and `main`'s names a .NET 10 SDK, and
+  nothing else in the CI definitions differs
+- **THEN** the parity check passes
+
+#### Scenario: The rest of the SDK file is still compared
+- **WHEN** one line's pinned SDK file changes its roll-forward policy and the others do not
+- **THEN** the parity check fails, naming the file
+
+#### Scenario: A pull request is not parity-checked
+- **WHEN** a pull request into `dev/v18` changes a workflow file that the other lines do not yet
+  have
+- **THEN** its verification run does not run the parity check, and the parity check runs on the
+  push that merging it makes
+
+#### Scenario: A listed line that cannot be found fails the check
+- **WHEN** a published line is in the list but its branch is not on the remote
+- **THEN** the parity check on every other line fails, naming the missing line
+
+### Requirement: The published lines are listed once
+The repository SHALL name its published lines in exactly one list, and every check that depends on
+which lines are published SHALL take them from that list: verification's treatment of a published
+line, the parity check, the release-tag check and the vulnerability audit. A branch that is not in
+the list SHALL be treated as any other branch: it is verified, but it is not parity-checked, it is
+not audited, and a release tag cannot be published from it. Adding a line to the list, or removing
+one, SHALL require no other change to bring that line under, or take it out of, those checks. The
+exceptions are workflow filters that the CI platform requires to be static: those SHALL match
+published lines by pattern (`main`, and `dev/v` followed by the major), not by a separate copy of
+the list.
+
+#### Scenario: A new line is brought under every check by the list alone
+- **WHEN** `dev/v19` is added to the list
+- **THEN** pushes to it are verified as a published line, its CI definitions are parity-checked
+  against every other published line, it is audited, and a `19.x` tag on it can be published,
+  with no other file naming `dev/v19`
+
+#### Scenario: A line dropped from the list stops being checked as published
+- **WHEN** a line is removed from the list
+- **THEN** no parity check compares against it, the audit no longer checks it, and a tag with its
+  major is refused as belonging to no published line
