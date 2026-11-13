@@ -215,15 +215,79 @@
 
 ## 5. Port to `dev/v18` (worktree `..\uBookIt-v18`, branch `backoffice-client-upgrade-v18`)
 
-- [ ] 5.1 Branch from `origin/dev/v18`, and cherry-pick the hand-written commits of section 2 and the
+- [x] 5.1 Branch from `origin/dev/v18`, and cherry-pick the hand-written commits of section 2 and the
       openspec artifacts. Do **not** cherry-pick `package.json`, `package-lock.json` or `src/api`
       (design D6). Verify: `git diff origin/dev/v18 --stat` lists only hand-written files.
-- [ ] 5.2 Repeat 1.3 and 1.4 on `dev/v18`, the baseline regeneration and the pre-upgrade live check,
+
+      **Done.** `git checkout --no-track -b backoffice-client-upgrade-v18 origin/dev/v18` (`57ad4f1`),
+      with no upstream. Cherry-picked `635d50b` (artifacts) and `3058276` (hand-written) without
+      conflict. `git diff origin/dev/v18 --stat` lists 9 files, all hand-written or openspec:
+      the two workflows, `generate-openapi.js`, `README.txt`, `NodeEngineGuardTests.cs`, and the 4
+      artifact files. The later artifact edits on `main` are brought across as files at close (6.1),
+      since `main`'s upgrade commit mixes them with generated files.
+- [x] 5.2 Repeat 1.3 and 1.4 on `dev/v18`, the baseline regeneration and the pre-upgrade live check,
       against the v18 TestSite (`/umbraco/openapi/ubookitbackoffice.json`). Verify as there.
-- [ ] 5.3 Repeat 3.1–3.4 with `@umbraco-cms/backoffice@^18.3.1`. Verify as there, against `dev/v18`'s
+
+      **Done.**
+      - **Baseline regeneration.** The cherry-picked script already carries the 0.99 options, so the
+        baseline ran with `origin/dev/v18`'s script (`git checkout origin/dev/v18 -- scripts/...`),
+        restored to HEAD afterwards and confirmed by `git diff HEAD` being empty. The document was
+        saved (`apply\v18-ubookitbackoffice.json`, 80,667 bytes). 0.85.2: `git diff --stat` empty,
+        `git diff --quiet` exit 0, and the `M` entries are line endings only.
+      - **Pre-upgrade live check.** The v18 TestSite has its own database; Chris logged in.
+        1. Bookings, default window 2026-11-09 to 2026-11-15: GET 200, 1 row, "Showing 1–1 of 1". The
+           67-day window gives GET 400 with the same inline message and no toast.
+        2. This site has no site closures. Create 2027-03-10 "CLU live check (delete me)": POST 200,
+           rows 0 → 1. Delete: DELETE 200, rows 1 → 0.
+        3. Holiday 404 stub: one GET. The panel is withdrawn, with no Import or Fetch control and no
+           toast. **500 control:** the panel stays, showing "The site's holiday source could not be
+           reached…", with no toast.
+        4. Closure 2027-03-10 to 2027-03-05: POST 400, the same message on `closure-end-date`, no
+           toast. Cancelled; 0 rows, 0 `CLU`.
+      - **Console:** `[UmbAuthClient] Token request failed: 400` appeared here too, after this
+        **un-upgraded** TestSite restarted. That confirms 4.1's attribution: it comes from the restart
+        and session, not from this change. Nothing came from the section.
+- [x] 5.3 Repeat 3.1–3.4 with `@umbraco-cms/backoffice@^18.3.1`. Verify as there, against `dev/v18`'s
       own 1.2 figures. Also verify that the regenerated `sdk.gen.ts` matches the explore's prediction:
       the same 37 names, and `types.gen.ts` identical.
-- [ ] 5.4 Repeat 4.1–4.2 on the v18 TestSite. Verify as there.
+
+      **Done** (`dev/v18` commit `a1ecad1`).
+      - 3.1: no ERESOLVE and no `EBADENGINE`. `@hey-api/openapi-ts@0.99.0` and
+        `@umbraco-cms/backoffice@18.3.1` (its peer `0.99.0 deduped`). `npm audit` gives 12 findings
+        (3 moderate, 8 high, 1 critical), as on `main`.
+      - 3.2: no deprecation line. Method names 37 / 37 with no difference. `types.gen.ts` is
+        **identical** (`git diff --quiet` exit 0). `client.gen.ts` imports `'../hey-api'`. Diff stat:
+        15 files, +427 / −709. **Matches the explore's prediction exactly:** `diff -r
+        --strip-trailing-cr` of `src/api` against the explore's offline `api-099-byTags` output exits 0.
+      - 3.3: `tsc --noEmit` exit 0, vitest 391/391, build succeeds. **No section-code edit.**
+      - 3.4: bundle and `obj/Release` deleted, clean Release build with 0 warnings and 0 errors. Unit
+        **2516** = 2490 + 26, integration **222**, rendering **1211**, all equal to `dev/v18`'s 1.2.
+        `GeneratedClientTests` + `OpenApiTransformerTests` + `NodeEngineGuardTests` give 40/40, and
+        both client-guard files have an empty diff.
+      - Guard fires on this line's lockfile: `ci.yml` `24`→`22` gives red, ".github/workflows/ci.yml
+        job 'verify' pins node-version 22, but @umbraco-cms/backoffice 18.3.1 requires Node '>=24.13'."
+        The file was confirmed mutated, and the revert confirmed by hash. **Instrument note:** a first
+        attempt reported `mutated: False` and a green test. `[IO.File]` resolves relative paths
+        against the process directory, not PowerShell's location, so it had read and written `main`'s
+        `ci.yml` (restored to identical content, and `git status` on `main` confirmed it clean). It was
+        re-run with an absolute path. The `main` mutations in 2.3 were unaffected: there the process
+        directory and PowerShell's location were the same worktree, and every run reported
+        `mutated: True`.
+- [x] 5.4 Repeat 4.1–4.2 on the v18 TestSite. Verify as there.
+
+      **Done.** `obj/Debug` deleted, then the TestSite run on the rebuilt output. The page loads
+      `entrypoint-CeZYdjkU.js` and `closures-view.element-U9tWRkR7.js`, which are the rebuilt
+      bundle's files. Screenshot:
+      `C:\Users\cnorw\AppData\Local\Temp\claude-chrome-screenshots-x4R5b5\screenshot-1794570268292-1.jpg`.
+      **Every step matches 5.2:**
+      1. GET 200, 1 row, "Showing 1–1 of 1". The 67-day window gives 400 with the same inline
+         message.
+      2. POST 200, rows 0 → 1. DELETE 200, rows 1 → 0.
+      3. 404 stub: one GET, panel withdrawn, no toast. 500 control: panel stays with "could not be
+         reached".
+      4. POST 400, the same message on `closure-end-date`, no toast. 0 rows, 0 `CLU`.
+
+      Console: no errors at all; the session survived this restart. No finding.
 
 ## 6. Close
 
