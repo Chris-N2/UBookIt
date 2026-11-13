@@ -43,7 +43,7 @@ The documented breaking changes were clear, and most of them didn't touch a pack
 ## 2. `IEmailSender.CanSendRequiredEmail()` was removed without a note
 
 - **What happened.** Removed, and replaced by `IsEmailConfigured()` (same logic) plus a new
-  `IsEmailAvailableAsync()`. Three of our call sites, and five test doubles implementing
+  `IsEmailAvailableAsync()`. Three of our call sites, and four test doubles implementing
   `IEmailSender`, stopped compiling.
 - **How we found it.** The compiler. The version-specific page doesn't mention it.
 - **What would have helped.** A line in the breaking changes, ideally an `[Obsolete]` pointer on
@@ -59,6 +59,10 @@ The documented breaking changes were clear, and most of them didn't touch a pack
 - **What would have helped.** The page's note that ".NET 11 requires `Microsoft.OpenApi` 3.10 or
   later; custom OpenAPI transformers may need updates" could add: "documents not registered through
   Umbraco default to OpenAPI 3.2; set `OpenApiVersion` to stay on 3.1, as Umbraco does."
+- **After the pin** (found during apply), both of our documents, including the one Umbraco's
+  builder registers, report `3.1.2` where 18 reported `3.1.1`. That comes from `Microsoft.OpenApi`'s
+  patch level, not from Umbraco. No path, operation or schema changed. It is harmless, but anyone
+  asserting the exact string will see it move.
 
 ## 4. `IRuntimeState.CurrentMigrationVersion` was added
 
@@ -76,6 +80,12 @@ The documented breaking changes were clear, and most of them didn't touch a pack
   section code needed no change: `tsc` was clean and all 391 client tests passed.
 - The client-side auth guidance was accurate: `authContext.configureClient()` was all our generated
   client needed.
+- Once entry 1's line was in, the cookie model behaved exactly as described, checked live on RC1:
+  - an editor's calls carry no `Authorization` header and succeed;
+  - an editor whose group lacks one of our permissions gets **403**, not 401, so the cookie
+    principal reaches our requirement handlers;
+  - a client-credentials API user still works for reads and writes;
+  - our anonymous delivery API ignores the editor's cookie on writes, as it should.
 
 ## Added during apply
 
@@ -95,3 +105,13 @@ The documented breaking changes were clear, and most of them didn't touch a pack
   construct when testing permission handlers. Also worth stating: what an upgraded group's
   `hasAccessToInvariantForVariant` becomes. It is backfilled from the legacy
   `AllowEditInvariantFromNonDefault` setting, which we only learned by reading the migration.
+
+## Met during apply, but not Umbraco's (do not send)
+
+Recorded so every friction point has a home. Neither belongs in feedback to Umbraco:
+- **EF Core 11 prefixes `ExecuteUpdate` SQL with `SET NOCOUNT OFF;`.** Two of our storage guards
+  read the first recorded statement, and broke. This is Microsoft's EF Core, so it is fixed in our
+  test interceptor (design D11).
+- **`dotnet add package … --version "19.*"` does not match a prerelease.** That is NuGet's
+  floating-version rule, so our install command uses `"19.*-*"` while 19 is a release candidate
+  (design D10).

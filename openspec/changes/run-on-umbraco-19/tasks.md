@@ -508,9 +508,29 @@
 
 ## 8. Close
 
-- [ ] 8.1 Fill in `umbraco-feedback.md` from apply (design D9), and record the explore spike stash's
+- [x] 8.1 Fill in `umbraco-feedback.md` from apply (design D9), and record the explore spike stash's
       fate (dropped once nothing in it is unused). Verify: every friction point met during apply has
       an entry.
+
+      **Done.** `umbraco-feedback.md` was reconciled against every friction point in this apply's
+      records:
+      - **Corrected:** entry 2 said five `IEmailSender` doubles. It is **four**, the count design
+        Context was corrected to at apply. Recounted: 4 files implement `IsEmailAvailableAsync`.
+      - **Added to entry 3:** after the pin, both documents report `3.1.2` (18 reported `3.1.1`).
+        That is `Microsoft.OpenApi`'s patch level, and harmless (7.1).
+      - **Added to "What worked well":** the live results of 6.1–7.2 (no header, 403 not 401, the API
+        user, the delivery API ignoring ambient identity).
+      - **New closing section, "not Umbraco's (do not send)":** EF Core 11's `SET NOCOUNT OFF;`
+        (D11) and NuGet's floating-version rule for prereleases (D10). Each friction point now has a
+        home.
+      - Entry 5 (`ReadOnlyUserGroup`) was already added at 1.2.
+
+      **Spike stash dropped.** Each of its 18 files was compared with HEAD: 15 are identical, and the
+      other 3 (`Directory.Packages.props`, `UBookItAuthorizationComposer.cs`, `TestSite.csproj`)
+      differ only by HEAD's range floors, comments and indentation. Nothing in it is unused.
+      `git stash drop` printed `c8445e9c1a6baa937dbd8f47f77e7443102e6506`, which is recoverable with
+      `git stash apply <sha>` until gc.
+
 - [ ] 8.2 `openspec validate --all --strict` with the pinned CLI, after the last commit. Verify:
       passes.
 - [ ] 8.3 QA (`qa-review`): a fresh subagent, reused across rounds, told what is claimed and asked to
