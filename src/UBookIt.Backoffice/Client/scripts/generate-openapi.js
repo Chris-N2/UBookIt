@@ -46,8 +46,9 @@ fetch(swaggerUrl).then(async (response) => {
         name: '@hey-api/sdk',
         // One static class per OpenAPI tag. Every operation carries the single UBookItBackoffice
         // tag, so this is UBookItBackofficeService, as the deprecated asClass/classNameBuilder
-        // options produced. A second tag would produce a second class, which tsc and
-        // GeneratedClientTests would both see.
+        // options produced. A second tag would produce a second class. tsc catches that only when
+        // an existing operation moves to the new tag (its UBookItBackofficeService.x call sites
+        // break); a new operation under a new tag lands in a new class that nothing flags.
         operations: { strategy: 'byTags', containerName: '{{name}}Service' },
       }
     ],
