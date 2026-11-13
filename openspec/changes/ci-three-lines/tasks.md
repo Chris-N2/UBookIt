@@ -373,8 +373,14 @@
       - Release `--no-incremental` build: 0 warnings, 0 errors. Unit **2559/2559** (net11.0;
         dev/v19's 2528 + 31).
 
-- [ ] 6.3 `openspec validate --all --strict` with the pinned CLI on all three branches, after the last
+- [x] 6.3 `openspec validate --all --strict` with the pinned CLI on all three branches, after the last
       commit. Verify: it passes on each.
+
+      **Done.** `npx --yes @fission-ai/openspec@1.13.0 validate --all --strict` gives **28 passed, 0
+      failed**, exit 0, with a clean tree, on `ci-three-lines` (`ac083cb`), `ci-three-lines-v18`
+      (`3f69b5c`) and `ci-three-lines-v19` (`f05a178`). It was re-run on all three after this
+      record's own commit and copy; see the next commit's message.
+
 
 ## 7. QA
 
