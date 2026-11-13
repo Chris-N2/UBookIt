@@ -111,9 +111,10 @@ The spec says "letters, digits and hyphens", deliberately not "as SemVer defines
 also forbids leading zeros in numeric identifiers, and this check does not enforce that: the
 declared version must match anyway, and `dotnet pack` refuses an invalid version.
 
-`publish.yml`'s trigger gains a second filter, `'[0-9]+.[0-9]+.[0-9]+-*'`. Filters are not anchored
-matches, which is why the script re-tests the shape: a tag such as `1.2.3-` starts the workflow,
-and the check refuses it.
+`publish.yml`'s trigger gains a second filter, `'[0-9]+.[0-9]+.[0-9]+-*'`. A filter's `*` matches
+any characters at all, including none, which is why the script re-tests the shape: a tag such as
+`1.2.3-` or `1.2.3-x+y` starts the workflow, and the check refuses it. *(Corrected at QA round 2:
+this said filters are not anchored matches; GitHub matches the whole ref name.)*
 
 `Assert-PackedRelease.ps1` compares versions as strings, and its package file names
 (`<Id>.<Tag>.nupkg`) hold for `19.0.0-rc1`, so it needs no change. That rests on a recorded reading
