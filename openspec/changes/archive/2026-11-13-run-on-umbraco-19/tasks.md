@@ -622,7 +622,7 @@
         18 is refused by the Umbraco floor instead. It now reads "because it requires .NET 11 and
         Umbraco 19".
 
-- [ ] 8.4 Merge `run-on-umbraco-19` into `dev/v19` locally (no remote; design *Migration Plan*).
+- [x] 8.4 Merge `run-on-umbraco-19` into `dev/v19` locally (no remote; design *Migration Plan*).
       Record the owed follow-ups in the deferred-obligations record:
       - the 19.0.0-final bump;
       - CI for three lines, before the first push;
@@ -636,3 +636,15 @@
       omitted the verify-install defect 2.1 records as owed.)*
 
       Then archive. Verify: `dev/v19` contains the change, and the obligations are written.
+
+      **Done** on 2026-11-13.
+      - `git merge --no-ff run-on-umbraco-19` into local `dev/v19` gives `c08fd9b`.
+        `git diff run-on-umbraco-19` is empty, and `dev/v19` still has no upstream (nothing is
+        pushed).
+      - The four follow-ups are written into the deferred-obligations record:
+        - the 19.0.0-final bump;
+        - CI for three lines, before the first push;
+        - `release-19-0-0-rc1`, whose entry must also carry backoffice-client-upgrade's owed line;
+        - `scripts/verify-install.ps1`.
+      - Archived next, on `dev/v19`.
+
