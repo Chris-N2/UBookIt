@@ -12,7 +12,7 @@
                                                                                         
 
 == Requirements ==
-* Node LTS Version 20.17.0+
+* Node 24.13 or later (npm 11 or later), the engine `@umbraco-cms/backoffice` declares; CI pins Node 24
 * Use a tool such as NVM (Node Version Manager) for your OS to help manage multiple versions of Node
 
 == Node Version Manager tools ==
