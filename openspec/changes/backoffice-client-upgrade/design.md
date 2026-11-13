@@ -66,8 +66,14 @@ before going further. It must not be folded into this diff.
 | `strategy: 'flat'` (default) | Standalone functions | Rejected: rewrites every call site for no gain |
 
 `byTags` depends on every operation carrying the one `UBookItBackoffice` tag. A future controller in
-a different tag would produce a second `…Service` class. That is not silent: the method-name guard and
-`tsc` would both see it.
+a different tag would produce a second `…Service` class. `tsc` catches that only when an **existing**
+operation moves to the new tag, because its `UBookItBackofficeService.x` call sites break. A **new**
+operation under a new tag lands in a new class, and nothing flags it: `GeneratedClientTests` reads
+only `types.gen.ts`, `main` has no method-name guard, and `dev/v18`'s
+`OpenApiTransformerTests` matches `public static` names across the whole file, whatever class they are
+in. That case is harmless, since nothing calls the new class until someone writes the call, and
+writing it shows the class name. *(Corrected in QA round 1: this paragraph previously claimed the
+method-name guard and `tsc` would both see a second class.)*
 
 `runtimeConfigPath` becomes `'./src/hey-api'`. 0.99 resolves it from the working directory (the
 `Client` folder) and computes the import from the output folder, so `'../hey-api'` became

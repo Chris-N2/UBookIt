@@ -223,8 +223,9 @@
       with no upstream. Cherry-picked `635d50b` (artifacts) and `3058276` (hand-written) without
       conflict. `git diff origin/dev/v18 --stat` lists 9 files, all hand-written or openspec:
       the two workflows, `generate-openapi.js`, `README.txt`, `NodeEngineGuardTests.cs`, and the 4
-      artifact files. The later artifact edits on `main` are brought across as files at close (6.1),
-      since `main`'s upgrade commit mixes them with generated files.
+      artifact files. `main`'s upgrade commit mixes later artifact edits with generated files, so those
+      edits were brought across as files instead, in `dev/v18` commit `15b8bd6` ("artifacts as on
+      main"), and again after each later edit. *(Corrected in QA round 1: this said "at close (6.1)".)*
 - [x] 5.2 Repeat 1.3 and 1.4 on `dev/v18`, the baseline regeneration and the pre-upgrade live check,
       against the v18 TestSite (`/umbraco/openapi/ubookitbackoffice.json`). Verify as there.
 
@@ -296,6 +297,34 @@
 - [ ] 6.2 QA (`qa-review`): a subagent that did not write this change, reused across rounds. Tell it
       what is claimed and ask it to verify, not trust: the build state, the totals, the live results.
       Verify: APPROVE, or APPROVE WITH NITS, with any nits resolved or recorded.
+
+      **Round 1 (2026-11-13): REJECT, on one MINOR documentation finding; no CRITICAL or MAJOR.** The
+      reviewer independently re-verified:
+      - packages, lockfiles and engines;
+      - both regenerations, including its own whitespace/return-type comparison;
+      - "no section-code edits", Node 24 and README;
+      - the guard, by its own mutations: workflow pins, `node-version-file`, lockfile `>=26`, a renamed
+        `engines.node`, `>=24.13 <25`, and vite's `||` range;
+      - the 0.99 error path: `throwOnError` comes from Umbraco 17.8.1's `createConfig({ throwOnError:
+        true })`, and the parsed problem body is thrown;
+      - every total, one line at a time;
+      - openspec on both lines, line parity, and the DevExpress scan (pass).
+
+      It judged the `window.fetch` stub sound evidence for D4 and did not ask for the live check to be
+      repeated.
+
+      Findings and responses:
+      1. **MINOR:** `generate-openapi.js` and design D2 claimed that `GeneratedClientTests` / "the
+         method-name guard" and `tsc` would see a second SDK class. They cannot: `GeneratedClientTests`
+         reads only `types.gen.ts`, `main` has no method-name guard, and v18's regex matches across
+         classes. **Fixed on both lines:** both now say `tsc` catches an existing operation moving tag,
+         and nothing flags a new operation under a new tag.
+      2. **NIT:** the 5.1 record said the artifacts come across "at close (6.1)". **Fixed:** it now
+         names commit `15b8bd6`.
+      3. **NIT, accepted as scope:** the guard reads `*.yml` only. Both client-building workflows are
+         asserted present, and D5 claims no more. Adding `*.yaml` would also trip
+         `RepoFiles.Paths`'s non-empty assertion, since no such file exists.
+      4. **Accepted by QA:** the `>=a.b` same-major approximation is stated in D5.
 - [ ] 6.3 Push both branches and open both PRs. Merge once CI is green on each, including Node 24
       in the logs, and QA has approved. Verify: both merged; `main` and `dev/v18` CI green after the
       merge.
