@@ -109,17 +109,27 @@ A test in `UBookIt.Tests`:
   reads every `actions/setup-node` step's `node-version`;
 - reads `engines.node` for each of the client's **direct** `devDependencies` from
   `package-lock.json`, the versions actually installed;
-- asserts that each pinned major satisfies the highest `>=` lower bound among them. A pin of `24`
-  satisfies `>=24.13` because `setup-node` resolves a bare major to that major's latest release.
+- asserts that each pinned major satisfies **every** direct dependency's range. `setup-node` resolves
+  a bare major `M` to that major's latest release, so the question per range is "does the latest
+  `M.x.y` satisfy it?". A range is alternatives joined by `||`; the pin passes if any alternative
+  admits it:
+  - `>=a[.b[.c]]` admits `M` when `M >= a`. A pin of `24` satisfies `>=24.13`;
+  - `^a[.b[.c]]` (with `a > 0`) admits `M` when `M == a`.
 
 **It fails rather than passes on anything it cannot read:**
-- no `setup-node` step found;
+- no `setup-node` step found, or no direct dependency carrying an `engines.node`;
 - a `node-version` that is not a bare major;
-- an `engines.node` that is not a single `>=` bound.
+- an alternative in any other form (`~`, `<`, `x`-ranges, hyphen ranges, `^0.x`).
 
-Direct dependencies only, because they are the ones we chose and can act on. Transitive ranges include
-forms such as `^18 || >=20` that this guard should not have to interpret. Its ability to fire is shown
-at apply: setting a pin back to `22` turns it red.
+*Amended at apply (Chris, 2026-11-13).* As proposed, the guard required each range to be a single
+`>=` bound. But four of the client's eight direct devDependencies declare compound ranges (vite
+`^20.19.0 || >=22.12.0`, vitest `^20.0.0 || ^22.0.0 || >=24.0.0`, chalk, node-fetch), so that guard
+would have been red on day one. Interpreting `||` of `>=` and `^` covers every range the direct
+dependencies use today. It also means a vite or vitest that raises its floor turns the guard red,
+not only the backoffice package.
+
+Direct dependencies only, because they are the ones we chose and can act on. Its ability to fire is
+shown at apply: setting a pin back to `22` turns it red.
 
 *Rejected:* `engine-strict=true` in an `.npmrc`. It fails `npm ci` itself, but only once someone runs
 it on an old Node. It also checks transitive packages, and it says nothing about what CI is *pinned* to.

@@ -14,13 +14,25 @@
       warning only: `npx esbuild --version` gives 0.28.1, because the binary comes from the optional
       platform package. Also reported: 41 audit findings (32 moderate, 7 high, 2 critical) in the
       dev tree before the upgrade; re-counted after 3.1 for comparison, and not in this change's scope.
-- [ ] 1.2 Record each line's baseline **before** touching it, `main` then `dev/v18`. On each:
+- [x] 1.2 Record each line's baseline **before** touching it, `main` then `dev/v18`. On each:
       - build the client first, then a clean Release build: 0 warnings, 0 errors;
       - record the unit, integration and rendering totals, and the vitest total.
 
       Run the two lines one at a time, never chained, because the machine has 16 GB. Verify: the
       four figures per line are recorded here, and each unit total matches that line's figure in
       memory, or the difference is explained.
+
+      **Done 2026-11-13, under Node 24.22.1.** `npm ci`, then `npm run build` and `npm test`, then
+      `dotnet build UBookIt.slnx -c Release --no-incremental` (after deleting `obj/Release`), then
+      each suite with `--no-build`:
+
+      | Line | Build | Unit | Integration | Rendering | Vitest |
+      |---|---|---|---|---|---|
+      | `main` (`192b955`) | 0 warnings, 0 errors | 2496 | 222 | 1211 | 391 |
+      | `dev/v18` (`57ad4f1`) | 0 warnings, 0 errors | 2490 | 222 | 1211 | 391 |
+
+      Unit, integration and rendering totals match memory. Memory's client figure (389) is stale: 391
+      was already the explore's count on `dev/v18`, and both lines give 391 here.
 - [ ] 1.3 On `main` (branch `backoffice-client-upgrade`), with the TestSite running, save the live
       backoffice OpenAPI document to the scratchpad. Regenerate with the **current** 0.85.2 from it
       (design D1). Verify: `git diff --stat -- src/UBookIt.Backoffice/Client/src/api` is empty. If it

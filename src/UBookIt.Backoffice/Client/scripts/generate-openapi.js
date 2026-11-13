@@ -38,12 +38,17 @@ fetch(swaggerUrl).then(async (response) => {
       ...defaultPlugins,
       {
         name: '@hey-api/client-fetch',
-        runtimeConfigPath: '../hey-api',
+        // Resolved from the working directory (this Client folder) since @hey-api/openapi-ts
+        // 0.99; the generated import is computed relative to src/api, so it reads '../hey-api'.
+        runtimeConfigPath: './src/hey-api',
       },
       {
         name: '@hey-api/sdk',
-        asClass: true,
-        classNameBuilder: '{{name}}Service',
+        // One static class per OpenAPI tag. Every operation carries the single UBookItBackoffice
+        // tag, so this is UBookItBackofficeService, as the deprecated asClass/classNameBuilder
+        // options produced. A second tag would produce a second class, which tsc and
+        // GeneratedClientTests would both see.
+        operations: { strategy: 'byTags', containerName: '{{name}}Service' },
       }
     ],
   });
