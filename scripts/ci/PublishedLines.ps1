@@ -13,9 +13,11 @@
 
     A malformed list is refused, not read as far as it goes: a check run against part of the
     list would report the lines agree when it never looked at some of them.
-#>
 
-Set-StrictMode -Version Latest
+    Dot-sourcing this file defines the function and nothing else. In particular it sets no
+    strict mode on its caller: strict mode is set inside the function, where it applies only to
+    the function.
+#>
 
 function Read-PublishedLines {
     [CmdletBinding()]
@@ -23,6 +25,8 @@ function Read-PublishedLines {
         [Parameter(Mandatory)]
         [string] $Path
     )
+
+    Set-StrictMode -Version Latest
 
     if (-not (Test-Path -LiteralPath $Path -PathType Leaf)) {
         throw "The published-lines list '$Path' does not exist."

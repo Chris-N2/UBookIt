@@ -73,17 +73,34 @@
 
 ## 2. The release tag (design D4)
 
-- [ ] 2.1 `scripts/ci/Assert-ReleaseTag.ps1`:
+- [x] 2.1 `scripts/ci/Assert-ReleaseTag.ps1`:
       - the lines come from the list (a `-LinesFile` parameter, default beside the script);
       - the shape is the D4 pattern, with the major still in group 1, and the shape message updated;
       - a new `-ApiBaseUri` parameter (default `https://api.github.com`) for step 4;
       - the description updated (step 1's shape, step 3's "same pair" sentence).
 
       Verify: task 2.3's tests.
-- [ ] 2.2 `.github/workflows/publish.yml`: add the trigger filter `'[0-9]+.[0-9]+.[0-9]+-*'` beside the
+
+      **Done** (`3b72602`).
+      - The lines come from `Read-PublishedLines` (`-LinesFile`, default beside the script). A bad
+        list fails as `line`.
+      - The shape is `-cnotmatch '^(\d+)\.(\d+)\.(\d+)(?:-[0-9A-Za-z-]+(?:\.[0-9A-Za-z-]+)*)?$'`
+        (case-sensitive), and the major is still group 1.
+      - The shape message lists the allowed and refused forms.
+      - Step 2's description says "compared whole", and step 3's says the lines come from the list.
+      - New `-ApiBaseUri` parameter, default `https://api.github.com`, used to build `$runsUri`.
+
+- [x] 2.2 `.github/workflows/publish.yml`: add the trigger filter `'[0-9]+.[0-9]+.[0-9]+-*'` beside the
       existing one, and update the header and `check` job comments that name two lines. Verify:
       `PublishingWorkflowTests` passes, and the YAML parses as one plain document.
-- [ ] 2.3 Add `ReleaseTagScriptTests` (design D6), with the API pointed at a closed local port and
+
+      **Done.** Trigger `tags: ['[0-9]+.[0-9]+.[0-9]+', '[0-9]+.[0-9]+.[0-9]+-*']`, with a comment that
+      `1.2.3-` starts the workflow and the check refuses it. The header ("IDENTICAL on every published
+      line … ONE … policy serves them all") and the `check` job's "origin/<line> for each line in the
+      list" are updated. `PublishingWorkflowTests` gives **5/5**, including the one-plain-YAML-document
+      test.
+
+- [x] 2.3 Add `ReleaseTagScriptTests` (design D6), with the API pointed at a closed local port and
       `-WaitMinutes 0`, so nothing leaves the machine. Cases:
       - shape refusals: `v17.2.2`, `17.2`, `17.2.2-`, `17.2.2-rc..1` and `17.2.2+build.5` each fail
         on "shape";
@@ -99,10 +116,41 @@
       (b) dropping the label's identifier rule lets `17.2.2-rc..1` pass;
       (c) a hard-coded `@('main','dev/v18')` makes the `dev/v19` case fail.
       Revert each one, and confirm `git status` is clean.
-- [ ] 2.4 Confirm that `Assert-PackedRelease.ps1` needs no change for a prerelease. Read its version
+
+      **Done.** `ReleaseTagScriptTests` gives **14/14**. Each run uses `-ApiBaseUri http://127.0.0.1:1`
+      (a closed loopback port), `-WaitMinutes 0` and `-PollSeconds 0`. The fixture history is a root,
+      plus each line forked from it (main 17.7.0 by way of a 19.0.0-rc2 commit, dev/v18 18.6.0,
+      dev/v19 19.0.0-rc1). Cases:
+      - shape refusals: `v17.2.2`, `17.2`, `17.2.2-`, `17.2.2-rc..1`, `17.2.2-rc1.`,
+        `17.2.2+build.5`, `17.2.2-rc1+build.5` and `17.2.2-rc_1`;
+      - version both ways;
+      - **the positive case:** `19.0.0-rc1` gives "matches." and "is contained in origin/dev/v19.",
+        with no shape, version or line error, then "verified … could not be read from the GitHub
+        API";
+      - line not containing the commit;
+      - a major no line has;
+      - ambiguous major (a 4-line list).
+
+      Mutations (scratchpad `mut_tag.py`; each reverted, `git status` clean):
+
+      | Mutation | Fails |
+      |---|---|
+      | (a) the old `^(\d+)\.(\d+)\.(\d+)$` | the positive case, version-reverse, line, ambiguous: 4 |
+      | (b) label `(?:-[0-9A-Za-z.-]+)?` | the shape cases `17.2.2-rc..1` and `17.2.2-rc1.` |
+      | (c) hard-coded `@('main','dev/v18')` | the positive case, line, no-line, ambiguous: 4 |
+
+- [x] 2.4 Confirm that `Assert-PackedRelease.ps1` needs no change for a prerelease. Read its version
       and file-name handling against `<Id>.19.0.0-rc1.nupkg` and `<Id>.19.0.0-rc1.snupkg`, and a
       nuspec `<version>19.0.0-rc1</version>`. Verify: the record names the lines read. If anything
       would refuse a prerelease, stop and raise it.
+
+      **Done, no change needed.** `Assert-PackedRelease.ps1` builds the expected names as
+      `"$($package.PackageId).$Tag.nupkg"` / `.snupkg` (lines 164-165) and compares the nuspec
+      `<version>` with `"$($metadata.version)" -ne $Tag` (line 188). Both are string operations on the
+      tag as given, with no `[version]` cast, `-split` or numeric parse anywhere in the file (grep).
+      `dotnet pack` names `UBookIt.19.0.0-rc1.nupkg` and writes `<version>19.0.0-rc1</version>` as
+      declared, so a prerelease passes through unchanged.
+
 
 ## 3. ci.yml, the audit, and the guards (design D1, D3, D5, D6)
 
