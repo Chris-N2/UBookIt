@@ -486,22 +486,62 @@
 
 ## 8. Rollout (design, Migration Plan)
 
-- [ ] 8.1 Merge `ci-three-lines-v19` into local `dev/v19`, then **push `dev/v19`** for the first time.
+- [x] 8.1 Merge `ci-three-lines-v19` into local `dev/v19`, then **push `dev/v19`** for the first time.
       Chris confirms before the push. Verify:
       - the push run builds and tests the Umbraco 19 port on Linux / .NET 11;
       - every activity except parity passes;
       - parity fails, naming `main` and `dev/v18` as lacking the change.
 
       Any other failure is a finding, and is fixed on `dev/v19` before going on.
-- [ ] 8.2 Push `ci-three-lines` and `ci-three-lines-v18`, and open their PRs. Verify: both PR runs are
+
+      **Done** on 2026-11-13. `ci-three-lines-v19` was merged into local `dev/v19` (`9ba0b12`), then
+      `dev/v19` pushed for the first time, after Chris confirmed ("Yes please, go ahead"). Push run
+      `43509356039`, attempt 1:
+      - **The Umbraco 19 port's first CI run on Linux, .NET 11 and the SQL container passed every
+        suite:** client 391/391, Integration **222**, Rendering **1211**, Unit **2569** (all
+        net11.0), and openspec 28.
+      - **Parity failed, exactly as planned.** It named the same 7 files against `origin/main` and
+        against `origin/dev/v18`: 3 workflows, `Assert-LineParity.ps1`, `Assert-ReleaseTag.ps1`,
+        `PublishedLines.ps1` and `published-lines.json`.
+
+      No other failure, so no finding.
+
+- [x] 8.2 Push `ci-three-lines` and `ci-three-lines-v18`, and open their PRs. Verify: both PR runs are
       green, with the parity step skipped.
-- [ ] 8.3 Merge both (CI green, QA approved). Verify: both merge push runs pass parity against every
+
+      **Done.** `ci-three-lines` and `ci-three-lines-v18` were pushed, and PRs #75 (into main) and #76
+      (into dev/v18) opened. PR runs `43509487055` and `43509495010` were both **success**, with
+      every step green and **"Parity with the other published lines" skipped**, as push-only parity
+      intends.
+
+- [x] 8.3 Merge both (CI green, QA approved). Verify: both merge push runs pass parity against every
       line, including `origin/dev/v19`.
-- [ ] 8.4 Re-run `dev/v19`'s push run. Verify: it is green, parity included.
+
+      **Done.** #75 and #76 were merged with CI green and QA approved: main `a1eb94d` and dev/v18
+      `11ee8ca`. No `--delete-branch`, because both head branches were checked out in worktrees. The
+      merge push runs were `43510165442` (main) and `43510178204` (dev/v18). Both were **success**,
+      with parity passing: main "agree with every other published line: dev/v18, dev/v19", and
+      dev/v18 "…: main, dev/v19". **This was the first three-line parity comparison on GitHub.**
+
+- [x] 8.4 Re-run `dev/v19`'s push run. Verify: it is green, parity included.
+
+      **Done.** `gh run rerun 43509356039` gave attempt 2 at `9ba0b12`: **success**. Integration 222,
+      Rendering 1211 and Unit 2569 again, and parity "agree with every other published line: main,
+      dev/v18". `dev/v19`'s head now has the successful push run that a `19.x` tag requires.
+
 
 ## 9. Close
 
-- [ ] 9.1 Record merge SHAs, archive on `main`, and bring the archive to `dev/v18` and `dev/v19` by
+- [x] 9.1 Record merge SHAs, archive on `main`, and bring the archive to `dev/v18` and `dev/v19` by
       close-out PRs. Update the deferred obligations: strike "CI for three lines"; the next step is
       `release-19-0-0-rc1`, which proves the `release` environment's `*.*.*` rule with the real
       tag. Verify: the lines are level, and openspec validates on each after the last commit.
+
+      **Done.** Recorded here and archived on main by the close-out PR. The same archive commit was
+      brought to dev/v18 and dev/v19 by their own close-out PRs; the two specs it updates were
+      identical on all three lines beforehand.
+      - **Deferred obligations:** "CI for three lines" is struck, and `release-19-0-0-rc1` is next
+        (Chris: Monday). It proves the `release` environment's `*.*.*` rule with the real tag.
+      - The merged branches `ci-three-lines`, `ci-three-lines-v18` and `ci-three-lines-v19` are
+        deleted, locally and on origin where they were pushed.
+
