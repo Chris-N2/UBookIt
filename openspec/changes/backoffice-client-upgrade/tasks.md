@@ -33,26 +33,65 @@
 
       Unit, integration and rendering totals match memory. Memory's client figure (389) is stale: 391
       was already the explore's count on `dev/v18`, and both lines give 391 here.
-- [ ] 1.3 On `main` (branch `backoffice-client-upgrade`), with the TestSite running, save the live
+- [x] 1.3 On `main` (branch `backoffice-client-upgrade`), with the TestSite running, save the live
       backoffice OpenAPI document to the scratchpad. Regenerate with the **current** 0.85.2 from it
       (design D1). Verify: `git diff --stat -- src/UBookIt.Backoffice/Client/src/api` is empty. If it
       is not, stop and report: the committed client is stale against its own server.
-- [ ] 1.4 On `main`, run the live check of design D4 (steps 1–4) **before** the upgrade, and record
+
+      **Done.** Document saved to the scratchpad (`apply\main-ubookitbackoffice.json`, 130,414 bytes).
+      `npm run generate-client` under 0.85.2: `git diff --stat` empty and `git diff --quiet` exit 0.
+      `git status` lists `types.gen.ts` as `M`, but that is line endings only (LF written, CRLF
+      checked out); there is no content difference.
+- [x] 1.4 On `main`, run the live check of design D4 (steps 1–4) **before** the upgrade, and record
       what each step showed. This is the comparison point for 4.2.
+
+      **Done**, on the TestSite with Chris logged in (0.85.2 / 17.5.3 bundle):
+      1. Bookings, window 2026-10-16 to 2026-11-15: GET `bookings?...` 200, 7 rows, "Showing 1–7 of
+         7". *Extra point, found by accident:* a 67-day window gives GET 400, and the section shows
+         the server's message inline: "The window 2026-09-10 to 2026-11-15 covers 67 days, which
+         exceeds the maximum of 31." No toast.
+      2. Closure 2027-03-10 "CLU live check (delete me)": POST 200, and the row is listed. Delete:
+         DELETE 200, and the list is back to its original 10 rows.
+      3. Holiday 404. **Method:** with the Closures view open, `window.fetch` is replaced for the path
+         `/umbraco/ubookitbackoffice/api/v1/closures/holidays` only (preview GET and import POST).
+         It answers with the server's own sourceless 404 body:
+         `{type:"NotFound", title:"This site has no public holiday source.", status:404}`,
+         `application/problem+json`. Script: scratchpad `apply\holiday-404-stub.js`. Because the
+         generated client resolves `globalThis.fetch` per request (in both 0.85.2 and 0.99), the real
+         runtime and Umbraco's interceptors handle the failure; only the transport is faked. (Truly
+         deregistering the source needs it to vanish while the screen is open, which tidy-2026-10 could
+         not reproduce live.) **Result:** Import → Fetch holidays makes one stubbed request. The whole
+         "Public holidays" panel is withdrawn, with no import control left and no toast. After a reload
+         with the real fetch, the panel is back.
+      4. Closure from 2027-03-10 to 2027-03-05: POST 400. The section shows "A closure cannot end
+         (2027-03-05) before it starts (2027-03-10).", with `_errorControl` = `closure-end-date`, and
+         **no toast**. Design D4 expected a backoffice error notification as well. None appears on the
+         un-upgraded line, so "as before" means section message only, no toast. The list is still 10
+         rows, with no `CLU` row.
+
+      Console: no errors from the section.
 
 ## 2. Hand-written changes (on `main`; cherry-picked in 5)
 
-- [ ] 2.1 Update `scripts/generate-openapi.js` per design D2: `runtimeConfigPath: './src/hey-api'`, and
+- [x] 2.1 Update `scripts/generate-openapi.js` per design D2: `runtimeConfigPath: './src/hey-api'`, and
       `operations: { strategy: 'byTags', containerName: '{{name}}Service' }` in place of
       `asClass` / `classNameBuilder`. Verify: the script contains neither deprecated option, and the
       generation in 3.2 prints no deprecation warning.
-- [ ] 2.2 Set `node-version: 24` on the `actions/setup-node` step in `.github/workflows/ci.yml` and
+
+      **Done** (`3058276`). Neither deprecated option is configured. `grep "asClass\|classNameBuilder"`
+      matches only line 48, the comment that says what `operations` replaces.
+      3.2's generation printed no deprecation warning: the output has no "deprecat" anywhere.
+- [x] 2.2 Set `node-version: 24` on the `actions/setup-node` step in `.github/workflows/ci.yml` and
       `.github/workflows/publish.yml`. Correct the Requirements line of
       `src/UBookIt.Backoffice/README.txt` from "Node LTS Version 20.17.0+" to Node 24.13 or later,
       saying it follows `@umbraco-cms/backoffice`'s declared engine. Verify: a grep of the repo,
       excluding `openspec/changes/archive` and `node_modules`, finds no `node-version: 22` and no
       `20.17`.
-- [ ] 2.3 Add the Node-engine guard to `UBookIt.Tests` per design D5. Verify:
+
+      **Done** (`3058276`). `git grep -E "node-version: 22|20\.17"` outside the archive finds only this
+      change's own artifacts, which quote the old text. A wider `git grep -i "node 22"` finds nothing
+      in docs or specs.
+- [x] 2.3 Add the Node-engine guard to `UBookIt.Tests` per design D5. Verify:
       - green after 3.1;
       - **it can fire:**
         - setting either workflow's `node-version` back to `22` turns it red, with a message naming
@@ -62,29 +101,78 @@
       - the non-empty checks hold: zero `setup-node` steps found, or zero direct dependencies with
         an `engines.node`, fails the test.
 
+      **Done.** `NodeEngineGuardTests`, 26 tests, built to amended D5 (`||` of `>=` and `^`). Green
+      after 3.1 (26/26, and within 3.4's 2522). **It can fire** (after 3.1, lockfile at 17.8.1
+      `>=24.13`). Each mutation was a single exact replacement, checked to have changed the file's
+      hash, and each revert was confirmed by the hash matching the original:
+      - `ci.yml` `24`→`22`: red, ".github/workflows/ci.yml job 'verify' pins node-version 22, but
+        @umbraco-cms/backoffice 17.8.1 requires Node '>=24.13'."
+      - `publish.yml` `24`→`22`: red, the same message naming `publish.yml` job 'pack'.
+      - `ci.yml` `24`→`24.x`: red as unreadable, "cannot read node-version '24.x'", not passing.
+
+      **Non-empty checks:** `No_pins_fails` and `No_engine_ranges_fails` hold over `Problems`. The real
+      test also asserts that `ci.yml` and `publish.yml` each contribute a pin, and
+      `The_lockfile_reading_finds_the_backoffice_package` asserts that the package the guard exists
+      for is read. Unreadable ranges (`~`, `<`, x-range, hyphen, `^0.x`, compound `>= <`, empty) and
+      pins (`24.x`, `lts/*`, `24.13.0`, absent) each have a case.
+
 ## 3. Upgrade and regenerate on `main`
 
-- [ ] 3.1 In `Client/`, run `npm install --save-dev @hey-api/openapi-ts@^0.99.0
+- [x] 3.1 In `Client/`, run `npm install --save-dev @hey-api/openapi-ts@^0.99.0
       @umbraco-cms/backoffice@^17.8.1`. Do not use `--legacy-peer-deps` or `--force`. Verify:
       - no ERESOLVE and no `EBADENGINE`;
       - `npm ls @hey-api/openapi-ts @umbraco-cms/backoffice` shows 0.99.x and 17.8.x;
       - the resolved versions are recorded here.
-- [ ] 3.2 With the TestSite running, run `npm run generate-client`. Verify, against 1.3:
+
+      **Done.** No ERESOLVE and no `EBADENGINE`. `npm ls` resolves `@hey-api/openapi-ts@0.99.0` and
+      `@umbraco-cms/backoffice@17.8.1`, with the backoffice's own peer `@hey-api/openapi-ts@0.99.0
+      deduped`. "added 11, removed 97, changed 60". `npm audit` moved from 41 findings (32 moderate,
+      7 high, 2 critical) to 12 (3 moderate, 8 high, 1 critical). That is dev-tree only, recorded for
+      comparison, and not in scope. The esbuild allowScripts warning is unchanged from 1.1.
+- [x] 3.2 With the TestSite running, run `npm run generate-client`. Verify, against 1.3:
       - `types.gen.ts` is unchanged, or every difference is listed here and judged against design D3;
       - the `UBookItBackofficeService` method names are identical (sorted list diff);
       - `client.gen.ts` imports `'../hey-api'`;
       - the diff stat is recorded.
-- [ ] 3.3 Typecheck, test and build the client: `npx tsc --noEmit`, `npm test`, `npm run build`. Verify:
+
+      **Done**, against the live `main` TestSite under 0.99.0:
+      - **`types.gen.ts`: one line differs, and it is type-equivalent.** `ProblemDetails`'s index
+        signature `[key: string]: unknown | string | null | ... | undefined` became
+        `[key: string]: unknown`. `unknown` already absorbs that union, so the type is the same. It is
+        main's Swashbuckle (OpenAPI 3.0) document producing a redundant union that 0.99 collapses; on
+        `dev/v18`'s Microsoft.AspNetCore.OpenApi document the explore saw no difference. Judged against
+        D3: not a contract change, and the guards in 3.4 decide.
+      - **Method names:** sorted lists before and after are 37 and 37, and `Compare-Object` finds no
+        difference. `export class UBookItBackofficeService` is unchanged.
+      - **`sdk.gen.ts`:** with whitespace stripped and the 37 added `: RequestResult<XResponses,
+        XErrors, ThrowOnError>` return types removed, the class body is byte-identical (12,981 bytes
+        each, `cmp` equal). The rest is the `Options` type gaining `TResponse` and `ClientMeta`, and
+        the multi-line `security` blocks collapsed onto one line.
+      - `client.gen.ts` imports `'../hey-api'` and now annotates `client: Client`. `index.ts` moved to
+        named exports, as predicted.
+      - Diff stat: 16 files, +428 / −710 (`client/**` and `core/**` runtime rewritten).
+- [x] 3.3 Typecheck, test and build the client: `npx tsc --noEmit`, `npm test`, `npm run build`. Verify:
       - all green, with the vitest total equal to 1.2's;
       - **any section-code edit made to compile against 17.8.1** is listed here with its reason. A
         fix that is not narrow is raised with Chris before it is made.
-- [ ] 3.4 Delete `wwwroot/App_Plugins/UBookItBackoffice` and `src/UBookIt.Backoffice/obj/Release`.
+
+      **Done.** `npx tsc --noEmit` exit 0; vitest 391/391 (equal to 1.2); `npm run build` succeeds.
+      **No section-code edit** was needed to compile against 17.8.1.
+- [x] 3.4 Delete `wwwroot/App_Plugins/UBookItBackoffice` and `src/UBookIt.Backoffice/obj/Release`.
       Then do a clean Release build (0 warnings, 0 errors), and run the unit, integration and
       rendering suites. Verify:
       - totals equal 1.2's, plus the guard's own tests from 2.3;
       - `GeneratedClientTests` and `OpenApiTransformerTests` pass **without edits** (design D3);
       - `git diff -- tests/UBookIt.Tests/GeneratedClientTests.cs tests/UBookIt.Tests/OpenApiTransformerTests.cs`
         is empty.
+
+      **Done.** TestSite stopped, bundle folder and `obj/Release` deleted, then `dotnet build
+      UBookIt.slnx -c Release --no-incremental`: 0 warnings, 0 errors. The bundle was rebuilt (39
+      files). Unit **2522** = 2496 + 26 (the guard's own tests from 2.3), integration **222**,
+      rendering **1211**: all equal to 1.2's. `GeneratedClientTests` run alone gives 2/2 passed. The
+      diff of `GeneratedClientTests.cs` / `OpenApiTransformerTests.cs` is empty.
+      **`OpenApiTransformerTests` does not exist on `main`**: it is `dev/v18`-only (design D3,
+      corrected). On `main` the method names are checked by 3.2's comparison, not by a test.
 
 ## 4. Live check on `main`
 
