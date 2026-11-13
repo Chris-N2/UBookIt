@@ -226,12 +226,34 @@
       each declare OpenAPI `3.1.x` (design D4). Verify: it passes, and it **fails** with 3.3's line
       removed (a mutation, reverted, with the revert confirmed by content comparison using absolute
       paths).
-- [ ] 4.5 The two storage guards skip EF Core 11's leading `SET NOCOUNT OFF;` and nothing else
+- [x] 4.5 The two storage guards skip EF Core 11's leading `SET NOCOUNT OFF;` and nothing else
       (design D11; Chris, 2026-11-13). Verify:
       - `BookerErasureStorageTests` and `MoveStorageTests` pass;
       - **each still fires**: a reverted mutation that issues a read before the write in
         `SqlBookingStore` turns it red;
       - the revert is confirmed by content comparison.
+
+      **Done.** One helper, `CommandRecordingInterceptor.Statements`, in
+      `tests/UBookIt.Tests.Integration/Support/SqlServerFixture.cs`:
+      - it is the recorded commands with exactly a leading `SET NOCOUNT OFF;` removed
+        (case-insensitive, at the start only, then trimmed);
+      - `Commands` stays raw;
+      - its remarks say why, and why matching `UPDATE` anywhere was rejected.
+
+      Both guards now read `Statements`: the erase guard's `Assert.Single` and its `StartsWith`, and
+      the move guard's `UPDATE` filter.
+
+      **Can fire.** Mutations of `SqlBookingStore.cs`, made byte-for-byte (BOM preserved), each
+      confirmed as a mutation by hash and restored with the hash equal:
+
+      | Run | Erase guard | Move guard |
+      |---|---|---|
+      | unmutated | pass | pass |
+      | M1: `AnyAsync` read before the erase's `UPDATE` | **FAIL**, "Assert.Single() … contained 2 items" | pass (it selects `UPDATE`s by design) |
+      | M2: the move's `WHERE` without `permitted.Contains(b.Status)` | pass | **FAIL**, "Assert.Contains() … Sub-string not found" |
+
+      `git status --short src` is empty after the restores.
+
 - [ ] 4.6 Clean Release build (`--no-incremental`, after deleting the bundle folder and `obj/Release`):
       0 warnings, 0 errors. Then all three suites. Verify:
       - the totals are recorded and compared with 1.1's: the differences are only 4.3's, 4.4's and

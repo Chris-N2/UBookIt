@@ -225,8 +225,10 @@ public class BookerErasureStorageTests(SqlServerFixture fixture)
         var erased = await new SqlBookingStore(context).EraseBookerAsync(booking.Id, Now, Ct);
         Assert.True(erased);
 
-        var command = Assert.Single(interceptor.Commands);
-        Assert.StartsWith("UPDATE", command.TrimStart(), StringComparison.OrdinalIgnoreCase);
+        // Statements, not Commands: EF Core 11 opens the write with SET NOCOUNT OFF; in the same
+        // command (see CommandRecordingInterceptor.Statements). It is still ONE command.
+        var command = Assert.Single(interceptor.Statements);
+        Assert.StartsWith("UPDATE", command, StringComparison.OrdinalIgnoreCase);
 
         // The decision is IN the statement: the stored instant is what each column is tested
         // against, so there is no earlier read whose answer could have gone stale.

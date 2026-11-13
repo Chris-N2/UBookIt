@@ -79,4 +79,19 @@ The documented breaking changes were clear, and most of them didn't touch a pack
 
 ## Added during apply
 
-*(Entries from the apply follow, in the same shape.)*
+### 5. `ReadOnlyUserGroup`'s current constructor changed shape with no obsolete warning first
+
+- **What happened.** Our test fixtures build a user group with the constructor 18 recommended,
+  the one that added `startElementId`, using named arguments. In 19 that constructor gained two
+  required parameters (`startDocumentBlueprintId`, `hasAccessToInvariantForVariant`), and the
+  shorter overloads were removed. Six fixtures stopped compiling.
+- **The contrast.** The *shorter* overloads were marked
+  `[Obsolete("… Scheduled for removal in Umbraco 19.")]` on 18, so that removal was signposted. The
+  constructor everyone was told to move to was not, and it changed anyway.
+- **How we found it.** The compiler, on its second pass: these errors only appear once the
+  interface-member errors are fixed. They were not in our first error list.
+- **What would have helped.** An overload with the 18 signature, marked obsolete in 19 and removed
+  in 20. Or, at least, a breaking-change line, since `ReadOnlyUserGroup` is the natural type to
+  construct when testing permission handlers. Also worth stating: what an upgraded group's
+  `hasAccessToInvariantForVariant` becomes. It is backfilled from the legacy
+  `AllowEditInvariantFromNonDefault` setting, which we only learned by reading the migration.
