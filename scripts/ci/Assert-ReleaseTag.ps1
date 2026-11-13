@@ -7,17 +7,21 @@
     The first job of .github/workflows/publish.yml. Nothing is built, and nothing reaches
     nuget.org, unless every check here passes. In order:
 
-      1. SHAPE.     The tag is <major>.<minor>.<patch>. The workflow's trigger filter
-                    already limits it, but a filter is not an anchored match, and a dry run
-                    takes the tag as free text. So it is checked again here.
+      1. SHAPE.     The tag is <major>.<minor>.<patch>, optionally followed by a hyphen and a
+                    prerelease label of non-empty, dot-separated identifiers of letters, digits
+                    and hyphens (19.0.0-rc1, 19.0.0-rc.2). No prefix, no build metadata. The
+                    workflow's trigger filters already limit it, but a filter's * matches any
+                    characters at all, including none (1.2.3- and 1.2.3-x+y start the workflow),
+                    and a dry run takes the tag as free text. So it is checked again here.
       2. VERSION.   The tag equals the first whole-line <Version> in Directory.Build.props
-                    at the tagged commit. That is the same "first whole line" rule
+                    at the tagged commit, compared whole: 19.0.0 against 19.0.0-rc1 fails, in
+                    either direction. That is the same "first whole line" rule
                     Assert-LineParity.ps1 uses to find the package version.
       3. LINE.      Each published line's major is read from the <Version> at that line's
                     tip. Exactly one line must have the tag's major, and the tagged commit
                     must be contained in it. The line is derived rather than tabled, so
-                    nothing here needs editing when main moves to a new LTS major. The
-                    branch names are the same pair Assert-LineParity.ps1 holds.
+                    nothing here needs editing when main moves to a new LTS major. The lines
+                    come from published-lines.json, the same list Assert-LineParity.ps1 reads.
       4. VERIFIED.  The ci workflow has a SUCCESSFUL run for a push of this exact commit to
                     that line. A run still queued or in progress is waited for, up to
                     -WaitMinutes. A run that failed or was cancelled fails here. So does no
@@ -45,6 +49,13 @@
 .PARAMETER Remote
     The remote whose branches are the published lines. Defaults to origin.
 
+.PARAMETER LinesFile
+    The published-lines list. Defaults to published-lines.json beside this script.
+
+.PARAMETER ApiBaseUri
+    The GitHub API's base address. Defaults to https://api.github.com. The tests point it at a
+    closed local port, so that a run reaching step 4 never leaves the machine.
+
 .PARAMETER WaitMinutes
     How long to wait for a queued or in-progress ci run. Defaults to 60 (ci's own timeout
     is 45).
@@ -65,6 +76,10 @@ param(
 
     [string] $Remote = 'origin',
 
+    [string] $LinesFile = (Join-Path $PSScriptRoot 'published-lines.json'),
+
+    [string] $ApiBaseUri = 'https://api.github.com',
+
     [int] $WaitMinutes = 60,
 
     [int] $PollSeconds = 30
@@ -73,11 +88,17 @@ param(
 Set-StrictMode -Version Latest
 $ErrorActionPreference = 'Stop'
 
-$lines = @('main', 'dev/v18')
-
 function Fail([string] $title, [string] $message) {
     Write-Host "::error title=Release tag - ${title}::$message"
     exit 1
+}
+
+. (Join-Path $PSScriptRoot 'PublishedLines.ps1')
+try {
+    $lines = Read-PublishedLines -Path $LinesFile
+}
+catch {
+    Fail 'line' $_.Exception.Message
 }
 
 # Git as a function, so every call runs against the release checkout and a failure can be
@@ -105,8 +126,8 @@ function Get-DeclaredVersion([string] $ref) {
 }
 
 # 1. Shape.
-if ($Tag -notmatch '^(\d+)\.(\d+)\.(\d+)$') {
-    Fail 'shape' "'$Tag' is not a release tag. A release tag is <major>.<minor>.<patch>, with no prefix or suffix (not v17.2.2, not 17.2.2-rc1)."
+if ($Tag -cnotmatch '^(\d+)\.(\d+)\.(\d+)(?:-[0-9A-Za-z-]+(?:\.[0-9A-Za-z-]+)*)?$') {
+    Fail 'shape' "'$Tag' is not a release tag. A release tag is <major>.<minor>.<patch>, optionally followed by a hyphen and a prerelease label of dot-separated letters, digits and hyphens (17.2.2, 19.0.0-rc1); no prefix, no empty label or identifier, no build metadata (not v17.2.2, not 17.2.2-, not 17.2.2+build.5)."
 }
 $major = $Matches[1]
 
@@ -122,7 +143,7 @@ $declared = Get-DeclaredVersion $sha
 if ($null -eq $declared) {
     Fail 'version' "Directory.Build.props at $sha has no whole-line <Version>, so the version the tag claims cannot be confirmed."
 }
-if ($declared -ne $Tag) {
+if ($declared -cne $Tag) {
     Fail 'version' "The tag is $Tag, but $sha declares <Version>$declared</Version>. Tag the commit that declares $Tag, or bump the version first."
 }
 Write-Host "Declared version at ${sha}: $declared - matches."
@@ -164,7 +185,7 @@ $headers = @{ Accept = 'application/vnd.github+json'; 'X-GitHub-Api-Version' = '
 if ($env:GITHUB_TOKEN) {
     $headers.Authorization = "Bearer $env:GITHUB_TOKEN"
 }
-$runsUri = "https://api.github.com/repos/$Repository/actions/workflows/ci.yml/runs?head_sha=$sha&event=push&per_page=100"
+$runsUri = "$($ApiBaseUri.TrimEnd('/'))/repos/$Repository/actions/workflows/ci.yml/runs?head_sha=$sha&event=push&per_page=100"
 
 $deadline = (Get-Date).AddMinutes($WaitMinutes)
 # A tag pushed together with its merge can arrive before GitHub has registered the merge's ci
@@ -189,7 +210,7 @@ while ($true) {
         continue
     }
 
-    $runs = @($response.workflow_runs | Where-Object { $_.head_branch -eq $line })
+    $runs = @($response.workflow_runs | Where-Object { $_.head_branch -ceq $line })
     $succeeded = @($runs | Where-Object { $_.status -eq 'completed' -and $_.conclusion -eq 'success' })
     if ($succeeded.Count -gt 0) {
         Write-Host "ci succeeded for a push of $sha to ${line}: $($succeeded[0].html_url)"
