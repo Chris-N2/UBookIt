@@ -344,11 +344,41 @@
       `eraseBooker`, has no call site in the section on either line, so its move would not be flagged
       either. The sentence is still literally true ("only when" is a necessary condition), and the case
       is equally harmless. It is left as approved, rather than edited after approval.
-- [ ] 6.3 Push both branches and open both PRs. Merge once CI is green on each, including Node 24
+- [x] 6.3 Push both branches and open both PRs. Merge once CI is green on each, including Node 24
       in the logs, and QA has approved. Verify: both merged; `main` and `dev/v18` CI green after the
       merge.
-- [ ] 6.4 Record the obligations this leaves:
+
+      **Done 2026-11-13** (Chris moved this from evening to lunchtime; he leaves the hourly client at
+      the end of December).
+      - **First push refused:** the gh token lacked the `workflow` scope needed to update
+        `.github/workflows/*`. Chris ran `gh auth refresh -s workflow`.
+      - **PRs:** #71 (`main`) and #72 (`dev/v18`).
+      - **Push runs** for both heads were green on **Node v24.22.2**:
+        - `main`: 2522 / 222 / 1211, openspec 28/28;
+        - `dev/v18`: 2516 / 222 / 1211, openspec 28/28.
+      - **Each PR run failed only "Parity with the other published line"**, because `ci.yml` and
+        `publish.yml` differed from the other line's base. That is by design for a change to CI files
+        on both lines: the step's own message says to land the same change on the other line, then
+        re-run.
+      - **Merge order, with Chris's approval** (merging past a red check is outside the standing
+        authority):
+        1. #72 merged into `dev/v18` (`3670d0d`) with its parity check red.
+        2. #71's PR run re-run: fully green. #71 merged into `main` (`f392f4f`).
+        3. `dev/v18`'s post-merge push run (red on parity while `main` lacked the change) re-run.
+      - **After the merge, both lines are green:** `main` push run on `f392f4f` succeeded, and the
+        `dev/v18` run on `3670d0d` succeeded on attempt 2.
+- [x] 6.4 Record the obligations this leaves:
       - the next release's CHANGELOG line (proposal, *Impact*), on both lines;
       - the deferred obligation "v18's client to 18.x is its own change" marked superseded.
 
       Verify: both written in the deferred-obligations record. Then archive the change.
+
+      **Done.** Written to the deferred-obligations record (memory `ubookit-deferred-obligations`):
+      - a new OPEN obligation: the next release's CHANGELOG, on both lines, must say the backoffice
+        client was regenerated with hey-api 0.99 against the current Umbraco types, with no intended
+        behaviour change, and that contributors need Node 24.13+ / npm 11+;
+      - "v18's client to `@umbraco-cms/backoffice` 18.x is its own change" marked **SUPERSEDED** by
+        this change, which covers both lines;
+      - the 2026-10-14 observation that `dev/v18`'s client builds against 17.5.3 marked **RESOLVED**.
+
+      Then archived (`skip_specs`: no spec sync).
