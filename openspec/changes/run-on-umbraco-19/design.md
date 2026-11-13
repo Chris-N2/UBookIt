@@ -63,8 +63,9 @@ routes get exactly the protection `/umbraco/management/api` gets, no more and no
 Consequences:
 - uBookIt adds no anti-forgery mechanism of its own. One would protect only part of the backoffice
   and make the overall stance harder to state.
-- `release-19-0-0` owes a docs sentence: a site that sets `AuthCookieSameSite=None` exposes uBookIt
-  as much as Umbraco.
+- The docs say so: a site that sets `AuthCookieSameSite=None` exposes uBookIt as much as Umbraco.
+  *(Amended at apply: this was owed by `release-19-0-0` until D10 folded the RC's documentation in.
+  It is now in `docs/getting-started.md` section 1 and the CHANGELOG entry, task 4.3.)*
 - The delivery API is untouched by this. Its policies are not these, and its "ambient identity is
   not trusted" guarantee is checked live (D7).
 

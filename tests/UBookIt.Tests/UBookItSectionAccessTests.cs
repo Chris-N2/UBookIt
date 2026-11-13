@@ -227,6 +227,12 @@ public class UBookItSectionAccessTests
         Assert.Contains(
             OpenIddictValidationAspNetCoreDefaults.AuthenticationScheme,
             provider.AuthenticationSchemes);
+
+        // Umbraco 19: the editor's cookie is the backoffice scheme now. Every policy's exact
+        // scheme set is guarded in AuthenticationSchemeGuardTests.
+        Assert.Contains(
+            Umbraco.Cms.Core.Constants.Security.BackOfficeAuthenticationType,
+            provider.AuthenticationSchemes);
     }
 
     [Fact]

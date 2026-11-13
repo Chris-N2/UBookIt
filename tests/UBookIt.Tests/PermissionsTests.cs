@@ -431,6 +431,9 @@ public class PermissionsTests
         Assert.Contains(
             OpenIddict.Validation.AspNetCore.OpenIddictValidationAspNetCoreDefaults.AuthenticationScheme,
             policy.AuthenticationSchemes);
+        Assert.Contains(
+            Umbraco.Cms.Core.Constants.Security.BackOfficeAuthenticationType,
+            policy.AuthenticationSchemes);
 
         var requirements = policy.Requirements.Select(r => r.GetType()).ToList();
 

@@ -62,7 +62,8 @@
       recorded as owed:**
       - `docs/theming.md:22`, the example theme RCL's `<TargetFramework>`. This is line wording, owed
         by `release-19-0-0` (proposal Non-goals). On 19 it must read `net11.0`, because Umbraco 19
-        packages are net11.0-only.
+        packages are net11.0-only. *(Superseded at apply: D10 folded the RC's documentation into
+        this change, and 4.3 made it `net11.0`.)*
       - `scripts/verify-install.ps1:198`, `bin/Debug/net10.0`. **A pre-existing defect on dev/v18
         too:** the script creates its site with `dotnet new umbraco -r LTS`, an Umbraco **17** site,
         then installs the branch's declared version. So on any non-LTS line it installs an 18 or 19
@@ -442,6 +443,16 @@
       5. Find by email `floor-raise-18@example.com`: POST `bookings/find-by-booker` 200 (`auth=false`).
          "Bookings for floor-raise-18@example.com, all dates" shows DTJ3-7MQH.
 
+      *(Added at QA round 1.)*
+      - **Booker shown.** In step 1 and step 5, the row's Booker column showed the name and email
+        ("Floor Raise Live Check v18", `floor-raise-18@example.com`), not a withheld placeholder.
+        So `BookingsController`'s visibility decision, which goes through `IBackOfficeSecurityAccessor`
+        rather than the requirement handlers, also resolved the cookie principal.
+      - **How the recorder read headers.** It merged `new Headers(request.headers)` from the
+        `Request` object (hey-api calls `fetch(Request)`) with any `init.headers`, so `auth=false`
+        means neither carried `Authorization`. It also recorded the `Request`'s `credentials`
+        (`include`). The wrapper was page-context code in this session and is not kept as a file.
+
 - [x] 6.3 Refusal through the cookie: Chris removes one uBookIt verb from his group. The matching
       action gives **403**, with the section's refusal message, not 401 and not the sign-in prompt.
       Chris then restores it. Verify: the 403 is recorded, and the permission is confirmed restored.
@@ -541,10 +552,70 @@
 - [ ] 8.3 QA (`qa-review`): a fresh subagent, reused across rounds, told what is claimed and asked to
       verify it. The live checks are judged by method unless QA asks for a repeat. Verify:
       APPROVE, or APPROVE WITH NITS, with the nits resolved or recorded.
+
+      **Round 1 (2026-11-13): REJECT, on one MAJOR; no CRITICAL.** The reviewer independently
+      re-verified:
+      - client 391, build 0/0;
+      - Unit 2520, Integration 222, Rendering 1211, and the 42-test client guard set;
+      - the OpenAPI pin mutation;
+      - openspec (28 passed);
+      - authorization completeness: 6 controllers, 7 policies, both schemes named at all 3 sites;
+      - the D2 claims against RC1's source;
+      - `skip_specs`;
+      - the D11 helper, the floor guard, leftover literals, and the DevExpress scan (pass).
+
+      It accepted 6.1–7.2 on method.
+
+      - **MAJOR, fixed: the cookie scheme had no regression guard.** With the scheme removed from all
+        three `AddAuthenticationSchemes` calls, the unit suite passed 2520/2520. The fix:
+        - New `AuthenticationSchemeGuardTests`:
+          - The theory asserts that each policy's scheme set is **exactly** {OpenIddict,
+            `BackOfficeAuthenticationType`}. Its data is the union of every policy constant
+            (`Constants` + `Constants.VerbPolicies` by reflection) and every policy named by an
+            `[Authorize]` on a backoffice controller or action.
+          - A floor fact pins the policy count at 7, with constants ⊆ named and named ⊆ constants,
+            so an empty enumeration cannot pass vacuously.
+        - The three older guards (`UBookItSectionAccessTests`, `PermissionsTests` verb theory,
+          `EraseBookerEndpointTests`) now assert the cookie scheme as well as OpenIddict.
+        - **Proven to fire** (scratchpad `mut_cookie.py`; each mutation reverted with
+          `git checkout`, and `src` is clean after):
+
+          | Mutation | Fails |
+          |---|---|
+          | cookie removed at the section site | the guard's `UBookItSectionAccess` case and `The_registered_policy_carries_the_backoffice_authentication_scheme` |
+          | cookie removed at the sensitive-data site | the guard's `UBookItSensitiveDataAccess` case and `The_sensitive_data_policy_carries…` |
+          | cookie removed in `AddVerbPolicy` | the guard's 5 verb cases and the `PermissionsTests` theory's 3 |
+          | a third scheme (`"Extra"`) added in `AddVerbPolicy` | the guard's 5 verb cases |
+
+      - **MINOR, fixed: stale owed items** written before D10.
+        - D2's "`release-19-0-0` owes a docs sentence" is amended: the sentence is in getting-started
+          and the CHANGELOG.
+        - 2.1's theming item is marked superseded by 4.3.
+        - 8.4's obligation list now names what is actually owed: the 19.0.0 bump, CI for three lines,
+          `release-19-0-0-rc1`, and the verify-install defect.
+      - **NIT, fixed:** `proposal.md` said "six" policies; it is seven.
+      - **NIT, fixed:** the 6.2 record now states that the booker was shown, and how the recorder read
+        headers (from the `Request` object).
+      - **NIT, fixed:** in the README Umbraco row, "below 19.0.0-rc1 … raises the Umbraco packages"
+        is now "A site on Umbraco 18 or earlier cannot install it at all, because the package targets
+        .NET 11. On an earlier 19 prerelease, installing uBookIt raises only…". The floor guard's
+        "to 19.0.0-rc1 first" phrasing is kept.
+
+      After the fixes: clean Release `--no-incremental` build, **0 warnings, 0 errors**; Unit
+      **2528/2528** (2520 + 8 new). Integration and Rendering are untouched by this round: no
+      source change, only tests, README and records.
+
 - [ ] 8.4 Merge `run-on-umbraco-19` into `dev/v19` locally (no remote; design *Migration Plan*).
       Record the owed follow-ups in the deferred-obligations record:
       - the 19.0.0-final bump;
       - CI for three lines, before the first push;
-      - `release-19-0-0`'s line wording and the SameSite docs sentence.
+      - `release-19-0-0-rc1`: date the CHANGELOG entry, check the artifacts, and tag (Chris pushes
+        the tag);
+      - `scripts/verify-install.ps1` (2.1): it uses `-r LTS` and `bin/Debug/net10.0`, so it is
+        wrong on dev/v18 and dev/v19 alike, and needs a per-line template choice.
+
+      *(Amended at QA round 1: this list named "`release-19-0-0`'s line wording and the SameSite
+      docs sentence", both done here in 4.3 once D10 folded the RC's documentation in, and it
+      omitted the verify-install defect 2.1 records as owed.)*
 
       Then archive. Verify: `dev/v19` contains the change, and the obligations are written.

@@ -245,6 +245,9 @@ public class EraseBookerEndpointTests
         Assert.Contains(
             OpenIddict.Validation.AspNetCore.OpenIddictValidationAspNetCoreDefaults.AuthenticationScheme,
             policy.AuthenticationSchemes);
+        Assert.Contains(
+            Umbraco.Cms.Core.Constants.Security.BackOfficeAuthenticationType,
+            policy.AuthenticationSchemes);
     }
 
     [Fact]

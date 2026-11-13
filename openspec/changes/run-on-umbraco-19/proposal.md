@@ -4,7 +4,7 @@ Umbraco 19 RC1 shipped on 2026-11-12, and Umbraco has asked package authors to t
 on it. uBookIt does not build on it. The explore of 2026-11-13 found that **once it does build, it
 locks every editor out of its own section**. Umbraco 19 removed the bridge that turned the
 backoffice cookie into an OpenIddict token. Its Management API now authenticates editors with the
-cookie alone. uBookIt's six authorization policies name only the OpenIddict scheme, so an editor's
+cookie alone. uBookIt's seven authorization policies name only the OpenIddict scheme, so an editor's
 request reaches them with no identity.
 
 This was proven on a running RC1 TestSite, in one page load:
