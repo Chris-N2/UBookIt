@@ -323,12 +323,33 @@
 
       `git status --short src` is empty after the restores.
 
-- [ ] 4.6 Clean Release build (`--no-incremental`, after deleting the bundle folder and `obj/Release`):
+- [x] 4.6 Clean Release build (`--no-incremental`, after deleting the bundle folder and `obj/Release`):
       0 warnings, 0 errors. Then all three suites. Verify:
       - the totals are recorded and compared with 1.1's: the differences are only 4.3's, 4.4's and
         4.5's test edits and any test 4.2 recorded;
       - `GeneratedClientTests`, `OpenApiTransformerTests` and `NodeEngineGuardTests` pass;
       - the Node guard reads backoffice 19.0.0-rc1's `engines.node`.
+
+      **Done.** First, the last port-forced literal:
+      `PackageCompositionTests.The_front_end_rendering_is_in_the_box` now expects
+      `lib/net11.0/UBookIt.Web.dll` (framework literal, D6). `AuditScriptTests`' `net10.0`
+      occurrences are self-contained fixture data (synthetic projects with their own JSON). They
+      pass, and are not port-forced, so they are left.
+
+      I deleted `wwwroot/App_Plugins/UBookItBackoffice` and `obj/Release`, ran `npm run build`, then
+      `dotnet build UBookIt.slnx -c Release --no-incremental`: **0 warnings, 0 errors.** Release
+      suites, one at a time:
+
+      | Suite | Total | vs 1.1 (2516 / 222 / 1211) |
+      |---|---|---|
+      | Unit | **2520** | +2 from 4.4's `Each_document_declares_openapi_3_1`, +2 from 4.3's prerelease-floor facts |
+      | Integration | **222** | equal |
+      | Rendering | **1211** | equal |
+
+      `GeneratedClientTests` + `OpenApiTransformerTests` + `NodeEngineGuardTests`: **42/42** (40 +
+      4.4's 2). The Node guard reading 19.0.0-rc1's `engines.node` is verified in 5.1, where the
+      lockfile moves.
+
 
 ## 5. Client
 

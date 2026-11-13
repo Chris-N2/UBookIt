@@ -131,7 +131,7 @@ public class PackageCompositionTests(PackedSolutionFixture fixture)
         // booking page that rendered nothing at all, with no error raised anywhere.
         var web = Packed["UBookIt.Web"];
 
-        Assert.Contains("lib/net10.0/UBookIt.Web.dll", web.Entries);
+        Assert.Contains("lib/net11.0/UBookIt.Web.dll", web.Entries);
         Assert.Contains("staticwebassets/ubookit.css", web.Entries);
     }
 
