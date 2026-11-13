@@ -531,8 +531,13 @@
       `git stash drop` printed `c8445e9c1a6baa937dbd8f47f77e7443102e6506`, which is recoverable with
       `git stash apply <sha>` until gc.
 
-- [ ] 8.2 `openspec validate --all --strict` with the pinned CLI, after the last commit. Verify:
+- [x] 8.2 `openspec validate --all --strict` with the pinned CLI, after the last commit. Verify:
       passes.
+
+      **Done.** `npx --yes @fission-ai/openspec@1.13.0 validate --all --strict` gives **28 passed,
+      0 failed**, exit 0, after `a24676b` (the 8.1 commit). It was re-run after this record's own
+      commit, and the commit is stated in the message of the commit that follows it.
+
 - [ ] 8.3 QA (`qa-review`): a fresh subagent, reused across rounds, told what is claimed and asked to
       verify it. The live checks are judged by method unless QA asks for a repeat. Verify:
       APPROVE, or APPROVE WITH NITS, with the nits resolved or recorded.
