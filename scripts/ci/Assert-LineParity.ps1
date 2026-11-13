@@ -58,17 +58,6 @@ param(
 Set-StrictMode -Version Latest
 $ErrorActionPreference = 'Stop'
 
-# git's output is decoded with [Console]::OutputEncoding. Without a console (a test host, some
-# runners) that falls back to a legacy code page, and the bytes of a UTF-8 file - a byte-order mark,
-# or any non-ASCII text - arrive as other characters. Pinned so that what is compared is what is in
-# the file, wherever this runs. Setting it can fail where there is no console to set, and then the
-# default stands; the comparison of two refs decoded the same way is still like for like.
-try {
-    [Console]::OutputEncoding = [System.Text.UTF8Encoding]::new($false)
-}
-catch {
-}
-
 . (Join-Path $PSScriptRoot 'PublishedLines.ps1')
 
 try {
@@ -88,12 +77,48 @@ $others = @($lines | Where-Object { $_ -cne $Line })
 # global.json is compared on its own (below), so it is not in the whole-file list.
 $paths = @('.github', 'scripts/ci')
 
+# A file as it stands at a ref, decoded as UTF-8, or $null when git cannot show it.
+#
+# Read through its own process rather than as PowerShell native output, which is decoded with
+# [Console]::OutputEncoding. Without a console (a test host, some runners) that is a legacy code page,
+# and a UTF-8 file's bytes arrive as other characters. Setting [Console]::OutputEncoding is not the
+# fix: on Windows it changes the code page of the whole console the process shares, so it leaks
+# into the terminal or runner that started this script, and into every process attached to it
+# (QA round 1 found it doing exactly that between parallel tests). The reader strips a leading
+# UTF-8 byte-order mark, which the SDK accepts in global.json.
+function Get-GitFile([string] $ref, [string] $path) {
+    $info = [System.Diagnostics.ProcessStartInfo]::new('git')
+    $info.ArgumentList.Add('show')
+    $info.ArgumentList.Add("${ref}:$path")
+    $info.WorkingDirectory = (Get-Location).ProviderPath
+    $info.UseShellExecute = $false
+    $info.RedirectStandardOutput = $true
+    $info.RedirectStandardError = $true
+    $info.StandardOutputEncoding = [System.Text.UTF8Encoding]::new($false)
+
+    $process = [System.Diagnostics.Process]::Start($info)
+    try {
+        $stdout = $process.StandardOutput.ReadToEndAsync()
+        $stderr = $process.StandardError.ReadToEndAsync()
+        $process.WaitForExit()
+        [void] $stderr.GetAwaiter().GetResult()
+        if ($process.ExitCode -ne 0) {
+            return $null
+        }
+        return $stdout.GetAwaiter().GetResult()
+    }
+    finally {
+        $process.Dispose()
+    }
+}
+
 # Directory.Build.props, minus the one line that is allowed to differ.
 function Get-PropsWithoutVersion([string] $ref) {
-    $text = git show "${ref}:Directory.Build.props" 2>$null
-    if ($LASTEXITCODE -ne 0) {
+    $file = Get-GitFile $ref 'Directory.Build.props'
+    if ($null -eq $file) {
         return $null
     }
+    $text = $file -split '\r?\n'
 
     # Only the FIRST whole-line <Version> element is dropped: that is the package version. A
     # second one elsewhere in the file would be something else, and must be compared.
@@ -160,13 +185,10 @@ function ConvertTo-CanonicalJson([System.Text.Json.JsonElement] $element, [strin
 # version at all is a failure, not a difference that happens to be exempt (QA round 1). Returns
 # Canonical, or Problem saying why it could not be compared.
 function Get-ComparableGlobalJson([string] $ref) {
-    $text = git show "${ref}:global.json" 2>$null
-    if ($LASTEXITCODE -ne 0) {
+    $joined = Get-GitFile $ref 'global.json'
+    if ($null -eq $joined) {
         return [pscustomobject]@{ Canonical = $null; Problem = 'it could not be read' }
     }
-
-    # git show keeps a UTF-8 byte-order mark, which the SDK accepts and the parser does not.
-    $joined = (@($text) -join "`n").TrimStart([char] 0xFEFF)
     $options = [System.Text.Json.JsonDocumentOptions]@{
         CommentHandling     = [System.Text.Json.JsonCommentHandling]::Skip
         AllowTrailingCommas = $true
