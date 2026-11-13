@@ -115,7 +115,64 @@ public sealed class LineParityScriptTests : IDisposable
         var (exit, output) = Run("main");
 
         Assert.Equal(1, exit);
-        Assert.Contains("global.json could not be read or parsed as a JSON object at origin/dev/v18", output);
+        Assert.Contains("global.json at origin/dev/v18 cannot be compared: it is not valid JSON", output);
+    }
+
+    [Fact]
+    public void A_line_that_pins_no_sdk_version_fails()
+    {
+        // The exemption is the version's VALUE, not its presence (QA round 1, MINOR-3): a line
+        // dropping sdk.version is unpinned, and comparing with the value removed would not see it.
+        PublishAll(Definitions("18.6.0"), ("dev/v19", Definitions("19.0.0-rc1", globalJson: """{"sdk":{"rollForward":"latestPatch"}}""")));
+        CheckOut(Definitions("17.7.0"));
+
+        var (exit, output) = Run("main");
+
+        Assert.Equal(1, exit);
+        Assert.Contains("global.json at origin/dev/v19 cannot be compared: it pins no SDK version", output);
+    }
+
+    [Fact]
+    public void An_empty_sdk_version_at_this_commit_fails()
+    {
+        PublishAll(Definitions("18.6.0"));
+        CheckOut(Definitions("17.7.0", sdk: ""));
+
+        var (exit, output) = Run("main");
+
+        Assert.Equal(1, exit);
+        Assert.Contains("global.json at this commit cannot be compared: it pins no SDK version", output);
+    }
+
+    [Fact]
+    public void A_byte_order_mark_is_not_a_difference()
+    {
+        // The SDK reads a global.json with a UTF-8 BOM; git show keeps it (QA round 1, MINOR-4).
+        const string WithBom = "\uFEFF{\"sdk\":{\"version\":\"10.0.300\",\"rollForward\":\"latestPatch\"}}";
+        PublishAll(Definitions("18.6.0", globalJson: WithBom));
+        CheckOut(Definitions("17.7.0", globalJson: WithBom));
+
+        var (exit, output) = Run("main");
+
+        Assert.Equal(0, exit);
+        Assert.DoesNotContain("cannot be compared", output);
+    }
+
+    [Theory]
+    [InlineData("""{"sdk":{"version":"10.0.300","rollForward":"disable","RollForward":"latestPatch"}}""")]
+    [InlineData("""{"sdk":{"version":"10.0.300","rollForward":"disable","rollForward":"latestPatch"}}""")]
+    public void A_key_given_twice_is_refused_rather_than_guessed(string globalJson)
+    {
+        // Which of the two the SDK reads is not this check's to guess; a hashtable kept the last
+        // one and folded case, so a file saying something else compared equal (QA round 1, NIT-6).
+        PublishAll(Definitions("18.6.0"));
+        CheckOut(Definitions("17.7.0", globalJson: globalJson));
+
+        var (exit, output) = Run("main");
+
+        Assert.Equal(1, exit);
+        Assert.Contains("global.json at this commit cannot be compared: the key", output);
+        Assert.Contains("appears more than once at $.sdk", output);
     }
 
     [Fact]

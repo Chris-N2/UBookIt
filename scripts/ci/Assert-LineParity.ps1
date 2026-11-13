@@ -58,6 +58,17 @@ param(
 Set-StrictMode -Version Latest
 $ErrorActionPreference = 'Stop'
 
+# git's output is decoded with [Console]::OutputEncoding. Without a console (a test host, some
+# runners) that falls back to a legacy code page, and the bytes of a UTF-8 file - a byte-order mark,
+# or any non-ASCII text - arrive as other characters. Pinned so that what is compared is what is in
+# the file, wherever this runs. Setting it can fail where there is no console to set, and then the
+# default stands; the comparison of two refs decoded the same way is still like for like.
+try {
+    [Console]::OutputEncoding = [System.Text.UTF8Encoding]::new($false)
+}
+catch {
+}
+
 . (Join-Path $PSScriptRoot 'PublishedLines.ps1')
 
 try {
@@ -98,51 +109,112 @@ function Get-PropsWithoutVersion([string] $ref) {
     return @($kept) -join "`n"
 }
 
-# A JSON value with every object's keys in ordinal order, so two files that say the same thing
-# serialise the same way however they are laid out.
-function ConvertTo-Canonical($value) {
-    if ($value -is [System.Collections.IDictionary]) {
-        $ordered = [ordered]@{}
-        foreach ($key in @($value.Keys | Sort-Object -CaseSensitive)) {
-            $ordered[$key] = ConvertTo-Canonical $value[$key]
+# A JSON value written out canonically: every object's keys in ordinal order, arrays in their own
+# order, and scalars exactly as written. Two files that say the same thing serialise the same way
+# however they are laid out. Built on System.Text.Json rather than ConvertFrom-Json, because a
+# PowerShell hashtable folds keys that differ only in case into one, and keeps only the last of a
+# duplicated key: two files that differ could then compare equal. Here a duplicated key, or two
+# keys differing only in case, is refused outright: which one the SDK would read is not something
+# this check should guess. $skip names one property path to leave out ('$.sdk.version').
+function ConvertTo-CanonicalJson([System.Text.Json.JsonElement] $element, [string] $path, [string] $skip) {
+    switch ($element.ValueKind) {
+        'Object' {
+            $seen = [System.Collections.Generic.HashSet[string]]::new([System.StringComparer]::OrdinalIgnoreCase)
+            $byName = @{}
+            $names = [System.Collections.Generic.List[string]]::new()
+            foreach ($property in $element.EnumerateObject()) {
+                if (-not $seen.Add($property.Name)) {
+                    throw "the key '$($property.Name)' appears more than once at $path (two keys that differ only in case count as the same key)"
+                }
+                if ("$path.$($property.Name)" -ceq $skip) {
+                    continue
+                }
+                $names.Add($property.Name)
+                $byName[$property.Name] = $property.Value
+            }
+
+            $sorted = $names.ToArray()
+            [System.Array]::Sort($sorted, [System.StringComparer]::Ordinal)
+            $members = foreach ($name in $sorted) {
+                '"' + [System.Text.Json.JsonEncodedText]::Encode($name).ToString() + '":' +
+                    (ConvertTo-CanonicalJson $byName[$name] "$path.$name" $skip)
+            }
+            return '{' + (@($members) -join ',') + '}'
         }
-        return $ordered
+        'Array' {
+            $index = 0
+            $items = foreach ($item in $element.EnumerateArray()) {
+                ConvertTo-CanonicalJson $item "$path[$index]" $skip
+                $index++
+            }
+            return '[' + (@($items) -join ',') + ']'
+        }
+        default {
+            return $element.GetRawText()
+        }
     }
-    if ($value -is [System.Collections.IList]) {
-        return , @($value | ForEach-Object { ConvertTo-Canonical $_ })
-    }
-    return $value
 }
 
-# global.json, parsed, minus sdk.version: the one value allowed to differ. $null when the file is
-# missing or is not a JSON object.
-function Get-GlobalJsonWithoutSdkVersion([string] $ref) {
+# global.json at a ref, canonical and minus sdk.version: the one value allowed to differ. The
+# exemption covers the version's VALUE, not its presence: a line whose global.json pins no SDK
+# version at all is a failure, not a difference that happens to be exempt (QA round 1). Returns
+# Canonical, or Problem saying why it could not be compared.
+function Get-ComparableGlobalJson([string] $ref) {
     $text = git show "${ref}:global.json" 2>$null
     if ($LASTEXITCODE -ne 0) {
-        return $null
+        return [pscustomobject]@{ Canonical = $null; Problem = 'it could not be read' }
+    }
+
+    # git show keeps a UTF-8 byte-order mark, which the SDK accepts and the parser does not.
+    $joined = (@($text) -join "`n").TrimStart([char] 0xFEFF)
+    $options = [System.Text.Json.JsonDocumentOptions]@{
+        CommentHandling     = [System.Text.Json.JsonCommentHandling]::Skip
+        AllowTrailingCommas = $true
     }
 
     try {
-        $parsed = (@($text) -join "`n") | ConvertFrom-Json -AsHashtable
+        $document = [System.Text.Json.JsonDocument]::Parse($joined, $options)
     }
     catch {
-        return $null
-    }
-    if ($parsed -isnot [System.Collections.IDictionary]) {
-        return $null
+        return [pscustomobject]@{ Canonical = $null; Problem = "it is not valid JSON ($($_.Exception.Message))" }
     }
 
-    if ($parsed['sdk'] -is [System.Collections.IDictionary]) {
-        $parsed['sdk'].Remove('version')
-    }
+    try {
+        $root = $document.RootElement
+        if ($root.ValueKind -ne 'Object') {
+            return [pscustomobject]@{ Canonical = $null; Problem = 'it is not a JSON object' }
+        }
 
-    return (ConvertTo-Canonical $parsed) | ConvertTo-Json -Depth 32 -Compress
+        try {
+            $canonical = ConvertTo-CanonicalJson $root '$' '$.sdk.version'
+        }
+        catch {
+            return [pscustomobject]@{ Canonical = $null; Problem = "$($_.Exception.Message)" }
+        }
+
+        $sdk = [System.Text.Json.JsonElement]::new()
+        $version = [System.Text.Json.JsonElement]::new()
+        if (-not $root.TryGetProperty('sdk', [ref] $sdk) -or $sdk.ValueKind -ne 'Object' -or
+            -not $sdk.TryGetProperty('version', [ref] $version) -or $version.ValueKind -ne 'String' -or
+            [string]::IsNullOrWhiteSpace($version.GetString())) {
+            return [pscustomobject]@{ Canonical = $null; Problem = 'it pins no SDK version (sdk.version must be a non-empty string; only its value may differ between lines)' }
+        }
+
+        return [pscustomobject]@{ Canonical = $canonical; Problem = $null }
+    }
+    finally {
+        $document.Dispose()
+    }
 }
 
 $ourProps = Get-PropsWithoutVersion 'HEAD'
-$ourGlobal = Get-GlobalJsonWithoutSdkVersion 'HEAD'
-if ($null -eq $ourProps -or $null -eq $ourGlobal) {
-    Write-Host "::error title=Line parity::Directory.Build.props or global.json could not be read or parsed at this commit, so parity could not be checked."
+if ($null -eq $ourProps) {
+    Write-Host "::error title=Line parity::Directory.Build.props could not be read at this commit, so parity could not be checked."
+    exit 1
+}
+$ourGlobal = Get-ComparableGlobalJson 'HEAD'
+if ($ourGlobal.Problem) {
+    Write-Host "::error title=Line parity,file=global.json::global.json at this commit cannot be compared: $($ourGlobal.Problem)."
     exit 1
 }
 
@@ -178,12 +250,12 @@ foreach ($other in $others) {
         Write-Host "Directory.Build.props differs from $otherRef even with its package <Version> line ignored."
     }
 
-    $theirGlobal = Get-GlobalJsonWithoutSdkVersion $otherRef
-    if ($null -eq $theirGlobal) {
-        Write-Host "::error title=Line parity,file=global.json::global.json could not be read or parsed as a JSON object at $otherRef, so its parity could not be checked."
+    $theirGlobal = Get-ComparableGlobalJson $otherRef
+    if ($theirGlobal.Problem) {
+        Write-Host "::error title=Line parity,file=global.json::global.json at $otherRef cannot be compared: $($theirGlobal.Problem)."
         $failures++
     }
-    elseif ($ourGlobal -cne $theirGlobal) {
+    elseif ($ourGlobal.Canonical -cne $theirGlobal.Canonical) {
         $differing += 'global.json'
         Write-Host "global.json differs from $otherRef even with its sdk.version ignored."
     }
