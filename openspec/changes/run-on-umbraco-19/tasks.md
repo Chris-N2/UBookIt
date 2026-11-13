@@ -387,13 +387,29 @@
 
 ## 6. Live: identities (design D7, steps 1–3)
 
-- [ ] 6.1 API user, with `v19-auth-probe.ps1` extended by one verb-gated write that leaves no
+- [x] 6.1 API user, with `v19-auth-probe.ps1` extended by one verb-gated write that leaves no
       residue:
       - anonymous gives 401;
       - a token gives 200 on settings and closures;
       - a closure create then delete gives 200 / 200.
 
       Verify: the output is recorded.
+
+      **Done**, using `scratchpad\v19-auth-probe2.ps1` (the explore's probe plus a write). The TestSite
+      was restarted after 5.3's bundle rebuild, with `obj/Debug` deleted. The client id and secret are
+      read from `~/.claude.json` and never printed.
+
+      | Request | Status |
+      |---|---|
+      | uBookIt GET settings, no credentials | **401** (`WWW-Authenticate: Bearer`) |
+      | token (client credentials) | 200 |
+      | uBookIt GET settings, bearer | **200** |
+      | uBookIt GET closures, bearer | **200** |
+      | Umbraco GET user/current, bearer (control) | 200 |
+      | uBookIt POST closure 2027-03-11 "CLU API probe (delete me)", bearer | **200** |
+      | uBookIt DELETE that closure, bearer | **200** |
+      | closures named "CLU API probe" remaining | **0** |
+
 - [ ] 6.2 Editor, with Chris logged in:
       - the backoffice-client-upgrade D4 set (bookings list and the 67-day refusal; closure create
         and delete; holiday 404 withdraws the panel and 500 keeps it; the invalid closure's
