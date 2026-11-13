@@ -176,15 +176,42 @@
 
 ## 4. Live check on `main`
 
-- [ ] 4.1 Start the TestSite on the rebuilt output, and confirm in the browser that the uBookIt
+- [x] 4.1 Start the TestSite on the rebuilt output, and confirm in the browser that the uBookIt
       section loads with no console error from the section's own scripts. Verify: a screenshot, and
       a console read filtered to the section.
-- [ ] 4.2 Run design D4 steps 1–4 again and compare each with 1.4. Verify:
+
+      **Done.** `obj/Debug` deleted as well, then `dotnet run` on the rebuilt output, with the session in
+      a fresh tab. Bookings view screenshot:
+      `C:\Users\cnorw\AppData\Local\Temp\claude-chrome-screenshots-x4R5b5\screenshot-1794569078789-0.jpg`.
+      The section's scripts come from the rebuilt bundle. Console errors over the whole session: **none
+      from the section**. Two came from Umbraco's own auth module at first load,
+      `[UmbAuthClient] Token request failed: 400` (`packages/core/auth/index.js`). They are attributed
+      to the session's refresh token surviving a TestSite restart, not to this change; 5.2's
+      pre-upgrade restart on `dev/v18` is the check on that attribution.
+- [x] 4.2 Run design D4 steps 1–4 again and compare each with 1.4. Verify:
       - each step's outcome matches 1.4: the list loads; the closure is created and deleted; the
         holiday-source 404 withdraws the panel; the invalid closure shows the same notification and
         message;
       - any difference is a finding, recorded here and raised before continuing;
       - the closure from step 2 is confirmed gone.
+
+      **Done. Every step matches 1.4:**
+      1. Bookings, 2026-10-16 to 2026-11-15: GET 200, 7 rows, "Showing 1–7 of 7". The 67-day window
+         gives GET 400 and the same inline message, with no toast.
+      2. Create 2027-03-10 "CLU live check (delete me)": POST 200, rows 10 → 11. Delete: DELETE 200,
+         back to 10 rows, 0 `CLU`.
+      3. Holiday 404 (same stub): one stubbed GET. The panel is withdrawn, with neither Import nor
+         Fetch controls left and no toast. **Control, new in 4.2:** the same stub answering **500**
+         keeps the panel and shows "The site's holiday source could not be reached, so there is
+         nothing to show. This is not the same as there being no holidays…". So the withdrawal is the
+         404 being classified from the thrown status, not every failure removing the panel. *(1.4 did
+         not run this control. It is run on `dev/v18` before and after.)*
+      4. Closure 2027-03-10 to 2027-03-05: POST 400, "A closure cannot end (2027-03-05) before it
+         starts (2027-03-10).", `_errorControl` = `closure-end-date`, no toast. Cancelled, 10 rows,
+         0 `CLU`.
+
+      No difference from 1.4, so no finding. The step-2 closure is confirmed gone (row count and name
+      search).
 
 ## 5. Port to `dev/v18` (worktree `..\uBookIt-v18`, branch `backoffice-client-upgrade-v18`)
 
