@@ -147,11 +147,17 @@ outside the machine. `-WaitMinutes 0` makes that failure immediate.
 
 Guards that need no script run:
 - every listed line matches `main` or `dev/v<digits>`;
-- the list has no duplicates and names the current line;
+- the list has no duplicates, and names `main`;
 - no file under `.github/` or `scripts/ci/` names `dev/v18` or `dev/v19` literally, outside the
   list (the spec's "listed once").
 
 Each new guard is proven to fire by a mutation during apply.
+
+*(Amended at apply, task 3.3.)* This said the list must name "the current line". A test cannot
+tell which line it runs on: CI checks out a detached commit, and no test has a notion of its own
+line. So the guard is `main` is always listed. A `dev/vNN` line that drops itself is caught by
+parity instead: the list is a parity-checked file, so that line's copy differs from every other
+line's, and the next push to any of them fails.
 
 ### D7. Order of work and identity across lines
 
