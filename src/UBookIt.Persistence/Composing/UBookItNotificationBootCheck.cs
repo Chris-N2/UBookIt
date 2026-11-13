@@ -77,7 +77,7 @@ public sealed class UBookItNotificationBootCheck(
 
             try
             {
-                canSend = emailSender.CanSendRequiredEmail();
+                canSend = emailSender.IsEmailConfigured();
             }
             catch (Exception exception)
             {

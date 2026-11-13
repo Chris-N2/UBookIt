@@ -129,7 +129,7 @@ public sealed class BookingEmailHandler(
 
         // ASKED BEFORE THE HOST IS, and that order is load-bearing. A site that has asked for
         // nothing must not be affected by its mail configuration at all — including by a host
-        // whose CanSendRequiredEmail() throws, which Umbraco's own default sender does. "Asked"
+        // whose IsEmailConfigured() throws, which Umbraco's own default sender does. "Asked"
         // now includes the assignment check above: our own database may be consulted before the
         // host is, the host is never consulted for a site that asked for nothing.
         if (!notifications.SendBookerEmails && !toSite)
@@ -145,7 +145,7 @@ public sealed class BookingEmailHandler(
         //
         // Asked per message rather than cached: EmailSender watches IOptionsMonitor<GlobalSettings>
         // and re-reads on change, so mail configuration can appear or vanish while the site runs.
-        var hostCanSendMail = emailSender.CanSendRequiredEmail();
+        var hostCanSendMail = emailSender.IsEmailConfigured();
 
         if (!hostCanSendMail)
         {
