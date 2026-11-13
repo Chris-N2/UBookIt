@@ -75,7 +75,11 @@ a different tag would produce a second `…Service` class. That is not silent: t
 
 ### D3. The client guards are run unchanged, and a failure stops the change
 
-`GeneratedClientTests` and `OpenApiTransformerTests` assert on the generated files. If either goes
+`GeneratedClientTests` and `OpenApiTransformerTests` assert on the generated files. *(Corrected at
+apply: `OpenApiTransformerTests`, which pins the SDK's method names, exists on `dev/v18` only; it
+came with that line's OpenAPI generator swap. On `main`, `GeneratedClientTests` (two tests over
+`types.gen.ts`) is the only automated guard, so 3.2's sorted method-name comparison is what checks
+the names there.)* If either goes
 red after regeneration, the client changed in a way the explore did not predict. The response is to
 stop and report what changed. **Adjusting a pattern to match the new output is not allowed in this
 change**: that would make the guard agree with whatever the generator now does, which is the failure
