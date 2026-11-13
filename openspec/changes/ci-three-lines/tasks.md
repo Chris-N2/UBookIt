@@ -389,6 +389,78 @@
       "listed once" guard's reach in particular. Verify: APPROVE or APPROVE WITH NITS, with the nits
       resolved or recorded.
 
+      **Round 1 (2026-11-13): REJECT, on 2 MAJOR; 3 MINOR, 4 NIT.** The reviewer independently
+      re-verified:
+      - builds 0/0 on all three lines;
+      - unit 2553 / 2547 / 2559;
+      - openspec 28 ×3;
+      - rename handling, via `openspec archive` on a temp copy;
+      - the guarantee diff, by hand;
+      - parity across the real branches;
+      - port identity;
+      - 17 JSON probes through the real script;
+      - the list helper.
+
+      **All findings fixed** (`d2062eb`, `04be070`):
+      - **MAJOR-1, fixed.** The dotted label (`19.0.0-rc.2`, the spec's own example) was untested.
+        The positive case is now a theory over `19.0.0-rc1`, `19.0.0-rc.2`, `19.0.0-rc-1` and
+        `19.0.0-beta.1.2`. Each commits a tip declaring that version and asserts "contained in
+        origin/dev/v19" before the step-4 API failure.
+      - **MAJOR-2, fixed.** The version comparison was `-ne` (case-insensitive), so `19.0.0-RC1`
+        matched `19.0.0-rc1`. It is now `-cne`, with a test that `19.0.0-RC1` fails on "version".
+        Fixed by the same reasoning: the step-4 run filter `head_branch -eq $line` is now `-ceq`
+        (git branch names are case-sensitive).
+      - **MINOR-3, fixed.** A line could drop `sdk.version` and pass parity. `global.json` must now
+        have `sdk.version` as a non-empty string on both sides, and otherwise fails "it pins no SDK
+        version". Tests: missing on another line, and empty at this commit.
+      - **MINOR-4, fixed.** A BOM always failed parity. It is now handled, with a test that a BOM on
+        both sides passes. **While fixing it, a worse defect was found and removed.** The test failed
+        only in a console-less test host, where PowerShell decodes native output with a legacy code
+        page. My first fix set `[Console]::OutputEncoding`, which on Windows changes the code page
+        of the whole SHARED console, so it leaked out of the script. It visibly did: the parallel
+        release-tag tests' children set it, and that masked the parity test's failure in batch runs.
+        The final fix reads `git show` through its own `Process`, with a UTF-8
+        `StandardOutputEncoding`, whose reader also detects and strips a BOM. No console state is
+        touched, and the pin was removed from both scripts. `Directory.Build.props` is read the same
+        way.
+      - **MINOR-5, fixed.** Two design sentences claimed things that do not exist: "A test pins that"
+        for `Assert-PackedRelease`, and the "names the current line" guard. Both are corrected in
+        place and marked as corrected.
+      - **NIT-6, fixed.** The canonicaliser folded case and kept the last duplicate key. It is now
+        built on `System.Text.Json`: keys in ordinal order, and a duplicate key, or two differing only
+        in case, refused, with a 2-row test.
+      - **NIT-7, fixed.** The `ci.yml` header, `PublishedLines.ps1` and `docs/publishing.md` now say
+        the workflow matches `dev/v…` broadly and the list decides (an unlisted `dev/vNN-hotfix` is
+        verified, and parity reports it as unlisted).
+      - **NIT-8, fixed.** `PwshScript.Run` removes `GITHUB_TOKEN`, `GH_TOKEN`, `GITHUB_OUTPUT` and
+        `GITHUB_ENV`, and sets `NO_PROXY` / `no_proxy` to `127.0.0.1,localhost`.
+      - **NIT-9, fixed.** The `publish.yml` comment's reason is now "a filter's `*` matches any
+        characters at all, including none".
+
+      **Mutations** (scratchpad `mut_r1.py` / `mut_native.py`, run on COMMITTED code, each reverted,
+      `git status` clean):
+
+      | Mutation | Fails |
+      |---|---|
+      | `-cne` back to `-ne` | `A_tag_that_differs_from_the_declared_version_only_in_case_is_refused` |
+      | QA's dotted-label pattern | the `19.0.0-rc.2` and `19.0.0-beta.1.2` rows |
+      | the presence refusal removed | `A_line_that_pins_no_sdk_version_fails`, `An_empty_sdk_version_at_this_commit_fails` |
+      | duplicate-key refusal off | both `A_key_given_twice…` rows |
+      | `global.json` read as native `git show` output again | `A_byte_order_mark_is_not_a_difference`, **alone and in the batch** |
+
+      **Survived, and why it should:** forcing the reader's encoding to Latin-1 changes nothing. The
+      reader's BOM detection overrides the configured encoding, and both refs are decoded alike, so
+      the comparison is like for like. The guard is on the read path, which the native-read mutation
+      proves.
+
+      **Process slip, recorded:** one mutation round reverted with `git checkout -- scripts/ci`
+      while the reader rewrite was still uncommitted, which discarded it. It was found because a
+      mutation anchor was missing ("dirty: 0"), re-applied from its saved script, committed, and
+      every mutation was re-run. Commit before mutating.
+
+      After the fixes: build 0/0; Unit **2562/2562** on main (2553 + 9).
+
+
 ## 8. Rollout (design, Migration Plan)
 
 - [ ] 8.1 Merge `ci-three-lines-v19` into local `dev/v19`, then **push `dev/v19`** for the first time.
