@@ -90,8 +90,10 @@ expire at the events it describes.**
 **The published lines are listed once**, in `scripts/ci/published-lines.json`: today `main`,
 `dev/v18` and `dev/v19`. The parity check, the release-tag check and the audit all read that list,
 so adding a line, or dropping one at its end of life, is one edit there. GitHub's workflow filters
-cannot read a file, so `ci.yml` matches the lines by pattern instead (`main`, and `dev/v` followed
-by the major), and `PublishedLinesTests` holds every listed name to that pattern.
+cannot read a file, so `ci.yml` matches the lines broadly by pattern instead (`main`, and any branch
+starting `dev/v`), and the list decides which of those are published: a `dev/v` branch it does not
+name is verified, but its parity step reports it as unlisted and passes. `PublishedLinesTests`
+holds every listed name to `main` or `dev/v` followed by digits.
 
 Three GitHub Actions workflows, held **identical on every published line** together with
 `scripts/ci/`, `global.json` and `Directory.Build.props`. Two values are exempt, because each

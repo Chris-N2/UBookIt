@@ -116,7 +116,8 @@ matches, which is why the script re-tests the shape: a tag such as `1.2.3-` star
 and the check refuses it.
 
 `Assert-PackedRelease.ps1` compares versions as strings, and its package file names
-(`<Id>.<Tag>.nupkg`) hold for `19.0.0-rc1`, so it needs no change. A test pins that. The
+(`<Id>.<Tag>.nupkg`) hold for `19.0.0-rc1`, so it needs no change. That rests on a recorded reading
+(task 2.4), not a test. *(Corrected at QA round 1: this said "A test pins that", and none does.)* The
 `release` environment's `*.*.*` rule is left alone (see Risks).
 
 ### D5. The audit builds its matrix from the list, and runs each line with the line's own SDK
@@ -184,8 +185,9 @@ Each line's `global.json` keeps its own SDK version, which is now exactly the ex
   in the commit first.
 - **[The list is a new single point of truth.]** A typo in it (for example `dev/19`) would drop a
   line from every check at once. The pattern guard (D6) refuses any name that `ci.yml` would not
-  treat as a published line, and the "names the current line" guard refuses a list that leaves out
-  the line it is on.
+  treat as a published line, and the `main`-listed guard keeps the LTS line in it. A `dev/vNN` line
+  that leaves itself out is caught by parity on the list file itself. *(Corrected at QA round 1:
+  this named a "names the current line" guard that D6's amendment had already replaced.)*
 
 ## Migration Plan
 

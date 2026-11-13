@@ -24,6 +24,16 @@ public static class PwshScript
             info.ArgumentList.Add(argument);
         }
 
+        // The scripts read GitHub's environment when they find it. A test never hands them the
+        // caller's token or output file, and loopback is never sent through a proxy, so a script
+        // pointed at a closed local port cannot reach anything else (QA round 1, NIT-8).
+        foreach (var variable in new[] { "GITHUB_TOKEN", "GH_TOKEN", "GITHUB_OUTPUT", "GITHUB_ENV" })
+        {
+            info.Environment.Remove(variable);
+        }
+        info.Environment["NO_PROXY"] = "127.0.0.1,localhost";
+        info.Environment["no_proxy"] = "127.0.0.1,localhost";
+
         using var process = Process.Start(info) ?? throw new InvalidOperationException("Could not start pwsh.");
 
         // Both pipes drained concurrently, so neither can fill and block the script.
