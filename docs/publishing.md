@@ -74,8 +74,8 @@ expire at the events it describes.**
 
 **What is still outstanding**, stated here so this section cannot be read as "everything is done":
 
-- **CI verifies, but does not yet gate.** Every push to `main` or `dev/v18` is built and
-  tested unattended, as is the latest push to any other branch (see *Continuous integration*
+- **CI verifies, but does not yet gate.** Every push to a published line (`main`, `dev/v18` and
+  `dev/v19`) is built and tested unattended, as is the latest push to any other branch (see *Continuous integration*
   below). No branch protection requires a green run, so an untested push is visible rather than
   prevented.
 - **What the feed answers when a symbol package is pushed while its predecessor is still pending
@@ -87,16 +87,28 @@ expire at the events it describes.**
 
 ## Continuous integration
 
-Three GitHub Actions workflows, held **identical on `main` and `dev/v18`** together with
-`global.json`, `scripts/ci/` and `Directory.Build.props` (all of it except the `<Version>` line,
-which is the one thing the lines legitimately disagree on). A push to either line fails its parity
-step while those files
-differ from the other line's tip — so after changing CI on one line, **expect that line's run to be
-red until the same change is pushed to the other**, then re-run it. The red is true: at that moment
-the lines do differ.
+**The published lines are listed once**, in `scripts/ci/published-lines.json`: today `main`,
+`dev/v18` and `dev/v19`. The parity check, the release-tag check and the audit all read that list,
+so adding a line, or dropping one at its end of life, is one edit there. GitHub's workflow filters
+cannot read a file, so `ci.yml` matches the lines by pattern instead (`main`, and `dev/v` followed
+by the major), and `PublishedLinesTests` holds every listed name to that pattern.
 
-- **`ci`** — every push to either line, each with its own run that nothing cancels; the
-  latest push to any other branch; and pull requests into either line. On Linux, from a clean
+Three GitHub Actions workflows, held **identical on every published line** together with
+`scripts/ci/`, `global.json` and `Directory.Build.props`. Two values are exempt, because each
+legitimately differs between lines: `Directory.Build.props`'s `<Version>`, and `global.json`'s
+`sdk.version` (a line pins the SDK its Umbraco major needs; Umbraco 19 needs .NET 11). Everything
+else in those two files, including the SDK roll-forward policy, is still compared.
+
+**The parity check runs on pushes to a published line, not on pull requests.** A CI change reaches
+every line through one pull request per line, and compared against the other lines' tips, each pull
+request would fail until all of them had merged. So a pull request's run skips parity, and the push
+that merging it makes runs it. After changing CI, **expect each line's push run to be red until the
+same change has reached every line**, then re-run the earlier ones. The red is true: at that moment
+the lines do differ. A release tag requires a successful push run, so a commit cannot be released
+while it stands.
+
+- **`ci`** — every push to a published line, each with its own run that nothing cancels; the
+  latest push to any other branch; and pull requests into any published line. On Linux, from a clean
   clone with full history: the client's tests, a Release build with warnings as errors, the three
   .NET suites against a SQL Server started for the run, and `openspec validate --all --strict`.
   **A green run means every suite demonstrably ran**: the integration fixture runs with
@@ -106,7 +118,9 @@ the lines do differ.
   tests, from the report vitest writes: a skipped or todo test, or a report that ran none, fails
   the run. It publishes nothing and holds no secrets.
 - **`audit`** — Mondays 06:00 UTC, and on demand from the Actions tab. Audits the NuGet graph of
-  **both** lines for known vulnerabilities, direct and transitive, and fails on any. Each line is
+  **every** published line for known vulnerabilities, direct and transitive, and fails on any. Its
+  matrix is built from the list, and each line is audited with the .NET SDK that line's own
+  `global.json` pins, so `dev/v19` is restored with .NET 11 while `main` uses .NET 10. Each line is
   restored and listed as Debug and again as Release, so an advisory reachable only from the graph
   that ships is still found. There is one narrow exception: a project that is not packable can
   accept an advisory it suppresses (`NuGetAuditSuppress`), for one no reachable version can fix
@@ -149,18 +163,24 @@ the lines do differ.
 
 **To reproduce CI's build locally**, set `CI=true` for the build (`$env:CI='true'` in PowerShell):
 the warnings-as-errors rule and its advisory exception both live in `Directory.Build.props`, not in
-the workflow. `global.json` pins the SDK to the 10.0.3xx band for local builds as well as CI; a
-machine without one is told so rather than silently building with another band.
+the workflow. `global.json` pins the line's SDK band for local builds as well as CI (10.0.3xx on `main` and
+`dev/v18`, 11.0.1xx on `dev/v19`); a machine without one is told so rather than silently building
+with another band.
 
 ## Publishing a release
 
 **The route is: merge, push the tag, approve the run.** Pushing a tag of the form
-`<major>.<minor>.<patch>` starts `.github/workflows/publish.yml`, which runs three jobs in order:
+`<major>.<minor>.<patch>`, or the same with a prerelease label (`19.0.0-rc1`), starts
+`.github/workflows/publish.yml`, which runs three jobs in order:
 
 1. **check** — `scripts/ci/Assert-ReleaseTag.ps1`. It refuses the tag unless:
-   - the tag equals the `<Version>` the tagged commit declares;
-   - the commit is on the published line whose declared major matches (`17.x` on `main`,
-     `18.x` on `dev/v18`, worked out from each line's own `<Version>`);
+   - the tag is a release tag: `<major>.<minor>.<patch>`, optionally followed by a hyphen and a
+     label of dot-separated letters, digits and hyphens, with no `v` prefix and no `+build`
+     metadata;
+   - the tag equals the `<Version>` the tagged commit declares, compared whole, so `19.0.0` on a
+     commit declaring `19.0.0-rc1` is refused, and so is the reverse;
+   - the commit is on the published line whose declared major matches (`17.x` on `main`, `18.x` on
+     `dev/v18`, `19.x` on `dev/v19`, worked out from each listed line's own `<Version>`);
    - `ci` succeeded for a push of that commit to that line.
 
    If that `ci` run is still going, it waits for up to an hour, so a tag can be pushed straight
@@ -214,6 +234,22 @@ push a local pack. That would skip the tag check, the clean-clone pack, the pack
 the approval and the push order, and those checks are the reason the workflow exists. Every
 release up to `17.2.1`/`18.1.1` was pushed by hand, and the sections below record what that cost.
 
+### Publishing a prerelease
+
+A prerelease, such as `19.0.0-rc1`, takes the same route and passes the same checks. The only
+difference is the label:
+
+- **Declare it first.** The version in `Directory.Build.props` is the prerelease
+  (`<Version>19.0.0-rc1</Version>`), bumped like any other version (*Before any push*), and the tag
+  is exactly that string. A tag without the label on a commit that declares one is refused, and so
+  is the reverse.
+- **The feed lists it as a prerelease** because of the label. A site sees it only when it asks for
+  prereleases, which is why the install command the docs give while a line's floor is a prerelease
+  is `--version "19.*-*"`, not `"19.*"`.
+- **The `release` environment admits tags matching `*.*.*`**, which a prerelease tag matches. If
+  the publish job ever fails to start for one, check that rule first. Nothing is pushed until
+  the publish job runs, so the failure is safe.
+
 ## Trusted Publishing setup
 
 One-time, outside the repository, and recorded here because a mismatch only shows up as a
@@ -247,7 +283,7 @@ Notes on the policy:
 - **The policy belongs to the account that owns the packages.** Transferring them to the
   organisation means creating a new policy under the new owner. The workflow's `NUGET_USER` then
   changes to match.
-- **One policy serves both lines**, because the workflow file is the same on both. Renaming
+- **One policy serves every line**, because the workflow file is the same on every line. Renaming
   `publish.yml` or the environment breaks it.
 
 ### A 403 usually means the policy's OWNER, not the key
@@ -540,9 +576,9 @@ folder the package's project URL points to. That URL is this GitHub repository, 
 file from the root of `main`, at its own sync. It does not read it from any package, so **changing
 the file needs no release**. The logo it names is `docs/images/ndd-logo.png`, served from `main`.
 
-- **The file is on `main` only.** The Marketplace reads only the default branch. A copy on
-  `dev/v18` would be read by nothing and free to drift, and so would its test.
-- **It may carry only `$schema` and `AuthorDetails`.** One listing serves both lines, so a `Title`
+- **The file is on `main` only.** The Marketplace reads only the default branch. A copy on a
+  `dev/v*` line would be read by nothing and free to drift, and so would its test.
+- **It may carry only `$schema` and `AuthorDetails`.** One listing serves every line, so a `Title`
   or `Description` there would override every line's description with one sentence.
   `MarketplaceListingFileTests`, on `main`, refuses:
   - any other top-level field;

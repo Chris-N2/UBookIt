@@ -154,7 +154,7 @@
 
 ## 3. ci.yml, the audit, and the guards (design D1, D3, D5, D6)
 
-- [ ] 3.1 `.github/workflows/ci.yml`:
+- [x] 3.1 `.github/workflows/ci.yml`:
       - pull requests `branches: [main, 'dev/v*']`;
       - the concurrency group and `cancel-in-progress` use `main` or
         `startsWith(github.ref, 'refs/heads/dev/v')`;
@@ -163,7 +163,20 @@
       - the header and step comments are updated for N lines and push-only parity.
 
       Verify: `PublishingWorkflowTests` and `NodeEngineGuardTests` pass, and the YAML parses.
-- [ ] 3.2 `.github/workflows/audit.yml`:
+
+      **Done** (`61cf394`).
+      - PR `branches: [main, 'dev/v*']`.
+      - The concurrency group and `cancel-in-progress` use `github.ref == 'refs/heads/main' ||
+        startsWith(github.ref, 'refs/heads/dev/v')`.
+      - The parity step is renamed "Parity with the other published lines". Its `if:` is
+        `!cancelled() && github.event_name == 'push' && (main || startsWith dev/v)`, and it runs
+        with `-Line "${{ github.ref_name }}"`; the `base_ref` arms are removed.
+      - The header and comments now cover the list, the pattern, the two exempt values and
+        push-only.
+      - `PublishingWorkflowTests` 5/5 (the YAML parses as one document); `NodeEngineGuardTests`
+        green.
+
+- [x] 3.2 `.github/workflows/audit.yml`:
       - a `lines` job outputs the list;
       - the matrix is `fromJSON` of that output;
       - `setup-dotnet` uses `line/global.json`;
@@ -174,19 +187,59 @@
       Before relying on the working directory, read `Assert-NoVulnerablePackages.ps1` for any
       dependence on it, and record what you find. Verify: `AuditScriptTests` and
       `PublishingWorkflowTests` pass (every action is still pinned), and the YAML parses.
-- [ ] 3.3 Add the static guards (design D6):
+
+      **Done.**
+      - **Working-directory read first:** `Assert-NoVulnerablePackages.ps1` uses its working
+        directory only to resolve `-Target`. Its `dotnet msbuild $path` calls take `path` from
+        `dotnet list`'s JSON report, which gives absolute paths. There is no `Get-Location`,
+        `$PWD`, `Resolve-Path` or `Set-Location`. So running it from inside `line/` is safe.
+      - **A new `lines` job:** it checks out the default branch, dot-sources `PublishedLines.ps1`,
+        and writes `lines=<ConvertTo-Json -InputObject … -Compress>` to `GITHUB_OUTPUT`. Simulated
+        locally, that gives `lines=["main","dev/v18","dev/v19"]`, and a one-line list stays
+        `["main"]`.
+      - **The `audit` job** has `needs: lines` and a matrix of
+        `fromJSON(needs.lines.outputs.lines)`. `setup-dotnet` uses `line/global.json`, and the
+        audit step uses `working-directory: line` and
+        `../scripts/ci/Assert-NoVulnerablePackages.ps1 -Target UBookIt.slnx`. The comment claiming
+        "the parity check holds the lines' copies identical anyway" is replaced.
+      - **Finding during the simulation:** dot-sourcing the helper set `Set-StrictMode` in the
+        CALLER's scope, which broke the calling shell. The fix moves `Set-StrictMode` inside
+        `Read-PublishedLines`. Confirmed: after dot-sourcing, the caller's strict mode is off.
+      - `AuditScriptTests` and `PublishingWorkflowTests` are green; the new job's checkout is
+        pinned by SHA.
+
+- [x] 3.3 Add the static guards (design D6):
       - every listed line matches `^(main|dev/v\d+)$`;
-      - the list names this line's own branch: the line whose major is `Directory.Build.props`'s
-        major, read from the list's own naming rule;
+      - the list names `main` *(amended at apply: was "this line's own branch"; see design D6)*;
       - no file under `.github/` or `scripts/ci/`, other than the list, names `dev/v18` or `dev/v19`
         literally.
 
       Verify: they pass. Then mutate: (a) list `dev/19`; (b) put `dev/v18` back into `ci.yml`'s
-      filter; (c) remove this line from the list. Each must fail a named guard. Revert each one.
+      filter; (c) remove `main` from the list. Each must fail a named guard. Revert each one.
+
+      **Done.** New `PublishedLinesTests`, 4/4:
+      - every listed name matches `^(main|dev/v\d+)$`;
+      - no duplicates;
+      - `main` is listed;
+      - no `dev/v\d+` appears in any file under `.github/` or `scripts/ci/` except the list.
+
+      **Deviation, recorded in design D6 and in this task:** the guard "the list names this line's
+      own branch" cannot be written, because a test cannot know its line (CI checks out detached).
+      A dev line dropping itself from the list is caught by parity, since the list is
+      parity-checked.
+
+      All CI-related classes together: **93/93**. Mutations (each reverted, `git status` clean):
+
+      | Mutation | Fails |
+      |---|---|
+      | (a) `dev/19` listed | `Every_listed_line_is_one_the_workflows_treat_as_published` |
+      | (b) `dev/v18` put back into `ci.yml`'s PR filter | `No_CI_definition_names_a_dev_line_except_the_list` |
+      | (c) `main` removed | `Main_is_always_a_published_line` |
+
 
 ## 4. Documentation
 
-- [ ] 4.1 `docs/publishing.md`:
+- [x] 4.1 `docs/publishing.md`:
       - the *Continuous integration* section: lines from the list, parity on pushes only, and the
         SDK exemption;
       - the release-tag check's description: prerelease tags, and the lines from the list;
@@ -197,12 +250,77 @@
       Verify: `DocumentationLinkTests` and the documentation guards pass, and a grep shows no
       remaining "both lines" claim about CI in `docs/`.
 
+      **Done.** `docs/publishing.md`:
+      - *Status*: "every push to a published line (`main`, `dev/v18` and `dev/v19`)".
+      - *Continuous integration*:
+        - a new opening paragraph on the list and the pattern;
+        - the identical-definitions paragraph now gives both exempt values;
+        - a new paragraph on push-only parity, with the re-run and the release consequence;
+        - the `ci` bullet covers any published line, and the `audit` bullet covers every published
+          line, from the list, each with its own SDK;
+        - the local-build sentence gives each line's SDK band.
+      - *Publishing a release*: the tag form with the label; the check's three conditions (shape,
+        whole-version, the line from the list including `19.x` on `dev/v19`); and a new subsection,
+        *Publishing a prerelease* (declare it first, it is listed as a prerelease, the `release`
+        environment's `*.*.*` rule).
+      - "One policy serves every line", "One listing serves every line", and the Marketplace file
+        "on a `dev/v*` line".
+
+      **Two guards fired on my own text, and both were fixed at the cause:**
+      - `VersionTruthTests.Every_mention_of_the_feed_is_accounted_for` found two new unregistered
+        "nuget.org" mentions in the prerelease note. They were reworded ("The feed lists it…",
+        "Nothing is pushed until…") rather than registered, because neither sentence needs the
+        name.
+      - `ChangeDeltaIntegrityTests` found no task naming the replaced requirements, which led to
+        task 4.2.
+
+      A grep for "both lines" / "either line" in `docs/` now finds nothing about CI.
+
+
+- [x] 4.2 Diff the guarantees of every requirement this change replaces wholesale, against the
+      current `openspec/specs/` text (CLAUDE.md, *Rewriting a requirement destroys guarantees
+      silently*). Each SHALL and each scenario is classed as carried, deliberately dropped (with
+      its reason in the proposal), or superseded by a stronger claim:
+      - `continuous-integration`: "Verification runs unattended on every published line" (renamed
+        from "…on both published lines"), "Vulnerability advisories are audited separately from
+        the build", and "Every published line carries the same CI definitions" (renamed from "Both
+        published lines carry the same CI definitions");
+      - `release-publishing`: "A release is published by pushing its tag", and "A release tag is
+        checked before anything is built".
+
+      Verify: design.md's *Guarantee diff* accounts for every old SHALL and scenario, checked line
+      by line against the current specs, and anything found missing is restored to the delta.
+
+      **Done.** A word-level `difflib` of each old requirement against its delta (scratch, inline),
+      printing only the text the OLD version has and the new does not:
+
+      | Requirement | Old-only text, and its disposition |
+      |---|---|
+      | Verification runs unattended… | `main` or `dev/v18` (×3) and the old title in the cross-reference: generalised to the list and the renamed title. Nothing dropped. |
+      | Vulnerability advisories… | "either", "`dev/v18` explicitly", "both lines": generalised to every published line, from the list. Nothing dropped. |
+      | Every published line carries… | "(every part except the package version…)": restated as the two exempt values, with "everything else … SHALL still be identical". The names `main`/`dev/v18`, "either", "both lines' tips": generalised. Nothing dropped. |
+      | A release is published by pushing its tag | "of the form `<major>.<minor>.<patch>`" and "three dot-separated numbers": superseded by the widened release-tag definition. **`17.2.2-rc1`: deliberately dropped** (proposal *What Changes*). "`v17.2.2`)" is punctuation only; the example is kept. |
+      | A release tag is checked… | "commit;" gained ", compared whole, including any prerelease label;". "`main` and `dev/v18`)" is generalised to the list. Nothing dropped. |
+
+      Every old scenario title is present in its delta: `openspec validate --strict` refuses a
+      MODIFIED block that omits one. It caught three titles I had reworded, which are now kept
+      verbatim beside the new scenarios. The design's *Guarantee diff* matches this table.
+
+
 ## 5. Verify on `main`
 
-- [ ] 5.1 Clean Release build (`--no-incremental`), with 0 warnings and 0 errors, and the unit suite,
+- [x] 5.1 Clean Release build (`--no-incremental`), with 0 warnings and 0 errors, and the unit suite,
       one suite at a time. Integration and Rendering read no CI file. Run them only if the build
       changes anything they compile, and record the reason either way. Verify: the totals are
       recorded against `main`'s baseline (2522 unit tests).
+
+      **Done.** `dotnet build UBookIt.slnx -c Release --no-incremental`: **0 warnings, 0 errors**.
+      Unit **2553/2553**, which is main's baseline 2522 plus 31 new: `LineParityScriptTests` 13,
+      `ReleaseTagScriptTests` 14, `PublishedLinesTests` 4. **Integration and Rendering not run:** this
+      change touches no file under `src/`. Its compiled changes are confined to
+      `tests/UBookIt.Tests` (three test classes and two `Support/` files), which neither of those
+      projects references, and neither reads any CI file.
+
 - [ ] 5.2 Run the reworked parity script locally against the real three lines. Use a scratch clone
       in which `refs/remotes/origin/dev/v19` points at the local `dev/v19` carrying this change
       (task 6.2). Verify: it passes for each of the three lines, and fails as expected for a branch
