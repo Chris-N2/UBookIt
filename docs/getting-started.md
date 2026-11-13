@@ -11,25 +11,33 @@ start with [the delivery API](delivery-api.md).
 
 | | |
 |---|---|
-| **Umbraco** | 18.3.0 or later, and below 19. For Umbraco 17, install uBookIt `17.x`. |
-| **.NET** | 10.0 |
+| **Umbraco** | 19.0.0-rc1 or later, and below 20. For Umbraco 17 or 18, install uBookIt `17.x` or `18.x`. |
+| **.NET** | 11.0 |
 | **Database** | **SQL Server 2019 or later**, including LocalDB and Azure SQL. SQLite is not supported, and that includes the SQLite database a new `dotnet new umbraco` site uses by default. |
 
 A site on SQLite fails when uBookIt installs its schema, rather than quietly misbehaving.
 
-If your site is below 18.3.0, upgrade `Umbraco.Cms` first, so that every Umbraco package stays on
-one version.
+If your site is below 19.0.0-rc1, upgrade `Umbraco.Cms` first, so that every Umbraco package stays
+on one version.
+
+**Backoffice sign-in.** From Umbraco 19 the backoffice signs editors in with a cookie only, and
+uBookIt's section accepts that cookie as Umbraco's own sections do. What keeps another site from
+using it is the cookie's `SameSite` setting, which is `Strict` unless you change it. If your site
+sets `Umbraco:CMS:Security:AuthCookieSameSite` to `None`, uBookIt's backoffice API is exposed to
+cross-site requests exactly as much as Umbraco's own, and no more.
 
 ## 2. Install the package
 
 ```
-dotnet add package UBookIt --version "18.*"
+dotnet add package UBookIt --version "19.*-*"
 ```
 
 **The version is not optional.** uBookIt's major follows Umbraco's, so without it your package
 manager picks the newest uBookIt, which is for a later Umbraco, and the restore fails with a
-version conflict. `18.*` takes the newest uBookIt for Umbraco 18; give an exact version instead if
-you prefer to choose when to move.
+version conflict. `19.*-*` takes the newest uBookIt for Umbraco 19, including a prerelease: this
+line's first release is `19.0.0-rc1`, a release candidate for Umbraco's own 19 release candidate,
+and a plain `19.*` does not select a prerelease. Give an exact version instead if you prefer to
+choose when to move.
 
 Start the site. uBookIt installs its schema, its **Booking Page** document type and that page's
 template on the first start. Nothing is sent to anybody and nothing is published until you do the
@@ -37,7 +45,7 @@ steps below. What an install and each later upgrade change on your site is in
 [what an upgrade does](booking-page.md#what-an-upgrade-does-and-what-it-never-touches).
 
 **How uBookIt's versions work.** The major follows the Umbraco major it is built for, so `17.x` is
-for Umbraco 17 and `18.x` for Umbraco 18, and a new major is not a sign of a breaking change. In
+for Umbraco 17, `18.x` for Umbraco 18 and `19.x` for Umbraco 19, and a new major is not a sign of a breaking change. In
 that respect uBookIt departs from Semantic Versioning. The public interface is kept as consistent
 as possible; where a breaking change is genuinely needed it lands in a minor version, never a
 patch, and ships with defaults or an upgrade path that keep an existing site working. Each

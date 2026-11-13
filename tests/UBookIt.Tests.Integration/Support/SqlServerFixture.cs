@@ -206,6 +206,31 @@ internal sealed class CommandRecordingInterceptor : DbCommandInterceptor
 
     public IReadOnlyList<string> Commands => _commands;
 
+    /// <summary>
+    /// The recorded commands with EF Core 11's leading <c>SET NOCOUNT OFF;</c> removed, and
+    /// nothing else.
+    /// </summary>
+    /// <remarks>
+    /// From EF Core 11 the SQL Server provider starts an <c>ExecuteUpdate</c> command with
+    /// <c>SET NOCOUNT OFF;</c>. That is a session setting sent in the same command, not a
+    /// separate statement and not a read, so a guard about what a write <i>sends</i> should see
+    /// past it. Exactly that text is removed, case-insensitively, and only at the start. A guard
+    /// that matched <c>UPDATE</c> anywhere instead would let a read placed before the write
+    /// through, which is the shape those guards exist to refuse.
+    /// </remarks>
+    public IReadOnlyList<string> Statements => _commands.Select(WithoutSessionPreamble).ToList();
+
+    internal static string WithoutSessionPreamble(string commandText)
+    {
+        const string Preamble = "SET NOCOUNT OFF;";
+
+        var text = commandText.TrimStart();
+
+        return text.StartsWith(Preamble, StringComparison.OrdinalIgnoreCase)
+            ? text[Preamble.Length..].TrimStart()
+            : text;
+    }
+
     public override InterceptionResult<int> NonQueryExecuting(
         DbCommand command, CommandEventData eventData, InterceptionResult<int> result)
     {

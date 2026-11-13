@@ -12,12 +12,27 @@ namespace UBookIt.Backoffice.Composers;
 /// </summary>
 /// <remarks>
 /// <para>
-/// <b>The OpenIddict validation scheme is not optional.</b> A backoffice API policy that
-/// omits it rejects an authenticated user with nothing useful to say about why — the
-/// request never resolves to a backoffice principal in the first place, so the handler sees
-/// no user and refuses. This is the shape Umbraco's own documentation gives for a custom
-/// backoffice policy, and the reason it is worth stating is that leaving it out fails in a
+/// <b>Every policy names BOTH authentication schemes, and neither is optional.</b> A policy
+/// authenticates a request only through the schemes it names. A request that matches none of
+/// them never resolves to a backoffice principal, so the handlers see no user and refuse, in a
 /// way that looks like the handler being wrong.
+/// </para>
+/// <list type="bullet">
+/// <item><b>The backoffice cookie</b> (<c>Constants.Security.BackOfficeAuthenticationType</c>)
+/// is how an editor arrives. From Umbraco 19 the backoffice sends the cookie and no bearer
+/// token: the bridge that turned the cookie into a token Umbraco 17/18 validated through
+/// OpenIddict is gone. A policy without this scheme answers every editor with a 401, which the
+/// backoffice reads as an expired session and answers with its sign-in prompt.</item>
+/// <item><b>OpenIddict validation</b> is how an API user arrives, with a client-credentials
+/// bearer token.</item>
+/// </list>
+/// <para>
+/// The pair is exactly what Umbraco 19's own backoffice policies name
+/// (<c>BackOfficeAuthPolicyBuilderExtensions.AddAuthenticationSchemes</c>). Accepting the cookie
+/// takes Umbraco's stance on cross-site request forgery, no weaker and no stronger: the
+/// Management API has no anti-forgery tokens, and the cookie's <c>SameSite</c> setting
+/// (<c>Strict</c> by default, path <c>/</c>) is what keeps a cross-site request from carrying it,
+/// for these routes as for Umbraco's.
 /// </para>
 /// </remarks>
 public sealed class UBookItAuthorizationComposer : IComposer
@@ -32,8 +47,9 @@ public sealed class UBookItAuthorizationComposer : IComposer
         {
             options.AddPolicy(Constants.SectionAccessPolicy, policy =>
             {
-                policy.AuthenticationSchemes.Add(
-                    OpenIddictValidationAspNetCoreDefaults.AuthenticationScheme);
+                policy.AddAuthenticationSchemes(
+                    OpenIddictValidationAspNetCoreDefaults.AuthenticationScheme,
+                    Umbraco.Cms.Core.Constants.Security.BackOfficeAuthenticationType);
                 policy.Requirements.Add(new UBookItSectionRequirement());
             });
 
@@ -44,8 +60,9 @@ public sealed class UBookItAuthorizationComposer : IComposer
             // which is a widening dressed as a tightening.
             options.AddPolicy(Constants.SensitiveDataAccessPolicy, policy =>
             {
-                policy.AuthenticationSchemes.Add(
-                    OpenIddictValidationAspNetCoreDefaults.AuthenticationScheme);
+                policy.AddAuthenticationSchemes(
+                    OpenIddictValidationAspNetCoreDefaults.AuthenticationScheme,
+                    Umbraco.Cms.Core.Constants.Security.BackOfficeAuthenticationType);
                 policy.Requirements.Add(new UBookItSectionRequirement());
                 policy.Requirements.Add(new UBookItSensitiveDataRequirement());
             });
@@ -81,8 +98,9 @@ public sealed class UBookItAuthorizationComposer : IComposer
         AuthorizationOptions options, string policyName, params string[] anyOfVerbs)
         => options.AddPolicy(policyName, policy =>
         {
-            policy.AuthenticationSchemes.Add(
-                OpenIddictValidationAspNetCoreDefaults.AuthenticationScheme);
+            policy.AddAuthenticationSchemes(
+                OpenIddictValidationAspNetCoreDefaults.AuthenticationScheme,
+                Umbraco.Cms.Core.Constants.Security.BackOfficeAuthenticationType);
             policy.Requirements.Add(new UBookItSectionRequirement());
             policy.Requirements.Add(new UBookItVerbRequirement(anyOfVerbs));
         });

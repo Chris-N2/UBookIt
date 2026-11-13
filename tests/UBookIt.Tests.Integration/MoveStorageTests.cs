@@ -231,7 +231,9 @@ public class MoveStorageTests(SqlServerFixture fixture)
         var moved = await new SqlBookingStore(context).MoveAsync(booking.Id, Interval(Fourteen, 60), Movable, Ct);
         Assert.True(moved.Succeeded);
 
-        var updates = interceptor.Commands.Where(c => c.TrimStart().StartsWith("UPDATE", StringComparison.OrdinalIgnoreCase)).ToList();
+        // Statements, not Commands: EF Core 11 opens the write with SET NOCOUNT OFF; in the same
+        // command (see CommandRecordingInterceptor.Statements).
+        var updates = interceptor.Statements.Where(c => c.StartsWith("UPDATE", StringComparison.OrdinalIgnoreCase)).ToList();
         var update = Assert.Single(updates);
 
         // The status is a PREDICATE of the statement, not a value it sets.

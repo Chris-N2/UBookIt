@@ -32,7 +32,7 @@ internal static class HostMailAvailability
     {
         try
         {
-            return emailSender.CanSendRequiredEmail();
+            return emailSender.IsEmailConfigured();
         }
         catch (Exception)
         {

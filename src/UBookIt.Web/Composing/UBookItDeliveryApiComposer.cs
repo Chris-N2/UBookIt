@@ -67,6 +67,15 @@ public sealed class UBookItDeliveryApiComposer : IComposer
         // a public API that has nothing to do with the backoffice.
         builder.Services.AddOpenApi(Constants.DeliveryApiName, options =>
         {
+            // THE CONTRACT DOES NOT MOVE BECAUSE A FRAMEWORK DEFAULT DID. On .NET 11 a document
+            // registered with plain AddOpenApi defaults to OpenAPI 3.2, and this one moved from
+            // 3.1.1 to 3.2.0 with no change of ours. Headless consumers generate their clients
+            // from this document, and not every generator reads 3.2 yet. Umbraco 19 pins its own
+            // documents to 3.1 (ConfigureUmbracoOpenApiOptionsBase, BackOfficeOpenApiDocumentBuilder),
+            // and the rule is to follow Umbraco: this moves when Umbraco's pin does, not before.
+            // OpenApiTransformerTests holds both documents to 3.1.
+            options.OpenApiVersion = OpenApiSpecVersion.OpenApi3_1;
+
             options.AddDocumentTransformer((document, _, _) =>
             {
                 document.Info.Title = "uBookIt Delivery API";

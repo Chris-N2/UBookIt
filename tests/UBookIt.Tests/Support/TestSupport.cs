@@ -837,7 +837,10 @@ public sealed class TestEmailSender(bool canSend = false) : IEmailSender
 {
     public List<EmailMessage> Sent { get; } = [];
 
-    public bool CanSendRequiredEmail() => canSend;
+    public bool IsEmailConfigured() => canSend;
+
+    public Task<bool> IsEmailAvailableAsync(CancellationToken cancellationToken = default)
+        => Task.FromResult(canSend);
 
     public Task SendAsync(EmailMessage message, string emailType)
         => SendAsync(message, emailType, false, null);

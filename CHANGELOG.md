@@ -12,9 +12,55 @@ when its release date is stamped at publication — that stamp completes the ent
 revising it, and nothing else about it moves afterwards.
 
 The major tracks the **Umbraco** major, not uBookIt's own breaking changes — uBookIt `17.x` is for
-Umbraco 17 and `18.x` for Umbraco 18. That means the major cannot signal a break, so a break lands
+Umbraco 17, `18.x` for Umbraco 18 and `19.x` for Umbraco 19. That means the major cannot signal a break, so a break lands
 in a **minor** and never in a patch.
 See [the versioning note](README.md#versions-and-the-api-promise).
+
+---
+
+## 19.0.0-rc1
+
+The first release for **Umbraco 19**, and a **prerelease**: a release candidate built for Umbraco's
+own 19.0.0 release candidate, published so that a site trying Umbraco 19 can try uBookIt with it.
+
+### What you have to do
+
+**This is the 19 line. Install it only on an Umbraco 19 site.** uBookIt `19.x` requires Umbraco
+19.0.0-rc1 or later, and .NET 11. For Umbraco 17 or 18, stay on uBookIt `17.x` or `18.x`.
+
+**Ask for the prerelease when you install it.** `dotnet add package UBookIt --version "19.*-*"`.
+The `-*` is what admits a prerelease: a plain `"19.*"` does not select `19.0.0-rc1`.
+
+**Upgrading a site from Umbraco 18: upgrade Umbraco first, as Umbraco's own notes describe**, then
+move uBookIt from `18.x` to `19.0.0-rc1`. **Back up the database before you start.** Umbraco 19
+migrates it on first boot, and Umbraco 18 cannot open it afterwards. uBookIt's own schema does not
+change in this release.
+
+Nothing else is asked of you. There is no setting to change and no published uBookIt API is added,
+removed or changed.
+
+### Why this release was needed
+
+**Umbraco 19 signs backoffice editors in with a cookie, and nothing else.** Umbraco 17 and 18 turned
+the backoffice's cookie into an access token that uBookIt's section checked. Umbraco 19 removed that
+step. On Umbraco 19, an `18.x` uBookIt answers every editor with "not signed in", and the backoffice
+reads that as an expired session: opening the uBookIt section shows Umbraco's sign-in prompt. In
+`19.0.0-rc1`, uBookIt's section accepts the backoffice cookie exactly as Umbraco's own sections do,
+and still accepts the access token an API user signs in with. Which editors may see and do what is
+unchanged: the same uBookIt permissions on the same user groups.
+
+**The security stance is Umbraco's.** What stops another site using an editor's cookie is the
+cookie's `SameSite` setting, `Strict` unless a site changes it. A site that sets
+`Umbraco:CMS:Security:AuthCookieSameSite` to `None` exposes uBookIt's backoffice API exactly as much
+as Umbraco's own. See [Getting started](docs/getting-started.md#1-check-the-requirements).
+
+### Also in this release
+
+- **The delivery API's OpenAPI document stays on OpenAPI 3.1.** On .NET 11 it would have moved to
+  3.2 by default. It now declares 3.1, the version Umbraco 19 declares for its own documents, so a
+  client generated from it is generated from the same kind of document as before.
+- **No behaviour change.** Bookings, availability, the booking page, emails, the backoffice
+  screens and the delivery API behave as in `18.6.0`.
 
 ---
 

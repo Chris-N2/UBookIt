@@ -211,8 +211,11 @@ public class PrivacyNoticeSourceTests
     /// </summary>
     private sealed class ThrowingEmailSender(Type exceptionType) : IEmailSender
     {
-        public bool CanSendRequiredEmail()
+        public bool IsEmailConfigured()
             => throw (Exception)Activator.CreateInstance(exceptionType)!;
+
+        public Task<bool> IsEmailAvailableAsync(CancellationToken cancellationToken = default)
+            => Task.FromResult(IsEmailConfigured());
 
         public Task SendAsync(EmailMessage message, string emailType) => Task.CompletedTask;
 

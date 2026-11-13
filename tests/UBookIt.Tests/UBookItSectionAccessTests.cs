@@ -62,6 +62,13 @@ public class UBookItSectionAccessTests
         // information is not available" has to name where it looked.** This one had looked in
         // one place, found nothing, and reported that nowhere had it — inventing a debt
         // ("OWED BEFORE UMBRACO 19") to be paid by whoever hit the build error in a year.
+        //
+        // Umbraco 19 then changed even this constructor, which 18 had NOT marked obsolete: it
+        // added `startDocumentBlueprintId` and `hasAccessToInvariantForVariant`, and removed the
+        // shorter overloads. The blueprint start node is null for the same reason as the others.
+        // The invariant-for-variant flag is false, the value that grants nothing extra: it
+        // governs editing invariant content from a non-default language, which no uBookIt
+        // requirement reads.
         user.AddGroup(new ReadOnlyUserGroup(
             id: 1,
             key: Guid.NewGuid(),
@@ -71,12 +78,14 @@ public class UBookItSectionAccessTests
             startContentId: null,
             startMediaId: null,
             startElementId: null,
+            startDocumentBlueprintId: null,
             alias: "testGroup",
             allowedLanguages: [],
             allowedSections: sections,
             permissions: new HashSet<string>(),
             granularPermissions: new HashSet<IGranularPermission>(),
-            hasAccessToAllLanguages: true));
+            hasAccessToAllLanguages: true,
+            hasAccessToInvariantForVariant: false));
 
         return user;
     }
@@ -217,6 +226,12 @@ public class UBookItSectionAccessTests
         Assert.NotNull(provider);
         Assert.Contains(
             OpenIddictValidationAspNetCoreDefaults.AuthenticationScheme,
+            provider.AuthenticationSchemes);
+
+        // Umbraco 19: the editor's cookie is the backoffice scheme now. Every policy's exact
+        // scheme set is guarded in AuthenticationSchemeGuardTests.
+        Assert.Contains(
+            Umbraco.Cms.Core.Constants.Security.BackOfficeAuthenticationType,
             provider.AuthenticationSchemes);
     }
 

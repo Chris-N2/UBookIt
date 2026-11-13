@@ -213,10 +213,14 @@ public class BookingNotificationSettingsTests
 
         public bool Throws { get; init; }
 
-        public bool CanSendRequiredEmail()
+        public bool IsEmailConfigured()
             => Throws
                 ? throw new NotImplementedException("To send an Email ensure IEmailSender is implemented")
                 : CanSend;
+
+        // uBookIt never asks whether the transport is reachable, only whether mail is configured.
+        public Task<bool> IsEmailAvailableAsync(CancellationToken cancellationToken = default)
+            => Task.FromResult(IsEmailConfigured());
 
         public Task SendAsync(EmailMessage message, string emailType) => Task.CompletedTask;
 

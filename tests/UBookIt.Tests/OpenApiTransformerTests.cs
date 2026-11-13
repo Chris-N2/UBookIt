@@ -268,6 +268,49 @@ public class OpenApiTransformerTests
     }
 
     /// <summary>
+    /// Both of uBookIt's documents declare OpenAPI 3.1, the version Umbraco declares for its own.
+    /// </summary>
+    /// <remarks>
+    /// <para>
+    /// <b>The delivery document is the one at risk.</b> It is registered with the framework's
+    /// plain <c>AddOpenApi</c>, so it takes the framework's default. On .NET 11 that default is
+    /// 3.2, and the document moved from 3.1.1 to 3.2.0 with no change of ours. Headless consumers
+    /// generate their clients from it, so its version is part of the contract. The rule (Chris,
+    /// 2026-11-13) is to follow Umbraco, which pins its own documents to 3.1.
+    /// </para>
+    /// <para>
+    /// The backoffice document is registered through Umbraco's builder and so gets Umbraco's pin.
+    /// It is asserted too, so that if Umbraco moves, this test is where uBookIt finds out.
+    /// </para>
+    /// </remarks>
+    [Theory]
+    [InlineData("delivery")]
+    [InlineData("backoffice")]
+    public void Each_document_declares_openapi_3_1(string which)
+    {
+        var services = new ServiceCollection();
+        var config = new ConfigurationBuilder().AddInMemoryCollection([]).Build();
+        var builder = new ServicesOnlyUmbracoBuilder(services, config);
+
+        string documentName;
+        if (which == "delivery")
+        {
+            new UBookItDeliveryApiComposer().Compose(builder);
+            documentName = UBookIt.Web.Constants.DeliveryApiName;
+        }
+        else
+        {
+            new UBookItBackofficeApiComposer().Compose(builder);
+            documentName = UBookIt.Backoffice.Constants.ApiName;
+        }
+
+        using var provider = services.BuildServiceProvider();
+        var options = provider.GetRequiredService<IOptionsMonitor<OpenApiOptions>>().Get(documentName);
+
+        Assert.Equal(OpenApiSpecVersion.OpenApi3_1, options.OpenApiVersion);
+    }
+
+    /// <summary>
     /// The transformer types registered on one document, read off the options object the
     /// framework will actually consume.
     /// </summary>

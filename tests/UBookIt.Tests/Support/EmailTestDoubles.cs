@@ -69,7 +69,7 @@ internal sealed class RecordingEmailSender : IEmailSender
     /// <summary>Every call, including the ones that threw.</summary>
     public int Attempts { get; private set; }
 
-    public bool CanSendRequiredEmail()
+    public bool IsEmailConfigured()
     {
         Probed = true;
 
@@ -77,6 +77,11 @@ internal sealed class RecordingEmailSender : IEmailSender
             ? throw new NotImplementedException("To send an Email ensure IEmailSender is implemented")
             : CanSend;
     }
+
+    // uBookIt never asks whether the transport is reachable, only whether mail is configured, so
+    // this answers the same and counts as the same probe.
+    public Task<bool> IsEmailAvailableAsync(CancellationToken cancellationToken = default)
+        => Task.FromResult(IsEmailConfigured());
 
     public Task SendAsync(EmailMessage message, string emailType)
         => SendAsync(message, emailType, false, null);

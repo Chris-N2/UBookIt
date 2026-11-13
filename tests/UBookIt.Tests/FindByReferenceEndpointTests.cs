@@ -245,12 +245,14 @@ public class FindByReferenceEndpointTests
             startContentId: null,
             startMediaId: null,
             startElementId: null,
+            startDocumentBlueprintId: null,
             alias: "testGroup",
             allowedLanguages: [],
             allowedSections: [UBookIt.Backoffice.Constants.SectionAlias],
             permissions: new HashSet<string>(),
             granularPermissions: new HashSet<IGranularPermission>(),
-            hasAccessToAllLanguages: true));
+            hasAccessToAllLanguages: true,
+            hasAccessToInvariantForVariant: false));
 
         return new StubAccessor(new StubSecurity(user));
     }
