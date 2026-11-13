@@ -410,7 +410,7 @@
       | uBookIt DELETE that closure, bearer | **200** |
       | closures named "CLU API probe" remaining | **0** |
 
-- [ ] 6.2 Editor, with Chris logged in:
+- [x] 6.2 Editor, with Chris logged in:
       - the backoffice-client-upgrade D4 set (bookings list and the 67-day refusal; closure create
         and delete; holiday 404 withdraws the panel and 500 keeps it; the invalid closure's
         message);
@@ -419,21 +419,92 @@
       Verify: each step matches what dev/v18 showed in backoffice-client-upgrade 5.4, and **no
       "session timed out" prompt** appears. Network records show uBookIt calls carrying no
       `Authorization` header.
-- [ ] 6.3 Refusal through the cookie: Chris removes one uBookIt verb from his group. The matching
+
+      **Done** on 2026-11-13, with the TestSite restarted on the same output and Chris logged in.
+      Before step 1, a page-context recorder wrapped `window.fetch`. For every `/ubookitbackoffice/`
+      call it logs the method, status, whether an `Authorization` header is present, and the
+      credentials mode. **Every recorded uBookIt call had `auth=false` and `credentials: include`**,
+      so the cookie carried them. **No "session timed out" prompt** appeared at any point, and the
+      console showed no errors. **Every step matches `dev/v18` (backoffice-client-upgrade 5.4):**
+      1. Bookings, default window 2026-11-09 to 2026-11-15: 1 row, "Showing 1–1 of 1". Setting From
+         to 2026-09-09 gives GET 400 and the same inline message ("…covers 68 days, which exceeds the
+         maximum of 31."), with no toast.
+      2. This site has no closures. Created 2027-03-10 "CLU live check (delete me)": rows 0 → 1.
+         Deleted it: rows 1 → 0.
+      3. Holiday stub (scratchpad `apply\holiday-404-stub.js`, layered over the recorder):
+         - **404**: one stubbed GET; the panel is withdrawn, no Import or Fetch control is left, and
+           0 toasts.
+         - **500 control**: the panel stays, showing "The site's holiday source could not be
+           reached…". Stub removed afterwards.
+      4. Closure 2027-03-10 to 2027-03-05: POST 400 with "A closure cannot end (2027-03-05) before it
+         starts (2027-03-10).", `_errorControl` = `closure-end-date`, and 0 toasts. Cancelled; "No
+         closures yet".
+      5. Find by email `floor-raise-18@example.com`: POST `bookings/find-by-booker` 200 (`auth=false`).
+         "Bookings for floor-raise-18@example.com, all dates" shows DTJ3-7MQH.
+
+- [x] 6.3 Refusal through the cookie: Chris removes one uBookIt verb from his group. The matching
       action gives **403**, with the section's refusal message, not 401 and not the sign-in prompt.
       Chris then restores it. Verify: the 403 is recorded, and the permission is confirmed restored.
 
+      **Done** on 2026-11-13. The verb used is `UBookIt.Settings` ("Change site settings"). Each probe
+      is a cookie-only fetch from the backoffice tab, with no `Authorization` header.
+      - **Baseline** (verb held): GET `settings` **200**.
+      - **Chris removed the verb** from his group:
+        - GET `settings` gives **403**.
+        - POST `closures` (2027-03-10 "CLU refusal probe (delete me)") gives **403**, and nothing is
+          created.
+        - GET `closures` gives **200**. The read is still satisfied by `UBookIt.Configure`, so the
+          refusal follows the verb, not a blanket failure.
+        - No 401, and no sign-in prompt. The Settings view shows the section's own refusal ("You do
+          not have permission to change uBookIt settings. An administrator can grant it in Users →
+          User Groups…").
+        - So the cookie principal reaches the requirement handlers, not only authentication.
+      - **Chris restored the verb:** GET `settings` **200**, the Settings view shows the settings
+        again, and GET `closures` **200** with an empty list.
+
+
 ## 7. Live: delivery and documents (design D7, step 4)
 
-- [ ] 7.1 Fetch both OpenAPI documents and diff them, normalised, against dev/v18's saved copies.
+- [x] 7.1 Fetch both OpenAPI documents and diff them, normalised, against dev/v18's saved copies.
       Verify: the only differences are the `openapi` field (now `3.1.x`) and the server URL's
       trailing slash, or each other difference is listed and judged.
-- [ ] 7.2 With the editor's cookie present in the browser:
+
+      **Done** on 2026-11-13. Both documents were fetched from the v19 TestSite
+      (`/umbraco/openapi/ubookitbackoffice.json` and `ubookitdelivery.json`, both 200). There was no
+      saved dev/v18 delivery copy (only the backoffice one, from backoffice-client-upgrade 5.2). So
+      the dev/v18 TestSite (`55e1a18`, its own secrets id and DB `uBookIt_v18`) was run briefly, its
+      two documents fetched, and the site stopped. The fresh v18 backoffice document equals the
+      saved copy after normalisation. Diffed after normalisation (parsed, keys sorted):
+
+      | Document | Differences, v18 → v19 |
+      |---|---|
+      | backoffice | `openapi` 3.1.1 → **3.1.2**; `servers[0].url` `https://localhost:44348/` → `https://localhost:44348` |
+      | delivery | the same two lines, and nothing else |
+
+      No other difference, so every path, operation and schema is unchanged. 3.1.2 is still 3.1
+      (design D4: pinned to 3.1, the patch level comes from Microsoft.OpenApi). The trailing slash is
+      the one 5.2 saw in the generated client.
+
+- [x] 7.2 With the editor's cookie present in the browser:
       - an anonymous delivery read gives 200;
       - a delivery placement with body-only contact details is placed, and its booker reflects the
         body only (*Ambient identity is not trusted for writes*).
 
       The test booking is cancelled afterwards. Verify: recorded, including the cancellation.
+
+      **Done** on 2026-11-13, from the backoffice tab, so the editor's cookie was present, with
+      `credentials: 'include'` set explicitly on every call:
+      - **Anonymous reads:** delivery GET `resources?take=50` gives **200** (31 resources). GET
+        `resources/{DBO Granted}/bookable-starts` 2026-11-23..28 gives **200**.
+      - **Placement:** POST `bookings` for DBO Granted, 2026-11-23 10:00Z, 30 min, with booker
+        `{ name: "V19 Delivery Check", email: "v19-delivery-check@example.com", phone: null }`.
+        Result: **200**, XM59JG6D, Confirmed. The response's booker is the body exactly.
+      - **Stored row** (`uBookIt_v19.uBookItBooking`): `MemberKey` **null**, BookerName and BookerEmail
+        as the body, BookerPhone null. So the editor's ambient identity was not taken; *Ambient
+        identity is not trusted for writes* holds on 19.
+      - **Cancelled** from the backoffice: POST `bookings/{id}/cancel` **200** (`auth=false`, by
+        cookie). The row now shows **Cancelled**.
+
 
 ## 8. Close
 
