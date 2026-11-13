@@ -87,6 +87,17 @@ param(
 Set-StrictMode -Version Latest
 $ErrorActionPreference = 'Stop'
 
+# git's output is decoded with [Console]::OutputEncoding. Without a console (a test host, some
+# runners) that falls back to a legacy code page, and the bytes of a UTF-8 file - a byte-order mark,
+# or any non-ASCII text - arrive as other characters. Pinned so that what is compared is what is in
+# the file, wherever this runs. Setting it can fail where there is no console to set, and then the
+# default stands; the comparison of two refs decoded the same way is still like for like.
+try {
+    [Console]::OutputEncoding = [System.Text.UTF8Encoding]::new($false)
+}
+catch {
+}
+
 function Fail([string] $title, [string] $message) {
     Write-Host "::error title=Release tag - ${title}::$message"
     exit 1
@@ -142,7 +153,7 @@ $declared = Get-DeclaredVersion $sha
 if ($null -eq $declared) {
     Fail 'version' "Directory.Build.props at $sha has no whole-line <Version>, so the version the tag claims cannot be confirmed."
 }
-if ($declared -ne $Tag) {
+if ($declared -cne $Tag) {
     Fail 'version' "The tag is $Tag, but $sha declares <Version>$declared</Version>. Tag the commit that declares $Tag, or bump the version first."
 }
 Write-Host "Declared version at ${sha}: $declared - matches."
@@ -209,7 +220,7 @@ while ($true) {
         continue
     }
 
-    $runs = @($response.workflow_runs | Where-Object { $_.head_branch -eq $line })
+    $runs = @($response.workflow_runs | Where-Object { $_.head_branch -ceq $line })
     $succeeded = @($runs | Where-Object { $_.status -eq 'completed' -and $_.conclusion -eq 'success' })
     if ($succeeded.Count -gt 0) {
         Write-Host "ci succeeded for a push of $sha to ${line}: $($succeeded[0].html_url)"

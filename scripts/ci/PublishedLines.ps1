@@ -7,9 +7,10 @@
     its matrix. Every check that depends on which lines are published takes them from
     published-lines.json beside this file, so adding or dropping a line is one edit there.
 
-    ci.yml cannot read a file in a static filter, so it matches published lines by pattern
-    (main, and dev/v followed by the major). A unit test holds every listed name to that pattern,
-    so a line can never be listed that the workflows do not treat as published.
+    ci.yml cannot read a file in a static filter, so it matches published lines broadly, by
+    pattern (main, and any branch starting dev/v), and this list decides which of those are
+    published. A unit test holds every listed name to main or dev/v<digits>, so a line can never be
+    listed that the workflows do not treat as published.
 
     A malformed list is refused, not read as far as it goes: a check run against part of the
     list would report the lines agree when it never looked at some of them.

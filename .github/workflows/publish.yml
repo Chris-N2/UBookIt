@@ -29,8 +29,9 @@ name: publish
 on:
   push:
     # Release tags only: <major>.<minor>.<patch>, and the same with a prerelease label
-    # (19.0.0-rc1). The check job re-tests the shape with an anchored match, because a filter is
-    # not one: '1.2.3-' starts this workflow, and the check refuses it.
+    # (19.0.0-rc1). The check job re-tests the shape exactly, because a filter's `*` matches any
+    # characters at all, including none: '1.2.3-' and '1.2.3-x+y' start this workflow, and the
+    # check refuses them.
     tags: ['[0-9]+.[0-9]+.[0-9]+', '[0-9]+.[0-9]+.[0-9]+-*']
   workflow_dispatch:
     inputs:

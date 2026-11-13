@@ -102,15 +102,40 @@ public sealed class ReleaseTagScriptTests : IDisposable
     }
 
     [Fact]
-    public void A_prerelease_tag_is_placed_on_its_line_by_its_major_and_reaches_the_verification_step()
+    public void A_tag_that_differs_from_the_declared_version_only_in_case_is_refused()
     {
-        _repo.Tag("19.0.0-rc1", _v19Tip);
+        // "Compared whole" means exactly: 19.0.0-RC1 is not the version 19.0.0-rc1 declares, and
+        // the package files it would look for would not exist on a case-sensitive runner either
+        // (QA round 1, MAJOR-2: the comparison used PowerShell's case-insensitive -ne).
+        _repo.Tag("19.0.0-RC1", _v19Tip);
 
-        var (exit, output) = Run("19.0.0-rc1");
+        var (exit, output) = Run("19.0.0-RC1");
+
+        Assert.Equal(1, exit);
+        Assert.Contains("Release tag - version", output);
+        Assert.Contains("declares <Version>19.0.0-rc1</Version>", output);
+    }
+
+    [Theory]
+    [InlineData("19.0.0-rc1")]
+    [InlineData("19.0.0-rc.2")]
+    [InlineData("19.0.0-rc-1")]
+    [InlineData("19.0.0-beta.1.2")]
+    public void A_prerelease_tag_is_placed_on_its_line_by_its_major_and_reaches_the_verification_step(string tag)
+    {
+        // Each shape the spec's label allows, including dot-separated identifiers (the spec's own
+        // 19.0.0-rc.2) and hyphens inside one (QA round 1, MAJOR-1: only rc1 was covered, so a
+        // pattern refusing every dotted label passed).
+        _repo.Checkout(_v19Tip);
+        var declaring = _repo.Commit(Declaring(tag));
+        _repo.SetRemoteLine("dev/v19", declaring);
+        _repo.Tag(tag, declaring);
+
+        var (exit, output) = Run(tag);
 
         // Steps 1-3 passed: the version matched, and the line was found and contains the commit.
         Assert.Contains("matches.", output);
-        Assert.Contains($"{_v19Tip} is contained in origin/dev/v19.", output);
+        Assert.Contains($"{declaring} is contained in origin/dev/v19.", output);
         Assert.DoesNotContain("Release tag - shape", output);
         Assert.DoesNotContain("Release tag - version", output);
         Assert.DoesNotContain("Release tag - line", output);
