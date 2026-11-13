@@ -384,7 +384,7 @@
 
 ## 7. QA
 
-- [ ] 7.1 QA (`qa-review`): a fresh subagent, reused across rounds, told what is claimed and asked to
+- [x] 7.1 QA (`qa-review`): a fresh subagent, reused across rounds, told what is claimed and asked to
       verify rather than trust. Ask it to probe the D2 JSON comparison, the D4 pattern, and the
       "listed once" guard's reach in particular. Verify: APPROVE or APPROVE WITH NITS, with the nits
       resolved or recorded.
@@ -459,6 +459,29 @@
       every mutation was re-run. Commit before mutating.
 
       After the fixes: build 0/0; Unit **2562/2562** on main (2553 + 9).
+
+      **Round 2 (2026-11-13): APPROVE WITH NITS.** Every round-1 finding is verified fixed, each fix
+      checked as new code, and no new defect was introduced.
+      - HEAD on every branch has `Get-GitFile` and no console-wide encoding assignment.
+      - The reviewer's own mutations: dotted labels, `-ne`, the empty-version check, the duplicate
+        check, and the `sdk.version` skip made a no-op. **All caught.**
+      - Its probes: missing, miscased, numeric and escaped `version`; a BOM on one or both sides,
+        with non-ASCII text; key order inside arrays; array order; `1` against `1.0`; a top-level
+        array; trailing data.
+      - It also checked builds 0/0 ×3, unit 2562 / 2556 / 2568, openspec 28 ×3, real-branch parity,
+        and port identity.
+
+      It corrected my claim about the Latin-1 survivor: "both refs decoded alike" is not quite true
+      when only one side has a BOM. The real UTF-8 setting handles that case correctly, as its
+      one-sided BOM probe shows.
+
+      **Both nits resolved** (`bcb39b5`):
+      - **NIT-A:** array order had no test. Added `Array_order_is_a_difference` (`sdk.paths`
+        `["a","b"]` against `["b","a"]` fails). Mutation: sorting the array items in the canonical
+        form fails exactly that test; reverted, clean.
+      - **NIT-B:** the round-1 NIT-9 reason survived in `Assert-ReleaseTag.ps1`'s description and in
+        design D4. Both now give the true reason (a filter's `*` matches anything, including
+        nothing), and the design's sentence is marked as corrected.
 
 
 ## 8. Rollout (design, Migration Plan)
