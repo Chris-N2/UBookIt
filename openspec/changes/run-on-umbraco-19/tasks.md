@@ -206,7 +206,7 @@
 
       Proposal, design and tasks were amended before any of it was implemented.
 
-- [ ] 4.3 The RC's documentation (design D10; amended at apply, Chris, 2026-11-13; it replaces the
+- [x] 4.3 The RC's documentation (design D10; amended at apply, Chris, 2026-11-13; it replaces the
       original "version literals only" task):
       - a `CHANGELOG.md` `## 19.0.0-rc1` entry, undated, leading with *What you have to do*, and the
         header's line-major sentence extended to 19;
@@ -222,6 +222,64 @@
       - `ChangelogTests`, `VersionTruthTests` and `UmbracoFloorDocumentationTests` pass;
       - the floor guard **fails** when one page states a different floor (a reverted mutation);
       - `DocumentationLinkTests` passes.
+
+      **Done.** Edits applied by a staged script: every anchor count was checked before any write,
+      and BOM and line endings were preserved.
+
+      - **README:**
+        - intro "Umbraco 19";
+        - install `--version "19.*-*"`, with the reason (`-*` admits the prerelease);
+        - floor `19.0.0-rc1 or later` (×2), "below 19.0.0-rc1", "to 19.0.0-rc1 first";
+        - "and not 20", and 17/18 directed to their lines;
+        - .NET 11.0;
+        - version sentence `19.0.0-rc1`;
+        - line majors now include `19.x`;
+        - 20 `blob/…` links and 4 raw image URLs pinned to `19.0.0-rc1`.
+      - **Getting started:**
+        - the requirements row (19.0.0-rc1 or later, below 20, 17/18 → their lines), .NET 11.0,
+          "below 19.0.0-rc1";
+        - the install command `19.*-*`, with the reason;
+        - line majors including `19.x`;
+        - **the SameSite paragraph** (design D2), in section 1, *Check the requirements*.
+      - **`docs/theming.md`:** `net11.0`.
+      - **`docs/publishing.md`:** "uBookIt is at `19.0.0-rc1`"; the raw image URL ×2; the
+        `git tag` and `git push` examples. Historical mentions (`17.2.1`/`18.1.1` and others) were
+        left alone. Its `dev/v18`-only description of the lines is left for the CI-for-three-lines
+        change.
+      - **`CHANGELOG.md`:**
+        - the header's line-major sentence gains 19;
+        - a new `## 19.0.0-rc1` entry, undated. It leads with *What you have to do*: the 19 line
+          only, `19.*-*`, upgrade Umbraco first, back up the database. Then *Why this release was
+          needed*: the cookie sign-in and the SameSite stance, linked to Getting started. Then *Also
+          in this release*: OpenAPI 3.1, no behaviour change.
+      - **`UmbracoFloorDocumentationTests`:**
+        - one `Version` pattern (SemVer prerelease: dot-separated non-empty identifiers) used by
+          both the declared floor and the stated phrasings;
+        - the install command expects `"{major}.*-*"` when the floor is a prerelease, and
+          `"{major}.*"` otherwise;
+        - new `A_prerelease_floor_is_read_whole_in_every_phrasing` and
+          `A_release_and_its_prerelease_are_different_floors`. **The second caught my first
+          pattern** (`[0-9A-Za-z.]*`) reading "below 19.0.0-rc2." with its full stop; it was fixed
+          to SemVer's shape, and the comment records it.
+
+      **Verify:** `ChangelogTests`, `VersionTruthTests`, `UmbracoFloorDocumentationTests` and
+      `DocumentationLinkTests` give 38/38. **Can fire** (mutating `README.md`, which is read at
+      runtime):
+      - F1: one floor phrase changed to `19.0.0 or later` → **FAIL**, "README.md states Umbraco
+        19.0.0, but Directory.Packages.props declares 19.0.0-rc1 as the floor."
+      - F2: install changed to `"19.*"` → **FAIL**, "…does not select uBookIt's 19.x line with
+        "19.*-*"…"
+
+      **Instrument failure, recorded:** the restore function was named `R`, which is a built-in
+      PowerShell alias (`Invoke-History`), and aliases win over functions. So neither restore ran,
+      and the "unmutated" control ran against F2's file and failed. The README's 4.3 edits were not
+      yet committed, so `git checkout` was not an option. Each mutation had been written from the
+      original text, so the file held exactly F2. I counted the F2 form (1), the intended form (0)
+      and the F1 form (0), then reversed F2's one replacement. **Proof of the restore:**
+      `verify43.py` re-applied the 4.3 edits to HEAD in memory, and all four doc files compare
+      **IDENTICAL** to the worktree (line endings normalised). The docs guards are 38/38 on the
+      restored files.
+
 - [x] 4.4 Add to `OpenApiTransformerTests` an assertion that the backoffice and delivery documents
       each declare OpenAPI `3.1.x` (design D4). Verify: it passes, and it **fails** with 3.3's line
       removed (a mutation, reverted, with the revert confirmed by content comparison using absolute
