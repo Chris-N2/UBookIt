@@ -321,20 +321,58 @@
       `tests/UBookIt.Tests` (three test classes and two `Support/` files), which neither of those
       projects references, and neither reads any CI file.
 
-- [ ] 5.2 Run the reworked parity script locally against the real three lines. Use a scratch clone
+- [x] 5.2 Run the reworked parity script locally against the real three lines. Use a scratch clone
       in which `refs/remotes/origin/dev/v19` points at the local `dev/v19` carrying this change
       (task 6.2). Verify: it passes for each of the three lines, and fails as expected for a branch
       missing the change.
 
+      **Done**, against the real branches, with no scratch clone needed. The three worktrees share
+      one repository, so temporary `refs/remotes/sim/<line>` refs pointed at `ci-three-lines`,
+      `ci-three-lines-v18` and `ci-three-lines-v19`. The real script was run in each worktree with
+      `-Remote sim`:
+
+      | Run | Result |
+      |---|---|
+      | main (`5debd70`) | identical to dev/v18 and dev/v19, **exit 0** |
+      | dev/v18 (`5604ffb`) | identical to main and dev/v19, **exit 0** |
+      | dev/v19 (`3d5a6a9`) | identical to main and dev/v18 (`<Version>` and `sdk.version` differ, as exempt), **exit 0** |
+      | negative: `sim/dev/v18` at the OLD `origin/dev/v18`, from dev/v19 | **exit 1**: 7 files named against `sim/dev/v18` (3 workflows, 2 scripts, the list, the helper); main still identical |
+
+      The sim refs were deleted (0 left). **Instrument note:** a first negative run printed `exit 0`,
+      because piping through `Select-Object -First 6` stopped pwsh before its exit code was set. It
+      was re-run without truncation, giving exit 1.
+
+
 ## 6. Ports (design D7)
 
-- [ ] 6.1 `ci-three-lines-v18` from `origin/dev/v18`: copy this change's CI files, tests and docs as
+- [x] 6.1 `ci-three-lines-v18` from `origin/dev/v18`: copy this change's CI files, tests and docs as
       on `main`, with no edits, plus the change artifacts. Verify:
       `git diff ci-three-lines ci-three-lines-v18 -- .github scripts/ci Directory.Build.props
       global.json` shows only `<Version>`. The unit suite is green, with its total recorded.
-- [ ] 6.2 `ci-three-lines-v19` from local `dev/v19`, the same way, with `global.json` keeping
+
+      **Done.**
+      - `ci-three-lines-v18` was branched from `origin/dev/v18` (`55e1a18`) with no upstream, and
+        main's six commits cherry-picked cleanly (`docs/publishing.md` auto-merged).
+      - `git diff ci-three-lines ci-three-lines-v18 -- .github scripts/ci Directory.Build.props
+        global.json` shows `<Version>` only.
+      - The CI sections of `docs/publishing.md` (*Continuous integration* through *Publishing a
+        prerelease*) are identical to main's.
+      - Release `--no-incremental` build: 0 warnings, 0 errors. Unit **2547/2547** (dev/v18's 2516 +
+        31).
+
+- [x] 6.2 `ci-three-lines-v19` from local `dev/v19`, the same way, with `global.json` keeping
       `11.0.100`. Verify: the same diff shows only `<Version>` and `sdk.version`. The unit suite is
       green, with its total recorded.
+
+      **Done.**
+      - `ci-three-lines-v19` was branched from local `dev/v19` (`e260835`, the archived Umbraco 19
+        port), and the same six commits cherry-picked cleanly.
+      - The parity-path diff from main's branch shows exactly `<Version>` 17.7.0 → 19.0.0-rc1 and
+        `global.json` `"version": "10.0.300"` → `"11.0.100"`, the two exempt values. The CI docs
+        sections are identical.
+      - Release `--no-incremental` build: 0 warnings, 0 errors. Unit **2559/2559** (net11.0;
+        dev/v19's 2528 + 31).
+
 - [ ] 6.3 `openspec validate --all --strict` with the pinned CLI on all three branches, after the last
       commit. Verify: it passes on each.
 
