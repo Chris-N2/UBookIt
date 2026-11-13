@@ -4,8 +4,10 @@ See proposal.md, *Why*. Everything below was measured in the explore spike of 20
 was the `uBookIt-v19` worktree at dev/v18 `55e1a18`, retargeted to RC1. It is kept as
 `stash@{0}` ("v19 RC1 spike 2026-11-13"), and the apply may consult it, not just pop it:
 - **Restore and build:** after retargeting, the shipped projects had exactly 3 compile errors, all
-  `CanSendRequiredEmail`. The test projects had 12 more: 5 `IEmailSender` doubles and 4
-  `IRuntimeState` stubs (`CurrentMigrationVersion`).
+  `CanSendRequiredEmail`. The test projects had 12 more: 4 `IEmailSender` doubles (× 2 members) and
+  4 `IRuntimeState` stubs (`CurrentMigrationVersion`). *(Corrected at apply: this said 5 doubles.
+  Once those errors were fixed, the compiler's next pass also showed 6 `ReadOnlyUserGroup`
+  constructor errors; see D6's note.)*
 - **Run:** Umbraco's unattended upgrade migrated a copy of v18's database to 19 on first boot.
 - **Auth:** the API-user path (client credentials) worked unchanged. The editor path failed (401
   from uBookIt beside 200 from Umbraco, in one page load). The scheme fix below then made both pass,
@@ -104,10 +106,55 @@ Unlike the 18 port, which kept a spent version so it could not be published by a
 carries an unspent prerelease version. The protection now comes from elsewhere: `dev/v19` is not
 pushed, and publishing needs a release tag that only Chris pushes.
 
-Any version guard that fails after the bump (`VersionTruthTests`, the README's version sentence and
-image pins, `docs/publishing.md`'s literals) is satisfied by changing **the literal it names**, and
-each one is recorded. Line wording ("Umbraco 18" in prose, getting-started requirements) is left to
-`release-19-0-0`, and listed there as owed.
+~~Any version guard that fails after the bump is satisfied by changing the literal it names; line
+wording is left to `release-19-0-0`.~~ *Superseded at apply by D10.* The bump made the guards ask
+for more than literals: a CHANGELOG entry, and floor statements for a prerelease floor. Chris chose
+to fold the RC's documentation into this change.
+
+### D10. The RC's documentation is written here; publication stays in the release change (amended at apply, Chris, 2026-11-13)
+
+The 4.2 run showed that `19.0.0-rc1` cannot go green without release paperwork:
+- `ChangelogTests` requires an entry for the declared version;
+- `UmbracoFloorDocumentationTests` requires the README and Getting started to state the declared
+  floor, and its parser could not read a prerelease bound;
+- `VersionTruthTests` requires the README's links, images and version sentence to name the version.
+
+Chris also now wants the RC published for real-world testing. So this change writes all of the
+RC's documentation:
+- **`CHANGELOG.md`:** a `## 19.0.0-rc1` entry, undated. Released entries are dated at publication;
+  `Every_released_version_is_dated` reads only archived releases, so an undated entry is right
+  until `release-19-0-0-rc1`. It leads with *What you have to do*: Umbraco 19.0.0-rc1 or later,
+  .NET 11, the backoffice sign-in change and what uBookIt did about it, and that this is a
+  prerelease. The header's "`17.x` … `18.x`" sentence gains 19.
+- **README and Getting started:**
+  - the floor reads `19.0.0-rc1 or later`;
+  - **the install command must select a prerelease**: NuGet's `"19.*"` excludes prereleases, so it
+    becomes `--version "19.*-*"`, and the text says why;
+  - the version sentence, and the links and images pinned to the `19.0.0-rc1` ref.
+- **`docs/theming.md`:** `net11.0`. **`docs/publishing.md`:** its version literals.
+- **The SameSite sentence** (D2), on the page that covers backoffice configuration.
+- **`UmbracoFloorDocumentationTests.DeclaredFloor`** reads `[19.0.0-rc1,`. A floor phrase such as
+  "19.0.0-rc1 or later" must still be matched, and the guard must still fire when a page states a
+  different floor, which is checked by mutation.
+
+`release-19-0-0-rc1` keeps the rest: dating the entry, checking the artifacts, the tag, and
+publication. It follows the CI-for-three-lines change.
+
+### D11. Two storage guards skip EF Core 11's `SET NOCOUNT OFF;` preamble, and nothing else (Chris, 2026-11-13)
+
+EF Core 11's SQL Server provider sends `SET NOCOUNT OFF;` at the start of an `ExecuteUpdate`
+command. The erase guard still records exactly one command, so its *one statement, no read first*
+guarantee holds. But it asserts the command text starts with `UPDATE`. The move guard selects
+commands that start with `UPDATE`, and finds none.
+
+Both guards strip exactly that leading text (case-insensitive, then trimmed) before matching, and
+nothing more, with a comment saying why.
+- *Rejected: matching `UPDATE` anywhere.* A read placed before the update would then pass.
+- *Rejected: dropping the text assertion.* The single-command assertion alone cannot tell
+  an `UPDATE` from a `SELECT`.
+
+Each guard is shown still able to fire: a reverted mutation that puts a read before the write must
+fail it.
 
 ### D6. Guards that encode a framework or host major move, but each one is listed and must still fire
 
@@ -115,6 +162,10 @@ Some tests contain `net10.0` or a Umbraco 18 bound as data: `AuditScriptTests`' 
 `PackageCompositionTests`' `lib/net10.0` entry, the bound's examples. A port legitimately changes
 those values. That is different from adjusting a guard to agree with whatever the build now does,
 which this project treats as a defect.
+
+*Note added at apply:* host type **signature** changes in test fixtures belong to the same class
+as interface members. `ReadOnlyUserGroup`'s constructor gained `startDocumentBlueprintId` and
+`hasAccessToInvariantForVariant`, and its shorter overloads were removed.
 
 So every test edit in this change is recorded in tasks.md with:
 - the failing message;

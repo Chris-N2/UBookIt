@@ -152,31 +152,90 @@
 
 ## 4. Tests
 
-- [ ] 4.1 Implement the new interface members on the test doubles (design D3):
-      - `IEmailSender` (5 doubles): `IsEmailConfigured` gives the double's existing answer, and
+- [x] 4.1 Implement the new interface members on the test doubles (design D3):
+      - `IEmailSender` (4 doubles; the design's "5" was a miscount): `IsEmailConfigured` gives the double's existing answer, and
         `IsEmailAvailableAsync` gives `Task.FromResult(IsEmailConfigured())`;
       - `IRuntimeState.CurrentMigrationVersion` (4 stubs): the value the stub's state implies.
 
       Verify: every test project compiles.
-- [ ] 4.2 Run unit, integration and rendering, one at a time. For **every** failure, record:
+
+      **Done.**
+      - **`IEmailSender`, 4 doubles:** `StubEmailSender`, `ThrowingEmailSender`,
+        `RecordingEmailSender` and `TestEmailSender`.
+        - Each declared an orphaned `CanSendRequiredEmail()`, which is **renamed** to
+          `IsEmailConfigured()` with its body unchanged (stub value, throw-on-probe, `Probed`
+          tracking).
+        - `IsEmailAvailableAsync` delegates to it (`TestEmailSender` returns `canSend` directly).
+      - **`IRuntimeState.CurrentMigrationVersion`, 4 stubs:** `=> null`, matching each stub's
+        `CurrentMigrationState => null`.
+      - **Found once those compiled (D6 note): 6 `ReadOnlyUserGroup` fixtures.** RC1 removed the
+        shorter overloads and added `startDocumentBlueprintId` and `hasAccessToInvariantForVariant`
+        to the full constructor, which 18 had not marked obsolete.
+        - The fixtures pass `startDocumentBlueprintId: null`, like their other start nodes.
+        - They pass `hasAccessToInvariantForVariant: false`, the value that grants nothing extra;
+          no uBookIt requirement reads it. Umbraco's upgrade backfills it from the legacy
+          `AllowEditInvariantFromNonDefault`, so there is no single "upgraded" value.
+        - The edits were made by a script that preserves BOM, line endings and indentation.
+        - `UBookItSectionAccessTests`' constructor comment gained a 19 addendum.
+      - `dotnet build UBookIt.slnx`: **0 errors, 0 warnings.**
+
+- [x] 4.2 Run unit, integration and rendering, one at a time. For **every** failure, record:
       - the message;
       - its class (framework or host-major literal, version-derived, interface member, or other);
       - the fix (design D6).
 
       An "other" stops apply and is raised with Chris. Verify: the table is here, and no test was
       deleted or skipped.
-- [ ] 4.3 Version-guard fallout from 2.2 (design D5): change only the literals a failing version guard
-      names. Verify: each one is listed with its guard; no prose that says "Umbraco 18" is changed
-      unless a guard names it; and the remaining line-wording obligations are listed for
-      `release-19-0-0`.
+
+      **Done; first run (Debug, after 4.1):** unit 2505/2516, integration 220/222, rendering
+      1211/1211. No test deleted or skipped.
+
+      | Tests | Message (abridged) | Class | Fix |
+      |---|---|---|---|
+      | `PackageCompositionTests.The_front_end_rendering_is_in_the_box` | `lib/net10.0/UBookIt.Web.dll` not found | framework literal | → `net11.0`, in 4.6 |
+      | `VersionTruthTests` ×3 (links, images, documented version) | pinned to / states `18.6.0`, declared `19.0.0-rc1` | version-derived | 4.3 |
+      | `ChangelogTests` ×3 | "declares 19.0.0-rc1, but CHANGELOG.md has no entry" | version-derived, **needs release content** | **raised**, then 4.3 |
+      | `UmbracoFloorDocumentationTests` ×4 | "declares no Umbraco.Cms range with an inclusive lower bound" (the parser reads only `\d+.\d+.\d+`) | **other**: the guard cannot read a prerelease floor | **raised**, then 4.3 |
+      | `BookerErasureStorageTests.…one_statement_and_reads_nothing_first` | command starts `SET NOCOUNT OFF;`, expected `UPDATE` | **other**: EF Core 11 SQL text | **raised**, then 4.5 |
+      | `MoveStorageTests.…one_update_whose_predicate_is_the_status` | no command starts `UPDATE` (`Assert.Single` on empty) | **other**: same cause | **raised**, then 4.5 |
+
+      **Raised with Chris (D6 stop), and decided the same day:**
+      1. Fold the RC's documentation into this change (design D10). Chris also now wants the RC
+         published.
+      2. The storage guards skip exactly the `SET NOCOUNT OFF;` preamble (design D11).
+
+      Proposal, design and tasks were amended before any of it was implemented.
+
+- [ ] 4.3 The RC's documentation (design D10; amended at apply, Chris, 2026-11-13; it replaces the
+      original "version literals only" task):
+      - a `CHANGELOG.md` `## 19.0.0-rc1` entry, undated, leading with *What you have to do*, and the
+        header's line-major sentence extended to 19;
+      - README and Getting started:
+        - the floor is `19.0.0-rc1 or later`;
+        - the install command is `--version "19.*-*"`, with the reason given;
+        - the version sentence, and the links and images pinned to `19.0.0-rc1`;
+      - `docs/theming.md` `net11.0`; `docs/publishing.md`'s literals;
+      - the SameSite sentence (design D2);
+      - `UmbracoFloorDocumentationTests.DeclaredFloor` reads a prerelease bound.
+
+      Verify:
+      - `ChangelogTests`, `VersionTruthTests` and `UmbracoFloorDocumentationTests` pass;
+      - the floor guard **fails** when one page states a different floor (a reverted mutation);
+      - `DocumentationLinkTests` passes.
 - [ ] 4.4 Add to `OpenApiTransformerTests` an assertion that the backoffice and delivery documents
       each declare OpenAPI `3.1.x` (design D4). Verify: it passes, and it **fails** with 3.3's line
       removed (a mutation, reverted, with the revert confirmed by content comparison using absolute
       paths).
-- [ ] 4.5 Clean Release build (`--no-incremental`, after deleting the bundle folder and `obj/Release`):
+- [ ] 4.5 The two storage guards skip EF Core 11's leading `SET NOCOUNT OFF;` and nothing else
+      (design D11; Chris, 2026-11-13). Verify:
+      - `BookerErasureStorageTests` and `MoveStorageTests` pass;
+      - **each still fires**: a reverted mutation that issues a read before the write in
+        `SqlBookingStore` turns it red;
+      - the revert is confirmed by content comparison.
+- [ ] 4.6 Clean Release build (`--no-incremental`, after deleting the bundle folder and `obj/Release`):
       0 warnings, 0 errors. Then all three suites. Verify:
-      - the totals are recorded and compared with 1.1's: the differences are only 4.4's assertions
-        and any test 4.2 recorded;
+      - the totals are recorded and compared with 1.1's: the differences are only 4.3's, 4.4's and
+        4.5's test edits and any test 4.2 recorded;
       - `GeneratedClientTests`, `OpenApiTransformerTests` and `NodeEngineGuardTests` pass;
       - the Node guard reads backoffice 19.0.0-rc1's `engines.node`.
 

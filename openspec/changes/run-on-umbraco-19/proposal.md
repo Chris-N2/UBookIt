@@ -46,6 +46,23 @@ All of it is on `dev/v19` only, a local branch, and nothing is pushed (see Non-g
   RC1 TestSite. In the explore: no conflicts, `tsc` with 0 errors, and vitest 391/391.
 - **`umbraco-feedback.md`** in this change: notes on how smooth the upgrade was, for Chris to pass
   to Umbraco. It is seeded from the explore and added to during apply.
+- **The RC's documentation (folded in at apply, Chris, 2026-11-13).** Moving the version to
+  `19.0.0-rc1` made the documentation guards ask for release paperwork. Chris also now wants to
+  publish the RC for real-world testing, as other packages are doing. So this change writes it:
+  - a `CHANGELOG.md` entry for `19.0.0-rc1`, left undated until publication;
+  - README and Getting started: the Umbraco floor, the install command for a prerelease
+    (`--version "19.*"` does not select an RC), the version sentence, and the pinned links and
+    images;
+  - `docs/theming.md`'s example `net11.0`;
+  - `docs/publishing.md`'s version literals;
+  - the SameSite sentence;
+  - the floor guard, taught to read a prerelease lower bound.
+
+  `release-19-0-0-rc1` then keeps only publication: dating the entry, checking the artifacts, and
+  the tag. It follows the CI-for-three-lines change.
+- **Two storage guards ignore EF Core 11's `SET NOCOUNT OFF;` preamble** (Chris, 2026-11-13). The
+  guarantee they check, one statement with no read first, is unchanged. Only the SQL's leading text
+  moved.
 
 ## Non-goals
 
@@ -53,9 +70,10 @@ All of it is on `dev/v19` only, a local branch, and nothing is pushed (see Non-g
   released (Chris, 2026-11-13). So this change's verification is local: every suite, a clean
   Release build and live checks. CI for three lines (`ci.yml` branch filters, the parity script) is
   its own change, before the first push.
-- **Not the release.** No CHANGELOG entry and no publishing. The README, docs and Marketplace
-  wording that says "Umbraco 18" belongs to `release-19-0-0`, as on the 18 line. The version's
-  literals change only where a version guard requires it.
+- **Not the publication.** No date on the CHANGELOG entry, no artifact checks, no tag, no push.
+  Those are `release-19-0-0-rc1`'s. *(Amended at apply: this originally deferred all release
+  wording to the release change. The version guards made the documentation part of this change;
+  see What Changes.)*
 - **Not 19.0.0 final.** Moving the floor to `[19.0.0,20.0.0)` and the version to `19.0.0` is a
   one-line follow-up once Umbraco releases.
 - **No behaviour change, and no new feature.** Every spec guarantee holds on 19 as it does on 18.
@@ -95,14 +113,21 @@ Checked rather than assumed:
 | `UBookIt.TestSite/UBookIt.TestSite.csproj` | Its own `UserSecretsId` |
 | Client | `@umbraco-cms/backoffice` 19.0.0-rc1, lockfile, regenerated `src/api` |
 | Tests | Interface members on the test doubles. Guards whose expected values follow the host or framework major (target-framework literals, the Umbraco range) are updated, each one listed with its reason |
-| Version literals | Only those a version guard names (README version sentence and image pins, `docs/publishing.md`) |
+| Docs and CHANGELOG | The RC's documentation, folded in at apply (see What Changes) |
+| `UmbracoFloorDocumentationTests` | Reads a prerelease lower bound |
+| Two integration storage guards | Skip EF Core 11's leading `SET NOCOUNT OFF;` |
 
 **No breaking change to uBookIt's public API.** The host requirement changes, which is the point of
 the line. **No schema change:** uBookIt's migrations are untouched, and Umbraco migrates its own
 schema on first boot.
 
-**Documentation:** no `docs/*.md` page changes in substance. `docs/getting-started.md` and
-`docs/publishing.md` name .NET 10 / Umbraco 18. Their line wording is owed by `release-19-0-0`, and
-only version literals a guard requires change here. Also owed by the release: a sentence for site
-operators saying that `Umbraco:CMS:Security:AuthCookieSameSite=None` exposes uBookIt's backoffice
-API exactly as much as Umbraco's own.
+**Documentation** *(amended at apply)*. This change updates:
+- `README.md`;
+- `docs/getting-started.md` (setup: the floor and the prerelease install command);
+- `docs/theming.md`;
+- `docs/publishing.md`;
+- `CHANGELOG.md`.
+
+The SameSite sentence for site operators goes in the getting-started or configuration page:
+`Umbraco:CMS:Security:AuthCookieSameSite=None` exposes uBookIt's backoffice API exactly as much as
+Umbraco's own. No page is added, so `docs/docs.json` is unchanged.

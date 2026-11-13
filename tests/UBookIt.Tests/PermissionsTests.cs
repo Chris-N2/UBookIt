@@ -503,12 +503,14 @@ public class PermissionsTests
             startContentId: null,
             startMediaId: null,
             startElementId: null,
+            startDocumentBlueprintId: null,
             alias: alias ?? $"group{id}",
             allowedLanguages: [],
             allowedSections: sections,
             permissions: new HashSet<string>(verbs),
             granularPermissions: new HashSet<Umbraco.Cms.Core.Models.Membership.Permissions.IGranularPermission>(),
-            hasAccessToAllLanguages: true);
+            hasAccessToAllLanguages: true,
+            hasAccessToInvariantForVariant: false);
 
     /// <summary>
     /// The whole pipeline: the REAL composer composed, the REAL policies and handlers,

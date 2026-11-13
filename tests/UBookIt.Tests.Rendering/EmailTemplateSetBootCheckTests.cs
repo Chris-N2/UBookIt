@@ -27,6 +27,8 @@ public class EmailTemplateSetBootCheckTests
 
         public string? FinalMigrationState => null;
 
+        public Umbraco.Cms.Core.Semver.SemVersion? CurrentMigrationVersion => null;
+
         public RuntimeLevelReason Reason => RuntimeLevelReason.Run;
 
         public Umbraco.Cms.Core.Semver.SemVersion SemanticVersion => null!;
