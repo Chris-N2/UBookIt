@@ -353,15 +353,37 @@
 
 ## 5. Client
 
-- [ ] 5.1 `npm install --save-dev @umbraco-cms/backoffice@19.0.0-rc1` (no `--force` and no
+- [x] 5.1 `npm install --save-dev @umbraco-cms/backoffice@19.0.0-rc1` (no `--force` and no
       `--legacy-peer-deps`). Verify:
       - no ERESOLVE and no EBADENGINE;
       - `npm ls` shows 19.0.0-rc1 with hey-api 0.99.0 deduped.
-- [ ] 5.2 With the RC1 TestSite running, run `npm run generate-client`. Verify:
+
+      **Done.** `"@umbraco-cms/backoffice": "^19.0.0-rc1"`. "changed 1 package", with no ERESOLVE and
+      no EBADENGINE. `npm ls` shows `@umbraco-cms/backoffice@19.0.0-rc1` with `@hey-api/openapi-ts@0.99.0`
+      deduped. `npm audit`: 12 (3 moderate, 8 high, 1 critical), unchanged from dev/v18.
+      **Deferred from 4.6:** the lockfile's backoffice entry is `19.0.0-rc1`, `engines.node >=24.13`,
+      and `NodeEngineGuardTests.Every_pinned…` plus `The_lockfile_reading_finds…` pass against it.
+
+- [x] 5.2 With the RC1 TestSite running, run `npm run generate-client`. Verify:
       - `types.gen.ts` and the 37 method names are unchanged;
       - every difference is listed (the explore expects at most the `baseUrl` trailing slash).
-- [ ] 5.3 `npx tsc --noEmit`, `npm test`, `npm run build`. Verify: green, vitest 391, and no
+
+      **Done**, against the RC1 TestSite (`/umbraco/openapi/ubookitbackoffice.json`): no deprecation
+      line. Method names 37 / 37, with no difference. Diff stat: 2 files, +2/−2. **Both lines are the
+      server URL's trailing slash**, which the explore predicted:
+      - `client.gen.ts` `baseUrl: 'https://localhost:44348/'` → `'https://localhost:44348'`;
+      - `types.gen.ts` `ClientOptions.baseUrl` literal type, the same change.
+
+      That second one is the generated client's own options type, not an API contract type, so it
+      is judged harmless against design D3/D6. At runtime `createClientConfig` takes Umbraco's own
+      client configuration, which the live checks exercise in section 6.
+
+- [x] 5.3 `npx tsc --noEmit`, `npm test`, `npm run build`. Verify: green, vitest 391, and no
       section-code edit, or each one listed with its reason.
+
+      **Done.** `npx tsc --noEmit` exit 0; vitest **391/391**; `npm run build` succeeds. **No
+      section-code edit**: `git diff --stat` of `Client/src` outside `src/api` is empty.
+
 
 ## 6. Live: identities (design D7, steps 1–3)
 
