@@ -10,8 +10,9 @@
       1. SHAPE.     The tag is <major>.<minor>.<patch>, optionally followed by a hyphen and a
                     prerelease label of non-empty, dot-separated identifiers of letters, digits
                     and hyphens (19.0.0-rc1, 19.0.0-rc.2). No prefix, no build metadata. The
-                    workflow's trigger filters already limit it, but a filter is not an anchored
-                    match, and a dry run takes the tag as free text. So it is checked again here.
+                    workflow's trigger filters already limit it, but a filter's * matches any
+                    characters at all, including none (1.2.3- and 1.2.3-x+y start the workflow),
+                    and a dry run takes the tag as free text. So it is checked again here.
       2. VERSION.   The tag equals the first whole-line <Version> in Directory.Build.props
                     at the tagged commit, compared whole: 19.0.0 against 19.0.0-rc1 fails, in
                     either direction. That is the same "first whole line" rule

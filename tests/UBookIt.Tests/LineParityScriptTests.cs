@@ -107,6 +107,21 @@ public sealed class LineParityScriptTests : IDisposable
     }
 
     [Fact]
+    public void Array_order_is_a_difference()
+    {
+        // The SDK resolves sdk.paths in order, so ["a","b"] and ["b","a"] pin different things.
+        // The canonical form sorts object keys and must never sort array items (QA round 2,
+        // NIT-A: sorting them passed every other test here).
+        PublishAll(Definitions("18.6.0", globalJson: """{"sdk":{"version":"10.0.300","paths":["a","b"]}}"""));
+        CheckOut(Definitions("17.7.0", globalJson: """{"sdk":{"version":"10.0.300","paths":["b","a"]}}"""));
+
+        var (exit, output) = Run("main");
+
+        Assert.Equal(1, exit);
+        Assert.Contains("global.json differs from origin/dev/v18 even with its sdk.version ignored", output);
+    }
+
+    [Fact]
     public void An_unparseable_global_json_on_another_line_fails()
     {
         PublishAll(Definitions("18.6.0"), ("dev/v18", Definitions("18.6.0", globalJson: "{ not json")));
