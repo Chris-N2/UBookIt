@@ -549,7 +549,7 @@
       0 failed**, exit 0, after `a24676b` (the 8.1 commit). It was re-run after this record's own
       commit, and the commit is stated in the message of the commit that follows it.
 
-- [ ] 8.3 QA (`qa-review`): a fresh subagent, reused across rounds, told what is claimed and asked to
+- [x] 8.3 QA (`qa-review`): a fresh subagent, reused across rounds, told what is claimed and asked to
       verify it. The live checks are judged by method unless QA asks for a repeat. Verify:
       APPROVE, or APPROVE WITH NITS, with the nits resolved or recorded.
 
@@ -604,6 +604,23 @@
       After the fixes: clean Release `--no-incremental` build, **0 warnings, 0 errors**; Unit
       **2528/2528** (2520 + 8 new). Integration and Rendering are untouched by this round: no
       source change, only tests, README and records.
+
+      **Round 2 (2026-11-13): APPROVE WITH NITS.** Round 1's MAJOR, MINOR and NITs are resolved.
+      The reviewer's own mutations:
+      - the cookie scheme removed at each of the 3 sites fails 2, 2 and 8 tests;
+      - a third scheme at the **section** site fails the exact-set case;
+      - **an enumeration probe**, a bogus `[Authorize(Policy = "UBookItBogus")]` on a single action,
+        fails both the theory case and the floor fact. So action-level attributes are reached.
+
+      It also checked: build 0/0; Unit 2528/2528; the README-reading guards
+      (`UmbracoFloor|VersionTruth|DocumentationLink` with the new guard) 39/39; openspec 28 passed. It
+      agreed with not re-running Integration and Rendering, since no compiled or read input of theirs
+      changed.
+
+      - **One optional NIT, resolved.** The README's reason, "because the package targets .NET 11",
+        is complete only for a `net10.0` site. A site retargeted to `net11.0` but still on Umbraco
+        18 is refused by the Umbraco floor instead. It now reads "because it requires .NET 11 and
+        Umbraco 19".
 
 - [ ] 8.4 Merge `run-on-umbraco-19` into `dev/v19` locally (no remote; design *Migration Plan*).
       Record the owed follow-ups in the deferred-obligations record:

@@ -185,7 +185,7 @@ a breaking change.
 
 | | |
 |---|---|
-| **Umbraco** | **19.0.0-rc1 or later**, and not 20. Not 13, not the 14–16 STS line, and not 17 or 18: uBookIt `17.x` and `18.x` are the releases for those. A site on Umbraco 18 or earlier cannot install it at all, because the package targets .NET 11. On an earlier 19 prerelease, installing uBookIt raises only the Umbraco packages it depends on and leaves the rest where they are; **upgrade `Umbraco.Cms` itself to 19.0.0-rc1 first** so every Umbraco package stays on one version. |
+| **Umbraco** | **19.0.0-rc1 or later**, and not 20. Not 13, not the 14–16 STS line, and not 17 or 18: uBookIt `17.x` and `18.x` are the releases for those. A site on Umbraco 18 or earlier cannot install it at all, because it requires .NET 11 and Umbraco 19. On an earlier 19 prerelease, installing uBookIt raises only the Umbraco packages it depends on and leaves the rest where they are; **upgrade `Umbraco.Cms` itself to 19.0.0-rc1 first** so every Umbraco package stays on one version. |
 | **.NET** | 11.0 |
 | **Database** | **SQL Server 2019 or later**, including LocalDB and Azure SQL. SQLite is not supported, including the SQLite database a `dotnet new umbraco` site gives you by default. |
 
