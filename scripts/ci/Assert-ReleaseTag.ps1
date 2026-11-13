@@ -87,17 +87,6 @@ param(
 Set-StrictMode -Version Latest
 $ErrorActionPreference = 'Stop'
 
-# git's output is decoded with [Console]::OutputEncoding. Without a console (a test host, some
-# runners) that falls back to a legacy code page, and the bytes of a UTF-8 file - a byte-order mark,
-# or any non-ASCII text - arrive as other characters. Pinned so that what is compared is what is in
-# the file, wherever this runs. Setting it can fail where there is no console to set, and then the
-# default stands; the comparison of two refs decoded the same way is still like for like.
-try {
-    [Console]::OutputEncoding = [System.Text.UTF8Encoding]::new($false)
-}
-catch {
-}
-
 function Fail([string] $title, [string] $message) {
     Write-Host "::error title=Release tag - ${title}::$message"
     exit 1
