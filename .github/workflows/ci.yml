@@ -1,8 +1,15 @@
-# Unattended verification for both published lines.
+# Unattended verification for every published line.
 #
-# This file, global.json, scripts/ci/ and Directory.Build.props (apart from its <Version> line)
-# are held IDENTICAL on main and dev/v18 - the
-# parity step below fails when they are not. Change them on both lines in one sitting.
+# The published lines are listed once, in scripts/ci/published-lines.json. GitHub filters here
+# cannot read a file, so this workflow matches them broadly, by pattern: main, and any branch whose
+# name starts dev/v. The list decides which of those are published: a dev/v branch it does not
+# name (dev/vNN-hotfix, or a line past its end of life) is treated by this workflow as a published
+# line for concurrency and pull requests, and its parity step reports it as unlisted and passes. A
+# unit test holds every listed name to main or dev/v<digits>.
+#
+# This file, scripts/ci/, global.json (apart from its sdk.version) and Directory.Build.props (apart
+# from its <Version> line) are held IDENTICAL on every published line - the parity step below
+# fails, on a push, when they are not. Change them on every line in one sitting.
 #
 # A green run here means every suite demonstrably ran, not merely that nothing failed:
 #   - integration tests run against a real SQL Server started for the job, with
@@ -23,7 +30,7 @@ on:
     # tag unless this workflow succeeded for a push of that commit to its line.
     branches: ['**']
   pull_request:
-    branches: [main, dev/v18]
+    branches: [main, 'dev/v*']
 
 permissions:
   contents: read
@@ -41,10 +48,10 @@ concurrency:
   # Feature branches and pull requests keep one group per ref, where replacing a superseded
   # run is the intent: only the latest push to them is verified, and the spec says so.
   group: >-
-    ${{ (github.ref == 'refs/heads/main' || github.ref == 'refs/heads/dev/v18')
+    ${{ (github.ref == 'refs/heads/main' || startsWith(github.ref, 'refs/heads/dev/v'))
         && format('ci-{0}-{1}', github.ref, github.sha)
         || format('ci-{0}', github.ref) }}
-  cancel-in-progress: ${{ github.ref != 'refs/heads/main' && github.ref != 'refs/heads/dev/v18' }}
+  cancel-in-progress: ${{ github.ref != 'refs/heads/main' && !startsWith(github.ref, 'refs/heads/dev/v') }}
 
 jobs:
   verify:
@@ -64,7 +71,7 @@ jobs:
       - name: Check out, with full history
         # Full history: RetiredClaimEvidenceTests reads files as they stood at historical
         # commits (`git show <sha>:<path>`), and the parity step compares against the other
-        # line's branch. A depth-1 clone has neither.
+        # lines' branches. A depth-1 clone has neither.
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           fetch-depth: 0
@@ -162,12 +169,14 @@ jobs:
         if: ${{ !cancelled() }}
         run: npx --yes @fission-ai/openspec@1.13.0 validate --all --strict
 
-      - name: Parity with the other published line
-        # Only where a published line is involved: a push to one, or a pull request into
-        # one. A feature branch is expected to differ until it lands.
+      - name: Parity with the other published lines
+        # On a PUSH to a published line only. Not on pull requests: a CI change reaches every line
+        # through one pull request per line, and each would fail against the others' tips until all
+        # had merged - a deadlock. The push run is where this counts, and a release tag requires it
+        # to succeed. A feature branch is expected to differ until it lands; a dev/v* branch that
+        # is not in the list is told so by the script, and passes.
         if: >-
-          ${{ !cancelled() && (
-            github.ref == 'refs/heads/main' || github.ref == 'refs/heads/dev/v18' ||
-            github.base_ref == 'main' || github.base_ref == 'dev/v18') }}
+          ${{ !cancelled() && github.event_name == 'push' && (
+            github.ref == 'refs/heads/main' || startsWith(github.ref, 'refs/heads/dev/v')) }}
         shell: pwsh
-        run: ./scripts/ci/Assert-LineParity.ps1 -Line "${{ github.base_ref || github.ref_name }}"
+        run: ./scripts/ci/Assert-LineParity.ps1 -Line "${{ github.ref_name }}"
