@@ -292,9 +292,13 @@
 
 ## 6. Close
 
-- [ ] 6.1 On both branches, run CI's exact command: `openspec validate --all --strict`, using the
+- [x] 6.1 On both branches, run CI's exact command: `openspec validate --all --strict`, using the
       pinned CLI version. Run it after the last commit. Verify: it passes on each line.
-- [ ] 6.2 QA (`qa-review`): a subagent that did not write this change, reused across rounds. Tell it
+
+      **Done.** `npx --yes @fission-ai/openspec@1.13.0 validate --all --strict` gives 28 passed, 0
+      failed on both lines. It was re-run after this record's own commit (the last commit before
+      push); see the commit message.
+- [x] 6.2 QA (`qa-review`): a subagent that did not write this change, reused across rounds. Tell it
       what is claimed and ask it to verify, not trust: the build state, the totals, the live results.
       Verify: APPROVE, or APPROVE WITH NITS, with any nits resolved or recorded.
 
@@ -325,6 +329,21 @@
          asserted present, and D5 claims no more. Adding `*.yaml` would also trip
          `RepoFiles.Paths`'s non-empty assertion, since no such file exists.
       4. **Accepted by QA:** the `>=a.b` same-major approximation is stated in D5.
+
+      **Round 2 (2026-11-13): APPROVE WITH NITS.** Same reviewer. It treated the fixes as new code.
+      - It confirmed the round-2 diff is 3 files per line and that the script change touches comment
+        lines only, so round 1's totals stand.
+      - It confirmed each reason D2 now gives.
+      - A grep for the old claim finds it only where it is quoted as corrected.
+      - Parity holds across the lines, and openspec gives 28/28 on both at the last commits.
+      - It accepted NIT 3 on D5's scope. It noted that the `RepoFiles.Paths` reason is narrow, since a
+        combined pattern would not trip the non-empty assertion.
+
+      **Recorded, not changed (NIT, optional per QA):** D2 and the script comment say `tsc` catches a
+      second class "only when an existing operation moves", "its call sites break". One operation,
+      `eraseBooker`, has no call site in the section on either line, so its move would not be flagged
+      either. The sentence is still literally true ("only when" is a necessary condition), and the case
+      is equally harmless. It is left as approved, rather than edited after approval.
 - [ ] 6.3 Push both branches and open both PRs. Merge once CI is green on each, including Node 24
       in the logs, and QA has approved. Verify: both merged; `main` and `dev/v18` CI green after the
       merge.
