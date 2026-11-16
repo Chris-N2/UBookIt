@@ -12,9 +12,9 @@ on a page of your own site, in your own layout. Every step works with JavaScript
 dotnet add package UBookIt --version "19.*-*"
 ```
 
-The version keeps uBookIt on the line for your Umbraco major. Without it the newest uBookIt is
-chosen, which may be for a different Umbraco, and the restore fails. The `-*` admits a
-prerelease: uBookIt `19.0.0-rc1` is a release candidate, built for Umbraco's own 19 release
+The version keeps uBookIt on the line for your Umbraco major. **Without it your package manager
+chooses the newest *stable* uBookIt, an `18.x`, which installs on an Umbraco 19 release candidate
+without complaint and does not work there.** The `-*` admits a prerelease: uBookIt `19.0.0-rc1` is a release candidate, built for Umbraco's own 19 release
 candidate, and a plain `"19.*"` does not select it.
 
 Run the site, and uBookIt installs its schema on first boot. It needs **SQL Server** (not SQLite)

@@ -32,9 +32,10 @@ cross-site requests exactly as much as Umbraco's own, and no more.
 dotnet add package UBookIt --version "19.*-*"
 ```
 
-**The version is not optional.** uBookIt's major follows Umbraco's, so without it your package
-manager picks the newest uBookIt, which is for a later Umbraco, and the restore fails with a
-version conflict. `19.*-*` takes the newest uBookIt for Umbraco 19, including a prerelease: this
+**The version is not optional.** uBookIt's major follows Umbraco's. Without it, your package
+manager picks the newest *stable* uBookIt, an `18.x` built for Umbraco 18. It installs on an
+Umbraco 19 release candidate without any error, because a release candidate comes before the 19.0.0 release in version order, but
+it does not work there: opening the uBookIt section shows Umbraco's sign-in prompt. `19.*-*` takes the newest uBookIt for Umbraco 19, including a prerelease: this
 line's first release is `19.0.0-rc1`, a release candidate for Umbraco's own 19 release candidate,
 and a plain `19.*` does not select a prerelease. Give an exact version instead if you prefer to
 choose when to move.

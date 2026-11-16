@@ -76,11 +76,16 @@
 
 ## 4. Publish
 
-- [ ] 4.1 Chris pushes tag `19.0.0-rc1` on the merge commit, **by explicit SHA**. Verify: `publish.yml`
+- [ ] 4.1 **Only once `18.6.1` is live** (`release-18-6-1` task 4.4), because this entry names `18.6.1`
+      and would be wrong forever if 18.6.1 had to become 18.6.2 *(QA round 1)*. Chris pushes tag
+      `19.0.0-rc1` on the merge commit, **by explicit SHA**. Verify: `publish.yml`
       starts (its prerelease filter), and `check` and `pack` pass.
 - [ ] 4.2 Before approving, check the run's `packages` artifact (Chris downloads it to
       `artifacts\packages-v19`): five packages and their symbols at `19.0.0-rc1`, each nuspec naming the
-      tagged commit, with `lib/net11.0`, and with Umbraco dependencies `[19.0.0-rc1, 20.0.0)`.
+      tagged commit, with `lib/net11.0` and every dependency group `net11.0`. Umbraco dependencies
+      `[19.0.0-rc1, 20.0.0)`; the uBookIt packages' references to each other `19.0.0-rc1`; every other
+      dependency a STABLE version equal to `Directory.Packages.props`. `UBookIt.Backoffice` holds
+      exactly one hashed bundle set. *(Sharpened at QA round 1.)*
 - [ ] 4.3 Chris approves, with both Trusted Publishing policies left enabled. Verify: the publish job
       **starts** (proving the `release` environment admits `19.0.0-rc1`) and succeeds.
 - [ ] 4.4 Confirm `19.0.0-rc1` per package on the flat container, and that the package page renders

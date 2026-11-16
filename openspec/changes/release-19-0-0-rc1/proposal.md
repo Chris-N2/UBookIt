@@ -31,6 +31,14 @@ candidate, and will announce it in Umbraco's Discord. It is released with `17.7.
    site can pick it up by accident, and its `[19.0.0-rc1,20.0.0)` Umbraco range refuses any site
    below 19 anyway.
 
+6. **The install text is corrected (QA round 1).** The README and *Getting started* said a bare
+   install fails restore. On an Umbraco 19 release candidate it succeeds, and gets the newest stable
+   uBookIt, an 18.x, which does not work there (18.x's range admits 19's prereleases). Both pages,
+   and the entry's *What you have to do*, now say so. **The range `[19.0.0-rc1, 20.0.0)` is
+   published as it stands (Chris).** It admits Umbraco 20 prereleases in the same way, but none can
+   exist before Umbraco 19.0.0, and the guard that checks ceilings wrongly requires `X.0.0`. So one
+   change will fix the ceiling and the guard on all three lines.
+
 ## Non-goals
 
 - `17.7.1` and `18.6.1` are their own changes, `release-17-7-1` on `main` and `release-18-6-1` on
@@ -50,5 +58,5 @@ candidate, and will announce it in Umbraco's Discord. It is released with `17.7.
 
 ## Impact
 
-- `CHANGELOG.md` only, for the entry. No code, and no other docs: the README and runbook literals
-  are already `19.0.0-rc1`.
+- `CHANGELOG.md` (the entry), and the README and `docs/getting-started.md` (what a bare install does,
+  item 6). No code; the README and runbook version literals are already `19.0.0-rc1`.

@@ -29,7 +29,9 @@ own 19.0.0 release candidate, published so that a site trying Umbraco 19 can try
 19.0.0-rc1 or later, and .NET 11. For Umbraco 17 or 18, stay on uBookIt `17.x` or `18.x`.
 
 **Ask for the prerelease when you install it.** `dotnet add package UBookIt --version "19.*-*"`.
-The `-*` is what admits a prerelease: a plain `"19.*"` does not select `19.0.0-rc1`.
+The `-*` is what admits a prerelease: a plain `"19.*"` does not select `19.0.0-rc1`. **Without a
+version at all, your package manager installs the newest stable uBookIt, an `18.x`.** It installs
+on an Umbraco 19 release candidate without an error, but it does not work there.
 
 **Upgrading a site from Umbraco 18: upgrade Umbraco first, as Umbraco's own notes describe**, then
 move uBookIt from `18.x` to `19.0.0-rc1`. **Back up the database before you start.** Umbraco 19
