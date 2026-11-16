@@ -18,7 +18,7 @@ See [the versioning note](README.md#versions-and-the-api-promise).
 
 ---
 
-## 19.0.0-rc1
+## 19.0.0-rc1 — 2026-11-16
 
 The first release for **Umbraco 19**, and a **prerelease**: a release candidate built for Umbraco's
 own 19.0.0 release candidate, published so that a site trying Umbraco 19 can try uBookIt with it.
