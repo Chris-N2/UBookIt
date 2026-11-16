@@ -11,7 +11,7 @@ start with [the delivery API](delivery-api.md).
 
 | | |
 |---|---|
-| **Umbraco** | 18.3.0 or later, and below 19. For Umbraco 17, install uBookIt `17.x`. |
+| **Umbraco** | 18.3.0 or later, and below 19. For Umbraco 17, install uBookIt `17.x`; for Umbraco 19, including its release candidates, install `19.x`. The packages do not refuse an Umbraco 19 release candidate, so an `18.x` would install there and not work. |
 | **.NET** | 10.0 |
 | **Database** | **SQL Server 2019 or later**, including LocalDB and Azure SQL. SQLite is not supported, and that includes the SQLite database a new `dotnet new umbraco` site uses by default. |
 

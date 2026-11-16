@@ -32,6 +32,15 @@ that every line ends level with what is published.
    archive. nuget.org still lists the organisation as an owner of `UBookIt` only (checked
    2026-11-16), so the observation deferred at `17.7.0` / `18.6.0` stays deferred.
 
+4. **The 18 line's requirement rows are corrected (QA round 1; Chris chose wording now, range
+   later).** uBookIt 18.x's Umbraco range `[18.3.0, 19.0.0)` admits Umbraco 19 *prereleases*,
+   because `19.0.0-rc1` sorts below `19.0.0`. So "and not 19" was false for Umbraco 19's release
+   candidates: a bare install there gets an 18.x without complaint, and it does not work. The README
+   and *Getting started* now say so. Changing the range itself would change what a site resolves,
+   so it is not a patch. It is recorded as a deferred obligation, to be done in one change for all
+   three lines (the ceiling excluding the next major's prereleases, and the guard that wrongly
+   requires `X.0.0`). The CHANGELOG header also names `19.x` now.
+
 ## Non-goals
 
 - `17.7.1` and `19.0.0-rc1` are their own changes, `release-17-7-1` on `main` and
@@ -51,6 +60,8 @@ that every line ends level with what is published.
 
 ## Impact
 
-- `Directory.Build.props`, `README.md`, `docs/publishing.md` and `CHANGELOG.md`.
-- No code. Docs pages: the README and `docs/publishing.md`, version literals only.
-  `docs/getting-started.md` is not touched, because setup does not change.
+- `Directory.Build.props`, `README.md`, `docs/publishing.md`, `docs/getting-started.md` and
+  `CHANGELOG.md`.
+- No code. Docs pages: the README (version literals and the Umbraco requirement row),
+  `docs/getting-started.md` (the Umbraco requirement row: a 19 release candidate is not refused) and
+  `docs/publishing.md` (version literals). Setup itself does not change.

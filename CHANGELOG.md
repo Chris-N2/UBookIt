@@ -12,7 +12,7 @@ when its release date is stamped at publication — that stamp completes the ent
 revising it, and nothing else about it moves afterwards.
 
 The major tracks the **Umbraco** major, not uBookIt's own breaking changes — uBookIt `17.x` is for
-Umbraco 17 and `18.x` for Umbraco 18. That means the major cannot signal a break, so a break lands
+Umbraco 17, `18.x` for Umbraco 18, and `19.x` for Umbraco 19. That means the major cannot signal a break, so a break lands
 in a **minor** and never in a patch.
 See [the versioning note](README.md#versions-and-the-api-promise).
 
@@ -23,9 +23,10 @@ See [the versioning note](README.md#versions-and-the-api-promise).
 ### What you have to do
 
 **Nothing.** This is a patch. No published API is added, removed or changed, there is no schema
-change, no configuration changes, and every package declares exactly the dependencies `18.6.0`
-declared, so updating changes nothing your package manager resolves. Going back to `18.6.0` is
-equally safe.
+change and no configuration changes. Every package declares the same third-party dependencies, at
+the same versions, as `18.6.0`; only the uBookIt packages' references to each other move to
+`18.6.1`. So updating changes nothing else your package manager resolves, and going back to `18.6.0`
+is equally safe.
 
 ### What changed
 
