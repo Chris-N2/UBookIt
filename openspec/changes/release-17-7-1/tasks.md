@@ -128,6 +128,25 @@
       "below X.Y.Z" as a stated floor. They were reworded ("comes before the 19.0.0 release in version
       order"), and the guard is unchanged. Then unit **2563 / 2557 / 2569**, all green.
 
+      **Round 2: REJECT, on one MINOR.** Every round-1 fix was verified as new code:
+      - a new restore probe (Umbraco 18.3.1 with UBookIt 17.7.0) fails with NU1107, so main's
+        "refuses any released Umbraco 18 or later" is true;
+      - no new phrase matches the floor guard's regex;
+      - my reasoning about the ceiling guard was confirmed: it demands `X.0.0`, its prerelease
+        explanation is wrong for `-0`, and fixing all three lines in one change is the right shape;
+      - unit 2563 / 2557 / 2569, and openspec 28 ×3.
+
+      **Fixed:**
+      - **MINOR:** v18's README and *Getting started* said a bare install gets "a later Umbraco" and
+        fails. That is false today: the newest stable is 18.x, and rc1 is a prerelease a bare add
+        does not pick. They now say it gets an `18.x` today and fails once `19.0.0` is released.
+      - **NIT:** v19's "not 20" / "below 20" rows now say the packages do not yet refuse a prerelease
+        of Umbraco 20. Proposal item 6's "none can exist" becomes "none is expected". The deferred
+        obligation names every caveat row the ceiling change must reword.
+      - **NIT, accepted:** some added lines are longer than their neighbours. Markdown renders them.
+
+      Unit after the fixes: dev/v18 **2557**, dev/v19 **2569**. main is unchanged this round.
+
 - [ ] 3.2 Push this branch and open the PR. Verify: the PR's CI is green (parity is skipped on PRs by
       design).
 - [ ] 3.3 Merge with a merge commit, without `--delete-branch`. Verify: the merge's push run is green,
