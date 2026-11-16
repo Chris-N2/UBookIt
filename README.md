@@ -14,7 +14,8 @@ dotnet add package UBookIt --version "18.*"
 
 The version keeps uBookIt on the line for your Umbraco major. Without it the newest *stable*
 uBookIt is chosen. Today that is an `18.x`, but once a uBookIt for a later Umbraco is released
-(`19.0.0`), that is the one chosen, and the restore fails.
+(`19.0.0`), that is the one chosen, and the restore fails because it is not compatible with
+.NET 10.
 
 Run the site, and uBookIt installs its schema on first boot. It needs **SQL Server** (not SQLite)
 and Umbraco 18.3.0 or later. The full requirements are further down, and

@@ -145,6 +145,34 @@
 
       Unit after the fixes: dev/v18 **2557**, dev/v19 **2569**. main is unchanged this round.
 
+      **Round 3: REJECT, on one MAJOR, which was a real packaging defect.** A real restore against a
+      local feed showed that **`UBookIt 19.0.0-rc1` on a net10.0 (Umbraco 18) site restores with no
+      warning or error and brings none of uBookIt**. The meta-package had no `lib/` folder, so NuGet
+      treated it as compatible with every framework, no dependency group matched, and the Umbraco
+      range was never consulted. That made v19's "cannot install it at all" and v18's new "the
+      restore fails" false. Once 19 is the newest stable, every bare install on an Umbraco 18 site
+      would get an empty package.
+
+      **Chris chose to fix the packaging now:**
+      - `src/UBookIt/UBookIt.csproj` packs an empty `src/UBookIt/_._` to `lib/$(TargetFramework)/`.
+      - The `NU5128` suppression is removed. A CI pack without it is clean, so it suppressed nothing.
+      - New guard `PackageCompositionTests.The_installable_package_is_compatible_with_its_own_framework_and_no_other`:
+        `lib/` is exactly `lib/<tfm>/_._` for the nuspec's single framework (the distinct
+        dependency and frameworkReference group frameworks). A first version expected one `<group>`
+        and failed, because the frameworkReferences group repeats `net11.0`. **Removing the
+        placeholder fails it.**
+      - **Restore probe** (scratchpad `nu1202_probe.ps1`: its own feed, packages folder and source
+        mapping; the user cache untouched): net10.0 gives **NU1202 "Package UBookIt 19.0.0-rc1 is
+        not compatible with net10.0"**. A first probe run was void, because the user-level source
+        mapping applied (NU1100); the probe now clears it.
+      - **Wording:** v18's README and *Getting started* now say that once 19.0.0 is released, the
+        restore fails "because it is not compatible with .NET 10" (no longer "a version conflict").
+        The v19 entry gains "On an earlier .NET, `UBookIt` refuses to install". Proposal item 5's
+        range claim is corrected and item 7 added. Task 4.2 checks the placeholder.
+
+      After: CI-rules builds 0 warnings / 0 errors; unit dev/v18 **2557**, dev/v19 **2570** (2569 + the
+      new guard). main is unchanged.
+
 - [ ] 3.2 Push this branch and open the PR. Verify: the PR's CI is green (parity is skipped on PRs by
       design).
 - [ ] 3.3 Merge with a merge commit, without `--delete-branch`. Verify: the merge's push run is green,
