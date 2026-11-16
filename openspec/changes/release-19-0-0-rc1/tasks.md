@@ -32,15 +32,37 @@
 
 ## 2. Clean build and suites
 
-- [ ] 2.1 Make sure no TestSite is running. Clean the outputs, including the stale hashed client
+- [x] 2.1 Make sure no TestSite is running. Clean the outputs, including the stale hashed client
       assets and the backoffice `obj`. Build the client, then
       `CI=true dotnet build UBookIt.slnx -c Release --no-incremental`. Verify: 0 warnings, 0 errors.
-- [ ] 2.2 Run the suites per project, one after another, in Release with
+
+      **Done (2026-11-16) at `d2e933a`.** No TestSite was listening on 44348. Each project's `bin` and
+      `obj` were deleted, plus the hashed client assets. `npm run build` gave exit 0, then
+      `CI=true dotnet build UBookIt.slnx -c Release --no-incremental` gave **0 warnings, 0 errors**.
+      *A first run was void, because of my script:* its clean step recursed into `node_modules` and
+      deleted packages' own `bin` folders (`typescript/bin/tsc`), so the client build failed and Unit
+      never built. It was repaired with `npm ci` (from the lockfile; the git tree stayed clean), the
+      clean step was limited to each project's own `bin`/`obj` with a toolchain check, and every
+      line was re-run.
+
+- [x] 2.2 Run the suites per project, one after another, in Release with
       `UBOOKIT_TEST_DB_REQUIRED=true`. Verify, each with 0 skipped: unit **2569**, integration
       **222**, rendering **1211**, client **391**, and `openspec validate --all --strict` passing
       after the last commit.
-- [ ] 2.3 Run the audit as `audit.yml` does, from inside the line with its own .NET 11 SDK. Verify:
+
+      **Done**, one project after another, in Release with `UBOOKIT_TEST_DB_REQUIRED=true` (net11.0),
+      0 skipped and 0 failed in each: unit **2569**, integration **222**, rendering **1211**, client
+      **391** (19 files). `openspec validate --all --strict` gives 28 passed, to be re-run after the
+      last commit.
+
+- [x] 2.3 Run the audit as `audit.yml` does, from inside the line with its own .NET 11 SDK. Verify:
       exit 0, and the accepted count recorded.
+
+      **Done**, as `audit.yml` now runs it, from inside the line with its own pinned SDK
+      (`Assert-NoVulnerablePackages.ps1 -Target UBookIt.slnx`): "audited 10 project(s) in UBookIt.slnx
+      (Debug, Release); 0 finding(s) accepted by a suppression", "No known advisories in the graph.",
+      exit **0**.
+
 
 ## 3. Review and merge
 
