@@ -30,6 +30,14 @@ that every line ends level with what is published.
    archive. nuget.org still lists the organisation as an owner of `UBookIt` only (checked
    2026-11-16), so the observation deferred at `17.7.0` stays deferred.
 
+4. **Two corrections from QA round 1.**
+   - The README's requirement row said the packages make a package manager "refuse a mismatch". A
+     *prerelease* of Umbraco 18 sorts below 18.0.0 and is not refused, so it now says released
+     Umbraco 18 or later is refused, and names the prerelease exception. The range itself is
+     unchanged here, because changing it changes what a site resolves. It is recorded as one change
+     for all three lines.
+   - The CHANGELOG header and README now name `19.x` for Umbraco 19 beside `17.x` and `18.x`.
+
 ## Non-goals
 
 - `18.6.1` and `19.0.0-rc1` are their own changes, `release-18-6-1` on `dev/v18` and
@@ -50,5 +58,6 @@ that every line ends level with what is published.
 ## Impact
 
 - `Directory.Build.props`, `README.md`, `docs/publishing.md` and `CHANGELOG.md`.
-- No code. Docs pages: the README and `docs/publishing.md`, version literals only.
+- No code. Docs pages: the README (version literals, the requirement row and the versioning
+  sentence) and `docs/publishing.md` (version literals).
   `docs/getting-started.md` is not touched, because setup does not change.

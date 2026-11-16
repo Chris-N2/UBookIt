@@ -163,7 +163,7 @@ the same file the AI agents working on it read. The release procedure is in
 > and never arrives in a patch.
 
 **The major tracks the Umbraco major**, as Umbraco packages are conventionally versioned: uBookIt
-`17.x` is for Umbraco 17 and `18.x` for Umbraco 18. That means **the major is not a breaking-change
+`17.x` is for Umbraco 17, `18.x` for Umbraco 18, and `19.x` for Umbraco 19. That means **the major is not a breaking-change
 signal, and this is where uBookIt departs from Semantic Versioning**:
 
 | | |
@@ -183,7 +183,7 @@ a breaking change.
 
 | | |
 |---|---|
-| **Umbraco** | **17.8.0 or later, and not 18 or anything after it** — from `17.1.2` the packages say so, so your package manager refuses a mismatch instead of installing one. Not 13, and not the 14–16 STS line. For Umbraco 18, install uBookIt `18.x`. On a site below 17.8.0, installing uBookIt raises the Umbraco packages it depends on and leaves the rest where they are; **upgrade `Umbraco.Cms` itself to 17.8.0 first** so every Umbraco package stays on one version. |
+| **Umbraco** | **17.8.0 or later, and not 18 or anything after it** — from `17.1.2` the packages say so, so your package manager refuses any released Umbraco 18 or later instead of installing on it. (A *prerelease* of Umbraco 18 comes before the 18.0.0 release in version order, and is not refused.) Not 13, and not the 14–16 STS line. For Umbraco 18, install uBookIt `18.x`. On a site below 17.8.0, installing uBookIt raises the Umbraco packages it depends on and leaves the rest where they are; **upgrade `Umbraco.Cms` itself to 17.8.0 first** so every Umbraco package stays on one version. |
 | **.NET** | 10.0 |
 | **Database** | **SQL Server 2019 or later**, including LocalDB and Azure SQL. SQLite is not supported, including the SQLite database a `dotnet new umbraco` site gives you by default. |
 

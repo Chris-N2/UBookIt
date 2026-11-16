@@ -92,7 +92,10 @@
       `pack` pass.
 - [ ] 4.2 Before approving, check the run's `packages` artifact (Chris downloads it to
       `artifacts\packages-v17`): five packages and their symbols at `17.7.1`, each nuspec naming the
-      tagged commit, and dependencies identical to `17.7.0`'s.
+      tagged commit. Dependencies identical to the published `17.7.0` nuspecs **except** that the
+      uBookIt packages' references to each other read `17.7.1`. `UBookIt.Backoffice`'s
+      `staticwebassets/App_Plugins/UBookItBackoffice` holds exactly one hashed bundle set (19 `.js`
+      files at `17.7.0`), with no stale assets. *(Sharpened at QA round 1.)*
 - [ ] 4.3 Chris approves, with both Trusted Publishing policies left enabled. Verify: the publish job
       succeeds.
 - [ ] 4.4 Confirm `17.7.1` per package on the flat container, and that the package page renders.
