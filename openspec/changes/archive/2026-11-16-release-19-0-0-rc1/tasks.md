@@ -181,33 +181,60 @@
       published `UBookIt.19.0.0-rc1.nupkg` be confirmed to list `lib/net11.0/_._`, which v19's 4.2
       already includes.
 
-- [ ] 3.2 Push this branch and open the PR into `dev/v19`. Verify: the PR's CI is green (parity is
+- [x] 3.2 Push this branch and open the PR into `dev/v19`. Verify: the PR's CI is green (parity is
       skipped on PRs by design).
-- [ ] 3.3 Merge with a merge commit, without `--delete-branch`. Verify: the merge's push run is green,
+
+      **Done.** Pushed, and PR #82 into `dev/v19` opened. PR run `43863098362`: **success** (parity skipped on PRs, by design).
+
+- [x] 3.3 Merge with a merge commit, without `--delete-branch`. Verify: the merge's push run is green,
       parity included. A tag requires it.
+
+      **Done.** Merged with a merge commit, without `--delete-branch`: `dev/v19` = **`041c6bb`**, declaring `19.0.0-rc1`. Merge push run `43863687858`: **success**, parity "agree with every other published line".
+
 
 ## 4. Publish
 
-- [ ] 4.1 **Only once `18.6.1` is live** (`release-18-6-1` task 4.4), because this entry names `18.6.1`
+- [x] 4.1 **Only once `18.6.1` is live** (`release-18-6-1` task 4.4), because this entry names `18.6.1`
       and would be wrong forever if 18.6.1 had to become 18.6.2 *(QA round 1)*. Chris pushes tag
       `19.0.0-rc1` on the merge commit, **by explicit SHA**. Verify: `publish.yml`
       starts (its prerelease filter), and `check` and `pack` pass.
-- [ ] 4.2 Before approving, check the run's `packages` artifact (Chris downloads it to
+
+      **Done (2026-11-16), once `18.6.1` was live.** Chris pushed `19.0.0-rc1` on `041c6bbf84fabd6632603788cfc72c91e5c1fa79` by explicit SHA. **The prerelease trigger filter started `publish.yml` on its own** (run `43877183556`), and `check` (the label-aware shape and case-exact version) and `pack` were **success**.
+
+- [x] 4.2 Before approving, check the run's `packages` artifact (Chris downloads it to
       `artifacts\packages-v19`): five packages and their symbols at `19.0.0-rc1`, each nuspec naming the
       tagged commit, with `lib/net11.0` and every dependency group `net11.0`. Umbraco dependencies
       `[19.0.0-rc1, 20.0.0)`; the uBookIt packages' references to each other `19.0.0-rc1`; every other
       dependency a STABLE version equal to `Directory.Packages.props`. `UBookIt.Backoffice` holds
       exactly one hashed bundle set. *(Sharpened at QA round 1.)* `UBookIt`'s `lib/` folder is exactly
       `lib/net11.0/_._` *(QA round 3)*.
-- [ ] 4.3 Chris approves, with both Trusted Publishing policies left enabled. Verify: the publish job
+
+      **Done**, downloaded to `artifacts\packages-v19\19.0.0-rc1`. 5 `.nupkg` + 4 `.snupkg`; every nuspec at `19.0.0-rc1`, commit `041c6bb`. **`UBookIt`'s `lib/` is exactly `lib/net11.0/_._`.** Every dependency group is `net11.0`. All 7 Umbraco ranges are `[19.0.0-rc1, 20.0.0)`. Siblings are `19.0.0-rc1`. The other dependencies are STABLE and equal to `Directory.Packages.props` at `041c6bb` (EF Core SqlServer 11.0.0, AspNetCore.OpenApi 11.0.0). `UBookIt.Backoffice` has 19 `.js` and one entrypoint.
+
+- [x] 4.3 Chris approves, with both Trusted Publishing policies left enabled. Verify: the publish job
       **starts** (proving the `release` environment admits `19.0.0-rc1`) and succeeds.
-- [ ] 4.4 Confirm `19.0.0-rc1` per package on the flat container, and that the package page renders
+
+      **Done.** Chris approved with both Trusted Publishing policies left enabled. Publish run `43877183556`: **success**. **The `publish` job STARTED and waited for approval, so the `release` environment's `*.*.*` rule admits `19.0.0-rc1`.** The one unknown of the first prerelease is answered: no settings change was needed.
+
+- [x] 4.4 Confirm `19.0.0-rc1` per package on the flat container, and that the package page renders
       and shows it as a prerelease.
+
+      **Done.** All five packages list `19.0.0-rc1` on the flat container (polled; indexed about 15 minutes after the publish). The package page answers 200. It says "This is a prerelease version". Search without prereleases gives `18.6.1` as the latest; with prereleases, `19.0.0-rc1`. So nobody gets the RC without asking.
+
 
 ## 5. Close
 
-- [ ] 5.1 Stamp the entry's date.
-- [ ] 5.2 Update the deferred-obligations memory: the changelog obligation is paid on this line, and
+- [x] 5.1 Stamp the entry's date.
+
+      **Done.** The heading reads `## 19.0.0-rc1 — 2026-11-16`.
+
+- [x] 5.2 Update the deferred-obligations memory: the changelog obligation is paid on this line, and
       the `release` environment's rule is proved (or what was changed).
-- [ ] 5.3 Archive last. Run the unit suite and `openspec validate --all --strict` before the archive
+
+      **Done.** The deferred-obligations memory records the `backoffice-client-upgrade` changelog obligation as paid on this line. It also records that the `release` environment admits a prerelease tag.
+
+- [x] 5.3 Archive last. Run the unit suite and `openspec validate --all --strict` before the archive
       commit, and validate again after it.
+
+      **Done.** Before the archive commit: unit **2570**, 0 failed and 0 skipped (with the dated entry); `openspec validate --all --strict` 28 passed. Archived with the pinned CLI (`skip_specs`: no spec sync), and validated again after the archive commit.
+
