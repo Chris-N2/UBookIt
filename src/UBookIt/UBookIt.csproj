@@ -41,14 +41,13 @@
     <PackageTags>$(PackageTags);umbraco-marketplace</PackageTags>
 
     <!--
-      There is nothing to ship: this package exists to name its dependencies. NU5128 is the
-      warning for exactly that shape — dependency groups with no matching lib/ folder — and
-      it is suppressed here, on the one project where it is the intent, rather than anywhere
-      broader. Warnings are errors in CI, so leaving it would fail the build.
+      There is nothing to ship: this package exists to name its dependencies. The lib/ folder
+      holds only the placeholder below. (NU5128, the warning for dependency groups with no
+      matching lib/ folder, used to be suppressed here; the placeholder satisfies it, so the
+      suppression went with it - a NoWarn that suppresses nothing hides the next real one.)
     -->
     <IncludeBuildOutput>false</IncludeBuildOutput>
     <IncludeSymbols>false</IncludeSymbols>
-    <NoWarn>$(NoWarn);NU5128</NoWarn>
   </PropertyGroup>
 
   <!--
@@ -62,6 +61,24 @@
   <ItemGroup>
     <ProjectReference Include="..\UBookIt.Backoffice\UBookIt.Backoffice.csproj" />
     <ProjectReference Include="..\UBookIt.Web\UBookIt.Web.csproj" />
+  </ItemGroup>
+
+  <!--
+    THE PLACEHOLDER: an empty lib/<framework>/_._, so the package is compatible with its own
+    framework and NOTHING ELSE.
+
+    Without any lib/ folder NuGet treats a package as compatible with every framework, and a
+    site on an earlier .NET restores it without a warning or an error, resolving none of its
+    dependencies, because no dependency group matches. On an Umbraco 18 (.NET 10) site,
+    `dotnet add package UBookIt` would then install an EMPTY uBookIt 19 as soon as 19 was the
+    newest stable: the silent failure this package exists to prevent, one level up. QA proved
+    it with a real restore (release-19-0-0-rc1, round 3). With the placeholder, an earlier
+    framework gets NU1202, "not compatible". `_._` is NuGet's own convention for "this
+    framework, no assemblies". PackageCompositionTests holds the lib/ folder to exactly this
+    one file, for the framework the dependencies are declared for.
+  -->
+  <ItemGroup>
+    <None Include="_._" Pack="true" PackagePath="lib/$(TargetFramework)/" Visible="false" />
   </ItemGroup>
 
   <!-- Installed only into Umbraco sites, which are ASP.NET Core applications, so it declares the

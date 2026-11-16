@@ -35,6 +35,38 @@ public class PackageCompositionTests(PackedSolutionFixture fixture)
     private PackedSolution Packed => fixture.Packed;
 
     [Fact]
+    public void The_installable_package_is_compatible_with_its_own_framework_and_no_other()
+    {
+        // The meta-package ships no assemblies. With no lib/ folder at all, NuGet treats a
+        // package as compatible with EVERY framework, and a site on an earlier .NET restores it
+        // with no warning and no error, resolving none of its dependencies because no group
+        // matches. QA proved it with a real restore: UBookIt 19.0.0-rc1 on a .NET 10 (Umbraco 18)
+        // site installed empty (release-19-0-0-rc1, round 3). Once 19 is the newest stable, every
+        // bare install on an Umbraco 18 site would do that. The placeholder lib/<tfm>/_._ makes an
+        // earlier framework fail with NU1202 instead.
+        //
+        // So the lib/ folder must be EXACTLY one placeholder, for exactly the framework the
+        // dependencies are declared for. A missing placeholder reopens the silent install; a
+        // second framework, or a real assembly, would claim a compatibility the package does not
+        // have.
+        var aggregate = Packed.Packages.Single(p => p.Id.Equals(Aggregate, StringComparison.OrdinalIgnoreCase));
+
+        var nuspecName = aggregate.Entries.Single(e => e.EndsWith(".nuspec", StringComparison.OrdinalIgnoreCase) && !e.Contains('/'));
+        // Every framework the nuspec groups anything for: its dependencies, and the
+        // frameworkReferences group the ASP.NET Core FrameworkReference adds. They name the same
+        // framework, which is the one the placeholder must name.
+        var groups = Regex.Matches(aggregate.ReadText(nuspecName), @"<group\s+targetFramework=""(?<tfm>[^""]+)""")
+            .Select(m => m.Groups["tfm"].Value)
+            .Distinct(StringComparer.OrdinalIgnoreCase)
+            .ToList();
+
+        var tfm = Assert.Single(groups);
+        var lib = aggregate.Entries.Where(e => e.StartsWith("lib/", StringComparison.OrdinalIgnoreCase)).ToList();
+
+        Assert.Equal([$"lib/{tfm}/_._"], lib);
+    }
+
+    [Fact]
     public void Every_ubookit_dependency_names_a_package_this_repository_produces()
     {
         // This is the original defect exactly. UBookIt.Backoffice depended on

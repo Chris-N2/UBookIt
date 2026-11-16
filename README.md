@@ -12,9 +12,9 @@ on a page of your own site, in your own layout. Every step works with JavaScript
 dotnet add package UBookIt --version "19.*-*"
 ```
 
-The version keeps uBookIt on the line for your Umbraco major. Without it the newest uBookIt is
-chosen, which may be for a different Umbraco, and the restore fails. The `-*` admits a
-prerelease: uBookIt `19.0.0-rc1` is a release candidate, built for Umbraco's own 19 release
+The version keeps uBookIt on the line for your Umbraco major. **Without it your package manager
+chooses the newest *stable* uBookIt, an `18.x`, which installs on an Umbraco 19 release candidate
+without complaint and does not work there.** The `-*` admits a prerelease: uBookIt `19.0.0-rc1` is a release candidate, built for Umbraco's own 19 release
 candidate, and a plain `"19.*"` does not select it.
 
 Run the site, and uBookIt installs its schema on first boot. It needs **SQL Server** (not SQLite)
@@ -185,7 +185,7 @@ a breaking change.
 
 | | |
 |---|---|
-| **Umbraco** | **19.0.0-rc1 or later**, and not 20. Not 13, not the 14–16 STS line, and not 17 or 18: uBookIt `17.x` and `18.x` are the releases for those. A site on Umbraco 18 or earlier cannot install it at all, because it requires .NET 11 and Umbraco 19. On an earlier 19 prerelease, installing uBookIt raises only the Umbraco packages it depends on and leaves the rest where they are; **upgrade `Umbraco.Cms` itself to 19.0.0-rc1 first** so every Umbraco package stays on one version. |
+| **Umbraco** | **19.0.0-rc1 or later**, and not 20. (A *prerelease* of Umbraco 20 comes before the 20.0.0 release in version order, and the packages do not yet refuse it.) Not 13, not the 14–16 STS line, and not 17 or 18: uBookIt `17.x` and `18.x` are the releases for those. A site on Umbraco 18 or earlier cannot install it at all, because it requires .NET 11 and Umbraco 19. On an earlier 19 prerelease, installing uBookIt raises only the Umbraco packages it depends on and leaves the rest where they are; **upgrade `Umbraco.Cms` itself to 19.0.0-rc1 first** so every Umbraco package stays on one version. |
 | **.NET** | 11.0 |
 | **Database** | **SQL Server 2019 or later**, including LocalDB and Azure SQL. SQLite is not supported, including the SQLite database a `dotnet new umbraco` site gives you by default. |
 
