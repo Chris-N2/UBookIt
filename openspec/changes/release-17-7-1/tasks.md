@@ -78,7 +78,7 @@
 
 ## 3. Review and merge
 
-- [ ] 3.1 QA (`qa-review`) in one subagent, reused across rounds, covering this change,
+- [x] 3.1 QA (`qa-review`) in one subagent, reused across rounds, covering this change,
       `release-18-6-1` and `release-19-0-0-rc1`. Brief it that temporary source mutations are
       allowed if reverted. Verify: APPROVE, or APPROVE WITH NITS with the nits resolved or recorded.
 
@@ -174,6 +174,24 @@
 
       After: CI-rules builds 0 warnings / 0 errors; unit dev/v18 **2557**, dev/v19 **2570** (2569 + the
       new guard). main is unchanged.
+
+      **Round 4: APPROVE.** Nothing is outstanding, and no further round was asked for. The reviewer
+      checked the placeholder against a real pack and real restores (local feed, its own packages
+      folder, a cleared source mapping):
+      - the nupkg holds exactly `lib/net11.0/_._`, and its groups are unchanged;
+      - **net10.0 with Umbraco 18.3.1: NU1202**;
+      - **net11.0 with Umbraco 19.0.0-rc1: exit 0**, every library resolving its
+        `lib/net11.0/*.dll`, so the placeholder does not change resolution on the package's own
+        framework.
+
+      **Its own mutations:**
+      - the placeholder with `Pack="false"` and a CI pack gives `error NU5128`. So dropping the
+        suppression was right: the old one would have hidden the placeholder's loss;
+      - `PackagePath="lib/net10.0/"` fails the new guard.
+
+      Unit dev/v18 2557, dev/v19 2570, and openspec 28 ×3, with clean trees. For 4.2 it asks that the
+      published `UBookIt.19.0.0-rc1.nupkg` be confirmed to list `lib/net11.0/_._`, which v19's 4.2
+      already includes.
 
 - [ ] 3.2 Push this branch and open the PR. Verify: the PR's CI is green (parity is skipped on PRs by
       design).
