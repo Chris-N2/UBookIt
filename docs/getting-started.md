@@ -26,9 +26,10 @@ one version.
 dotnet add package UBookIt --version "18.*"
 ```
 
-**The version is not optional.** uBookIt's major follows Umbraco's, so without it your package
-manager picks the newest uBookIt, which is for a later Umbraco, and the restore fails with a
-version conflict. `18.*` takes the newest uBookIt for Umbraco 18; give an exact version instead if
+**The version is not optional.** uBookIt's major follows Umbraco's. Without it your package
+manager picks the newest *stable* uBookIt. Today that is an `18.x`, but once a uBookIt for a later
+Umbraco is released (`19.0.0`), that is the one it picks, and the restore fails with a version
+conflict. `18.*` takes the newest uBookIt for Umbraco 18; give an exact version instead if
 you prefer to choose when to move.
 
 Start the site. uBookIt installs its schema, its **Booking Page** document type and that page's
