@@ -28,8 +28,8 @@ candidate, and will announce it in Umbraco's Discord. It is released with `17.7.
    (checked 2026-11-16).
 5. **Prerelease on nuget.org.** The label makes nuget.org list it as a prerelease. A site gets it only
    by asking (`--version "19.*-*"`, as the README and *Getting started* say), so no Umbraco 17 or 18
-   site can pick it up by accident, and its `[19.0.0-rc1,20.0.0)` Umbraco range refuses any site
-   below 19 anyway.
+   site picks it up by accident. *(Corrected at QA round 3: this said its Umbraco range "refuses any
+   site below 19 anyway". On a .NET 10 site the range is never consulted; see item 7.)*
 
 6. **The install text is corrected (QA round 1).** The README and *Getting started* said a bare
    install fails restore. On an Umbraco 19 release candidate it succeeds, and gets the newest stable
@@ -39,6 +39,23 @@ candidate, and will announce it in Umbraco's Discord. It is released with `17.7.
    expected before Umbraco 19.0.0 (the README and *Getting started* rows now say the packages do not
    yet refuse one), and the guard that checks ceilings wrongly requires `X.0.0`. So one
    change will fix the ceiling and the guard on all three lines.
+
+7. **The `UBookIt` meta-package packs a `lib/net11.0/_._` placeholder (QA round 3; Chris chose to fix
+   it now).** The meta-package ships no assemblies, and with no `lib/` folder NuGet treats it as
+   compatible with every framework. QA proved with a real restore that `UBookIt 19.0.0-rc1` on a
+   .NET 10 (Umbraco 18) site restored with no warning or error and brought none of uBookIt, because
+   no dependency group matched. Once 19 is the newest stable, every bare install on an Umbraco 18
+   site would have done that. The placeholder is NuGet's convention for "this framework, no
+   assemblies". A local-feed restore probe now gives **NU1202 "not compatible with net10.0"**.
+   - `PackageCompositionTests.The_installable_package_is_compatible_with_its_own_framework_and_no_other`
+     holds `lib/` to exactly `lib/<tfm>/_._` for the nuspec's one framework. Removing the
+     placeholder fails it.
+   - The `NU5128` suppression is removed: the placeholder satisfies that warning, and a pack
+     without the suppression is clean.
+   - 17 and 18 are left as they are: no Umbraco 17 or 18 site runs a framework below net10.0.
+     Recorded with the ceiling obligation.
+   - Being the first 19 release, this breaks nobody. It is a code change inside the release,
+     made at Chris's direction.
 
 ## Non-goals
 
@@ -60,4 +77,7 @@ candidate, and will announce it in Umbraco's Discord. It is released with `17.7.
 ## Impact
 
 - `CHANGELOG.md` (the entry), and the README and `docs/getting-started.md` (what a bare install does,
-  item 6). No code; the README and runbook version literals are already `19.0.0-rc1`.
+  item 6). The README and runbook version literals are already `19.0.0-rc1`.
+- **One packaging change (item 7):** `src/UBookIt/UBookIt.csproj` packs the new empty `src/UBookIt/_._`
+  to `lib/$(TargetFramework)/`, and drops the `NU5128` suppression. One new guard in
+  `PackageCompositionTests`.

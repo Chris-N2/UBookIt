@@ -41,14 +41,13 @@
     <PackageTags>$(PackageTags);umbraco-marketplace</PackageTags>
 
     <!--
-      There is nothing to ship: this package exists to name its dependencies. NU5128 is the
-      warning for exactly that shape — dependency groups with no matching lib/ folder — and
-      it is suppressed here, on the one project where it is the intent, rather than anywhere
-      broader. Warnings are errors in CI, so leaving it would fail the build.
+      There is nothing to ship: this package exists to name its dependencies. The lib/ folder
+      holds only the placeholder below. (NU5128, the warning for dependency groups with no
+      matching lib/ folder, used to be suppressed here; the placeholder satisfies it, so the
+      suppression went with it - a NoWarn that suppresses nothing hides the next real one.)
     -->
     <IncludeBuildOutput>false</IncludeBuildOutput>
     <IncludeSymbols>false</IncludeSymbols>
-    <NoWarn>$(NoWarn);NU5128</NoWarn>
   </PropertyGroup>
 
   <!--
