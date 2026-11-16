@@ -233,5 +233,8 @@
 
       **Done.** The deferred-obligations memory records the `backoffice-client-upgrade` changelog obligation as paid on this line. It also records that the `release` environment admits a prerelease tag.
 
-- [ ] 5.3 Archive last. Run the unit suite and `openspec validate --all --strict` before the archive
+- [x] 5.3 Archive last. Run the unit suite and `openspec validate --all --strict` before the archive
       commit, and validate again after it.
+
+      **Done.** Before the archive commit: unit **2570**, 0 failed and 0 skipped (with the dated entry); `openspec validate --all --strict` 28 passed. Archived with the pinned CLI (`skip_specs`: no spec sync), and validated again after the archive commit.
+
