@@ -191,29 +191,53 @@
       published `UBookIt.19.0.0-rc1.nupkg` be confirmed to list `lib/net11.0/_._`, which v19's 4.2
       already includes.
 
-- [ ] 3.2 Push this branch and open the PR. Verify: the PR's CI is green (parity is skipped on PRs by
+- [x] 3.2 Push this branch and open the PR. Verify: the PR's CI is green (parity is skipped on PRs by
       design).
-- [ ] 3.3 Merge with a merge commit, without `--delete-branch`. Verify: the merge's push run is green,
+
+      **Done.** Pushed, and PR #81 into `dev/v18` opened. PR run `43863089820`: **success** (parity skipped on PRs, by design).
+
+- [x] 3.3 Merge with a merge commit, without `--delete-branch`. Verify: the merge's push run is green,
       parity included.
+
+      **Done.** Merged with a merge commit, without `--delete-branch`: `dev/v18` = **`9c84ee6`**, declaring `18.6.1`. Merge push run `43863676294`: **success**, parity "agree with every other published line".
+
 
 ## 4. Publish
 
-- [ ] 4.1 Chris pushes tag `18.6.1` on the merge commit, **by explicit SHA**. Verify: `check` and
+- [x] 4.1 Chris pushes tag `18.6.1` on the merge commit, **by explicit SHA**. Verify: `check` and
       `pack` pass.
-- [ ] 4.2 Before approving, check the run's `packages` artifact (Chris downloads it to
+
+      **Done (2026-11-16).** Chris pushed `18.6.1` on `9c84ee64f008b12eb657f0096d9fa89978ea9e78` by explicit SHA (`git rev-parse 18.6.1^{commit}` confirms it). Publish run `43864978691`: `check` and `pack` **success**.
+
+- [x] 4.2 Before approving, check the run's `packages` artifact (Chris downloads it to
       `artifacts\packages-v18`): five packages and their symbols at `18.6.1`, each nuspec naming the
       tagged commit. Dependencies identical to the published `18.6.0` nuspecs **except** that the
       uBookIt packages' references to each other read `18.6.1`. `UBookIt.Backoffice`'s
       `staticwebassets/App_Plugins/UBookItBackoffice` holds exactly one hashed bundle set (19 `.js`
       files at `18.6.0`), with no stale assets. *(Sharpened at QA round 1.)*
-- [ ] 4.3 Chris approves, with both Trusted Publishing policies left enabled. Verify: the publish job
+
+      **Done**, downloaded with `gh run download` to `artifacts\packages-v18\18.6.1` (the previous `packages.zip` kept as `packages-18.6.0.zip`). Scratchpad `check_release_artifact.py`: 5 `.nupkg` + 4 `.snupkg` at `18.6.1`; every nuspec `<version>` `18.6.1` and repository commit `9c84ee6`; dependencies **identical to the published `18.6.0` nuspecs** (fetched from the flat container) apart from the uBookIt-to-uBookIt versions, which read `18.6.1`; `UBookIt.Backoffice` 19 `.js`, one entrypoint. The chunk set is the same 19 names as published `18.6.0`: chunks that do not import the regenerated client (`api-errors`, `booking-rows`, `confirm`, `en-us`, …) keep their exact hashes, and only `client.gen`, `sdk.gen` and the views/modals change. *(My first comparison said "same chunk names: False" because my regex did not allow `-`/`_` in Vite's hash; read by eye, the sets match.)*
+
+- [x] 4.3 Chris approves, with both Trusted Publishing policies left enabled. Verify: the publish job
       succeeds.
-- [ ] 4.4 Confirm `18.6.1` per package on the flat container, and that the package page renders.
+
+      **Done.** Chris approved with both Trusted Publishing policies left enabled. Publish run `43864978691`: **success**.
+
+- [x] 4.4 Confirm `18.6.1` per package on the flat container, and that the package page renders.
+
+      **Done.** All five packages list `18.6.1` on the flat container (polled; indexed about 15 minutes after the publish). The package page answers 200. Search lists `18.6.1` as the latest stable.
+
 
 ## 5. Close
 
-- [ ] 5.1 Stamp the entry's date.
-- [ ] 5.2 Update the deferred-obligations memory: the `backoffice-client-upgrade` changelog
+- [x] 5.1 Stamp the entry's date.
+
+      **Done.** The heading reads `## 18.6.1 — 2026-11-16`.
+
+- [x] 5.2 Update the deferred-obligations memory: the `backoffice-client-upgrade` changelog
       obligation is paid on this line.
+
+      **Done.** The deferred-obligations memory records the `backoffice-client-upgrade` changelog obligation as paid on this line.
+
 - [ ] 5.3 Archive last. Run the unit suite and `openspec validate --all --strict` before the archive
       commit, and validate again after it.
