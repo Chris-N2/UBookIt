@@ -11,7 +11,7 @@ start with [the delivery API](delivery-api.md).
 
 | | |
 |---|---|
-| **Umbraco** | 18.3.0 or later, and below 19. For Umbraco 17, install uBookIt `17.x`. |
+| **Umbraco** | 18.3.0 or later, and below 19. For Umbraco 17, install uBookIt `17.x`; for Umbraco 19, including its release candidates, install `19.x`. The packages do not refuse an Umbraco 19 release candidate, so an `18.x` would install there and not work. |
 | **.NET** | 10.0 |
 | **Database** | **SQL Server 2019 or later**, including LocalDB and Azure SQL. SQLite is not supported, and that includes the SQLite database a new `dotnet new umbraco` site uses by default. |
 
@@ -26,9 +26,10 @@ one version.
 dotnet add package UBookIt --version "18.*"
 ```
 
-**The version is not optional.** uBookIt's major follows Umbraco's, so without it your package
-manager picks the newest uBookIt, which is for a later Umbraco, and the restore fails with a
-version conflict. `18.*` takes the newest uBookIt for Umbraco 18; give an exact version instead if
+**The version is not optional.** uBookIt's major follows Umbraco's. Without it your package
+manager picks the newest *stable* uBookIt. Today that is an `18.x`, but once a uBookIt for a later
+Umbraco is released (`19.0.0`), that is the one it picks, and the restore fails because it is not
+compatible with .NET 10. `18.*` takes the newest uBookIt for Umbraco 18; give an exact version instead if
 you prefer to choose when to move.
 
 Start the site. uBookIt installs its schema, its **Booking Page** document type and that page's
