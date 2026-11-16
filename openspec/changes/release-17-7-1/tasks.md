@@ -81,6 +81,53 @@
 - [ ] 3.1 QA (`qa-review`) in one subagent, reused across rounds, covering this change,
       `release-18-6-1` and `release-19-0-0-rc1`. Brief it that temporary source mutations are
       allowed if reverted. Verify: APPROVE, or APPROVE WITH NITS with the nits resolved or recorded.
+
+      **Round 1 (2026-11-16): REJECT** across the three release changes. No hard gate tripped, and the
+      version numbers were right on all three lines. The reviewer independently verified:
+      - the bumps (31 / 31 / none needed);
+      - the patch class: local `dotnet pack` against the PUBLISHED 17.7.0 / 18.6.0 nuspecs, all five
+        packages identical apart from the sibling version, and the Backoffice file set equal (19 `.js`);
+      - every entry fact from lockfiles and `npm view`;
+      - unit 2563 / 2557 / 2569, guards 171 / 171 / 173, client 391 ×3, the audit ×3, openspec 28 ×3;
+      - that the `npm ci` repair was sound.
+
+      **Findings, and what was done:**
+      - **MAJOR, fixed:** the v19 README and *Getting started* said a bare install fails restore.
+        **A real restore shows it succeeds and installs 18.6.0**, because `19.0.0-rc1` comes before
+        `19.0.0` in NuGet's ordering, so 18.x's `[18.3.0,19.0.0)` admits it. Both pages, and the rc1
+        entry's *What you have to do*, now say a bare install gets a stable 18.x that installs
+        without complaint and does not work there.
+      - **MAJOR, decided by Chris:** 18.x "and not 19" is false for 19 prereleases, and 19's
+        `[19.0.0-rc1,20.0.0)` admits 20 prereleases the same way. The range fix (`X.0.0-0`) changes
+        what a site resolves, so it is not a patch, and the guard
+        `PackageCompositionTests.The_bound_admits_this_major_and_excludes_the_next` wrongly REQUIRES
+        `X.0.0` and calls `X.0.0-0` a fault. Chris chose: wording now; ONE later change for the
+        ceiling and the guard on all three lines (17 and 18 as minors, 19 with its 19.0.0 floor
+        change). This is recorded in the deferred obligations. The wording is done: the v18 README
+        and *Getting started* say a 19 RC is not refused and needs 19.x, and the main README says a
+        prerelease of 18 is not refused.
+      - **MINOR, fixed:** the 17.7.1 entry said "before and after" for every check, but on 17 the
+        unreachable-source (500) case ran only after. It is now worded that way. The 18.6.1 entry
+        was already accurate (v18 ran it before and after).
+      - **MINOR, fixed:** "every package declares exactly the dependencies 17.7.0 declared" is
+        literally false, because sibling references move. Both entries now say the same third-party
+        dependencies at the same versions, and only the uBookIt packages' references to each other
+        move.
+      - **MINOR, fixed:** task 4.2 is sharpened on all three changes: the sibling-version exemption,
+        exactly one hashed bundle set, and for 19 the `net11.0` groups and stable non-Umbraco
+        versions matching `Directory.Packages.props`.
+      - **MINOR, fixed:** `release-19-0-0-rc1` task 4.1 is now gated on 18.6.1 being live, because
+        the 19 entry names 18.6.1.
+      - **NIT, fixed:** the CHANGELOG headers (main, dev/v18) and main's README versioning sentence
+        now name `19.x`.
+      - **NIT, accepted:** v18 and v19 `src/api` differ only in a `baseUrl` literal, which is
+        overwritten at runtime.
+
+      **A trap met while fixing:** `UmbracoFloorDocumentationTests` failed on all three lines,
+      because my explanations said prereleases sort "below 18.0.0 / 19.0.0" and the guard reads any
+      "below X.Y.Z" as a stated floor. They were reworded ("comes before the 19.0.0 release in version
+      order"), and the guard is unchanged. Then unit **2563 / 2557 / 2569**, all green.
+
 - [ ] 3.2 Push this branch and open the PR. Verify: the PR's CI is green (parity is skipped on PRs by
       design).
 - [ ] 3.3 Merge with a merge commit, without `--delete-branch`. Verify: the merge's push run is green,
