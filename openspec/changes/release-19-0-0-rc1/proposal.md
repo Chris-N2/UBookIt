@@ -35,8 +35,9 @@ candidate, and will announce it in Umbraco's Discord. It is released with `17.7.
    install fails restore. On an Umbraco 19 release candidate it succeeds, and gets the newest stable
    uBookIt, an 18.x, which does not work there (18.x's range admits 19's prereleases). Both pages,
    and the entry's *What you have to do*, now say so. **The range `[19.0.0-rc1, 20.0.0)` is
-   published as it stands (Chris).** It admits Umbraco 20 prereleases in the same way, but none can
-   exist before Umbraco 19.0.0, and the guard that checks ceilings wrongly requires `X.0.0`. So one
+   published as it stands (Chris).** It admits Umbraco 20 prereleases in the same way, but none is
+   expected before Umbraco 19.0.0 (the README and *Getting started* rows now say the packages do not
+   yet refuse one), and the guard that checks ceilings wrongly requires `X.0.0`. So one
    change will fix the ceiling and the guard on all three lines.
 
 ## Non-goals
